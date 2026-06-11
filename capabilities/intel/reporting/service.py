@@ -1105,6 +1105,555 @@ class IntelligenceReportingService:
 		result.sort(key=lambda x: x["product_count"], reverse=True)
 		return result
 
+	async def version_report(self, product_id: str) -> dict[str, Any]:
+		"""Snapshot the current state of *product_id* as an immutable version record.
+
+		Captures the product metadata, all its sections (with confidence scores), and
+		all citations at the moment of the call.  Each snapshot is stored in the internal
+		version registry and assigned a monotonically increasing version number.
+		Subsequent calls create new version entries; existing versions are never mutated.
+		"""
+		assert present(product_id), "product_id required"
+		tenant_id = self.tenant_id
+
+		product = self._tenant_product_or_none(product_id, tenant_id)
+		if product is None:
+			raise KeyError(f"Report not found: {product_id}")
+
+		# Build snapshot of sections + citations
+		product_sections = [
+			{
+				"section_id": sid,
+				"section_type": getattr(s, "section_type", ""),
+				"section_reference": getattr(s, "section_reference", ""),
+				"confidence_score": getattr(s, "confidence_score", 0.0),
+			}
+			for (tid, sid), s in self.sections.items()
+			if tid == tenant_id and getattr(s, "product_id", "") == product_id
+		]
+		product_citations = [
+			{
+				"citation_id": cid,
+				"section_id": getattr(c, "section_id", ""),
+				"citation_type": getattr(c, "citation_type", ""),
+				"source_reference": getattr(c, "source_reference", ""),
+			}
+			for (tid, cid), c in self.citations.items()
+			if tid == tenant_id
+			and getattr(c, "section_id", "") in {s["section_id"] for s in product_sections}
+		]
+
+		version_registry = self._report_state.setdefault(f"__versions__{product_id}", {})
+		version_number = len(version_registry) + 1
+		snapshot = {
+			"version": version_number,
+			"product_id": product_id,
+			"title": getattr(product, "title", ""),
+			"classification": getattr(product, "classification", ""),
+			"product_type": getattr(product, "product_type", ""),
+			"lifecycle_status": self._report_state.get(product_id, {}).get("status", "unknown"),
+			"section_count": len(product_sections),
+			"citation_count": len(product_citations),
+			"sections": product_sections,
+			"citations": product_citations,
+			"snapshotted_at": _utcnow(),
+		}
+		version_registry[version_number] = snapshot
+		self._audit(tenant_id, "report_version_created", f"{product_id}@v{version_number}")
+		return snapshot
+
+	async def diff_versions(
+		self,
+		product_id: str,
+		v1: int,
+		v2: int,
+	) -> dict[str, Any]:
+		"""Return a structured diff between two previously snapshotted versions of *product_id*.
+
+		Compares sections and citations present in *v1* vs *v2* and reports:
+		- sections added (in v2, not in v1)
+		- sections removed (in v1, not in v2)
+		- sections modified (same section_id, differing confidence_score or section_reference)
+		- citations added / removed
+		- mean confidence delta
+		"""
+		assert present(product_id), "product_id required"
+		assert isinstance(v1, int) and v1 >= 1, "v1 must be a positive integer"
+		assert isinstance(v2, int) and v2 >= 1, "v2 must be a positive integer"
+
+		version_registry: dict[int, dict[str, Any]] = self._report_state.get(f"__versions__{product_id}", {})
+		if v1 not in version_registry:
+			raise KeyError(f"Version {v1} not found for product {product_id}")
+		if v2 not in version_registry:
+			raise KeyError(f"Version {v2} not found for product {product_id}")
+
+		snap1 = version_registry[v1]
+		snap2 = version_registry[v2]
+
+		secs1: dict[str, dict] = {s["section_id"]: s for s in snap1.get("sections", [])}
+		secs2: dict[str, dict] = {s["section_id"]: s for s in snap2.get("sections", [])}
+
+		added_sections = [secs2[k] for k in secs2 if k not in secs1]
+		removed_sections = [secs1[k] for k in secs1 if k not in secs2]
+		modified_sections = [
+			{
+				"section_id": k,
+				"confidence_delta": round(secs2[k]["confidence_score"] - secs1[k]["confidence_score"], 4),
+				"reference_changed": secs1[k]["section_reference"] != secs2[k]["section_reference"],
+			}
+			for k in secs1
+			if k in secs2 and (
+				secs1[k]["confidence_score"] != secs2[k]["confidence_score"]
+				or secs1[k]["section_reference"] != secs2[k]["section_reference"]
+			)
+		]
+
+		cits1 = {c["citation_id"] for c in snap1.get("citations", [])}
+		cits2 = {c["citation_id"] for c in snap2.get("citations", [])}
+
+		confs1 = [s["confidence_score"] for s in snap1.get("sections", [])]
+		confs2 = [s["confidence_score"] for s in snap2.get("sections", [])]
+		mean1 = round(statistics.mean(confs1), 4) if confs1 else 0.0
+		mean2 = round(statistics.mean(confs2), 4) if confs2 else 0.0
+
+		self._audit(self.tenant_id, "report_versions_diffed", f"{product_id}:v{v1}..v{v2}")
+		return {
+			"product_id": product_id,
+			"v1": v1,
+			"v2": v2,
+			"sections_added": added_sections,
+			"sections_removed": removed_sections,
+			"sections_modified": modified_sections,
+			"citations_added": list(cits2 - cits1),
+			"citations_removed": list(cits1 - cits2),
+			"mean_confidence_v1": mean1,
+			"mean_confidence_v2": mean2,
+			"mean_confidence_delta": round(mean2 - mean1, 4),
+			"diffed_at": _utcnow(),
+		}
+
+	async def register_kiq(
+		self,
+		kiq_id: str,
+		question: str,
+		priority: int,
+	) -> dict[str, Any]:
+		"""Register a Key Intelligence Question (KIQ) that drives reporting production.
+
+		KIQs represent formal intelligence requirements.  Priority 1 is highest.
+		Once registered, reports can be tagged against a KIQ and the
+		:meth:`kiq_coverage_report` method tracks which requirements are answered.
+		"""
+		assert present(kiq_id), "kiq_id required"
+		assert present(question), "question required"
+		assert isinstance(priority, int) and priority >= 1, "priority must be a positive integer"
+
+		tenant_id = self.tenant_id
+		if not hasattr(self, "_kiqs"):
+			self._kiqs: dict[str, dict[str, Any]] = {}
+
+		entry: dict[str, Any] = {
+			"kiq_id": kiq_id,
+			"tenant_id": tenant_id,
+			"question": question,
+			"priority": priority,
+			"status": "open",
+			"answer_product_id": None,
+			"registered_at": _utcnow(),
+		}
+		self._kiqs[kiq_id] = entry
+		self._audit(tenant_id, "kiq_registered", kiq_id)
+		return entry
+
+	async def answer_kiq(
+		self,
+		kiq_id: str,
+		product_id: str,
+	) -> dict[str, Any]:
+		"""Mark KIQ *kiq_id* as answered by intelligence product *product_id*.
+
+		Validates that the product exists and is in an approved or disseminated state
+		before accepting the linkage.  Deferred status is preserved if the product is
+		still in draft or peer-review.
+		"""
+		assert present(kiq_id), "kiq_id required"
+		assert present(product_id), "product_id required"
+
+		if not hasattr(self, "_kiqs"):
+			self._kiqs = {}
+		if kiq_id not in self._kiqs:
+			raise KeyError(f"KIQ not found: {kiq_id}")
+
+		product = self._tenant_product_or_none(product_id, self.tenant_id)
+		if product is None:
+			raise KeyError(f"Report not found: {product_id}")
+
+		state = self._report_state.get(product_id, {})
+		lifecycle = state.get("status", "unknown")
+		new_status = "answered" if lifecycle in {REPORT_APPROVED, REPORT_DISSEMINATED} else "deferred"
+
+		self._kiqs[kiq_id]["status"] = new_status
+		self._kiqs[kiq_id]["answer_product_id"] = product_id
+		self._kiqs[kiq_id]["answered_at"] = _utcnow()
+		self._audit(self.tenant_id, "kiq_answered", kiq_id)
+		return {**self._kiqs[kiq_id], "product_lifecycle": lifecycle}
+
+	async def kiq_coverage_report(self) -> dict[str, Any]:
+		"""Aggregate KIQ coverage statistics for the current tenant.
+
+		Returns counts of open, answered, and deferred KIQs, a list of unanswered
+		high-priority items (priority == 1), and the overall coverage ratio so
+		operators can gauge intelligence-requirements satisfaction.
+		"""
+		if not hasattr(self, "_kiqs"):
+			self._kiqs = {}
+
+		tenant_kiqs = [kiq for kiq in self._kiqs.values() if kiq.get("tenant_id") == self.tenant_id]
+		status_dist: dict[str, int] = defaultdict(int)
+		for kiq in tenant_kiqs:
+			status_dist[kiq["status"]] += 1
+
+		high_priority_open = [
+			kiq for kiq in tenant_kiqs
+			if kiq["status"] == "open" and kiq["priority"] == 1
+		]
+		total = len(tenant_kiqs)
+		answered = status_dist.get("answered", 0)
+		coverage = round(answered / total, 4) if total else 0.0
+
+		self._audit(self.tenant_id, "kiq_coverage_computed", f"coverage={coverage}")
+		return {
+			"tenant_id": self.tenant_id,
+			"total_kiqs": total,
+			"answered": answered,
+			"deferred": status_dist.get("deferred", 0),
+			"open": status_dist.get("open", 0),
+			"coverage_ratio": coverage,
+			"high_priority_open": high_priority_open,
+			"computed_at": _utcnow(),
+		}
+
+	async def redact_report(
+		self,
+		source_product_id: str,
+		target_classification: str,
+		redaction_authority_id: str,
+	) -> dict[str, Any]:
+		"""Produce a sanitised, lower-classification copy of *source_product_id*.
+
+		Clones the source product at *target_classification*.  Sections whose
+		classification exceeds *target_classification* are replaced with
+		``[REDACTED]`` placeholders.  The resulting product is linked to the source
+		via ``parent_product_id`` metadata and entered into the same workspace.
+		The operation is gated by a valid recorded authority of type
+		``classification_downgrade``.
+
+		The classification ordering used is:
+		  unclassified < restricted < confidential < secret < top_secret
+		"""
+		assert present(source_product_id), "source_product_id required"
+		assert present(target_classification), "target_classification required"
+		assert present(redaction_authority_id), "redaction_authority_id required"
+
+		tenant_id = self.tenant_id
+		product = self._tenant_product_or_none(source_product_id, tenant_id)
+		if product is None:
+			raise KeyError(f"Source report not found: {source_product_id}")
+
+		# Validate authority exists
+		authority = self._tenant_authority_or_none(redaction_authority_id, tenant_id)
+		if authority is None:
+			raise PermissionError(f"Redaction authority not found: {redaction_authority_id}")
+
+		classification_order = {
+			"unclassified": 0, "restricted": 1, "confidential": 2,
+			"secret": 3, "top_secret": 4,
+		}
+		source_cls_norm = normalize_code(getattr(product, "classification", "unclassified"))
+		target_cls_norm = normalize_code(target_classification)
+
+		if classification_order.get(target_cls_norm, 99) >= classification_order.get(source_cls_norm, 0):
+			raise ValueError(
+				f"target_classification={target_cls_norm} must be lower than source={source_cls_norm}"
+			)
+
+		# Clone product at lower classification
+		redacted_product_id = f"redacted_{source_product_id}_{target_cls_norm}"
+		template_id = getattr(product, "template_id", "")
+		redacted_product = self.record_product(
+			product_id=redacted_product_id,
+			tenant_id=tenant_id,
+			template_id=template_id,
+			product_type=normalize_code(getattr(product, "product_type", "report")),
+			title=f"[REDACTED] {getattr(product, 'title', '')}",
+			author_id=self.actor_id,
+			classification=target_cls_norm,
+			evidence_reference=f"redacted_from:{source_product_id}:authority:{redaction_authority_id}",
+		)
+
+		# Track parent linkage
+		self._report_state[redacted_product_id]["parent_product_id"] = source_product_id
+		self._report_state[redacted_product_id]["redaction_authority_id"] = redaction_authority_id
+
+		# Clone sections, redacting those that exceed the target classification
+		sections_copied = 0
+		sections_redacted = 0
+		for (tid, sid), section in self.sections.items():
+			if tid != tenant_id or getattr(section, "product_id", "") != source_product_id:
+				continue
+			section_cls = normalize_code(getattr(section, "classification", target_cls_norm))
+			section_cls_level = classification_order.get(section_cls, 0)
+			target_level = classification_order.get(target_cls_norm, 0)
+
+			new_section_id = f"{sid}_redacted"
+			if section_cls_level <= target_level:
+				self.record_section(
+					section_id=new_section_id,
+					tenant_id=tenant_id,
+					product_id=redacted_product_id,
+					section_type=normalize_code(getattr(section, "section_type", "body")),
+					section_reference=getattr(section, "section_reference", ""),
+					confidence_score=getattr(section, "confidence_score", 0.5),
+					evidence_reference=f"redacted_from_section:{sid}",
+				)
+				sections_copied += 1
+			else:
+				self.record_section(
+					section_id=new_section_id,
+					tenant_id=tenant_id,
+					product_id=redacted_product_id,
+					section_type=normalize_code(getattr(section, "section_type", "body")),
+					section_reference="[REDACTED]",
+					confidence_score=0.0,
+					evidence_reference=f"redacted_section:{sid}:classification_exceeded",
+				)
+				sections_redacted += 1
+
+		self._audit(tenant_id, "report_redacted", redacted_product_id)
+		return {
+			**redacted_product,
+			"parent_product_id": source_product_id,
+			"target_classification": target_cls_norm,
+			"sections_copied": sections_copied,
+			"sections_redacted": sections_redacted,
+			"redacted_at": _utcnow(),
+		}
+
+	async def subscription_register(
+		self,
+		subscriber_id: str,
+		filters: dict[str, str] | None = None,
+	) -> dict[str, Any]:
+		"""Register *subscriber_id* for push notifications on report lifecycle events.
+
+		*filters* is an optional dict of field->value pairs that limit which events
+		trigger a notification.  Supported filter keys: ``classification``,
+		``product_type``, ``kiq_id``.  An empty *filters* dict subscribes to all
+		events for the tenant.
+
+		Notifications are dispatched via the ``notify`` adapter if configured;
+		otherwise the subscription is stored for programmatic polling via
+		:meth:`subscription_events`.
+		"""
+		assert present(subscriber_id), "subscriber_id required"
+
+		if not hasattr(self, "_subscriptions"):
+			self._subscriptions: dict[str, dict[str, Any]] = {}
+			self._subscription_events: dict[str, list[dict[str, Any]]] = defaultdict(list)
+
+		subscription_id = f"sub_{subscriber_id}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
+		subscription: dict[str, Any] = {
+			"subscription_id": subscription_id,
+			"subscriber_id": subscriber_id,
+			"tenant_id": self.tenant_id,
+			"filters": filters or {},
+			"registered_at": _utcnow(),
+			"event_count": 0,
+		}
+		self._subscriptions[subscription_id] = subscription
+		self._audit(self.tenant_id, "subscription_registered", subscription_id)
+		return subscription
+
+	async def subscription_events(
+		self,
+		subscriber_id: str,
+	) -> list[dict[str, Any]]:
+		"""Return all pending notification events for *subscriber_id*.
+
+		Events are emitted by lifecycle transitions (draft→peer_review,
+		peer_review→approved, approved→disseminated, archiving).  This method
+		acts as the polling endpoint when a push adapter is not configured.
+		"""
+		assert present(subscriber_id), "subscriber_id required"
+
+		if not hasattr(self, "_subscription_events"):
+			self._subscription_events = defaultdict(list)
+
+		events = self._subscription_events.get(subscriber_id, [])
+		self._audit(self.tenant_id, "subscription_events_polled", subscriber_id)
+		return events
+
+	def _notify_subscribers(
+		self,
+		event_type: str,
+		product_id: str,
+		classification: str,
+		product_type: str,
+	) -> None:
+		"""Internal: fan out a lifecycle event to all matching subscribers.
+
+		Matches each subscription's filters against the event attributes.  Dispatches
+		via the ``notify`` adapter when present; always appends to the in-process
+		event buffer for polling consumers.
+		"""
+		if not hasattr(self, "_subscriptions"):
+			return
+
+		event: dict[str, Any] = {
+			"event_type": event_type,
+			"product_id": product_id,
+			"classification": classification,
+			"product_type": product_type,
+			"tenant_id": self.tenant_id,
+			"emitted_at": _utcnow(),
+		}
+		for sub in self._subscriptions.values():
+			if sub.get("tenant_id") != self.tenant_id:
+				continue
+			filters = sub.get("filters", {})
+			match = all(
+				str(event.get(k, "")).lower() == v.lower()
+				for k, v in filters.items()
+				if k in {"classification", "product_type"}
+			)
+			if match:
+				sub_id = sub["subscriber_id"]
+				if not hasattr(self, "_subscription_events"):
+					self._subscription_events = defaultdict(list)
+				self._subscription_events[sub_id].append(event)
+				sub["event_count"] = sub.get("event_count", 0) + 1
+				if self._notify is not None:
+					try:
+						self._notify(sub_id, event)
+					except Exception:
+						pass  # notification failures must not block lifecycle transitions
+
+	async def report_classification_audit(self) -> dict[str, Any]:
+		"""Audit classification distribution and flag potential misclassification risks.
+
+		Scans all products and their sections for classification mismatches (a section
+		carrying a higher classification than its parent product), produces a per-level
+		count, and returns a list of suspect records for operator review.
+		"""
+		tenant_id = self.tenant_id
+		classification_order = {
+			"unclassified": 0, "restricted": 1, "confidential": 2,
+			"secret": 3, "top_secret": 4,
+		}
+		level_dist: dict[str, int] = defaultdict(int)
+		mismatch_records: list[dict[str, Any]] = []
+
+		for (tid, pid), product in self.products.items():
+			if tid != tenant_id:
+				continue
+			product_cls = normalize_code(getattr(product, "classification", "unclassified"))
+			product_level = classification_order.get(product_cls, 0)
+			level_dist[product_cls] += 1
+
+			# Check each section
+			for (stid, sid), section in self.sections.items():
+				if stid != tenant_id or getattr(section, "product_id", "") != pid:
+					continue
+				section_cls = normalize_code(getattr(section, "classification", product_cls))
+				section_level = classification_order.get(section_cls, 0)
+				if section_level > product_level:
+					mismatch_records.append({
+						"product_id": pid,
+						"section_id": sid,
+						"product_classification": product_cls,
+						"section_classification": section_cls,
+						"risk": "section_exceeds_product",
+					})
+
+		self._audit(tenant_id, "classification_audit_executed", f"mismatches={len(mismatch_records)}")
+		return {
+			"tenant_id": tenant_id,
+			"by_classification_level": dict(level_dist),
+			"mismatch_count": len(mismatch_records),
+			"mismatches": mismatch_records,
+			"risk_level": "high" if mismatch_records else "low",
+			"audited_at": _utcnow(),
+		}
+
+	async def review_sla_check(
+		self,
+		sla_hours: int = 24,
+	) -> dict[str, Any]:
+		"""Identify reports that have been in *peer_review* status beyond *sla_hours*.
+
+		Inspects ``created_at`` timestamps for reports stuck in peer review and returns
+		overdue records sorted by age descending.  Intended to be called by a scheduler
+		or background coroutine to trigger escalation via the ``notify`` adapter.
+		"""
+		assert isinstance(sla_hours, int) and sla_hours >= 1, "sla_hours must be a positive integer"
+
+		now = datetime.now(timezone.utc)
+		overdue: list[dict[str, Any]] = []
+		on_time: list[str] = []
+
+		for product_id, state in self._report_state.items():
+			# Skip version snapshot registry keys
+			if product_id.startswith("__versions__"):
+				continue
+			if state.get("status") != REPORT_PEER_REVIEW:
+				continue
+			created_raw = state.get("created_at", "")
+			try:
+				created_dt = datetime.fromisoformat(created_raw)
+			except (ValueError, TypeError):
+				continue
+			age_hours = (now - created_dt).total_seconds() / 3600.0
+			if age_hours > sla_hours:
+				product = self._tenant_product_or_none(product_id, self.tenant_id)
+				overdue.append({
+					"product_id": product_id,
+					"title": getattr(product, "title", "") if product else "",
+					"classification": getattr(product, "classification", "") if product else "",
+					"created_at": created_raw,
+					"age_hours": round(age_hours, 2),
+					"sla_hours": sla_hours,
+					"last_reviewer": state.get("last_reviewer", ""),
+				})
+			else:
+				on_time.append(product_id)
+
+		overdue.sort(key=lambda x: x["age_hours"], reverse=True)
+
+		# Optionally fire escalation notifications
+		for record in overdue:
+			self._audit(
+				self.tenant_id,
+				"review_sla_breached",
+				record["product_id"],
+			)
+			if self._notify is not None:
+				try:
+					self._notify(
+						record.get("last_reviewer", "system"),
+						{"type": "sla_breach", **record},
+					)
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		return {
+			"tenant_id": self.tenant_id,
+			"sla_hours": sla_hours,
+			"overdue_count": len(overdue),
+			"on_time_count": len(on_time),
+			"overdue": overdue,
+			"checked_at": _utcnow(),
+		}
+
 	# ------------------------------------------------------------------
 	# Internal helpers
 	# ------------------------------------------------------------------

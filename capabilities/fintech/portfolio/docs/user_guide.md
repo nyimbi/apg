@@ -1,10 +1,10 @@
 # Portfolio Management
 
-**Capability ID**: `fintech_portfolio` | **Domain**: `fintech` | **Version**: `1.1.0`
+**Capability ID**: `fintech_portfolio` | **Domain**: `fintech` | **Version**: `2.0.0`
 
 ## Description
 
-Portfolio Management provides regulated investment book operations: portfolio book creation, holding ledger recording, allocation policy activation (totals must equal exactly 100%), valuation capture, benchmark assignment, risk exposure tracking, performance attribution, cash movement recording, corporate action processing, compliance breach recording, and governance reviews. It is the investment operations layer for discretionary, advisory, model, and execution-only portfolios.
+Portfolio Management provides regulated investment book operations: portfolio book creation, holding ledger recording, allocation policy activation (totals must equal exactly 100%), valuation capture, benchmark assignment, risk exposure tracking, performance attribution, cash movement recording, corporate action processing, compliance breach recording, and governance reviews. Version 2.0.0 adds GIPS-compliant TWR/MWR, multi-scenario stress testing, counterparty concentration risk, FX rate management, portfolio cloning, ESG scoring, structured client report generation, and queryable audit log export.
 
 ## Installation
 
@@ -19,6 +19,22 @@ pip install apg-fintech-portfolio
 - `portfolio_allocation_policy_workflow`
 - `portfolio_valuation_workflow`
 - `portfolio_benchmark_workflow`
+- `portfolio_risk_workflow`
+- `portfolio_attribution_workflow`
+- `portfolio_cash_workflow`
+- `portfolio_corporate_action_workflow`
+- `portfolio_compliance_workflow`
+- `portfolio_review_workflow`
+- `portfolio_agent_workflow`
+- `portfolio_twr_workflow`
+- `portfolio_mwr_workflow`
+- `portfolio_stress_test_workflow`
+- `portfolio_counterparty_workflow`
+- `portfolio_fx_workflow`
+- `portfolio_clone_workflow`
+- `portfolio_audit_query_workflow`
+- `portfolio_client_report_workflow`
+- `portfolio_esg_workflow`
 
 ## Requires
 
@@ -40,21 +56,182 @@ pip install apg-fintech-portfolio
 | `/fintech-portfolio/benchmarks` | `fintech_portfolio:benchmarks` | Policy |
 | `/fintech-portfolio/risk` | `fintech_portfolio:risk` | Risk |
 | `/fintech-portfolio/attribution` | `fintech_portfolio:attribution` | Performance |
+| `/fintech-portfolio/twr` | `fintech_portfolio:performance` | Performance |
+| `/fintech-portfolio/mwr` | `fintech_portfolio:performance` | Performance |
+| `/fintech-portfolio/stress-test` | `fintech_portfolio:risk` | Risk |
+| `/fintech-portfolio/counterparty-exposure` | `fintech_portfolio:risk` | Risk |
+| `/fintech-portfolio/fx-rates` | `fintech_portfolio:operations` | Operations |
+| `/fintech-portfolio/clone` | `fintech_portfolio:admin` | Administration |
+| `/fintech-portfolio/audit` | `fintech_portfolio:admin` | Administration |
+| `/fintech-portfolio/client-report` | `fintech_portfolio:view` | Reports |
+| `/fintech-portfolio/esg` | `fintech_portfolio:view` | ESG |
 
 ## Key Service Methods
 
-- `describe()`
-- `evaluate()`
-- `create_portfolio()`
-- `get_portfolio()`
-- `list_portfolios()`
-- `close_portfolio()`
-- `add_holding()`
-- `remove_holding()`
-- `get_holding()`
-- `list_holdings()`
+### Portfolio Lifecycle
+- `create_portfolio(name, client_id, strategy, benchmark, portfolio_type, base_currency, policy_reference)`
+- `get_portfolio(portfolio_id)`
+- `list_portfolios(client_id, portfolio_type)`
+- `close_portfolio(portfolio_id, reason)`
+- `clone_portfolio(source_portfolio_id, target_client_id, name, override_allocations)`
 
-_(See `service.py` for complete API.)_
+### Holdings
+- `add_holding(portfolio_id, asset_id, quantity, cost_basis, currency)`
+- `remove_holding(portfolio_id, asset_id, quantity, proceeds)`
+- `get_holding(portfolio_id, asset_id)`
+- `list_holdings(portfolio_id)`
+- `bulk_add_holdings(portfolio_id, holdings)`
+
+### Valuation & Allocation
+- `portfolio_valuation(portfolio_id, as_of_date, source_reference)`
+- `activate_allocation_policy(allocation_id, portfolio_id, target_allocation, policy_reference)`
+- `rebalance_portfolio(portfolio_id)`
+
+### Performance
+- `performance_attribution(portfolio_id, period, benchmark_id)` — Brinson-Hood-Beebower attribution
+- `sharpe_ratio(portfolio_id, period)` — annualised Sharpe from valuation history
+- `drawdown_analysis(portfolio_id)` — max drawdown and current drawdown with peak/trough dates
+- `total_return_calculation(portfolio_id, period)` — capital gain + income return
+- `time_weighted_return(portfolio_id, start_date, end_date)` — GIPS-compliant chain-linked TWR
+- `money_weighted_return(portfolio_id, start_date, end_date)` — IRR, MOIC, DPI for closed-end funds
+- `benchmark_tracking_error(portfolio_id, benchmark_id)` — annualised active return standard deviation
+
+### Risk
+- `risk_metrics(portfolio_id)` — VaR 95/99, CVaR, beta, Herfindahl concentration
+- `record_risk_exposure(exposure_id, portfolio_id, metric, value, as_of_date, source_reference)`
+- `stress_test(portfolio_id, scenarios)` — multi-scenario shocked NAV and drawdown
+- `counterparty_exposure_summary()` — single-counterparty CMA concentration across all portfolios
+
+### ESG
+- `record_esg_rating(instrument_id, e_score, s_score, g_score, source, excluded)`
+- `esg_portfolio_score(portfolio_id)` — weighted E/S/G scores and exclusion breach detection
+
+### FX & Currency
+- `record_fx_rate(base_currency, quote_currency, rate, as_of_date, source_reference)` — store FX rates for multi-currency revaluation
+
+### Reporting
+- `regulatory_reporting(portfolio_id, report_type)` — UCITS, AIFMD, MiFID_TRANSACTION, SORP, IPS_QUARTERLY, CMA_QUARTERLY
+- `generate_client_report(portfolio_id, period, template)` — structured client report (ips_quarterly, annual_review, factsheet)
+- `cma_portfolio_return(period)` — CMA Kenya investment manager return
+- `income_distribution_report(portfolio_id, period)`
+- `cash_flow_projection(portfolio_id, months)`
+- `export_portfolio_data(portfolio_id, fmt)`
+
+### Compliance & Operations
+- `record_compliance_breach(breach_id, portfolio_id, severity, evidence_reference)`
+- `record_review(review_id, reference_id, reviewer_id, status, evidence_reference)`
+- `position_reconciliation(portfolio_id, custodian_report)` — matched/break/internal-only/custodian-only
+- `record_cash_movement(movement_id, portfolio_id, amount_minor, currency, reference)`
+- `record_corporate_action(action_id, instrument_id, action_type, effective_date, evidence_reference, ratio)`
+
+### Audit
+- `query_audit_events(event_type, reference_id, start_dt, end_dt, limit)` — filterable, paginated audit log
+- `dashboard_summary()` — aggregate tenant-level counts
+
+### Agents & Batch
+- `register_portfolio_agent(agent_id, name, runtime, role, scope)`
+- `validate_agent_action(privileged_scope, human_approval_recorded)`
+- `validate_batch(item_count, event_stream)`
+
+_(See `service.py` for complete signatures and inline docstrings.)_
+
+## Usage Examples
+
+### Create a portfolio and add holdings
+
+```python
+from capabilities.fintech.portfolio.service import PortfolioManagementService
+
+svc = PortfolioManagementService(tenant_id="datacraft")
+
+# Create portfolio
+portfolio = await svc.create_portfolio(
+    name="Growth Fund A",
+    client_id="client-001",
+    strategy="equity_growth",
+    benchmark="NSE20",
+    portfolio_type="discretionary",
+    base_currency="KES",
+    policy_reference="IPS-2025-001",
+)
+
+# Add holdings
+await svc.add_holding(portfolio["portfolio_id"], "SCOM", 10000, 42.5, "KES")
+await svc.add_holding(portfolio["portfolio_id"], "KCB", 5000, 38.0, "KES")
+```
+
+### GIPS-compliant performance reporting
+
+```python
+# Record daily valuations over time
+await svc.portfolio_valuation(pid, "2025-01-31", "pricing_service")
+await svc.portfolio_valuation(pid, "2025-02-28", "pricing_service")
+await svc.portfolio_valuation(pid, "2025-03-31", "pricing_service")
+
+# Chain-linked time-weighted return (TWR)
+twr = await svc.time_weighted_return(pid, "2025-01-01", "2025-03-31")
+print(twr["annualised_twr"])   # e.g. 0.142
+
+# Money-weighted return (IRR) for closed-end fund reporting
+mwr = await svc.money_weighted_return(pid, "2025-01-01", "2025-03-31")
+print(mwr["moic"], mwr["irr_annualised"])
+```
+
+### Stress testing
+
+```python
+scenarios = [
+    {"name": "2020_covid", "shocks": {"equity": -0.35, "default": -0.20}},
+    {"name": "rate_shock_300bps", "shocks": {"fixed_income": -0.15, "default": -0.05}},
+    {"name": "fx_depreciation_30pct", "shocks": {"SCOM": -0.10, "default": -0.02}},
+]
+result = await svc.stress_test(pid, scenarios)
+print(result["worst_case_scenario"])
+```
+
+### ESG scoring
+
+```python
+# Load instrument-level ESG ratings
+await svc.record_esg_rating("SCOM", e_score=72, s_score=65, g_score=80, source="MSCI_ESG")
+await svc.record_esg_rating("ARMS", e_score=15, s_score=30, g_score=55, source="MSCI_ESG", excluded=True)
+
+# Get weighted portfolio ESG score
+esg = await svc.esg_portfolio_score(pid)
+print(esg["composite_score"])         # 0–100
+print(esg["exclusion_breaches"])      # ["ARMS"]
+```
+
+### Clone a model portfolio
+
+```python
+# Clone model portfolio to a new client, overriding allocations
+new = await svc.clone_portfolio(
+    source_portfolio_id=model_pid,
+    target_client_id="client-042",
+    name="Client 042 Growth",
+    override_allocations={"SCOM": 0.40, "KCB": 0.30, "EQTY": 0.30},
+)
+print(new["portfolio"]["portfolio_id"])
+```
+
+### Generate a client factsheet
+
+```python
+report = await svc.generate_client_report(pid, period="Q1_2025", template="factsheet")
+# report contains performance, risk, drawdown, income, benchmarks, holdings
+```
+
+### Query the audit log
+
+```python
+events = await svc.query_audit_events(
+    event_type="compliance_breach_recorded",
+    start_dt="2025-01-01T00:00:00",
+    limit=50,
+)
+print(events["total_matched"])
+```
 
 ## Interoperability
 
@@ -70,8 +247,10 @@ All configuration keys are tenant-scoped. Set via the `conf` capability or envir
 
 ## Further Reading
 
-- `service.py` — Business logic implementation
-- `models.py` — Data models
-- `api.py` — REST API endpoints
-- `views.py` — Flask-AppBuilder views and Pydantic schemas
-- `README.md` — Quick reference
+- `service.py` — Business logic implementation (all async methods)
+- `models.py` — Data models (Pydantic v2)
+- `api.py` — REST API endpoints (Flask-AppBuilder blueprints)
+- `views.py` — Flask-AppBuilder views and Pydantic request/response schemas
+- `capability_contract.py` — Rule engine contract and supported constant sets
+- `README.md` — Quick reference, business rules, streaming events
+- `works/WORLD_CLASS_IMPROVEMENTS.md` — Improvement roadmap with 15 detailed enhancements

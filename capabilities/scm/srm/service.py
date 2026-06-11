@@ -569,3 +569,580 @@ class SupplierRelationshipService:
 			else:
 				results.append(item)
 		return {"created": len(results), "failed": len(errors), "suppliers": results, "errors": errors}
+
+	# ── Supplier segmentation ─────────────────────────────────────────────────
+
+	async def segment_suppliers(
+		self,
+		strategy: str = "risk_score",
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Segment supplier portfolio using Kraljic-style or risk/score strategy.
+
+		strategy values:
+		  - "risk_score"   : 2x2 matrix of risk_level vs overall_score
+		  - "spend_category": group by category (proxy for spend category)
+		  - "geography"   : group by country
+		"""
+		tenant = self._tenant(tenant_id)
+		suppliers = [s for s in self.suppliers.values() if s["tenant_id"] == tenant]
+		if strategy == "risk_score":
+			segments: dict[str, list[str]] = {
+				"strategic": [],      # high-score, high-risk → manage closely
+				"leverage": [],       # high-score, low-risk  → exploit volume
+				"bottleneck": [],     # low-score, high-risk  → develop or dual-source
+				"non_critical": [],   # low-score, low-risk   → simplify/automate
+			}
+			level_order = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+			for s in suppliers:
+				score = s.get("overall_score") or 5.0
+				risk_n = level_order.get(s["risk_level"], 0)
+				high_score = score >= 7.0
+				high_risk = risk_n >= 2
+				if high_score and high_risk:
+					segments["strategic"].append(s["id"])
+				elif high_score and not high_risk:
+					segments["leverage"].append(s["id"])
+				elif not high_score and high_risk:
+					segments["bottleneck"].append(s["id"])
+				else:
+					segments["non_critical"].append(s["id"])
+			return {"strategy": strategy, "segments": segments, "generated_at": self._now()}
+		elif strategy == "spend_category":
+			by_cat: dict[str, list[str]] = {}
+			for s in suppliers:
+				by_cat.setdefault(s["category"], []).append(s["id"])
+			return {"strategy": strategy, "segments": by_cat, "generated_at": self._now()}
+		elif strategy == "geography":
+			by_geo: dict[str, list[str]] = {}
+			for s in suppliers:
+				by_geo.setdefault(s["country"], []).append(s["id"])
+			return {"strategy": strategy, "segments": by_geo, "generated_at": self._now()}
+		else:
+			raise ValueError(f"unknown strategy '{strategy}'; choose risk_score | spend_category | geography")
+
+	# ── Scorecard trending ────────────────────────────────────────────────────
+
+	async def scorecard_trend(
+		self,
+		supplier_id: str,
+		dimension: str = "overall_score",
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Return time-ordered score series for a supplier on a given dimension.
+
+		dimension: overall_score | quality_score | delivery_score |
+		           responsiveness_score | cost_score | sustainability_score
+		"""
+		tenant = self._tenant(tenant_id)
+		s = self.suppliers.get(supplier_id)
+		if not s or s["tenant_id"] != tenant:
+			raise KeyError(f"supplier '{supplier_id}' not found")
+		valid_dims = {
+			"overall_score", "quality_score", "delivery_score",
+			"responsiveness_score", "cost_score", "sustainability_score",
+		}
+		if dimension not in valid_dims:
+			raise ValueError(f"dimension must be one of {valid_dims}")
+		cards = sorted(
+			[c for c in self.scorecards.values() if c["tenant_id"] == tenant and c["supplier_id"] == supplier_id],
+			key=lambda c: c["period"],
+		)
+		series = [{"period": c["period"], "value": c.get(dimension)} for c in cards]
+		if len(series) >= 2:
+			first = series[0]["value"] or 0
+			last = series[-1]["value"] or 0
+			trend = "improving" if last > first else ("declining" if last < first else "stable")
+		else:
+			trend = "insufficient_data"
+		return {
+			"supplier_id": supplier_id,
+			"dimension": dimension,
+			"series": series,
+			"trend": trend,
+			"generated_at": self._now(),
+		}
+
+	# ── Concentration risk detection ──────────────────────────────────────────
+
+	async def concentration_risk_report(
+		self,
+		threshold_pct: float = 40.0,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Identify categories / countries where fewer than 3 suppliers represent
+		the majority of the base — a classic single-source concentration risk.
+
+		threshold_pct: if one supplier represents >= this percentage of the category
+		               count, it is flagged.
+		"""
+		tenant = self._tenant(tenant_id)
+		suppliers = [s for s in self.suppliers.values() if s["tenant_id"] == tenant and s["status"] == "active"]
+		by_cat: dict[str, list[str]] = {}
+		by_country: dict[str, list[str]] = {}
+		for s in suppliers:
+			by_cat.setdefault(s["category"], []).append(s["id"])
+			by_country.setdefault(s["country"], []).append(s["id"])
+
+		cat_risks = []
+		for cat, ids in by_cat.items():
+			if len(ids) <= 2:
+				cat_risks.append({"dimension": "category", "value": cat, "supplier_count": len(ids), "risk": "single_source"})
+
+		geo_risks = []
+		for country, ids in by_country.items():
+			pct = (1 / len(ids)) * 100 if ids else 0
+			if len(ids) == 1 or pct >= threshold_pct:
+				geo_risks.append({"dimension": "country", "value": country, "supplier_count": len(ids), "pct": round(pct, 1)})
+
+		return {
+			"tenant_id": tenant,
+			"threshold_pct": threshold_pct,
+			"category_concentration": cat_risks,
+			"geography_concentration": geo_risks,
+			"total_active_suppliers": len(suppliers),
+			"generated_at": self._now(),
+		}
+
+	# ── Supplier development plan ─────────────────────────────────────────────
+
+	async def create_development_plan(
+		self,
+		supplier_id: str,
+		plan_title: str,
+		objectives: list[str],
+		target_score: float,
+		target_date: str,
+		assigned_to: str,
+		budget: float | None = None,
+		currency: str = "USD",
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Create a structured supplier development plan to improve scorecard scores."""
+		tenant = self._tenant(tenant_id)
+		s = self.suppliers.get(supplier_id)
+		if not s or s["tenant_id"] != tenant:
+			raise KeyError(f"supplier '{supplier_id}' not found")
+		if not 0 <= target_score <= 10:
+			raise ValueError("target_score must be 0–10")
+		record: dict[str, Any] = {
+			"id": self._id("sdp"),
+			"type": "scm_srm_development_plan",
+			"tenant_id": tenant,
+			"supplier_id": supplier_id,
+			"plan_title": plan_title,
+			"objectives": objectives,
+			"target_score": target_score,
+			"current_score": s.get("overall_score"),
+			"target_date": target_date,
+			"assigned_to": assigned_to,
+			"budget": budget,
+			"currency": currency,
+			"progress_pct": 0,
+			"status": "active",
+			"milestones": [],
+			"created_at": self._now(),
+			"updated_at": None,
+		}
+		if not hasattr(self, "development_plans"):
+			self.development_plans: dict[str, dict[str, Any]] = {}
+		self.development_plans[record["id"]] = record
+		self._emit(tenant, "development_plan_created", record["id"], "scm_srm_development_plan", "active")
+		return deepcopy(record)
+
+	async def update_development_plan_progress(
+		self,
+		plan_id: str,
+		progress_pct: float,
+		milestone_note: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Update progress on a supplier development plan (0–100 %)."""
+		tenant = self._tenant(tenant_id)
+		if not hasattr(self, "development_plans"):
+			self.development_plans = {}
+		plan = self.development_plans.get(plan_id)
+		if not plan or plan["tenant_id"] != tenant:
+			raise KeyError(f"development_plan '{plan_id}' not found")
+		if not 0 <= progress_pct <= 100:
+			raise ValueError("progress_pct must be 0–100")
+		plan["progress_pct"] = progress_pct
+		if milestone_note:
+			plan["milestones"].append({"note": milestone_note, "recorded_at": self._now()})
+		if progress_pct >= 100:
+			plan["status"] = "completed"
+		plan["updated_at"] = self._now()
+		self._emit(tenant, "development_plan_updated", plan_id, "scm_srm_development_plan", plan["status"])
+		return deepcopy(plan)
+
+	# ── Contract management ───────────────────────────────────────────────────
+
+	async def register_contract(
+		self,
+		supplier_id: str,
+		contract_reference: str,
+		contract_type: str,
+		start_date: str,
+		end_date: str,
+		value: float | None = None,
+		currency: str = "USD",
+		auto_renew: bool = False,
+		notice_period_days: int = 30,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Register a supplier contract and track renewal dates."""
+		tenant = self._tenant(tenant_id)
+		s = self.suppliers.get(supplier_id)
+		if not s or s["tenant_id"] != tenant:
+			raise KeyError(f"supplier '{supplier_id}' not found")
+		if not hasattr(self, "contracts"):
+			self.contracts: dict[str, dict[str, Any]] = {}
+		record: dict[str, Any] = {
+			"id": self._id("ctr"),
+			"type": "scm_srm_contract",
+			"tenant_id": tenant,
+			"supplier_id": supplier_id,
+			"contract_reference": contract_reference,
+			"contract_type": contract_type,
+			"start_date": start_date,
+			"end_date": end_date,
+			"value": value,
+			"currency": currency,
+			"auto_renew": auto_renew,
+			"notice_period_days": notice_period_days,
+			"status": "active",
+			"created_at": self._now(),
+			"updated_at": None,
+		}
+		self.contracts[record["id"]] = record
+		self._emit(tenant, "contract_registered", record["id"], "scm_srm_contract", "active")
+		return deepcopy(record)
+
+	async def list_contracts(
+		self,
+		supplier_id: str | None = None,
+		expiring_within_days: int | None = None,
+		tenant_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List registered contracts, optionally filtering to those expiring soon."""
+		tenant = self._tenant(tenant_id)
+		if not hasattr(self, "contracts"):
+			self.contracts = {}
+		items = [deepcopy(c) for c in self.contracts.values() if c["tenant_id"] == tenant]
+		if supplier_id:
+			items = [c for c in items if c["supplier_id"] == supplier_id]
+		if expiring_within_days is not None:
+			now_dt = datetime.utcnow()
+			filtered = []
+			for c in items:
+				try:
+					end_dt = datetime.fromisoformat(c["end_date"].rstrip("Z"))
+					delta = (end_dt - now_dt).days
+					if 0 <= delta <= expiring_within_days:
+						c["days_to_expiry"] = delta
+						filtered.append(c)
+				except ValueError as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+			return filtered
+		return items
+
+	# ── ESG scoring ───────────────────────────────────────────────────────────
+
+	async def record_esg_score(
+		self,
+		supplier_id: str,
+		period: str,
+		environmental_score: float,
+		social_score: float,
+		governance_score: float,
+		assessed_by: str,
+		evidence_urls: list[str] | None = None,
+		notes: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Record a full ESG score for a supplier for a given period.
+
+		All sub-scores are 0–10.  Composite = weighted average (E:40%, S:30%, G:30%).
+		"""
+		tenant = self._tenant(tenant_id)
+		s = self.suppliers.get(supplier_id)
+		if not s or s["tenant_id"] != tenant:
+			raise KeyError(f"supplier '{supplier_id}' not found")
+		for label, val in [("environmental", environmental_score), ("social", social_score), ("governance", governance_score)]:
+			if not 0 <= val <= 10:
+				raise ValueError(f"{label}_score must be 0–10")
+		composite = round(environmental_score * 0.4 + social_score * 0.3 + governance_score * 0.3, 2)
+		if not hasattr(self, "esg_scores"):
+			self.esg_scores: dict[str, dict[str, Any]] = {}
+		record: dict[str, Any] = {
+			"id": self._id("esg"),
+			"type": "scm_srm_esg_score",
+			"tenant_id": tenant,
+			"supplier_id": supplier_id,
+			"period": period,
+			"environmental_score": environmental_score,
+			"social_score": social_score,
+			"governance_score": governance_score,
+			"composite_score": composite,
+			"assessed_by": assessed_by,
+			"evidence_urls": evidence_urls or [],
+			"notes": notes,
+			"status": "recorded",
+			"created_at": self._now(),
+		}
+		self.esg_scores[record["id"]] = record
+		# Propagate to supplier top-level ESG field
+		s["esg_composite"] = composite
+		s["updated_at"] = self._now()
+		self._emit(tenant, "esg_score_recorded", record["id"], "scm_srm_esg_score", "recorded")
+		return deepcopy(record)
+
+	async def list_esg_scores(
+		self,
+		supplier_id: str | None = None,
+		period: str | None = None,
+		tenant_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List ESG scores."""
+		tenant = self._tenant(tenant_id)
+		if not hasattr(self, "esg_scores"):
+			self.esg_scores = {}
+		items = [deepcopy(e) for e in self.esg_scores.values() if e["tenant_id"] == tenant]
+		if supplier_id:
+			items = [e for e in items if e["supplier_id"] == supplier_id]
+		if period:
+			items = [e for e in items if e["period"] == period]
+		return items
+
+	# ── Escalation management ─────────────────────────────────────────────────
+
+	async def raise_escalation(
+		self,
+		supplier_id: str,
+		title: str,
+		description: str,
+		severity: str,
+		raised_by: str,
+		due_date: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Raise a formal escalation against a supplier.
+
+		severity: low | medium | high | critical
+		"""
+		tenant = self._tenant(tenant_id)
+		if severity not in RISK_LEVELS:
+			raise ValueError(f"severity must be one of {RISK_LEVELS}")
+		s = self.suppliers.get(supplier_id)
+		if not s or s["tenant_id"] != tenant:
+			raise KeyError(f"supplier '{supplier_id}' not found")
+		record: dict[str, Any] = {
+			"id": self._id("esc"),
+			"type": "scm_srm_escalation",
+			"tenant_id": tenant,
+			"supplier_id": supplier_id,
+			"title": title,
+			"description": description,
+			"severity": severity,
+			"raised_by": raised_by,
+			"due_date": due_date,
+			"status": "open",
+			"resolution": None,
+			"resolved_by": None,
+			"created_at": self._now(),
+			"resolved_at": None,
+		}
+		self.escalations[record["id"]] = record
+		self._emit(tenant, "escalation_raised", record["id"], "scm_srm_escalation", "open")
+		return deepcopy(record)
+
+	async def resolve_escalation(
+		self,
+		escalation_id: str,
+		resolution: str,
+		resolved_by: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Resolve an open escalation."""
+		tenant = self._tenant(tenant_id)
+		esc = self.escalations.get(escalation_id)
+		if not esc or esc["tenant_id"] != tenant:
+			raise KeyError(f"escalation '{escalation_id}' not found")
+		if esc["status"] != "open":
+			raise ValueError("only open escalations can be resolved")
+		esc["status"] = "resolved"
+		esc["resolution"] = resolution
+		esc["resolved_by"] = resolved_by
+		esc["resolved_at"] = self._now()
+		self._emit(tenant, "escalation_resolved", escalation_id, "scm_srm_escalation", "resolved")
+		return deepcopy(esc)
+
+	async def list_escalations(
+		self,
+		supplier_id: str | None = None,
+		status: str | None = None,
+		severity: str | None = None,
+		tenant_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List escalations with optional filters."""
+		tenant = self._tenant(tenant_id)
+		items = [deepcopy(e) for e in self.escalations.values() if e["tenant_id"] == tenant]
+		if supplier_id:
+			items = [e for e in items if e["supplier_id"] == supplier_id]
+		if status:
+			items = [e for e in items if e["status"] == status]
+		if severity:
+			items = [e for e in items if e["severity"] == severity]
+		return items
+
+	# ── Supplier benchmarking ─────────────────────────────────────────────────
+
+	async def benchmark_supplier(
+		self,
+		supplier_id: str,
+		peer_supplier_ids: list[str],
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Compare a supplier's latest scorecard against named peers.
+
+		Returns z-score-like deviation from peer mean for each scored dimension.
+		"""
+		tenant = self._tenant(tenant_id)
+		s = self.suppliers.get(supplier_id)
+		if not s or s["tenant_id"] != tenant:
+			raise KeyError(f"supplier '{supplier_id}' not found")
+
+		def _latest_card(sid: str) -> dict[str, Any] | None:
+			cards = sorted(
+				[c for c in self.scorecards.values() if c["tenant_id"] == tenant and c["supplier_id"] == sid],
+				key=lambda c: c["period"],
+				reverse=True,
+			)
+			return cards[0] if cards else None
+
+		subject_card = _latest_card(supplier_id)
+		if not subject_card:
+			raise ValueError(f"supplier '{supplier_id}' has no scorecard data")
+
+		dims = ["quality_score", "delivery_score", "responsiveness_score", "cost_score", "overall_score"]
+		peer_cards = [_latest_card(pid) for pid in peer_supplier_ids if _latest_card(pid)]
+
+		benchmarks: dict[str, Any] = {}
+		for dim in dims:
+			subject_val = subject_card.get(dim) or 0.0
+			peer_vals = [pc[dim] for pc in peer_cards if pc and pc.get(dim) is not None]
+			if peer_vals:
+				peer_mean = sum(peer_vals) / len(peer_vals)
+				delta = round(subject_val - peer_mean, 2)
+			else:
+				peer_mean = None
+				delta = None
+			benchmarks[dim] = {"subject": subject_val, "peer_mean": peer_mean, "delta": delta}
+
+		return {
+			"supplier_id": supplier_id,
+			"peer_supplier_ids": peer_supplier_ids,
+			"period": subject_card["period"],
+			"benchmarks": benchmarks,
+			"generated_at": self._now(),
+		}
+
+	# ── Onboarding workflow ───────────────────────────────────────────────────
+
+	async def start_onboarding(
+		self,
+		supplier_id: str,
+		checklist_items: list[str] | None = None,
+		assigned_to: str = "procurement",
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Start a structured onboarding workflow for a pending supplier.
+
+		Default checklist: NDA, bank details, ISO cert, tax compliance, site audit.
+		"""
+		tenant = self._tenant(tenant_id)
+		s = self.suppliers.get(supplier_id)
+		if not s or s["tenant_id"] != tenant:
+			raise KeyError(f"supplier '{supplier_id}' not found")
+		default_items = [
+			"NDA signed",
+			"Bank details verified",
+			"ISO or equivalent certification provided",
+			"Tax compliance documentation submitted",
+			"Site / factory audit scheduled",
+			"Insurance certificate received",
+			"Data privacy agreement signed",
+		]
+		items = checklist_items or default_items
+		checklist = [{"item": it, "completed": False, "completed_at": None} for it in items]
+		if not hasattr(self, "onboarding_records"):
+			self.onboarding_records: dict[str, dict[str, Any]] = {}
+		record: dict[str, Any] = {
+			"id": self._id("onb"),
+			"type": "scm_srm_onboarding",
+			"tenant_id": tenant,
+			"supplier_id": supplier_id,
+			"assigned_to": assigned_to,
+			"checklist": checklist,
+			"completion_pct": 0,
+			"status": "in_progress",
+			"started_at": self._now(),
+			"completed_at": None,
+		}
+		self.onboarding_records[record["id"]] = record
+		self._emit(tenant, "onboarding_started", record["id"], "scm_srm_onboarding", "in_progress")
+		return deepcopy(record)
+
+	async def complete_onboarding_item(
+		self,
+		onboarding_id: str,
+		item_index: int,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Mark a single onboarding checklist item as completed."""
+		tenant = self._tenant(tenant_id)
+		if not hasattr(self, "onboarding_records"):
+			self.onboarding_records = {}
+		rec = self.onboarding_records.get(onboarding_id)
+		if not rec or rec["tenant_id"] != tenant:
+			raise KeyError(f"onboarding '{onboarding_id}' not found")
+		checklist = rec["checklist"]
+		if not 0 <= item_index < len(checklist):
+			raise IndexError(f"item_index {item_index} out of range (0–{len(checklist) - 1})")
+		checklist[item_index]["completed"] = True
+		checklist[item_index]["completed_at"] = self._now()
+		done = sum(1 for it in checklist if it["completed"])
+		rec["completion_pct"] = round((done / len(checklist)) * 100, 1)
+		if done == len(checklist):
+			rec["status"] = "completed"
+			rec["completed_at"] = self._now()
+			self._emit(tenant, "onboarding_completed", onboarding_id, "scm_srm_onboarding", "completed")
+		return deepcopy(rec)
+
+	# ── Portfolio risk heatmap ────────────────────────────────────────────────
+
+	async def risk_heatmap(self, tenant_id: str | None = None) -> dict[str, Any]:
+		"""Generate a risk heatmap aggregating open risk assessments by category and level."""
+		tenant = self._tenant(tenant_id)
+		open_risks = [r for r in self.risk_assessments.values() if r["tenant_id"] == tenant and r["status"] == "open"]
+		heatmap: dict[str, dict[str, int]] = {}
+		for risk in open_risks:
+			cat = risk["risk_category"]
+			lvl = risk["risk_level"]
+			heatmap.setdefault(cat, {})
+			heatmap[cat][lvl] = heatmap[cat].get(lvl, 0) + 1
+		# Identify hot spots (critical or high with count >= 2)
+		hotspots = []
+		for cat, levels in heatmap.items():
+			for lvl in ("critical", "high"):
+				count = levels.get(lvl, 0)
+				if count >= 1:
+					hotspots.append({"category": cat, "level": lvl, "count": count})
+		hotspots.sort(key=lambda x: ({"critical": 0, "high": 1}.get(x["level"], 2), -x["count"]))
+		return {
+			"tenant_id": tenant,
+			"heatmap": heatmap,
+			"hotspots": hotspots,
+			"total_open_risks": len(open_risks),
+			"generated_at": self._now(),
+		}

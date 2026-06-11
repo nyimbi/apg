@@ -6,7 +6,7 @@ Portfolio Management provides regulated investment book operations: portfolio bo
 Allocation policies must total exactly 100% before activation. Valuations require a source and valuation date. Performance attribution requires a benchmark. All portfolio lifecycle events stream to `apg.fintech.portfolio.lifecycle` via Bytewax.
 
 ## Capability ID
-`fintech_portfolio`  Version: 1.1.0
+`fintech_portfolio`  Version: 2.0.0
 
 ## Provides
 | Service | Description |
@@ -23,6 +23,15 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | portfolio_compliance_workflow | Record and review compliance breaches with severity controls |
 | portfolio_review_workflow | Governance reviews for allocations, valuations, and compliance |
 | portfolio_agent_workflow | Register AI agents for book review, valuation, risk exposure, and attribution |
+| portfolio_twr_workflow | GIPS-compliant time-weighted return with sub-period chain-linking |
+| portfolio_mwr_workflow | Money-weighted return (IRR), MOIC, and DPI for closed-end funds |
+| portfolio_stress_test_workflow | Multi-scenario stress testing with per-asset-class shock factors |
+| portfolio_counterparty_workflow | Single-counterparty concentration risk aggregation across portfolios |
+| portfolio_fx_workflow | FX rate store for multi-currency holding revaluation |
+| portfolio_clone_workflow | Clone model/template portfolio to a new client book |
+| portfolio_audit_query_workflow | Query and export the structured audit event log |
+| portfolio_client_report_workflow | Assemble structured client-facing performance reports (IPS, factsheet) |
+| portfolio_esg_workflow | Weighted ESG scoring and exclusion breach detection |
 
 ## Requires
 | Capability | Purpose |
@@ -68,6 +77,15 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | reviews | /fintech-portfolio/reviews | GET/POST | fintech_portfolio:reviews | Governance |
 | agents | /fintech-portfolio/agents | GET/POST | fintech_portfolio:admin | Automation |
 | settings | /fintech-portfolio/settings | GET/POST | fintech_portfolio:admin | Administration |
+| twr | /fintech-portfolio/twr | POST | fintech_portfolio:performance | Performance |
+| mwr | /fintech-portfolio/mwr | POST | fintech_portfolio:performance | Performance |
+| stress_test | /fintech-portfolio/stress-test | POST | fintech_portfolio:risk | Risk |
+| counterparty | /fintech-portfolio/counterparty-exposure | GET | fintech_portfolio:risk | Risk |
+| fx_rates | /fintech-portfolio/fx-rates | GET/POST | fintech_portfolio:operations | Operations |
+| clone | /fintech-portfolio/clone | POST | fintech_portfolio:admin | Administration |
+| audit_query | /fintech-portfolio/audit | GET | fintech_portfolio:admin | Administration |
+| client_report | /fintech-portfolio/client-report | POST | fintech_portfolio:view | Reports |
+| esg | /fintech-portfolio/esg | GET/POST | fintech_portfolio:view | ESG |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -124,6 +142,12 @@ Events emitted to the fintech event stream via Bytewax.
 - Corporate actions apply to an instrument, not a portfolio — the same dividend or split can affect holdings across multiple portfolios; the action is recorded at the instrument level with an effective date
 - Risk exposure as-of-date is required to prevent stale exposure records being confused with current positions
 - Holdings can have fractional quantities (ETF fractional shares) but cannot be zero or negative — the `positive_quantity` rule enforces strict positivity
+- TWR requires at least two valuation records; fewer returns `insufficient_data` rather than a misleading 0.0
+- MWR (IRR) annualisation uses the actual calendar distance between start and end date to avoid compounding artifacts on sub-annual periods
+- Stress test scenarios without a matching instrument_id fall back to `equity` then `default` shock keys, ensuring portfolios with unmapped instruments are not silently excluded
+- Counterparty concentration is computed only against holdings with an `issuer_id` attribute; unattributed holdings are grouped under `unattributed` and excluded from the limit check
+- ESG score aggregation requires explicit `record_esg_rating` calls per instrument; unscored holdings are listed separately and do not dilute the weighted average
+- Portfolio cloning copies the allocation policy from the source but starts with zero holdings, preventing unintended position duplication across client books
 
 ## Composability
 - **Upstream**: `fintech_wealth` provides client profile and mandate context; `fintech_robo` provides model portfolio templates; market data feeds are adapter boundaries referenced by ID

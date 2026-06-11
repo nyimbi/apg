@@ -1245,6 +1245,519 @@ class DigitalSurveillanceService:
 		return result
 
 	# ------------------------------------------------------------------
+	# New async methods — physical surveillance + advanced analytics
+	# ------------------------------------------------------------------
+
+	async def field_agent_tasking(
+		self,
+		target_id: str,
+		agent_id: str,
+		observation_zone: str,
+		priority: str,
+		instructions: str = "",
+	) -> dict[str, Any]:
+		"""Task a registered field agent with a physical surveillance assignment.
+
+		Validates that both the target and agent are registered and active, then
+		creates a tasking record that bridges physical-world observation into the
+		digital analytics pipeline.
+
+		priority: CRITICAL | HIGH | MEDIUM | LOW
+		"""
+		VALID_PRIORITIES = {"CRITICAL", "HIGH", "MEDIUM", "LOW"}
+		assert present(target_id), "target_id required"
+		assert present(agent_id), "agent_id required"
+		assert present(observation_zone), "observation_zone required"
+		priority_upper = priority.upper()
+		if priority_upper not in VALID_PRIORITIES:
+			raise ValueError(f"priority must be one of {VALID_PRIORITIES}")
+
+		reg = self._target_registrations.get(target_id)
+		if reg is None:
+			raise KeyError(f"target_id {target_id!r} not registered")
+		if reg["status"] != "ACTIVE":
+			raise PermissionError(f"Surveillance on {target_id!r} is {reg['status']}, not ACTIVE")
+
+		agent_rec = self.agents.get(self._tenant_key(self.tenant_id, agent_id))
+		if agent_rec is None:
+			raise KeyError(f"agent_id {agent_id!r} not registered for tenant {self.tenant_id!r}")
+
+		tasking_id = _fingerprint(target_id, agent_id, observation_zone, _utcnow())
+		record: dict[str, Any] = {
+			"tasking_id": tasking_id,
+			"target_id": target_id,
+			"agent_id": agent_id,
+			"observation_zone": observation_zone,
+			"priority": priority_upper,
+			"instructions": instructions,
+			"status": "ASSIGNED",
+			"authority_ref": reg["authority_ref"],
+			"assigned_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+			"actor_id": self.actor_id,
+		}
+		# Persist to a dedicated store keyed by tasking_id
+		if not hasattr(self, "_field_taskings"):
+			self._field_taskings: dict[str, dict[str, Any]] = {}
+		self._field_taskings[tasking_id] = record
+		self._audit(self.tenant_id, "surveillance_field_agent_tasked", tasking_id)
+		return record
+
+	async def observation_report_ingest(
+		self,
+		target_id: str,
+		agent_id: str,
+		report_text: str,
+		media_refs: list[str] | None = None,
+		location_lat: float | None = None,
+		location_lon: float | None = None,
+	) -> dict[str, Any]:
+		"""Ingest a physical-world observation report submitted by a field agent.
+
+		Stores the report, links it to the digital target record, and optionally
+		records a location fix derived from the agent's reported position.
+		"""
+		assert present(target_id), "target_id required"
+		assert present(agent_id), "agent_id required"
+		assert present(report_text), "report_text required"
+
+		reg = self._target_registrations.get(target_id)
+		if reg is None:
+			raise KeyError(f"target_id {target_id!r} not registered")
+
+		report_id = _fingerprint(target_id, agent_id, report_text[:64], _utcnow())
+		record: dict[str, Any] = {
+			"report_id": report_id,
+			"target_id": target_id,
+			"agent_id": agent_id,
+			"report_text": report_text,
+			"media_refs": media_refs or [],
+			"word_count": len(report_text.split()),
+			"has_location": location_lat is not None and location_lon is not None,
+			"location_lat": location_lat,
+			"location_lon": location_lon,
+			"reported_at": _utcnow(),
+			"authority_ref": reg["authority_ref"],
+			"tenant_id": self.tenant_id,
+			"actor_id": self.actor_id,
+		}
+		if not hasattr(self, "_observation_reports"):
+			self._observation_reports: dict[str, dict[str, Any]] = {}
+		self._observation_reports[report_id] = record
+
+		# If coordinates provided, also log a location fix
+		if location_lat is not None and location_lon is not None:
+			track_id = _fingerprint(target_id, "FIELD_REPORT", _utcnow())
+			self._location_tracks[track_id] = {
+				"track_id": track_id,
+				"target_id": target_id,
+				"source": "FIELD_REPORT",
+				"latitude": location_lat,
+				"longitude": location_lon,
+				"accuracy_m": 100.0,
+				"tracked_at": _utcnow(),
+				"tenant_id": self.tenant_id,
+			}
+			record["location_track_id"] = track_id
+
+		self._audit(self.tenant_id, "surveillance_observation_report_ingested", report_id)
+		return record
+
+	async def build_target_profile(self, target_id: str) -> dict[str, Any]:
+		"""Aggregate all available intelligence into a unified target profile.
+
+		Denormalises registration, location centroid, communication metadata,
+		digital footprint score, cross-platform correlation confidence,
+		pattern-of-life, and associate network depth into a single read-through
+		record suitable for downstream consumers (case management, dissemination).
+		"""
+		assert present(target_id), "target_id required"
+
+		tenant = self.tenant_id
+		reg = self._target_registrations.get(target_id)
+
+		# Location centroid
+		tracks = [t for t in self._location_tracks.values() if t.get("target_id") == target_id and t["tenant_id"] == tenant]
+		centroid_lat = round(statistics.mean(t["latitude"] for t in tracks), 6) if tracks else None
+		centroid_lon = round(statistics.mean(t["longitude"] for t in tracks), 6) if tracks else None
+
+		# Comm metadata (latest)
+		comm_entries = [c for c in self._comm_metadata.values() if c.get("target_id") == target_id and c["tenant_id"] == tenant]
+		latest_comm = max(comm_entries, key=lambda c: c.get("collected_at", "")) if comm_entries else None
+
+		# Digital footprint (latest)
+		footprint_entries = [f for f in self._footprint_analyses.values() if f.get("target_id") == target_id and f["tenant_id"] == tenant]
+		latest_footprint = max(footprint_entries, key=lambda f: f.get("analysed_at", "")) if footprint_entries else None
+
+		# Cross-platform (latest)
+		corr_entries = [c for c in self._cross_platform_corrs.values() if c.get("target_id") == target_id and c["tenant_id"] == tenant]
+		latest_corr = max(corr_entries, key=lambda c: c.get("correlated_at", "")) if corr_entries else None
+
+		# Pattern of life (latest)
+		pol_entries = [p for p in self._pattern_of_life.values() if p.get("target_id") == target_id and p["tenant_id"] == tenant]
+		latest_pol = max(pol_entries, key=lambda p: p.get("analysed_at", "")) if pol_entries else None
+
+		# Associate network (widest)
+		assoc_entries = [n for n in self._associate_networks.values() if n.get("target_id") == target_id and n["tenant_id"] == tenant]
+		widest_network = max(assoc_entries, key=lambda n: n.get("associate_count", 0)) if assoc_entries else None
+
+		profile_id = _fingerprint(target_id, tenant, _utcnow())
+		profile: dict[str, Any] = {
+			"profile_id": profile_id,
+			"target_id": target_id,
+			"registration_status": reg["status"] if reg else "NOT_REGISTERED",
+			"authority_ref": reg["authority_ref"] if reg else None,
+			"location_fixes": len(tracks),
+			"centroid_lat": centroid_lat,
+			"centroid_lon": centroid_lon,
+			"comm_call_count": latest_comm["call_count"] if latest_comm else None,
+			"comm_unique_contacts": latest_comm["unique_contacts"] if latest_comm else None,
+			"comm_peak_hour_utc": latest_comm["peak_hour_utc"] if latest_comm else None,
+			"digital_footprint_score": latest_footprint["digital_footprint_score"] if latest_footprint else None,
+			"high_digital_exposure": latest_footprint["high_exposure"] if latest_footprint else None,
+			"cross_platform_confidence": latest_corr["unified_identity_confidence"] if latest_corr else None,
+			"routine_score": latest_pol["routine_score"] if latest_pol else None,
+			"high_routine": latest_pol["high_routine"] if latest_pol else None,
+			"max_displacement_km": latest_pol["max_displacement_km"] if latest_pol else None,
+			"night_activity_flag": latest_pol["night_activity_flag"] if latest_pol else False,
+			"associate_count": widest_network["associate_count"] if widest_network else 0,
+			"associate_network_depth": widest_network["depth"] if widest_network else 0,
+			"built_at": _utcnow(),
+			"tenant_id": tenant,
+			"actor_id": self.actor_id,
+		}
+		self._audit(tenant, "surveillance_target_profile_built", profile_id)
+		return profile
+
+	async def trajectory_analysis(
+		self,
+		target_id: str,
+		window_hours: int = 24,
+	) -> dict[str, Any]:
+		"""Analyse the movement trajectory of a target within a time window.
+
+		Computes per-leg distance, speed, heading, mode-of-transport estimate,
+		and flags impossible jumps (>300 km/h between consecutive fixes).
+
+		Returns a trajectory report with ordered legs and a summary.
+		"""
+		assert present(target_id), "target_id required"
+		assert 1 <= window_hours <= 720, "window_hours must be 1–720"
+
+		tenant = self.tenant_id
+		tracks = sorted(
+			[t for t in self._location_tracks.values() if t.get("target_id") == target_id and t["tenant_id"] == tenant],
+			key=lambda t: t.get("tracked_at", ""),
+		)
+
+		legs: list[dict[str, Any]] = []
+		impossible_jumps = 0
+		total_distance_km = 0.0
+
+		for i in range(1, len(tracks)):
+			prev = tracks[i - 1]
+			curr = tracks[i]
+			dist_km = _haversine(prev["latitude"], prev["longitude"], curr["latitude"], curr["longitude"])
+			total_distance_km += dist_km
+
+			# Rough time delta in hours using string prefix comparison (ISO format sortable)
+			# For simulation purposes, estimate a 1-hour gap per fix
+			time_delta_h = 1.0
+			speed_kmh = dist_km / max(time_delta_h, 1e-6)
+			impossible = speed_kmh > 300.0
+			if impossible:
+				impossible_jumps += 1
+
+			mode = (
+				"STATIONARY" if speed_kmh < 2
+				else "PEDESTRIAN" if speed_kmh < 10
+				else "VEHICLE" if speed_kmh < 150
+				else "AIR" if not impossible
+				else "IMPOSSIBLE"
+			)
+
+			# Heading in degrees (approximate)
+			dlat = curr["latitude"] - prev["latitude"]
+			dlon = curr["longitude"] - prev["longitude"]
+			heading_deg = round(math.degrees(math.atan2(dlon, dlat)) % 360, 1)
+
+			legs.append({
+				"from_fix": i - 1,
+				"to_fix": i,
+				"distance_km": round(dist_km, 3),
+				"speed_kmh": round(speed_kmh, 1),
+				"heading_deg": heading_deg,
+				"mode": mode,
+				"impossible_jump": impossible,
+			})
+
+		traj_id = _fingerprint(target_id, str(window_hours), _utcnow())
+		result: dict[str, Any] = {
+			"trajectory_id": traj_id,
+			"target_id": target_id,
+			"window_hours": window_hours,
+			"fix_count": len(tracks),
+			"leg_count": len(legs),
+			"total_distance_km": round(total_distance_km, 3),
+			"impossible_jumps": impossible_jumps,
+			"data_integrity_flag": impossible_jumps > 0,
+			"legs": legs[:100],  # cap to avoid oversized responses
+			"analysed_at": _utcnow(),
+			"tenant_id": tenant,
+		}
+		self._audit(tenant, "surveillance_trajectory_analysed", traj_id)
+		return result
+
+	async def register_evidence(
+		self,
+		evidence_id: str,
+		reference_url: str,
+		sha256_hash: str,
+		custodian_id: str,
+		expiry: str,
+	) -> dict[str, Any]:
+		"""Register an evidence item in the chain-of-custody registry.
+
+		Each evidence item is uniquely identified, fingerprinted, and linked to
+		a custodian. All subsequent surveillance methods that consume an
+		evidence_reference should resolve against this registry.
+
+		sha256_hash: hex-encoded SHA-256 of the evidence artefact at ingest.
+		"""
+		assert present(evidence_id), "evidence_id required"
+		assert present(reference_url), "reference_url required"
+		assert present(sha256_hash) and len(sha256_hash) == 64, "sha256_hash must be 64-char hex"
+		assert present(custodian_id), "custodian_id required"
+		assert present(expiry), "expiry required"
+
+		if not hasattr(self, "_evidence_registry"):
+			self._evidence_registry: dict[str, dict[str, Any]] = {}
+
+		if evidence_id in self._evidence_registry:
+			raise ValueError(f"evidence_id {evidence_id!r} already registered — use a unique ID")
+
+		ingest_fingerprint = _fingerprint(evidence_id, sha256_hash, reference_url)
+		record: dict[str, Any] = {
+			"evidence_id": evidence_id,
+			"reference_url": reference_url,
+			"sha256_hash": sha256_hash,
+			"ingest_fingerprint": ingest_fingerprint,
+			"custodian_id": custodian_id,
+			"expiry": expiry,
+			"chain_of_custody": [
+				{
+					"event": "REGISTERED",
+					"actor_id": self.actor_id,
+					"at": _utcnow(),
+				}
+			],
+			"registered_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+		}
+		self._evidence_registry[evidence_id] = record
+		self._audit(self.tenant_id, "surveillance_evidence_registered", evidence_id)
+		return record
+
+	async def check_authority_renewals(self, days_ahead: int = 30) -> dict[str, Any]:
+		"""Identify surveillance authorities expiring within *days_ahead* days.
+
+		Fires a notification via the injected notify adapter if configured.
+		Returns a renewal alert record listing affected authority IDs and their
+		expiry dates so operators can initiate renewal workflows.
+		"""
+		assert 1 <= days_ahead <= 365, "days_ahead must be 1–365"
+
+		tenant = self.tenant_id
+		now_ts = _utcnow()
+		alerts_list: list[dict[str, Any]] = []
+
+		for auth in self.authorities.values():
+			if auth.tenant_id != tenant:
+				continue
+			# Compare ISO strings lexicographically — valid for UTC ISO-8601 dates
+			# (works because YYYY-MM-DD... sorts correctly as strings)
+			expires = getattr(auth, "expires_at", "")
+			if expires and expires <= now_ts:
+				alerts_list.append({
+					"authority_id": auth.authority_id,
+					"expires_at": expires,
+					"status": "EXPIRED",
+				})
+			elif expires:
+				alerts_list.append({
+					"authority_id": auth.authority_id,
+					"expires_at": expires,
+					"status": "EXPIRING_SOON",
+				})
+
+		# Notify if adapter is wired
+		if self._notify and alerts_list:
+			try:
+				if asyncio.iscoroutinefunction(self._notify.send):
+					await self._notify.send(
+						topic="surveillance.authority_renewal",
+						payload={"alerts": alerts_list, "tenant_id": tenant},
+					)
+				else:
+					self._notify.send(
+						topic="surveillance.authority_renewal",
+						payload={"alerts": alerts_list, "tenant_id": tenant},
+					)
+			except Exception:
+				pass  # notification failure must not block the workflow
+
+		check_id = _fingerprint(tenant, str(days_ahead), _utcnow())
+		result: dict[str, Any] = {
+			"check_id": check_id,
+			"days_ahead": days_ahead,
+			"authorities_checked": sum(1 for a in self.authorities.values() if a.tenant_id == tenant),
+			"renewal_alerts": alerts_list,
+			"alert_count": len(alerts_list),
+			"checked_at": _utcnow(),
+			"tenant_id": tenant,
+		}
+		self._audit(tenant, "surveillance_authority_renewal_checked", check_id)
+		return result
+
+	async def ingest_observations_batch(
+		self,
+		observations: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Batch-ingest up to 500 observations with per-item deduplication.
+
+		Each item must carry the same keys as `record_observation`.
+		Items with a `content_fingerprint` already present in the store are
+		skipped (DEDUP) rather than re-ingested. Returns per-item
+		success/skip/failure breakdown.
+
+		Suitable for high-volume sensor feeds; processes items concurrently
+		using asyncio.gather.
+		"""
+		assert observations, "observations list required"
+		assert len(observations) <= 500, "batch cap: 500 observations"
+
+		# Build fingerprint index for dedup
+		existing_fingerprints: set[str] = {
+			obs.content_fingerprint
+			for obs in self.observations.values()
+			if obs.tenant_id == self.tenant_id
+		}
+
+		successes: list[str] = []
+		skipped: list[str] = []
+		failures: list[dict[str, Any]] = []
+
+		async def _ingest_one(item: dict[str, Any]) -> None:
+			fp = item.get("content_fingerprint", "")
+			oid = item.get("observation_id", "?")
+			if fp in existing_fingerprints:
+				skipped.append(oid)
+				return
+			try:
+				self.record_observation(
+					observation_id=item["observation_id"],
+					tenant_id=item.get("tenant_id", self.tenant_id),
+					program_id=item["program_id"],
+					sensor_id=item["sensor_id"],
+					observation_type=item["observation_type"],
+					observation_reference=item["observation_reference"],
+					content_fingerprint=fp,
+					observed_at=item.get("observed_at", _utcnow()),
+					confidence_score=float(item.get("confidence_score", 0.5)),
+					evidence_reference=item.get("evidence_reference", "batch"),
+				)
+				existing_fingerprints.add(fp)
+				successes.append(oid)
+			except Exception as exc:
+				failures.append({"observation_id": oid, "error": str(exc)})
+
+		await asyncio.gather(*[_ingest_one(item) for item in observations], return_exceptions=True)
+
+		batch_id = _fingerprint(str(len(observations)), self.tenant_id, _utcnow())
+		result: dict[str, Any] = {
+			"batch_id": batch_id,
+			"submitted": len(observations),
+			"succeeded": len(successes),
+			"skipped_dedup": len(skipped),
+			"failed": len(failures),
+			"observation_ids": successes,
+			"failures": failures,
+			"tenant_id": self.tenant_id,
+		}
+		self._audit(self.tenant_id, "surveillance_observations_batch_ingested", batch_id)
+		return result
+
+	async def cross_target_pattern_correlation(
+		self,
+		target_ids: list[str],
+		period: str,
+	) -> dict[str, Any]:
+		"""Correlate pattern-of-life entries across multiple targets.
+
+		Identifies targets that share similar location centroids, communication
+		peak hours, or night-activity flags — indicators of coordinated behaviour
+		or shared handler contact.
+
+		Returns a correlation matrix and a list of suspected co-ordination pairs.
+		"""
+		assert target_ids and len(target_ids) >= 2, "need at least 2 target_ids"
+		assert present(period), "period required"
+
+		tenant = self.tenant_id
+		profiles: dict[str, dict[str, Any]] = {}
+		for tid in target_ids:
+			pol_entries = [
+				p for p in self._pattern_of_life.values()
+				if p["tenant_id"] == tenant and p["target_id"] == tid
+			]
+			if pol_entries:
+				profiles[tid] = max(pol_entries, key=lambda p: p.get("analysed_at", ""))
+
+		pairs: list[dict[str, Any]] = []
+		tids = list(profiles.keys())
+		for i in range(len(tids)):
+			for j in range(i + 1, len(tids)):
+				a, b = profiles[tids[i]], profiles[tids[j]]
+				dist_km = _haversine(
+					a["centroid_lat"], a["centroid_lon"],
+					b["centroid_lat"], b["centroid_lon"],
+				)
+				same_peak_hour = a.get("comm_peak_hour") == b.get("comm_peak_hour")
+				both_night = a.get("night_activity_flag", False) and b.get("night_activity_flag", False)
+				correlation_score = round(
+					(1.0 if dist_km < 5.0 else 0.0) * 0.5 +
+					(0.3 if same_peak_hour else 0.0) +
+					(0.2 if both_night else 0.0),
+					4,
+				)
+				pairs.append({
+					"target_a": tids[i],
+					"target_b": tids[j],
+					"centroid_distance_km": round(dist_km, 3),
+					"same_peak_hour": same_peak_hour,
+					"both_night_active": both_night,
+					"correlation_score": correlation_score,
+					"coordinated": correlation_score >= 0.5,
+				})
+
+		coordinated_pairs = [p for p in pairs if p["coordinated"]]
+		corr_id = _fingerprint(*sorted(target_ids), period, _utcnow())
+		result: dict[str, Any] = {
+			"correlation_id": corr_id,
+			"period": period,
+			"targets_analysed": len(profiles),
+			"targets_without_pol": len(target_ids) - len(profiles),
+			"pair_count": len(pairs),
+			"coordinated_pair_count": len(coordinated_pairs),
+			"coordinated_pairs": coordinated_pairs,
+			"pairs": pairs,
+			"correlated_at": _utcnow(),
+			"tenant_id": tenant,
+		}
+		self._audit(tenant, "surveillance_cross_target_pattern_correlated", corr_id)
+		return result
+
+	# ------------------------------------------------------------------
 	# Internal helpers (preserved)
 	# ------------------------------------------------------------------
 

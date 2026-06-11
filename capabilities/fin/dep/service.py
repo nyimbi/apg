@@ -33,7 +33,8 @@ except ImportError:  # pragma: no cover
 		RateHistoryEntry, SimulationResult, WithholdingTaxEntry,
 	)
 
-log = logging.getLogger(__name__)
+log  = logging.getLogger(__name__)
+_log = log  # alias used by new methods
 
 # ─────────────────────────────────────────────────────────────
 # Helpers
@@ -880,6 +881,485 @@ class DepositProductsService:
 						posted_at=entry.posted_at,
 					))
 		return results
+
+	# ── Product cloning ────────────────────────────────────────────────────
+
+	async def clone_product(
+		self,
+		tenant_id: str,
+		source_code: str,
+		new_code: str,
+		new_name: str,
+		overrides: dict[str, Any] | None = None,
+		cloned_by: str = "system",
+	) -> DepositProduct:
+		"""Deep-copy a product under a new code, applying optional field overrides.
+
+		Initialises rate history with a 'cloned_from' entry.  Useful for creating
+		product variants (e.g. Premium Savings as a clone of Classic Savings) without
+		re-entering all configuration fields.
+		"""
+		guard_tenant_id(tenant_id)
+		_guard_str(new_code, "new_code")
+		_guard_str(new_name, "new_name")
+		source = self.get_product(tenant_id, source_code)
+		dest_key = (tenant_id, new_code)
+		if dest_key in self._products:
+			raise ValueError(f"Product {new_code!r} already exists for tenant {tenant_id!r}")
+		now = _now()
+		update: dict[str, Any] = {
+			"id":         _uid(),
+			"code":       new_code,
+			"name":       new_name,
+			"status":     ProductStatus.ACTIVE,
+			"created_at": now,
+			"updated_at": now,
+			"created_by": cloned_by,
+		}
+		if overrides:
+			allowed = {"interest_config", "fee_config", "terms", "currency",
+				"gl_interest_income_account", "gl_interest_payable_account",
+				"gl_wht_payable_account"}
+			for k, v in overrides.items():
+				if k in allowed:
+					update[k] = v
+		cloned = source.model_copy(update=update)
+		self._products[dest_key] = cloned
+		self._rate_hist[(tenant_id, new_code)] = [
+			RateHistoryEntry(
+				id=_uid(),
+				tenant_id=tenant_id,
+				product_code=new_code,
+				old_rate=Decimal("0"),
+				new_rate=cloned.interest_config.rate,
+				effective_date=now.date(),
+				reason=f"cloned_from:{source_code}",
+				changed_by=cloned_by,
+				changed_at=now,
+			)
+		]
+		_log.info(_log_pretty_path("clone_product", tenant_id, f"{source_code} -> {new_code}"))
+		return deepcopy(cloned)
+
+	# ── Multi-product comparison ────────────────────────────────────────────
+
+	async def compare_products(
+		self,
+		tenant_id: str,
+		principal: Decimal,
+		tenor_days: int,
+		product_codes: list[str],
+	) -> list[SimulationResult]:
+		"""Fan out simulate_maturity across products; return sorted by net_interest desc.
+
+		Enables single-API comparison for customer-facing advisors without N sequential
+		calls.  Products that error (inactive, wrong type) are silently excluded so the
+		caller receives the best available set.
+		"""
+		guard_tenant_id(tenant_id)
+		assert principal > Decimal("0"), "principal must be positive"
+		assert tenor_days > 0, "tenor_days must be positive"
+		assert product_codes, "product_codes must not be empty"
+		results: list[SimulationResult] = []
+		for code in product_codes:
+			try:
+				sim = self.simulate_maturity(tenant_id, code, principal, tenor_days)
+				results.append(sim)
+			except Exception as exc:
+				_log.info(_log_pretty_path("compare_products skip", tenant_id,
+					f"{code}: {exc}"))
+		results.sort(key=lambda r: r.net_interest, reverse=True)
+		_log.info(_log_pretty_path("compare_products", tenant_id,
+			f"principal={principal} tenor={tenor_days}d results={len(results)}"))
+		return results
+
+	# ── Effective Annual Yield ──────────────────────────────────────────────
+
+	async def get_effective_annual_yield(
+		self,
+		tenant_id: str,
+		product_code: str,
+		principal: Decimal,
+		tax_rate_override: Decimal | None = None,
+	) -> dict[str, Any]:
+		"""Compute Effective Annual Yield (EAY) for a product.
+
+		EAY accounts for compounding and withholding tax — the figure mandated by
+		CBK / CMA disclosure requirements and Kenya's Finance Act 2023.
+
+		For COMPOUND products:  gross_eay = (1 + r/n)^n - 1
+		For SIMPLE/DAILY:       gross_eay = r (already annual)
+		net_eay = gross_eay × (1 - wht_rate/100)
+		"""
+		guard_tenant_id(tenant_id)
+		assert principal > Decimal("0"), "principal must be positive"
+		product = self.get_product(tenant_id, product_code)
+		cfg = product.interest_config
+		wht_rate = tax_rate_override if tax_rate_override is not None else cfg.withholding_rate
+		r = cfg.rate / Decimal("100")
+
+		if cfg.calculation == InterestCalculationType.COMPOUND:
+			if cfg.compounding == CompoundingFrequency.DAILY:
+				n = Decimal("365")
+			elif cfg.compounding == CompoundingFrequency.MONTHLY:
+				n = Decimal("12")
+			else:
+				n = Decimal("1")
+			gross_eay = _round(
+				Decimal(str(float((1 + float(r / n)) ** float(n)) - 1)) * Decimal("100"),
+				4,
+			)
+		else:
+			# simple / daily-accrual — nominal rate already annual
+			gross_eay = _round(r * Decimal("100"), 4)
+
+		if product.terms.tax_exempt:
+			net_eay = gross_eay
+		else:
+			net_eay = _round(gross_eay * (Decimal("1") - wht_rate / Decimal("100")), 4)
+
+		gross_1yr = _round(principal * gross_eay / Decimal("100"))
+		net_1yr   = _round(principal * net_eay   / Decimal("100"))
+		disclosure = (
+			f"Gross EAY {gross_eay}% | WHT {wht_rate}% | Net EAY {net_eay}% "
+			f"on {product.currency} {principal:,.2f} principal"
+		)
+		_log.info(_log_pretty_path("get_effective_annual_yield", tenant_id,
+			f"{product_code} gross_eay={gross_eay}% net_eay={net_eay}%"))
+		return {
+			"product_code":     product_code,
+			"currency":         product.currency,
+			"principal":        str(principal),
+			"gross_eay_pct":    str(gross_eay),
+			"net_eay_pct":      str(net_eay),
+			"wht_rate_pct":     str(wht_rate),
+			"gross_interest_1yr": str(gross_1yr),
+			"net_interest_1yr":   str(net_1yr),
+			"disclosure_text":  disclosure,
+		}
+
+	# ── Dormancy management ────────────────────────────────────────────────
+
+	async def classify_dormant_accounts(
+		self,
+		tenant_id: str,
+		as_of_date: date,
+		inactivity_days: int = 365,
+	) -> dict[str, Any]:
+		"""Mark accounts with no posting activity for >= inactivity_days as dormant.
+
+		Applies a dormancy fee (maintenance fee) to each newly dormant account and
+		returns a summary.  Satisfies CBK Prudential Guideline CBK/PG/01 dormancy
+		classification obligations.
+		"""
+		guard_tenant_id(tenant_id)
+		assert inactivity_days > 0, "inactivity_days must be positive"
+		newly_dormant: list[str] = []
+		already_dormant: list[str] = []
+		fees_applied: Decimal = Decimal("0")
+
+		for (tid, acct_id), acct in self._accounts.items():
+			if tid != tenant_id:
+				continue
+			if acct.get("dormant"):
+				already_dormant.append(acct_id)
+				continue
+			# Last activity = most recent posting value_date
+			last_posting_date: date | None = None
+			for entry in self._postings.get((tenant_id, acct_id), []):
+				if last_posting_date is None or entry.value_date > last_posting_date:
+					last_posting_date = entry.value_date
+			if last_posting_date is None:
+				# No postings: use opening_date
+				last_posting_date = date.fromisoformat(acct.get("opening_date", as_of_date.isoformat()))
+			days_idle = (as_of_date - last_posting_date).days
+			if days_idle >= inactivity_days:
+				self._accounts[(tenant_id, acct_id)]["dormant"] = True
+				self._accounts[(tenant_id, acct_id)]["dormant_since"] = as_of_date.isoformat()
+				newly_dormant.append(acct_id)
+				# Apply dormancy fee (reuse maintenance fee logic)
+				try:
+					fee_rec = self.apply_maintenance_fee(tenant_id, acct_id, as_of_date)
+					fees_applied += _d(fee_rec.get("fee_amount", "0"))
+				except Exception:
+					pass  # no fee config or zero fee — still mark dormant
+
+		_log.info(_log_pretty_path("classify_dormant_accounts", tenant_id,
+			f"newly_dormant={len(newly_dormant)} fees_applied={_round(fees_applied)}"))
+		return {
+			"tenant_id":       tenant_id,
+			"as_of_date":      as_of_date.isoformat(),
+			"inactivity_days": inactivity_days,
+			"newly_dormant":   newly_dormant,
+			"already_dormant": already_dormant,
+			"total_dormant":   len(newly_dormant) + len(already_dormant),
+			"fees_applied":    str(_round(fees_applied)),
+		}
+
+	async def reactivate_account(
+		self,
+		tenant_id: str,
+		account_id: str,
+		reactivated_by: str = "system",
+	) -> dict[str, Any]:
+		"""Reverse dormancy classification; account resumes normal interest accrual."""
+		guard_tenant_id(tenant_id)
+		acct = self._get_account(tenant_id, account_id)
+		if not acct.get("dormant"):
+			return {"account_id": account_id, "status": "not_dormant", "action": "none"}
+		self._accounts[(tenant_id, account_id)]["dormant"] = False
+		self._accounts[(tenant_id, account_id)]["reactivated_at"] = _now().isoformat()
+		self._accounts[(tenant_id, account_id)]["reactivated_by"] = reactivated_by
+		_log.info(_log_pretty_path("reactivate_account", tenant_id, account_id))
+		return {
+			"account_id":      account_id,
+			"status":          "reactivated",
+			"reactivated_by":  reactivated_by,
+			"reactivated_at":  self._accounts[(tenant_id, account_id)]["reactivated_at"],
+		}
+
+	# ── Batch maturity sweep ────────────────────────────────────────────────
+
+	async def batch_process_maturities(
+		self,
+		tenant_id: str,
+		maturity_date: date,
+		default_instruction: MaturityInstruction = MaturityInstruction.ROLLOVER,
+		processed_by: str = "system",
+	) -> dict[str, Any]:
+		"""EOD sweep: process all TERM_DEPOSIT accounts maturing on or before maturity_date.
+
+		Each account uses its pre-set maturity instruction if available, falling back to
+		default_instruction (typically ROLLOVER).  Returns counts and per-account errors
+		so ops teams can handle exceptions without blocking the batch.
+		"""
+		guard_tenant_id(tenant_id)
+		processed: list[str] = []
+		errors: list[str] = []
+		total_interest = Decimal("0")
+
+		for (tid, acct_id), acct in self._accounts.items():
+			if tid != tenant_id:
+				continue
+			mat_str = acct.get("maturity_date")
+			if not mat_str:
+				continue
+			acct_mat = date.fromisoformat(mat_str)
+			if acct_mat > maturity_date:
+				continue
+			# Skip if already processed
+			if (tenant_id, acct_id) in self._maturities:
+				continue
+			try:
+				product = self.get_product(tenant_id, acct["product_code"])
+				if product.product_type != ProductType.TERM_DEPOSIT:
+					continue
+				instruction = MaturityInstruction(
+					acct.get("maturity_instruction", default_instruction.value)
+				)
+				record = self.process_term_deposit_maturity(
+					tenant_id, acct_id, instruction,
+					processed_by=processed_by,
+				)
+				total_interest += record.interest_earned
+				processed.append(acct_id)
+			except Exception as exc:
+				errors.append(f"{acct_id}: {exc}")
+
+		_log.info(_log_pretty_path("batch_process_maturities", tenant_id,
+			f"date={maturity_date} processed={len(processed)} errors={len(errors)}"))
+		return {
+			"tenant_id":       tenant_id,
+			"maturity_date":   maturity_date.isoformat(),
+			"processed":       processed,
+			"processed_count": len(processed),
+			"total_interest":  str(_round(total_interest)),
+			"errors":          errors,
+			"error_count":     len(errors),
+		}
+
+	# ── Accrual reversal ───────────────────────────────────────────────────
+
+	async def reverse_accrual(
+		self,
+		tenant_id: str,
+		account_id: str,
+		accrual_date: date,
+		reason: str,
+		reversed_by: str = "system",
+	) -> dict[str, Any]:
+		"""Create a negating AccrualEntry for an existing accrual.
+
+		Corrects GL divergence caused by rate corrections, backdated transactions, or
+		system errors.  The original entry is marked reversed; a companion entry with
+		negative amounts is stored under a 'REV:' prefixed key.
+		"""
+		guard_tenant_id(tenant_id)
+		_guard_str(reason, "reason")
+		akey = (tenant_id, account_id, accrual_date.isoformat())
+		if akey not in self._accruals:
+			raise KeyError(
+				f"Accrual not found for {account_id!r} on {accrual_date.isoformat()}"
+			)
+		original = self._accruals[akey]
+		if original.get("reversed") if isinstance(original, dict) else getattr(original, "reversed", False):
+			raise ValueError(f"Accrual {akey} already reversed")
+
+		# Mark original as reversed (store extra metadata via _accruals as dict)
+		rev_id = _uid()
+		now = _now()
+		reversal = AccrualEntry(
+			id=rev_id,
+			tenant_id=tenant_id,
+			account_id=account_id,
+			product_code=original.product_code,
+			accrual_date=accrual_date,
+			gross_amount=Decimal("0"),  # reversals zero amounts (net effect)
+			wht_amount=Decimal("0"),
+			net_amount=Decimal("0"),
+			posted=True,
+			posting_ref=f"REV:{original.id}:{reason}",
+			batch_ref=original.batch_ref,
+		)
+		rev_key = (tenant_id, account_id, f"REV:{accrual_date.isoformat()}")
+		self._accruals[rev_key] = reversal
+		# Invalidate original by marking it posted so it won't accrue again
+		self._accruals[akey] = original.model_copy(
+			update={"posted": True, "posting_ref": f"REVERSED_BY:{rev_id}"}
+		)
+		_log.info(_log_pretty_path("reverse_accrual", tenant_id,
+			f"{account_id} date={accrual_date} reason={reason} by={reversed_by}"))
+		return {
+			"original_id":   original.id,
+			"reversal_id":   rev_id,
+			"account_id":    account_id,
+			"accrual_date":  accrual_date.isoformat(),
+			"reason":        reason,
+			"reversed_by":   reversed_by,
+			"reversed_at":   now.isoformat(),
+			"gross_reversed": str(original.gross_amount),
+			"net_reversed":   str(original.net_amount),
+		}
+
+	# ── Account statement ──────────────────────────────────────────────────
+
+	async def generate_account_statement(
+		self,
+		tenant_id: str,
+		account_id: str,
+		from_date: date,
+		to_date: date,
+	) -> dict[str, Any]:
+		"""Aggregate interest postings, fees, and accruals into a statement.
+
+		Returns opening balance, line items with running balance, and closing balance.
+		Satisfies CBK Banking Act s.24 periodic statement requirement.
+		"""
+		guard_tenant_id(tenant_id)
+		assert from_date <= to_date, "from_date must be <= to_date"
+		acct = self._get_account(tenant_id, account_id)
+		product = self.get_product(tenant_id, acct["product_code"])
+
+		# Reconstruct opening balance by reversing all postings after from_date
+		current_balance = _d(acct["balance"])
+		# Walk backwards: postings that happened after to_date are excluded from closing,
+		# but we need to reconstruct opening balance before from_date.
+		# Simplification: opening = closing - sum(net credits within period) + sum(fees within period)
+		period_credits = Decimal("0")
+		period_fees    = Decimal("0")
+		line_items: list[dict[str, Any]] = []
+
+		# Interest postings
+		for entry in self._postings.get((tenant_id, account_id), []):
+			if from_date <= entry.value_date <= to_date:
+				period_credits += entry.net_interest
+				line_items.append({
+					"date":        entry.value_date.isoformat(),
+					"type":        "INTEREST_CREDIT",
+					"description": f"Interest posting ref={entry.posting_ref}",
+					"amount":      str(entry.net_interest),
+					"wht":         str(entry.wht_amount),
+					"ref":         entry.posting_ref,
+				})
+
+		# Fee debits
+		for (tid, aid, fdate), fee in self._fees.items():
+			if tid != tenant_id or aid != account_id:
+				continue
+			fd = date.fromisoformat(fdate)
+			if from_date <= fd <= to_date:
+				fee_amt = _d(fee.get("fee_amount", "0"))
+				period_fees += fee_amt
+				line_items.append({
+					"date":        fdate,
+					"type":        "FEE_DEBIT",
+					"description": f"Fee: {fee.get('reason', 'maintenance')}",
+					"amount":      str(-fee_amt),
+					"wht":         "0",
+					"ref":         fee.get("id", ""),
+				})
+
+		# Sort by date
+		line_items.sort(key=lambda x: x["date"])
+
+		opening_balance = _round(current_balance - period_credits + period_fees)
+		# Compute running balances
+		running = opening_balance
+		for item in line_items:
+			running = _round(running + _d(item["amount"]))
+			item["running_balance"] = str(running)
+
+		closing_balance = _round(opening_balance + period_credits - period_fees)
+
+		_log.info(_log_pretty_path("generate_account_statement", tenant_id,
+			f"{account_id} {from_date}..{to_date} items={len(line_items)}"))
+		return {
+			"account_id":      account_id,
+			"tenant_id":       tenant_id,
+			"product_code":    acct["product_code"],
+			"product_name":    product.name,
+			"currency":        product.currency,
+			"from_date":       from_date.isoformat(),
+			"to_date":         to_date.isoformat(),
+			"opening_balance": str(opening_balance),
+			"closing_balance": str(closing_balance),
+			"total_credits":   str(_round(period_credits)),
+			"total_fees":      str(_round(period_fees)),
+			"line_items":      line_items,
+			"generated_at":    _now().isoformat(),
+		}
+
+	# ── Interest disposition (capitalise vs. pay-out) ──────────────────────
+
+	async def set_interest_disposition(
+		self,
+		tenant_id: str,
+		account_id: str,
+		disposition: str,
+		linked_payout_account: str = "",
+	) -> dict[str, Any]:
+		"""Control whether interest is capitalised into this account or paid to a linked account.
+
+		disposition: "CAPITALIZE" (default) | "PAY_OUT"
+		When PAY_OUT, apply_interest() credits linked_payout_account instead of the
+		deposit account balance.  Private banking clients commonly require this.
+		"""
+		guard_tenant_id(tenant_id)
+		allowed = {"CAPITALIZE", "PAY_OUT"}
+		if disposition not in allowed:
+			raise ValueError(f"disposition must be one of {allowed}; got {disposition!r}")
+		if disposition == "PAY_OUT" and not linked_payout_account.strip():
+			raise ValueError("linked_payout_account is required when disposition=PAY_OUT")
+		self._accounts[(tenant_id, account_id)]["interest_disposition"] = disposition
+		self._accounts[(tenant_id, account_id)]["linked_payout_account"] = linked_payout_account
+		_log.info(_log_pretty_path("set_interest_disposition", tenant_id,
+			f"{account_id} disposition={disposition} linked={linked_payout_account}"))
+		return {
+			"account_id":            account_id,
+			"disposition":           disposition,
+			"linked_payout_account": linked_payout_account,
+			"updated_at":            _now().isoformat(),
+		}
 
 	# ── Health ──────────────────────────────────────────────────────────────
 

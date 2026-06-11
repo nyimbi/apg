@@ -114,6 +114,60 @@ PLGN composes with:
 Batch plugin mutation and plugin release lifecycle events must use the
 `bytewax` event-stream adapter.
 
+## Async API
+
+Every public method has a native `async` counterpart for use in async hosts.
+
+```python
+import asyncio
+from capabilities.common.plgn import PlgnService
+
+svc = PlgnService()
+
+async def main():
+    # Non-blocking registration — hook point for remote signing/scanning
+    plugin = await svc.async_register_plugin(
+        name="analytics-ext", version="2.0.0", author="alice",
+        entry_point="analytics.main", permissions=[], tenant_id="t1",
+    )
+
+    # Concurrent fan-out event dispatch with per-handler timeout isolation
+    await svc.async_hook_fire(
+        tenant_id="t1", event_name="data.ingested",
+        payload={"rows": 1000}, handler_timeout_ms=500,
+    )
+
+    # Parallel health checks across all plugins in the tenant
+    reports = await svc.async_health_check_all("t1", concurrency=10)
+
+    # Install a set of plugins concurrently
+    result = await svc.async_bulk_install(
+        plugin_ids=["analytics-ext", "report-ext"],
+        tenant_id="t1", concurrency=5,
+    )
+
+    # Paginated marketplace search (hook for full-text/vector adapter)
+    hits = await svc.async_search_marketplace("analytics", tenant_id="t1", limit=10)
+
+    # Filtered audit query, newest-first
+    events = await svc.async_audit_query("t1", event_type="plugin_registered")
+
+asyncio.run(main())
+```
+
+| Async method | Purpose |
+|---|---|
+| `async_register_plugin` | Non-blocking registration; I/O hook for signing/scanning |
+| `async_install_plugin` | Non-blocking install; hook for package-registry downloads |
+| `async_hook_fire` | Concurrent fan-out dispatch with per-handler timeout |
+| `async_health_check_all` | Semaphore-bounded parallel health checks |
+| `async_bulk_install` | Concurrent multi-plugin install with stop-on-first-error |
+| `async_dependency_resolve` | Non-blocking dependency resolution |
+| `async_sandboxed_execution` | Sandbox call with `asyncio.wait_for` wall-clock timeout |
+| `async_plugin_analytics` | Non-blocking analytics; hook for time-series adapters |
+| `async_search_marketplace` | Paginated search; hook for full-text/vector index |
+| `async_audit_query` | Filtered, sorted audit event retrieval |
+
 ## Verification
 
 Focused verification for this packet:

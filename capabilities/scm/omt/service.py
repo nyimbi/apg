@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -15,10 +15,29 @@ _log = logging.getLogger(__name__)
 CAPABILITY_ID = "scm_omt"
 ORDER_STATUSES = {
 	"draft", "confirmed", "allocated", "picking", "packed",
-	"shipped", "delivered", "cancelled", "on_hold",
+	"shipped", "partially_shipped", "delivered", "cancelled", "on_hold",
 }
 NOTIFICATION_CHANNELS = {"email", "sms", "push", "webhook"}
 ORDER_PRIORITIES = {"urgent", "high", "normal", "low"}
+PRIORITY_WEIGHTS = {"urgent": 4.0, "high": 3.0, "normal": 2.0, "low": 1.0}
+CUSTOMER_TIER_WEIGHTS = {"strategic": 3.0, "preferred": 2.0, "standard": 1.0}
+
+# Formal state-machine adjacency — only these transitions are permitted.
+TRANSITIONS: dict[str, set[str]] = {
+	"draft":            {"confirmed", "cancelled", "on_hold"},
+	"confirmed":        {"allocated", "cancelled", "on_hold"},
+	"allocated":        {"picking", "cancelled", "on_hold"},
+	"picking":          {"packed", "on_hold"},
+	"packed":           {"shipped", "partially_shipped", "on_hold"},
+	"shipped":          {"delivered"},
+	"partially_shipped":{"shipped", "delivered", "on_hold"},
+	"delivered":        set(),
+	"cancelled":        set(),
+	"on_hold":          {"confirmed", "cancelled"},
+}
+
+# Maximum concurrent tasks for bounded bulk operations.
+_BULK_CONCURRENCY = 10
 
 
 class OrderManagementService:
@@ -34,8 +53,11 @@ class OrderManagementService:
 		self.notifications: dict[str, dict[str, Any]] = {}
 		self.atp_records: dict[str, dict[str, Any]] = {}  # available-to-promise
 		self.holds: dict[str, dict[str, Any]] = {}
+		self.rmas: dict[str, dict[str, Any]] = {}  # return merchandise authorizations
+		self.customer_tiers: dict[str, str] = {}  # customer_id → tier
 		self._order_seq: int = 1000
 		self._audit_events: list[dict[str, Any]] = []
+		self._idempotency_cache: dict[str, str] = {}  # key → order_id
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -53,16 +75,51 @@ class OrderManagementService:
 		self._order_seq += 1
 		return f"ORD-{tenant_id[:4].upper()}-{self._order_seq:06d}"
 
-	def _emit(self, tenant_id: str, event_type: str, record_id: str, record_type: str, status: str) -> None:
+	def _emit(
+		self,
+		tenant_id: str,
+		event_type: str,
+		record_id: str,
+		record_type: str,
+		status: str,
+		causation_id: str | None = None,
+		correlation_id: str | None = None,
+	) -> str:
+		"""Append an audit event; return its generated id for causal chaining."""
+		event_id = self._id("evt")
 		self._audit_events.append({
+			"id": event_id,
 			"tenant_id": tenant_id,
 			"event_type": event_type,
 			"record_id": record_id,
 			"record_type": record_type,
 			"status": status,
 			"capability_id": CAPABILITY_ID,
+			"causation_id": causation_id,
+			"correlation_id": correlation_id,
 			"emitted_at": self._now(),
 		})
+		return event_id
+
+	def _assert_transition(self, order: dict[str, Any], target_status: str) -> None:
+		"""Raise ValueError if the target status is not a valid next state."""
+		current = order["status"]
+		allowed = TRANSITIONS.get(current, set())
+		if target_status not in allowed:
+			raise ValueError(
+				f"cannot transition order '{order['id']}' from '{current}' to '{target_status}'; "
+				f"allowed: {sorted(allowed) or '(none)'}"
+			)
+
+	async def _bounded_gather(self, coros: list, concurrency: int = _BULK_CONCURRENCY) -> list:
+		"""Run coroutines with a bounded semaphore to prevent resource exhaustion."""
+		sem = asyncio.Semaphore(concurrency)
+
+		async def _wrap(coro):
+			async with sem:
+				return await coro
+
+		return list(await asyncio.gather(*[_wrap(c) for c in coros], return_exceptions=True))
 
 	# ── Health & describe ─────────────────────────────────────────────────────
 
@@ -104,9 +161,21 @@ class OrderManagementService:
 		priority: str = "normal",
 		notes: str | None = None,
 		tenant_id: str | None = None,
+		idempotency_key: str | None = None,
 	) -> dict[str, Any]:
-		"""Create a new customer order."""
+		"""Create a new customer order.
+
+		If *idempotency_key* is supplied and a previous call with the same key succeeded,
+		the original order is returned without creating a duplicate.
+		"""
 		tenant = self._tenant(tenant_id)
+		if idempotency_key:
+			cache_key = f"{tenant}:{idempotency_key}"
+			if cache_key in self._idempotency_cache:
+				existing_id = self._idempotency_cache[cache_key]
+				if existing_id in self.orders:
+					_log.debug("idempotency hit for key=%s order=%s", idempotency_key, existing_id)
+					return deepcopy(self.orders[existing_id])
 		if priority not in ORDER_PRIORITIES:
 			raise ValueError(f"priority must be one of {ORDER_PRIORITIES}")
 		if not lines:
@@ -143,6 +212,8 @@ class OrderManagementService:
 			"updated_at": None,
 		}
 		self.orders[record["id"]] = record
+		if idempotency_key:
+			self._idempotency_cache[f"{tenant}:{idempotency_key}"] = record["id"]
 		self._emit(tenant, "order_created", record["id"], "scm_omt_order", "draft")
 		return deepcopy(record)
 
@@ -566,11 +637,12 @@ class OrderManagementService:
 		order_ids: list[str],
 		confirmed_by: str,
 		tenant_id: str | None = None,
+		concurrency: int = _BULK_CONCURRENCY,
 	) -> dict[str, Any]:
-		"""Bulk-confirm multiple orders."""
+		"""Bulk-confirm multiple orders with bounded concurrency."""
 		tenant = self._tenant(tenant_id)
-		tasks = [self.confirm_order(oid, confirmed_by, tenant_id=tenant) for oid in order_ids]
-		raw = await asyncio.gather(*tasks, return_exceptions=True)
+		coros = [self.confirm_order(oid, confirmed_by, tenant_id=tenant) for oid in order_ids]
+		raw = await self._bounded_gather(coros, concurrency=concurrency)
 		results, errors = [], []
 		for item in raw:
 			if isinstance(item, Exception):
@@ -578,3 +650,474 @@ class OrderManagementService:
 			else:
 				results.append(item)
 		return {"confirmed": len(results), "failed": len(errors), "orders": results, "errors": errors}
+
+	# ── Order scoring & priority queue ────────────────────────────────────────
+
+	async def set_customer_tier(
+		self,
+		customer_id: str,
+		tier: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Assign a SLA tier to a customer (strategic | preferred | standard)."""
+		self._tenant(tenant_id)
+		if tier not in CUSTOMER_TIER_WEIGHTS:
+			raise ValueError(f"tier must be one of {set(CUSTOMER_TIER_WEIGHTS)}")
+		self.customer_tiers[customer_id] = tier
+		return {"customer_id": customer_id, "tier": tier, "updated_at": self._now()}
+
+	async def get_order_queue(
+		self,
+		tenant_id: str | None = None,
+		status_filter: str = "confirmed",
+	) -> list[dict[str, Any]]:
+		"""Return confirmed orders sorted by composite score (revenue × priority × tier).
+
+		The warehouse picks from the top of this list to maximise value delivery.
+		"""
+		tenant = self._tenant(tenant_id)
+		candidates = [
+			deepcopy(o) for o in self.orders.values()
+			if o["tenant_id"] == tenant and o["status"] == status_filter
+		]
+		for order in candidates:
+			p_weight = PRIORITY_WEIGHTS.get(order.get("priority", "normal"), 2.0)
+			tier = self.customer_tiers.get(order["customer_id"], "standard")
+			t_weight = CUSTOMER_TIER_WEIGHTS.get(tier, 1.0)
+			order["_score"] = round(order.get("total_value", 0.0) * p_weight * t_weight, 4)
+		candidates.sort(key=lambda o: o["_score"], reverse=True)
+		return candidates
+
+	# ── Order routing ─────────────────────────────────────────────────────────
+
+	async def route_order(
+		self,
+		order_id: str,
+		warehouse_atp_snapshots: list[dict[str, Any]],
+		policy: str = "consolidate",
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Assign order lines to warehouses according to a routing policy.
+
+		*warehouse_atp_snapshots* — list of dicts with keys:
+		  ``warehouse_id``, ``sku``, ``available_quantity``.
+
+		*policy* options:
+		  - ``consolidate`` — prefer fewest warehouses (minimize shipment count).
+		  - ``fastest``     — use the warehouse with the most surplus stock.
+
+		Returns an assignment plan: list of ``{line_index, sku, warehouse_id, quantity}``.
+		"""
+		tenant = self._tenant(tenant_id)
+		order = self.orders.get(order_id)
+		if not order or order["tenant_id"] != tenant:
+			raise KeyError(f"order '{order_id}' not found")
+		if policy not in {"consolidate", "fastest"}:
+			raise ValueError("policy must be 'consolidate' or 'fastest'")
+
+		# Build a lookup: sku → [(warehouse_id, available_qty)] sorted by available_qty desc
+		wh_index: dict[str, list[tuple[str, float]]] = {}
+		for snap in warehouse_atp_snapshots:
+			wh = snap["warehouse_id"]
+			sku = snap["sku"]
+			qty = float(snap.get("available_quantity", 0))
+			wh_index.setdefault(sku, []).append((wh, qty))
+		for sku in wh_index:
+			wh_index[sku].sort(key=lambda x: x[1], reverse=True)
+
+		assignments: list[dict[str, Any]] = []
+		unroutable: list[dict[str, Any]] = []
+
+		for idx, line in enumerate(order["lines"]):
+			sku = line["sku"]
+			needed = float(line["quantity"])
+			options = wh_index.get(sku, [])
+
+			if policy == "fastest":
+				# Pick the single warehouse with the most stock, regardless of whether it
+				# can fully cover the line.
+				if options:
+					wh_id, avail = options[0]
+					assignments.append({
+						"line_index": idx,
+						"sku": sku,
+						"warehouse_id": wh_id,
+						"quantity": min(needed, avail),
+					})
+				else:
+					unroutable.append({"line_index": idx, "sku": sku, "reason": "no_stock"})
+			else:  # consolidate — prefer one warehouse for all lines
+				# Find any single warehouse that can cover the full quantity.
+				covered = False
+				for wh_id, avail in options:
+					if avail >= needed:
+						assignments.append({
+							"line_index": idx,
+							"sku": sku,
+							"warehouse_id": wh_id,
+							"quantity": needed,
+						})
+						covered = True
+						break
+				if not covered:
+					unroutable.append({"line_index": idx, "sku": sku, "reason": "insufficient_stock"})
+
+		record: dict[str, Any] = {
+			"id": self._id("route"),
+			"type": "scm_omt_route_plan",
+			"tenant_id": tenant,
+			"order_id": order_id,
+			"policy": policy,
+			"assignments": assignments,
+			"unroutable_lines": unroutable,
+			"created_at": self._now(),
+		}
+		self._emit(tenant, "order_routed", record["id"], "scm_omt_route_plan", "created")
+		return record
+
+	# ── Delivery window negotiation ───────────────────────────────────────────
+
+	async def get_available_delivery_windows(
+		self,
+		order_id: str,
+		candidate_dates: list[str],
+		warehouse_calendar: dict[str, Any] | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Return feasible delivery windows for an order from a list of candidates.
+
+		*candidate_dates* — ISO-8601 date strings the customer is considering.
+		*warehouse_calendar* — optional dict with ``blackout_dates`` (list[str]) and
+		  ``cutoff_time`` (``HH:MM`` UTC).  Dates in the blackout list are excluded.
+
+		Returns feasible and infeasible windows with reasons.
+		"""
+		tenant = self._tenant(tenant_id)
+		order = self.orders.get(order_id)
+		if not order or order["tenant_id"] != tenant:
+			raise KeyError(f"order '{order_id}' not found")
+
+		blackout: set[str] = set((warehouse_calendar or {}).get("blackout_dates", []))
+		feasible, infeasible = [], []
+
+		for date_str in candidate_dates:
+			if date_str in blackout:
+				infeasible.append({"date": date_str, "reason": "warehouse_blackout"})
+				continue
+			# ATP horizon check — if we have an ATP record for any line sku, verify stock.
+			shortage_skus: list[str] = []
+			for line in order["lines"]:
+				sku = line["sku"]
+				key = f"{tenant}:{sku}:any"
+				atp = self.atp_records.get(key, {})
+				if float(atp.get("available_quantity", 0)) < float(line["quantity"]):
+					shortage_skus.append(sku)
+			if shortage_skus:
+				infeasible.append({"date": date_str, "reason": "insufficient_atp", "skus": shortage_skus})
+			else:
+				feasible.append({"date": date_str, "status": "available"})
+
+		return {
+			"order_id": order_id,
+			"feasible_windows": feasible,
+			"infeasible_windows": infeasible,
+			"checked_at": self._now(),
+		}
+
+	# ── SLA breach detection ──────────────────────────────────────────────────
+
+	async def detect_sla_breaches(
+		self,
+		tenant_id: str | None = None,
+		escalate: bool = False,
+		escalation_recipient: str | None = None,
+	) -> dict[str, Any]:
+		"""Scan active orders for SLA breaches (now > promised_date, not yet delivered).
+
+		If *escalate* is True and *escalation_recipient* is given, a notification is
+		queued for each breached order.
+
+		Returns a summary with the list of breached order ids.
+		"""
+		tenant = self._tenant(tenant_id)
+		now_str = self._now()
+		breached: list[dict[str, Any]] = []
+
+		for order in self.orders.values():
+			if order["tenant_id"] != tenant:
+				continue
+			if order["status"] in {"delivered", "cancelled"}:
+				continue
+			promised = order.get("promised_delivery_date")
+			if not promised:
+				continue
+			if promised < now_str:
+				breach = {
+					"order_id": order["id"],
+					"order_number": order["order_number"],
+					"promised_delivery_date": promised,
+					"current_status": order["status"],
+					"customer_id": order["customer_id"],
+				}
+				breached.append(breach)
+				causation = self._emit(
+					tenant, "sla_breach_detected", order["id"], "scm_omt_order", order["status"]
+				)
+				if escalate and escalation_recipient:
+					await self.send_notification(
+						order_id=order["id"],
+						channel="email",
+						event_type="sla_breach",
+						message=(
+							f"Order {order['order_number']} promised by {promised} "
+							f"is still in status '{order['status']}'."
+						),
+						recipient=escalation_recipient,
+						tenant_id=tenant,
+					)
+
+		return {
+			"tenant_id": tenant,
+			"total_breached": len(breached),
+			"breached_orders": breached,
+			"scanned_at": now_str,
+		}
+
+	# ── Re-promising engine ───────────────────────────────────────────────────
+
+	async def re_promise_breached_orders(
+		self,
+		tenant_id: str | None = None,
+		auto_revoke: bool = False,
+		new_promise_offset_days: int = 3,
+	) -> dict[str, Any]:
+		"""Scan active promises, revoke any whose promised_date has passed, and
+		optionally re-promise with *new_promise_offset_days* added to today.
+
+		Returns counts of revoked and re-promised records.
+		"""
+		tenant = self._tenant(tenant_id)
+		now_str = self._now()
+		today = now_str[:10]
+		revoked, repromised = [], []
+
+		for promise in list(self.order_promises.values()):
+			if promise["tenant_id"] != tenant or promise["status"] != "active":
+				continue
+			if promise["promised_date"] < today:
+				if auto_revoke:
+					promise["status"] = "revoked"
+					promise["revocation_reason"] = "system_re_promise_sweep"
+					promise["revoked_at"] = self._now()
+					self._emit(tenant, "order_promise_revoked", promise["id"], "scm_omt_order_promise", "revoked")
+					revoked.append(promise["id"])
+
+					# Re-promise: compute new date (naive offset, no calendar awareness)
+					from datetime import timedelta
+					new_date_obj = datetime.fromisoformat(today) + timedelta(days=new_promise_offset_days)
+					new_date = new_date_obj.date().isoformat()
+					new_promise = await self.promise_order(
+						order_id=promise["order_id"],
+						promised_date=new_date,
+						promised_by="system_re_promise",
+						confidence_pct=70.0,
+						tenant_id=tenant,
+					)
+					repromised.append(new_promise["id"])
+
+		return {
+			"tenant_id": tenant,
+			"revoked_count": len(revoked),
+			"repromised_count": len(repromised),
+			"revoked_promise_ids": revoked,
+			"new_promise_ids": repromised,
+			"processed_at": self._now(),
+		}
+
+	# ── Return Merchandise Authorization (RMA) ────────────────────────────────
+
+	async def create_rma(
+		self,
+		order_id: str,
+		lines: list[dict[str, Any]],
+		reason: str,
+		requested_by: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Initiate a return / RMA against a delivered order.
+
+		*lines* — list of dicts with ``sku``, ``return_quantity``, and optional
+		``condition`` (``new`` | ``damaged`` | ``missing_parts``).
+		"""
+		tenant = self._tenant(tenant_id)
+		order = self.orders.get(order_id)
+		if not order or order["tenant_id"] != tenant:
+			raise KeyError(f"order '{order_id}' not found")
+		if order["status"] != "delivered":
+			raise ValueError("RMAs can only be raised against delivered orders")
+		if not lines:
+			raise ValueError("return lines must not be empty")
+		record: dict[str, Any] = {
+			"id": self._id("rma"),
+			"type": "scm_omt_rma",
+			"tenant_id": tenant,
+			"order_id": order_id,
+			"order_number": order["order_number"],
+			"lines": deepcopy(lines),
+			"reason": reason,
+			"requested_by": requested_by,
+			"status": "pending",
+			"created_at": self._now(),
+		}
+		self.rmas[record["id"]] = record
+		self._emit(tenant, "rma_created", record["id"], "scm_omt_rma", "pending")
+		return deepcopy(record)
+
+	async def approve_rma(
+		self,
+		rma_id: str,
+		approved_by: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Approve a pending RMA, authorising the customer to ship goods back."""
+		tenant = self._tenant(tenant_id)
+		rma = self.rmas.get(rma_id)
+		if not rma or rma["tenant_id"] != tenant:
+			raise KeyError(f"RMA '{rma_id}' not found")
+		if rma["status"] != "pending":
+			raise ValueError(f"RMA is already '{rma['status']}'")
+		rma["status"] = "approved"
+		rma["approved_by"] = approved_by
+		rma["approved_at"] = self._now()
+		self._emit(tenant, "rma_approved", rma_id, "scm_omt_rma", "approved")
+		return deepcopy(rma)
+
+	async def receive_return(
+		self,
+		rma_id: str,
+		received_by: str,
+		condition_notes: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Record physical receipt of returned goods against an approved RMA."""
+		tenant = self._tenant(tenant_id)
+		rma = self.rmas.get(rma_id)
+		if not rma or rma["tenant_id"] != tenant:
+			raise KeyError(f"RMA '{rma_id}' not found")
+		if rma["status"] != "approved":
+			raise ValueError("can only receive goods against an approved RMA")
+		rma["status"] = "received"
+		rma["received_by"] = received_by
+		rma["received_at"] = self._now()
+		if condition_notes:
+			rma["condition_notes"] = condition_notes
+		self._emit(tenant, "return_received", rma_id, "scm_omt_rma", "received")
+		return deepcopy(rma)
+
+	async def list_rmas(
+		self,
+		tenant_id: str | None = None,
+		status: str | None = None,
+		order_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List RMAs with optional status and order filters."""
+		tenant = self._tenant(tenant_id)
+		items = [deepcopy(r) for r in self.rmas.values() if r["tenant_id"] == tenant]
+		if status:
+			items = [r for r in items if r["status"] == status]
+		if order_id:
+			items = [r for r in items if r["order_id"] == order_id]
+		return items
+
+	# ── ATP horizon (date-bucketed) ───────────────────────────────────────────
+
+	async def update_atp_horizon(
+		self,
+		sku: str,
+		supply_events: list[dict[str, Any]],
+		demand_events: list[dict[str, Any]],
+		opening_stock: float = 0.0,
+		warehouse_id: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Build a rolling ATP profile from supply and demand events.
+
+		*supply_events* — list of ``{date: str, quantity: float}`` (PO receipts,
+		  production completions, etc.).
+		*demand_events* — list of ``{date: str, quantity: float}`` (confirmed orders,
+		  forecast consumption, etc.).
+
+		Returns a date-sorted list of buckets showing cumulative ATP at each event date,
+		stored under the ATP record and returned for inspection.
+		"""
+		tenant = self._tenant(tenant_id)
+		key = f"{tenant}:{sku}:{warehouse_id or 'any'}"
+
+		# Merge and sort all events chronologically.
+		all_events: list[tuple[str, float]] = []
+		for e in supply_events:
+			all_events.append((e["date"], +float(e["quantity"])))
+		for e in demand_events:
+			all_events.append((e["date"], -float(e["quantity"])))
+		all_events.sort(key=lambda x: x[0])
+
+		buckets: list[dict[str, Any]] = []
+		running = opening_stock
+		for date_str, delta in all_events:
+			running += delta
+			buckets.append({"date": date_str, "delta": delta, "cumulative_atp": round(running, 6)})
+
+		record: dict[str, Any] = {
+			"id": key,
+			"tenant_id": tenant,
+			"sku": sku,
+			"warehouse_id": warehouse_id,
+			"opening_stock": opening_stock,
+			"available_quantity": round(running, 6),  # final balance
+			"atp_horizon": buckets,
+			"updated_at": self._now(),
+		}
+		self.atp_records[key] = record
+		self._emit(tenant, "atp_horizon_updated", key, "scm_omt_atp", "updated")
+		return deepcopy(record)
+
+	async def check_atp_by_date(
+		self,
+		sku: str,
+		requested_quantity: float,
+		requested_date: str,
+		warehouse_id: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Check whether ATP will be >= *requested_quantity* by *requested_date*.
+
+		Uses the stored ATP horizon if available; falls back to point-in-time ATP.
+		"""
+		tenant = self._tenant(tenant_id)
+		key = f"{tenant}:{sku}:{warehouse_id or 'any'}"
+		atp_entry = self.atp_records.get(key, {})
+		horizon: list[dict[str, Any]] = atp_entry.get("atp_horizon", [])
+
+		if horizon:
+			# Find the cumulative ATP at or just before the requested date.
+			atp_at_date = float(atp_entry.get("opening_stock", 0))
+			for bucket in horizon:
+				if bucket["date"] <= requested_date:
+					atp_at_date = bucket["cumulative_atp"]
+				else:
+					break
+		else:
+			atp_at_date = float(atp_entry.get("available_quantity", 0))
+
+		can_fulfil = atp_at_date >= requested_quantity
+		return {
+			"tenant_id": tenant,
+			"sku": sku,
+			"warehouse_id": warehouse_id,
+			"requested_quantity": requested_quantity,
+			"requested_date": requested_date,
+			"atp_at_date": atp_at_date,
+			"can_fulfil": can_fulfil,
+			"shortage_quantity": max(0.0, requested_quantity - atp_at_date),
+			"checked_at": self._now(),
+		}

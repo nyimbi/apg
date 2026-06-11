@@ -1196,3 +1196,741 @@ class TerminalBankingService:
 			{"jurisdiction": jurisdiction, "period": period},
 		)
 		return report
+
+	# ── New world-class methods ────────────────────────────────────────────────
+
+	async def inject_terminal_key(
+		self,
+		terminal_id: str,
+		bdk_id: str,
+		ksn: str,
+		key_type: str,
+		injected_by: str,
+		*,
+		expiry_days: int = 365,
+	) -> dict[str, Any]:
+		"""Record a DUKPT/TR-31 key-injection event for a terminal.
+
+		Stores the Base Derivation Key reference (BDK ID), the initial Key Serial
+		Number (KSN), and the key type (TDES/AES128/AES256).  Raw key material is
+		*never* passed through this method — only opaque references produced by
+		the HSM.  After injection the terminal status transitions from
+		``configuration_pending`` to ``key_injected``.
+
+		Args:
+			terminal_id: Target terminal.
+			bdk_id: Opaque HSM reference for the Base Derivation Key.
+			ksn: Initial Key Serial Number (hex string, 20 hex chars).
+			key_type: One of ``TDES``, ``AES128``, ``AES256``.
+			injected_by: Actor performing the injection (HSM operator ID).
+			expiry_days: Days until the key expires and must be rotated.
+		"""
+		assert bdk_id, "bdk_id required"
+		assert ksn, "ksn required"
+		assert key_type in {"TDES", "AES128", "AES256"}, (
+			"key_type must be TDES | AES128 | AES256"
+		)
+		assert injected_by, "injected_by required"
+
+		terminal = await self._get_terminal(terminal_id)
+
+		expiry_dt = datetime.now(timezone.utc) + timedelta(days=expiry_days)
+		key_record: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"terminal_id": terminal_id,
+			"bdk_id": bdk_id,
+			"ksn": ksn,
+			"key_type": key_type,
+			"injected_by": injected_by,
+			"injected_at": _now(),
+			"expires_at": expiry_dt.isoformat(),
+			"status": "active",
+			"rotation_count": 0,
+		}
+		await self._store.put("terminal_keys", key_record)
+
+		# Advance terminal state
+		if terminal.get("status") == "configuration_pending":
+			terminal["status"] = "key_injected"
+		terminal["active_key_id"] = key_record["id"]
+		terminal["key_expiry"] = key_record["expires_at"]
+		terminal["ksn"] = ksn
+		terminal["updated_at"] = _now()
+		await self._store.put("terminals", terminal)
+
+		await self._audit_event(
+			"terminal_key_injected", injected_by, terminal_id,
+			{"bdk_id": bdk_id, "key_type": key_type, "expires_at": key_record["expires_at"]},
+		)
+		return key_record
+
+	async def rotate_terminal_key(
+		self,
+		terminal_id: str,
+		new_bdk_id: str,
+		new_ksn: str,
+		key_type: str,
+		rotated_by: str,
+	) -> dict[str, Any]:
+		"""Rotate the active encryption key on a terminal.
+
+		Marks the previous key record as ``retired`` and injects a new one via
+		:meth:`inject_terminal_key`.  Maintains a full rotation audit chain.
+
+		Args:
+			terminal_id: Target terminal.
+			new_bdk_id: HSM reference for the new BDK.
+			new_ksn: New initial KSN (hex string).
+			key_type: Key algorithm for the replacement key.
+			rotated_by: Actor authorising the rotation.
+		"""
+		terminal = await self._get_terminal(terminal_id)
+		old_key_id = terminal.get("active_key_id")
+
+		if old_key_id:
+			old_key = await self._store.get("terminal_keys", old_key_id)
+			if old_key:
+				old_key["status"] = "retired"
+				old_key["retired_at"] = _now()
+				await self._store.put("terminal_keys", old_key)
+
+		new_key = await self.inject_terminal_key(
+			terminal_id, new_bdk_id, new_ksn, key_type, rotated_by
+		)
+
+		rotation_record: dict[str, Any] = {
+			"id": _uid(),
+			"terminal_id": terminal_id,
+			"old_key_id": old_key_id,
+			"new_key_id": new_key["id"],
+			"rotated_by": rotated_by,
+			"rotated_at": _now(),
+		}
+		await self._store.put("terminal_key_rotations", rotation_record)
+		await self._audit_event(
+			"terminal_key_rotated", rotated_by, terminal_id,
+			{"old_key_id": old_key_id, "new_key_id": new_key["id"]},
+		)
+		return rotation_record
+
+	async def provision_terminal_certificate(
+		self,
+		terminal_id: str,
+		csr_pem: str,
+		issued_by: str,
+		*,
+		validity_days: int = 90,
+	) -> dict[str, Any]:
+		"""Issue a TLS client certificate for terminal-to-host mutual TLS.
+
+		In production this calls the platform CA signing API.  Here we model
+		the certificate lifecycle record (CSR hash, serial, expiry, revocation
+		status) that the platform CA would return.
+
+		Args:
+			terminal_id: Terminal requesting the certificate.
+			csr_pem: PEM-encoded Certificate Signing Request.
+			issued_by: CA operator or automated CA service identifier.
+			validity_days: Certificate validity period in days.
+		"""
+		assert csr_pem, "csr_pem required"
+		assert issued_by, "issued_by required"
+
+		await self._assert_active(terminal_id)
+
+		csr_fingerprint = hashlib.sha256(csr_pem.encode()).hexdigest()
+		expiry_dt = datetime.now(timezone.utc) + timedelta(days=validity_days)
+		serial = hashlib.md5(f"{terminal_id}{_now()}".encode()).hexdigest().upper()[:16]
+
+		cert_record: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"terminal_id": terminal_id,
+			"serial": serial,
+			"csr_fingerprint": csr_fingerprint,
+			"issued_by": issued_by,
+			"issued_at": _now(),
+			"expires_at": expiry_dt.isoformat(),
+			"status": "active",
+			"revoked": False,
+			"revoked_at": None,
+			"revocation_reason": None,
+		}
+		await self._store.put("terminal_certificates", cert_record)
+
+		terminal = await self._get_terminal(terminal_id)
+		terminal["active_cert_id"] = cert_record["id"]
+		terminal["cert_expiry"] = cert_record["expires_at"]
+		terminal["updated_at"] = _now()
+		await self._store.put("terminals", terminal)
+
+		await self._audit_event(
+			"terminal_certificate_issued", issued_by, terminal_id,
+			{"serial": serial, "expires_at": cert_record["expires_at"]},
+		)
+		return cert_record
+
+	async def revoke_terminal_certificate(
+		self,
+		terminal_id: str,
+		cert_id: str,
+		reason: str,
+		revoked_by: str,
+	) -> dict[str, Any]:
+		"""Revoke an active TLS client certificate for a terminal.
+
+		Certificates are revoked on tamper detection, key compromise, or
+		terminal decommission.  The terminal is suspended if the revoked
+		certificate is its current active one.
+
+		Args:
+			terminal_id: Owning terminal.
+			cert_id: Certificate record ID to revoke.
+			reason: Revocation reason (e.g., ``tamper_detected``, ``key_compromise``).
+			revoked_by: Actor authorising the revocation.
+		"""
+		assert reason, "reason required"
+		assert revoked_by, "revoked_by required"
+
+		cert = await self._store.get("terminal_certificates", cert_id)
+		if cert is None:
+			raise ValueError(f"Certificate not found: {cert_id}")
+		if cert["terminal_id"] != terminal_id:
+			raise ValueError(f"Certificate {cert_id} does not belong to terminal {terminal_id}")
+
+		cert["status"] = "revoked"
+		cert["revoked"] = True
+		cert["revoked_at"] = _now()
+		cert["revocation_reason"] = reason
+		await self._store.put("terminal_certificates", cert)
+
+		# Auto-suspend terminal if this was its active cert
+		terminal = await self._get_terminal(terminal_id)
+		if terminal.get("active_cert_id") == cert_id:
+			terminal["status"] = "suspended"
+			terminal["suspension_reason"] = f"certificate_revoked:{reason}"
+			terminal["suspended_at"] = _now()
+			terminal["updated_at"] = _now()
+			await self._store.put("terminals", terminal)
+
+		await self._audit_event(
+			"terminal_certificate_revoked", revoked_by, terminal_id,
+			{"cert_id": cert_id, "reason": reason},
+		)
+		await self._notify.send(
+			"security_ops@datacraft.co.ke", "email",
+			f"Certificate revoked on terminal {terminal_id}",
+			f"Cert {cert_id} revoked: {reason} by {revoked_by}.",
+		)
+		return cert
+
+	async def evaluate_transaction_velocity(
+		self,
+		terminal_id: str,
+		customer_id: str,
+		transaction_type: str,
+		amount: float,
+	) -> dict[str, Any]:
+		"""Check real-time transaction velocity limits before authorising a transaction.
+
+		Computes rolling 1-hour and 24-hour counts and volumes per customer and
+		per terminal.  Returns a fraud score (0–100) and an ``allow``/``review``/
+		``deny`` recommendation.
+
+		Args:
+			terminal_id: Terminal originating the transaction.
+			customer_id: Customer account reference.
+			transaction_type: Transaction category string.
+			amount: Proposed transaction amount (KES).
+		"""
+		now_dt = datetime.now(timezone.utc)
+		cutoff_1h = (now_dt - timedelta(hours=1)).isoformat()
+		cutoff_24h = (now_dt - timedelta(hours=24)).isoformat()
+
+		all_txns = await self._store.query(
+			"terminal_transactions",
+			{"customer_id": customer_id},
+			limit=5_000,
+		)
+
+		txns_1h = [t for t in all_txns if t.get("timestamp", "") >= cutoff_1h]
+		txns_24h = [t for t in all_txns if t.get("timestamp", "") >= cutoff_24h]
+		terminal_txns_1h = [t for t in txns_1h if t.get("terminal_id") == terminal_id]
+
+		vol_1h = sum(t.get("amount", 0) for t in txns_1h)
+		vol_24h = sum(t.get("amount", 0) for t in txns_24h)
+		count_1h = len(txns_1h)
+		count_24h = len(txns_24h)
+		terminal_count_1h = len(terminal_txns_1h)
+
+		# Simple rule-based scoring
+		score = 0
+		flags: list[str] = []
+		if count_1h > 10:
+			score += 30; flags.append("high_frequency_1h")
+		if vol_1h > 500_000:
+			score += 25; flags.append("high_volume_1h")
+		if vol_24h > 2_000_000:
+			score += 20; flags.append("high_volume_24h")
+		if terminal_count_1h > 5:
+			score += 15; flags.append("terminal_concentration")
+		if amount > 200_000:
+			score += 10; flags.append("large_single_amount")
+
+		if score >= 70:
+			recommendation = "deny"
+		elif score >= 40:
+			recommendation = "review"
+		else:
+			recommendation = "allow"
+
+		result: dict[str, Any] = {
+			"id": _uid(),
+			"terminal_id": terminal_id,
+			"customer_id": customer_id,
+			"transaction_type": transaction_type,
+			"amount": amount,
+			"count_1h": count_1h,
+			"count_24h": count_24h,
+			"volume_1h": round(vol_1h, 2),
+			"volume_24h": round(vol_24h, 2),
+			"fraud_score": min(score, 100),
+			"flags": flags,
+			"recommendation": recommendation,
+			"evaluated_at": _now(),
+		}
+		await self._store.put("terminal_velocity_checks", result)
+		return result
+
+	async def push_terminal_parameters(
+		self,
+		terminal_id: str,
+		parameters: dict[str, Any],
+		pushed_by: str,
+		*,
+		version: str | None = None,
+		rollback_version: str | None = None,
+	) -> dict[str, Any]:
+		"""Push an updated parameter set to a terminal over-the-air (OTA).
+
+		Parameters include BIN tables, commission rate tables, CAF files,
+		merchant category codes, and EMV tag defaults.  A rollback version may
+		be specified so the terminal can revert if the new parameters cause errors.
+
+		Args:
+			terminal_id: Destination terminal.
+			parameters: Key-value parameter payload.
+			pushed_by: Operator authorising the push.
+			version: Semantic version tag for this parameter set.
+			rollback_version: Parameter version to roll back to on failure.
+		"""
+		assert parameters, "parameters must be non-empty"
+		assert pushed_by, "pushed_by required"
+
+		terminal = await self._get_terminal(terminal_id)
+
+		param_hash = hashlib.sha256(
+			json.dumps(parameters, sort_keys=True).encode()
+		).hexdigest()
+
+		push_record: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"terminal_id": terminal_id,
+			"version": version or f"auto-{_uid()[:8]}",
+			"param_hash": param_hash,
+			"parameter_keys": list(parameters.keys()),
+			"pushed_by": pushed_by,
+			"pushed_at": _now(),
+			"rollback_version": rollback_version,
+			"status": "deployed",
+		}
+		await self._store.put("terminal_parameter_deployments", push_record)
+
+		terminal["active_parameter_version"] = push_record["version"]
+		terminal["active_param_hash"] = param_hash
+		terminal["last_param_push_at"] = _now()
+		terminal["updated_at"] = _now()
+		await self._store.put("terminals", terminal)
+
+		await self._audit_event(
+			"terminal_parameters_pushed", pushed_by, terminal_id,
+			{"version": push_record["version"], "keys": push_record["parameter_keys"]},
+		)
+		return push_record
+
+	async def geo_fence_check(
+		self,
+		terminal_id: str,
+		latitude: float,
+		longitude: float,
+		*,
+		radius_meters: float = 500.0,
+	) -> dict[str, Any]:
+		"""Validate that a terminal's reported GPS position is within its registered geo-fence.
+
+		If the terminal has drifted outside the allowed radius it is auto-suspended
+		and a fraud alert is raised.  Uses the Haversine formula for distance.
+
+		Args:
+			terminal_id: Terminal reporting its location.
+			latitude: Current GPS latitude in decimal degrees.
+			longitude: Current GPS longitude in decimal degrees.
+			radius_meters: Allowed radius from registered coordinates (default 500 m).
+		"""
+		import math
+
+		terminal = await self._get_terminal(terminal_id)
+		registered_loc = terminal.get("location", {})
+		reg_lat = registered_loc.get("latitude")
+		reg_lon = registered_loc.get("longitude")
+
+		within_fence = True
+		distance_meters = 0.0
+
+		if reg_lat is not None and reg_lon is not None:
+			# Haversine
+			R = 6_371_000.0  # Earth radius in metres
+			phi1 = math.radians(reg_lat)
+			phi2 = math.radians(latitude)
+			dphi = math.radians(latitude - reg_lat)
+			dlambda = math.radians(longitude - reg_lon)
+			a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+			distance_meters = 2 * R * math.asin(math.sqrt(a))
+			within_fence = distance_meters <= radius_meters
+
+		result: dict[str, Any] = {
+			"id": _uid(),
+			"terminal_id": terminal_id,
+			"current_lat": latitude,
+			"current_lon": longitude,
+			"registered_lat": reg_lat,
+			"registered_lon": reg_lon,
+			"distance_meters": round(distance_meters, 2),
+			"radius_meters": radius_meters,
+			"within_fence": within_fence,
+			"checked_at": _now(),
+		}
+		await self._store.put("terminal_geo_checks", result)
+
+		if not within_fence:
+			await self.fraud_alert_terminal(
+				terminal_id, "geo_fence_violation",
+				{"distance_meters": distance_meters, "radius_meters": radius_meters},
+			)
+
+		return result
+
+	async def relocate_terminal(
+		self,
+		terminal_id: str,
+		new_location: dict[str, Any],
+		requested_by: str,
+		approved_by: str,
+	) -> dict[str, Any]:
+		"""Relocate a terminal to a new physical location with dual approval.
+
+		Both the agent (``requested_by``) and a supervisor (``approved_by``) must
+		be distinct actors.  The registered location and geo-fence centre are
+		updated atomically.
+
+		Args:
+			terminal_id: Terminal to relocate.
+			new_location: Location dict with at minimum ``latitude``, ``longitude``,
+				and ``address``.
+			requested_by: Agent or field engineer requesting the relocation.
+			approved_by: Supervisor approving the move.
+		"""
+		assert new_location, "new_location required"
+		assert requested_by, "requested_by required"
+		assert approved_by, "approved_by required"
+		if requested_by == approved_by:
+			raise PermissionError("requested_by and approved_by must be different actors")
+
+		terminal = await self._get_terminal(terminal_id)
+		old_location = terminal.get("location", {})
+
+		terminal["location"] = new_location
+		terminal["previous_location"] = old_location
+		terminal["relocated_at"] = _now()
+		terminal["relocated_by"] = requested_by
+		terminal["relocation_approved_by"] = approved_by
+		terminal["updated_at"] = _now()
+
+		# Lift geo-fence suspension if terminal was suspended for geo violation
+		if terminal.get("suspension_reason") == "geo_fence_violation":
+			terminal["status"] = "active"
+			terminal.pop("suspension_reason", None)
+
+		await self._store.put("terminals", terminal)
+
+		relocation_record: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"terminal_id": terminal_id,
+			"old_location": old_location,
+			"new_location": new_location,
+			"requested_by": requested_by,
+			"approved_by": approved_by,
+			"relocated_at": _now(),
+		}
+		await self._store.put("terminal_relocations", relocation_record)
+		await self._audit_event(
+			"terminal_relocated", approved_by, terminal_id,
+			{"old_location": old_location, "new_location": new_location},
+		)
+		return relocation_record
+
+	async def batch_reconcile_network(
+		self,
+		recon_date: str,
+		*,
+		variance_threshold_pct: float = 0.5,
+	) -> dict[str, Any]:
+		"""Run end-of-day batch reconciliation across all active terminals.
+
+		Aggregates per-terminal reconciliation, flags those with float variance
+		exceeding ``variance_threshold_pct`` percent, and emits alert notifications
+		for each.  Returns a summary suitable for CBK ABR-01 daily reporting.
+
+		Args:
+			recon_date: ISO date string (``YYYY-MM-DD``).
+			variance_threshold_pct: Float variance % above which a terminal is
+				flagged (default 0.5 %).
+		"""
+		terminals = await self._store.query(
+			"terminals", {"tenant_id": self._tenant_id}, limit=10_000
+		)
+		active_terminals = [t for t in terminals if t.get("status") == "active"]
+
+		results, flagged = [], []
+		total_credits = total_debits = 0.0
+
+		for terminal in active_terminals:
+			tid = terminal["id"]
+			recon = await self.terminal_reconciliation(tid, recon_date)
+			results.append(recon)
+			total_credits += recon.get("total_credits", 0.0)
+			total_debits += recon.get("total_debits", 0.0)
+
+			float_bal = recon.get("float_balance", 0.0)
+			variance = recon.get("float_variance", 0.0)
+			variance_pct = abs(variance) / max(float_bal, 1.0) * 100
+			if variance_pct > variance_threshold_pct:
+				flagged.append({
+					"terminal_id": tid,
+					"float_variance": variance,
+					"variance_pct": round(variance_pct, 3),
+				})
+				await self._notify.send(
+					"reconciliation@datacraft.co.ke", "email",
+					f"Float variance on {tid} for {recon_date}",
+					f"Terminal {tid} float variance: KES {variance:,.2f} ({variance_pct:.2f}%)",
+				)
+
+		summary: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"recon_date": recon_date,
+			"total_active_terminals": len(active_terminals),
+			"terminals_reconciled": len(results),
+			"terminals_flagged": len(flagged),
+			"flagged_details": flagged,
+			"aggregate_credits_kes": round(total_credits, 2),
+			"aggregate_debits_kes": round(total_debits, 2),
+			"net_position_kes": round(total_credits - total_debits, 2),
+			"generated_at": _now(),
+		}
+		await self._store.put("network_reconciliations", summary)
+		await self._audit_event(
+			"network_batch_reconciled", "system", "network",
+			{"recon_date": recon_date, "flagged": len(flagged)},
+		)
+		return summary
+
+	async def agent_credit_drawdown(
+		self,
+		agent_id: str,
+		terminal_id: str,
+		amount: float,
+		*,
+		currency: str = "KES",
+	) -> dict[str, Any]:
+		"""Draw down from an agent's intraday float credit facility.
+
+		The credit line is replenished at EOD via :meth:`agent_credit_repayment`.
+		If the requested amount exceeds the remaining credit limit, the call
+		raises ``ValueError``.
+
+		Args:
+			agent_id: Agent whose credit line is being drawn.
+			terminal_id: Terminal that will receive the float top-up.
+			amount: Amount to draw (positive KES value).
+			currency: Settlement currency (default ``KES``).
+		"""
+		assert amount > 0, "drawdown amount must be positive"
+
+		# Load or initialise credit facility record
+		facilities = await self._store.query(
+			"agent_credit_facilities", {"agent_id": agent_id}, limit=1
+		)
+		if facilities:
+			facility = facilities[0]
+		else:
+			facility = {
+				"id": _uid(),
+				"agent_id": agent_id,
+				"tenant_id": self._tenant_id,
+				"credit_limit": 100_000.0,
+				"outstanding": 0.0,
+				"currency": currency,
+				"created_at": _now(),
+			}
+
+		available = facility["credit_limit"] - facility["outstanding"]
+		if amount > available:
+			raise ValueError(
+				f"Drawdown {amount:,.2f} exceeds available credit {available:,.2f}"
+			)
+
+		facility["outstanding"] = facility["outstanding"] + amount
+		facility["last_drawdown_at"] = _now()
+		await self._store.put("agent_credit_facilities", facility)
+
+		# Top up float on terminal
+		await self.float_management(
+			terminal_id, amount, "top_up", authorised_by=f"credit_facility:{facility['id']}"
+		)
+
+		drawdown_record: dict[str, Any] = {
+			"id": _uid(),
+			"agent_id": agent_id,
+			"terminal_id": terminal_id,
+			"facility_id": facility["id"],
+			"amount": amount,
+			"currency": currency,
+			"outstanding_after": facility["outstanding"],
+			"drawn_at": _now(),
+		}
+		await self._store.put("agent_credit_drawdowns", drawdown_record)
+		await self._audit_event(
+			"agent_credit_drawdown", agent_id, terminal_id,
+			{"amount": amount, "outstanding_after": facility["outstanding"]},
+		)
+		return drawdown_record
+
+	async def agent_credit_repayment(
+		self,
+		agent_id: str,
+		amount: float,
+		*,
+		currency: str = "KES",
+		reference: str | None = None,
+	) -> dict[str, Any]:
+		"""Repay outstanding intraday credit drawn by an agent.
+
+		Typically called at end-of-day settlement.  Reduces the outstanding
+		balance; excess repayment (over-payment) is rejected.
+
+		Args:
+			agent_id: Repaying agent.
+			amount: Amount being repaid (positive KES).
+			currency: Settlement currency.
+			reference: Optional external reference (e.g., RTGS/EFT ref).
+		"""
+		assert amount > 0, "repayment amount must be positive"
+
+		facilities = await self._store.query(
+			"agent_credit_facilities", {"agent_id": agent_id}, limit=1
+		)
+		if not facilities:
+			raise ValueError(f"No credit facility found for agent: {agent_id}")
+
+		facility = facilities[0]
+		if amount > facility["outstanding"]:
+			raise ValueError(
+				f"Repayment {amount:,.2f} exceeds outstanding balance {facility['outstanding']:,.2f}"
+			)
+
+		facility["outstanding"] = facility["outstanding"] - amount
+		facility["last_repayment_at"] = _now()
+		await self._store.put("agent_credit_facilities", facility)
+
+		repayment_record: dict[str, Any] = {
+			"id": _uid(),
+			"agent_id": agent_id,
+			"facility_id": facility["id"],
+			"amount": amount,
+			"currency": currency,
+			"reference": reference,
+			"outstanding_after": facility["outstanding"],
+			"repaid_at": _now(),
+		}
+		await self._store.put("agent_credit_repayments", repayment_record)
+		await self._audit_event(
+			"agent_credit_repayment", agent_id, "credit_facility",
+			{"amount": amount, "outstanding_after": facility["outstanding"]},
+		)
+		return repayment_record
+
+	async def foreign_currency_transaction(
+		self,
+		terminal_id: str,
+		customer_id: str,
+		amount: float,
+		source_currency: str,
+		target_currency: str = "KES",
+		*,
+		exchange_rate: float | None = None,
+	) -> dict[str, Any]:
+		"""Execute a cross-currency transaction at an agency terminal.
+
+		Converts ``amount`` from ``source_currency`` to ``target_currency`` using
+		the provided (or fetched) CBK daily exchange rate.  Both the original and
+		converted amounts are recorded for regulatory reporting.
+
+		Args:
+			terminal_id: Originating terminal.
+			customer_id: Customer account reference.
+			amount: Amount in source currency.
+			source_currency: ISO 4217 source currency code.
+			target_currency: ISO 4217 target currency code (default ``KES``).
+			exchange_rate: Override exchange rate.  If ``None``, a default
+				approximate rate is used (production would call the CBK rates API).
+		"""
+		assert source_currency, "source_currency required"
+		assert source_currency != target_currency, "source and target currency must differ"
+		assert amount > 0, "amount must be positive"
+
+		# Fallback rates for common pairs (production: CBK API)
+		_default_rates: dict[str, float] = {
+			"USD": 130.0, "EUR": 140.0, "GBP": 165.0,
+			"TZS": 0.050, "UGX": 0.034, "RWF": 0.085,
+		}
+		if exchange_rate is None:
+			exchange_rate = _default_rates.get(source_currency.upper(), 1.0)
+
+		converted_amount = round(amount * exchange_rate, 2)
+
+		txn = await self.terminal_transaction(
+			terminal_id, "foreign_currency_exchange", converted_amount,
+			target_currency, customer_id,
+			f"FX-{source_currency}-{_uid()[:8].upper()}",
+			metadata={
+				"source_currency": source_currency,
+				"source_amount": amount,
+				"exchange_rate": exchange_rate,
+				"target_currency": target_currency,
+				"converted_amount": converted_amount,
+			},
+		)
+		await self._audit_event(
+			"terminal_fx_transaction", customer_id, terminal_id,
+			{
+				"source": f"{source_currency} {amount}",
+				"target": f"{target_currency} {converted_amount}",
+				"rate": exchange_rate,
+			},
+		)
+		return txn

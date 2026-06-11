@@ -1,14 +1,19 @@
-# WSBL - Website Builder
+# WSBL - Website Builder + WebSocket Broker
 
-WSBL is the APG capability for governed website and page composition. It gives
-generated applications a composable runtime for tenant sites, domains, pages,
-components, public-site controls, publishing, rollback, accessibility,
-privacy-consent policy, AI-assisted review, and Bytewax lifecycle events.
+WSBL is the APG capability for governed website and page composition, extended
+with a real-time WebSocket broker layer for live collaborative editing.  It
+gives generated applications a composable runtime for tenant sites, domains,
+pages, components, public-site controls, publishing, rollback, accessibility,
+privacy-consent policy, AI-assisted review, Bytewax lifecycle events, and
+real-time presence, rooms, and collaborative sessions.
 
 Use WSBL when an application needs a website builder that can move from draft
-composition to controlled publication without skipping governance evidence.
+composition to controlled publication without skipping governance evidence, and
+where multiple editors can collaborate in real time on the same site or page.
 
 ## What WSBL Provides
+
+**Website Builder (synchronous)**
 
 - Tenant-scoped site registry.
 - Domain registration and validation state.
@@ -26,6 +31,20 @@ composition to controlled publication without skipping governance evidence.
 - Bytewax lifecycle stream metadata.
 - Dashboard, site, page, editor, component, publishing, analytics, agent,
   policy, and settings view models.
+
+**WebSocket Broker (async)**
+
+- Tenant-scoped WebSocket connection registry with transport metadata.
+- Heartbeat tracking and idle-connection pruning.
+- Room creation, join, leave, and close with capacity enforcement.
+- Presence protocol: cursor position, active page/component, intent TTL.
+- Presence snapshots delivered on room join.
+- Fan-out broadcast with delivery receipts and sender exclusion.
+- Collaborative editing sessions with heartbeat-based lifecycle.
+- Stale session reaping.
+- Exclusive component locks with TTL and connection-scoped ownership.
+- In-context section annotations visible to all room members.
+- Channel-level access control integrated with the WSBL policy engine.
 
 ## Quick Start
 
@@ -194,6 +213,31 @@ WSBL enforces:
 - `list_records()`
 - `list_website_builder()`
 
+**WebSocket Broker service methods (all `async`):**
+
+- `async_connect(tenant_id, connection_id, actor_id, ...)`
+- `async_disconnect(tenant_id, connection_id, actor_id, ...)`
+- `async_heartbeat(tenant_id, connection_id)`
+- `async_prune_dead_connections(tenant_id, max_idle_seconds)`
+- `async_room_create(tenant_id, room_id, site_id, actor_id, ...)`
+- `async_room_join(tenant_id, room_id, connection_id, actor_id)`
+- `async_room_leave(tenant_id, room_id, connection_id, actor_id)`
+- `async_room_close(tenant_id, room_id, actor_id)`
+- `async_presence_update(tenant_id, connection_id, actor_id, ...)`
+- `async_presence_snapshot(tenant_id, room_id)`
+- `async_broadcast(tenant_id, room_id, message, actor_id, ...)`
+- `async_session_start(tenant_id, connection_id, site_id, page_id, actor_id, ...)`
+- `async_session_end(tenant_id, session_id, actor_id)`
+- `async_reap_stale_sessions(tenant_id, max_idle_seconds)`
+- `async_lock_component(tenant_id, component_id, connection_id, actor_id, ...)`
+- `async_unlock_component(tenant_id, component_id, connection_id, actor_id)`
+- `async_annotate_section(tenant_id, page_id, section_id, actor_id, text, ...)`
+- `async_list_annotations(tenant_id, page_id, include_resolved)`
+- `async_authorize_channel(tenant_id, connection_id, channel, required_perm, ...)`
+- `list_connections(tenant_id)`
+- `list_rooms(tenant_id)`
+- `list_component_locks(tenant_id)`
+
 ## UI Routes
 
 - dashboard: `/wsbl/dashboard`
@@ -215,7 +259,7 @@ WSBL publishes lifecycle metadata for Bytewax:
 - stream: `apg.wsbl.lifecycle`
 - key: `tenant_id`
 
-Events:
+Events (website builder):
 
 - `site_created`
 - `domain_registered`
@@ -229,14 +273,91 @@ Events:
 - `site_rolled_back`
 - `wsbl_agent_registered`
 
+Events (WebSocket broker — stream `apg.wsbl.realtime`):
+
+- `ws_connected`
+- `ws_disconnected`
+- `connection_reaped`
+- `ws_room_created`
+- `ws_room_joined`
+- `ws_room_left`
+- `ws_room_closed`
+- `ws_broadcast`
+- `ws_session_started`
+- `ws_session_ended`
+- `ws_component_locked`
+- `ws_component_unlocked`
+- `ws_annotation_added`
+- `ws_channel_authorized`
+- `ws_channel_denied`
+
+## WebSocket Broker: Quick Start
+
+```python
+import asyncio
+from capabilities.common.wsbl import WsblService
+
+service = WsblService()
+
+async def demo():
+    # Connect two editors
+    await service.async_connect("tenant-a", "conn-1", "editor-1")
+    await service.async_connect("tenant-a", "conn-2", "editor-2")
+
+    # Open a collaboration room for the site
+    site = service.create_site("blog", "tenant-a", "Blog", "editor-1")
+    room = await service.async_room_create(
+        "tenant-a", "room-blog", site["id"], "editor-1", room_type="collaboration"
+    )
+    await service.async_room_join("tenant-a", "room-blog", "conn-1", "editor-1")
+    await service.async_room_join("tenant-a", "room-blog", "conn-2", "editor-2")
+
+    # Publish presence
+    await service.async_presence_update(
+        "tenant-a", "conn-1", "editor-1", intent="editing"
+    )
+
+    # Broadcast a content-change event
+    receipt = await service.async_broadcast(
+        "tenant-a", "room-blog",
+        message={"type": "section_update", "section_id": "s1"},
+        actor_id="editor-1",
+        exclude_connection_ids=["conn-1"],
+    )
+    assert receipt["delivered"] == 1
+
+    # Start a collaborative session
+    page = service.create_page(site["id"], "home", "Home", "tenant-a")
+    session = await service.async_session_start(
+        "tenant-a", "conn-1", site["id"], page["id"], "editor-1"
+    )
+
+    # Lock a component while editing
+    comp = service.create_component("hero", "tenant-a", "Hero", reviewed=True, reviewed_by="r1")
+    await service.async_lock_component("tenant-a", comp["id"], "conn-1", "editor-1")
+
+    # Annotate a section
+    annot = await service.async_annotate_section(
+        "tenant-a", page["id"], "section-1", "reviewer-1", "Needs stronger CTA"
+    )
+
+    # Clean up
+    await service.async_unlock_component("tenant-a", comp["id"], "conn-1", "editor-1")
+    await service.async_session_end("tenant-a", session["id"], "editor-1")
+    await service.async_room_close("tenant-a", "room-blog", "editor-1")
+
+asyncio.run(demo())
+```
+
 ## Adapter Boundaries
 
 The in-package service stores records in memory so generated applications,
 tests, and publish-plan probes can execute without external infrastructure.
 Production systems should attach visual editors, asset stores, preview
 renderers, accessibility scanners, consent platforms, analytics collectors, CDN
-or static-host deployment, search/sitemap systems, audit sinks, and Bytewax
-workers through APG adapters.
+or static-host deployment, search/sitemap systems, audit sinks, Bytewax
+workers, and a real WebSocket transport (e.g. Redis pub/sub via
+``RedisBrokerBackend``) through APG adapters.
 
 ## Verification
 

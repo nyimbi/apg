@@ -1028,5 +1028,431 @@ class LicensingService:
 			"generated_at": datetime.now().isoformat(),
 		}
 
+	# ------------------------------------------------------------------
+	# World-class enhancement methods (v1.1.0)
+	# ------------------------------------------------------------------
+
+	async def risk_score_licence(self, licence_id: str) -> dict[str, Any]:
+		"""Compute a risk-based compliance score (0–100) for a licence.
+
+		Components:
+		  - Inspection pass/fail history: 40 pts
+		  - Fee payment timeliness:        20 pts
+		  - Renewal timeliness:            20 pts
+		  - Condition adherence:           20 pts (placeholder)
+
+		Higher score = lower risk. Drives inspection frequency and fee-discount eligibility.
+		"""
+		assert _present(licence_id), "licence_id required"
+		tenant = self.tenant_id
+		lic = self.licences.get(self._key(tenant, licence_id))
+		if lic is None:
+			raise KeyError(f"licence {licence_id!r} not found")
+
+		relevant_inspections = [
+			i for i in self.inspections.values()
+			if i.tenant_id == tenant and i.licence_id == licence_id and i.outcome
+		]
+		if relevant_inspections:
+			passed = sum(1 for i in relevant_inspections if i.outcome == "pass")
+			inspection_score = round(passed / len(relevant_inspections) * 40)
+		else:
+			inspection_score = 30
+
+		fee_records = [
+			f for f in self.fees.values()
+			if f.tenant_id == tenant and f.application_id == licence_id
+		]
+		fee_score = round(sum(1 for f in fee_records if f.paid) / max(len(fee_records), 1) * 20) if fee_records else 15
+
+		renewal_records = [r for r in self.renewals.values() if r.tenant_id == tenant and r.licence_id == licence_id]
+		renewal_score = 20 if renewal_records else 15
+		condition_score = 20
+
+		total_score = inspection_score + fee_score + renewal_score + condition_score
+		risk_tier = "low" if total_score >= 80 else "medium" if total_score >= 50 else "high"
+		score_id = _new_id()
+		self._audit(tenant, "lic_risk_scored", score_id)
+		return {
+			"score_id": score_id,
+			"licence_id": licence_id,
+			"tenant_id": tenant,
+			"total_score": total_score,
+			"risk_tier": risk_tier,
+			"components": {
+				"inspection": inspection_score,
+				"fee_payment": fee_score,
+				"renewal_timeliness": renewal_score,
+				"condition_adherence": condition_score,
+			},
+			"scored_at": datetime.now().isoformat(),
+		}
+
+	async def sla_status_report(self) -> dict[str, Any]:
+		"""Report SLA compliance for pending applications.
+
+		SLA targets: business=21 days, professional=14 days, temporary=5 days.
+		Applications within 3 days of their deadline are flagged as approaching_breach.
+		"""
+		tenant = self.tenant_id
+		now = datetime.now()
+		SLA_DAYS: dict[str, int] = {"business": 21, "professional": 14, "temporary": 5}
+		DEFAULT_SLA = 21
+
+		within_sla: list[dict[str, Any]] = []
+		approaching: list[dict[str, Any]] = []
+		breached: list[dict[str, Any]] = []
+
+		for app in self.applications.values():
+			if app.tenant_id != tenant or app.status not in {"submitted", "under_review"}:
+				continue
+			submitted_events = [
+				e for e in self.audit_events
+				if e["tenant_id"] == tenant
+				and e["event_type"] == "licence_application_submitted"
+				and e["reference_id"] == app.id
+			]
+			if not submitted_events:
+				continue
+			submitted_at = submitted_events[0].get("recorded_at", now.isoformat())
+			try:
+				start = datetime.fromisoformat(submitted_at)
+			except (ValueError, TypeError):
+				start = now
+			sla_days = SLA_DAYS.get(app.licence_type, DEFAULT_SLA)
+			deadline = start + timedelta(days=sla_days)
+			days_remaining = (deadline - now).days
+			entry = {
+				"application_id": app.id,
+				"licence_type": app.licence_type,
+				"submitted_at": submitted_at,
+				"sla_deadline": deadline.isoformat(),
+				"days_remaining": days_remaining,
+			}
+			if days_remaining < 0:
+				breached.append(entry)
+			elif days_remaining <= 3:
+				approaching.append(entry)
+			else:
+				within_sla.append(entry)
+
+		report_id = _new_id()
+		self._audit(tenant, "lic_sla_reported", report_id)
+		return {
+			"report_id": report_id,
+			"tenant_id": tenant,
+			"within_sla": len(within_sla),
+			"approaching_breach": len(approaching),
+			"breached": len(breached),
+			"details": {
+				"within_sla": within_sla,
+				"approaching_breach": approaching,
+				"breached": breached,
+			},
+			"generated_at": now.isoformat(),
+		}
+
+	async def late_fee_assessment(self, licence_id: str) -> dict[str, Any]:
+		"""Assess and record a late renewal penalty when a licence is overdue.
+
+		Late fee = KES 500/day * days_overdue. Creates a FeeRecord that must be
+		settled before the renewed licence is issued.
+		"""
+		assert _present(licence_id), "licence_id required"
+		tenant = self.tenant_id
+		lic = self.licences.get(self._key(tenant, licence_id))
+		if lic is None:
+			raise KeyError(f"licence {licence_id!r} not found")
+
+		now = datetime.now()
+		try:
+			expiry = datetime.fromisoformat(lic.expiry_date)
+		except (ValueError, TypeError):
+			raise ValueError(f"licence {licence_id!r} has unparseable expiry_date")
+
+		days_overdue = max(0, (now - expiry).days)
+		base_rate_per_day: float = 500.0
+		penalty_amount = days_overdue * base_rate_per_day
+		penalty_id = _new_id()
+		receipt = f"LFP-{now.strftime('%Y%m%d')}-{penalty_id[:6].upper()}"
+
+		if days_overdue > 0:
+			fee_item = FeeRecord(
+				penalty_id, tenant, licence_id, "late_renewal_penalty",
+				penalty_amount, "KES", receipt, False,
+			)
+			self.fees[self._key(tenant, penalty_id)] = fee_item
+			self._audit(tenant, "lic_late_fee_assessed", penalty_id)
+
+		return {
+			"penalty_id": penalty_id,
+			"licence_id": licence_id,
+			"expiry_date": lic.expiry_date,
+			"days_overdue": days_overdue,
+			"base_rate_per_day": base_rate_per_day,
+			"penalty_amount": penalty_amount,
+			"currency": "KES",
+			"receipt": receipt,
+			"paid": False,
+			"renewal_blocked_until_paid": days_overdue > 0,
+			"assessed_at": now.isoformat(),
+			"tenant_id": tenant,
+		}
+
+	async def appeal_revocation(
+		self,
+		licence_id: str,
+		appellant_id: str,
+		grounds: str,
+	) -> dict[str, Any]:
+		"""File a formal appeal against a revocation decision (must be within 30 days)."""
+		assert _present(licence_id), "licence_id required"
+		assert _present(appellant_id), "appellant_id required"
+		assert _present(grounds), "grounds required"
+		tenant = self.tenant_id
+
+		rev = next(
+			(r for r in sorted(
+				self.revocations.values(), key=lambda x: x.revoked_at, reverse=True,
+			) if r.tenant_id == tenant and r.licence_id == licence_id),
+			None,
+		)
+		if rev is None:
+			raise KeyError(f"no revocation found for licence {licence_id!r}")
+
+		now = datetime.now()
+		try:
+			revoked_dt = datetime.fromisoformat(rev.revoked_at)
+		except (ValueError, TypeError):
+			revoked_dt = now
+		days_since = (now - revoked_dt).days
+		if days_since > 30:
+			raise ValueError(f"appeal window expired: {days_since} days since revocation (limit 30)")
+
+		appeal_id = _new_id()
+		deadline = (now + timedelta(days=60)).isoformat()
+		self._audit(tenant, "lic_revocation_appeal_filed", appeal_id)
+		return {
+			"appeal_id": appeal_id,
+			"licence_id": licence_id,
+			"revocation_id": rev.id,
+			"appellant_id": appellant_id,
+			"grounds": grounds,
+			"days_since_revocation": days_since,
+			"hearing_deadline": deadline,
+			"status": "appeal_filed",
+			"filed_at": now.isoformat(),
+			"tenant_id": tenant,
+		}
+
+	async def inspection_checklist_evaluate(
+		self,
+		inspection_id: str,
+		responses: dict[str, bool],
+	) -> dict[str, Any]:
+		"""Score a completed inspection checklist; pass threshold is 80%.
+
+		Updates inspection.outcome and inspection.findings in-place.
+		"""
+		assert _present(inspection_id), "inspection_id required"
+		assert responses, "responses required"
+		tenant = self.tenant_id
+
+		inspection = self.inspections.get(self._key(tenant, inspection_id))
+		if inspection is None:
+			raise KeyError(f"inspection {inspection_id!r} not found")
+
+		total_items = len(responses)
+		passed_items = sum(1 for v in responses.values() if v)
+		score_pct = round(passed_items / total_items * 100, 1)
+		outcome = "pass" if score_pct >= 80.0 else "fail"
+
+		inspection.outcome = outcome
+		inspection.findings = (
+			f"Score {score_pct}% ({passed_items}/{total_items} items). "
+			+ ("PASS" if outcome == "pass" else "FAIL — re-inspection required.")
+		)
+		self._audit(tenant, "lic_checklist_evaluated", inspection_id)
+		return {
+			"inspection_id": inspection_id,
+			"total_items": total_items,
+			"passed_items": passed_items,
+			"score_pct": score_pct,
+			"outcome": outcome,
+			"findings": inspection.findings,
+			"pass_threshold_pct": 80.0,
+			"evaluated_at": datetime.now().isoformat(),
+			"tenant_id": tenant,
+		}
+
+	async def impact_analysis(self, proposed_change: dict[str, Any]) -> dict[str, Any]:
+		"""Dry-run a policy or fee-schedule change; return affected licence count and revenue delta.
+
+		proposed_change keys:
+		  - change_type: "fee_schedule" | "policy_rule"
+		  - licence_type: affected type or "*" for all
+		  - new_fee: new fee amount (fee_schedule changes)
+		"""
+		assert proposed_change, "proposed_change required"
+		tenant = self.tenant_id
+		lt = _normalize(proposed_change.get("licence_type", "*"))
+		change_type = proposed_change.get("change_type", "fee_schedule")
+
+		affected = [
+			l for l in self.licences.values()
+			if l.tenant_id == tenant and (lt == "*" or l.licence_type == lt)
+		]
+		new_fee = float(proposed_change.get("new_fee", 0))
+		current_total = sum(
+			f.amount for f in self.fees.values()
+			if f.tenant_id == tenant and (lt == "*" or f.fee_type.startswith(lt))
+		)
+		projected_delta = len(affected) * new_fee - current_total if new_fee else 0.0
+		would_fail = [l.id for l in affected if self._last_inspection_failed(l.id, tenant)]
+
+		analysis_id = _new_id()
+		self._audit(tenant, "lic_impact_analysed", analysis_id)
+		return {
+			"analysis_id": analysis_id,
+			"proposed_change": proposed_change,
+			"change_type": change_type,
+			"affected_licence_count": len(affected),
+			"projected_revenue_delta_kes": round(projected_delta, 2),
+			"would_fail_revalidation_count": len(would_fail),
+			"would_fail_revalidation_ids": would_fail[:50],
+			"dry_run": True,
+			"analysed_at": datetime.now().isoformat(),
+			"tenant_id": tenant,
+		}
+
+	async def digital_licence_credential(self, licence_id: str) -> dict[str, Any]:
+		"""Issue a W3C VC-compatible digital licence credential payload.
+
+		Returns a JSON-LD credential stub for delivery to a citizen wallet.
+		Wire proof.proofValue to a signing service for production use.
+		"""
+		assert _present(licence_id), "licence_id required"
+		tenant = self.tenant_id
+		lic = self.licences.get(self._key(tenant, licence_id))
+		if lic is None:
+			raise KeyError(f"licence {licence_id!r} not found")
+
+		issued_at = datetime.now().isoformat()
+		credential_id = _new_id()
+		self._audit(tenant, "lic_digital_credential_issued", credential_id)
+		return {
+			"@context": [
+				"https://www.w3.org/2018/credentials/v1",
+				"https://schema.datacraft.co.ke/lic/v1",
+			],
+			"id": f"urn:datacraft:lic:{credential_id}",
+			"type": ["VerifiableCredential", "GovernmentLicenceCredential"],
+			"issuer": f"did:web:datacraft.co.ke:government:{tenant}",
+			"issuanceDate": issued_at,
+			"expirationDate": lic.expiry_date,
+			"credentialSubject": {
+				"id": f"did:web:datacraft.co.ke:holder:{lic.holder_id}",
+				"licence_number": lic.licence_number,
+				"licence_type": lic.licence_type,
+				"status": lic.status,
+				"tenant_id": tenant,
+			},
+			"proof": {
+				"type": "Ed25519Signature2020",
+				"created": issued_at,
+				"verificationMethod": f"did:web:datacraft.co.ke:government:{tenant}#key-1",
+				"proofPurpose": "assertionMethod",
+				"proofValue": "PLACEHOLDER — wire signing service for production",
+			},
+		}
+
+	async def inspection_sync_payload(self, inspector_id: str) -> dict[str, Any]:
+		"""Package all pending inspections for an inspector as an offline-sync payload.
+
+		Designed for mobile apps in low-connectivity areas. TTL: 48 hours.
+		"""
+		assert _present(inspector_id), "inspector_id required"
+		tenant = self.tenant_id
+		now = datetime.now()
+
+		scheduled = [
+			{
+				"inspection_id": i.id,
+				"licence_id": i.licence_id,
+				"inspection_type": i.inspection_type,
+				"scheduled_date": i.scheduled_date,
+				"checklist": ["fire_safety", "sanitation", "signage", "capacity", "equipment"],
+				"outcome": i.outcome,
+				"findings": i.findings,
+			}
+			for i in self.inspections.values()
+			if i.tenant_id == tenant
+			and i.inspector_id == inspector_id
+			and i.outcome in {"", "scheduled", "pending"}
+		]
+
+		sync_id = _new_id()
+		self._audit(tenant, "lic_inspection_sync_packaged", sync_id)
+		return {
+			"sync_id": sync_id,
+			"inspector_id": inspector_id,
+			"tenant_id": tenant,
+			"inspection_count": len(scheduled),
+			"inspections": scheduled,
+			"sync_schema_version": "1.0",
+			"packaged_at": now.isoformat(),
+			"ttl_hours": 48,
+		}
+
+	async def compliance_scorecard(self) -> dict[str, Any]:
+		"""Generate a ranked compliance scorecard for all active licences.
+
+		Licences are sorted ascending by score (highest risk first).
+		Score components mirror risk_score_licence() for consistency.
+		"""
+		tenant = self.tenant_id
+		active = [l for l in self.licences.values() if l.tenant_id == tenant and l.status == "active"]
+
+		scored: list[dict[str, Any]] = []
+		for lic in active:
+			relevant = [
+				i for i in self.inspections.values()
+				if i.tenant_id == tenant and i.licence_id == lic.id and i.outcome
+			]
+			insp_score = 40
+			if relevant:
+				insp_score = round(sum(1 for i in relevant if i.outcome == "pass") / len(relevant) * 40)
+
+			fee_score = 20 if any(
+				f for f in self.fees.values()
+				if f.tenant_id == tenant and f.application_id == lic.id and f.paid
+			) else 10
+			renewal_score = 20 if any(
+				r for r in self.renewals.values() if r.tenant_id == tenant and r.licence_id == lic.id
+			) else 15
+			total = insp_score + fee_score + renewal_score + 20
+			tier = "low_risk" if total >= 80 else "medium_risk" if total >= 50 else "high_risk"
+			scored.append({
+				"licence_id": lic.id,
+				"licence_type": lic.licence_type,
+				"holder_id": lic.holder_id,
+				"score": total,
+				"risk_tier": tier,
+			})
+
+		scored.sort(key=lambda x: x["score"])
+		card_id = _new_id()
+		self._audit(tenant, "lic_scorecard_generated", card_id)
+		return {
+			"scorecard_id": card_id,
+			"tenant_id": tenant,
+			"total_assessed": len(scored),
+			"high_risk_count": sum(1 for s in scored if s["risk_tier"] == "high_risk"),
+			"medium_risk_count": sum(1 for s in scored if s["risk_tier"] == "medium_risk"),
+			"low_risk_count": sum(1 for s in scored if s["risk_tier"] == "low_risk"),
+			"rankings": scored,
+			"generated_at": datetime.now().isoformat(),
+		}
+
 
 GovernmentLicService = LicensingService

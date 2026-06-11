@@ -17,6 +17,13 @@ Comprehensive workplace and space management: versioned floor plans, space alloc
 - `department_space_reporting`: Space allocation by department with area and headcount
 - `space_optimisation_advisor`: Evidence-based recommendations from occupancy history
 - `chargeback_space_accounting`: Cost-per-sqm chargeback to departments
+- `accessibility_space_finder`: Feature-matched accessible space discovery for PSED compliance
+- `allocation_expiry_monitor`: Lookahead scanning for expiring allocations with urgency tiering
+- `portfolio_benchmarking`: Percentile ranking of properties across utilisation, density, void-rate
+- `overcrowding_detection`: Sensor-based overuse event logging with severity ratings
+- `energy_intensity_analytics`: kWh-per-person-day analysis with zero-occupancy waste flagging
+- `space_request_workflow`: Structured request → approval → matching chain with audit trail
+- `zone_analytics`: Ad-hoc space grouping for neighbourhood and wing-level reporting
 
 ## Requires
 | Capability | Reason |
@@ -44,17 +51,25 @@ Comprehensive workplace and space management: versioned floor plans, space alloc
 | `/realestate/spa/floor-plans` | GET/POST | Floor plans | `floor_plans` |
 | `/realestate/spa/spaces` | GET/POST | Space registry | `spaces` |
 | `/realestate/spa/spaces/available` | GET | Available spaces | `spaces` |
+| `/realestate/spa/spaces/accessible` | GET | Accessible spaces by feature set | `spaces` |
 | `/realestate/spa/allocations` | GET/POST | Allocations | `allocations` |
 | `/realestate/spa/allocations/<id>` | DELETE | Deallocate | `allocations` |
+| `/realestate/spa/allocations/expiries` | GET | Expiry lookahead | `allocations` |
 | `/realestate/spa/moves` | GET/POST | Moves | `moves` |
 | `/realestate/spa/moves/<id>/approve` | POST | Approve move | `moves` |
 | `/realestate/spa/bookings` | GET/POST | Bookings | `bookings` |
 | `/realestate/spa/bookings/<id>` | DELETE | Cancel booking | `bookings` |
 | `/realestate/spa/occupancy` | POST | Ingest sensor data | `occupancy` |
 | `/realestate/spa/occupancy/<property_id>` | GET | Occupancy metrics | `occupancy` |
+| `/realestate/spa/occupancy/<space_id>/overuse` | GET | Overcrowding events | `occupancy` |
 | `/realestate/spa/density` | POST | Density plan | `density` |
 | `/realestate/spa/density/<property_id>` | GET | Density analysis | `density` |
 | `/realestate/spa/chargeback/<property_id>` | GET | Chargeback calc | `chargeback` |
+| `/realestate/spa/energy/<property_id>` | GET | Energy per occupant | `analytics` |
+| `/realestate/spa/requests` | GET/POST | Space requests | `requests` |
+| `/realestate/spa/requests/<id>/approve` | POST | Approve request | `requests` |
+| `/realestate/spa/zones/analytics` | POST | Zone-level analytics | `analytics` |
+| `/realestate/spa/benchmark` | GET | Portfolio benchmark | `analytics` |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -96,3 +111,12 @@ Comprehensive workplace and space management: versioned floor plans, space alloc
 - Space chargeback feeds into `realestate_acc` cost allocation runs
 - Move completions may trigger `realestate_prm` unit status updates
 - Occupancy analytics inform `realestate_val` DCF rental growth assumptions
+- Overcrowding events publish to `mqeb` for FM maintenance workflow dispatch
+- Allocation expiry events route through `ntfy` for department-head alerts
+- Energy intensity data feeds `esg` sustainability reporting capability
+- Zone analytics compose with `org` organisational hierarchy for budget attribution
+
+## World-Class Improvement Roadmap
+See `WORLD_CLASS_IMPROVEMENTS.md` for 15 prioritised enhancements covering real-time
+occupancy streaming, BIM layer extraction, ML utilisation forecasting, digital twin
+sync, and RICS-compliant immutable audit history.

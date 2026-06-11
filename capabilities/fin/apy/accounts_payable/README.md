@@ -148,6 +148,63 @@ Supported roles:
 
 Register an agent with `register_ap_agent()` and validate privileged proposals with `validate_agent_ap_action()`.
 
+## New Features (2026)
+
+### Async AI and Analytics Extensions
+
+The following async methods have been added to `AccountsPayableService`:
+
+| Method | Category | Description |
+|---|---|---|
+| `ml_duplicate_invoice_detect(invoice_id, tenant_id)` | Fraud Prevention | Ollama embedding-based cosine similarity duplicate detection with exact-match fallback |
+| `forecast_cash_outflows(tenant_id, horizon_weeks)` | Treasury | 13-week rolling AP cash outflow forecast with P10/P50/P90 bands derived from historical payment velocity |
+| `compute_invoice_tax(invoice_record_id, tenant_id, tax_profile)` | Compliance | VAT (16%) and withholding tax computation with iTax-compatible output |
+| `generate_vat_schedule(tenant_id, period)` | Compliance | KRA iTax input VAT schedule aggregated from all invoices in period |
+| `score_vendor_risk(vendor_record_id, tenant_id)` | Risk | 0–100 composite vendor risk score from exception rate, dispute rate, price variance, and bank-change flags |
+| `straight_through_process(invoice_record_id, tenant_id)` | Automation | Full STP pipeline: validate → duplicate check → PO match → auto-approve; aborts and escalates on any failure |
+| `compute_vendor_scorecard(vendor_record_id, tenant_id, period)` | Analytics | Vendor performance scorecard (accuracy, match pass, on-time submission, dispute score) with composite index |
+| `score_payment_fraud_risk(payment_record_id, tenant_id)` | Security | Real-time payment fraud scoring: new bank account, amount anomaly, weekend payment, bank-change proximity |
+| `compute_accruals(tenant_id, period)` | Accounting | Period-end RNI and service accrual journal entries from GRNs and POs with no matching invoice |
+| `nl_query(question, tenant_id)` | UX / AI | Natural language AP query via Ollama LLM (llama3.1:8b) with keyword-router fallback |
+
+### Usage Examples
+
+```python
+import asyncio
+from capabilities.fin.apy.accounts_payable import AccountsPayableService
+
+service = AccountsPayableService()
+vendor = service.register_vendor("v1", "tenant-a", "Acme Ltd", "ap-ops", "vat-ke", "ach")
+invoice = service.record_invoice("inv-1", "tenant-a", vendor["id"], "INV-2026-001", 50000, "KES", "doc-001")
+
+# Compute tax
+tax = asyncio.run(service.compute_invoice_tax(invoice["id"], "tenant-a", "standard"))
+# -> {"vat_amount": "8000.00", "wht_amount": "2500.00", "net_payable": "55500.00", ...}
+
+# STP pipeline
+result = asyncio.run(service.straight_through_process(invoice["id"], "tenant-a"))
+# -> {"passed": True, "steps": [...], "completed_at": "..."}
+
+# Cash flow forecast
+forecast = asyncio.run(service.forecast_cash_outflows("tenant-a", horizon_weeks=4))
+# -> {"total_projected_outflow": "50000.00", "weekly_buckets": [...], ...}
+
+# Natural language query
+answer = asyncio.run(service.nl_query("Which invoices are overdue?", "tenant-a"))
+# -> {"answer": "AP aging: 1 open invoice...", "data": {...}, ...}
+```
+
+### OLLAMA Integration
+
+Set `OLLAMA_BASE_URL` to enable ML-enhanced features:
+
+```bash
+export OLLAMA_BASE_URL=http://localhost:11434
+export OLLAMA_AP_MODEL=llama3.1:8b   # default model for nl_query
+```
+
+All ML-enhanced methods degrade gracefully to rule-based fallbacks when Ollama is unavailable. The `ml_enhanced` field in every response indicates which execution path was taken.
+
 ## Verification
 
 Focused verification for this package:

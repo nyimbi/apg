@@ -1,7 +1,7 @@
 # Project Accounting
 
 ## Overview
-Project Accounting (pac) provides complete financial tracking for projects: cost capture, revenue recognition under multiple WIP methods, milestone billing, budget control, and profitability reporting. Every transaction is tenant-scoped, approval-gated, and streamed via Bytewax for real-time financial visibility.
+Project Accounting (pac) provides complete financial tracking for projects: cost capture, revenue recognition under multiple WIP methods, milestone billing, earned value management, budget control, cash flow forecasting, and profitability reporting. Every transaction is tenant-scoped, approval-gated, and streamed via Bytewax for real-time financial visibility.
 
 ## Capability ID
 `ppm_pac`
@@ -9,14 +9,21 @@ Project Accounting (pac) provides complete financial tracking for projects: cost
 ## Provides
 | Service | Description |
 |---------|-------------|
-| project_cost_tracking | Capture actual, committed, and forecast costs by type |
+| project_cost_tracking | Capture actual, committed, and forecast costs by type and cost code |
 | revenue_recognition_workflow | Recognise revenue via percentage completion, completed contract, EV, and other GAAP/IFRS methods |
 | wip_accounting_workflow | Post WIP adjustments with auditor sign-off |
 | milestone_billing_workflow | Raise milestone and progress invoices with approval gates |
 | project_profitability_reporting | Gross/contribution/net margin per project account |
 | budget_vs_actual_analysis | Real-time budget variance with controller-approval override path |
-| cost_variance_alerts | Event-driven alerts on cost overruns |
-| cash_flow_forecasting | Forward-looking cash flow from committed and forecast costs |
+| cost_variance_alerts | Event-driven alerts on cost overruns with configurable thresholds |
+| cash_flow_forecasting | Period-by-period cash flow projection from committed POs and milestone schedules |
+| earned_value_management | Full EVM suite: PV, EV, AC, SPI, CPI, EAC, ETC with trend analysis |
+| three_point_eac | PERT-weighted EAC with P50/P80/P90 confidence bands |
+| period_cost_summary | Per-period burn rate and time-to-completion forecasting |
+| accruals | Period-end accrual posting with auto-reversal tracking |
+| intercompany_recharge | Cross-project cost recharging with transfer pricing markup |
+| variance_classification | Heuristic root-cause classification of budget variances |
+| ledger_reconciliation | External ERP ledger reconciliation with tolerance matching |
 | multi_currency_project_accounting | USD, EUR, GBP, KES, and 6 more currencies |
 | audit_trail_maintenance | Immutable audit events via Bytewax stream |
 
@@ -42,6 +49,9 @@ Project Accounting (pac) provides complete financial tracking for projects: cost
 | billing.supported_billing_types | 6 types | Invoice styles |
 | governance.backdated_transaction_requires_justification | true | Audit control |
 | governance.revenue_recognition_requires_approval | true | Segregation of duties |
+| budget.warn_threshold_pct | 80 | Budget utilisation warn threshold |
+| budget.critical_threshold_pct | 95 | Budget utilisation critical threshold |
+| eac.tolerance_pct | 0.5 | Ledger reconciliation tolerance |
 
 ## API Routes
 | Path | Method | Description | Permission |
@@ -57,6 +67,51 @@ Project Accounting (pac) provides complete financial tracking for projects: cost
 | /ppm-pac/variance | GET | Variance analysis | ppm_pac:reports |
 | /ppm-pac/approvals | GET/POST | Approval queue | ppm_pac:approve |
 | /ppm-pac/agents | GET/POST | Agent workbench | ppm_pac:admin |
+| /ppm-pac/cashflow | GET | Cash flow forecast | ppm_pac:reports |
+| /ppm-pac/ev-trend | GET | Earned value trend analysis | ppm_pac:reports |
+| /ppm-pac/accruals | GET/POST | Period-end accruals | ppm_pac:costs |
+| /ppm-pac/recharges | POST | Intercompany cost recharges | ppm_pac:admin |
+| /ppm-pac/reconcile | POST | External ledger reconciliation | ppm_pac:admin |
+
+## Key Service Methods
+
+### Core Accounting
+- `create_account()` — Open a new project accounting record
+- `get_account()` / `list_accounts()` — Retrieve accounts
+- `record_cost()` — Post a direct cost transaction
+- `project_budget_setup()` — Define itemised budget lines
+- `cost_code_create()` — Create a cost code for granular tracking
+- `record_timesheet_cost()` — Post labour cost from timesheet hours
+- `record_expense()` — Record an approved project expense
+- `purchase_order_project()` — Raise a supplier purchase order
+
+### Revenue and WIP
+- `recognise_revenue()` — Post a revenue recognition entry
+- `revenue_recognition_project()` — Auto-recognise using a WIP method
+- `post_wip_adjustment()` — Post an auditor-signed WIP adjustment
+- `raise_invoice()` — Issue a milestone billing invoice
+
+### Analytics and EVM
+- `earned_value_analysis()` — Full EVM metrics for a period
+- `ev_trend_analysis()` — CPI/SPI trend across stored snapshots
+- `three_point_eac()` — PERT-weighted EAC with confidence percentiles
+- `project_profitability()` — Full P&L: revenue, costs, margins
+- `project_cost_report()` — Budget vs actual by cost code
+- `budget_vs_actual()` — Quick budget variance summary
+- `period_cost_summary()` — Per-period burn rate and forecast
+
+### Planning and Control
+- `cash_flow_forecast()` — Period-by-period inflow/outflow projection
+- `check_budget_thresholds()` — Alert evaluation by cost code
+- `post_accrual()` — Period-end accrual with auto-reversal tracking
+- `classify_variance()` — Root-cause classification of budget variances
+- `override_budget()` — Controller-approved budget revision
+
+### Interoperability
+- `create_intercompany_recharge()` — Cross-project cost recharge with markup
+- `reconcile_with_external_ledger()` — ERP ledger reconciliation
+- `invoice_project_cost()` — Allocate supplier invoice across cost codes
+- `export_accounting_data()` — JSON/CSV export
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -71,6 +126,8 @@ Project Accounting (pac) provides complete financial tracking for projects: cost
 | cross_tenant_cost_access_denied | cross_tenant_access=True | deny |
 | cost_batch_requires_bytewax | event_stream != "bytewax" | deny |
 | privileged_agent_action_requires_human_approval | privileged_scope + no approval | deny |
+| accrual_reversal_period_different | period == reversal_period | deny |
+| intercompany_self_recharge_denied | from_project == to_project | deny |
 
 ## Data Models
 - **ProjectAccount** — id, tenant_id, project_id, name, status, currency, budget_amount, owner_id
@@ -86,6 +143,10 @@ Project Accounting (pac) provides complete financial tracking for projects: cost
 - `project_account_created`, `cost_transaction_recorded`, `revenue_recognised`
 - `wip_adjustment_posted`, `milestone_invoice_raised`, `budget_variance_detected`
 - `approval_submitted`, `approval_completed`, `profitability_report_generated`, `agent_registered`
+- `cash_flow_forecast_generated`, `ev_trend_analysed`, `three_point_eac_computed`
+- `accrual_posted`, `intercompany_recharge_posted`, `reconciliation_complete`
+- `budget_threshold_warn`, `budget_threshold_critical`, `variance_classified`
+- `period_cost_summary_generated`
 
 ## Edge Cases Handled
 - Backdated transactions require explicit justification to prevent retroactive manipulation
@@ -94,9 +155,14 @@ Project Accounting (pac) provides complete financial tracking for projects: cost
 - Budget overrides need controller-level approval separate from the PM
 - Cross-tenant cost access is structurally denied via tenant-keyed storage
 - Cost batch submissions must route through Bytewax; direct queue writes are rejected
+- Accrual and reversal periods must differ; same-period accruals are rejected
+- Intercompany recharges cannot be self-directed (from == to is rejected)
+- Ledger reconciliation uses configurable tolerance to handle minor rounding differences
 
 ## Composability Notes
 - Pairs with **ppm_tex** (time entries feed actual costs automatically)
-- Pairs with **ppm_pbl** (EV snapshots use cost baseline data)
+- Pairs with **ppm_pbl** (EV snapshots use cost baseline data; percent_complete source)
 - Pairs with **ppm_res** (resource cost rates underpin labour cost transactions)
 - Downstream consumers can subscribe to `apg.ppm.pac.lifecycle` via Bytewax
+- `reconcile_with_external_ledger` integrates with ERP adapters (SAP, Xero, Sage)
+- `create_intercompany_recharge` pairs with `ppm_pac` instances across entity tenants

@@ -5,8 +5,10 @@ Digital Payments is the application-facing payment lifecycle capability: account
 
 Blocked risk levels deny authorization. Overcapture and overrefund are blocked deterministically. Settlement variance requires review. All payment events stream to `apg.fintech.payments.lifecycle` via Bytewax.
 
+Version 2.1.0 adds: recurring payment mandates, network fraud scoring, multi-party approval workflows, real-time health monitoring, and cross-border corridor cost estimation.
+
 ## Capability ID
-`fintech_payments`  Version: 1.1.0
+`fintech_payments`  Version: 2.1.0
 
 ## Provides
 | Service | Description |
@@ -20,6 +22,11 @@ Blocked risk levels deny authorization. Overcapture and overrefund are blocked d
 | settlement_reconciliation_workflow | Record settlements with variance review gates |
 | payment_dispute_workflow | Open and manage payment disputes with owner assignment |
 | payment_agents | Register AI agents for payment operations, risk, settlement, and dispute review |
+| recurring_mandate_engine | Create and execute server-side recurring payment mandates with smart retry |
+| network_fraud_scoring | Real-time fan-in network graph fraud detection without ML infrastructure |
+| approval_workflow_engine | Configurable multi-party payment approval with quorum and timeout |
+| health_monitoring | Real-time per-method health snapshots with anomaly alerting |
+| corridor_cost_estimation | Cross-border corridor cost comparison: SWIFT vs stablecoin bridge |
 
 ## Requires
 | Capability | Purpose |
@@ -53,6 +60,14 @@ Blocked risk levels deny authorization. Overcapture and overrefund are blocked d
 | disputes | /fintech-payments/disputes | GET/POST | fintech_payments:disputes | Risk |
 | agents | /fintech-payments/agents | GET/POST | fintech_payments:admin | Automation |
 | settings | /fintech-payments/settings | GET/POST | fintech_payments:admin | Administration |
+| mandates | /fintech-payments/mandates | GET/POST | fintech_payments:operate | Recurring |
+| mandates_execute | /fintech-payments/mandates/{id}/execute | POST | fintech_payments:operate | Recurring |
+| fraud_score | /fintech-payments/fraud/network-score | POST | fintech_payments:risk | Risk |
+| approvals | /fintech-payments/approvals | GET/POST | fintech_payments:risk | Approvals |
+| approval_decide | /fintech-payments/approvals/{id}/decide | POST | fintech_payments:risk | Approvals |
+| health | /fintech-payments/health | GET | fintech_payments:view | Monitoring |
+| health_alerts | /fintech-payments/health/alerts | GET/POST | fintech_payments:admin | Monitoring |
+| corridor_cost | /fintech-payments/fx/corridor-cost | GET | fintech_payments:view | FX |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -103,6 +118,15 @@ Events emitted to the fintech event stream via Bytewax.
 | settlement_recorded | Settlement reconciled |
 | payment_dispute_opened | Dispute opened |
 | payment_agent_registered | AI agent registered |
+| mandate.created | Recurring mandate registered |
+| mandate.executed | Mandate billing cycle completed |
+| mandate.cancelled | Mandate deactivated |
+| fraud.network_alert | Network fraud score exceeds review/block threshold |
+| approval.requested | Payment submitted for multi-party approval |
+| approval.approved | Approval quorum reached |
+| approval.rejected | Approval rejected by any approver |
+| health.anomaly_detected | Payment health anomaly detected |
+| health.alert_configured | Health alert rule registered |
 
 ## Edge Cases Handled
 - `blocked` risk level produces a hard deny on authorization — there is no override path; the only resolution is to re-screen the payment at a lower risk level

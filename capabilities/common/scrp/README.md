@@ -1,15 +1,11 @@
-# SCRP - Scraper/Data Harvesting
+# SCRP - Screen Processing / Scraper & Data Harvesting
 
-SCRP is the APG capability for governed data-source harvesting. It lets an APG
-application register tenant-owned sources, define extractors, schedule harvest
-jobs, run guarded harvest lifecycles, record result batches, hand results to
-ETL pipelines, register scoped AI harvest agents, expose composable UI models,
-and audit every important lifecycle transition.
-
-The implementation is intentionally dependency-light. It models the application
-state and guardrails that generated APG applications need before they attach
-live crawlers, browser drivers, credential vaults, DLP scanners, schedulers, or
-warehouse pipelines.
+SCRP is the APG capability for governed data-source harvesting, screen capture,
+OCR, and UI automation. It lets an APG application register tenant-owned
+sources, define extractors, schedule harvest jobs, run guarded harvest
+lifecycles, record result batches, hand results to ETL pipelines, register
+scoped AI harvest agents, expose composable UI models, and audit every
+important lifecycle transition.
 
 ## What SCRP Provides
 
@@ -28,12 +24,27 @@ warehouse pipelines.
   compatible runtime adapters.
 - Deterministic rule engine for tenant context, source ownership, terms
   evidence, credentials, rate limits, extractor schemas, DLP scans, sensitive
-  source review, AI-agent governance, state-change reasons, audit evidence, and
-  Bytewax batch mutation streams.
+  source review, AI-agent governance, state-change reasons, audit evidence,
+  and Bytewax batch mutation streams.
+- **Screen capture** via `capture_screen` (PNG/JPEG, full-page, configurable
+  viewport).
+- **OCR** via `ocr_image` (Tesseract, Ollama vision models) and
+  `ocr_extract_table` for tabular data.
+- **RPA workflows** via `rpa_workflow_run` (navigate, click, type, select,
+  extract, screenshot, scroll, hover).
+- **LLM-based extraction** via `llm_extract` (Ollama-hosted models, content
+  hash cache).
+- **Incremental cursor management** via `cursor_read`, `cursor_advance`,
+  `cursor_reset`.
+- **Webhook dispatch** via `handoff_dispatch` and `handoff_retry` with
+  dead-letter support.
+- **Content diff** via `content_diff` (unified or JSON delta, threshold-based
+  alerting).
+- **Data quality reporting** via `quality_report` (per-field completeness,
+  type validity, format conformance).
 - View models for dashboard, source registry, job monitor, extractor
   workbench, pipeline handoff, compliance review, results, harvest agents,
   audit trail, analytics, and settings.
-- Theme metadata for APG Studio and generated Python applications.
 
 ## How To Use It
 
@@ -96,6 +107,63 @@ completed = service.complete_harvest_run(
 )
 ```
 
+### Async: Screen Capture and OCR
+
+```python
+import asyncio
+
+async def screen_pipeline(service, tenant_id):
+    capture = await service.capture_screen(
+        tenant_id=tenant_id, url="https://example.com/report",
+        output_format="png", full_page=True, owner="analyst",
+    )
+    ocr = await service.ocr_image(
+        tenant_id=tenant_id, image_ref=capture["storage_ref"],
+        model="tesseract", owner="analyst",
+    )
+    table = await service.ocr_extract_table(
+        tenant_id=tenant_id, image_ref=capture["storage_ref"],
+        header_row=True, owner="analyst",
+    )
+    return table["rows"]
+```
+
+### Async: RPA Workflow
+
+```python
+async def rpa_demo(service, tenant_id):
+    return await service.rpa_workflow_run(
+        tenant_id=tenant_id,
+        workflow_id="login-and-extract",
+        target_url="https://app.example.com",
+        steps=[
+            {"action": "navigate", "value": "https://app.example.com/login"},
+            {"action": "type", "selector": "#username", "value": "user@example.com"},
+            {"action": "click", "selector": "button[type=submit]"},
+            {"action": "wait_for", "selector": ".dashboard"},
+            {"action": "extract", "selector": ".report-table"},
+        ],
+        owner="rpa-agent",
+    )
+```
+
+### Async: LLM Extraction
+
+```python
+async def llm_demo(service, tenant_id):
+    return await service.llm_extract(
+        tenant_id=tenant_id,
+        content="Apple Q4 revenue $94B, up 6% YoY, headcount 164,000",
+        schema={
+            "company": {"type": "str"},
+            "revenue_usd_b": {"type": "float"},
+            "headcount": {"type": "int"},
+        },
+        model="mistral-nemo",
+        cache_results=True,
+    )
+```
+
 Use API helpers from `api.py` when composing the capability into generated APG
 applications:
 
@@ -117,6 +185,23 @@ from capabilities.common.scrp.views import dashboard_model, harvest_agents_model
 dashboard = dashboard_model(service, "tenant-demo")
 agents = harvest_agents_model(service, "tenant-demo")
 ```
+
+## Async Method Reference
+
+| Method | Description |
+|--------|-------------|
+| `capture_screen` | Screenshot of a web page (PNG/JPEG, full-page) |
+| `ocr_image` | OCR text extraction from image (Tesseract / Ollama vision) |
+| `ocr_extract_table` | OCR + table structure reconstruction |
+| `rpa_workflow_run` | Execute multi-step RPA workflow via Playwright |
+| `llm_extract` | LLM-powered structured extraction with content hash cache |
+| `cursor_read` | Read incremental cursor for a harvest job |
+| `cursor_advance` | Advance cursor after successful harvest |
+| `cursor_reset` | Reset cursor for full re-harvest (requires reason) |
+| `handoff_dispatch` | Deliver pipeline handoff via HTTP webhook |
+| `handoff_retry` | Retry a dead-lettered handoff |
+| `content_diff` | Line diff between source snapshots with alert threshold |
+| `quality_report` | Per-field completeness and format conformance report |
 
 ## Configuration And Composition
 
@@ -150,11 +235,12 @@ SCRP denies or requires review when:
   lacks explicit scope, or has undisclosed contributions;
 - a lifecycle state change lacks a reason or audit evidence;
 - a cross-tenant access attempt is detected;
-- a batch harvest mutation does not declare Bytewax.
+- a batch harvest mutation does not declare Bytewax;
+- a cursor reset is attempted without a stated reason;
+- an RPA workflow contains an unsupported action type;
+- a content diff uses an unsupported format.
 
 ## Focused Verification
-
-Battery-conscious SCRP checks:
 
 ```bash
 ./.venv/bin/python -m py_compile capabilities/common/scrp/__init__.py capabilities/common/scrp/capability_contract.py capabilities/common/scrp/models.py capabilities/common/scrp/harvest_runtime.py capabilities/common/scrp/service.py capabilities/common/scrp/api.py capabilities/common/scrp/views.py capabilities/common/scrp/test_capability_contract.py capabilities/common/scrp/tests/test_package_contract.py
@@ -162,4 +248,3 @@ Battery-conscious SCRP checks:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/scrp --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/scrp --json
 ```
-

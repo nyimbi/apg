@@ -5,8 +5,10 @@ FinTech Risk Management provides the enterprise risk framework for the APG platf
 
 Limit overrides require human approval — exceeding a limit without approval is a hard deny. Control effectiveness scores must be in a valid range. Stress scenario probabilities must be in basis points (0–10000). All risk events stream to `apg.fintech.risk.lifecycle` via Bytewax.
 
+**New in 1.2.0**: VaR backtesting (Kupiec POF), reverse stress testing, RAROC, IFRS 9 stage migration, Basel IV SA-CR regulatory capital, intraday liquidity monitoring (BCBS 248), sanctions screening, PSI model stability, and board-ready risk report summary.
+
 ## Capability ID
-`fintech_risk`  Version: 1.1.0
+`fintech_risk`  Version: 1.2.0
 
 ## Provides
 | Service | Description |
@@ -20,6 +22,15 @@ Limit overrides require human approval — exceeding a limit without approval is
 | risk_event_workflow | Open risk events with type, severity, profile, and evidence |
 | risk_review_workflow | Governance reviews for appetite changes, exposures, and breaches |
 | risk_agent_workflow | Register AI agents for exposure monitoring, stress testing, and control assurance |
+| var_backtest_workflow | Kupiec POF backtesting of VaR models with automatic model-drift event emission |
+| reverse_stress_test_workflow | Bisection search to find minimum shock that breaches CAR, LCR, or VaR thresholds |
+| raroc_workflow | Risk-Adjusted Return on Capital computation against configurable hurdle rate |
+| intraday_liquidity_workflow | BCBS 248 intraday settlement position tracking per correspondent bank |
+| ifrs9_migration_workflow | IFRS 9 stage migration assessment with forward-looking macro scenario overlays |
+| regulatory_capital_workflow | Basel IV SA-CR capital report: CET1/AT1/T2 stack with credit, market, and OpRWA |
+| sanctions_screening_workflow | Fuzzy-match screening against OFAC SDN, EU, UN, and CBK watchlists |
+| psi_model_stability_workflow | Population Stability Index computation with automatic model-drift event emission |
+| risk_report_summary_workflow | Board-ready concurrent RAG risk report across all domains |
 
 ## Requires
 | Capability | Purpose |
@@ -61,6 +72,15 @@ Limit overrides require human approval — exceeding a limit without approval is
 | reviews | /fintech-risk/reviews | GET/POST | fintech_risk:reviews | Governance |
 | agents | /fintech-risk/agents | GET/POST | fintech_risk:admin | Automation |
 | settings | /fintech-risk/settings | GET/POST | fintech_risk:admin | Administration |
+| var_backtest | /fintech-risk/analytics/var-backtest | GET | fintech_risk:analytics | Analytics |
+| reverse_stress | /fintech-risk/analytics/reverse-stress | POST | fintech_risk:stress | Analytics |
+| raroc | /fintech-risk/analytics/raroc | POST | fintech_risk:analytics | Analytics |
+| intraday_liquidity | /fintech-risk/liquidity/intraday | GET/POST | fintech_risk:liquidity | Liquidity |
+| ifrs9_migration | /fintech-risk/credit/ifrs9-migration | GET | fintech_risk:credit | Credit |
+| regulatory_capital | /fintech-risk/capital/regulatory | GET | fintech_risk:capital | Capital |
+| sanctions_screening | /fintech-risk/aml/sanctions | POST | fintech_risk:aml | AML |
+| psi_stability | /fintech-risk/models/psi | POST | fintech_risk:models | Model Risk |
+| risk_report | /fintech-risk/reports/summary | GET | fintech_risk:reports | Reporting |
 
 ## Business Rules
 | Rule | Condition | Effect |

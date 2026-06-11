@@ -139,6 +139,40 @@ Agents may prepare or review receivables work. Privileged changes require record
 git diff --check -- capabilities/fin/arc/accounts_receivable
 ```
 
+## New Features (v2.2)
+
+### Recurring Billing Engine
+
+`create_recurring_schedule` defines a customer invoice template with a frequency (daily / weekly / monthly / quarterly / annually) and optional end date. `run_recurring_invoicing(as_of_date)` processes all due schedules, creates and submits invoices, advances the schedule, and marks completed schedules automatically.
+
+### Dynamic Early-Payment Discounts
+
+`calculate_dynamic_discount(invoice_id, cost_of_capital_pct)` computes sliding-scale discount tiers (pay in 2 / 5 / 10 / 15 days) based on the cost of capital, returning an `ar_discount_offer` record. `accept_early_payment_discount(offer_id, tier_index)` applies the accepted tier to the invoice outstanding amount.
+
+### Instalment Plans
+
+`create_instalment_plan(invoice_id, num_instalments, frequency, first_due_date)` splits an outstanding invoice into structured instalments with individual due dates. `process_instalment_payment(instalment_id, payment_id)` closes individual instalments and auto-completes the plan when all instalments are paid.
+
+### Period-Close Checklist
+
+`run_period_close_checklist(period)` executes a six-step AR close: unposted invoice check, FX revaluation, ECL provision, AR-to-GL reconciliation, aging snapshot, and dunning archive count. Returns a structured checklist record with pass/fail/skipped per step.
+
+### Customer Churn Risk Scoring
+
+`calculate_churn_risk_score(customer_id)` produces a 0.0–1.0 churn risk score from four AR signals: payment delay trend slope, dispute frequency, credit-hold history, and outstanding/limit ratio. `run_churn_scoring()` scores all active customers and emits internal alerts for scores >= 0.7.
+
+### IFRS 9 Scenario-Based ECL
+
+`calculate_ecl_scenarios(scenarios)` computes expected credit losses under base, adverse, and severe scenarios with configurable per-bucket loss rates, returns a probability-weighted ECL (60/30/10 default weights).
+
+### Customer Self-Service Portal Tokens
+
+`generate_customer_portal_token(customer_id, expires_in_hours)` issues a scoped SHA-256-hashed token for the customer portal. `portal_get_open_invoices(token, customer_id)` validates the token and returns sanitised open invoices.
+
+### Bank Statement Ingestion
+
+`ingest_bank_statement(statement_lines, statement_date, bank_account)` auto-creates payment records from ISO 20022 / MT940 parsed lines, runs `smart_match_payment` for each, and returns a reconciliation report distinguishing matched vs unmatched lines.
+
 ## Next Extensions
 
 - Add durable persistence adapters.
@@ -146,3 +180,6 @@ git diff --check -- capabilities/fin/arc/accounts_receivable
 - Add rendered browser validation for the UI shell.
 - Add durable Bytewax topology deployment and replay checks.
 - Add revenue recognition integration once the revenue capability is available.
+- Implement `submit_to_tax_authority` for KRA eTIMS, URA, and ZATCA e-invoicing compliance.
+- Build credit insurance policy management and claim workflow.
+- Add intercompany netting and settlement engine.

@@ -1667,3 +1667,63 @@ APG's Biometric Authentication capability will establish **undisputed market lea
 The combination of breakthrough technology, revolutionary user experience, and universal global capabilities positions APG as the definitive leader in the next generation of identity verification platforms, transforming an entire industry through intelligent, predictive, collaborative, and invisible authentication solutions.
 
 **Market Reality**: While Socure, Entrust, and Onfido compete with incremental improvements to existing paradigms, APG introduces revolutionary capabilities that create entirely new market categories and establish insurmountable competitive advantages through breakthrough innovation and superior execution.
+
+---
+
+## Improvement #11: Hardware-Backed FIDO2 / WebAuthn Credential Lifecycle
+
+**Category**: Security / Standards Compliance
+
+**Justification**: FIDO2 with platform authenticators (TPM, Secure Enclave) eliminates credential phishing. The service tracks template hashes without binding them to hardware attestation objects. Without a credential lifecycle (create → activate → deactivate → revoke), FIDO2 interoperability is theoretical. Sign_count monotonicity enforcement detects credential cloning (CTAP 2.2 requirement).
+
+**Implementation**: `fido2_credential_register()` stores AAGUID, credential_id, public_key_cbor, attestation_type, transports, backup_eligible. `fido2_assertion_verify()` validates sign_count; if `new_sign_count <= stored_count` (and stored is non-zero) the credential is flagged `compromised` and rejected. Both methods call `guard_tenant_id`. Supported attestation types: `packed`, `tpm`, `android-key`, `android-safetynet`, `fido-u2f`, `none`.
+
+**Competitor Reference**: Yubico's python-fido2 and Duo's MFA platform enforce sign-count monotonicity to detect cloning. Neither offers tenant-scoped credential policy enforcement that APG adds.
+
+---
+
+## Improvement #12: Cancelable Biometrics with Irreversibility Guarantee
+
+**Category**: Privacy / Template Protection
+
+**Justification**: GDPR Article 9 and ISO/IEC 24745 require biometric data be irreversible and unlinkable. XOR-based transforms (`biometric_encrypt`) are reversible if the key leaks. Proper cancelable schemes (BioHashing, Bloom filter) make raw template recovery computationally infeasible even with key exposure.
+
+**Implementation**: `cancelable_transform_apply()` applies a salted BioHash transform — random orthonormal projection matrix seeded from user-specific salt, binarized to bit-vector; stores bit-vector, salt reference, transform_version. `cancelable_transform_revoke_and_reissue()` generates new salt, re-transforms fresh capture; old and new tokens are unlinkable. Quality gate: reject templates with `quality_score < 0.6` (low-quality templates produce unstable bit-vectors). Compliance report surfaces `transform_version`.
+
+**Competitor Reference**: NEC NeoFace and Thales SafeNet claim cancelable biometric support but require proprietary HSM. APG's implementation is HSM-optional and audit-transparent.
+
+---
+
+## Improvement #13: Biometric Verification Cost Tracking with Decimal Accounting
+
+**Category**: FinOps / Multi-Tenancy
+
+**Justification**: Tenants operating biometric services at scale need per-verification cost attribution for chargebacks and SLA billing. Using `float` introduces rounding errors at high volume. `Decimal` with fixed precision is mandatory for financial records (ISO 4217 best practice).
+
+**Implementation**: `verification_cost_record()` looks up a per-tenant, per-modality cost schedule and stores `unit_cost: Decimal`, `quantity: Decimal(1)`, `line_total: Decimal` using `ROUND_HALF_EVEN`. `billing_summary()` aggregates records for a date range, returning `total_cost` and `by_modality` as `str`-encoded Decimals for JSON safety. All arithmetic via `decimal.Decimal`. Default unit cost $0.05 when no schedule configured.
+
+**Competitor Reference**: AWS Rekognition and Azure Face API charge per API call with float-based billing. Neither offers per-tenant, per-modality cost schedules with on-platform cost attribution — both require external cloud billing consoles.
+
+---
+
+## Improvement #14: Step-Up Authentication Orchestration
+
+**Category**: Adaptive Authentication / UX
+
+**Justification**: Static threshold-based decisions are binary. Real deployments need step-up: first factor at low confidence → request second modality without restarting the session. This requires session state management and orchestration absent from the base service.
+
+**Implementation**: `step_up_session_create()` creates a session with initial_modality, current_confidence, required_confidence, step_up_modalities list, and TTL. `step_up_session_evaluate()` fuses the new verification score (via `max` fusion), advances through the modality cascade, and returns `status: satisfied | step_up_required | failed | expired`. Sessions expire after configurable TTL; expired evaluation returns `status: "expired"`. All step-up verification IDs linked to parent session for chain-of-evidence.
+
+**Competitor Reference**: Transmit Security BindID and ForgeRock Intelligent Access both offer step-up authentication trees. Neither provides biometric-native step-up with modality cascade and immutable session audit chains.
+
+---
+
+## Improvement #15: Biometric Match Confidence Scoring with Uncertainty Quantification
+
+**Category**: ML / Accuracy
+
+**Justification**: A single scalar match score obscures model uncertainty. A score of 0.85 from a sharp distribution (high certainty) differs from the same score from a flat distribution (high uncertainty). Uncertainty-aware scoring lets downstream systems route low-certainty matches to manual review even when the score exceeds threshold.
+
+**Implementation**: `match_confidence_with_uncertainty()` extends `verify()` to produce both a point estimate `match_score` (mean over N bit windows) and a `confidence_interval: [ci_lo, ci_hi]` (5th–95th percentile bootstrap over 16 hash-comparison windows). `uncertainty_width = ci_hi - ci_lo`; records tagged `high_uncertainty=True` when width > 0.15. High-uncertainty accepts automatically emit an `uncertainty_review_needed` audit event. Threshold calibration uses CI lower bound for conservative threshold setting.
+
+**Competitor Reference**: BehavioSec and BioCatch report confidence intervals on behavioral biometric scores. Physical biometric vendors (NEC NeoFace, Idemia MorphoFace) report scalar scores only. APG is first to add uncertainty quantification to hash-comparison-based physical biometric verification.

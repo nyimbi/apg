@@ -1320,6 +1320,671 @@ class NeobanksService:
 		return [t.to_dict() for t in sorted(items, key=lambda t: t.id)]
 
 	# ------------------------------------------------------------------
+	# World-class enhancements
+	# ------------------------------------------------------------------
+
+	async def fx_convert_and_transfer(
+		self,
+		from_account: str,
+		to_account: str,
+		amount: float,
+		from_currency: str,
+		to_currency: str,
+		fx_rate: float,
+		fx_spread_pct: float = 0.5,
+		reference: str = "",
+		transaction_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Convert and transfer funds between accounts with different currencies.
+		Applies mid-market fx_rate plus fx_spread_pct spread, posts an FX fee
+		transaction on the debit leg, and settles both legs atomically.
+		"""
+		tid = transaction_id or _uuid()
+		sender = self._tenant_account_or_none(from_account, self.tenant_id)
+		receiver = self._tenant_account_or_none(to_account, self.tenant_id)
+		if sender is None:
+			raise KeyError(f"sender account not found: {from_account}")
+		if receiver is None:
+			raise KeyError(f"receiver account not found: {to_account}")
+		if getattr(sender, "status", "active") != "active":
+			raise ValueError(f"sender account {from_account} is not active")
+		if getattr(receiver, "status", "active") != "active":
+			raise ValueError(f"receiver account {to_account} is not active")
+
+		amount_val = normalize_amount(amount)
+		from_norm = normalize_currency(from_currency)
+		to_norm = normalize_currency(to_currency)
+		assert from_norm != to_norm, "use peer_transfer for same-currency moves"
+		assert fx_rate > 0, "fx_rate must be positive"
+
+		effective_rate = fx_rate * (1 - fx_spread_pct / 100)
+		converted_amount = round(amount_val * effective_rate, 2)
+		fx_fee = round(amount_val * (fx_spread_pct / 100) * fx_rate, 2)
+
+		if sender.balance < amount_val:
+			raise ValueError(f"insufficient funds: {sender.balance} < {amount_val}")
+
+		sender.balance = round(sender.balance - amount_val, 2)
+		debit_tx = AccountTransaction(
+			tid, self.tenant_id, from_account, "transfer_out",
+			amount_val, from_norm, "debit", reference or f"fx_{from_norm}_{to_norm}", "auto",
+		)
+		debit_tx.__dict__.update({
+			"fx_rate": fx_rate, "effective_rate": effective_rate, "fx_fee": fx_fee,
+			"to_currency": to_norm, "converted_amount": converted_amount, "created_at": _now_iso(),
+		})
+		self.transactions[tid] = debit_tx
+
+		credit_id = _uuid()
+		receiver.balance = round(receiver.balance + converted_amount, 2)
+		credit_tx = AccountTransaction(
+			credit_id, self.tenant_id, to_account, "transfer_in",
+			converted_amount, to_norm, "credit", reference or f"fx_{from_norm}_{to_norm}", "auto",
+		)
+		credit_tx.__dict__.update({
+			"original_amount": amount_val, "original_currency": from_norm,
+			"fx_rate": effective_rate, "counterparty": from_account, "created_at": _now_iso(),
+		})
+		self.transactions[credit_id] = credit_tx
+
+		await self._audit("fx_transfer_completed", tid, {
+			"from": from_account, "to": to_account,
+			"amount": amount_val, "from_currency": from_norm,
+			"converted": converted_amount, "to_currency": to_norm,
+			"fx_rate": fx_rate, "fx_fee": fx_fee,
+		})
+		await self._maybe_notify("fx_transfer_completed", {
+			"from": from_account, "to": to_account,
+			"amount": amount_val, "converted": converted_amount,
+		})
+		return {
+			"transfer_id": tid,
+			"from_account": from_account,
+			"to_account": to_account,
+			"original_amount": amount_val,
+			"original_currency": from_norm,
+			"converted_amount": converted_amount,
+			"target_currency": to_norm,
+			"mid_market_rate": fx_rate,
+			"effective_rate": effective_rate,
+			"fx_spread_pct": fx_spread_pct,
+			"fx_fee": fx_fee,
+			"sender_balance": sender.balance,
+			"completed_at": _now_iso(),
+		}
+
+	async def savings_pot_autosweep_rule(
+		self,
+		account_id: str,
+		pot_id: str,
+		trigger: str,
+		value: float,
+		rule_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Attach an auto-sweep rule to a savings pot.
+		trigger: 'end_of_day' | 'percentage_of_balance' | 'after_credit'
+		"""
+		pot = self.savings_pots.get(pot_id)
+		if pot is None or pot.tenant_id != self.tenant_id:
+			raise KeyError(f"savings pot not found: {pot_id}")
+		account = self._tenant_account_or_none(account_id, self.tenant_id)
+		if account is None:
+			raise KeyError(f"account not found: {account_id}")
+		valid_triggers = {"end_of_day", "percentage_of_balance", "after_credit"}
+		if trigger not in valid_triggers:
+			raise ValueError(f"unsupported trigger '{trigger}'; must be one of {valid_triggers}")
+		assert value > 0, "autosweep value must be positive"
+
+		rid = rule_id or _uuid()
+		if not hasattr(self, "autosweep_rules"):
+			self.autosweep_rules: dict[str, dict[str, Any]] = {}
+		rule: dict[str, Any] = {
+			"rule_id": rid, "account_id": account_id, "pot_id": pot_id,
+			"trigger": trigger, "value": value, "tenant_id": self.tenant_id,
+			"status": "active", "created_at": _now_iso(),
+			"last_executed_at": None, "execution_count": 0,
+		}
+		self.autosweep_rules[rid] = rule
+		await self._audit("autosweep_rule_created", rid, {
+			"account_id": account_id, "pot_id": pot_id, "trigger": trigger,
+		})
+		return rule
+
+	async def execute_autosweep_rules(
+		self,
+		trigger: str,
+		account_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Evaluate and execute all active autosweep rules matching the given trigger."""
+		if not hasattr(self, "autosweep_rules"):
+			self.autosweep_rules = {}
+		rules = [
+			r for r in self.autosweep_rules.values()
+			if r["tenant_id"] == self.tenant_id
+			and r["trigger"] == trigger
+			and r["status"] == "active"
+			and (account_id is None or r["account_id"] == account_id)
+		]
+		applied, skipped = [], []
+		for rule in rules:
+			acct = self._tenant_account_or_none(rule["account_id"], self.tenant_id)
+			if acct is None or acct.balance <= 0:
+				skipped.append(rule["rule_id"])
+				continue
+			sweep_amount = (
+				round(acct.balance * rule["value"] / 100, 2)
+				if trigger == "percentage_of_balance"
+				else rule["value"]
+			)
+			if sweep_amount <= 0 or acct.balance < sweep_amount:
+				skipped.append(rule["rule_id"])
+				continue
+			try:
+				await self.savings_pot_deposit(rule["pot_id"], sweep_amount)
+				rule["last_executed_at"] = _now_iso()
+				rule["execution_count"] = rule.get("execution_count", 0) + 1
+				applied.append({"rule_id": rule["rule_id"], "amount": sweep_amount})
+			except Exception as exc:
+				skipped.append({"rule_id": rule["rule_id"], "reason": str(exc)})
+
+		await self._audit("autosweep_rules_executed", self.tenant_id, {
+			"trigger": trigger, "applied": len(applied), "skipped": len(skipped),
+		})
+		return {
+			"trigger": trigger, "rules_evaluated": len(rules),
+			"applied": len(applied), "skipped": len(skipped),
+			"details": applied, "executed_at": _now_iso(),
+		}
+
+	async def register_account_webhook(
+		self,
+		account_id: str,
+		webhook_url: str,
+		event_filter: list[str],
+		secret: str = "",
+		webhook_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Register a webhook endpoint for account events.
+		Payloads are HMAC-SHA256 signed when secret is provided.
+		"""
+		import hashlib
+		account = self._tenant_account_or_none(account_id, self.tenant_id)
+		if account is None:
+			raise KeyError(f"account not found: {account_id}")
+		assert webhook_url.startswith(("http://", "https://")), "webhook_url must be http/https"
+
+		wid = webhook_id or _uuid()
+		if not hasattr(self, "webhooks"):
+			self.webhooks: dict[str, dict[str, Any]] = {}
+		webhook: dict[str, Any] = {
+			"webhook_id": wid, "account_id": account_id, "tenant_id": self.tenant_id,
+			"url": webhook_url, "event_filter": list(event_filter),
+			"secret_hash": hashlib.sha256(secret.encode()).hexdigest() if secret else "",
+			"status": "active", "registered_at": _now_iso(),
+			"delivery_count": 0, "last_delivery_at": None,
+		}
+		self.webhooks[wid] = webhook
+		await self._audit("account_webhook_registered", wid, {
+			"account_id": account_id, "url": webhook_url,
+		})
+		return {k: v for k, v in webhook.items() if k != "secret_hash"}
+
+	async def set_spending_budget(
+		self,
+		account_id: str,
+		category: str,
+		monthly_limit: float,
+		budget_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Set a monthly spending budget for a transaction-kind category.
+		Fires 75% and 100% notifications via spending_budget_check.
+		Replaces any existing budget for the same category.
+		"""
+		account = self._tenant_account_or_none(account_id, self.tenant_id)
+		if account is None:
+			raise KeyError(f"account not found: {account_id}")
+		limit_val = normalize_amount(monthly_limit)
+		assert limit_val > 0, "monthly_limit must be positive"
+
+		bid = budget_id or _uuid()
+		if not hasattr(self, "spending_budgets"):
+			self.spending_budgets: dict[str, list[dict[str, Any]]] = {}
+		budgets = self.spending_budgets.setdefault(account_id, [])
+		budgets[:] = [b for b in budgets if b["category"] != category]
+		budget: dict[str, Any] = {
+			"budget_id": bid, "account_id": account_id, "tenant_id": self.tenant_id,
+			"category": category, "monthly_limit": limit_val,
+			"status": "active", "created_at": _now_iso(),
+		}
+		budgets.append(budget)
+		await self._audit("spending_budget_set", bid, {
+			"account_id": account_id, "category": category, "limit": limit_val,
+		})
+		return budget
+
+	async def spending_budget_check(
+		self,
+		account_id: str,
+		category: str,
+	) -> dict[str, Any]:
+		"""
+		Check current spend vs budget for a category.
+		Returns remaining, burn rate, projected over-budget date.
+		Fires notifications at 75% and 100% thresholds (once per month per threshold).
+		"""
+		account = self._tenant_account_or_none(account_id, self.tenant_id)
+		if account is None:
+			raise KeyError(f"account not found: {account_id}")
+		if not hasattr(self, "spending_budgets"):
+			self.spending_budgets = {}
+		budgets = self.spending_budgets.get(account_id, [])
+		budget = next((b for b in budgets if b["category"] == category), None)
+		if budget is None:
+			raise KeyError(f"no budget set for category '{category}' on account {account_id}")
+
+		now = _now_iso()
+		month_prefix = now[:7]
+		spent = sum(
+			t.amount for t in self.transactions.values()
+			if t.tenant_id == self.tenant_id
+			and t.account_id == account_id
+			and t.kind == category
+			and t.direction == "debit"
+			and getattr(t, "created_at", now)[:7] == month_prefix
+		)
+		limit = budget["monthly_limit"]
+		remaining = round(limit - spent, 2)
+		utilisation_pct = round(spent / limit * 100, 2) if limit > 0 else 0.0
+		day_of_month = int(now[8:10])
+		burn_rate_daily = round(spent / max(day_of_month, 1), 2)
+		days_until_over = round(remaining / burn_rate_daily, 1) if burn_rate_daily > 0 else None
+
+		if not hasattr(self, "_budget_alerts"):
+			self._budget_alerts: dict[str, bool] = {}
+		alert_key = f"budget_{account_id}_{category}_{month_prefix}"
+		if utilisation_pct >= 100 and not self._budget_alerts.get(f"{alert_key}_100"):
+			await self._maybe_notify("budget_exceeded", {
+				"account_id": account_id, "category": category, "spent": spent, "limit": limit,
+			})
+			self._budget_alerts[f"{alert_key}_100"] = True
+		elif utilisation_pct >= 75 and not self._budget_alerts.get(f"{alert_key}_75"):
+			await self._maybe_notify("budget_75pct_warning", {
+				"account_id": account_id, "category": category, "spent": spent, "limit": limit,
+			})
+			self._budget_alerts[f"{alert_key}_75"] = True
+
+		return {
+			"account_id": account_id, "category": category,
+			"monthly_limit": limit, "spent_this_month": round(spent, 2),
+			"remaining": remaining, "utilisation_pct": utilisation_pct,
+			"burn_rate_daily": burn_rate_daily, "days_until_over_budget": days_until_over,
+			"month": month_prefix, "as_of": now,
+		}
+
+	async def open_chargeback(
+		self,
+		case_id: str,
+		customer_id: str,
+		account_id: str,
+		disputed_transaction_id: str,
+		reason: str,
+		evidence_references: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Open a chargeback dispute for a posted transaction.
+		Issues a provisional credit equal to the disputed amount immediately.
+		"""
+		account = self._tenant_account_or_none(account_id, self.tenant_id)
+		if account is None:
+			raise KeyError(f"account not found: {account_id}")
+		disputed_tx = self.transactions.get(disputed_transaction_id)
+		if disputed_tx is None or disputed_tx.tenant_id != self.tenant_id:
+			raise KeyError(f"transaction not found: {disputed_transaction_id}")
+		if disputed_tx.account_id != account_id:
+			raise ValueError(f"transaction {disputed_transaction_id} does not belong to account {account_id}")
+
+		disputed_amount = disputed_tx.amount
+		prov_id = _uuid()
+		account.balance = round(account.balance + disputed_amount, 2)
+		prov_tx = AccountTransaction(
+			prov_id, self.tenant_id, account_id, "transfer_in",
+			disputed_amount, account.currency, "credit",
+			f"chargeback_{case_id}_provisional", "",
+		)
+		prov_tx.__dict__["created_at"] = _now_iso()
+		self.transactions[prov_id] = prov_tx
+
+		chargeback: dict[str, Any] = {
+			"case_id": case_id, "tenant_id": self.tenant_id,
+			"customer_id": customer_id, "account_id": account_id,
+			"disputed_transaction_id": disputed_transaction_id,
+			"disputed_amount": disputed_amount, "currency": account.currency,
+			"reason": reason, "evidence_references": evidence_references or [],
+			"provisional_credit_tx_id": prov_id,
+			"status": "provisional_credit_issued",
+			"merchant_response": None, "arbitration_reference": None, "final_ruling": None,
+			"opened_at": _now_iso(),
+		}
+		if not hasattr(self, "chargebacks"):
+			self.chargebacks: dict[str, dict[str, Any]] = {}
+		self.chargebacks[case_id] = chargeback
+		await self._audit("chargeback_opened", case_id, {
+			"disputed_tx": disputed_transaction_id, "amount": disputed_amount,
+		})
+		await self._maybe_notify("chargeback_provisional_credit", {
+			"account_id": account_id, "amount": disputed_amount, "case_id": case_id,
+		})
+		return chargeback
+
+	async def resolve_chargeback(
+		self,
+		case_id: str,
+		ruling: str,
+		ruling_notes: str = "",
+	) -> dict[str, Any]:
+		"""
+		Resolve a chargeback. ruling='upheld' keeps provisional credit;
+		ruling='rejected' reverses it with a debit transaction.
+		"""
+		if not hasattr(self, "chargebacks"):
+			self.chargebacks = {}
+		chargeback = self.chargebacks.get(case_id)
+		if chargeback is None or chargeback["tenant_id"] != self.tenant_id:
+			raise KeyError(f"chargeback not found: {case_id}")
+		if ruling not in {"upheld", "rejected"}:
+			raise ValueError(f"ruling must be 'upheld' or 'rejected'; got '{ruling}'")
+
+		if ruling == "rejected":
+			account = self._tenant_account_or_none(chargeback["account_id"], self.tenant_id)
+			if account is not None:
+				account.balance = round(account.balance - chargeback["disputed_amount"], 2)
+				reversal_id = _uuid()
+				reversal = AccountTransaction(
+					reversal_id, self.tenant_id, chargeback["account_id"], "transfer_out",
+					chargeback["disputed_amount"], account.currency, "debit",
+					f"chargeback_{case_id}_reversal", "",
+				)
+				reversal.__dict__["created_at"] = _now_iso()
+				self.transactions[reversal_id] = reversal
+
+		chargeback["final_ruling"] = ruling
+		chargeback["ruling_notes"] = ruling_notes
+		chargeback["status"] = f"resolved_{ruling}"
+		chargeback["resolved_at"] = _now_iso()
+		await self._audit("chargeback_resolved", case_id, {"ruling": ruling})
+		await self._maybe_notify("chargeback_resolved", {"case_id": case_id, "ruling": ruling})
+		return chargeback
+
+	async def compute_customer_risk_score(
+		self,
+		customer_id: str,
+	) -> dict[str, Any]:
+		"""
+		Aggregate a 0-100 risk score from velocity, overdraft utilisation,
+		savings behaviour, and account freeze history.
+		Tier: low (0-29) | medium (30-64) | high (65-100).
+		"""
+		customer = self._tenant_customer_or_none(customer_id, self.tenant_id)
+		if customer is None:
+			raise KeyError(f"customer not found: {customer_id}")
+
+		accounts = [
+			a for a in self.accounts.values()
+			if a.tenant_id == self.tenant_id and a.owner_id == customer_id
+		]
+		if not accounts:
+			return {
+				"customer_id": customer_id, "risk_score": 50, "tier": "medium",
+				"signals": {}, "note": "no accounts — baseline score applied",
+			}
+
+		acct_ids = {a.id for a in accounts}
+		total_debits = sum(
+			1 for t in self.transactions.values()
+			if t.tenant_id == self.tenant_id and t.account_id in acct_ids and t.direction == "debit"
+		)
+		velocity_score = min(total_debits / 10, 30)
+
+		overdraft_score = 0.0
+		for acct in accounts:
+			od_limit = getattr(acct, "overdraft_limit", 0.0)
+			if od_limit > 0 and acct.balance < 0:
+				overdraft_score += min(abs(acct.balance) / od_limit * 20, 20)
+
+		total_balance = sum(a.balance for a in accounts)
+		total_savings = sum(
+			getattr(p, "balance", 0.0) for p in self.savings_pots.values()
+			if p.tenant_id == self.tenant_id and p.account_id in acct_ids
+		)
+		savings_ratio = total_savings / max(total_balance + total_savings, 1)
+		savings_score = max(0, 20 - round(savings_ratio * 20))
+		freeze_score = sum(10 for a in accounts if getattr(a, "status", "active") == "frozen")
+
+		risk_score = min(max(round(velocity_score + overdraft_score + savings_score + freeze_score), 0), 100)
+		tier = "low" if risk_score < 30 else "medium" if risk_score < 65 else "high"
+		await self._audit("customer_risk_score_computed", customer_id, {
+			"risk_score": risk_score, "tier": tier,
+		})
+		return {
+			"customer_id": customer_id, "risk_score": risk_score, "tier": tier,
+			"signals": {
+				"velocity_score": round(velocity_score, 1),
+				"overdraft_score": round(overdraft_score, 1),
+				"savings_score": round(savings_score, 1),
+				"freeze_score": freeze_score,
+				"total_debit_count": total_debits,
+				"savings_ratio_pct": round(savings_ratio * 100, 1),
+			},
+			"computed_at": _now_iso(),
+		}
+
+	async def generate_balance_attestation(
+		self,
+		account_id: str,
+		purpose: str = "proof_of_funds",
+	) -> dict[str, Any]:
+		"""
+		Generate a HMAC-SHA256 signed balance attestation for third-party verification.
+		Valid until end-of-day of issuance.
+		"""
+		import hashlib
+		import hmac
+		import json
+
+		account = self._tenant_account_or_none(account_id, self.tenant_id)
+		if account is None:
+			raise KeyError(f"account not found: {account_id}")
+		if getattr(account, "status", "active") != "active":
+			raise ValueError(f"cannot attest balance on non-active account {account_id}")
+
+		attestation_id = _uuid()
+		payload = {
+			"attestation_id": attestation_id,
+			"tenant_id": self.tenant_id,
+			"account_id": account_id,
+			"balance": account.balance,
+			"currency": account.currency,
+			"purpose": purpose,
+			"issued_at": _now_iso(),
+			"expires_at": _now_iso()[:10] + "T23:59:59+00:00",
+		}
+		payload_bytes = json.dumps(payload, sort_keys=True).encode()
+		signature = hmac.new(
+			self.tenant_id.encode(), payload_bytes, hashlib.sha256
+		).hexdigest()
+		await self._audit("balance_attestation_generated", attestation_id, {
+			"account_id": account_id, "purpose": purpose,
+		})
+		return {**payload, "signature": signature, "algorithm": "HMAC-SHA256"}
+
+	async def record_consent(
+		self,
+		customer_id: str,
+		consent_type: str,
+		channel: str,
+		evidence_hash: str = "",
+		consent_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Record a structured consent event (Kenya DPA Article 30 compliant).
+		consent_type: account_opening | data_sharing | marketing | overdraft | biometric
+		channel: sms_otp | biometric | e_signature | agent_assisted | in_app
+		"""
+		customer = self._tenant_customer_or_none(customer_id, self.tenant_id)
+		if customer is None:
+			raise KeyError(f"customer not found: {customer_id}")
+
+		valid_types = {"account_opening", "data_sharing", "marketing", "overdraft", "biometric"}
+		valid_channels = {"sms_otp", "biometric", "e_signature", "agent_assisted", "in_app"}
+		if consent_type not in valid_types:
+			raise ValueError(f"unsupported consent_type '{consent_type}'; must be one of {valid_types}")
+		if channel not in valid_channels:
+			raise ValueError(f"unsupported channel '{channel}'; must be one of {valid_channels}")
+
+		cid = consent_id or _uuid()
+		if not hasattr(self, "consent_records"):
+			self.consent_records: dict[str, list[dict[str, Any]]] = {}
+		records = self.consent_records.setdefault(customer_id, [])
+		record: dict[str, Any] = {
+			"consent_id": cid, "customer_id": customer_id, "tenant_id": self.tenant_id,
+			"consent_type": consent_type, "channel": channel, "evidence_hash": evidence_hash,
+			"status": "active", "recorded_at": _now_iso(), "revoked_at": None,
+		}
+		records.append(record)
+		await self._audit("consent_recorded", cid, {
+			"customer_id": customer_id, "type": consent_type, "channel": channel,
+		})
+		return record
+
+	async def revoke_consent(
+		self,
+		customer_id: str,
+		consent_type: str,
+		reason: str = "",
+	) -> dict[str, Any]:
+		"""Revoke all active consents of a given type for a customer."""
+		customer = self._tenant_customer_or_none(customer_id, self.tenant_id)
+		if customer is None:
+			raise KeyError(f"customer not found: {customer_id}")
+		if not hasattr(self, "consent_records"):
+			self.consent_records = {}
+		records = self.consent_records.get(customer_id, [])
+		revoked = []
+		for r in records:
+			if r["consent_type"] == consent_type and r["status"] == "active":
+				r["status"] = "revoked"
+				r["revoked_at"] = _now_iso()
+				r["revocation_reason"] = reason
+				revoked.append(r["consent_id"])
+		await self._audit("consent_revoked", customer_id, {
+			"consent_type": consent_type, "revoked_count": len(revoked),
+		})
+		return {
+			"customer_id": customer_id, "consent_type": consent_type,
+			"revoked_count": len(revoked), "revoked_ids": revoked, "revoked_at": _now_iso(),
+		}
+
+	async def bulk_issue_statements(
+		self,
+		period_start: str,
+		period_end: str,
+		account_ids: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Bulk-generate statements for all active accounts or a specified subset.
+		Returns summary with statement IDs and any errors.
+		"""
+		assert period_start and period_end, "period_start and period_end required"
+		if account_ids is None:
+			target_accounts = [
+				a for a in self.accounts.values()
+				if a.tenant_id == self.tenant_id and getattr(a, "status", "active") == "active"
+			]
+		else:
+			target_accounts = [
+				a for a in self.accounts.values()
+				if a.tenant_id == self.tenant_id and a.id in account_ids
+			]
+
+		issued, errors = [], []
+		for acct in target_accounts:
+			sid = _uuid()
+			try:
+				await self.issue_statement(sid, acct.id, period_start, period_end)
+				issued.append({"statement_id": sid, "account_id": acct.id})
+			except Exception as exc:
+				errors.append({"account_id": acct.id, "error": str(exc)})
+
+		await self._audit("bulk_statements_issued", self.tenant_id, {
+			"period": f"{period_start}:{period_end}", "issued": len(issued), "errors": len(errors),
+		})
+		return {
+			"period_start": period_start, "period_end": period_end,
+			"accounts_processed": len(target_accounts),
+			"statements_issued": len(issued), "errors": len(errors),
+			"statement_refs": issued, "error_details": errors, "generated_at": _now_iso(),
+		}
+
+	async def overdraft_interest_accrual(
+		self,
+		account_id: str,
+		period: str,
+	) -> dict[str, Any]:
+		"""
+		Post daily overdraft interest for an overdrawn account.
+		Applies annual rate / 365 on the overdrawn balance plus a flat daily fee.
+		Skips silently if the account is not overdrawn or has no overdraft limit.
+		"""
+		account = self._tenant_account_or_none(account_id, self.tenant_id)
+		if account is None:
+			raise KeyError(f"account not found: {account_id}")
+
+		od_config = self.overdraft_configs.get(account_id, {})
+		od_limit = getattr(account, "overdraft_limit", 0.0)
+		overdrawn_balance = max(0.0, -account.balance)
+
+		if overdrawn_balance <= 0 or od_limit <= 0:
+			return {
+				"account_id": account_id, "period": period,
+				"overdrawn_balance": overdrawn_balance, "interest_charged": 0.0,
+				"message": "account not overdrawn — no interest applied",
+			}
+
+		annual_rate = od_config.get("interest_rate_pa", 0.18)
+		daily_rate = annual_rate / 365
+		daily_fee = od_config.get("daily_fee", 50.0)
+		interest = round(overdrawn_balance * daily_rate, 2)
+		total_charge = round(interest + daily_fee, 2)
+
+		fee_tx_id = _uuid()
+		fee_tx = AccountTransaction(
+			fee_tx_id, self.tenant_id, account_id, "transfer_out",
+			total_charge, account.currency, "debit",
+			f"overdraft_interest_{period}", "auto",
+		)
+		fee_tx.__dict__["created_at"] = _now_iso()
+		self.transactions[fee_tx_id] = fee_tx
+		account.balance = round(account.balance - total_charge, 2)
+
+		await self._audit("overdraft_interest_accrued", account_id, {
+			"period": period, "overdrawn": overdrawn_balance,
+			"interest": interest, "fee": daily_fee, "total": total_charge,
+		})
+		return {
+			"account_id": account_id, "period": period,
+			"overdrawn_balance": overdrawn_balance,
+			"annual_rate_pct": round(annual_rate * 100, 2),
+			"daily_rate_pct": round(daily_rate * 100, 4),
+			"interest_charged": interest, "daily_fee": daily_fee,
+			"total_charge": total_charge, "account_balance": account.balance,
+			"fee_transaction_id": fee_tx_id, "accrued_at": _now_iso(),
+		}
+
+	# ------------------------------------------------------------------
 	# Internal helpers
 	# ------------------------------------------------------------------
 

@@ -3,6 +3,8 @@
 ## Overview
 Full lease lifecycle from heads of terms through abstraction, activation, rent escalation, option tracking, IFRS 16/ASC 842 schedule generation, rent reviews, assignments, and expiry pipeline management. AI-assisted abstraction with mandatory human verification before activation.
 
+Includes advanced analytics: full amortisation schedules, multi-year rent escalation projections, ERV benchmarking, holding-over detection, break option cost modelling, discount rate sensitivity analysis, lease KPI dashboards, and data integrity validation.
+
 ## Capability ID
 `realestate_lea`
 
@@ -11,12 +13,17 @@ Full lease lifecycle from heads of terms through abstraction, activation, rent e
 - `rent_escalation_scheduler`: Fixed %, CPI-linked, ratchet, open market, and stepped escalations
 - `lease_option_tracker`: Break, renewal, purchase, expansion, and contraction options with notice alerts
 - `ifrs16_asc842_compliance`: Present-value ROU asset and lease liability amortisation schedules
-- `lease_expiry_pipeline`: Rolling 12-month expiry dashboard sorted by urgency
+- `full_amortisation_schedule`: Complete period-by-period or annual/quarterly amortisation table
+- `rent_escalation_projection`: Multi-year rent projection with CPI forecast and stepped schedules
+- `lease_expiry_pipeline`: Rolling expiry dashboard with holding-over detection and transition
 - `rent_review_workflow`: Upward-only, indexed, and open-market reviews with backdating controls
+- `erv_benchmarking`: Over/under-rented analysis, reversion potential, and time-to-reversion
+- `break_option_modelling`: NPV break vs. stay analysis with penalty, dilaps, and relocation costs
+- `discount_rate_sensitivity`: Lease liability sensitivity matrix across a rate range
+- `lease_kpi_dashboard`: Occupancy rate, WAULT, rent collection efficiency, and balance sheet KPIs
+- `data_integrity_validation`: Cross-record consistency checks across reviews, options, and subleases
 - `lease_assignment_management`: Assignment and subletting with landlord consent enforcement
-- `dilapidation_management`: Pre-lease, interim, and terminal dilapidation schedules
 - `lease_renewal_workflow`: Investment committee escalation for major renewals
-- `lease_performance_reporting`: WAULT, passing vs. ERV, vacancy rate
 
 ## Requires
 | Capability | Reason |
@@ -46,6 +53,12 @@ Full lease lifecycle from heads of terms through abstraction, activation, rent e
 | `/realestate/lea/leases` | GET/POST | List/create leases | `leases` |
 | `/realestate/lea/leases/<id>/activate` | POST | Activate lease | `leases` |
 | `/realestate/lea/leases/<id>/surrender` | POST | Surrender lease | `leases` |
+| `/realestate/lea/leases/<id>/amortisation` | GET | Full amortisation schedule | `leases` |
+| `/realestate/lea/leases/<id>/escalation-projection` | GET | Multi-year rent projection | `leases` |
+| `/realestate/lea/leases/<id>/erv-benchmark` | POST | ERV benchmarking | `leases` |
+| `/realestate/lea/leases/<id>/break-cost` | POST | Break option cost model | `leases` |
+| `/realestate/lea/leases/<id>/rate-sensitivity` | GET | Discount rate sensitivity | `leases` |
+| `/realestate/lea/leases/<id>/integrity` | GET | Data integrity check | `leases` |
 | `/realestate/lea/abstraction` | POST | Create abstraction | `abstraction` |
 | `/realestate/lea/abstraction/<id>/verify` | POST | Verify abstraction | `abstraction` |
 | `/realestate/lea/escalations` | GET/POST | Escalations | `escalations` |
@@ -56,6 +69,9 @@ Full lease lifecycle from heads of terms through abstraction, activation, rent e
 | `/realestate/lea/ifrs16` | POST | Generate schedule | `ifrs16` |
 | `/realestate/lea/ifrs16/<id>/reclassify` | POST | Reclassify (auditor) | `ifrs16` |
 | `/realestate/lea/expiry` | GET | Expiry pipeline | `view` |
+| `/realestate/lea/holding-over` | GET | Detect holding-over leases | `leases` |
+| `/realestate/lea/analytics/kpi` | GET | Lease KPI dashboard | `analytics` |
+| `/realestate/lea/analytics/portfolio` | GET | Portfolio analytics | `analytics` |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -94,8 +110,24 @@ Full lease lifecycle from heads of terms through abstraction, activation, rent e
 - Reclassification requires auditor approval to prevent silent balance sheet changes
 - Expiry pipeline sorts by days_remaining ascending for urgency
 
+## New Methods (v2 additions)
+
+| Method | Description |
+|--------|-------------|
+| `full_amortisation_schedule(lease_id, summarise_by)` | Complete schedule for entire term; monthly/quarterly/annual grouping |
+| `project_rent_escalation_schedule(lease_id, years, cpi_forecast)` | Multi-year compounded rent projection |
+| `detect_holding_over(as_of_date, uplift_pct)` | Find and transition overdue leases to holding-over status |
+| `validate_lease_data_integrity(lease_id)` | Cross-record consistency checks with issue/warning detail |
+| `discount_rate_sensitivity(lease_id, rate_min, rate_max, step)` | Liability sensitivity matrix across rate range |
+| `lease_kpi_dashboard(tenant_id, period)` | Occupancy, WAULT, collection efficiency, balance sheet KPIs |
+| `model_break_option_cost(lease_id, break_date)` | NPV break vs. stay with penalty, dilaps, relocation components |
+| `benchmark_against_erv(lease_id, erv_per_sqm_annual)` | Over/under-rented analysis and reversion potential |
+
 ## Composability Notes
 - Provides IFRS 16 schedules consumed by `realestate_acc`
 - Activating a lease triggers unit status update in `realestate_prm`
 - Rent escalations feed into `realestate_ren` rent collection expected amounts
 - Option tracking integrates with `realestate_ren` renewal pipeline
+- ERV benchmark feeds from `realestate_val` valuation data
+- KPI dashboard data surfaces in `realestate_ren` reporting module
+- Holding-over detection triggers alerts via `ntfy` capability

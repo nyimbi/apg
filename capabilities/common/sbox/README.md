@@ -87,6 +87,58 @@ run = service.start_run(
 service.complete_run("tenant-demo", run["id"], tests_passed=12)
 ```
 
+
+## Async Usage
+
+```python
+import asyncio
+from capabilities.common.sbox import SboxService
+
+svc = SboxService()
+
+async def run_parallel_tests():
+    sandbox = await svc.async_create_sandbox(
+        name="async-ci-sandbox",
+        template="python",
+        owner_id="ci-bot",
+        expiry_hours=2,
+        tenant_id="tenant-ci",
+        lifecycle_review_recorded=True,
+    )
+    result = await svc.async_parallel_scenario_run(
+        sandbox_id=sandbox["id"],
+        scenario_ids=["auth-flow", "payment-flow", "order-flow"],
+        tenant_id="tenant-ci",
+        run_type="integration",
+        requested_by="ci-bot",
+        tests_per_scenario=10,
+        max_concurrency=4,
+    )
+    print(f"Passed: {result['passed_scenario_count']}/{result['scenario_count']}")
+    posture = await svc.async_security_posture_report(
+        sandbox_id=sandbox["id"],
+        tenant_id="tenant-ci",
+    )
+    assert posture["posture_grade"] in {"A", "B"}, posture["recommendations"]
+
+asyncio.run(run_parallel_tests())
+```
+
+## Async Method Reference
+
+| Method | Description |
+|--------|-------------|
+| `async_create_sandbox(...)` | Non-blocking sandbox provisioning |
+| `async_start_run(...)` | Non-blocking run initiation |
+| `async_complete_run(...)` | Non-blocking run finalization |
+| `async_simulate_event(..., delivery_delay_ms)` | Event delivery with latency control |
+| `async_parallel_scenario_run(..., max_concurrency)` | Concurrent scenario execution |
+| `async_chaos_inject_and_observe(...)` | Inject fault and collect time-series observations |
+| `async_load_and_validate_dataset(..., strict)` | Load and schema-validate records |
+| `async_snapshot_and_restore(...)` | Snapshot/reset/restore isolation primitive |
+| `async_security_posture_report(...)` | Multi-dimension security scoring |
+| `async_quota_check(...)` | Resource quota enforcement |
+
 ## AI Sandbox Agents
 
 Register AI agents before they assist with sandbox governance:

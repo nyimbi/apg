@@ -105,3 +105,160 @@ POST /api/pmin/logs/{log_id}/events/nats
   ]
 }
 ```
+
+---
+
+## Advanced Features (v1.1)
+
+### SLA / KPI Breach Alerting
+
+Configure per-log SLA rules and scan for breaches after each ingestion batch.
+
+```python
+# Configure rules
+await svc.configure_sla_rules("acme", log_id, rules=[
+    {"name": "Payment T+2", "activity": "Payment Verified",
+     "max_duration_s": 172800, "scope": "transition"},
+    {"name": "Total case 5 days", "activity": "Order Received",
+     "max_duration_s": 432000, "scope": "case"},
+])
+
+# Scan for breaches
+result = await svc.check_sla_breaches("acme", log_id)
+# result["breaches"][0] → {rule_name, breach_count, breach_rate, breaching_cases}
+```
+
+Two scopes are supported:
+- `transition` — gap between the named activity and the *next* activity in the case
+- `case` — total case duration from first to last event
+
+---
+
+### Predictive Completion Time
+
+Estimate how long open cases will take to complete based on the empirical distribution of
+historical cases that followed the same activity prefix.
+
+```python
+result = await svc.predict_completion_time("acme", log_id, partial_traces=[
+    {
+        "case_id": "O-999",
+        "activities": ["Order Received", "Payment Verified"],
+        "started_at": "2026-06-11T08:00:00Z",
+    }
+])
+# result["predictions"][0] →
+#   {remaining_p50_s, remaining_p75_s, remaining_p95_s, matched_historical_cases}
+```
+
+Shorter prefix fallback is applied automatically when no exact match exists.
+
+---
+
+### Happy-Path Alignment Score
+
+Quantify how closely each case follows the happy path (most frequent variant) using
+Levenshtein edit distance.
+
+```python
+result = await svc.compute_happy_path_alignment("acme", log_id)
+# result["avg_alignment_score"]  → e.g. 0.87
+# result["most_deviant_cases"]   → bottom 10% of cases by alignment
+```
+
+Score of 1.0 = perfect match; 0.0 = completely unrelated sequence.
+
+---
+
+### Deviation Root-Cause Analysis
+
+After running `check_conformance`, identify which case attributes statistically explain
+why some cases deviate from the model.
+
+```python
+result = await svc.analyze_deviation_root_causes("acme", log_id, model_id)
+# result["top_drivers"] →
+#   [{attribute, value, lift, p_value_approx, count_in_deviating, count_in_conforming}, ...]
+```
+
+Ranked by lift (ratio of deviation rate to conformance rate). Run `check_conformance` first.
+
+---
+
+### Process Cost Analysis
+
+Compute per-activity and per-variant costs by combining resource hourly rates with
+transition durations. All monetary values use `Decimal` for precision.
+
+```python
+result = await svc.analyze_process_costs("acme", log_id, resource_rates={
+    "agent_tier1": "45.00",
+    "agent_tier2": "90.00",
+    "default": "60.00",
+})
+# result["total_process_cost"]    → "12450.00"
+# result["activity_costs"]["Underwriting"]["avg_cost_per_case"] → "320.50"
+```
+
+A `"default"` key is used as the fallback rate for resources not listed.
+
+---
+
+### Multi-Log Process Comparison
+
+Compare two event logs from the same tenant to surface structural differences — useful
+for benchmarking sites, periods, or product lines.
+
+```python
+result = await svc.compare_event_logs("acme", log_id_region_a, log_id_region_b)
+# result["jaccard_activity_similarity"]  → 0.82
+# result["jaccard_edge_similarity"]      → 0.67
+# result["edges_only_in_a"]             → [{"edge": "Review → Approve", "frequency_a": 120}]
+# result["top_duration_divergences"]    → ranked list of shared edges with time deltas
+```
+
+---
+
+### Streaming Conformance
+
+Maintain per-case running conformance state. Push new events as they arrive; the first
+deviation per case emits a `conformance_deviation` NATS audit event.
+
+```python
+result = await svc.update_streaming_conformance(
+    "acme", log_id, model_id,
+    new_events=[
+        {"order_id": "O-100", "event_type": "Shipped"},
+        {"order_id": "O-101", "event_type": "Cancelled"},  # out-of-model
+    ]
+)
+# result["newly_deviating_this_batch"] → ["O-101"]
+# result["currently_deviating"]        → 1
+```
+
+State is persisted on the log record so subsequent calls are additive.
+
+---
+
+### Case Attribute Enrichment and Segmented Analysis
+
+Attach business dimensions to cases, then re-run analyses on a filtered subset.
+
+```python
+# Step 1 — enrich
+await svc.enrich_case_attributes("acme", log_id, case_attributes={
+    "O-001": {"region": "APAC", "tier": "gold", "amount": 15000},
+    "O-002": {"region": "EMEA", "tier": "standard", "amount": 800},
+})
+
+# Step 2 — segment
+result = await svc.segment_analysis(
+    "acme", log_id,
+    segment_filter={"region": "APAC"},
+    analysis_type="bottlenecks",
+)
+# result["matched_cases"] → 1
+# result["result"]        → standard bottleneck report scoped to APAC cases
+```
+
+`analysis_type` is either `"variants"` or `"bottlenecks"`.

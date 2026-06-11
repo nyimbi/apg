@@ -322,6 +322,12 @@ class PointOfSaleService:
 		# Offline sync sequence tracking: (tenant_id, terminal_id) -> last_accepted_sequence
 		self._offline_sync_sequences: dict[tuple[str, str], int] = {}
 
+		# Inventory soft-holds: (store_id, sku) -> list of active hold dicts
+		self._inventory_holds: dict[tuple[str, str], list[dict[str, Any]]] = {}
+
+		# Shift handovers: (tenant_id, handover_id) -> handover dict
+		self._handovers: dict[tuple[str, str], dict[str, Any]] = {}
+
 		# Original stores (backward-compat)
 		self._terminals: dict[str, dict[str, Any]] = {}
 		self._sessions: dict[str, dict[str, Any]] = {}
@@ -2616,6 +2622,493 @@ class PointOfSaleService:
 			"total_refunds": session_dict.get("total_refunds", 0.0),
 			"net_sales": session_dict.get("total_sales", 0.0) - session_dict.get("total_refunds", 0.0),
 			"cash_balance": self._compute_session_cash(tenant_id, session_id),
+		}
+
+	# ======================================================================
+	# IMPROVEMENTS: New high-value async methods
+	# ======================================================================
+
+	async def basket_suggestions(
+		self,
+		customer_id: str,
+		current_skus: list[str],
+		*,
+		tenant_id: str = "default",
+		top_n: int = 3,
+	) -> list[dict[str, Any]]:
+		"""Return SKUs frequently co-purchased with current_skus by this customer.
+
+		Scans loyalty transaction history to find items the customer almost always
+		buys alongside the items already in the basket. Zero external dependencies —
+		runs on existing in-process loyalty history.
+
+		Returns top_n suggestions sorted by frequency descending.
+		"""
+		history = self._loyalty.customer_history(tenant_id, customer_id)
+		freq: dict[str, int] = defaultdict(int)
+		for entry in history:
+			txn_skus: set[str] = {i["sku"] for i in entry.get("items", [])}
+			if txn_skus & set(current_skus):
+				for sku in txn_skus - set(current_skus):
+					freq[sku] += 1
+		top = sorted(freq, key=freq.__getitem__, reverse=True)[:top_n]
+		return [
+			{
+				"sku": s,
+				"frequency": freq[s],
+				"price": self._inventory.get_price(tenant_id, s),
+			}
+			for s in top
+		]
+
+	async def session_performance_metrics(
+		self,
+		store_id: str,
+		*,
+		tenant_id: str = "default",
+	) -> list[dict[str, Any]]:
+		"""Real-time performance metrics for all open sessions in a store.
+
+		Returns per-cashier stats: transactions/hour, avg basket, void rate,
+		discount rate, and an alert flag when anomalies are detected.
+
+		Supervisors can use this to identify slow or high-risk sessions in real time.
+		"""
+		now = _now()
+		open_sessions = [
+			s for s in self._store_sessions.tenant_values(tenant_id)
+			if s.store_id == store_id and s.status == SessionStatus.OPEN
+		]
+		metrics: list[dict[str, Any]] = []
+		for s in open_sessions:
+			duration_h = max((now - s.opened_at).total_seconds() / 3600, 0.001)
+			txns = [
+				t for t in self._store_transactions.tenant_values(tenant_id)
+				if t.session_id == s.id and t.status == TransactionStatus.COMPLETED
+			]
+			voids = [
+				t for t in self._store_transactions.tenant_values(tenant_id)
+				if t.session_id == s.id and t.status == TransactionStatus.VOIDED
+			]
+			void_rate = len(voids) / max(len(txns) + len(voids), 1)
+			avg_basket = s.total_sales / max(len(txns), 1)
+			discount_rate = s.total_discounts / max(s.total_sales, 0.01)
+			metrics.append({
+				"session_id": s.id,
+				"cashier_id": s.cashier_id,
+				"terminal_id": s.terminal_id,
+				"transactions_per_hour": round(len(txns) / duration_h, 1),
+				"avg_basket_value": round(avg_basket, 2),
+				"void_rate_pct": round(void_rate * 100, 2),
+				"discount_rate_pct": round(discount_rate * 100, 2),
+				"duration_minutes": round(duration_h * 60, 0),
+				"total_sales": round(s.total_sales, 2),
+				"alert": void_rate > 0.05 or discount_rate > 0.15,
+			})
+		return sorted(metrics, key=lambda m: m["transactions_per_hour"], reverse=True)
+
+	async def predict_cash_runway(
+		self,
+		session_id: str,
+		*,
+		tenant_id: str = "default",
+		horizon_minutes: int = 30,
+	) -> dict[str, Any]:
+		"""Predict how many minutes until the till needs a safe drop or cash top-up.
+
+		Uses session-level cash velocity (cash sales per hour) to project when
+		the till will fall below 20% of the opening float. Fires an alert when
+		the projected shortage is within horizon_minutes.
+		"""
+		session = self._store_sessions.get_item(tenant_id, session_id)
+		assert session is not None, f"session not found: {session_id}"
+		now = _now()
+		duration_h = max((now - session.opened_at).total_seconds() / 3600, 0.001)
+		current_cash = session.opening_float + session.total_cash_sales
+		cash_velocity_per_hour = session.total_cash_sales / duration_h
+		# Change given is approximately 30% of cash-sales value on average
+		change_velocity = cash_velocity_per_hour * 0.30
+		minimum_float = session.opening_float * 0.20
+		runway_hours = max(
+			(current_cash - minimum_float) / max(change_velocity, 0.01), 0.0
+		)
+		runway_minutes = runway_hours * 60
+		_log_op("predict_cash_runway", tenant_id, session_id)
+		return {
+			"session_id": session_id,
+			"cashier_id": session.cashier_id,
+			"current_cash": round(current_cash, 2),
+			"cash_velocity_per_hour": round(cash_velocity_per_hour, 2),
+			"change_velocity_per_hour": round(change_velocity, 2),
+			"minimum_float": round(minimum_float, 2),
+			"predicted_shortage_in_minutes": round(runway_minutes, 0),
+			"alert": runway_minutes < horizon_minutes,
+			"recommended_action": "request_safe_drop" if runway_minutes < horizon_minutes else "ok",
+			"checked_at": now.isoformat(),
+		}
+
+	async def score_transaction_fraud_risk(
+		self,
+		transaction_id: str,
+		*,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Score a transaction's fraud risk on a 0–100 scale.
+
+		Signals evaluated:
+		  - Supervisor override present on transaction (+15)
+		  - Discount > 20% of basket (+25)
+		  - Cashier daily void rate > 5% (+20)
+		  - Suspiciously fast transaction: < 30 s for > 3 items (+20)
+		  - Price override present (+20)
+
+		Risk levels: low (0–29), medium (30–59), high (60+).
+		Transactions with score >= 60 are flagged for supervisor review.
+		"""
+		txn = self._store_transactions.get_item(tenant_id, transaction_id)
+		assert txn is not None, f"transaction not found: {transaction_id}"
+		session = self._store_sessions.get_item(tenant_id, txn.session_id) if txn.session_id else None
+
+		score = 0
+		signals: list[str] = []
+
+		if txn.supervisor_override_id:
+			score += 15
+			signals.append("supervisor_override_on_transaction")
+
+		if txn.subtotal and txn.subtotal > 0 and txn.discount_total / txn.subtotal > 0.20:
+			score += 25
+			signals.append(f"high_discount_rate_{txn.discount_total / txn.subtotal * 100:.0f}pct")
+
+		if session:
+			today_txns = [
+				t for t in self._store_transactions.tenant_values(tenant_id)
+				if t.cashier_id == session.cashier_id
+				and t.created_at.date() == txn.created_at.date()
+			]
+			void_rate = sum(
+				1 for t in today_txns if t.status == TransactionStatus.VOIDED
+			) / max(len(today_txns), 1)
+			if void_rate > 0.05:
+				score += 20
+				signals.append(f"cashier_void_rate_{void_rate * 100:.0f}pct")
+
+		if txn.posted_at and txn.created_at:
+			elapsed = (txn.posted_at - txn.created_at).total_seconds()
+			if elapsed < 30 and len(txn.items or []) > 3:
+				score += 20
+				signals.append(f"suspicious_speed_{elapsed:.0f}s_for_{len(txn.items or [])}items")
+
+		# Check for price overrides via supervisor override on items
+		overrides = [
+			o for o in self._store_supervisor_overrides.tenant_values(tenant_id)
+			if o.target_id == transaction_id
+		]
+		if overrides:
+			score += 20
+			signals.append("price_override_on_transaction")
+
+		score = min(score, 100)
+		return {
+			"transaction_id": transaction_id,
+			"fraud_risk_score": score,
+			"risk_level": "high" if score >= 60 else "medium" if score >= 30 else "low",
+			"signals": signals,
+			"requires_review": score >= 60,
+			"scored_at": _now().isoformat(),
+		}
+
+	async def get_live_dashboard_metrics(
+		self,
+		store_id: str,
+		*,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Live trading snapshot for the store manager dashboard.
+
+		Designed to be called every 15–30 seconds and pushed via SSE to a
+		browser-based dashboard. Returns:
+		  - active_sessions: count of open cashier sessions
+		  - open_baskets: in-flight PENDING transactions
+		  - transactions_per_minute_5m: rolling 5-minute TPM
+		  - hour_revenue_kes: cumulative sales in the last 60 minutes
+		  - payment_mix: payment method breakdown in last hour (KES)
+		"""
+		now = _now()
+		five_min_ago = now - timedelta(minutes=5)
+		one_hour_ago = now - timedelta(hours=1)
+
+		open_sessions = [
+			s for s in self._store_sessions.tenant_values(tenant_id)
+			if s.store_id == store_id and s.status == SessionStatus.OPEN
+		]
+		open_baskets = [
+			t for t in self._store_transactions.tenant_values(tenant_id)
+			if t.store_id == store_id and t.status == TransactionStatus.PENDING
+		]
+		recent_txns = [
+			t for t in self._store_transactions.tenant_values(tenant_id)
+			if t.store_id == store_id
+			and t.status == TransactionStatus.COMPLETED
+			and t.posted_at and t.posted_at >= five_min_ago
+		]
+		hour_txns = [
+			t for t in self._store_transactions.tenant_values(tenant_id)
+			if t.store_id == store_id
+			and t.status == TransactionStatus.COMPLETED
+			and t.posted_at and t.posted_at >= one_hour_ago
+		]
+
+		tpm = round(len(recent_txns) / 5.0, 2)
+		hour_revenue = round(sum(t.grand_total for t in hour_txns), 2)
+
+		payment_mix: dict[str, float] = defaultdict(float)
+		for t in hour_txns:
+			for p in self._get_txn_payments(tenant_id, t.id):
+				payment_mix[p.payment_method.value] += float(p.amount)
+
+		_log_op("get_live_dashboard_metrics", tenant_id, store_id)
+		return {
+			"store_id": store_id,
+			"active_sessions": len(open_sessions),
+			"open_baskets": len(open_baskets),
+			"transactions_per_minute_5m": tpm,
+			"hour_revenue_kes": hour_revenue,
+			"hour_transaction_count": len(hour_txns),
+			"payment_mix": dict(payment_mix),
+			"snapshot_at": now.isoformat(),
+		}
+
+	async def reserve_inventory(
+		self,
+		transaction_id: str,
+		sku: str,
+		quantity: float,
+		store_id: str,
+		*,
+		ttl_seconds: int = 900,
+	) -> dict[str, Any]:
+		"""Soft-reserve stock for an in-flight transaction.
+
+		Prevents two concurrent baskets from selling the same last unit.
+		On complete_transaction the hold is converted to a hard deduction.
+		On void or basket abandonment, call release_inventory_hold().
+
+		Raises AssertionError when available stock (on-hand minus all active holds)
+		is less than requested quantity.
+		"""
+		now = _now()
+		hold_key = (store_id, sku)
+		holds: list[dict[str, Any]] = self._inventory_holds.setdefault(hold_key, [])
+		# Expire stale holds before computing availability
+		holds[:] = [h for h in holds if h["expires_at"] > now]
+		held = sum(h["quantity"] for h in holds)
+		on_hand = self._inventory.get_stock(store_id, sku)
+		available = on_hand - held
+		assert available >= quantity, (
+			f"insufficient stock for sku={sku}: on_hand={on_hand:.2f} "
+			f"held={held:.2f} available={available:.2f} requested={quantity:.2f}"
+		)
+		holds.append({
+			"transaction_id": transaction_id,
+			"quantity": quantity,
+			"reserved_at": now.isoformat(),
+			"expires_at": (now + timedelta(seconds=ttl_seconds)),
+		})
+		_log_op("reserve_inventory", store_id, sku)
+		return {
+			"sku": sku,
+			"store_id": store_id,
+			"reserved": quantity,
+			"on_hand": on_hand,
+			"available_after_hold": round(available - quantity, 4),
+			"expires_in_seconds": ttl_seconds,
+		}
+
+	async def release_inventory_hold(
+		self,
+		transaction_id: str,
+		sku: str,
+		store_id: str,
+	) -> dict[str, Any]:
+		"""Release a previously soft-reserved inventory hold.
+
+		Called automatically on void_transaction or when a basket is abandoned.
+		Safe to call multiple times (idempotent — no hold = no-op).
+		"""
+		hold_key = (store_id, sku)
+		holds: list[dict[str, Any]] = self._inventory_holds.get(hold_key, [])
+		before = len(holds)
+		holds[:] = [h for h in holds if h["transaction_id"] != transaction_id]
+		released = before - len(holds)
+		_log_op("release_inventory_hold", store_id, sku)
+		return {
+			"sku": sku,
+			"store_id": store_id,
+			"transaction_id": transaction_id,
+			"holds_released": released,
+		}
+
+	async def initiate_shift_handover(
+		self,
+		outgoing_session_id: str,
+		incoming_cashier_id: str,
+		*,
+		tenant_id: str = "default",
+		created_by: str = "system",
+	) -> dict[str, Any]:
+		"""Lock a session for shift handover and require dual cash counts.
+
+		Both the outgoing and incoming cashier must submit independent cash counts
+		via submit_handover_count(). The terminal is only released for the new
+		session when both counts are within the configured tolerance (default KES 10).
+
+		Raises AssertionError if the session is not open or if incoming_cashier_id
+		is the same as the outgoing cashier (cannot hand over to self).
+		"""
+		session = self._store_sessions.get_item(tenant_id, outgoing_session_id)
+		assert session is not None, f"session not found: {outgoing_session_id}"
+		assert session.status == SessionStatus.OPEN, "can only hand over an open session"
+		assert incoming_cashier_id != session.cashier_id, "cannot hand over to self"
+
+		handover_id = uuid7str()
+		handover: dict[str, Any] = {
+			"id": handover_id,
+			"tenant_id": tenant_id,
+			"outgoing_session_id": outgoing_session_id,
+			"outgoing_cashier_id": session.cashier_id,
+			"incoming_cashier_id": incoming_cashier_id,
+			"terminal_id": session.terminal_id,
+			"status": "awaiting_counts",
+			"outgoing_count": None,
+			"incoming_count": None,
+			"variance": None,
+			"tolerance_kes": 10.0,
+			"initiated_at": _now().isoformat(),
+			"created_by": created_by,
+		}
+		self._handovers[(tenant_id, handover_id)] = handover
+
+		# Lock session to prevent new transactions during handover
+		sdata = session.model_dump()
+		sdata["notes"] = (sdata.get("notes") or "") + " | HANDOVER_IN_PROGRESS"
+		sdata["updated_at"] = _now()
+		self._store_sessions.put(tenant_id, outgoing_session_id, PosSessionResponse(**sdata))
+		_log_op("initiate_shift_handover", tenant_id, handover_id)
+		return handover
+
+	async def submit_handover_count(
+		self,
+		handover_id: str,
+		cashier_id: str,
+		counted_cash: float,
+		*,
+		tenant_id: str = "default",
+		denominations: dict[str, int] | None = None,
+	) -> dict[str, Any]:
+		"""Submit a cash count for an active shift handover.
+
+		Either the outgoing or incoming cashier calls this. When both counts are
+		received the variance is computed. If within tolerance the handover is
+		completed; otherwise it is flagged as disputed for supervisor review.
+
+		Returns the updated handover record.
+		"""
+		handover = self._handovers.get((tenant_id, handover_id))
+		assert handover is not None, f"handover not found: {handover_id}"
+		assert handover["status"] == "awaiting_counts", "handover already finalised"
+		assert cashier_id in (
+			handover["outgoing_cashier_id"], handover["incoming_cashier_id"]
+		), f"cashier {cashier_id} is not party to handover {handover_id}"
+
+		if cashier_id == handover["outgoing_cashier_id"]:
+			handover["outgoing_count"] = counted_cash
+			if denominations:
+				handover["outgoing_denominations"] = denominations
+		else:
+			handover["incoming_count"] = counted_cash
+			if denominations:
+				handover["incoming_denominations"] = denominations
+
+		if handover["outgoing_count"] is not None and handover["incoming_count"] is not None:
+			variance = round(handover["incoming_count"] - handover["outgoing_count"], 2)
+			handover["variance"] = variance
+			tolerance = handover.get("tolerance_kes", 10.0)
+			handover["status"] = "completed" if abs(variance) <= tolerance else "disputed"
+			handover["completed_at"] = _now().isoformat()
+			_log_op("handover_completed", tenant_id, handover_id)
+
+		self._handovers[(tenant_id, handover_id)] = handover
+		return handover
+
+	async def customer_purchase_history(
+		self,
+		customer_id: str,
+		*,
+		tenant_id: str = "default",
+		limit: int = 50,
+		period: str | None = None,
+	) -> dict[str, Any]:
+		"""Return a customer's transaction history with spending analytics.
+
+		Includes: total spend, transaction count, average basket, last visit date,
+		top SKUs by frequency, and payment method preferences. Used for loyalty
+		tier assignment, personalised promotions, and RFM segmentation.
+
+		period: optional period string (e.g. "2026-06", "Q1-2026", "2026-01-01/2026-06-30")
+		         If omitted, returns all history up to limit.
+		"""
+		if period:
+			period_start, period_end = self._parse_period(period)
+		else:
+			period_start, period_end = None, None
+
+		txns = [
+			t for t in self._store_transactions.tenant_values(tenant_id)
+			if t.customer_id == customer_id
+			and t.transaction_type == TransactionType.SALE
+			and t.status == TransactionStatus.COMPLETED
+			and (not period_start or (t.posted_at and t.posted_at.date() >= period_start))
+			and (not period_end or (t.posted_at and t.posted_at.date() <= period_end))
+		]
+		txns.sort(key=lambda t: t.posted_at or t.created_at, reverse=True)
+		txns = txns[:limit]
+
+		total_spend = round(sum(t.grand_total for t in txns), 2)
+		avg_basket = round(total_spend / len(txns), 2) if txns else 0.0
+		last_visit = max(
+			(t.posted_at or t.created_at for t in txns), default=None
+		)
+
+		sku_freq: dict[str, int] = defaultdict(int)
+		for t in txns:
+			for item in (t.items or []):
+				sku = item.sku if hasattr(item, "sku") else item["sku"]
+				sku_freq[sku] += 1
+		top_skus = sorted(
+			[{"sku": k, "count": v} for k, v in sku_freq.items()],
+			key=lambda x: x["count"], reverse=True,
+		)[:10]
+
+		payment_prefs: dict[str, int] = defaultdict(int)
+		for t in txns:
+			for p in self._get_txn_payments(tenant_id, t.id):
+				payment_prefs[p.payment_method.value] += 1
+
+		loyalty_balance = self._loyalty.balance(tenant_id, customer_id)
+
+		return {
+			"customer_id": customer_id,
+			"transaction_count": len(txns),
+			"total_spend": total_spend,
+			"avg_basket": avg_basket,
+			"loyalty_balance": loyalty_balance,
+			"loyalty_value_kes": round(loyalty_balance * float(_LOYALTY_REDEEM_RATE), 2),
+			"last_visit": last_visit.isoformat() if last_visit else None,
+			"top_skus": top_skus,
+			"payment_preferences": dict(payment_prefs),
+			"transactions": [t.model_dump(mode="json") for t in txns],
+			"generated_at": _now().isoformat(),
 		}
 
 

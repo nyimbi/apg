@@ -853,3 +853,485 @@ class SpaService:
 	async def get_audit_trail(self, tenant_id: str, entity_id: str = "") -> dict[str, Any]:
 		"""Get Audit Trail"""
 		return {"entity_id": entity_id, "tenant_id": tenant_id, "events": [], "retrieved_at": datetime.utcnow().isoformat()}
+
+	# ── World-Class Enhancements ──────────────────────────────────────────────
+
+	async def find_accessible_spaces(
+		self,
+		tenant_id: str,
+		required_features: list[str],
+		property_id: str | None = None,
+		min_capacity: int = 1,
+	) -> list[dict[str, Any]]:
+		"""Return spaces matching all requested accessibility features.
+
+		Filters the live space registry against the `amenities` list which
+		carries accessibility tags such as ``wheelchair_accessible``,
+		``hearing_loop``, and ``quiet_for_neurodivergent``.  Only available
+		spaces with capacity >= min_capacity are returned.
+
+		Args:
+			tenant_id: Tenant scope.
+			required_features: All features that must be present on the space.
+			property_id: Optional property filter.
+			min_capacity: Minimum seating capacity (default 1).
+
+		Returns:
+			List of matching space dicts with an ``accessibility_features`` key
+			containing the filtered feature intersection.
+		"""
+		assert required_features, "required_features must be non-empty"
+		spaces = await self.get_available_spaces(tenant_id, property_id=property_id, min_capacity=min_capacity)
+		required_set = set(required_features)
+		results: list[dict[str, Any]] = []
+		for s in spaces:
+			space_amenities = set(s.amenities)
+			if required_set.issubset(space_amenities):
+				d = s.model_dump()
+				d["accessibility_features"] = sorted(required_set & space_amenities)
+				results.append(d)
+		log.info("spa.find_accessible_spaces tenant=%s features=%s results=%d", tenant_id, required_features, len(results))
+		return results
+
+	async def check_allocation_expiries(
+		self,
+		tenant_id: str,
+		lookahead_days: int = 30,
+	) -> dict[str, Any]:
+		"""Identify active allocations expiring within lookahead_days and return expiry events.
+
+		Scans all active allocations with a non-null ``end_date`` that falls
+		within today + lookahead_days.  Each expiry candidate is returned with
+		days_remaining so notification systems can tier urgency.
+
+		Args:
+			tenant_id: Tenant scope.
+			lookahead_days: Window in days to look ahead (default 30).
+
+		Returns:
+			Dict with ``expiring`` list and summary counts.
+		"""
+		assert lookahead_days > 0, "lookahead_days must be positive"
+		today = date.today()
+		cutoff = today + timedelta(days=lookahead_days)
+		allocations = await self.list_allocations(tenant_id, is_active=True)
+		expiring: list[dict[str, Any]] = []
+		for a in allocations:
+			if a.end_date and today <= a.end_date <= cutoff:
+				space = await self.get_space(a.space_id, tenant_id)
+				days_remaining = (a.end_date - today).days
+				expiring.append({
+					"allocation_id": a.id,
+					"space_id": a.space_id,
+					"space_name": space.name if hasattr(space, "name") else a.space_id,
+					"department_id": a.department_id,
+					"occupant_ids": a.occupant_ids,
+					"end_date": str(a.end_date),
+					"days_remaining": days_remaining,
+					"urgency": "critical" if days_remaining <= 7 else "warning" if days_remaining <= 14 else "notice",
+				})
+		expiring.sort(key=lambda x: x["days_remaining"])
+		log.info("spa.check_allocation_expiries tenant=%s lookahead=%d expiring=%d", tenant_id, lookahead_days, len(expiring))
+		return {
+			"tenant_id": tenant_id,
+			"lookahead_days": lookahead_days,
+			"checked_at": date.today().isoformat(),
+			"expiring_count": len(expiring),
+			"critical": sum(1 for e in expiring if e["urgency"] == "critical"),
+			"warning": sum(1 for e in expiring if e["urgency"] == "warning"),
+			"notice": sum(1 for e in expiring if e["urgency"] == "notice"),
+			"expiring": expiring,
+		}
+
+	async def benchmark_portfolio(
+		self,
+		tenant_id: str,
+		metric: str = "utilisation_rate",
+	) -> dict[str, Any]:
+		"""Rank all properties in the tenant portfolio against each other for a given metric.
+
+		Supported metrics: ``utilisation_rate``, ``sqm_per_person``,
+		``booking_adherence``, ``void_rate``.  Returns percentile ranks and
+		flags outliers (> 1.5× IQR above/below median).
+
+		Args:
+			tenant_id: Tenant scope.
+			metric: Metric to benchmark (default ``utilisation_rate``).
+
+		Returns:
+			Dict with ranked property list and portfolio statistics.
+		"""
+		supported = {"utilisation_rate", "sqm_per_person", "booking_adherence", "void_rate"}
+		assert metric in supported, f"metric must be one of {supported}"
+
+		# collect unique property IDs
+		property_ids: list[str] = sorted({s["property_id"] for s in self._store["spaces"] if s["tenant_id"] == tenant_id})
+		if not property_ids:
+			return {"tenant_id": tenant_id, "metric": metric, "properties": [], "portfolio_median": None}
+
+		scores: list[dict[str, Any]] = []
+		for pid in property_ids:
+			spaces = await self.list_spaces(tenant_id, property_id=pid)
+			if not spaces:
+				continue
+			allocations = await self.list_allocations(tenant_id, is_active=True)
+			alloc_ids = {a.space_id for a in allocations if any(s.id == a.space_id for s in spaces)}
+			occupied = len(alloc_ids)
+			total = max(len(spaces), 1)
+			total_area = sum(float(s.area or 0) for s in spaces)
+			total_headcount = sum(a.headcount for a in allocations if a.space_id in alloc_ids) or 1
+			void_count = len([s for s in spaces if s.id not in alloc_ids and s.status.value == "available"])
+
+			if metric == "utilisation_rate":
+				score = occupied / total * 100
+			elif metric == "sqm_per_person":
+				score = total_area / total_headcount
+			elif metric == "void_rate":
+				score = void_count / total * 100
+			else:  # booking_adherence — proxy via bookings
+				bookings = await self.list_bookings(tenant_id)
+				prop_bookings = [b for b in bookings if any(s.id == b.space_id for s in spaces)]
+				score = len(prop_bookings) / max(occupied, 1)
+
+			scores.append({"property_id": pid, "score": round(score, 3)})
+
+		scores.sort(key=lambda x: x["score"])
+		n = len(scores)
+		for rank, item in enumerate(scores, 1):
+			item["rank"] = rank
+			item["percentile"] = round(rank / n * 100, 1)
+
+		raw_scores = [x["score"] for x in scores]
+		median = raw_scores[n // 2] if n else 0
+		q1 = raw_scores[n // 4] if n >= 4 else median
+		q3 = raw_scores[3 * n // 4] if n >= 4 else median
+		iqr = q3 - q1
+		for item in scores:
+			item["outlier"] = item["score"] < q1 - 1.5 * iqr or item["score"] > q3 + 1.5 * iqr
+
+		log.info("spa.benchmark_portfolio tenant=%s metric=%s properties=%d", tenant_id, metric, n)
+		return {
+			"tenant_id": tenant_id,
+			"metric": metric,
+			"portfolio_median": round(median, 3),
+			"portfolio_q1": round(q1, 3),
+			"portfolio_q3": round(q3, 3),
+			"properties": scores,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def detect_overuse_events(
+		self,
+		tenant_id: str,
+		space_id: str,
+		period_days: int = 30,
+		overcrowding_threshold: float = 1.1,
+	) -> dict[str, Any]:
+		"""Identify occupancy readings where occupant_count exceeds capacity * threshold.
+
+		Overcrowding events trigger downstream maintenance workflows (deep
+		cleaning, HVAC scheduling) via the ``mqeb`` capability.
+
+		Args:
+			tenant_id: Tenant scope.
+			space_id: Space to analyse.
+			period_days: Lookback window in days (default 30).
+			overcrowding_threshold: Fraction of capacity to flag (default 1.1).
+
+		Returns:
+			Dict with overuse events, max occupancy, and a severity rating.
+		"""
+		assert space_id, "space_id required"
+		assert period_days > 0, "period_days must be positive"
+		assert 1.0 <= overcrowding_threshold <= 3.0, "threshold must be between 1.0 and 3.0"
+
+		space = await self.get_space(space_id, tenant_id)
+		if space is None:
+			raise KeyError(f"space {space_id} not found for tenant {tenant_id}")
+
+		cutoff_dt = datetime.utcnow() - timedelta(days=period_days)
+		readings = [
+			r for r in self._store["occupancy_data"]
+			if r["tenant_id"] == tenant_id
+			and r.get("space_id") == space_id
+			and datetime.fromisoformat(str(r["recorded_at"])) >= cutoff_dt
+		]
+
+		overuse_threshold = int(space.capacity * overcrowding_threshold)
+		events = [
+			{
+				"recorded_at": r["recorded_at"],
+				"occupant_count": r["occupant_count"],
+				"capacity": space.capacity,
+				"excess": r["occupant_count"] - space.capacity,
+				"sensor_type": r.get("sensor_type"),
+			}
+			for r in readings
+			if r["occupant_count"] >= overuse_threshold
+		]
+		events.sort(key=lambda x: str(x["recorded_at"]))
+
+		max_occ = max((r["occupant_count"] for r in readings), default=0)
+		overuse_pct = len(events) / max(len(readings), 1) * 100
+		severity = "high" if overuse_pct >= 20 else "medium" if overuse_pct >= 5 else "low"
+
+		log.warning(
+			"spa.detect_overuse space=%s period=%dd events=%d severity=%s",
+			space_id, period_days, len(events), severity,
+		)
+		return {
+			"tenant_id": tenant_id,
+			"space_id": space_id,
+			"space_capacity": space.capacity,
+			"period_days": period_days,
+			"total_readings": len(readings),
+			"overuse_event_count": len(events),
+			"overuse_rate_pct": round(overuse_pct, 2),
+			"max_occupancy_recorded": max_occ,
+			"severity": severity,
+			"events": events,
+			"analysed_at": datetime.utcnow().isoformat(),
+		}
+
+	async def calculate_energy_per_occupant(
+		self,
+		tenant_id: str,
+		building_id: str,
+		period: str,
+		total_kwh: float,
+	) -> dict[str, Any]:
+		"""Compute energy intensity (kWh per person per day) for a building period.
+
+		Joins caller-supplied energy meter total with occupancy readings to
+		produce per-zone breakdowns.  Flags zones with zero occupancy consuming
+		measurable energy as waste candidates.
+
+		Args:
+			tenant_id: Tenant scope.
+			building_id: Property to analyse.
+			period: Human-readable period label (e.g. ``"2026-Q1"``).
+			total_kwh: Total electrical consumption for the period.
+
+		Returns:
+			Dict with portfolio and per-space energy intensity figures.
+		"""
+		assert building_id and period, "building_id and period required"
+		assert total_kwh >= 0, "total_kwh must be non-negative"
+
+		spaces = await self.list_spaces(tenant_id, property_id=building_id)
+		if not spaces:
+			return {"tenant_id": tenant_id, "building_id": building_id, "period": period, "total_kwh": total_kwh, "spaces": []}
+
+		readings = [
+			r for r in self._store["occupancy_data"]
+			if r["tenant_id"] == tenant_id
+			and any(s.id == r.get("space_id") for s in spaces)
+		]
+		total_person_days = sum(r["occupant_count"] for r in readings) or 1
+		portfolio_kwh_per_pd = round(total_kwh / total_person_days, 4)
+
+		space_stats: list[dict[str, Any]] = []
+		for s in spaces:
+			s_readings = [r for r in readings if r.get("space_id") == s.id]
+			person_days = sum(r["occupant_count"] for r in s_readings) or 0
+			# proportional energy allocation by area fraction
+			area_fraction = float(s.area or 0) / max(sum(float(x.area or 0) for x in spaces), 1)
+			attributed_kwh = total_kwh * area_fraction
+			kwh_per_pd = attributed_kwh / max(person_days, 1)
+			space_stats.append({
+				"space_id": s.id,
+				"space_type": s.space_type.value,
+				"area_sqm": float(s.area or 0),
+				"area_fraction_pct": round(area_fraction * 100, 2),
+				"attributed_kwh": round(attributed_kwh, 2),
+				"person_days": person_days,
+				"kwh_per_person_day": round(kwh_per_pd, 4),
+				"waste_candidate": person_days == 0 and attributed_kwh > 0,
+			})
+
+		waste_count = sum(1 for s in space_stats if s["waste_candidate"])
+		log.info("spa.energy_per_occupant tenant=%s building=%s kwh=%.1f waste_spaces=%d", tenant_id, building_id, total_kwh, waste_count)
+		return {
+			"tenant_id": tenant_id,
+			"building_id": building_id,
+			"period": period,
+			"total_kwh": total_kwh,
+			"total_person_days": total_person_days,
+			"portfolio_kwh_per_person_day": portfolio_kwh_per_pd,
+			"waste_candidate_spaces": waste_count,
+			"spaces": space_stats,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def submit_space_request(
+		self,
+		tenant_id: str,
+		requestor_id: str,
+		department_id: str,
+		requested_space_type: str,
+		required_capacity: int,
+		required_from: date,
+		justification: str,
+		required_to: date | None = None,
+		preferred_building_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Submit a formal space request for management approval.
+
+		Creates a pending request record.  Approvers query
+		``list_space_requests`` filtered by status.
+
+		Args:
+			tenant_id: Tenant scope.
+			requestor_id: Person submitting the request.
+			department_id: Department that will occupy the space.
+			requested_space_type: One of the ``SpaceType`` enum values.
+			required_capacity: Minimum headcount needed.
+			required_from: Earliest acceptable start date.
+			justification: Business case text (required for audit).
+			required_to: Optional end date (None = permanent).
+			preferred_building_id: Optional building preference.
+
+		Returns:
+			New space request dict with ``status = "pending"``.
+		"""
+		assert requestor_id and department_id, "requestor_id and department_id required"
+		assert justification.strip(), "justification must be non-empty"
+		assert required_capacity >= 1, "required_capacity must be at least 1"
+
+		from uuid6 import uuid7
+		request_id = str(uuid7())
+		request: dict[str, Any] = {
+			"id": request_id,
+			"tenant_id": tenant_id,
+			"requestor_id": requestor_id,
+			"department_id": department_id,
+			"requested_space_type": requested_space_type,
+			"required_capacity": required_capacity,
+			"required_from": str(required_from),
+			"required_to": str(required_to) if required_to else None,
+			"preferred_building_id": preferred_building_id,
+			"justification": justification,
+			"status": "pending",
+			"submitted_at": datetime.utcnow().isoformat(),
+			"reviewed_by": None,
+			"reviewed_at": None,
+			"review_notes": None,
+		}
+		self._store.setdefault("space_requests", []).append(request)
+		self._log_operation("space_request_submitted", request_id, tenant_id)
+		return request
+
+	async def approve_space_request(
+		self,
+		tenant_id: str,
+		request_id: str,
+		reviewer_id: str,
+		notes: str = "",
+	) -> dict[str, Any]:
+		"""Approve a pending space request and surface matching available spaces.
+
+		Args:
+			tenant_id: Tenant scope.
+			request_id: ID of the request to approve.
+			reviewer_id: Identity of the approver.
+			notes: Optional review comments.
+
+		Returns:
+			Updated request dict with ``status = "approved"`` and
+			``matching_spaces`` list of spaces meeting the requirements.
+
+		Raises:
+			KeyError: If request not found.
+			ValueError: If request is not in ``pending`` status.
+		"""
+		requests = self._store.setdefault("space_requests", [])
+		for i, req in enumerate(requests):
+			if req["id"] == request_id and req["tenant_id"] == tenant_id:
+				if req["status"] != "pending":
+					raise ValueError(f"request {request_id} is not pending (status={req['status']})")
+				req["status"] = "approved"
+				req["reviewed_by"] = reviewer_id
+				req["reviewed_at"] = datetime.utcnow().isoformat()
+				req["review_notes"] = notes
+				requests[i] = req
+				# find matching spaces
+				matching = await self.get_available_spaces(
+					tenant_id,
+					property_id=req.get("preferred_building_id"),
+					space_type=req.get("requested_space_type"),
+					min_capacity=req.get("required_capacity", 1),
+				)
+				req["matching_spaces"] = [{"id": s.id, "name": s.space_ref, "capacity": s.capacity} for s in matching[:10]]
+				self._log_operation("space_request_approved", request_id, tenant_id)
+				return req
+		raise KeyError(f"space request {request_id} not found for tenant {tenant_id}")
+
+	async def get_zone_analytics(
+		self,
+		tenant_id: str,
+		zone_space_ids: list[str],
+		zone_name: str = "",
+	) -> dict[str, Any]:
+		"""Aggregate utilisation, headcount, and density metrics across a named group of spaces.
+
+		A zone is an ad-hoc grouping (floor wing, department neighbourhood,
+		executive suite).  Callers pass the constituent space IDs explicitly;
+		no persistent zone model is required.
+
+		Args:
+			tenant_id: Tenant scope.
+			zone_space_ids: Ordered list of space IDs comprising the zone.
+			zone_name: Human-readable label for the zone (optional).
+
+		Returns:
+			Dict with aggregated zone metrics and per-space breakdown.
+		"""
+		assert zone_space_ids, "zone_space_ids must be non-empty"
+
+		spaces = [s for s in [await self.get_space(sid, tenant_id) for sid in zone_space_ids] if s is not None]
+		if not spaces:
+			return {"zone_name": zone_name, "tenant_id": tenant_id, "spaces_found": 0}
+
+		allocations = await self.list_allocations(tenant_id, is_active=True)
+		alloc_map = {a.space_id: a for a in allocations}
+
+		total_area = sum(float(s.area or 0) for s in spaces)
+		total_capacity = sum(s.capacity for s in spaces)
+		occupied_spaces = [s for s in spaces if s.id in alloc_map]
+		total_headcount = sum(alloc_map[s.id].headcount for s in occupied_spaces)
+		sqm_per_person = total_area / max(total_headcount, 1)
+		utilisation_pct = len(occupied_spaces) / len(spaces) * 100
+
+		space_breakdown: list[dict[str, Any]] = []
+		for s in spaces:
+			alloc = alloc_map.get(s.id)
+			readings = [r for r in self._store["occupancy_data"]
+				if r["tenant_id"] == tenant_id and r.get("space_id") == s.id]
+			avg_occ = sum(r["occupant_count"] for r in readings) / max(len(readings), 1) if readings else 0
+			space_breakdown.append({
+				"space_id": s.id,
+				"space_type": s.space_type.value,
+				"capacity": s.capacity,
+				"area_sqm": float(s.area or 0),
+				"status": s.status.value,
+				"headcount": alloc.headcount if alloc else 0,
+				"department_id": alloc.department_id if alloc else None,
+				"avg_sensor_occupancy": round(avg_occ, 2),
+				"sensor_readings": len(readings),
+			})
+
+		log.info("spa.zone_analytics tenant=%s zone=%r spaces=%d headcount=%d", tenant_id, zone_name, len(spaces), total_headcount)
+		return {
+			"zone_name": zone_name,
+			"tenant_id": tenant_id,
+			"spaces_in_zone": len(spaces),
+			"total_area_sqm": round(total_area, 2),
+			"total_capacity": total_capacity,
+			"occupied_spaces": len(occupied_spaces),
+			"total_headcount": total_headcount,
+			"utilisation_pct": round(utilisation_pct, 2),
+			"sqm_per_person": round(sqm_per_person, 2),
+			"density_ok": sqm_per_person >= 8.0,  # RICS standard minimum
+			"space_breakdown": space_breakdown,
+			"generated_at": datetime.utcnow().isoformat(),
+		}

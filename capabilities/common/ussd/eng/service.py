@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import re
 from copy import deepcopy
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
@@ -35,6 +37,16 @@ class UssdEngService:
 		self.session_variables: dict[str, dict[str, Any]] = {}
 		self.handlers: dict[str, Any] = {}  # handler_name -> callable
 		self._audit_events: list[dict[str, Any]] = []
+		# I3: idempotency cache keyed by "session_id:hop:handler"
+		self._idempotency_cache: dict[str, dict[str, Any]] = {}
+		# I4: sliding-window rate-limit buckets keyed by "tenant:phone:service"
+		self._rate_buckets: dict[str, list[float]] = {}
+		# I6: menu version snapshots keyed by "composite_key:vN"
+		self._menu_versions: dict[str, list[dict[str, Any]]] = {}
+		# I11: dead-letter queue keyed by tenant_id
+		self._dead_letters: list[dict[str, Any]] = []
+		# I14: webhook registrations
+		self._webhooks: list[dict[str, Any]] = []
 
 	# ── Utility ─────────────────────────────────────────────────────────────
 
@@ -866,3 +878,493 @@ class UssdEngService:
 				_log.debug("purge parse error for session %s: %s", sid, exc)
 		self._emit(tenant, "sessions_purged", tenant, "ussd_session", {"removed_count": len(removed)})
 		return {"removed_count": len(removed), "removed_session_ids": removed, "purged_at": self._now()}
+
+	# ── I2: Session resumption after timeout ─────────────────────────────────
+
+	async def resume_session(
+		self,
+		phone_number: str,
+		service_code: str,
+		tenant_id: str | None = None,
+		grace_seconds: int = 90,
+	) -> dict[str, Any]:
+		"""
+		Re-activate the most recent timed-out session for a phone number if it
+		fell within the grace window.  Preserves hop_count, menu position and
+		all session variables so the user continues mid-flow without re-entering
+		data.  Returns the re-activated session or raises KeyError when none
+		qualifies.
+		"""
+		tenant = guard_tenant_id(tenant_id or self.tenant_id)
+		guard_non_empty_string(phone_number, "phone_number")
+		guard_non_empty_string(service_code, "service_code")
+		now_ts = datetime.utcnow()
+		candidate: dict[str, Any] | None = None
+		candidate_ts: datetime | None = None
+		for record in self.sessions.values():
+			if record["tenant_id"] != tenant:
+				continue
+			if record["phone_number"] != phone_number:
+				continue
+			if record["service_code"] != service_code:
+				continue
+			if record["session_state"] != "timeout":
+				continue
+			ended_str = record.get("ended_at") or record.get("updated_at", "")
+			try:
+				ended_ts = datetime.fromisoformat(ended_str.rstrip("Z"))
+			except Exception:
+				continue
+			elapsed = (now_ts - ended_ts).total_seconds()
+			if elapsed <= grace_seconds:
+				if candidate_ts is None or ended_ts > candidate_ts:
+					candidate = record
+					candidate_ts = ended_ts
+		if candidate is None:
+			raise KeyError(f"no_resumable_session: {phone_number}:{service_code}")
+		candidate["session_state"] = "active"
+		candidate["ended_at"] = None
+		candidate["updated_at"] = self._now()
+		candidate["metadata"]["resumed_at"] = self._now()
+		candidate["metadata"]["resume_count"] = candidate["metadata"].get("resume_count", 0) + 1
+		self._emit(tenant, "session_resumed", candidate["id"], "ussd_session", {
+			"phone": phone_number,
+			"grace_seconds": grace_seconds,
+			"hop_count_at_resume": candidate["hop_count"],
+		})
+		_log.info(
+			"session resumed: %s phone=%s service=%s hop=%d",
+			candidate["id"], phone_number, service_code, candidate["hop_count"],
+		)
+		return deepcopy(candidate)
+
+	# ── I3: Idempotent transaction execution ─────────────────────────────────
+
+	async def execute_idempotent(
+		self,
+		session_id: str,
+		hop_count: int,
+		handler_name: str,
+		payload: dict[str, Any],
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Execute a handler exactly once per (session, hop, handler) triple.
+		Duplicate USSD callbacks from GSM DTAP retransmission will receive the
+		cached result rather than re-triggering the handler.  All monetary values
+		in handler results must use Decimal — this method enforces that by
+		coercing any ``amount`` / ``balance`` / ``total`` keys.
+		"""
+		tenant = guard_tenant_id(tenant_id or self.tenant_id)
+		guard_non_empty_string(handler_name, "handler_name")
+		idem_key = hashlib.sha256(
+			f"{session_id}:{hop_count}:{handler_name}".encode()
+		).hexdigest()
+		if idem_key in self._idempotency_cache:
+			cached = self._idempotency_cache[idem_key]
+			_log.info(
+				"idempotent hit: key=%s session=%s hop=%d handler=%s",
+				idem_key[:12], session_id, hop_count, handler_name,
+			)
+			return {"idempotent": True, "cached_at": cached["executed_at"], "result": deepcopy(cached["result"])}
+		handler = self.handlers.get(handler_name)
+		if handler is None:
+			raise KeyError(f"handler_not_found: {handler_name}")
+		session_record = self.sessions.get(session_id)
+		if not session_record or session_record["tenant_id"] != tenant:
+			raise KeyError(f"session_not_found: {session_id}")
+		result: dict[str, Any] = await handler(session_record, payload)
+		# Coerce monetary fields to Decimal for downstream financial integrity
+		for money_key in ("amount", "balance", "total", "fee", "charge"):
+			if money_key in result:
+				try:
+					result[money_key] = Decimal(str(result[money_key]))
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+		executed_at = self._now()
+		self._idempotency_cache[idem_key] = {"result": deepcopy(result), "executed_at": executed_at}
+		self._emit(tenant, "idempotent_execution", session_id, "ussd_session", {
+			"handler": handler_name, "hop": hop_count, "idem_key": idem_key[:12],
+		})
+		_log.info(
+			"idempotent execute: key=%s session=%s hop=%d handler=%s",
+			idem_key[:12], session_id, hop_count, handler_name,
+		)
+		return {"idempotent": False, "executed_at": executed_at, "result": result}
+
+	# ── I4: Rate limiting per phone number ───────────────────────────────────
+
+	async def check_rate_limit(
+		self,
+		phone_number: str,
+		service_code: str,
+		tenant_id: str | None = None,
+		window_seconds: int = 3600,
+		max_sessions: int = 10,
+	) -> dict[str, Any]:
+		"""
+		Sliding-window session rate limit per phone+service per tenant.
+		Returns ``{"allowed": bool, "remaining": int, "reset_at": str}``.
+		Callers should invoke this before ``create_session`` and refuse when
+		``allowed`` is False to prevent bot scraping and credential stuffing.
+		"""
+		import time
+		tenant = guard_tenant_id(tenant_id or self.tenant_id)
+		guard_non_empty_string(phone_number, "phone_number")
+		guard_non_empty_string(service_code, "service_code")
+		bucket_key = f"{tenant}:{phone_number}:{service_code}"
+		now = time.monotonic()
+		window_start = now - window_seconds
+		timestamps = self._rate_buckets.get(bucket_key, [])
+		# Evict expired entries from sliding window
+		timestamps = [t for t in timestamps if t > window_start]
+		self._rate_buckets[bucket_key] = timestamps
+		count = len(timestamps)
+		allowed = count < max_sessions
+		remaining = max(0, max_sessions - count)
+		reset_at_epoch = (timestamps[0] + window_seconds) if timestamps else (now + window_seconds)
+		reset_dt = datetime.utcfromtimestamp(
+			datetime.utcnow().timestamp() + (reset_at_epoch - now)
+		).isoformat(timespec="seconds") + "Z"
+		if allowed:
+			timestamps.append(now)
+			self._rate_buckets[bucket_key] = timestamps
+		else:
+			_log.info(
+				"rate limit hit: phone=%s service=%s tenant=%s count=%d/%d",
+				phone_number, service_code, tenant, count, max_sessions,
+			)
+			self._emit(tenant, "rate_limit_exceeded", phone_number, "phone", {
+				"service_code": service_code, "count": count, "max": max_sessions,
+			})
+		return {
+			"allowed": allowed,
+			"remaining": remaining if allowed else 0,
+			"count": count + (1 if allowed else 0),
+			"max_sessions": max_sessions,
+			"window_seconds": window_seconds,
+			"reset_at": reset_dt,
+		}
+
+	# ── I5: Input validation schema ──────────────────────────────────────────
+
+	async def validate_input_against_schema(
+		self,
+		value: str,
+		schema: dict[str, Any],
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Validate a free-text USSD input value against a field schema dict.
+		Schema keys: ``type`` (str|int|decimal|phone|pin), ``pattern`` (regex),
+		``min_value`` (Decimal), ``max_value`` (Decimal), ``max_length`` (int),
+		``min_length`` (int), ``required`` (bool).
+		Returns ``{"valid": bool, "error_message": str | None, "coerced": Any}``.
+		"""
+		tenant = guard_tenant_id(tenant_id or self.tenant_id)
+		errors: list[str] = []
+		coerced: Any = value
+		field_type = schema.get("type", "str")
+		required = schema.get("required", True)
+		if not value and required:
+			return {"valid": False, "error_message": "This field is required.", "coerced": None}
+		if not value and not required:
+			return {"valid": True, "error_message": None, "coerced": None}
+		max_length = schema.get("max_length")
+		min_length = schema.get("min_length")
+		if max_length and len(value) > max_length:
+			errors.append(f"Input too long (max {max_length} chars).")
+		if min_length and len(value) < min_length:
+			errors.append(f"Input too short (min {min_length} chars).")
+		pattern = schema.get("pattern")
+		if pattern and not re.fullmatch(pattern, value):
+			errors.append(f"Input does not match expected format.")
+		if field_type in ("int", "decimal", "amount"):
+			try:
+				coerced = Decimal(value.replace(",", ""))
+				min_val = schema.get("min_value")
+				max_val = schema.get("max_value")
+				if min_val is not None and coerced < Decimal(str(min_val)):
+					errors.append(f"Value must be at least {min_val}.")
+				if max_val is not None and coerced > Decimal(str(max_val)):
+					errors.append(f"Value must be at most {max_val}.")
+			except Exception:
+				errors.append("Please enter a valid number.")
+				coerced = None
+		elif field_type == "phone":
+			phone_re = r"^\+?[0-9]{9,15}$"
+			if not re.fullmatch(phone_re, value.replace(" ", "")):
+				errors.append("Please enter a valid phone number.")
+		elif field_type == "pin":
+			pin_len = schema.get("pin_length", 4)
+			if not re.fullmatch(r"\d+", value) or len(value) != pin_len:
+				errors.append(f"PIN must be {pin_len} digits.")
+		valid = len(errors) == 0
+		_log.info("input_validation: type=%s valid=%s tenant=%s", field_type, valid, tenant)
+		return {"valid": valid, "error_message": errors[0] if errors else None, "coerced": coerced}
+
+	# ── I6: Menu versioning and rollback ─────────────────────────────────────
+
+	async def create_menu_version(
+		self,
+		menu_id: str,
+		service_code: str,
+		tenant_id: str | None = None,
+		language: str = "en",
+	) -> dict[str, Any]:
+		"""
+		Snapshot the current state of a menu as a named version.
+		Returns ``{"menu_id": str, "version": int, "snapshotted_at": str}``.
+		Keeps the last 20 versions per menu to bound memory usage.
+		"""
+		tenant = guard_tenant_id(tenant_id or self.tenant_id)
+		composite_key = f"{tenant}:{service_code}:{language}:{menu_id}"
+		record = self.menus.get(composite_key)
+		if not record:
+			raise KeyError(f"menu_not_found: {menu_id}")
+		versions = self._menu_versions.setdefault(composite_key, [])
+		version_num = len(versions) + 1
+		snapshot = deepcopy(record)
+		snapshot["_version"] = version_num
+		snapshot["_snapshotted_at"] = self._now()
+		versions.append(snapshot)
+		if len(versions) > 20:
+			versions.pop(0)
+		self._emit(tenant, "menu_versioned", record["id"], "ussd_menu", {
+			"menu_id": menu_id, "version": version_num,
+		})
+		_log.info(
+			"menu version created: %s v%d service=%s tenant=%s",
+			menu_id, version_num, service_code, tenant,
+		)
+		return {"menu_id": menu_id, "service_code": service_code, "version": version_num, "snapshotted_at": snapshot["_snapshotted_at"]}
+
+	async def rollback_menu(
+		self,
+		menu_id: str,
+		service_code: str,
+		version: int,
+		tenant_id: str | None = None,
+		language: str = "en",
+	) -> dict[str, Any]:
+		"""
+		Restore a menu to a previously snapshotted version.
+		Atomically replaces the live menu entry so all new sessions
+		immediately use the rolled-back definition.
+		"""
+		tenant = guard_tenant_id(tenant_id or self.tenant_id)
+		composite_key = f"{tenant}:{service_code}:{language}:{menu_id}"
+		versions = self._menu_versions.get(composite_key, [])
+		snapshot = next((v for v in versions if v.get("_version") == version), None)
+		if snapshot is None:
+			raise KeyError(f"menu_version_not_found: {menu_id}:v{version}")
+		restored = deepcopy(snapshot)
+		restored.pop("_version", None)
+		restored.pop("_snapshotted_at", None)
+		restored["updated_at"] = self._now()
+		self.menus[composite_key] = restored
+		self._emit(tenant, "menu_rolled_back", restored["id"], "ussd_menu", {
+			"menu_id": menu_id, "version": version,
+		})
+		_log.info(
+			"menu rolled back: %s to v%d service=%s tenant=%s",
+			menu_id, version, service_code, tenant,
+		)
+		return deepcopy(restored)
+
+	# ── I11: Dead-letter queue for failed handler executions ─────────────────
+
+	async def queue_dead_letter(
+		self,
+		session_id: str,
+		handler_name: str,
+		payload: dict[str, Any],
+		error: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Append a failed handler execution to the dead-letter store.
+		Captures full execution context (session snapshot, menu position,
+		input payload, exception message) for ops replay or alerting.
+		"""
+		tenant = guard_tenant_id(tenant_id or self.tenant_id)
+		guard_non_empty_string(handler_name, "handler_name")
+		guard_non_empty_string(error, "error")
+		session_record = self.sessions.get(session_id, {})
+		entry = {
+			"id": self._record_id("dlq"),
+			"tenant_id": tenant,
+			"session_id": session_id,
+			"handler_name": handler_name,
+			"payload": deepcopy(payload),
+			"error": error,
+			"session_snapshot": {
+				"current_menu": session_record.get("current_menu"),
+				"hop_count": session_record.get("hop_count"),
+				"phone_number": session_record.get("phone_number"),
+				"service_code": session_record.get("service_code"),
+				"variables": deepcopy(session_record.get("variables", {})),
+			},
+			"retry_count": 0,
+			"status": "pending",
+			"queued_at": self._now(),
+			"last_retried_at": None,
+		}
+		self._dead_letters.append(entry)
+		self._emit(tenant, "dead_letter_queued", session_id, "ussd_session", {
+			"handler": handler_name, "error": error[:200],
+		})
+		_log.info(
+			"dead letter queued: handler=%s session=%s error=%s",
+			handler_name, session_id, error[:80],
+		)
+		return deepcopy(entry)
+
+	async def get_dead_letters(
+		self,
+		tenant_id: str | None = None,
+		handler_name: str | None = None,
+		status: str | None = None,
+		limit: int = 50,
+	) -> list[dict[str, Any]]:
+		"""Return dead-letter entries for ops dashboards and automated replay."""
+		tenant = guard_tenant_id(tenant_id or self.tenant_id)
+		results = [deepcopy(e) for e in self._dead_letters if e["tenant_id"] == tenant]
+		if handler_name:
+			results = [e for e in results if e["handler_name"] == handler_name]
+		if status:
+			results = [e for e in results if e["status"] == status]
+		return results[-limit:]
+
+	# ── I12: Paginated session queries ───────────────────────────────────────
+
+	async def list_sessions_paginated(
+		self,
+		tenant_id: str | None = None,
+		page: int = 1,
+		page_size: int = 50,
+		phone_number: str | None = None,
+		service_code: str | None = None,
+		session_state: str | None = None,
+		sort_by: str = "created_at",
+		sort_dir: str = "desc",
+	) -> dict[str, Any]:
+		"""
+		Return a paginated, filterable, sortable view of sessions.
+		At production scale (10M+ sessions) this avoids the O(n) full-copy
+		of ``list_sessions()``.  Returns
+		``{"items": [...], "total": int, "page": int, "pages": int, "page_size": int}``.
+		"""
+		tenant = guard_tenant_id(tenant_id or self.tenant_id)
+		assert page >= 1, "page must be >= 1"
+		assert 1 <= page_size <= 1000, "page_size must be 1-1000"
+		assert sort_dir in ("asc", "desc"), "sort_dir must be asc or desc"
+		results = [r for r in self.sessions.values() if r["tenant_id"] == tenant]
+		if phone_number:
+			results = [r for r in results if r["phone_number"] == phone_number]
+		if service_code:
+			results = [r for r in results if r["service_code"] == service_code]
+		if session_state:
+			results = [r for r in results if r["session_state"] == session_state]
+		reverse = sort_dir == "desc"
+		results.sort(key=lambda r: r.get(sort_by, ""), reverse=reverse)
+		total = len(results)
+		pages = max(1, (total + page_size - 1) // page_size)
+		start = (page - 1) * page_size
+		end = start + page_size
+		items = [deepcopy(r) for r in results[start:end]]
+		_log.info(
+			"list_sessions_paginated: tenant=%s page=%d/%d total=%d",
+			tenant, page, pages, total,
+		)
+		return {
+			"items": items,
+			"total": total,
+			"page": page,
+			"pages": pages,
+			"page_size": page_size,
+		}
+
+	# ── I15: Session replay for debugging ────────────────────────────────────
+
+	async def replay_session(
+		self,
+		session_id: str,
+		tenant_id: str | None = None,
+		stop_at_hop: int | None = None,
+	) -> list[dict[str, Any]]:
+		"""
+		Re-execute a completed session's input history against the current menu
+		tree and return a step-by-step trace.  Useful for diagnosing failed
+		transactions without needing to reconstruct the flow manually from audit
+		logs.  Uses a shadow session so the live session store is not mutated.
+		Returns a list of hop dicts:
+		``[{"hop": int, "input": str, "menu": str, "response_type": str, "body": str}]``.
+		"""
+		tenant = guard_tenant_id(tenant_id or self.tenant_id)
+		original = self.sessions.get(session_id)
+		if not original or original["tenant_id"] != tenant:
+			raise KeyError(f"session_not_found: {session_id}")
+		input_history: list[str] = list(original.get("input_history", []))
+		service_code = original["service_code"]
+		phone_number = original["phone_number"]
+		language = original.get("language", "en")
+		gateway = original.get("gateway", "africastalking")
+		if stop_at_hop is not None:
+			input_history = input_history[:stop_at_hop]
+		# Build a shadow session id so replay never collides with live data
+		shadow_id = f"replay-{session_id[:12]}-{uuid4().hex[:8]}"
+		trace: list[dict[str, Any]] = []
+		# Prime the shadow session (hop 0 — initial menu render)
+		shadow_resp = await self.handle_ussd_request(
+			session_id=shadow_id,
+			service_code=service_code,
+			phone_number=phone_number,
+			text="",
+			tenant_id=tenant,
+			gateway=gateway,
+			language=language,
+		)
+		shadow_session_id = shadow_resp["session_id"]
+		shadow = self.sessions.get(shadow_session_id, {})
+		trace.append({
+			"hop": 0,
+			"input": "",
+			"menu": shadow.get("current_menu", ""),
+			"response_type": shadow_resp["response_type"],
+			"body": shadow_resp["body"],
+		})
+		# Replay each recorded input
+		cumulative_text = ""
+		for hop_idx, user_input in enumerate(input_history, start=1):
+			cumulative_text = cumulative_text + ("*" if cumulative_text else "") + user_input
+			shadow_resp = await self.handle_ussd_request(
+				session_id=shadow_session_id,
+				service_code=service_code,
+				phone_number=phone_number,
+				text=cumulative_text,
+				tenant_id=tenant,
+				gateway=gateway,
+				language=language,
+			)
+			shadow = self.sessions.get(shadow_session_id, {})
+			trace.append({
+				"hop": hop_idx,
+				"input": user_input,
+				"menu": shadow.get("current_menu", ""),
+				"response_type": shadow_resp["response_type"],
+				"body": shadow_resp["body"],
+			})
+			if shadow_resp["response_type"] == "END":
+				break
+		# Clean up shadow session from the live store
+		self.sessions.pop(shadow_session_id, None)
+		self.session_variables.pop(shadow_session_id, None)
+		_log.info(
+			"session replay complete: original=%s hops_replayed=%d tenant=%s",
+			session_id, len(trace) - 1, tenant,
+		)
+		self._emit(tenant, "session_replayed", session_id, "ussd_session", {
+			"hops_replayed": len(trace) - 1, "shadow_id": shadow_id,
+		})
+		return trace

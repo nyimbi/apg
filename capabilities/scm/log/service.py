@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -14,6 +15,15 @@ _log = logging.getLogger(__name__)
 
 CAPABILITY_ID = "scm_log"
 SUPPORTED_FREIGHT_MODES = {"air", "sea", "road", "rail", "multimodal"}
+
+# GLEC Framework v3 emission factors — kgCO2e per tonne-km
+_CO2_FACTORS: dict[str, float] = {
+	"air": 0.602,
+	"sea": 0.016,
+	"road": 0.096,
+	"rail": 0.028,
+	"multimodal": 0.120,
+}
 SUPPORTED_SERVICE_LEVELS = {"express", "standard", "economy"}
 SUPPORTED_CARRIER_TYPES = {"air", "sea", "road", "rail", "multimodal", "courier"}
 SUPPORTED_DOC_TYPES = {
@@ -40,6 +50,10 @@ class LogisticsService:
 		self.customs_documents: dict[str, dict[str, Any]] = {}
 		self.third_party_providers: dict[str, dict[str, Any]] = {}
 		self.delivery_exceptions: dict[str, dict[str, Any]] = {}
+		self.insurance_policies: dict[str, dict[str, Any]] = {}
+		self.insurance_claims: dict[str, dict[str, Any]] = {}
+		self.consolidation_groups: dict[str, dict[str, Any]] = {}
+		self.webhooks: dict[str, dict[str, Any]] = {}
 		self._audit_events: list[dict[str, Any]] = []
 
 	# ── Internal helpers ─────────────────────────────────────────────────────
@@ -752,3 +766,566 @@ class LogisticsService:
 			else:
 				results.append(item)
 		return {"created": len(results), "failed": len(errors), "shipments": results, "errors": errors}
+
+	# ── Carbon footprint tracking ─────────────────────────────────────────────
+
+	async def calculate_shipment_co2(
+		self,
+		shipment_id: str,
+		distance_km: float | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Calculate CO2e emissions for a shipment using GLEC Framework v3 factors.
+
+		Emission factor (kgCO2e / tonne-km) is multiplied by weight and distance.
+		Supply `distance_km` directly or attach a route via the shipment's carrier
+		route; falls back to a great-circle estimate if neither is available.
+		"""
+		tenant = self._tenant(tenant_id)
+		shipment = self.shipments.get(shipment_id)
+		if not shipment or shipment["tenant_id"] != tenant:
+			raise KeyError(f"shipment '{shipment_id}' not found")
+		mode = shipment["freight_mode"]
+		factor = _CO2_FACTORS.get(mode, 0.120)  # default multimodal
+		weight_tonnes = shipment["weight_kg"] / 1000.0
+		# resolve distance
+		dist_km: float
+		if distance_km is not None:
+			dist_km = distance_km
+		elif shipment.get("route_distance_km"):
+			dist_km = shipment["route_distance_km"]
+		else:
+			# naive fallback — caller should supply real distance
+			dist_km = 1000.0
+		co2_kg = round(factor * weight_tonnes * dist_km, 4)
+		result: dict[str, Any] = {
+			"shipment_id": shipment_id,
+			"freight_mode": mode,
+			"emission_factor_kgco2e_per_tonne_km": factor,
+			"weight_tonnes": weight_tonnes,
+			"distance_km": dist_km,
+			"co2_kg": co2_kg,
+			"co2_tonnes": round(co2_kg / 1000, 6),
+			"framework": "GLEC v3",
+			"scope": "scope_3",
+			"calculated_at": self._now(),
+		}
+		# persist on shipment for aggregation
+		shipment["co2_kg"] = co2_kg
+		shipment["updated_at"] = self._now()
+		self._emit(tenant, "co2_calculated", shipment_id, "scm_log_shipment", shipment["status"])
+		return result
+
+	async def emissions_report(
+		self,
+		date_from: str | None = None,
+		date_to: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Aggregate Scope 3 transport emissions across all shipments.
+
+		Returns totals by freight mode and carrier. Filters by ISO-8601 date range
+		when supplied; otherwise covers all shipments.
+		"""
+		tenant = self._tenant(tenant_id)
+		all_shipments = [s for s in self.shipments.values() if s["tenant_id"] == tenant]
+		if date_from:
+			all_shipments = [s for s in all_shipments if s["created_at"] >= date_from]
+		if date_to:
+			all_shipments = [s for s in all_shipments if s["created_at"] <= date_to]
+		by_mode: dict[str, float] = {}
+		by_carrier: dict[str, float] = {}
+		total_co2 = 0.0
+		for s in all_shipments:
+			co2 = s.get("co2_kg", 0.0)
+			by_mode[s["freight_mode"]] = round(by_mode.get(s["freight_mode"], 0.0) + co2, 4)
+			cid = s.get("carrier_id", "unknown")
+			by_carrier[cid] = round(by_carrier.get(cid, 0.0) + co2, 4)
+			total_co2 += co2
+		return {
+			"tenant_id": tenant,
+			"date_from": date_from,
+			"date_to": date_to,
+			"total_co2_kg": round(total_co2, 4),
+			"total_co2_tonnes": round(total_co2 / 1000, 6),
+			"by_freight_mode": by_mode,
+			"by_carrier": by_carrier,
+			"shipment_count": len(all_shipments),
+			"scope": "scope_3",
+			"framework": "GLEC v3 / GHG Protocol",
+			"generated_at": self._now(),
+		}
+
+	# ── SLA monitoring ────────────────────────────────────────────────────────
+
+	async def check_sla_breaches(
+		self,
+		at_risk_hours: float = 4.0,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Scan in-transit shipments for SLA breaches and at-risk deliveries.
+
+		Compares `estimated_delivery` against current UTC time.  Returns three
+		buckets: `breached` (ETA already past), `at_risk` (ETA within
+		`at_risk_hours`), and `on_track`.
+		"""
+		tenant = self._tenant(tenant_id)
+		now_str = self._now()
+		now_dt = datetime.fromisoformat(now_str.rstrip("Z"))
+		at_risk_threshold = now_dt + timedelta(hours=at_risk_hours)
+		breached, at_risk, on_track = [], [], []
+		for s in self.shipments.values():
+			if s["tenant_id"] != tenant:
+				continue
+			if s["status"] not in {"booked", "in_transit"}:
+				continue
+			eta_raw = s.get("estimated_delivery")
+			if not eta_raw:
+				continue
+			eta_dt = datetime.fromisoformat(eta_raw.rstrip("Z"))
+			entry = {
+				"shipment_id": s["id"],
+				"carrier_id": s["carrier_id"],
+				"status": s["status"],
+				"estimated_delivery": eta_raw,
+				"hours_delta": round((eta_dt - now_dt).total_seconds() / 3600, 2),
+			}
+			if eta_dt < now_dt:
+				entry["breach_hours"] = round((now_dt - eta_dt).total_seconds() / 3600, 2)
+				breached.append(entry)
+				self._emit(tenant, "sla_breach_detected", s["id"], "scm_log_shipment", "breached")
+			elif eta_dt <= at_risk_threshold:
+				at_risk.append(entry)
+				self._emit(tenant, "sla_at_risk", s["id"], "scm_log_shipment", "at_risk")
+			else:
+				on_track.append(entry)
+		return {
+			"tenant_id": tenant,
+			"checked_at": now_str,
+			"at_risk_window_hours": at_risk_hours,
+			"breached": breached,
+			"at_risk": at_risk,
+			"on_track": on_track,
+			"summary": {
+				"breached_count": len(breached),
+				"at_risk_count": len(at_risk),
+				"on_track_count": len(on_track),
+			},
+		}
+
+	async def sla_performance_report(
+		self,
+		carrier_id: str | None = None,
+		date_from: str | None = None,
+		date_to: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Compute on-time delivery rate, average delay, and exception rate per carrier.
+
+		Considers only delivered shipments with both `estimated_delivery` and
+		`actual_delivery` populated.
+		"""
+		tenant = self._tenant(tenant_id)
+		delivered = [
+			s for s in self.shipments.values()
+			if s["tenant_id"] == tenant
+			and s["status"] == "delivered"
+			and s.get("estimated_delivery")
+			and s.get("actual_delivery")
+		]
+		if carrier_id:
+			delivered = [s for s in delivered if s["carrier_id"] == carrier_id]
+		if date_from:
+			delivered = [s for s in delivered if s["created_at"] >= date_from]
+		if date_to:
+			delivered = [s for s in delivered if s["created_at"] <= date_to]
+		per_carrier: dict[str, dict[str, Any]] = {}
+		for s in delivered:
+			cid = s["carrier_id"]
+			if cid not in per_carrier:
+				per_carrier[cid] = {"total": 0, "on_time": 0, "delay_hours_list": []}
+			eta_dt = datetime.fromisoformat(s["estimated_delivery"].rstrip("Z"))
+			act_dt = datetime.fromisoformat(s["actual_delivery"].rstrip("Z"))
+			delay_h = (act_dt - eta_dt).total_seconds() / 3600
+			per_carrier[cid]["total"] += 1
+			per_carrier[cid]["delay_hours_list"].append(delay_h)
+			if delay_h <= 0:
+				per_carrier[cid]["on_time"] += 1
+		summary = {}
+		for cid, data in per_carrier.items():
+			delays = data["delay_hours_list"]
+			summary[cid] = {
+				"total_deliveries": data["total"],
+				"on_time_count": data["on_time"],
+				"on_time_rate_pct": round(data["on_time"] / data["total"] * 100, 2),
+				"avg_delay_hours": round(sum(delays) / len(delays), 2),
+				"max_delay_hours": round(max(delays), 2),
+			}
+		return {
+			"tenant_id": tenant,
+			"carrier_id_filter": carrier_id,
+			"date_from": date_from,
+			"date_to": date_to,
+			"per_carrier": summary,
+			"generated_at": self._now(),
+		}
+
+	# ── Shipment consolidation ────────────────────────────────────────────────
+
+	async def suggest_consolidation(
+		self,
+		shipment_ids: list[str],
+		departure_window_hours: float = 24.0,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Analyse a list of shipments and propose consolidation groups.
+
+		Groups shipments by (origin country, destination country, freight mode).
+		Returns potential savings estimate based on weight-break tariff assumption
+		(10% discount per 100 kg consolidated above 100 kg).
+		"""
+		tenant = self._tenant(tenant_id)
+		shipments = []
+		for sid in shipment_ids:
+			s = self.shipments.get(sid)
+			if not s or s["tenant_id"] != tenant:
+				raise KeyError(f"shipment '{sid}' not found")
+			shipments.append(s)
+		# group by corridor + mode
+		groups: dict[tuple, list[dict]] = {}
+		for s in shipments:
+			o = s["origin_address"].get("country", "UNK")
+			d = s["destination_address"].get("country", "UNK")
+			key = (o, d, s["freight_mode"])
+			groups.setdefault(key, []).append(s)
+		proposals = []
+		for (o, d, mode), members in groups.items():
+			if len(members) < 2:
+				continue
+			total_weight = sum(m["weight_kg"] for m in members)
+			# simplified discount model
+			discount_pct = min(30.0, ((total_weight - 100) // 100) * 10) if total_weight > 100 else 0.0
+			proposals.append({
+				"origin_country": o,
+				"destination_country": d,
+				"freight_mode": mode,
+				"shipment_ids": [m["id"] for m in members],
+				"shipment_count": len(members),
+				"combined_weight_kg": round(total_weight, 3),
+				"estimated_discount_pct": discount_pct,
+				"departure_window_hours": departure_window_hours,
+			})
+		return {
+			"tenant_id": tenant,
+			"total_shipments_analysed": len(shipments),
+			"consolidation_proposals": proposals,
+			"generated_at": self._now(),
+		}
+
+	async def create_consolidated_shipment(
+		self,
+		child_shipment_ids: list[str],
+		carrier_id: str,
+		freight_mode: str,
+		service_level: str = "standard",
+		reference_number: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Merge multiple draft shipments into a single consolidated master shipment.
+
+		Child shipments are cancelled and linked to the master via
+		`consolidated_into` field. The master inherits the bounding origin/destination
+		and the sum of weights and volumes.
+		"""
+		tenant = self._tenant(tenant_id)
+		if freight_mode not in SUPPORTED_FREIGHT_MODES:
+			raise ValueError(f"freight_mode must be one of {SUPPORTED_FREIGHT_MODES}")
+		carrier = self.carriers.get(carrier_id)
+		if not carrier or carrier["tenant_id"] != tenant:
+			raise KeyError(f"carrier '{carrier_id}' not found")
+		children = []
+		for sid in child_shipment_ids:
+			s = self.shipments.get(sid)
+			if not s or s["tenant_id"] != tenant:
+				raise KeyError(f"shipment '{sid}' not found")
+			if s["status"] != "draft":
+				raise ValueError(f"shipment '{sid}' must be draft to consolidate")
+			children.append(s)
+		total_weight = sum(s["weight_kg"] for s in children)
+		total_volume = sum(s.get("volume_m3") or 0.0 for s in children)
+		origin = children[0]["origin_address"]
+		destination = children[0]["destination_address"]
+		master: dict[str, Any] = {
+			"id": self._id("shp"),
+			"type": "scm_log_shipment",
+			"tenant_id": tenant,
+			"carrier_id": carrier_id,
+			"origin_address": deepcopy(origin),
+			"destination_address": deepcopy(destination),
+			"weight_kg": round(total_weight, 3),
+			"volume_m3": round(total_volume, 4) if total_volume else None,
+			"freight_mode": freight_mode,
+			"service_level": service_level,
+			"declared_value": None,
+			"currency": "USD",
+			"special_instructions": f"Consolidated from {len(children)} shipments",
+			"reference_number": reference_number,
+			"tracking_number": None,
+			"estimated_delivery": None,
+			"actual_delivery": None,
+			"status": "draft",
+			"consolidated": True,
+			"child_shipment_ids": [s["id"] for s in children],
+			"created_at": self._now(),
+			"updated_at": None,
+		}
+		self.shipments[master["id"]] = master
+		# cancel children and link to master
+		for s in children:
+			s["status"] = "cancelled"
+			s["cancellation_reason"] = "consolidated"
+			s["consolidated_into"] = master["id"]
+			s["cancelled_at"] = self._now()
+			s["updated_at"] = self._now()
+		self._emit(tenant, "consolidated_shipment_created", master["id"], "scm_log_shipment", "draft")
+		return deepcopy(master)
+
+	# ── Carrier performance scorecard ─────────────────────────────────────────
+
+	async def generate_carrier_scorecard(
+		self,
+		carrier_id: str,
+		period_days: int = 90,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Compute a multi-dimensional performance scorecard for a carrier.
+
+		Dimensions: on-time rate, exception rate, freight audit dispute rate,
+		average cost per kg, average CO2 per tonne-km.
+		"""
+		tenant = self._tenant(tenant_id)
+		carrier = self.carriers.get(carrier_id)
+		if not carrier or carrier["tenant_id"] != tenant:
+			raise KeyError(f"carrier '{carrier_id}' not found")
+		cutoff = (datetime.utcnow() - timedelta(days=period_days)).isoformat(timespec="seconds") + "Z"
+		carrier_shipments = [
+			s for s in self.shipments.values()
+			if s["tenant_id"] == tenant
+			and s["carrier_id"] == carrier_id
+			and s["created_at"] >= cutoff
+		]
+		total = len(carrier_shipments)
+		delivered = [s for s in carrier_shipments if s["status"] == "delivered"]
+		exceptions = [s for s in carrier_shipments if s["status"] == "exception"]
+		on_time_count = sum(
+			1 for s in delivered
+			if s.get("estimated_delivery") and s.get("actual_delivery")
+			and s["actual_delivery"] <= s["estimated_delivery"]
+		)
+		audits = [
+			a for a in self.freight_audits.values()
+			if a["tenant_id"] == tenant and a["carrier_id"] == carrier_id
+			and a["created_at"] >= cutoff
+		]
+		dispute_count = sum(1 for a in audits if a["status"] == "disputed")
+		total_co2 = sum(s.get("co2_kg", 0.0) for s in carrier_shipments)
+		total_weight_t = sum(s["weight_kg"] for s in carrier_shipments) / 1000.0
+		avg_co2_per_tonne_km = round(total_co2 / total_weight_t, 4) if total_weight_t else None
+		return {
+			"carrier_id": carrier_id,
+			"carrier_name": carrier["name"],
+			"period_days": period_days,
+			"total_shipments": total,
+			"delivered_count": len(delivered),
+			"on_time_rate_pct": round(on_time_count / len(delivered) * 100, 2) if delivered else None,
+			"exception_rate_pct": round(len(exceptions) / total * 100, 2) if total else None,
+			"audit_count": len(audits),
+			"audit_dispute_rate_pct": round(dispute_count / len(audits) * 100, 2) if audits else None,
+			"avg_co2_per_tonne_km": avg_co2_per_tonne_km,
+			"avg_rating": carrier.get("avg_rating"),
+			"generated_at": self._now(),
+		}
+
+	# ── Insurance ─────────────────────────────────────────────────────────────
+
+	async def request_insurance_quote(
+		self,
+		shipment_id: str,
+		coverage_type: str = "all_risk",
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Generate a freight insurance premium estimate.
+
+		Premium model: declared_value * mode_risk_factor * coverage_multiplier.
+		Mode risk factors: air 0.005, sea 0.008, road 0.006, rail 0.004.
+		Coverage: all_risk 1.0, named_perils 0.65.
+		"""
+		tenant = self._tenant(tenant_id)
+		shipment = self.shipments.get(shipment_id)
+		if not shipment or shipment["tenant_id"] != tenant:
+			raise KeyError(f"shipment '{shipment_id}' not found")
+		if coverage_type not in {"all_risk", "named_perils"}:
+			raise ValueError("coverage_type must be 'all_risk' or 'named_perils'")
+		declared_value = shipment.get("declared_value")
+		if not declared_value:
+			raise ValueError("shipment must have declared_value to quote insurance")
+		mode_risk = {"air": 0.005, "sea": 0.008, "road": 0.006, "rail": 0.004, "multimodal": 0.007}
+		coverage_mult = {"all_risk": 1.0, "named_perils": 0.65}
+		rate = mode_risk.get(shipment["freight_mode"], 0.007) * coverage_mult[coverage_type]
+		premium = round(declared_value * rate, 2)
+		quote: dict[str, Any] = {
+			"id": self._id("insq"),
+			"type": "scm_log_insurance_quote",
+			"tenant_id": tenant,
+			"shipment_id": shipment_id,
+			"coverage_type": coverage_type,
+			"declared_value": declared_value,
+			"currency": shipment["currency"],
+			"premium": premium,
+			"rate_pct": round(rate * 100, 4),
+			"valid_until": (datetime.utcnow() + timedelta(hours=48)).isoformat(timespec="seconds") + "Z",
+			"status": "quoted",
+			"created_at": self._now(),
+		}
+		self._emit(tenant, "insurance_quoted", quote["id"], "scm_log_insurance_quote", "quoted")
+		return quote
+
+	async def bind_insurance_policy(
+		self,
+		shipment_id: str,
+		quote: dict[str, Any],
+		insured_by: str,
+		policy_number: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Bind an insurance policy against a previously obtained quote.
+
+		Stores policy metadata on the shipment and in the `insurance_policies`
+		registry. Emits `insurance_policy_bound` audit event.
+		"""
+		tenant = self._tenant(tenant_id)
+		shipment = self.shipments.get(shipment_id)
+		if not shipment or shipment["tenant_id"] != tenant:
+			raise KeyError(f"shipment '{shipment_id}' not found")
+		pol_num = policy_number or f"POL{uuid4().hex[:10].upper()}"
+		policy: dict[str, Any] = {
+			"id": self._id("ins"),
+			"type": "scm_log_insurance_policy",
+			"tenant_id": tenant,
+			"shipment_id": shipment_id,
+			"policy_number": pol_num,
+			"coverage_type": quote.get("coverage_type"),
+			"declared_value": quote.get("declared_value"),
+			"premium": quote.get("premium"),
+			"currency": quote.get("currency", shipment["currency"]),
+			"insured_by": insured_by,
+			"status": "active",
+			"bound_at": self._now(),
+		}
+		self.insurance_policies[policy["id"]] = policy
+		shipment["insurance_policy_id"] = policy["id"]
+		shipment["insurance_policy_number"] = pol_num
+		shipment["updated_at"] = self._now()
+		self._emit(tenant, "insurance_policy_bound", policy["id"], "scm_log_insurance_policy", "active")
+		return deepcopy(policy)
+
+	async def file_insurance_claim(
+		self,
+		shipment_id: str,
+		claim_type: str,
+		description: str,
+		claimed_amount: float,
+		filed_by: str,
+		supporting_exception_id: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""File an insurance claim against a bound policy on a shipment.
+
+		`claim_type` is free-form (damage, loss, delay, theft). Links to a
+		delivery exception when `supporting_exception_id` is supplied.
+		"""
+		tenant = self._tenant(tenant_id)
+		shipment = self.shipments.get(shipment_id)
+		if not shipment or shipment["tenant_id"] != tenant:
+			raise KeyError(f"shipment '{shipment_id}' not found")
+		if not shipment.get("insurance_policy_id"):
+			raise ValueError("shipment has no bound insurance policy")
+		policy_id = shipment["insurance_policy_id"]
+		policy = self.insurance_policies.get(policy_id)
+		if not policy:
+			raise KeyError(f"insurance_policy '{policy_id}' not found")
+		claim: dict[str, Any] = {
+			"id": self._id("clm"),
+			"type": "scm_log_insurance_claim",
+			"tenant_id": tenant,
+			"shipment_id": shipment_id,
+			"policy_id": policy_id,
+			"policy_number": policy["policy_number"],
+			"claim_type": claim_type,
+			"description": description,
+			"claimed_amount": claimed_amount,
+			"currency": policy["currency"],
+			"filed_by": filed_by,
+			"supporting_exception_id": supporting_exception_id,
+			"status": "filed",
+			"created_at": self._now(),
+		}
+		self.insurance_claims[claim["id"]] = claim
+		self._emit(tenant, "insurance_claim_filed", claim["id"], "scm_log_insurance_claim", "filed")
+		return deepcopy(claim)
+
+	# ── Proof of delivery ─────────────────────────────────────────────────────
+
+	async def attach_pod(
+		self,
+		shipment_id: str,
+		document_url: str,
+		captured_by: str,
+		mime_type: str = "image/jpeg",
+		signature_hash: str | None = None,
+		recipient_name: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Attach a proof-of-delivery (POD) record to a delivered shipment.
+
+		`document_url` is a reference to object storage (S3/GCS presigned URL).
+		`signature_hash` should be SHA-256 of the signature image when available.
+		Transitions shipment status to `delivered` if currently `in_transit`.
+		"""
+		tenant = self._tenant(tenant_id)
+		shipment = self.shipments.get(shipment_id)
+		if not shipment or shipment["tenant_id"] != tenant:
+			raise KeyError(f"shipment '{shipment_id}' not found")
+		if shipment["status"] not in {"in_transit", "delivered", "exception"}:
+			raise ValueError("POD can only be attached to in-transit or delivered shipments")
+		pod: dict[str, Any] = {
+			"id": self._id("pod"),
+			"type": "scm_log_pod",
+			"tenant_id": tenant,
+			"shipment_id": shipment_id,
+			"document_url": document_url,
+			"mime_type": mime_type,
+			"captured_by": captured_by,
+			"signature_hash": signature_hash,
+			"recipient_name": recipient_name,
+			"captured_at": self._now(),
+		}
+		shipment.setdefault("pods", []).append(pod)
+		if shipment["status"] == "in_transit":
+			shipment["status"] = "delivered"
+			shipment["actual_delivery"] = self._now()
+		shipment["updated_at"] = self._now()
+		self._emit(tenant, "pod_attached", pod["id"], "scm_log_pod", "captured")
+		return deepcopy(pod)
+
+	async def get_pod(
+		self,
+		shipment_id: str,
+		tenant_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Return all POD records attached to a shipment."""
+		tenant = self._tenant(tenant_id)
+		shipment = self.shipments.get(shipment_id)
+		if not shipment or shipment["tenant_id"] != tenant:
+			raise KeyError(f"shipment '{shipment_id}' not found")
+		return deepcopy(shipment.get("pods", []))

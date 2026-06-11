@@ -2981,6 +2981,775 @@ class GeneralLedgerService:
 			"generated_at": self._now(),
 		}
 
+	# ==================================================================
+	# AUDIT TRAIL INTELLIGENCE
+	# ==================================================================
+
+	async def audit_intelligence_scan(
+		self,
+		tenant_id: str,
+		lookback_days: int = 90,
+	) -> dict[str, Any]:
+		"""Scan audit events and posting history for behavioural anomalies.
+
+		Checks performed:
+		1. Benford's Law — first-digit frequency deviation in posting amounts.
+		2. Dormant account reactivation — accounts unused for > 365 days.
+		3. Round-number bias — proportion of zero-cent amounts.
+
+		Returns findings list with check name, severity, and supporting data.
+		"""
+		tenant = self._tenant(tenant_id)
+		findings: list[dict[str, Any]] = []
+
+		# --- Benford's Law ---
+		first_digits: dict[str, int] = {}
+		round_count = 0
+		total_postings = 0
+		for posting in self.postings.values():
+			if posting["tenant_id"] != tenant:
+				continue
+			for line in posting["lines"]:
+				amt = abs(_d(line.get("debit", 0)) - _d(line.get("credit", 0)))
+				if amt <= 0:
+					continue
+				total_postings += 1
+				# Round-number bias: amount has zero cents
+				if amt % 1 == 0:
+					round_count += 1
+				# First significant digit
+				digits = str(amt).replace(".", "").lstrip("0")
+				if digits:
+					first_digits[digits[0]] = first_digits.get(digits[0], 0) + 1
+
+		if total_postings >= 50:
+			_benford = {"1": 30.1, "2": 17.6, "3": 12.5, "4": 9.7, "5": 7.9,
+			            "6": 6.7, "7": 5.8, "8": 5.1, "9": 4.6}
+			for digit, expected_pct in _benford.items():
+				actual_pct = first_digits.get(digit, 0) / total_postings * 100
+				deviation = abs(actual_pct - expected_pct)
+				if deviation > 5:
+					findings.append({
+						"check": "benford_law",
+						"digit": digit,
+						"expected_pct": str(round(expected_pct, 1)),
+						"actual_pct": str(round(actual_pct, 2)),
+						"deviation": str(round(deviation, 2)),
+						"severity": "high" if deviation > 10 else "medium",
+					})
+			round_pct = round_count / total_postings * 100
+			if round_pct > 40:
+				findings.append({
+					"check": "round_number_bias",
+					"round_amount_pct": str(round(round_pct, 1)),
+					"threshold_pct": "40.0",
+					"severity": "medium",
+				})
+
+		# --- Dormant account reactivation ---
+		for acct in self.accounts.values():
+			if acct["tenant_id"] != tenant or acct["status"] != "active":
+				continue
+			acct_postings = sorted(
+				[p for p in self.postings.values()
+				 if p["tenant_id"] == tenant
+				 and any(ln.get("account_id") == acct["id"] for ln in p["lines"])],
+				key=lambda p: p["created_at"],
+			)
+			if len(acct_postings) < 2:
+				continue
+			for i in range(1, len(acct_postings)):
+				try:
+					t0 = datetime.fromisoformat(acct_postings[i - 1]["created_at"].rstrip("Z"))
+					t1 = datetime.fromisoformat(acct_postings[i]["created_at"].rstrip("Z"))
+					gap_days = (t1 - t0).days
+				except Exception:
+					continue
+				if gap_days > 365:
+					findings.append({
+						"check": "dormant_account_reactivated",
+						"account_code": acct["code"],
+						"account_name": acct["name"],
+						"gap_days": gap_days,
+						"severity": "medium",
+					})
+					break
+
+		return {
+			"id": self._record_id("ais"),
+			"type": "audit_intelligence_scan",
+			"tenant_id": tenant,
+			"lookback_days": lookback_days,
+			"postings_analysed": total_postings,
+			"findings_count": len(findings),
+			"findings": findings,
+			"generated_at": self._now(),
+		}
+
+	# ==================================================================
+	# TAX PROVISION ENGINE
+	# ==================================================================
+
+	async def compute_deferred_tax(
+		self,
+		tenant_id: str,
+		period_code: str,
+		enacted_tax_rate: str,
+		tax_base_overrides: dict[str, str] | None = None,
+	) -> dict[str, Any]:
+		"""Compute deferred tax balances under IAS 12 / ASC 740.
+
+		For each balance-sheet account:
+		  temporary_difference = carrying_value − tax_base
+		  deferred_tax = temporary_difference × enacted_tax_rate
+
+		Deferred tax asset (DTA): tax_base > carrying_value (future deductible).
+		Deferred tax liability (DTL): carrying_value > tax_base (future taxable).
+
+		tax_base_overrides: {account_code: tax_base_amount_str} for accounts where
+		the tax base differs from the carrying value.
+		"""
+		tenant = self._tenant(tenant_id)
+		rate = _d(enacted_tax_rate) / _d("100")
+		if rate <= 0 or rate > 1:
+			raise ValueError(f"enacted_tax_rate_out_of_range:{enacted_tax_rate}")
+
+		tb = await self.trial_balance(tenant, period_code, include_zero_balances=False)
+		overrides = tax_base_overrides or {}
+
+		items: list[dict[str, Any]] = []
+		total_dta = Decimal("0")
+		total_dtl = Decimal("0")
+
+		for row in tb["rows"]:
+			if row["account_type"] in _INCOME_STMT_TYPES:
+				continue  # Temporary differences arise only on B/S accounts
+			carrying = _d(row["closing_debit"]) - _d(row["closing_credit"])
+			if row["account_type"] in _CREDIT_NORMAL_TYPES:
+				carrying = -carrying
+			tax_base = _d(str(overrides.get(row["account_code"], carrying)))
+			temp_diff = carrying - tax_base
+			deferred_tax = (temp_diff * rate).quantize(TWO, rounding=ROUND_HALF_UP)
+			if deferred_tax == 0:
+				continue
+
+			items.append({
+				"account_code": row["account_code"],
+				"account_name": row["account_name"],
+				"carrying_value": str(carrying),
+				"tax_base": str(tax_base),
+				"temporary_difference": str(temp_diff),
+				"deferred_tax": str(deferred_tax),
+				"classification": "DTA" if deferred_tax > 0 else "DTL",
+			})
+			if deferred_tax > 0:
+				total_dta += deferred_tax
+			else:
+				total_dtl += abs(deferred_tax)
+
+		net_deferred_tax = total_dta - total_dtl
+
+		return {
+			"id": self._record_id("dt"),
+			"type": "deferred_tax_computation",
+			"tenant_id": tenant,
+			"period_code": period_code,
+			"enacted_tax_rate_pct": enacted_tax_rate,
+			"items": items,
+			"item_count": len(items),
+			"total_dta": str(total_dta),
+			"total_dtl": str(total_dtl),
+			"net_deferred_tax": str(net_deferred_tax),
+			"net_classification": "DTA" if net_deferred_tax > 0 else "DTL" if net_deferred_tax < 0 else "nil",
+			"generated_at": self._now(),
+		}
+
+	# ==================================================================
+	# MULTI-GAAP REPORTING
+	# ==================================================================
+
+	async def multi_gaap_adjustment(
+		self,
+		tenant_id: str,
+		period_code: str,
+		target_gaap: str,
+		adjustments: list[dict[str, Any]],
+		prepared_by: str,
+	) -> dict[str, Any]:
+		"""Record a GAAP-difference adjustment journal for statutory reporting.
+
+		adjustments: list of {description, account_code, amount, gaap_reference}
+		  - amount > 0 → debit the account
+		  - amount < 0 → credit the account
+		target_gaap: 'US_GAAP' | 'UK_GAAP' | 'OHADA' | 'IFRS' | 'LOCAL'
+
+		The adjustments must balance (total debits == total credits). This is
+		enforced before posting.
+		"""
+		tenant = self._tenant(tenant_id)
+		if not target_gaap:
+			raise ValueError("target_gaap_required")
+		if not prepared_by:
+			raise ValueError("preparer_required_for_gaap_adjustment")
+
+		adj_lines: list[dict[str, Any]] = []
+		for adj in adjustments:
+			acct = self._account_by_code(tenant, adj["account_code"])
+			if not acct:
+				raise ValueError(f"account_not_found:{adj['account_code']}")
+			amt = _d(str(adj["amount"]))
+			if amt > 0:
+				adj_lines.append({
+					"account_id": acct["id"],
+					"debit": str(amt), "credit": "0.00",
+					"description": f"{target_gaap}: {adj.get('description', '')}",
+				})
+			elif amt < 0:
+				adj_lines.append({
+					"account_id": acct["id"],
+					"debit": "0.00", "credit": str(abs(amt)),
+					"description": f"{target_gaap}: {adj.get('description', '')}",
+				})
+
+		total_d = sum(_d(ln["debit"]) for ln in adj_lines)
+		total_c = sum(_d(ln["credit"]) for ln in adj_lines)
+		if total_d != total_c:
+			raise ValueError(
+				f"multi_gaap_adjustments_not_balanced:debits={total_d} credits={total_c}"
+			)
+
+		posting = await self.post_journal_v2(
+			tenant_id=tenant,
+			journal_date=self._today(),
+			journal_type="manual",
+			lines=adj_lines,
+			description=f"Multi-GAAP adjustment: {target_gaap} {period_code}",
+			reference=f"MGAAP-{target_gaap}-{period_code}",
+			posted_by=prepared_by,
+		)
+
+		record = {
+			"id": self._record_id("mgaap"),
+			"type": "multi_gaap_adjustment",
+			"tenant_id": tenant,
+			"period_code": period_code,
+			"target_gaap": target_gaap,
+			"adjustment_count": len(adjustments),
+			"total_adjustments": str(total_d),
+			"posting_id": posting["id"],
+			"status": "posted",
+			"created_at": self._now(),
+		}
+		return deepcopy(record)
+
+	async def statutory_financial_statements(
+		self,
+		tenant_id: str,
+		period_code: str,
+		target_gaap: str,
+	) -> dict[str, Any]:
+		"""Generate statutory financial statements under a target GAAP.
+
+		Combines the base IFRS ledger postings with all adjustment journals
+		tagged for target_gaap, then produces balance sheet and income statement.
+
+		For IFRS or when target_gaap=='IFRS', returns the base statements directly.
+		"""
+		tenant = self._tenant(tenant_id)
+		if not target_gaap:
+			raise ValueError("target_gaap_required")
+
+		bs = await self.balance_sheet(tenant, period_code)
+		inc = await self.income_statement(tenant, period_code)
+
+		gaap_adjustments = [
+			r for r in self.journal_entries.values()
+			if r["tenant_id"] == tenant
+			and f"MGAAP-{target_gaap}-{period_code}" in r.get("reference", "")
+		]
+
+		return {
+			"id": self._record_id("sfs"),
+			"type": "statutory_financial_statements",
+			"tenant_id": tenant,
+			"period_code": period_code,
+			"target_gaap": target_gaap,
+			"gaap_adjustments_applied": len(gaap_adjustments),
+			"balance_sheet": bs,
+			"income_statement": inc,
+			"note": "GAAP adjustment journals are included in the posted ledger.",
+			"generated_at": self._now(),
+		}
+
+	# ==================================================================
+	# HYPERINFLATION ACCOUNTING (IAS 29)
+	# ==================================================================
+
+	async def hyperinflation_restatement(
+		self,
+		tenant_id: str,
+		period_code: str,
+		gpi_index: str,
+		base_gpi_index: str,
+		monetary_account_tags: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Restate non-monetary assets and equity under IAS 29.
+
+		Applies the restatement factor (gpi_index / base_gpi_index) to all
+		non-monetary balance-sheet accounts. Monetary items (cash, receivables,
+		payables) are explicitly excluded — they are already expressed in current
+		purchasing power.
+
+		The net adjustment is posted to the first account tagged
+		'restatement_reserve' in the chart of accounts.
+
+		gpi_index: General Price Index at measurement date.
+		base_gpi_index: General Price Index at the historical cost date.
+		"""
+		tenant = self._tenant(tenant_id)
+		monetary_tags = set(monetary_account_tags or ["cash", "accounts_receivable", "accounts_payable"])
+		restatement_factor = _d(gpi_index) / _d(base_gpi_index)
+		if restatement_factor <= 0:
+			raise ValueError("restatement_factor_must_be_positive")
+
+		restatement_lines: list[dict[str, Any]] = []
+		for acct in self.accounts.values():
+			if acct["tenant_id"] != tenant or acct["status"] != "active":
+				continue
+			if acct["account_type"] in _INCOME_STMT_TYPES:
+				continue  # P&L accounts not restated under IAS 29 retrospective method
+			if set(acct.get("tags", [])) & monetary_tags:
+				continue
+			bal = self._get_account_balance(tenant, acct["id"], period_code)
+			carrying_value = bal["opening"] + bal["debits"] - bal["credits"]
+			if carrying_value == 0:
+				continue
+			restated = (carrying_value * restatement_factor).quantize(TWO, rounding=ROUND_HALF_UP)
+			adjustment = restated - carrying_value
+			if adjustment == 0:
+				continue
+			if adjustment > 0:
+				restatement_lines.append({
+					"account_id": acct["id"], "debit": str(adjustment), "credit": "0.00",
+					"description": f"IAS29 restatement f={restatement_factor}",
+				})
+			else:
+				restatement_lines.append({
+					"account_id": acct["id"], "debit": "0.00", "credit": str(abs(adjustment)),
+					"description": f"IAS29 restatement f={restatement_factor}",
+				})
+
+		if not restatement_lines:
+			return {
+				"id": self._record_id("ias29"),
+				"type": "hyperinflation_restatement",
+				"tenant_id": tenant,
+				"period_code": period_code,
+				"restatement_factor": str(restatement_factor),
+				"status": "no_restatement_required",
+				"created_at": self._now(),
+			}
+
+		net_adjustment = sum(_d(ln["debit"]) - _d(ln["credit"]) for ln in restatement_lines)
+		re_accounts = [a for a in self.accounts.values()
+		               if a["tenant_id"] == tenant and "restatement_reserve" in a.get("tags", [])]
+		if re_accounts and net_adjustment != 0:
+			re_acct = re_accounts[0]
+			if net_adjustment > 0:
+				restatement_lines.append({
+					"account_id": re_acct["id"], "debit": "0.00", "credit": str(net_adjustment),
+					"description": "IAS29 restatement reserve",
+				})
+			else:
+				restatement_lines.append({
+					"account_id": re_acct["id"], "debit": str(abs(net_adjustment)), "credit": "0.00",
+					"description": "IAS29 restatement reserve",
+				})
+
+		posting = await self.post_journal_v2(
+			tenant_id=tenant,
+			journal_date=period_code[:10] if len(period_code) >= 10 else self._today(),
+			journal_type="manual",
+			lines=restatement_lines,
+			description=f"IAS 29 Hyperinflation Restatement {period_code} (factor={restatement_factor})",
+			reference=f"IAS29-{period_code}",
+			posted_by="system",
+		)
+
+		return {
+			"id": self._record_id("ias29"),
+			"type": "hyperinflation_restatement",
+			"tenant_id": tenant,
+			"period_code": period_code,
+			"restatement_factor": str(restatement_factor),
+			"accounts_restated": len([ln for ln in restatement_lines
+			                          if "reserve" not in ln.get("description", "")]),
+			"net_adjustment": str(net_adjustment),
+			"posting_id": posting["id"],
+			"status": "completed",
+			"created_at": self._now(),
+		}
+
+	# ==================================================================
+	# ACCOUNT HEALTH AND AGEING
+	# ==================================================================
+
+	async def account_ageing_analysis(
+		self,
+		tenant_id: str,
+		account_code: str,
+		ageing_buckets: list[int] | None = None,
+		as_of_date: str | None = None,
+	) -> dict[str, Any]:
+		"""Age an AR or AP account by time elapsed since each line item was posted.
+
+		ageing_buckets: list of bucket thresholds in days, e.g. [30, 60, 90, 120].
+		Defaults to [30, 60, 90, 120].
+
+		Each journal line that contributes to the account balance is classified
+		into an ageing bucket based on how many days have elapsed since posting.
+		Lines with zero net impact are excluded.
+
+		Returns: bucket summary + line-level detail.
+		"""
+		tenant = self._tenant(tenant_id)
+		acct = self._account_by_code(tenant, account_code)
+		if not acct:
+			raise ValueError(f"account_not_found:{account_code}")
+
+		buckets = ageing_buckets or [30, 60, 90, 120]
+		bucket_labels = [f"0-{buckets[0]}"] + [f"{buckets[i]+1}-{buckets[i+1]}" for i in range(len(buckets) - 1)] + [f">{buckets[-1]}"]
+		bucket_totals: dict[str, Decimal] = {label: Decimal("0") for label in bucket_labels}
+
+		reference_date = datetime.fromisoformat(as_of_date) if as_of_date else datetime.utcnow()
+		lines_detail: list[dict[str, Any]] = []
+
+		for posting in self.postings.values():
+			if posting["tenant_id"] != tenant:
+				continue
+			try:
+				posted_at = datetime.fromisoformat(posting["created_at"].rstrip("Z"))
+			except Exception:
+				posted_at = reference_date
+			age_days = (reference_date - posted_at).days
+
+			for line in posting["lines"]:
+				if line.get("account_id") != acct["id"]:
+					continue
+				net = _d(line.get("debit", 0)) - _d(line.get("credit", 0))
+				if net == 0:
+					continue
+				# Assign to bucket
+				bucket_label = bucket_labels[-1]
+				for i, threshold in enumerate(buckets):
+					if age_days <= threshold:
+						bucket_label = bucket_labels[i]
+						break
+				bucket_totals[bucket_label] += net
+				lines_detail.append({
+					"posting_id": posting["id"],
+					"age_days": age_days,
+					"bucket": bucket_label,
+					"net_amount": str(net),
+					"description": line.get("description", ""),
+				})
+
+		total_balance = sum(bucket_totals.values())
+
+		return {
+			"id": self._record_id("age"),
+			"type": "account_ageing_analysis",
+			"tenant_id": tenant,
+			"account_code": account_code,
+			"account_name": acct["name"],
+			"account_type": acct["account_type"],
+			"as_of_date": as_of_date or reference_date.isoformat(),
+			"total_balance": str(total_balance),
+			"buckets": {k: str(v) for k, v in bucket_totals.items()},
+			"line_count": len(lines_detail),
+			"lines": lines_detail,
+			"generated_at": self._now(),
+		}
+
+	# ==================================================================
+	# FINANCIAL RATIOS ENGINE
+	# ==================================================================
+
+	async def financial_ratios(
+		self,
+		tenant_id: str,
+		period_code: str,
+		prior_period_code: str | None = None,
+	) -> dict[str, Any]:
+		"""Compute standard financial ratios from live GL data.
+
+		Ratios computed (where data is available):
+		Liquidity:    Current Ratio, Quick Ratio, Cash Ratio
+		Leverage:     Debt/Equity, Debt/Assets, Interest Coverage
+		Profitability: Gross Margin, Operating Margin, Net Margin, ROA, ROE, ROCE
+		Efficiency:   Asset Turnover
+		Activity:     Defined by account tag 'receivables', 'payables', 'inventory'
+
+		All amounts are Decimal-precise. Ratios are returned as strings to 4dp.
+		"""
+		tenant = self._tenant(tenant_id)
+		bs = await self.balance_sheet(tenant, period_code)
+		inc = await self.income_statement(tenant, period_code)
+
+		total_assets = _d(bs["total_assets"])
+		total_liab = _d(bs["liabilities"]["total"])
+		total_equity = _d(bs["equity"]["total"])
+		revenue = _d(inc["revenue"])
+		ebit = _d(inc["ebit"])
+		pat = _d(inc["pat"])
+		finance_cost = _d(inc["finance_cost"])
+
+		# Current vs non-current: use tag-based classification
+		def _tagged_balance(tag: str) -> Decimal:
+			total = Decimal("0")
+			for acct in self.accounts.values():
+				if acct["tenant_id"] != tenant or tag not in acct.get("tags", []):
+					continue
+				bal = self._get_account_balance(tenant, acct["id"], period_code)
+				total += bal["opening"] + bal["debits"] - bal["credits"]
+			return total
+
+		current_assets = _tagged_balance("current_asset") or total_assets
+		current_liab = _tagged_balance("current_liability") or total_liab
+		cash = _tagged_balance("cash")
+		receivables = _tagged_balance("accounts_receivable")
+		inventory = _tagged_balance("inventory")
+		quick_assets = current_assets - inventory
+
+		ratios: dict[str, str] = {}
+		_four = Decimal("0.0001")
+
+		def _ratio(num: Decimal, den: Decimal) -> str | None:
+			if den == 0:
+				return None
+			return str((num / den).quantize(_four, rounding=ROUND_HALF_UP))
+
+		# Liquidity
+		ratios["current_ratio"] = _ratio(current_assets, current_liab) or "n/a"
+		ratios["quick_ratio"] = _ratio(quick_assets, current_liab) or "n/a"
+		ratios["cash_ratio"] = _ratio(cash, current_liab) or "n/a"
+
+		# Leverage
+		ratios["debt_to_equity"] = _ratio(total_liab, total_equity) or "n/a"
+		ratios["debt_to_assets"] = _ratio(total_liab, total_assets) or "n/a"
+		ratios["interest_coverage"] = _ratio(ebit, finance_cost) if finance_cost != 0 else "n/a"
+
+		# Profitability
+		ratios["gross_margin_pct"] = _ratio(_d(inc["gross_profit"]) * 100, revenue) or "n/a"
+		ratios["operating_margin_pct"] = _ratio(ebit * 100, revenue) or "n/a"
+		ratios["net_margin_pct"] = _ratio(pat * 100, revenue) or "n/a"
+		ratios["roa_pct"] = _ratio(pat * 100, total_assets) or "n/a"
+		ratios["roe_pct"] = _ratio(pat * 100, total_equity) or "n/a"
+		capital_employed = total_assets - current_liab
+		ratios["roce_pct"] = _ratio(ebit * 100, capital_employed) if capital_employed != 0 else "n/a"
+
+		# Efficiency
+		ratios["asset_turnover"] = _ratio(revenue, total_assets) or "n/a"
+
+		# Prior period for trend
+		prior: dict[str, Any] | None = None
+		if prior_period_code:
+			prior_result = await self.financial_ratios(tenant, prior_period_code)
+			prior = prior_result["ratios"]
+
+		return {
+			"id": self._record_id("fr"),
+			"type": "financial_ratios",
+			"tenant_id": tenant,
+			"period_code": period_code,
+			"ratios": ratios,
+			"prior_period_ratios": prior,
+			"generated_at": self._now(),
+		}
+
+	# ==================================================================
+	# DIMENSION REPORTING
+	# ==================================================================
+
+	async def dimensional_report(
+		self,
+		tenant_id: str,
+		period_code: str,
+		dimensions: list[str],
+		account_filter: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Multi-dimensional P&L analysis without chart proliferation.
+
+		Each journal line can carry arbitrary dimension key-value pairs
+		(e.g. cost_center, product_line, geography, project, channel).
+
+		dimensions: list of dimension keys to group by, e.g. ['cost_center', 'geography'].
+		account_filter: optional dict to filter accounts, e.g. {'account_type': 'revenue'}.
+
+		Returns a pivot-style result with one row per unique dimension combination.
+		"""
+		tenant = self._tenant(tenant_id)
+		if not dimensions:
+			raise ValueError("at_least_one_dimension_required")
+
+		acct_filter = account_filter or {}
+		pivot: dict[str, dict[str, Decimal]] = {}
+
+		for posting in self.postings.values():
+			if posting["tenant_id"] != tenant or posting.get("period_code") != period_code:
+				continue
+			for line in posting["lines"]:
+				acct = self.accounts.get(line.get("account_id") or "")
+				if not acct:
+					continue
+				# Apply account filter
+				if any(acct.get(k) != v for k, v in acct_filter.items()):
+					continue
+				# Build dimension key
+				dim_key = tuple(str(line.get(dim, "unallocated")) for dim in dimensions)
+				dim_label = "|".join(f"{d}={v}" for d, v in zip(dimensions, dim_key))
+				pivot.setdefault(dim_label, {"revenue": Decimal("0"), "expense": Decimal("0")})
+
+				d = _d(line.get("debit", 0))
+				c = _d(line.get("credit", 0))
+				if acct["account_type"] == "revenue":
+					pivot[dim_label]["revenue"] += c - d
+				elif acct["account_type"] == "expense":
+					pivot[dim_label]["expense"] += d - c
+
+		rows = [
+			{
+				"dimension_key": key,
+				"revenue": str(totals["revenue"]),
+				"expense": str(totals["expense"]),
+				"contribution": str(totals["revenue"] - totals["expense"]),
+			}
+			for key, totals in sorted(pivot.items())
+		]
+
+		total_rev = sum(_d(r["revenue"]) for r in rows)
+		total_exp = sum(_d(r["expense"]) for r in rows)
+
+		return {
+			"id": self._record_id("dim_rpt"),
+			"type": "dimensional_report",
+			"tenant_id": tenant,
+			"period_code": period_code,
+			"dimensions": dimensions,
+			"account_filter": acct_filter,
+			"rows": rows,
+			"row_count": len(rows),
+			"total_revenue": str(total_rev),
+			"total_expense": str(total_exp),
+			"total_contribution": str(total_rev - total_exp),
+			"generated_at": self._now(),
+		}
+
+	# ==================================================================
+	# RECURRING TEMPLATE MANAGEMENT
+	# ==================================================================
+
+	async def create_recurring_template(
+		self,
+		tenant_id: str,
+		name: str,
+		journal_type: str,
+		lines: list[dict[str, Any]],
+		owner: str,
+		amount_multiplier: str = "1",
+		amount_resolver: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Create a recurring journal template for zero-touch accruals.
+
+		templates can carry an amount_resolver to auto-compute amounts from
+		source data (prepaid schedules, depreciation runs, payroll):
+
+		amount_resolver = {
+		    "type": "prepaid_schedule",
+		    "source_account": "<account_code>",
+		    "total_amount": "120000",
+		    "total_periods": 12,
+		    "start_period": "2026-01",
+		}
+
+		Lines must balance: sum(debits) == sum(credits).
+		"""
+		tenant = self._tenant(tenant_id)
+		if not name:
+			raise ValueError("template_name_required")
+		if not lines or len(lines) < 2:
+			raise ValueError("template_requires_minimum_two_lines")
+		total_d = sum(_d(ln.get("debit", 0)) for ln in lines)
+		total_c = sum(_d(ln.get("credit", 0)) for ln in lines)
+		if total_d != total_c:
+			raise ValueError(f"template_lines_not_balanced:debits={total_d} credits={total_c}")
+
+		template_id = self._record_id("tmpl")
+		record = {
+			"id": template_id,
+			"type": "recurring_journal_template",
+			"tenant_id": tenant,
+			"name": name,
+			"journal_type": journal_type,
+			"lines": deepcopy(lines),
+			"owner": owner,
+			"amount_multiplier": amount_multiplier,
+			"amount_resolver": amount_resolver,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		self.recurring_templates[template_id] = record
+		self._emit(tenant, "recurring_template_created", record)
+		return deepcopy(record)
+
+	async def run_smart_recurring(
+		self,
+		tenant_id: str,
+		period: str,
+	) -> list[dict[str, Any]]:
+		"""Run all active recurring templates for a period with auto-resolved amounts.
+
+		For templates with an amount_resolver of type 'prepaid_schedule', the
+		per-period amount is computed as total_amount / total_periods, adjusted
+		by the number of periods elapsed since start_period.
+
+		Returns the list of run records (one per template).
+		"""
+		tenant = self._tenant(tenant_id)
+		results: list[dict[str, Any]] = []
+
+		for tmpl in list(self.recurring_templates.values()):
+			if tmpl["tenant_id"] != tenant or tmpl.get("status") != "active":
+				continue
+
+			resolver = tmpl.get("amount_resolver")
+			effective_tmpl = deepcopy(tmpl)
+
+			if resolver and resolver.get("type") == "prepaid_schedule":
+				total_amount = _d(str(resolver.get("total_amount", 0)))
+				total_periods = int(resolver.get("total_periods", 1))
+				per_period = (total_amount / total_periods).quantize(TWO, rounding=ROUND_HALF_UP)
+				effective_tmpl["amount_multiplier"] = str(per_period)
+				# Update lines to use the computed per-period amount
+				template_total = sum(_d(ln.get("debit", 0)) for ln in effective_tmpl["lines"])
+				if template_total != 0:
+					effective_tmpl["amount_multiplier"] = str(per_period / template_total)
+
+			try:
+				self.recurring_templates[tmpl["id"]]["amount_multiplier"] = effective_tmpl["amount_multiplier"]
+				run = await self.recurring_journal_run(tenant, tmpl["id"], period)
+				results.append(run)
+			except Exception as exc:
+				results.append({
+					"template_id": tmpl["id"],
+					"template_name": tmpl["name"],
+					"period": period,
+					"status": "failed",
+					"error": str(exc),
+				})
+
+		return results
+
 	# ------------------------------------------------------------------
 	# Convenience aliases / shim methods
 	# ------------------------------------------------------------------

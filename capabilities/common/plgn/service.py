@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
@@ -726,6 +727,371 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "plugin_policy_blocked") for action in result.get("actions", []))
+
+	# ------------------------------------------------------------------
+	# Async methods — world-class extension surface
+	# ------------------------------------------------------------------
+
+	async def async_register_plugin(
+		self,
+		name: str,
+		version: str,
+		author: str,
+		entry_point: str,
+		permissions: list[str],
+		tenant_id: str = "default",
+		plugin_id: str | None = None,
+		publisher: str = "",
+		release_channel: str = "stable",
+		external_plugin: bool = False,
+		signature_verified: bool = True,
+		manifest_schema_valid: bool = True,
+		dependency_validation_passed: bool = True,
+		supply_chain_scan_passed: bool = True,
+		external_review_recorded: bool = False,
+		permission_review_recorded: bool = False,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Async variant of register_plugin.
+
+		Yields to the event loop before and after the synchronous registration
+		so that callers in async contexts are not blocked. In a production
+		deployment the yield points are where real I/O — signature verification,
+		supply-chain scanning, remote manifest validation — would be awaited.
+		"""
+		await asyncio.sleep(0)
+		result = self.register_plugin(
+			name=name,
+			version=version,
+			author=author,
+			entry_point=entry_point,
+			permissions=permissions,
+			tenant_id=tenant_id,
+			plugin_id=plugin_id,
+			publisher=publisher,
+			release_channel=release_channel,
+			external_plugin=external_plugin,
+			signature_verified=signature_verified,
+			manifest_schema_valid=manifest_schema_valid,
+			dependency_validation_passed=dependency_validation_passed,
+			supply_chain_scan_passed=supply_chain_scan_passed,
+			external_review_recorded=external_review_recorded,
+			permission_review_recorded=permission_review_recorded,
+			metadata=metadata,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_install_plugin(
+		self,
+		plugin_id: str,
+		tenant_id: str,
+		installed_by: str = "system",
+		installation_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Async variant of install_plugin.
+
+		In a production system this is where package-registry downloads,
+		artifact integrity checks, and quota enforcement would be awaited.
+		"""
+		await asyncio.sleep(0)
+		result = self.install_plugin(
+			plugin_id=plugin_id,
+			tenant_id=tenant_id,
+			installed_by=installed_by,
+			installation_id=installation_id,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_hook_fire(
+		self,
+		tenant_id: str,
+		event_name: str,
+		payload: dict[str, Any],
+		fired_by: str = "system",
+		handler_timeout_ms: int = 2000,
+	) -> dict[str, Any]:
+		"""
+		Fan-out async event dispatch.
+
+		Fires all registered hooks for `event_name` concurrently via
+		``asyncio.gather``. Each handler coroutine is independently
+		time-boxed to `handler_timeout_ms`. Handler failures are captured
+		per-handler and do not abort the remaining dispatch. Returns a
+		structured dispatch report with per-handler outcomes.
+
+		In a production system handler coroutines would invoke plugin
+		sandbox workers via the sandbox adapter instead of the in-process
+		no-op below.
+		"""
+		hook_key = f"{tenant_id}:{event_name}"
+		hooks = [h for h in self._event_hooks.get(hook_key, []) if h.get("active")]
+
+		async def _dispatch_one(hook: dict[str, Any]) -> dict[str, Any]:
+			await asyncio.sleep(0)
+			plugin = self._plugins.get(_state_key(tenant_id, hook["plugin_id"]))
+			if plugin and plugin.status in {"enabled", "released", "registered"}:
+				return {
+					"plugin_id": hook["plugin_id"],
+					"handler":   hook["handler"],
+					"priority":  hook["priority"],
+					"status":    "dispatched",
+					"error":     None,
+				}
+			return {
+				"plugin_id": hook["plugin_id"],
+				"handler":   hook["handler"],
+				"priority":  hook["priority"],
+				"status":    "skipped_plugin_not_active",
+				"error":     None,
+			}
+
+		timeout_s = handler_timeout_ms / 1000
+
+		async def _with_timeout(hook: dict[str, Any]) -> dict[str, Any]:
+			try:
+				return await asyncio.wait_for(_dispatch_one(hook), timeout=timeout_s)
+			except asyncio.TimeoutError:
+				return {
+					"plugin_id": hook["plugin_id"],
+					"handler":   hook["handler"],
+					"priority":  hook["priority"],
+					"status":    "timeout",
+					"error":     f"handler_timed_out_after_{handler_timeout_ms}ms",
+				}
+			except Exception as exc:  # noqa: BLE001
+				return {
+					"plugin_id": hook["plugin_id"],
+					"handler":   hook["handler"],
+					"priority":  hook["priority"],
+					"status":    "error",
+					"error":     str(exc),
+				}
+
+		dispatched_list = list(await asyncio.gather(*[_with_timeout(h) for h in hooks]), return_exceptions=True)
+		self._record_audit(
+			tenant_id, event_name, "async_hook_fired", fired_by, "allow",
+			metadata={
+				"handlers_called": sum(1 for d in dispatched_list if d["status"] == "dispatched"),
+				"handler_timeout_ms": handler_timeout_ms,
+			},
+		)
+		return {
+			"event_name":       event_name,
+			"tenant_id":        tenant_id,
+			"payload_keys":     list(payload.keys()),
+			"hooks_registered": len(hooks),
+			"dispatched":       dispatched_list,
+			"fired_at":         _ts(),
+		}
+
+	async def async_health_check_all(
+		self,
+		tenant_id: str = "default",
+		checks: list[str] | None = None,
+		concurrency: int = 10,
+	) -> list[dict[str, Any]]:
+		"""
+		Run health checks on all plugins for a tenant concurrently.
+
+		`concurrency` caps simultaneous checks via a semaphore.
+		Returns per-plugin health reports ordered by plugin id.
+		"""
+		plugins = self.list_plugins(tenant_id)
+		semaphore = asyncio.Semaphore(concurrency)
+
+		async def _check_one(plugin_dict: dict[str, Any]) -> dict[str, Any]:
+			async with semaphore:
+				await asyncio.sleep(0)
+				return self.plugin_health_check(
+					plugin_id=plugin_dict["id"],
+					tenant_id=tenant_id,
+					checks=checks,
+				)
+
+		return list(await asyncio.gather(*[_check_one(p) for p in plugins]), return_exceptions=True)
+
+	async def async_bulk_install(
+		self,
+		plugin_ids: list[str],
+		tenant_id: str,
+		installed_by: str = "system",
+		concurrency: int = 5,
+		stop_on_first_error: bool = False,
+	) -> dict[str, Any]:
+		"""
+		Install multiple plugins concurrently.
+
+		Each install is capped by the `concurrency` semaphore. When
+		`stop_on_first_error` is True the first failure cancels remaining
+		installs. Returns a structured bulk-install report with per-plugin
+		outcomes.
+		"""
+		if not plugin_ids:
+			raise ValueError("plugin_ids_required")
+		semaphore = asyncio.Semaphore(concurrency)
+		cancelled_flag: list[bool] = [False]
+
+		async def _install_one(pid: str) -> dict[str, Any]:
+			if cancelled_flag[0]:
+				return {"plugin_id": pid, "status": "cancelled", "installation_id": None, "error": "bulk_install_aborted"}
+			async with semaphore:
+				await asyncio.sleep(0)
+				try:
+					record = self.install_plugin(
+						plugin_id=pid,
+						tenant_id=tenant_id,
+						installed_by=installed_by,
+					)
+					return {"plugin_id": pid, "status": "installed", "installation_id": record["id"], "error": None}
+				except (PermissionError, KeyError, ValueError) as exc:
+					if stop_on_first_error:
+						cancelled_flag[0] = True
+					return {"plugin_id": pid, "status": "failed", "installation_id": None, "error": str(exc)}
+
+		outcomes = list(await asyncio.gather(*[_install_one(pid) for pid in plugin_ids]), return_exceptions=True)
+		return {
+			"tenant_id":    tenant_id,
+			"requested":    len(plugin_ids),
+			"installed":    sum(1 for o in outcomes if o["status"] == "installed"),
+			"failed":       sum(1 for o in outcomes if o["status"] == "failed"),
+			"cancelled":    sum(1 for o in outcomes if o["status"] == "cancelled"),
+			"outcomes":     outcomes,
+			"completed_at": _ts(),
+		}
+
+	async def async_dependency_resolve(
+		self,
+		plugin_ids: list[str],
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""
+		Async variant of plugin_dependency_resolution.
+
+		Yields before and after resolution so that remote version-constraint
+		queries can be awaited without blocking in a production system.
+		"""
+		await asyncio.sleep(0)
+		result = self.plugin_dependency_resolution(plugin_ids=plugin_ids, tenant_id=tenant_id)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_sandboxed_execution(
+		self,
+		plugin_id: str,
+		method: str,
+		parameters: dict[str, Any],
+		tenant_id: str = "default",
+		execution_id: str | None = None,
+		timeout_ms: int = 5000,
+	) -> dict[str, Any]:
+		"""
+		Async sandboxed execution with wall-clock timeout enforcement.
+
+		Wraps `plugin_sandboxed_execution` in `asyncio.wait_for` so the
+		caller receives a clean `asyncio.TimeoutError` if the sandbox worker
+		does not respond within `timeout_ms` milliseconds. This is the hook
+		point for a real IPC/gRPC sandbox adapter.
+		"""
+		async def _run() -> dict[str, Any]:
+			await asyncio.sleep(0)
+			return self.plugin_sandboxed_execution(
+				plugin_id=plugin_id,
+				method=method,
+				parameters=parameters,
+				tenant_id=tenant_id,
+				execution_id=execution_id,
+				timeout_ms=timeout_ms,
+			)
+
+		return await asyncio.wait_for(_run(), timeout=timeout_ms / 1000)
+
+	async def async_plugin_analytics(
+		self,
+		tenant_id: str = "default",
+		period: str = "all_time",
+	) -> dict[str, Any]:
+		"""
+		Async plugin analytics aggregation.
+
+		Yields before aggregation so that adapters sourcing metrics from
+		a time-series store (InfluxDB, Prometheus, ClickHouse) can be
+		awaited without blocking.
+		"""
+		await asyncio.sleep(0)
+		return self._plugin_analytics_impl(period=period, tenant_id=tenant_id)
+
+	async def async_search_marketplace(
+		self,
+		query: str,
+		tenant_id: str = "default",
+		channel: str | None = None,
+		curated_only: bool = False,
+		limit: int = 20,
+		offset: int = 0,
+	) -> dict[str, Any]:
+		"""
+		Async marketplace search with pagination.
+
+		Performs case-insensitive substring matching against plugin name and
+		listing title. In a production deployment this is the hook point for
+		a full-text or vector search adapter (Meilisearch, pgvector).
+
+		Returns ``{items, total, limit, offset}``.
+		"""
+		await asyncio.sleep(0)
+		listings = self.plugin_marketplace_listing(
+			tenant_id=tenant_id,
+			channel=channel,
+			curated_only=curated_only,
+		)
+		if query:
+			q = query.lower()
+			listings = [
+				lst for lst in listings
+				if q in lst.get("plugin_name", "").lower()
+				or q in lst.get("title", "").lower()
+			]
+		total = len(listings)
+		page = listings[offset: offset + limit]
+		return {
+			"tenant_id": tenant_id,
+			"query":     query,
+			"total":     total,
+			"limit":     limit,
+			"offset":    offset,
+			"items":     page,
+		}
+
+	async def async_audit_query(
+		self,
+		tenant_id: str,
+		event_type: str | None = None,
+		actor: str | None = None,
+		since: str | None = None,
+		limit: int = 100,
+	) -> list[dict[str, Any]]:
+		"""
+		Async audit event query with optional filters.
+
+		`since` is an ISO-8601 timestamp string; events older than it are
+		excluded. In a production system this queries a durable audit sink
+		(PostgreSQL, OpenSearch) rather than the in-process list.
+		Returns events sorted newest-first up to `limit`.
+		"""
+		await asyncio.sleep(0)
+		events = self.list_audit_events(tenant_id)
+		if event_type:
+			events = [e for e in events if e.get("event_type") == event_type]
+		if actor:
+			events = [e for e in events if e.get("actor") == actor]
+		if since:
+			events = [e for e in events if e.get("created_at", "") >= since]
+		events.sort(key=lambda e: e.get("created_at", ""), reverse=True)
+		return events[:limit]
 
 	# ------------------------------------------------------------------
 	# Extended methods — 40+ total

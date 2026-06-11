@@ -1,1356 +1,698 @@
-# Product Lifecycle Management - User Guide
+# Product Information Management — User Guide
 
-**APG Platform Integration | Version 1.0 | Last Updated: January 2025**
+**APG Platform | Capability: pde_pim | Version 2.2.0 | Updated: June 2026**
+**Datacraft | www.datacraft.co.ke**
 
-Welcome to the Product Lifecycle Management (PLM) capability within the APG Platform. This comprehensive guide will help you leverage PLM's powerful features for managing your product development lifecycle, from concept to retirement, with seamless integration across all APG capabilities.
+---
 
 ## Table of Contents
 
-1. [Getting Started with PLM in APG Platform](#getting-started)
-2. [Product Management Dashboard](#dashboard)
-3. [Creating and Managing Products](#product-management)
-4. [Engineering Change Management](#change-management)
-5. [Product Configuration Management](#configuration-management)
-6. [Collaborative Design Sessions](#collaboration)
-7. [Performance Analytics and Insights](#analytics)
-8. [Integration with Manufacturing Systems](#manufacturing-integration)
-9. [Compliance and Regulatory Management](#compliance)
-10. [Mobile PLM App Usage](#mobile-usage)
-11. [Troubleshooting Common Issues](#troubleshooting)
-12. [Frequently Asked Questions](#faq)
+1. [Overview](#overview)
+2. [Getting Started](#getting-started)
+3. [Product Catalogue Management](#product-catalogue-management)
+4. [Attribute Management](#attribute-management)
+5. [Digital Asset Management](#digital-asset-management)
+6. [Content Localisation](#content-localisation)
+7. [Category Taxonomy](#category-taxonomy)
+8. [Data Quality Scoring](#data-quality-scoring)
+9. [Channel Publishing and Syndication](#channel-publishing-and-syndication)
+10. [Bulk Operations](#bulk-operations)
+11. [Async Enrichment Pipelines](#async-enrichment-pipelines)
+12. [Quality Remediation Plans](#quality-remediation-plans)
+13. [PIM Analytics and KPIs](#pim-analytics-and-kpis)
+14. [Product Lifecycle Management](#product-lifecycle-management)
+15. [Compliance Management](#compliance-management)
+16. [AI Agent Integration](#ai-agent-integration)
+17. [API Reference Summary](#api-reference-summary)
+18. [Troubleshooting](#troubleshooting)
+19. [Frequently Asked Questions](#frequently-asked-questions)
 
 ---
 
-## Getting Started with PLM in APG Platform {#getting-started}
+## Overview
+
+The PIM capability (`pde_pim`) is the authoritative record for every product in a tenant's catalogue. It governs the complete product data lifecycle:
+
+- **Ingest**: Create products individually or via bulk import from CSV or ERP feeds
+- **Enrich**: Add typed attributes, localised content, digital assets, and category assignments
+- **Govern**: Score data quality, record compliance, and manage change requests with full audit trails
+- **Publish**: Validate products against channel-specific quality gates and syndicate to web, marketplace, and B2B channels
+- **Analyse**: Track catalogue health, enrichment coverage, and publication KPIs across time periods
+
+All operations are multi-tenant isolated. Every write emits an audit event to the `apg.pde.pim.lifecycle` Bytewax stream.
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
-Before using PLM, ensure you have:
-- ✅ Active APG Platform account with appropriate tenant access
-- ✅ PLM capability permissions assigned via APG Auth & RBAC
-- ✅ Required integrations enabled (Manufacturing, Digital Twin Marketplace, AI Orchestration)
-- ✅ Browser compatibility: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
+- APG Platform account with `pde_pim` capability enabled for your tenant
+- Permission set: at minimum `pde_pim:view` for read operations, `pde_pim:manage_products` to create/update
+- Python 3.11+ if using the service layer directly
 
-### Initial Setup
+### Python Setup
 
-1. **Access PLM Dashboard**
-   - Navigate to your APG Platform home page
-   - Click on "PLM" in the main navigation menu
-   - You'll be redirected to the PLM Dashboard overview
+```python
+from capabilities.pde.pim.service import ProductInfoManagementService
 
-2. **Verify Capability Integrations**
-   - Go to Settings → Integrations
-   - Confirm green status for:
-     - Manufacturing System Integration
-     - Digital Twin Marketplace
-     - AI Orchestration Engine
-     - Document Management System
-     - Audit & Compliance Tracking
+svc = ProductInfoManagementService(tenant_id="your-tenant-id")
+```
 
-3. **Configure Your Profile**
-   - Click your profile icon → PLM Preferences
-   - Set default units of measure
-   - Configure notification preferences
-   - Select collaboration tools preferences
+Passing `tenant_id` at construction avoids repeating it on every call. You can still override per-call:
 
-### Quick Start Workflow
+```python
+svc = ProductInfoManagementService()
+product = svc.create_product("SKU-001", "Name", "Category", {}, tenant_id="tenant-a")
+```
 
-**Create Your First Product (5 minutes):**
+### Tenant Context
 
-1. Navigate to PLM → Products → Create New
-2. Fill in basic product information:
-   - Product Name: "My First APG Product"
-   - Product Number: "APG-001"
-   - Product Type: "Manufactured"
-   - Lifecycle Phase: "Concept"
-3. Click "Create Product"
-4. Optionally enable "Auto-create Digital Twin" for 3D visualization
-
-🎯 **Success Indicator:** Your product appears in the Products list with a unique product ID
+Every operation requires a resolved tenant context. Operations without one raise `PermissionError("tenant_context_required")`. In production, the APG auth layer injects the tenant context automatically.
 
 ---
 
-## Product Management Dashboard {#dashboard}
+## Product Catalogue Management
 
-### Dashboard Overview
+### Creating a Catalogue
 
-The PLM Dashboard provides real-time insights into your product portfolio with APG Platform integration:
+A catalogue groups products under a code/name. Products auto-create a default catalogue if none is specified.
 
-![PLM Dashboard Screenshot](images/plm-dashboard.png)
+```python
+catalog = svc.create_catalog("cat-main", "tenant-a", "MAIN", "Main Catalogue", "owner-1")
+```
 
-### Key Metrics Cards
+Fields: `catalog_id`, `tenant_id`, `code` (uppercase), `name`, `owner_id`.
 
-**Product Portfolio Overview**
-- Total Products: Complete count across all lifecycle phases
-- Active Products: Products in production/active phases
-- Products in Development: Concept through testing phases
-- Obsolete Products: End-of-life and discontinued items
+### Creating a Product
 
-**Engineering Change Metrics**
-- Open Changes: Changes requiring action
-- Pending Approvals: Changes awaiting your approval
-- Implemented This Month: Recently completed changes
-- Average Approval Time: Performance metric in days
+```python
+product = svc.create_product(
+    sku="SOLAR-20W-BLK",
+    name="Solar Charger 20W Black",
+    category="Electronics",
+    attributes={"weight_g": 180, "panel_watt": 20, "colour": "black"},
+    tenant_id="tenant-a",
+    product_type="physical",   # physical | digital | service | bundle | component | raw_material
+    owner_id="catalog_manager",
+    catalog_id="cat-main",     # omit to use auto-default
+)
+```
 
-**Collaboration Activity**
-- Active Sessions: Currently running design sessions
-- Scheduled Sessions: Upcoming collaborative meetings
-- Session Duration: Average collaboration time
-- Participant Engagement: User participation rates
+SKUs must be unique within a tenant. Duplicate SKUs raise `ValueError("sku_already_exists:<sku>")`.
 
-**Compliance Status**
-- Compliant Products: Fully certified products
-- Pending Reviews: Items requiring compliance validation
-- Expiring Certifications: Certificates expiring within 30 days
-- Compliance Percentage: Overall compliance rate
+### Product Types
 
-### Real-Time Integration Indicators
+| Type | Description |
+|------|-------------|
+| `physical` | Tangible, shippable goods |
+| `digital` | Downloads, software, licences |
+| `service` | Non-shippable offerings |
+| `bundle` | Grouped physical/digital products |
+| `component` | Sub-assembly or spare part |
+| `raw_material` | Input to manufacturing |
 
-Monitor your APG capability integrations:
-- 🟢 **Manufacturing Sync**: Real-time BOM synchronization status
-- 🟢 **Digital Twin Binding**: Active twin connections
-- 🟢 **AI Optimization**: ML model availability
-- 🟢 **Audit Compliance**: Regulatory tracking status
+### Retrieving and Searching Products
 
-### Customizing Your Dashboard
+```python
+# Text search across name, SKU, and attribute values
+results = svc.product_search("solar charger", tenant_id="tenant-a")
 
-1. Click the "Customize Dashboard" button
-2. Drag and drop metric cards to reorder
-3. Hide/show specific metrics based on your role
-4. Set refresh intervals (Real-time, 5min, 15min, 1hr)
-5. Configure alert thresholds for key metrics
+# With filters
+results = svc.product_search(
+    "solar",
+    filters={"category": "Electronics", "status": "published", "channel": "web"},
+    tenant_id="tenant-a",
+    limit=50,
+    offset=0,
+)
+```
+
+### Product Lifecycle Stages
+
+```python
+svc.product_lifecycle("SOLAR-20W-BLK", "launch", tenant_id="tenant-a")
+```
+
+Valid stages: `concept → development → launch → growth → maturity → decline → discontinue`
 
 ---
 
-## Creating and Managing Products {#product-management}
+## Attribute Management
 
-### Product Creation Workflow
+### Defining Attributes
 
-**Step 1: Basic Product Information**
-```
-Product Name*: Descriptive name (3-200 characters)
-Product Number*: Unique identifier (3-50 characters)
-Product Description: Detailed description (up to 2000 characters)
-Product Type*: Select from dropdown:
-  - Manufactured: Internally produced items
-  - Purchased: External vendor items
-  - Virtual: Software/service products
-  - Service: Service offerings
-  - Kit: Assembly kits
-  - Raw Material: Base materials
-  - Subassembly: Component assemblies
-  - Finished Good: Final products
+Define reusable attribute schemas at the tenant level:
+
+```python
+attr = svc.define_attribute(
+    "attr-colour", "tenant-a", "colour", "Colour", "enum", "owner-1"
+)
 ```
 
-**Step 2: Lifecycle Management**
-```
-Lifecycle Phase*: Current product stage
-  - Concept: Initial idea phase
-  - Design: Design development
-  - Prototype: Prototype development
-  - Development: Full development
-  - Testing: Validation and testing
-  - Production: Manufacturing setup
-  - Active: In-market products
-  - Mature: Established products
-  - Declining: End-of-life preparation
-  - Obsolete: No longer supported
-  - Discontinued: Completely retired
+Supported types: `text`, `number`, `boolean`, `date`, `enum`, `money`, `media`, `rich_text`
 
-Revision: Version identifier (default: "A")
-Status: Product status (default: "active")
+### Setting Attribute Values
+
+```python
+updated = svc.update_attributes(
+    "SOLAR-20W-BLK",
+    {"colour": "black", "warranty_years": 2, "certifications": ["CE", "RoHS"]},
+    tenant_id="tenant-a",
+    updated_by="enrichment_agent",
+)
 ```
 
-**Step 3: Financial Information**
-```
-Target Cost: Planned manufacturing cost
-Current Cost: Actual manufacturing cost
-Unit of Measure: Primary UoM (each, kg, m, etc.)
-```
+`update_attributes` merges into the existing attribute dict. Pass the full replacement dict if you need a clean overwrite.
 
-**Step 4: APG Platform Integration**
-```
-☑️ Auto-create Digital Twin: Enable 3D visualization
-☑️ Manufacturing BOM Sync: Sync with manufacturing systems
-☑️ Compliance Tracking: Enable regulatory monitoring
-☑️ AI Design Optimization: Enable ML-powered insights
-```
+### Rich-Text Attributes
 
-### Product Management Features
-
-**Product Structure (Bill of Materials)**
-- Hierarchical component relationships
-- Quantity and UoM specifications
-- Reference designators for assembly
-- Effective date management
-- Real-time manufacturing sync
-
-**Product Configurations**
-- Variant management for product families
-- Option codes and feature lists
-- Configuration-specific pricing
-- Manufacturing complexity ratings
-- Lead time management
-
-**Custom Attributes**
-- Flexible metadata fields
-- Material specifications
-- Technical parameters
-- Certification requirements
-- Custom business attributes
-
-### Bulk Operations
-
-**Mass Product Import**
-1. Download the CSV template: PLM → Products → Import → Download Template
-2. Fill in product data following the template format
-3. Upload CSV file: PLM → Products → Import → Upload File
-4. Review validation results and fix any errors
-5. Confirm import to create all products
-
-**Bulk Product Updates**
-1. Select multiple products from the product list
-2. Click "Bulk Actions" → "Update Selected"
-3. Choose fields to update across all selected products
-4. Apply changes with change tracking
-
-### Advanced Search and Filtering
-
-**Text Search:** Search across product names, numbers, and descriptions
-**Filters:**
-- Product Type: Filter by product classification
-- Lifecycle Phase: Filter by current phase
-- Cost Range: Min/max cost filtering
-- Date Range: Creation or update date filters
-- Tags: Filter by assigned tags
-- Status: Active, inactive, or deleted products
-
-**Saved Searches:** Save frequently used search criteria for quick access
+Rich-text attribute values require a locale. Setting one without a locale is denied at the rule engine level before persistence.
 
 ---
 
-## Engineering Change Management {#change-management}
+## Digital Asset Management
 
-### Understanding Engineering Changes
+### Adding Media
 
-Engineering changes in APG PLM provide structured workflows for managing product modifications with full audit trails and approval processes.
-
-### Change Types
-
-**Design Changes**
-- Product design modifications
-- Component updates
-- Material changes
-- Dimensional adjustments
-
-**Process Changes**
-- Manufacturing process updates
-- Assembly procedure changes
-- Quality control modifications
-- Tooling updates
-
-**Documentation Changes**
-- Technical drawing updates
-- Specification changes
-- Manual revisions
-- Certification updates
-
-**Cost Reduction Changes**
-- Material cost optimization
-- Process efficiency improvements
-- Vendor consolidation
-- Design simplification
-
-**Quality Improvement Changes**
-- Defect resolution
-- Performance enhancements
-- Reliability improvements
-- Customer feedback implementation
-
-**Safety & Regulatory Changes**
-- Safety requirement compliance
-- Regulatory standard updates
-- Environmental compliance
-- Industry standard adoption
-
-### Change Creation Process
-
-**Step 1: Change Request Initiation**
-1. Navigate to PLM → Engineering Changes → Create New
-2. Select change type from dropdown menu
-3. Provide descriptive change title (5-200 characters)
-4. Write detailed change description (10-2000 characters)
-
-**Step 2: Impact Assessment**
-```
-Affected Products*: Select all impacted products
-Affected Documents: Related technical documents
-Reason for Change*: Detailed justification (10-1000 characters)
-Business Impact*: Expected business outcomes
-Cost Impact: Estimated financial impact (positive/negative)
-Schedule Impact: Timeline impact in days
+```python
+media = svc.add_media(
+    sku="SOLAR-20W-BLK",
+    media_type="image",          # image | video | document | 3d_model | audio | thumbnail
+    url="https://cdn.example.com/solar-20w-hero.jpg",
+    alt_text="Solar Charger 20W hero shot",
+    tenant_id="tenant-a",
+    rights_basis="owned",        # owned | licensed | creative_commons
+    sort_order=0,
+)
 ```
 
-**Step 3: Approval Workflow Setup**
-```
-Priority Level:
-  - Low: Non-critical improvements
-  - Medium: Standard business changes
-  - High: Important business impact
-  - Critical: Safety or compliance critical
+### Asset Pipeline Recommendations
 
-Urgency Level:
-  - Normal: Standard processing time
-  - Urgent: Expedited review required
-  - Emergency: Immediate action needed
+For production environments, build an async pipeline around `add_media`:
 
-Approvers: Select required approval stakeholders
-```
+1. Upload the asset to your CDN/object store and obtain the URL
+2. Call `svc.add_media(...)` with the canonical CDN URL
+3. Store the returned `media_id` for later reference or deletion
 
-### Change Status Workflow
-
-```
-Draft → Submitted → Under Review → Approved/Rejected → Implemented → Closed
-```
-
-**Draft**: Initial change creation and editing
-**Submitted**: Change submitted for formal review
-**Under Review**: Active evaluation by stakeholders
-**Approved**: Change authorized for implementation
-**Rejected**: Change denied with feedback
-**Implemented**: Change successfully deployed
-**Closed**: Change process completed with documentation
-
-### Approval Process
-
-**Multi-Stakeholder Approval**
-- Technical reviewers evaluate feasibility
-- Manufacturing reviews production impact
-- Quality assesses compliance implications
-- Finance reviews cost implications
-- Management provides final authorization
-
-**Approval Comments**
-- Each approver provides detailed feedback
-- Comments captured for audit trail
-- Decision rationale documented
-- Follow-up actions identified
-
-**Conditional Approvals**
-- Approval with specific conditions
-- Required modifications before implementation
-- Timeline constraints
-- Budget limitations
-
-### Change Implementation
-
-**Implementation Planning**
-1. Create detailed implementation plan
-2. Schedule manufacturing changeover
-3. Coordinate with supply chain
-4. Plan quality validation activities
-5. Prepare documentation updates
-
-**Implementation Tracking**
-- Progress monitoring with milestones
-- Resource allocation tracking
-- Timeline adherence monitoring
-- Issue identification and resolution
-
-**Implementation Validation**
-- Quality verification testing
-- Performance validation
-- Compliance confirmation
-- Stakeholder sign-off
-
-### Integration with APG Capabilities
-
-**Audit & Compliance Integration**
-- Automatic audit trail creation
-- Regulatory compliance verification
-- Digital signature management
-- Record retention compliance
-
-**Manufacturing Integration**
-- Real-time BOM synchronization
-- Production schedule updates
-- Tooling change coordination
-- Quality control updates
-
-**Document Management Integration**
-- Automatic document version control
-- Related document updates
-- Drawing revision management
-- Specification synchronization
+Data quality scoring awards points for each media record: full score at 3+ assets.
 
 ---
 
-## Product Configuration Management {#configuration-management}
+## Content Localisation
 
-### Configuration Overview
+### Enriching Content for a Locale
 
-Product configurations enable management of product variants, options, and customizations within product families while maintaining relationships to base products.
-
-### Configuration Types
-
-**Standard Configurations**
-- Pre-defined product variants
-- Common option combinations
-- Market-specific versions
-- Regional compliance variants
-
-**Custom Configurations**
-- Customer-specific modifications
-- Special order requirements
-- Prototype configurations
-- One-off customizations
-
-**Option Packages**
-- Bundled feature sets
-- Upgrade packages
-- Accessory combinations
-- Service packages
-
-### Creating Product Configurations
-
-**Step 1: Base Product Selection**
-1. Navigate to PLM → Configurations → Create New
-2. Select base product from dropdown
-3. Provide configuration name and description
-4. Choose configuration type
-
-**Step 2: Variant Definition**
-```
-Configuration Attributes:
-- Color options
-- Size variations
-- Performance levels
-- Feature selections
-- Material choices
-
-Option Codes:
-- Standardized option identifiers
-- Manufacturing codes
-- Ordering codes
-- System integration codes
-
-Feature List:
-- Included features
-- Optional features
-- Excluded features
-- Upgrade paths
+```python
+content = svc.enrich_content(
+    content_id="content-en-001",
+    tenant_id="tenant-a",
+    product_id=product["id"],
+    locale="en",
+    title="Solar Charger 20W",
+    body="Portable solar panel charger with USB-C output. 20W peak output.",
+    generated=False,
+    reviewed_by="content_reviewer",
+)
 ```
 
-**Step 3: Pricing and Costing**
+### AI-Generated Content
+
+Set `generated=True` for AI-generated copy. The rule engine holds AI-generated content at `require_review` status until a human reviewer is recorded. Without `reviewed_by`, the content is saved but cannot be published.
+
+### Async Multi-Locale Localisation (v2.2.0)
+
+```python
+result = await svc.async_localise_product(
+    "SOLAR-20W-BLK",
+    localisations=[
+        {"locale": "en", "title": "Solar Charger 20W", "description": "..."},
+        {"locale": "fr", "title": "Chargeur Solaire 20W", "description": "..."},
+        {"locale": "sw", "title": "Chaja ya Jua 20W", "description": "..."},
+        {"locale": "ar", "title": "شاحن شمسي 20W", "description": "..."},
+    ],
+    tenant_id="tenant-a",
+    reviewed_by="translation_manager",
+)
+print(result["coverage_pct"])  # e.g. 100.0
 ```
-Base Price: Starting configuration price
-Option Price Delta: Additional cost for options
-Total Price: Calculated total price
-Cost Delta: Manufacturing cost difference
-Manufacturing Complexity: Complexity rating (standard/complex/advanced)
-Lead Time: Production lead time in days
-```
 
-### Configuration Management Features
-
-**Variant Comparison**
-- Side-by-side configuration comparison
-- Feature difference highlighting
-- Cost comparison analysis
-- Performance metric comparison
-
-**Configuration Validation**
-- Option compatibility checking
-- Manufacturing feasibility validation
-- Cost threshold verification
-- Lead time calculation
-
-**Ordering Integration**
-- Direct order generation from configurations
-- Customer self-service configuration
-- Sales tool integration
-- Quote generation
-
-### Advanced Configuration Features
-
-**Rule-Based Configuration**
-- Option dependency rules
-- Incompatibility constraints
-- Automatic feature selection
-- Pricing rule application
-
-**Configuration Inheritance**
-- Base configuration templates
-- Inherited feature sets
-- Cascading option updates
-- Family-wide changes
-
-**Mass Configuration Updates**
-- Bulk pricing updates
-- Feature availability changes
-- Lead time adjustments
-- Option code modifications
+All locale coroutines fire concurrently. `coverage_pct` is the ratio of successful locales to total attempted.
 
 ---
 
-## Collaborative Design Sessions {#collaboration}
+## Category Taxonomy
 
-### Real-Time Collaboration Overview
+### Assigning a Hierarchical Category Path
 
-APG PLM's collaborative design sessions enable distributed teams to work together in real-time on product development with integrated communication, visualization, and decision-making tools.
-
-### Session Types
-
-**Design Review Sessions**
-- New product design evaluation
-- Design iteration reviews
-- Technical specification discussions
-- Design decision workshops
-
-**Change Review Sessions**
-- Engineering change evaluation
-- Impact assessment meetings
-- Approval discussions
-- Implementation planning
-
-**Brainstorming Sessions**
-- Innovation workshops
-- Problem-solving sessions
-- Ideation meetings
-- Concept development
-
-**Problem-Solving Sessions**
-- Issue resolution meetings
-- Root cause analysis
-- Corrective action planning
-- Continuous improvement
-
-**Training Sessions**
-- Product knowledge sharing
-- Process training
-- Tool demonstrations
-- Best practice sharing
-
-**Customer/Supplier Meetings**
-- Customer requirement reviews
-- Supplier technical discussions
-- Partnership meetings
-- Stakeholder presentations
-
-### Creating Collaboration Sessions
-
-**Step 1: Session Setup**
-1. Navigate to PLM → Collaborate → Create Session
-2. Choose session type from dropdown
-3. Provide session name and description
-4. Set session date and time (timezone-aware)
-
-**Step 2: Participant Management**
-```
-Host Selection: Session moderator
-Invited Users: Email addresses or APG user IDs
-Max Participants: Session capacity (1-100)
-Participant Permissions:
-  - View only
-  - Comment and discuss
-  - Edit and modify
-  - Full collaboration rights
+```python
+assignment = svc.product_categorisation(
+    sku="SOLAR-20W-BLK",
+    category_path=["Electronics", "Energy", "Solar", "Chargers"],
+    tenant_id="tenant-a",
+    assigned_by="catalog_manager",
+)
 ```
 
-**Step 3: Session Features**
-```
-☑️ Recording Enabled: Record session for later review
-☑️ Whiteboard Enabled: Interactive whiteboard collaboration
-☑️ File Sharing Enabled: Document and file sharing
-☑️ 3D Viewing Enabled: Product 3D model viewing
-☑️ Screen Sharing: Presenter screen sharing
-☑️ Voice Chat: Audio communication
-☑️ Video Conferencing: Video communication
-```
+Category nodes are created automatically if they do not exist. The leaf category ID is stored on the assignment and on the product record.
 
-### Session Management
+### Bulk Classification
 
-**Pre-Session Preparation**
-- Session agenda distribution
-- Material pre-sharing
-- Technical checks
-- Participant confirmation
-
-**During Session Activities**
-- Real-time annotation
-- Collaborative whiteboarding
-- File sharing and review
-- Decision recording
-- Action item tracking
-
-**Post-Session Follow-up**
-- Session recording distribution
-- Action item assignment
-- Decision documentation
-- Follow-up meeting scheduling
-
-### Collaboration Tools
-
-**Interactive Whiteboard**
-- Drawing and annotation tools
-- Text and shape insertion
-- Image import and manipulation
-- Multi-user simultaneous editing
-- Whiteboard save and export
-
-**3D Model Collaboration**
-- Real-time 3D model viewing
-- Annotation on 3D models
-- Sectioning and exploded views
-- Measurement tools
-- View synchronization
-
-**Document Collaboration**
-- Simultaneous document editing
-- Version control integration
-- Comment and review tools
-- Real-time change tracking
-
-**Communication Tools**
-- Text chat with history
-- Voice communication
-- Video conferencing
-- Screen sharing
-- File transfer
-
-### Integration with APG Capabilities
-
-**Real-Time Collaboration Infrastructure**
-- WebSocket-based real-time communication
-- Load balancing for scalability
-- Session recording and playback
-- Mobile device support
-
-**Notification Engine Integration**
-- Session invitation notifications
-- Reminder notifications
-- Session start/end notifications
-- Action item notifications
-
-**Document Management Integration**
-- Automatic session document archival
-- Version control for session files
-- Search across session content
-- Document security and permissions
-
----
-
-## Performance Analytics and Insights {#analytics}
-
-### Analytics Dashboard Overview
-
-PLM Analytics provides comprehensive insights into product performance, development efficiency, collaboration effectiveness, and business impact with AI-powered recommendations.
-
-### Product Performance Analytics
-
-**Lifecycle Performance Metrics**
-- Time in each lifecycle phase
-- Phase transition efficiency
-- Development cycle time
-- Time-to-market analysis
-
-**Cost Performance Analysis**
-- Target vs. actual cost tracking
-- Cost variance analysis
-- Cost reduction achievements
-- Profitability analysis
-
-**Quality Metrics**
-- Defect rates by product
-- Customer satisfaction scores
-- Warranty claim analysis
-- Quality improvement trends
-
-### Development Process Analytics
-
-**Engineering Change Analytics**
-- Change request volume trends
-- Change approval cycle times
-- Change success rates
-- Change cost impact analysis
-
-**Collaboration Effectiveness**
-- Session frequency and duration
-- Participant engagement levels
-- Decision-making efficiency
-- Communication effectiveness
-
-**Design Efficiency Metrics**
-- Design iteration cycles
-- Review completion times
-- Approval bottlenecks
-- Resource utilization
-
-### AI-Powered Insights
-
-**Innovation Intelligence**
-- Market trend analysis
-- Technology adoption patterns
-- Competitive intelligence
-- Innovation opportunity identification
-
-**Predictive Analytics**
-- Product failure predictions
-- Market demand forecasting
-- Development timeline predictions
-- Resource requirement forecasting
-
-**Optimization Recommendations**
-- Cost optimization opportunities
-- Process improvement suggestions
-- Resource allocation optimization
-- Timeline compression recommendations
-
-### Custom Analytics
-
-**Report Builder**
-- Drag-and-drop report creation
-- Custom metric definitions
-- Flexible filtering options
-- Automated report scheduling
-
-**Dashboard Customization**
-- Personalized dashboard layouts
-- Role-based view configurations
-- Interactive chart options
-- Real-time data updates
-
-**Data Export Options**
-- CSV data export
-- PDF report generation
-- API data access
-- Integration with BI tools
-
-### Performance Benchmarking
-
-**Industry Benchmarks**
-- Industry-standard comparisons
-- Best practice identification
-- Performance gap analysis
-- Improvement target setting
-
-**Historical Trending**
-- Performance over time
-- Seasonal pattern analysis
-- Growth trajectory tracking
-- Goal achievement monitoring
-
----
-
-## Integration with Manufacturing Systems {#manufacturing-integration}
-
-### Manufacturing Integration Overview
-
-PLM seamlessly integrates with APG Manufacturing capabilities to ensure real-time synchronization of product data, BOMs, and production information.
-
-### Bill of Materials (BOM) Synchronization
-
-**Real-Time BOM Sync**
-- Automatic BOM updates to manufacturing
-- Change propagation to production systems
-- Multi-level BOM support
-- Effectivity date management
-
-**BOM Validation**
-- Manufacturing feasibility checking
-- Component availability verification
-- Lead time validation
-- Cost verification
-
-**BOM Versioning**
-- Version control integration
-- Change history tracking
-- Rollback capabilities
-- Comparison tools
-
-### Production Integration Features
-
-**Manufacturing Status Tracking**
-- Production readiness status
-- Manufacturing capacity monitoring
-- Quality gate status
-- Production schedule alignment
-
-**Supply Chain Coordination**
-- Supplier integration
-- Component availability tracking
-- Lead time management
-- Procurement coordination
-
-**Quality Integration**
-- Quality plan synchronization
-- Inspection requirement updates
-- Quality record integration
-- Compliance verification
-
-### Integration Configuration
-
-**Connection Setup**
-1. Navigate to PLM → Settings → Manufacturing Integration
-2. Configure manufacturing system endpoints
-3. Set up authentication credentials
-4. Define synchronization schedules
-5. Test connection and validate data flow
-
-**Sync Rules Configuration**
-```
-Sync Frequency:
-- Real-time: Immediate updates
-- Scheduled: Batch updates at defined intervals
-- Manual: On-demand synchronization
-
-Data Mapping:
-- PLM to Manufacturing field mapping
-- Data transformation rules
-- Validation criteria
-- Error handling procedures
+```python
+result = svc.bulk_classify(
+    skus=["SOLAR-20W-BLK", "SOLAR-10W-WHT", "SOLAR-30W-BLK"],
+    category_path=["Electronics", "Energy", "Solar", "Chargers"],
+    tenant_id="tenant-a",
+)
+print(result["classified"], result["failed"])
 ```
 
-### Troubleshooting Integration Issues
+### Managing Taxonomy Nodes
 
-**Common Issues and Resolutions**
-
-**Sync Failures**
-- Check network connectivity
-- Verify authentication credentials
-- Review data validation errors
-- Check system capacity limits
-
-**Data Inconsistencies**
-- Run data reconciliation reports
-- Review transformation rules
-- Validate source data quality
-- Check for timing conflicts
-
-**Performance Issues**
-- Monitor sync performance metrics
-- Optimize batch sizes
-- Review system resources
-- Consider sync schedule adjustments
+```python
+# Create a standalone taxonomy node (without product assignment)
+node = svc.taxonomy_manage(
+    tenant_id="tenant-a",
+    category_name="Accessories",
+    parent_id="cat-tenant-a-electronics",
+)
+```
 
 ---
 
-## Compliance and Regulatory Management {#compliance}
+## Data Quality Scoring
 
-### Compliance Overview
+### Computing a Score
 
-PLM provides comprehensive compliance management for regulatory requirements, industry standards, and internal quality policies with automated tracking and audit trails.
+```python
+score = svc.data_quality_score("SOLAR-20W-BLK", tenant_id="tenant-a")
+```
 
-### Supported Compliance Frameworks
+Returns a weighted total score (0–100) and per-dimension breakdown:
 
-**International Standards**
-- ISO 9001: Quality Management Systems
-- ISO 14001: Environmental Management
-- ISO 45001: Occupational Health and Safety
-- ISO 27001: Information Security Management
+| Dimension | Weight | Full Score Criteria |
+|-----------|--------|---------------------|
+| name | 20% | Product name is non-empty |
+| attributes | 20% | 5+ attributes present |
+| description | 15% | At least one content record exists |
+| media | 15% | 3+ media assets attached |
+| categorisation | 15% | Category path assigned |
+| compliance | 10% | At least one compliance record present |
+| channel_listing | 5% | Listed on at least one channel |
 
-**Industry-Specific Regulations**
-- FDA 21 CFR Part 820: Medical Device Quality
-- IATF 16949: Automotive Quality Management
-- AS9100: Aerospace Quality Management
-- IEC 62304: Medical Device Software
+Grade: A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, F < 40.
 
-**Regional Regulations**
-- CE Marking (European Conformity)
-- FCC (Federal Communications Commission)
-- RoHS (Restriction of Hazardous Substances)
-- REACH (Registration, Evaluation, Authorization of Chemicals)
+### Channel Validation
 
-### Compliance Management Process
+Before publishing, validate that a product meets the channel's minimum quality threshold:
 
-**Compliance Planning**
-1. Identify applicable regulations
-2. Map requirements to products
-3. Create compliance checklists
-4. Assign compliance responsibilities
-5. Set compliance milestones
+```python
+validation = svc.channel_validate("SOLAR-20W-BLK", "marketplace_amazon", tenant_id="tenant-a")
+# {"valid": True/False, "quality_score": 87.5, "min_required": 85, "issues": [...]}
+```
 
-**Compliance Tracking**
-- Requirement fulfillment monitoring
-- Documentation completeness checking
-- Certification status tracking
-- Expiration date monitoring
+Channel quality minimums:
 
-**Compliance Reporting**
-- Compliance dashboard updates
-- Regulatory submission preparation
-- Audit report generation
-- Non-compliance issue tracking
-
-### Certification Management
-
-**Certificate Tracking**
-- Certificate storage and organization
-- Expiration date monitoring
-- Renewal reminder automation
-- Compliance status visualization
-
-**Audit Preparation**
-- Audit checklist generation
-- Evidence collection automation
-- Documentation package creation
-- Audit trail preparation
-
-**Non-Conformance Management**
-- Issue identification and logging
-- Corrective action planning
-- Implementation tracking
-- Effectiveness verification
-
-### Integration with APG Audit & Compliance
-
-**Automated Audit Trails**
-- Complete change history tracking
-- User action logging
-- Decision rationale capture
-- Approval workflow documentation
-
-**Digital Signatures**
-- Electronic signature capture
-- Signature validation
-- Timestamp verification
-- Regulatory compliance
-
-**Document Control**
-- Version control automation
-- Access control enforcement
-- Distribution tracking
-- Archival management
+| Channel | Minimum Score |
+|---------|--------------|
+| `web` | 70 |
+| `mobile` | 60 |
+| `marketplace_amazon` | 85 |
+| `b2b_portal` | 75 |
+| other | 70 (default) |
 
 ---
 
-## Mobile PLM App Usage {#mobile-usage}
+## Channel Publishing and Syndication
 
-### Mobile App Overview
+### Publish to a Single Channel
 
-The PLM Mobile App provides on-the-go access to essential PLM functions, optimized for smartphones and tablets with offline capabilities and responsive design.
+```python
+pub = svc.publish_to_channel(
+    sku="SOLAR-20W-BLK",
+    channel_id="web",
+    tenant_id="tenant-a",
+    approved_by="catalog_manager",
+)
+```
 
-### Mobile App Features
+### Publish to Multiple Marketplaces (Synchronous)
 
-**Product Information Access**
-- Product catalog browsing
-- Product detail viewing
-- Image and document access
-- Search functionality
+```python
+result = svc.syndicate_marketplace(
+    "SOLAR-20W-BLK",
+    marketplaces=["marketplace_amazon", "web", "mobile"],
+    tenant_id="tenant-a",
+    approved_by="catalog_manager",
+)
+```
 
-**Engineering Change Review**
-- Change request notifications
-- Mobile approval workflows
-- Comment submission
-- Approval status tracking
+### Async Parallel Syndication (v2.2.0)
 
-**Collaboration Participation**
-- Mobile collaboration sessions
-- Voice and video participation
-- File sharing and viewing
-- Real-time notifications
+Uses quality-gated publish per channel, fired concurrently:
 
-**Manufacturing Integration**
-- Production status monitoring
-- Quality alert notifications
-- Mobile data collection
-- Shop floor integration
+```python
+result = await svc.async_syndicate_marketplaces(
+    "SOLAR-20W-BLK",
+    marketplaces=["marketplace_amazon", "web", "mobile", "b2b_portal"],
+    tenant_id="tenant-a",
+    approved_by="catalog_manager",
+)
+print(result["published"], result["failed"])
+```
 
-### Installation and Setup
+Channels that fail the quality gate surface in `results` with `status: "failed"` — they do not block other channels.
 
-**Download and Installation**
-1. Download from App Store (iOS) or Google Play (Android)
-2. Search for "APG PLM" or scan QR code from web interface
-3. Install following standard mobile app procedures
+### Scheduling Future Publication
 
-**Initial Configuration**
-1. Launch app and select "Connect to APG Platform"
-2. Enter your APG Platform URL
-3. Authenticate with your APG credentials
-4. Configure offline sync preferences
-5. Set notification preferences
+```python
+schedule = svc.publication_schedule(
+    sku="SOLAR-20W-BLK",
+    channel_id="web",
+    publish_at="2026-07-01T09:00:00Z",
+    tenant_id="tenant-a",
+    approved_by="catalog_manager",
+)
+```
 
-### Mobile Workflows
+### Unpublishing
 
-**Product Review Workflow**
-1. Receive product review notification
-2. Open PLM mobile app
-3. Navigate to assigned product
-4. Review product information and documents
-5. Submit review comments and approval
-
-**Change Approval Workflow**
-1. Receive change approval notification
-2. Open change request in mobile app
-3. Review change details and impact
-4. Add approval comments
-5. Submit approval decision
-
-**Collaboration Session Participation**
-1. Receive session invitation notification
-2. Join session from mobile notification
-3. Participate in voice/video discussion
-4. View shared documents and models
-5. Submit session feedback
-
-### Offline Capabilities
-
-**Offline Data Access**
-- Cached product information
-- Downloaded documents
-- Offline form completion
-- Local data storage
-
-**Sync Management**
-- Automatic sync when online
-- Manual sync triggering
-- Conflict resolution
-- Sync status indicators
-
-### Mobile Security
-
-**Security Features**
-- Device authentication required
-- Automatic session timeout
-- Encrypted data storage
-- Remote wipe capabilities
-
-**Access Control**
-- Role-based feature access
-- Document permission enforcement
-- Audit trail maintenance
-- Compliance monitoring
+```python
+svc.unpublish(
+    sku="SOLAR-20W-BLK",
+    channel_id="web",
+    tenant_id="tenant-a",
+    reason="seasonal_delisting",
+    unpublished_by="catalog_manager",
+)
+```
 
 ---
 
-## Troubleshooting Common Issues {#troubleshooting}
+## Bulk Operations
 
-### General Issues
+### Bulk Import from CSV / ERP
 
-**Login and Authentication Problems**
+```python
+rows = [
+    {"sku": "P001", "name": "Widget A", "category": "Widgets", "colour": "red"},
+    {"sku": "P002", "name": "Widget B", "category": "Widgets", "colour": "blue"},
+]
+log = svc.bulk_import(rows, tenant_id="tenant-a", owner_id="import_agent")
+print(log["created_count"], log["skipped_count"], log["failed_count"])
+```
 
-*Issue: Cannot access PLM dashboard*
-- **Solution**: Verify APG Platform credentials
-- Check tenant assignment in APG Auth & RBAC
-- Clear browser cache and cookies
-- Try incognito/private browsing mode
-- Contact APG administrator for permission verification
+Rows missing `sku` or `name` are recorded as failures and do not block the rest of the batch.
 
-*Issue: "Insufficient permissions" error*
-- **Solution**: Contact APG administrator to verify PLM permissions
-- Check role assignments in APG Auth & RBAC
-- Verify tenant access rights
-- Review capability-specific permissions
+### Import from ERP (domain alias)
 
-**Performance Issues**
+```python
+log = svc.import_from_erp(erp_rows, tenant_id="tenant-a", owner_id="erp_system")
+```
 
-*Issue: Slow dashboard loading*
-- **Solution**: Check internet connection speed
-- Clear browser cache
-- Disable browser extensions temporarily
-- Try different browser
-- Report to APG support if persistent
-
-*Issue: Timeout errors during operations*
-- **Solution**: Check for large file uploads
-- Verify network stability
-- Try operation during off-peak hours
-- Split large operations into smaller batches
-
-### Product Management Issues
-
-**Product Creation Problems**
-
-*Issue: "Product number already exists" error*
-- **Solution**: Check existing products for duplicates
-- Verify tenant isolation (same number allowed in different tenants)
-- Use product search to find conflicting product
-- Consider using different numbering scheme
-
-*Issue: Digital twin creation fails*
-- **Solution**: Verify Digital Twin Marketplace integration status
-- Check network connectivity to external services
-- Review product data completeness
-- Retry creation after correcting issues
-
-**BOM and Structure Issues**
-
-*Issue: BOM sync to manufacturing fails*
-- **Solution**: Check Manufacturing integration status
-- Verify BOM data completeness and accuracy
-- Review manufacturing system capacity
-- Check for circular references in BOM
-
-*Issue: Product structure appears incomplete*
-- **Solution**: Verify all components are properly linked
-- Check effectivity dates for components
-- Ensure proper parent-child relationships
-- Review component availability status
-
-### Engineering Change Issues
-
-**Change Workflow Problems**
-
-*Issue: Change approval stuck in workflow*
-- **Solution**: Check approver availability and notifications
-- Verify approver permissions and roles
-- Review change priority and urgency settings
-- Contact workflow administrators
-
-*Issue: Change implementation fails*
-- **Solution**: Verify all prerequisites are met
-- Check manufacturing system readiness
-- Review implementation timeline
-- Ensure all approvals are complete
-
-**Change Impact Assessment**
-
-*Issue: Inaccurate cost impact calculations*
-- **Solution**: Review cost model configuration
-- Verify component cost data accuracy
-- Check calculation methodology
-- Update cost models as needed
-
-### Collaboration Issues
-
-**Session Problems**
-
-*Issue: Cannot join collaboration session*
-- **Solution**: Check session permissions and invitations
-- Verify browser WebRTC support
-- Test microphone and camera permissions
-- Try different browser or device
-
-*Issue: Poor audio/video quality*
-- **Solution**: Check internet bandwidth
-- Close unnecessary applications
-- Use wired connection if possible
-- Adjust quality settings in session
-
-**Real-Time Synchronization**
-
-*Issue: Changes not appearing in real-time*
-- **Solution**: Check WebSocket connection status
-- Refresh browser page
-- Verify network stability
-- Report to technical support
-
-### Integration Issues
-
-**Manufacturing Integration Problems**
-
-*Issue: Manufacturing sync failures*
-- **Solution**: Check manufacturing system status
-- Verify integration credentials
-- Review data mapping configuration
-- Test connectivity to manufacturing endpoints
-
-*Issue: Data inconsistencies between systems*
-- **Solution**: Run data reconciliation reports
-- Check for timing conflicts
-- Verify data transformation rules
-- Manually sync problematic records
-
-**AI and Analytics Issues**
-
-*Issue: AI insights not generating*
-- **Solution**: Verify AI Orchestration integration status
-- Check data availability and quality
-- Review AI model configuration
-- Allow sufficient time for processing
-
-*Issue: Analytics reports showing incorrect data*
-- **Solution**: Check data source configuration
-- Verify report parameters and filters
-- Review calculation methodologies
-- Refresh data cache
-
-### Mobile App Issues
-
-**Mobile Connectivity Problems**
-
-*Issue: Mobile app not syncing*
-- **Solution**: Check mobile internet connection
-- Verify APG Platform URL configuration
-- Update mobile app to latest version
-- Clear app cache and data
-
-*Issue: Push notifications not working*
-- **Solution**: Check device notification settings
-- Verify app notification permissions
-- Check APG notification engine status
-- Restart mobile app
-
-### Getting Additional Help
-
-**Support Channels**
-
-**APG Platform Support**
-- Email: support@datacraft.co.ke
-- Phone: [Contact number from CLAUDE.md]
-- Support Portal: Via APG Platform help desk
-- Emergency Support: 24/7 for critical issues
-
-**Self-Service Resources**
-- APG Platform documentation portal
-- PLM capability knowledge base
-- Video tutorial library
-- Community forums
-
-**Escalation Process**
-1. Check this troubleshooting guide
-2. Search APG knowledge base
-3. Submit support ticket with detailed information
-4. Escalate to technical team if critical
-5. Emergency escalation for production issues
+Each row gets `source: "erp"` appended automatically.
 
 ---
 
-## Frequently Asked Questions {#faq}
+## Async Enrichment Pipelines
 
-### General PLM Questions
+### Concurrent Bulk Attribute Enrichment (v2.2.0)
 
-**Q: What is Product Lifecycle Management in the APG Platform?**
-A: PLM in APG Platform is a comprehensive capability that manages products from concept through retirement, integrating seamlessly with manufacturing, digital twins, AI optimization, and compliance systems for complete product lifecycle visibility and control.
+When processing large catalogues, sequential attribute updates become a bottleneck. Use `async_bulk_enrich` to fire all updates concurrently under a semaphore:
 
-**Q: How does APG PLM differ from standalone PLM systems?**
-A: APG PLM is designed as an integrated capability within the broader APG Platform ecosystem, providing native integration with manufacturing, AI/ML, compliance, document management, and other business capabilities without requiring separate integrations.
+```python
+import asyncio
 
-**Q: What are the system requirements for using PLM?**
-A: PLM requires a modern web browser (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+), stable internet connection, and appropriate APG Platform user permissions. Mobile apps are available for iOS 12+ and Android 8+.
+tasks = [
+    {"sku": "P001", "attributes": {"colour": "red", "weight_g": 50}},
+    {"sku": "P002", "attributes": {"colour": "blue", "weight_g": 65}},
+    # ... hundreds of rows
+]
+result = await svc.async_bulk_enrich(
+    tasks,
+    tenant_id="tenant-a",
+    updated_by="enrichment_pipeline",
+    concurrency=20,  # max 20 concurrent updates
+)
+print(result["succeeded"], result["failed"])
+```
 
-**Q: Is training required to use PLM?**
-A: While PLM is designed to be intuitive, we recommend completing the APG Platform onboarding and PLM-specific training modules for optimal usage. Advanced features may require additional training.
+`concurrency` defaults to 10. Tune based on your database connection pool size.
 
-### Product Management Questions
+### Async Product Creation
 
-**Q: What types of products can be managed in PLM?**
-A: PLM supports all product types including manufactured goods, purchased items, virtual products (software/services), kits, raw materials, subassemblies, and finished goods with full lifecycle management for each type.
-
-**Q: Can I import existing product data from other systems?**
-A: Yes, PLM provides CSV import functionality with data validation and mapping. For complex migrations, contact APG Professional Services for assisted data migration.
-
-**Q: How does multi-tenant isolation work for products?**
-A: Each APG tenant has completely isolated product data. Product numbers can be duplicated across tenants without conflict, and users only see products within their assigned tenant(s).
-
-**Q: What is the maximum number of products supported?**
-A: PLM is designed to scale to enterprise levels with no hard limits on product count. Performance is optimized for tens of thousands of products with proper database indexing and caching.
-
-### Engineering Change Questions
-
-**Q: Who can approve engineering changes?**
-A: Change approvals are controlled by APG Auth & RBAC permissions. Typically, technical leads, engineering managers, quality managers, and other stakeholders are assigned approval rights based on change type and impact.
-
-**Q: Can changes be implemented without approval?**
-A: No, PLM enforces approval workflows for all changes except draft modifications. Emergency procedures may allow expedited approvals but require post-implementation validation.
-
-**Q: How are change impacts calculated?**
-A: Change impacts are calculated using configurable cost models, BOM analysis, manufacturing complexity assessments, and historical data. AI-powered impact analysis provides additional insights for complex changes.
-
-**Q: Can I track change implementation progress?**
-A: Yes, PLM provides detailed implementation tracking with milestone management, resource allocation monitoring, and progress reporting with integration to project management tools.
-
-### Collaboration Questions
-
-**Q: How many people can participate in a collaboration session?**
-A: Standard sessions support up to 50 participants with excellent performance. Enterprise configurations can support up to 100 participants depending on network infrastructure and feature usage.
-
-**Q: Are collaboration sessions recorded?**
-A: Sessions can be recorded when enabled by the session host. Recordings are stored securely within the APG Platform with appropriate access controls and retention policies.
-
-**Q: Can external partners join collaboration sessions?**
-A: External participants can be invited via email with guest access. Guest accounts have limited permissions and session-specific access without full APG Platform access.
-
-**Q: What collaboration tools are integrated?**
-A: PLM collaboration integrates with APG Real-Time Collaboration infrastructure, including voice/video, screen sharing, interactive whiteboards, 3D model viewing, and document collaboration.
-
-### Integration Questions
-
-**Q: Which manufacturing systems integrate with PLM?**
-A: PLM integrates with major ERP and manufacturing systems including SAP, Oracle, Microsoft Dynamics, and custom systems via REST APIs. Contact APG for specific integration requirements.
-
-**Q: How does digital twin integration work?**
-A: PLM automatically creates and maintains digital twins through the APG Digital Twin Marketplace, enabling 3D visualization, simulation capabilities, and IoT data integration for physical products.
-
-**Q: Can PLM integrate with external design tools?**
-A: Yes, PLM supports integration with CAD systems, design tools, and engineering software through APIs and file-based integration. Popular integrations include SolidWorks, AutoCAD, and Fusion 360.
-
-**Q: How secure are the integrations?**
-A: All integrations use enterprise-grade security including encrypted communications, OAuth2 authentication, and comprehensive audit trails. Security configurations are managed through APG Security & Compliance capabilities.
-
-### Mobile App Questions
-
-**Q: What features are available in the mobile app?**
-A: The mobile app provides product browsing, change approvals, collaboration participation, notification management, and offline access to cached data with sync capabilities.
-
-**Q: Can I work offline on mobile?**
-A: Yes, the mobile app supports offline viewing of cached products, documents, and forms. Changes sync automatically when connectivity is restored.
-
-**Q: Is the mobile app secure?**
-A: Mobile apps implement enterprise security including device authentication, encrypted storage, automatic timeouts, and remote wipe capabilities managed through APG Mobile Device Management.
-
-### Performance and Scalability Questions
-
-**Q: What are the performance expectations for PLM?**
-A: PLM is designed to meet APG Platform performance standards with <500ms response times for typical operations, <2 second dashboard loads, and real-time collaboration with minimal latency.
-
-**Q: How does PLM handle high user loads?**
-A: PLM uses cloud-native architecture with auto-scaling capabilities, load balancing, and performance monitoring to maintain responsiveness under varying load conditions.
-
-**Q: What happens during maintenance windows?**
-A: Scheduled maintenance is announced in advance with minimal disruption. High availability configurations provide seamless failover during planned maintenance.
-
-### Pricing and Licensing Questions
-
-**Q: How is PLM licensed within APG Platform?**
-A: PLM licensing is typically included in APG Platform enterprise subscriptions. Contact your APG account representative for specific licensing details and options.
-
-**Q: Are there usage limits or restrictions?**
-A: Standard PLM usage follows APG Platform fair use policies. Enterprise customers receive dedicated resources with defined service levels and capacity guarantees.
-
-**Q: Can I add more users to PLM?**
-A: User additions are managed through APG Platform administration. Additional users may require license adjustments depending on your subscription model.
-
-### Support and Training Questions
-
-**Q: What support is available for PLM?**
-A: PLM support is provided through APG Platform support channels including 24/7 technical support, documentation, training resources, and professional services for complex implementations.
-
-**Q: Are there training materials available?**
-A: Comprehensive training materials include user guides, video tutorials, interactive walkthroughs, best practice guides, and instructor-led training sessions.
-
-**Q: How can I request new features?**
-A: Feature requests can be submitted through the APG Platform feedback system. Popular requests are evaluated for inclusion in future releases based on business value and technical feasibility.
-
-**Q: Can I customize PLM for my specific needs?**
-A: PLM provides extensive configuration options for workflows, forms, fields, and integrations. Advanced customizations are available through APG Professional Services.
+```python
+product = await svc.async_create_product(
+    "SKU-003", "Product C", "Category", {"attr": "val"},
+    tenant_id="tenant-a",
+)
+```
 
 ---
 
-## Additional Resources
+## Quality Remediation Plans
 
-### Documentation Links
-- [APG Platform User Guide](../../../platform/docs/user_guide.md)
-- [APG Auth & RBAC Documentation](../../../auth_rbac/docs/)
-- [Manufacturing Integration Guide](../../../manufacturing/docs/)
-- [Digital Twin Marketplace Guide](../../../digital_twin_marketplace/docs/)
+The `async_quality_remediation_plan` method returns an actionable, priority-sorted work queue for enrichment agents or human operators:
 
-### Training Resources
-- PLM Quick Start Video Series
-- Interactive PLM Tutorial
-- Best Practices Webinar Series
-- Advanced Configuration Workshop
+```python
+plan = await svc.async_quality_remediation_plan("SOLAR-20W-BLK", tenant_id="tenant-a")
+```
 
-### Support Contacts
-- **Technical Support**: support@datacraft.co.ke
-- **Training Services**: training@datacraft.co.ke  
-- **Professional Services**: services@datacraft.co.ke
-- **Account Management**: accounts@datacraft.co.ke
+Example response:
+
+```json
+{
+  "sku": "SOLAR-20W-BLK",
+  "total_score": 62.5,
+  "grade": "C",
+  "plan_items": 4,
+  "plan": [
+    {
+      "priority": 1,
+      "dimension": "description",
+      "current_score": 0.0,
+      "score_gain_if_fixed": 15.0,
+      "action": "Write or generate locale-scoped title and body content via enrich_content.",
+      "effort": "medium"
+    },
+    {
+      "priority": 2,
+      "dimension": "media",
+      "current_score": 33.3,
+      "score_gain_if_fixed": 10.0,
+      "action": "Attach at least 3 media assets: primary image, lifestyle image, and specification sheet.",
+      "effort": "medium"
+    }
+  ]
+}
+```
+
+AI agents operating within the `inspect_prepare_and_recommend` scope ceiling can consume this plan directly and queue enrichment tasks.
 
 ---
 
-*This user guide is maintained by the APG Development Team. For corrections or suggestions, please contact the documentation team or submit feedback through the APG Platform feedback system.*
+## PIM Analytics and KPIs
 
-**Document Version**: 1.0  
-**Last Updated**: January 2025  
-**Next Review**: March 2025
+### Full Analytics Payload
+
+```python
+analytics = svc.pim_analytics("2026-Q2", tenant_id="tenant-a")
+```
+
+Returns catalogue counts, publication rates, average data quality score, and import activity.
+
+### KPI Summary
+
+```python
+kpis = svc.pim_kpi_summary("2026-Q2", tenant_id="tenant-a")
+```
+
+Thin wrapper that adds `kpi_summary: True` flag for dashboard routing.
+
+### Dashboard Summary
+
+```python
+summary = svc.dashboard_summary("tenant-a")
+```
+
+Lightweight count aggregation across all stores — suitable for dashboard card population without computing quality scores.
+
+---
+
+## Product Lifecycle Management
+
+### Variant Creation
+
+```python
+variant = svc.product_variant_create(
+    sku="SOLAR-20W-BLK",
+    variant_attrs={"colour": "white", "sku_suffix": "WHT"},
+    tenant_id="tenant-a",
+    owner_id="catalog_manager",
+)
+```
+
+Variants are full product records with a parent relationship stored in `self.variants`. Variant SKU is auto-generated as `{parent_sku}-VAR-{n:03d}`.
+
+### Enrichment Workflows
+
+```python
+workflow = svc.enrichment_workflow(
+    sku="SOLAR-20W-BLK",
+    workflow_steps=["translate_fr", "translate_sw", "add_images", "compliance_check"],
+    tenant_id="tenant-a",
+    assigned_to="content_team",
+)
+```
+
+### Version Comparison
+
+```python
+diff = svc.version_compare("SOLAR-20W-BLK", tenant_id="tenant-a")
+# Returns current version, change count, and latest change record
+```
+
+---
+
+## Compliance Management
+
+### Recording Compliance
+
+```python
+issue = svc.record_quality_issue(
+    issue_id="qi-001",
+    tenant_id="tenant-a",
+    product_id=product["id"],
+    severity="high",           # low | medium | high | critical
+    description="Missing CE marking documentation",
+    owner_id="compliance_officer",
+)
+```
+
+High and critical severity issues require an `owner_id` — the rule engine denies without one.
+
+### Registering PIM Agents
+
+```python
+agent = svc.register_pim_agent(
+    tenant_id="tenant-a",
+    name="Enrichment Bot",
+    runtime="claude_code",     # codex | claude_code | opencode | pi
+    role="enrichment",         # catalog | data_quality | enrichment | channel | compliance | product_query
+    purpose="Auto-generate product descriptions from attributes",
+    owner_id="platform_admin",
+)
+```
+
+Agent scope is hard-capped at `inspect_prepare_and_recommend` regardless of runtime. Privileged actions require human approval recorded in the rule engine.
+
+---
+
+## API Reference Summary
+
+All routes are under prefix `/pde/pim/api/v1`.
+
+| Endpoint | Method | Permission | Description |
+|----------|--------|------------|-------------|
+| `/pde/pim/dashboard` | GET | `pde_pim:view` | Dashboard summary |
+| `/pde/pim/products` | GET/POST | `pde_pim:manage_products` | List / create products |
+| `/pde/pim/products/<sku>/attributes` | PATCH | `pde_pim:manage_products` | Update attributes |
+| `/pde/pim/products/<sku>/media` | POST | `pde_pim:manage_assets` | Add media |
+| `/pde/pim/products/<sku>/category` | PUT | `pde_pim:manage_products` | Set category path |
+| `/pde/pim/products/<sku>/quality` | GET | `pde_pim:view` | Data quality score |
+| `/pde/pim/products/<sku>/quality/plan` | GET | `pde_pim:view` | Remediation plan |
+| `/pde/pim/products/<sku>/publish` | POST | `pde_pim:publish` | Publish to channel |
+| `/pde/pim/products/<sku>/unpublish` | POST | `pde_pim:publish` | Unpublish from channel |
+| `/pde/pim/products/<sku>/localise` | POST | `pde_pim:manage_content` | Multi-locale content |
+| `/pde/pim/products/<sku>/syndicate` | POST | `pde_pim:publish` | Syndicate to marketplaces |
+| `/pde/pim/products/bulk-import` | POST | `pde_pim:manage_products` | Bulk CSV import |
+| `/pde/pim/products/bulk-enrich` | POST | `pde_pim:manage_products` | Async bulk enrichment |
+| `/pde/pim/catalogs` | GET/POST | `pde_pim:manage_catalogs` | Catalogue CRUD |
+| `/pde/pim/attributes` | GET/POST | `pde_pim:manage_attributes` | Attribute schema |
+| `/pde/pim/content` | GET/POST | `pde_pim:manage_content` | Content records |
+| `/pde/pim/assets` | GET/POST | `pde_pim:manage_assets` | Digital assets |
+| `/pde/pim/compliance` | GET/POST | `pde_pim:govern` | Compliance records |
+| `/pde/pim/channels` | GET/POST | `pde_pim:publish` | Channel listings |
+| `/pde/pim/quality` | GET/POST | `pde_pim:quality` | Quality issues |
+| `/pde/pim/agents` | GET/POST | `pde_pim:agent_manage` | PIM agents |
+| `/pde/pim/analytics` | GET | `pde_pim:view` | Analytics payload |
+| `/pde/pim/audit` | GET | `pde_pim:govern` | Audit event stream |
+
+---
+
+## Troubleshooting
+
+### `PermissionError: tenant_context_required`
+
+Every operation requires a tenant ID. Pass `tenant_id` at construction or on each call:
+
+```python
+svc = ProductInfoManagementService(tenant_id="your-tenant")
+```
+
+### `ValueError: sku_already_exists:<sku>`
+
+SKUs must be unique within a tenant. Use `product_search` to find the existing record before retrying with a different SKU.
+
+### `PIMRecordNotFoundError: product_not_found_for_sku:<sku>`
+
+The SKU does not exist for the resolved tenant. Check for typos, tenant mismatch, or that the product was not deleted.
+
+### `ValueError: unsupported_channel:<channel>`
+
+The channel is not in the `SUPPORTED_CHANNELS` contract list. Check `svc.describe()["channels"]["supported_channels"]` for the allowlist.
+
+### `ValueError: channel_quality_gate_failed:<channel>:score=<n>:min=<m>`
+
+Raised by `async_publish_to_channel` when the product's quality score is below the channel minimum. Run `async_quality_remediation_plan` to identify the fastest path to the required score.
+
+### Quality Score Unexpectedly Low
+
+Run the remediation plan:
+
+```python
+plan = asyncio.run(svc.async_quality_remediation_plan(sku, tenant_id="tenant-a"))
+for item in plan["plan"]:
+    print(f"[{item['effort']}] {item['action']} (+{item['score_gain_if_fixed']} pts)")
+```
+
+### Audit Events Missing
+
+Audit events are in-memory in the development service. In production, verify the Bytewax stream is running and the `apg.pde.pim.lifecycle` topic is consuming events.
+
+---
+
+## Frequently Asked Questions
+
+**Q: Can I use PIM without setting up a catalogue first?**
+A: Yes. If `catalog_id` is omitted from `create_product`, a default catalogue (`default-catalog-{tenant}`) is created automatically.
+
+**Q: What happens to publications when I update attributes?**
+A: Existing publication records are not automatically revoked on attribute updates. If the update changes data that affects channel compliance, re-run `channel_validate` and re-publish if needed.
+
+**Q: Can I have multiple category assignments for a product?**
+A: Yes. Each call to `product_categorisation` creates a new assignment record. The product's `category` field is updated to the most recent assignment's path string.
+
+**Q: How does the async enrichment concurrency work?**
+A: `async_bulk_enrich` uses an `asyncio.Semaphore(concurrency)` to cap simultaneous operations. With an in-memory store this is mostly about maintaining correct async patterns; in a PostgreSQL-backed deployment, set `concurrency` to your connection pool size minus headroom for other operations.
+
+**Q: Are async methods thread-safe?**
+A: The service stores are plain Python dicts, which are not thread-safe. Run the service within a single-threaded async event loop (FastAPI, aiohttp) or add explicit locking for multi-threaded deployments.
+
+**Q: Can AI agents publish products autonomously?**
+A: No. The `max_autonomous_scope` ceiling is `inspect_prepare_and_recommend`. Publishing is a privileged operation that requires a human-recorded `approved_by` value. An agent can prepare the publication request and queue it for human approval, but cannot self-approve.
+
+**Q: How do I integrate with a real database?**
+A: Replace the in-memory dict stores with async SQLAlchemy sessions. The service method signatures remain identical; only the persistence layer changes. See `WORLD_CLASS_IMPROVEMENTS.md` improvement #2 for the migration path.
+
+**Q: What is the Bytewax event stream used for?**
+A: All state-changing operations emit events to `apg.pde.pim.lifecycle`. Downstream capabilities (commerce, pricing, analytics, translation) subscribe to this stream rather than polling PIM directly. The stream processor must be Bytewax; routing to a queue is denied by the rule engine.
+
+---
+
+*Maintained by the APG Development Team — Datacraft*
+*For corrections or feature requests, submit via the APG Platform feedback system or email nyimbi@gmail.com*
+
+**Document Version**: 2.2.0
+**Last Updated**: June 2026
+**Next Review**: September 2026

@@ -96,3 +96,67 @@ End-to-end tenancy lifecycle: application, referencing, right-to-rent checks, de
 - Posts rent receipts to `realestate_acc` journal entries
 - Unit availability updates feed back to `realestate_prm`
 - Tenant communication integrates with `realestate_ten` portal
+
+## New Capabilities (v1.1)
+
+### Inspection Workflow
+| Method | Description |
+|--------|-------------|
+| `record_inspection()` | Move-in / mid-term / move-out condition grading with photo IDs |
+
+### Rent Review
+| Method | Description |
+|--------|-------------|
+| `propose_rent_increase()` | Statutory-notice-aware rent increase proposal |
+| `apply_rent_increase()` | Commit increase after effective_date passes |
+
+### Void Tracking
+| Method | Description |
+|--------|-------------|
+| `record_void_period()` | Log gap between tenancies with reason code |
+| `get_void_report()` | Void rate % and breakdown by reason |
+
+### Rent Roll Snapshots
+| Method | Description |
+|--------|-------------|
+| `snapshot_rent_roll()` | Named point-in-time rent roll snapshot |
+| `compare_rent_rolls()` | Diff two snapshots: added / removed / changed tenancies |
+
+### Statements & Receipts
+| Method | Description |
+|--------|-------------|
+| `get_tenancy_statement()` | Chronological charge/payment ledger with running balance |
+| `generate_rent_receipt()` | Formal `REC-YYYY-NNNN` receipt per payment |
+
+### Arrears Automation
+| Method | Description |
+|--------|-------------|
+| `schedule_arrears_chase()` | Multi-step chase schedule (email / SMS / letter / phone) |
+
+### Compliance
+| Method | Description |
+|--------|-------------|
+| `run_compliance_check()` | Checklist engine: deposit, referencing, EPC, gas cert, EICR |
+
+## New API Routes (v1.1)
+| Path | Method | Description | Permission |
+|------|--------|-------------|-----------|
+| `/realestate/ren/tenancies/<id>/statement` | GET | Statement of account | `tenancies` |
+| `/realestate/ren/tenancies/<id>/rent-increase` | POST | Propose rent increase | `tenancies` |
+| `/realestate/ren/inspections` | GET/POST | Inspections | `inspections` |
+| `/realestate/ren/voids` | GET/POST | Void periods | `voids` |
+| `/realestate/ren/voids/report` | GET | Void rate report | `voids` |
+| `/realestate/ren/rent-roll/snapshot` | POST | Snapshot rent roll | `rent_roll` |
+| `/realestate/ren/rent-roll/compare` | GET | Compare snapshots | `rent_roll` |
+| `/realestate/ren/payments/<id>/receipt` | POST | Generate receipt | `rent_collection` |
+| `/realestate/ren/arrears/<id>/chase` | POST | Schedule arrears chase | `arrears` |
+| `/realestate/ren/compliance/<tenancy_id>` | GET | Run compliance check | `compliance` |
+
+## New Streaming Events (v1.1)
+- `inspection_recorded`, `inspection_move_out`
+- `rent_increase_proposed`, `rent_increase_applied`
+- `void_opened`, `void_closed`
+- `rent_roll_snapshot_created`
+- `receipt_issued`
+- `chase_scheduled`, `chase_step_sent`
+- `compliance_check_completed`, `compliance_failed`

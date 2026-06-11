@@ -264,6 +264,146 @@ Monitor your financial health continuously:
 
 ---
 
+## New Features
+
+### Financial Ratios Engine
+
+Get a full suite of ratios from live GL data — no export to Excel required.
+
+```python
+ratios = await service.financial_ratios("tenant-a", "2026-01")
+# Returns: current_ratio, quick_ratio, debt_to_equity, net_margin_pct, roe_pct, ...
+
+# Compare to prior period
+ratios = await service.financial_ratios("tenant-a", "2026-01", prior_period_code="2025-01")
+```
+
+Ratios produced: Current, Quick, Cash (liquidity); Debt/Equity, Interest Coverage (leverage); Gross Margin, Operating Margin, Net Margin, ROA, ROE, ROCE (profitability); Asset Turnover (efficiency).
+
+### Dimensional Reporting
+
+Report P&L by any combination of dimensions attached to journal lines — no chart changes needed.
+
+```python
+result = await service.dimensional_report(
+    tenant_id="tenant-a",
+    period_code="2026-01",
+    dimensions=["cost_center", "geography"],
+    account_filter={"account_type": "revenue"},
+)
+# Returns rows: [{dimension_key: "cost_center=CC01|geography=KE", revenue: ..., contribution: ...}]
+```
+
+Dimensions are free-form keys on each journal line. Add a new dimension to journal lines — it immediately appears in reports without chart restructuring.
+
+### Account Ageing Analysis
+
+Age any AR or AP account by time elapsed since posting.
+
+```python
+ageing = await service.account_ageing_analysis(
+    tenant_id="tenant-a",
+    account_code="1200",
+    ageing_buckets=[30, 60, 90, 120],
+)
+# Returns: {buckets: {"0-30": "15000.00", "31-60": "8000.00", ...}, line_count: 12, ...}
+```
+
+### Audit Trail Intelligence
+
+Detect anomalies in your posting history automatically.
+
+```python
+scan = await service.audit_intelligence_scan("tenant-a", lookback_days=90)
+# findings may include: benford_law, round_number_bias, dormant_account_reactivated
+```
+
+Three checks run on every scan:
+1. **Benford's Law** — flags first-digit frequency distributions that deviate significantly from expected (a recognised fraud detection technique).
+2. **Round-number bias** — flags when more than 40% of posting amounts are whole-number values.
+3. **Dormant account reactivation** — flags accounts with a gap of more than 365 days between postings.
+
+### Deferred Tax Computation (IAS 12 / ASC 740)
+
+Compute deferred tax from live GL data.
+
+```python
+dt = await service.compute_deferred_tax(
+    tenant_id="tenant-a",
+    period_code="2026-12",
+    enacted_tax_rate="30",            # percent
+    tax_base_overrides={"1500": "0"}, # PPE: tax base is zero after 100% first-year allowance
+)
+# Returns: {items: [{account_code, carrying_value, tax_base, deferred_tax, classification}],
+#           total_dta: "12000.00", total_dtl: "4500.00", net_deferred_tax: "7500.00"}
+```
+
+### Hyperinflation Restatement (IAS 29)
+
+For entities operating in hyperinflationary economies.
+
+```python
+result = await service.hyperinflation_restatement(
+    tenant_id="tenant-a",
+    period_code="2026-12",
+    gpi_index="450.5",       # CPI at measurement date
+    base_gpi_index="100.0",  # CPI at historical cost date
+)
+# Posts a restatement journal; nets to the 'restatement_reserve' tagged account
+```
+
+### Multi-GAAP Reporting
+
+Record GAAP-difference adjustments and produce statutory statements.
+
+```python
+# Record adjustments from IFRS base to US GAAP
+await service.multi_gaap_adjustment(
+    tenant_id="tenant-a",
+    period_code="2026-12",
+    target_gaap="US_GAAP",
+    adjustments=[
+        {"account_code": "2100", "amount": "-5000", "description": "Operating lease capitalisation reversal"},
+        {"account_code": "5000", "amount": "5000", "description": "Lease expense add-back"},
+    ],
+    prepared_by="finance-controller",
+)
+
+# Produce statutory statements under US GAAP
+statements = await service.statutory_financial_statements("tenant-a", "2026-12", "US_GAAP")
+```
+
+### Zero-Touch Recurring Journals
+
+Create templates with automatic amount resolution.
+
+```python
+# Create a prepaid amortisation template
+template = await service.create_recurring_template(
+    tenant_id="tenant-a",
+    name="Software licence amortisation",
+    journal_type="accrual",
+    lines=[
+        {"account_id": prepaid_acct["id"], "debit": "0.00", "credit": "10000.00",
+         "description": "Monthly prepaid release"},
+        {"account_id": expense_acct["id"], "debit": "10000.00", "credit": "0.00",
+         "description": "Software expense"},
+    ],
+    owner="finance-controller",
+    amount_resolver={
+        "type": "prepaid_schedule",
+        "total_amount": "120000",
+        "total_periods": 12,
+        "start_period": "2026-01",
+    },
+)
+
+# Run all active templates for a period (one call, zero manual input)
+runs = await service.run_smart_recurring("tenant-a", "2026-06")
+```
+
+---
+
 ## 🚀 Why Users Love Our System
 
 **"Finally, a GL that thinks like I do!"** - Senior Accountant, Fortune 500

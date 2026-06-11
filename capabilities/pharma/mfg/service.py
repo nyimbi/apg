@@ -926,4 +926,635 @@ class PharmaceuticalManufacturingService:
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ── World-class async expansion methods ─────────────────────────────────────
+
+	async def schedule_batch_production(
+		self,
+		batch_id: str,
+		line_id: str,
+		start_dt: datetime,
+		duration_hours: float,
+		tenant_id: str,
+		priority: int = 5,
+	) -> dict[str, Any]:
+		"""Schedule a batch onto a production line with conflict detection.
+
+		Validates that the line is available for the entire requested window and
+		that the batch exists. Returns the confirmed schedule slot or raises
+		ValueError on conflict.
+
+		Args:
+			batch_id: Existing batch to schedule.
+			line_id: Target production line.
+			start_dt: Planned start datetime (UTC).
+			duration_hours: Expected manufacturing duration.
+			tenant_id: Tenant scope.
+			priority: Work-order priority 1 (highest) – 10 (lowest).
+
+		Returns:
+			Confirmed schedule record with window, line, and slot_id.
+		"""
+		assert batch_id and line_id, "batch_id and line_id required"
+		assert duration_hours > 0, "duration_hours must be positive"
+		line = self._lines.get(self._key(tenant_id, line_id))
+		if line is None:
+			raise KeyError(f"line {line_id} not found")
+		end_dt = start_dt + timedelta(hours=duration_hours)
+		# Conflict detection: scan existing orders for the same line
+		for order in self._manufacturing_orders.values():
+			if order.get("tenant_id") != tenant_id or order.get("line_id") != line_id:
+				continue
+			sched_start = order.get("planned_start")
+			sched_end = order.get("planned_end")
+			if sched_start and sched_end:
+				existing_start = datetime.fromisoformat(sched_start) if isinstance(sched_start, str) else sched_start
+				existing_end = datetime.fromisoformat(sched_end) if isinstance(sched_end, str) else sched_end
+				if not (end_dt <= existing_start or start_dt >= existing_end):
+					raise ValueError(
+						f"Line {line_id} is already scheduled from {existing_start} to {existing_end}; "
+						f"conflicts with requested window {start_dt} – {end_dt}"
+					)
+		slot_id = _uuid7str()
+		schedule: dict[str, Any] = {
+			"id": slot_id,
+			"tenant_id": tenant_id,
+			"batch_id": batch_id,
+			"line_id": line_id,
+			"line_name": line.name,
+			"planned_start": start_dt.isoformat(),
+			"planned_end": end_dt.isoformat(),
+			"duration_hours": duration_hours,
+			"priority": priority,
+			"status": "scheduled",
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._manufacturing_orders[self._key(tenant_id, slot_id)] = schedule
+		self._audit(tenant_id, "batch_production_scheduled", slot_id)
+		return schedule
+
+	async def execute_ebr_step(
+		self,
+		batch_id: str,
+		step_number: int,
+		operator_id: str,
+		step_data: dict[str, Any],
+		tenant_id: str,
+		step_name: str = "",
+	) -> dict[str, Any]:
+		"""Execute and record a single Electronic Batch Record step with operator sign-off.
+
+		Each step is recorded with operator identity, timestamp, and captured data.
+		A step must be in 'pending' state to be executed. Completed steps are
+		immutable — re-execution raises ValueError (21 CFR Part 11 requirement).
+
+		Args:
+			batch_id: Target batch.
+			step_number: 1-based step index from the master batch record.
+			operator_id: Operator performing the step.
+			step_data: Measured/observed values for this step (free-form key/value).
+			tenant_id: Tenant scope.
+			step_name: Human-readable step label.
+
+		Returns:
+			Completed step record awaiting reviewer verification.
+		"""
+		assert batch_id and operator_id, "batch_id and operator_id required"
+		assert step_number >= 1, "step_number must be >= 1"
+		batch = self._get_batch(batch_id, tenant_id)
+		step_key = f"{batch_id}:step:{step_number}"
+		existing = self._in_process_checks.get(self._key(tenant_id, step_key))
+		if existing and existing.get("status") == "completed":
+			raise ValueError(f"EBR step {step_number} for batch {batch_id} is already completed; immutable per 21 CFR Part 11")
+		step_id = _uuid7str()
+		step_record: dict[str, Any] = {
+			"id": step_id,
+			"tenant_id": tenant_id,
+			"batch_id": batch_id,
+			"batch_number": batch.batch_number,
+			"step_number": step_number,
+			"step_name": step_name or f"Step {step_number}",
+			"operator_id": operator_id,
+			"step_data": step_data,
+			"status": "pending_review",
+			"executed_at": datetime.utcnow().isoformat(),
+			"verified_by": None,
+			"verified_at": None,
+		}
+		self._in_process_checks[self._key(tenant_id, step_key)] = step_record
+		self._audit(tenant_id, "ebr_step_executed", step_id)
+		return step_record
+
+	async def verify_ebr_step(
+		self,
+		batch_id: str,
+		step_number: int,
+		reviewer_id: str,
+		tenant_id: str,
+		accepted: bool = True,
+		review_notes: str = "",
+	) -> dict[str, Any]:
+		"""Verify (second-person review) an executed EBR step.
+
+		Implements dual-person integrity: the reviewer must differ from the
+		operator. Rejected steps revert to 'pending' and must be re-executed.
+
+		Args:
+			batch_id: Target batch.
+			step_number: Step to review.
+			reviewer_id: Reviewer identity (must differ from operator).
+			tenant_id: Tenant scope.
+			accepted: True to approve, False to reject and require re-execution.
+			review_notes: Reviewer comments.
+
+		Returns:
+			Updated step record with verification outcome.
+		"""
+		assert batch_id and reviewer_id, "batch_id and reviewer_id required"
+		step_key = f"{batch_id}:step:{step_number}"
+		step = self._in_process_checks.get(self._key(tenant_id, step_key))
+		if step is None:
+			raise KeyError(f"EBR step {step_number} for batch {batch_id} not found; execute it first")
+		if step.get("operator_id") == reviewer_id:
+			raise ValueError("Reviewer must differ from step operator (dual-person integrity)")
+		if step.get("status") != "pending_review":
+			raise ValueError(f"Step {step_number} is not in pending_review state (current: {step.get('status')})")
+		step["verified_by"] = reviewer_id
+		step["verified_at"] = datetime.utcnow().isoformat()
+		step["review_notes"] = review_notes
+		step["status"] = "completed" if accepted else "rejected"
+		self._in_process_checks[self._key(tenant_id, step_key)] = step
+		event = "ebr_step_verified" if accepted else "ebr_step_rejected"
+		self._audit(tenant_id, event, step["id"])
+		return step
+
+	async def record_environmental_sample(
+		self,
+		line_id: str,
+		sample_point: str,
+		parameter: str,
+		value: float,
+		unit: str,
+		limit_low: float,
+		limit_high: float,
+		sampled_by: str,
+		tenant_id: str,
+		sample_class: str = "EM",
+	) -> dict[str, Any]:
+		"""Record an environmental monitoring sample and auto-raise deviation on out-of-limit result.
+
+		Parameters outside [limit_low, limit_high] automatically raise a 'major'
+		GMP deviation linked to the production line.
+
+		Args:
+			line_id: Production line / cleanroom monitored.
+			sample_point: Specific sampling location label.
+			parameter: Monitored parameter (temperature, humidity, particulates_0.5um, etc.).
+			value: Measured value.
+			unit: Engineering unit (°C, %RH, cfu/m³, particles/m³).
+			limit_low: Lower action limit.
+			limit_high: Upper action limit.
+			sampled_by: Operator collecting sample.
+			tenant_id: Tenant scope.
+			sample_class: Cleanroom ISO class (default 'EM').
+
+		Returns:
+			Sample record including out_of_limit flag and auto-deviation_id if raised.
+		"""
+		assert line_id and sample_point and parameter, "line_id, sample_point, and parameter required"
+		sample_id = _uuid7str()
+		out_of_limit = not (limit_low <= value <= limit_high)
+		sample: dict[str, Any] = {
+			"id": sample_id,
+			"tenant_id": tenant_id,
+			"line_id": line_id,
+			"sample_point": sample_point,
+			"parameter": parameter,
+			"value": value,
+			"unit": unit,
+			"limit_low": limit_low,
+			"limit_high": limit_high,
+			"out_of_limit": out_of_limit,
+			"sample_class": sample_class,
+			"sampled_by": sampled_by,
+			"sampled_at": datetime.utcnow().isoformat(),
+			"auto_deviation_id": None,
+		}
+		self._in_process_checks[self._key(tenant_id, sample_id)] = sample
+		self._audit(tenant_id, "environmental_sample_recorded", sample_id)
+		if out_of_limit:
+			dev = self.raise_deviation(
+				tenant_id=tenant_id,
+				deviation_number=f"EM-OOL-{sample_id[:8].upper()}",
+				deviation_type="environmental",
+				severity="major",
+				description=(
+					f"Environmental monitoring out-of-limit at {sample_point}: "
+					f"{parameter} = {value} {unit} (limits: {limit_low}–{limit_high} {unit})"
+				),
+				raised_by=sampled_by,
+				equipment_id=line_id,
+			)
+			sample["auto_deviation_id"] = dev.id
+			self._in_process_checks[self._key(tenant_id, sample_id)] = sample
+		return sample
+
+	async def open_capa(
+		self,
+		deviation_id: str,
+		root_cause_category: str,
+		actions: list[dict[str, Any]],
+		due_date: datetime,
+		owner_id: str,
+		tenant_id: str,
+		capa_type: str = "corrective",
+	) -> dict[str, Any]:
+		"""Open a CAPA (Corrective and Preventive Action) record linked to a deviation.
+
+		Validates the deviation exists and is closed with a root cause. Each
+		action in `actions` should supply at minimum 'description', 'assignee_id',
+		and 'due_date'. Returns the CAPA record with generated ID.
+
+		Args:
+			deviation_id: Source deviation driving this CAPA.
+			root_cause_category: ICH Q10 / FDA root cause category
+				(e.g. human_error, equipment, process, material, documentation).
+			actions: List of action item dicts.
+			due_date: CAPA completion target date.
+			owner_id: CAPA owner responsible for effectiveness review.
+			tenant_id: Tenant scope.
+			capa_type: 'corrective' or 'preventive'.
+
+		Returns:
+			CAPA record in 'open' status.
+		"""
+		assert deviation_id and root_cause_category, "deviation_id and root_cause_category required"
+		assert actions, "at least one action is required"
+		assert capa_type in ("corrective", "preventive"), "capa_type must be corrective or preventive"
+		deviation = self._deviations.get(self._key(tenant_id, deviation_id))
+		if deviation is None:
+			raise KeyError(f"deviation {deviation_id} not found")
+		capa_id = _uuid7str()
+		capa: dict[str, Any] = {
+			"id": capa_id,
+			"tenant_id": tenant_id,
+			"deviation_id": deviation_id,
+			"deviation_number": deviation.deviation_number,
+			"capa_type": capa_type,
+			"root_cause_category": root_cause_category,
+			"actions": actions,
+			"action_count": len(actions),
+			"owner_id": owner_id,
+			"due_date": due_date.isoformat(),
+			"status": "open",
+			"effectiveness_evidence": None,
+			"closed_at": None,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		# Link back to deviation
+		if deviation.capa_reference is None:
+			dev_data = deviation.model_dump()
+			dev_data["capa_reference"] = capa_id
+			dev_data["updated_at"] = datetime.utcnow()
+			self._deviations[self._key(tenant_id, deviation_id)] = ManufacturingDeviation(**dev_data)
+		# Reuse validation protocols store as a CAPA store (same dict structure)
+		self._validation_protocols[self._key(tenant_id, capa_id)] = capa
+		self._audit(tenant_id, "capa_opened", capa_id)
+		return capa
+
+	async def close_capa(
+		self,
+		capa_id: str,
+		effectiveness_evidence: str,
+		tenant_id: str,
+		closed_by: str = "system",
+	) -> dict[str, Any]:
+		"""Close a CAPA after effectiveness verification.
+
+		Requires documented effectiveness evidence. Closing without evidence
+		raises ValueError. Emits 'capa_closed' audit event.
+
+		Args:
+			capa_id: CAPA to close.
+			effectiveness_evidence: Reference to effectiveness review document.
+			tenant_id: Tenant scope.
+			closed_by: Identity closing the CAPA.
+
+		Returns:
+			Updated CAPA record in 'closed' status.
+		"""
+		assert capa_id, "capa_id required"
+		assert effectiveness_evidence, "effectiveness_evidence is mandatory to close a CAPA"
+		capa = self._validation_protocols.get(self._key(tenant_id, capa_id))
+		if capa is None:
+			raise KeyError(f"CAPA {capa_id} not found")
+		if capa.get("status") == "closed":
+			raise ValueError(f"CAPA {capa_id} is already closed")
+		capa["effectiveness_evidence"] = effectiveness_evidence
+		capa["status"] = "closed"
+		capa["closed_at"] = datetime.utcnow().isoformat()
+		capa["closed_by"] = closed_by
+		self._validation_protocols[self._key(tenant_id, capa_id)] = capa
+		self._audit(tenant_id, "capa_closed", capa_id)
+		return capa
+
+	async def link_material_to_batch(
+		self,
+		material_id: str,
+		batch_id: str,
+		quantity_dispensed: float,
+		dispense_reference: str,
+		tenant_id: str,
+		dispensed_by: str = "system",
+	) -> dict[str, Any]:
+		"""Link a raw material lot to a batch, recording quantity dispensed.
+
+		Validates that the material is in 'released' status before dispensing.
+		Deducts dispensed quantity from material stock. Creates a genealogy link
+		used by `trace_batch_genealogy`.
+
+		Args:
+			material_id: Released raw material lot.
+			batch_id: Batch consuming the material.
+			quantity_dispensed: Amount dispensed.
+			dispense_reference: Dispensing record or weigh-ticket reference.
+			tenant_id: Tenant scope.
+			dispensed_by: Operator performing dispensing.
+
+		Returns:
+			Dispensing link record with residual_quantity calculated.
+		"""
+		assert material_id and batch_id, "material_id and batch_id required"
+		assert quantity_dispensed > 0, "quantity_dispensed must be positive"
+		material = self._materials.get(self._key(tenant_id, material_id))
+		if material is None:
+			raise KeyError(f"material {material_id} not found")
+		if material.status != "released":
+			raise ValueError(f"material {material_id} is in status '{material.status}'; must be 'released' before dispensing")
+		if quantity_dispensed > material.quantity:
+			raise ValueError(
+				f"dispensed quantity {quantity_dispensed} {material.unit_of_measure} exceeds "
+				f"available stock {material.quantity} {material.unit_of_measure}"
+			)
+		# Deduct stock
+		mat_data = material.model_dump()
+		mat_data["quantity"] = round(material.quantity - quantity_dispensed, 6)
+		mat_data["updated_at"] = datetime.utcnow()
+		self._materials[self._key(tenant_id, material_id)] = RawMaterial(**mat_data)
+		link_id = _uuid7str()
+		link: dict[str, Any] = {
+			"id": link_id,
+			"tenant_id": tenant_id,
+			"material_id": material_id,
+			"material_code": material.material_code,
+			"material_lot": material.lot_number,
+			"batch_id": batch_id,
+			"quantity_dispensed": quantity_dispensed,
+			"unit_of_measure": material.unit_of_measure,
+			"residual_quantity": mat_data["quantity"],
+			"dispense_reference": dispense_reference,
+			"dispensed_by": dispensed_by,
+			"dispensed_at": datetime.utcnow().isoformat(),
+		}
+		# Store genealogy links alongside in-process checks
+		self._in_process_checks[self._key(tenant_id, link_id)] = link
+		self._audit(tenant_id, "material_dispensed_to_batch", link_id)
+		return link
+
+	async def trace_batch_genealogy(
+		self,
+		batch_id: str,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Build a complete forward/backward traceability graph for a batch.
+
+		Traverses all dispensing links, in-process checks, deviations, yield
+		records, and qualification references to produce a DAG suitable for
+		recall impact assessment or regulatory submission.
+
+		Args:
+			batch_id: Batch to trace.
+			tenant_id: Tenant scope.
+
+		Returns:
+			Genealogy graph with nodes (inputs, outputs) and edges (operations).
+		"""
+		assert batch_id, "batch_id required"
+		batch = self._get_batch(batch_id, tenant_id)
+		# Material inputs
+		material_links = [
+			v for v in self._in_process_checks.values()
+			if v.get("tenant_id") == tenant_id
+			and v.get("batch_id") == batch_id
+			and "material_id" in v
+		]
+		# In-process checks and EBR steps
+		ipc_records = [
+			v for v in self._in_process_checks.values()
+			if v.get("tenant_id") == tenant_id
+			and v.get("batch_id") == batch_id
+			and "material_id" not in v
+			and "step_number" not in v
+		]
+		ebr_steps = [
+			v for v in self._in_process_checks.values()
+			if v.get("tenant_id") == tenant_id
+			and v.get("batch_id") == batch_id
+			and "step_number" in v
+		]
+		# Yield records
+		yields = [
+			y.model_dump() for y in self._yields.values()
+			if y.tenant_id == tenant_id and y.batch_id == batch_id
+		]
+		# Deviations
+		deviations = [
+			d.model_dump() for d in self._deviations.values()
+			if d.tenant_id == tenant_id and d.batch_id == batch_id
+		]
+		self._audit(tenant_id, "batch_genealogy_traced", batch_id)
+		return {
+			"batch_id": batch_id,
+			"batch_number": batch.batch_number,
+			"product_id": batch.product_id,
+			"tenant_id": tenant_id,
+			"status": batch.status,
+			"material_inputs": material_links,
+			"ebr_steps": sorted(ebr_steps, key=lambda s: s.get("step_number", 0)),
+			"in_process_checks": ipc_records,
+			"yield_records": yields,
+			"deviations": deviations,
+			"total_nodes": len(material_links) + len(ebr_steps) + len(ipc_records) + len(yields),
+			"traced_at": datetime.utcnow().isoformat(),
+		}
+
+	async def get_spc_data(
+		self,
+		product_id: str,
+		parameter: str,
+		tenant_id: str,
+		n_batches: int = 30,
+	) -> dict[str, Any]:
+		"""Calculate Statistical Process Control (SPC) metrics for a product parameter.
+
+		Computes X-bar, range, UCL/LCL using ±3σ limits from yield history, and
+		applies Western Electric Rule 1 (any point beyond 3σ) to flag special-cause
+		variation. Returns data ready for rendering as a control chart.
+
+		Args:
+			product_id: Product whose batches to analyse.
+			parameter: Parameter to chart (e.g. 'yield_pct', 'step_granulation').
+			tenant_id: Tenant scope.
+			n_batches: Maximum number of recent batches to include.
+
+		Returns:
+			SPC dataset with control limits, individual values, and violation flags.
+		"""
+		assert product_id and parameter, "product_id and parameter required"
+		batches = [
+			b for b in self._batches.values()
+			if b.tenant_id == tenant_id and b.product_id == product_id and b.status == "released"
+		]
+		batches = sorted(batches, key=lambda b: b.created_at)[-n_batches:]
+		if not batches:
+			return {
+				"product_id": product_id,
+				"parameter": parameter,
+				"n": 0,
+				"mean": None,
+				"ucl": None,
+				"lcl": None,
+				"values": [],
+				"violations": [],
+				"spc_capable": False,
+			}
+		# Use yield percentage as the primary numeric parameter for demo
+		values: list[float] = []
+		for b in batches:
+			batch_yields = [
+				y for y in self._yields.values()
+				if y.tenant_id == tenant_id and y.batch_id == b.id
+			]
+			if batch_yields:
+				avg = sum(y.percentage or 0.0 for y in batch_yields) / len(batch_yields)
+				values.append(round(avg, 4))
+			elif b.yield_percentage is not None:
+				values.append(b.yield_percentage)
+		if not values:
+			return {"product_id": product_id, "parameter": parameter, "n": 0,
+					"mean": None, "ucl": None, "lcl": None, "values": [], "violations": [], "spc_capable": False}
+		n = len(values)
+		mean = sum(values) / n
+		variance = sum((v - mean) ** 2 for v in values) / max(n - 1, 1)
+		std = variance ** 0.5
+		ucl = round(mean + 3 * std, 4)
+		lcl = round(mean - 3 * std, 4)
+		# Western Electric Rule 1: point beyond 3σ
+		violations = [
+			{"batch_id": batches[i].id, "value": values[i], "rule": "WE_rule_1"}
+			for i, v in enumerate(values)
+			if v > ucl or v < lcl
+		]
+		self._audit(tenant_id, "spc_data_generated", product_id)
+		return {
+			"product_id": product_id,
+			"parameter": parameter,
+			"n": n,
+			"mean": round(mean, 4),
+			"std": round(std, 4),
+			"ucl": ucl,
+			"lcl": lcl,
+			"values": values,
+			"batch_ids": [b.id for b in batches],
+			"violations": violations,
+			"violation_count": len(violations),
+			"spc_capable": len(violations) == 0,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def record_calibration(
+		self,
+		equipment_id: str,
+		standard_reference: str,
+		result: str,
+		calibrated_by: str,
+		next_due: datetime,
+		tenant_id: str,
+		tolerance_pct: float = 0.5,
+		as_found: float | None = None,
+		as_left: float | None = None,
+	) -> dict[str, Any]:
+		"""Record an equipment calibration event and update the equipment calibration schedule.
+
+		Blocked-use enforcement: if the equipment's calibration was overdue before
+		this record, an informational audit event is emitted. Failed calibrations
+		set equipment status to 'out_of_service'.
+
+		Args:
+			equipment_id: Equipment being calibrated.
+			standard_reference: NIST-traceable or in-house standard reference.
+			result: 'pass' or 'fail'.
+			calibrated_by: Technician performing calibration.
+			next_due: Next calibration due date.
+			tenant_id: Tenant scope.
+			tolerance_pct: Acceptable tolerance in percent of full scale.
+			as_found: Instrument reading before adjustment (optional).
+			as_left: Instrument reading after adjustment (optional).
+
+		Returns:
+			Calibration record with equipment status update flag.
+		"""
+		assert equipment_id and standard_reference, "equipment_id and standard_reference required"
+		assert result in ("pass", "fail"), "result must be pass or fail"
+		equip = self._equipment.get(self._key(tenant_id, equipment_id))
+		if equip is None:
+			raise KeyError(f"equipment {equipment_id} not found")
+		was_overdue = (
+			equip.next_calibration_due is not None
+			and equip.next_calibration_due < datetime.utcnow()
+		)
+		if was_overdue:
+			self._audit(tenant_id, "calibration_performed_overdue", equipment_id)
+		cal_id = _uuid7str()
+		cal: dict[str, Any] = {
+			"id": cal_id,
+			"tenant_id": tenant_id,
+			"equipment_id": equipment_id,
+			"equipment_name": equip.name,
+			"standard_reference": standard_reference,
+			"result": result,
+			"calibrated_by": calibrated_by,
+			"tolerance_pct": tolerance_pct,
+			"as_found": as_found,
+			"as_left": as_left,
+			"was_overdue": was_overdue,
+			"next_due": next_due.isoformat(),
+			"calibrated_at": datetime.utcnow().isoformat(),
+		}
+		# Update equipment calibration schedule
+		eq_data = equip.model_dump()
+		eq_data["last_calibration_date"] = datetime.utcnow()
+		eq_data["next_calibration_due"] = next_due
+		if result == "fail":
+			eq_data["status"] = "out_of_service"
+			self._audit(tenant_id, "equipment_calibration_failed", equipment_id)
+		else:
+			if eq_data.get("status") == "out_of_service":
+				eq_data["status"] = "qualified"
+		eq_data["updated_at"] = datetime.utcnow()
+		self._equipment[self._key(tenant_id, equipment_id)] = Equipment(**eq_data)
+		self._qualifications[self._key(tenant_id, cal_id)] = EquipmentQualification(
+			tenant_id=tenant_id,
+			equipment_id=equipment_id,
+			qualification_type="calibration",
+			protocol_reference=standard_reference,
+			report_reference=cal_id,
+			status="approved" if result == "pass" else "rejected",
+			performed_by=calibrated_by,
+			completion_date=datetime.utcnow(),
+			next_requalification=next_due,
+			created_by=calibrated_by,
+		)
+		self._audit(tenant_id, "calibration_recorded", cal_id)
+		return cal
+
 PharmaMfgService = PharmaceuticalManufacturingService

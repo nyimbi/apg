@@ -1079,4 +1079,535 @@ class ProjectPlanningService:
 		t = tenant_id or self.tenant_id
 		return {"report_type": report_type, "tenant_id": t, "period": period}
 
+	# ── PERT three-point estimation ───────────────────────────────────────────
+
+	async def pert_estimate(
+		self,
+		project_id: str,
+		task_estimates: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Compute PERT expected durations and standard deviations for a list of tasks.
+
+		Each element in task_estimates: {task_id, optimistic, most_likely, pessimistic}
+		Returns per-task PERT mean/stddev and the critical-path uncertainty range.
+		"""
+		assert _present(project_id), "project_id required"
+		assert task_estimates, "task_estimates must not be empty"
+		tenant_id = self.tenant_id
+		results: list[dict[str, Any]] = []
+		for est in task_estimates:
+			task_id = est["task_id"]
+			o = float(est["optimistic"])
+			m = float(est["most_likely"])
+			p = float(est["pessimistic"])
+			assert o <= m <= p, f"task {task_id}: optimistic <= most_likely <= pessimistic required"
+			mean = (o + 4 * m + p) / 6.0
+			stddev = (p - o) / 6.0
+			variance = stddev ** 2
+			# Update stored task duration if present
+			task = self.tasks.get(self._key(tenant_id, task_id))
+			if task:
+				task.duration_days = round(mean, 3)
+			results.append({
+				"task_id": task_id,
+				"optimistic": o,
+				"most_likely": m,
+				"pessimistic": p,
+				"pert_mean_days": round(mean, 3),
+				"pert_stddev_days": round(stddev, 3),
+				"pert_variance": round(variance, 4),
+				"p50_days": round(mean, 3),
+				"p80_days": round(mean + 0.842 * stddev, 3),
+				"p90_days": round(mean + 1.282 * stddev, 3),
+			})
+		# Network critical-path uncertainty: sum variances on critical path
+		network_key = f"{tenant_id}:{project_id}:network"
+		network = self._schedules.get(network_key, {})
+		critical_ids = {s["task_id"] for s in network.get("schedule", []) if s.get("critical")}
+		cp_variance = sum(r["pert_variance"] for r in results if r["task_id"] in critical_ids)
+		cp_stddev = cp_variance ** 0.5
+		baseline_dur = network.get("project_duration_days", 0.0)
+		self._audit(tenant_id, "pert_estimated", project_id)
+		return {
+			"project_id": project_id,
+			"task_count": len(results),
+			"tasks": results,
+			"critical_path_stddev_days": round(cp_stddev, 3),
+			"p50_project_days": round(baseline_dur, 2),
+			"p80_project_days": round(baseline_dur + 0.842 * cp_stddev, 2),
+			"p90_project_days": round(baseline_dur + 1.282 * cp_stddev, 2),
+		}
+
+	# ── Monte Carlo schedule risk simulation ──────────────────────────────────
+
+	async def monte_carlo_simulation(
+		self,
+		project_id: str,
+		simulations: int = 1000,
+		seed: int | None = None,
+	) -> dict[str, Any]:
+		"""Run Monte Carlo schedule risk simulation using triangular distributions.
+
+		Requires tasks to have been estimated via pert_estimate first (uses pert_mean and stddev).
+		Returns P50/P80/P90 completion dates and probability distribution buckets.
+		"""
+		assert _present(project_id), "project_id required"
+		assert 100 <= simulations <= 10_000, "simulations must be between 100 and 10000"
+		import random
+		import math
+		rng = random.Random(seed)
+		tenant_id = self.tenant_id
+		project = self._project_or_none(project_id, tenant_id)
+		assert project is not None, f"project {project_id} not found"
+		project_tasks = [t for t in self.tasks.values()
+						 if t.tenant_id == tenant_id and t.project_id == project_id]
+		if not project_tasks:
+			return {"project_id": project_id, "simulations": 0, "p50": 0.0, "p80": 0.0, "p90": 0.0}
+
+		task_map: dict[str, Task] = {t.id: t for t in project_tasks}
+		task_ids = set(task_map)
+		successors: dict[str, list[str]] = {tid: [] for tid in task_ids}
+		predecessors_map: dict[str, list[tuple[str, float]]] = {tid: [] for tid in task_ids}
+		for dep in self.dependencies.values():
+			if dep.tenant_id == tenant_id and dep.predecessor_id in task_ids and dep.successor_id in task_ids:
+				successors[dep.predecessor_id].append(dep.successor_id)
+				predecessors_map[dep.successor_id].append((dep.predecessor_id, dep.lag_days))
+
+		in_degree: dict[str, int] = {tid: len(predecessors_map[tid]) for tid in task_ids}
+		queue = [tid for tid in task_ids if in_degree[tid] == 0]
+		topo: list[str] = []
+		_in_deg_copy = dict(in_degree)
+		while queue:
+			node = queue.pop(0)
+			topo.append(node)
+			for succ in successors[node]:
+				_in_deg_copy[succ] -= 1
+				if _in_deg_copy[succ] == 0:
+					queue.append(succ)
+
+		def _triangular_sample(mean: float, stddev: float) -> float:
+			# Approximate triangular from PERT mean/stddev
+			spread = stddev * 2.449  # stddev of triangular ≈ (b-a)/sqrt(18)
+			low = max(0.1, mean - spread)
+			high = mean + spread
+			mode = mean
+			u = rng.random()
+			fc = (mode - low) / (high - low) if high > low else 0.5
+			if u < fc:
+				return low + math.sqrt(u * (high - low) * (mode - low))
+			else:
+				return high - math.sqrt((1 - u) * (high - low) * (high - mode))
+
+		sim_durations: list[float] = []
+		for _ in range(simulations):
+			sampled: dict[str, float] = {}
+			for tid in task_ids:
+				t = task_map[tid]
+				stddev = t.duration_days * 0.15  # default 15% uncertainty if no PERT data
+				sampled[tid] = max(0.1, _triangular_sample(t.duration_days, stddev))
+			ES: dict[str, float] = {tid: 0.0 for tid in task_ids}
+			EF: dict[str, float] = {}
+			for tid in topo:
+				for (pred_id, lag) in predecessors_map[tid]:
+					ES[tid] = max(ES[tid], EF.get(pred_id, 0.0) + lag)
+				EF[tid] = ES[tid] + sampled[tid]
+			sim_durations.append(max(EF.values(), default=0.0))
+
+		sim_durations.sort()
+		n = len(sim_durations)
+		p50 = sim_durations[int(n * 0.50)]
+		p80 = sim_durations[int(n * 0.80)]
+		p90 = sim_durations[int(n * 0.90)]
+		mean_dur = sum(sim_durations) / n
+		min_dur = sim_durations[0]
+		max_dur = sim_durations[-1]
+
+		# Histogram buckets (10 equal-width bins)
+		bucket_width = (max_dur - min_dur) / 10 if max_dur > min_dur else 1.0
+		buckets: list[dict[str, Any]] = []
+		for i in range(10):
+			lo = min_dur + i * bucket_width
+			hi = lo + bucket_width
+			count = sum(1 for d in sim_durations if lo <= d < hi)
+			buckets.append({"from_days": round(lo, 2), "to_days": round(hi, 2), "count": count, "frequency_pct": round(count / n * 100, 2)})
+
+		project_start = _parse_date(project.start_date if hasattr(project, "start_date") else str(date.today()))
+		self._audit(tenant_id, "monte_carlo_simulated", project_id)
+		return {
+			"project_id": project_id,
+			"simulations": simulations,
+			"mean_duration_days": round(mean_dur, 2),
+			"min_duration_days": round(min_dur, 2),
+			"max_duration_days": round(max_dur, 2),
+			"p50_days": round(p50, 2),
+			"p80_days": round(p80, 2),
+			"p90_days": round(p90, 2),
+			"p50_date": (project_start + timedelta(days=p50)).isoformat(),
+			"p80_date": (project_start + timedelta(days=p80)).isoformat(),
+			"p90_date": (project_start + timedelta(days=p90)).isoformat(),
+			"distribution_buckets": buckets,
+		}
+
+	# ── EVM (Earned Value Management) ────────────────────────────────────────
+
+	async def earned_value_metrics(
+		self,
+		project_id: str,
+		planned_value: float,
+		actual_cost: float,
+	) -> dict[str, Any]:
+		"""Compute EVM metrics: EV, SPI, CPI, EAC, VAC, and TCPI.
+
+		planned_value: total budget allocated to work scheduled by status_date
+		actual_cost: total cost incurred to date
+		"""
+		assert _present(project_id), "project_id required"
+		assert planned_value >= 0, "planned_value must be >= 0"
+		assert actual_cost >= 0, "actual_cost must be >= 0"
+		tenant_id = self.tenant_id
+		project_tasks = [t for t in self.tasks.values()
+						 if t.tenant_id == tenant_id and t.project_id == project_id]
+		budget_at_completion = sum(t.duration_days * 8 for t in project_tasks)  # rough: days * 8h
+		earned_value = sum(t.duration_days * 8 * (t.progress_pct / 100.0) for t in project_tasks)
+		spi = round(earned_value / planned_value, 4) if planned_value else 1.0
+		cpi = round(earned_value / actual_cost, 4) if actual_cost else 1.0
+		eac = round(actual_cost + (budget_at_completion - earned_value) / cpi, 2) if cpi else budget_at_completion
+		vac = round(budget_at_completion - eac, 2)
+		tcpi = round((budget_at_completion - earned_value) / (budget_at_completion - actual_cost), 4) if (budget_at_completion - actual_cost) else 1.0
+		sv = round(earned_value - planned_value, 2)
+		cv = round(earned_value - actual_cost, 2)
+		self._audit(tenant_id, "evm_computed", project_id)
+		return {
+			"project_id": project_id,
+			"budget_at_completion": round(budget_at_completion, 2),
+			"planned_value": round(planned_value, 2),
+			"earned_value": round(earned_value, 2),
+			"actual_cost": round(actual_cost, 2),
+			"schedule_variance_sv": sv,
+			"cost_variance_cv": cv,
+			"spi": spi,
+			"cpi": cpi,
+			"eac": eac,
+			"vac": vac,
+			"tcpi": tcpi,
+			"status": "on_track" if spi >= 0.95 and cpi >= 0.95 else ("at_risk" if spi >= 0.80 and cpi >= 0.80 else "critical"),
+			"computed_at": str(date.today()),
+		}
+
+	# ── Schedule quality index (DCMA-style) ───────────────────────────────────
+
+	async def schedule_quality_index(self, project_id: str) -> dict[str, Any]:
+		"""Compute a DCMA-inspired schedule quality score (0–100) with itemised findings.
+
+		Checks: missing logic, long tasks, no resource assignments, open ends, duplicate names.
+		"""
+		assert _present(project_id), "project_id required"
+		tenant_id = self.tenant_id
+		project_tasks = [t for t in self.tasks.values()
+						 if t.tenant_id == tenant_id and t.project_id == project_id]
+		if not project_tasks:
+			return {"project_id": project_id, "score": 0, "findings": [], "task_count": 0}
+
+		task_ids = {t.id for t in project_tasks}
+		has_predecessor = set()
+		has_successor = set()
+		for dep in self.dependencies.values():
+			if dep.tenant_id == tenant_id:
+				has_successor.add(dep.predecessor_id)
+				has_predecessor.add(dep.successor_id)
+
+		findings: list[dict[str, Any]] = []
+		deductions = 0
+
+		# Missing logic: tasks with neither predecessor nor successor (isolates)
+		isolates = [t.id for t in project_tasks if t.id not in has_predecessor and t.id not in has_successor and t.task_type != "milestone"]
+		if isolates:
+			findings.append({"check": "missing_logic", "severity": "high", "count": len(isolates), "task_ids": isolates[:10]})
+			deductions += min(30, len(isolates) * 3)
+
+		# Open starts: tasks missing predecessors (excluding project start milestones)
+		open_starts = [t.id for t in project_tasks if t.id not in has_predecessor and t.task_type not in ("milestone",)]
+		if len(open_starts) > 1:
+			findings.append({"check": "open_starts", "severity": "medium", "count": len(open_starts) - 1, "task_ids": open_starts[1:10]})
+			deductions += min(20, (len(open_starts) - 1) * 2)
+
+		# Open ends: tasks missing successors
+		open_ends = [t.id for t in project_tasks if t.id not in has_successor and t.task_type not in ("milestone",)]
+		if len(open_ends) > 1:
+			findings.append({"check": "open_ends", "severity": "medium", "count": len(open_ends) - 1, "task_ids": open_ends[1:10]})
+			deductions += min(20, (len(open_ends) - 1) * 2)
+
+		# Long tasks: duration > 10 working days
+		long_tasks = [t.id for t in project_tasks if t.duration_days > 10 and t.task_type != "summary"]
+		if long_tasks:
+			findings.append({"check": "long_tasks", "severity": "low", "count": len(long_tasks), "task_ids": long_tasks[:10]})
+			deductions += min(15, len(long_tasks))
+
+		# Tasks with 0% progress but status=in_progress
+		stale = [t.id for t in project_tasks if t.status == "in_progress" and t.progress_pct == 0.0]
+		if stale:
+			findings.append({"check": "stale_in_progress", "severity": "medium", "count": len(stale), "task_ids": stale[:10]})
+			deductions += min(15, len(stale) * 2)
+
+		score = max(0, 100 - deductions)
+		self._audit(tenant_id, "schedule_quality_scored", project_id)
+		return {
+			"project_id": project_id,
+			"score": score,
+			"rating": "excellent" if score >= 90 else ("good" if score >= 75 else ("fair" if score >= 60 else "poor")),
+			"task_count": len(project_tasks),
+			"findings": findings,
+			"computed_at": str(date.today()),
+		}
+
+	# ── Dependency impact propagation ────────────────────────────────────────
+
+	async def dependency_impact_propagation(
+		self,
+		project_id: str,
+		affected_task_id: str,
+		slip_days: float,
+	) -> dict[str, Any]:
+		"""Forward-propagate a task slip through the network, identifying ripple impacts.
+
+		Returns each affected successor with its own slip, criticality, and total float.
+		"""
+		assert _present(project_id), "project_id required"
+		assert _present(affected_task_id), "affected_task_id required"
+		assert slip_days > 0, "slip_days must be positive"
+		tenant_id = self.tenant_id
+		# Get current network
+		network = await self.schedule_network(project_id)
+		schedule_map = {s["task_id"]: s for s in network.get("schedule", [])}
+		if affected_task_id not in schedule_map:
+			return {"project_id": project_id, "affected_task_id": affected_task_id, "impacted_tasks": []}
+
+		task_ids = set(schedule_map.keys())
+		successors_map: dict[str, list[str]] = {tid: [] for tid in task_ids}
+		for dep in self.dependencies.values():
+			if dep.tenant_id == tenant_id and dep.predecessor_id in task_ids and dep.successor_id in task_ids:
+				successors_map[dep.predecessor_id].append(dep.successor_id)
+
+		# BFS from affected task, accumulating slip
+		impacted: list[dict[str, Any]] = []
+		propagation_queue: list[tuple[str, float]] = [(affected_task_id, slip_days)]
+		visited: set[str] = {affected_task_id}
+		while propagation_queue:
+			current_id, current_slip = propagation_queue.pop(0)
+			for succ_id in successors_map.get(current_id, []):
+				sched = schedule_map.get(succ_id, {})
+				absorbed_by_float = min(current_slip, sched.get("total_float", 0.0))
+				net_slip = max(0.0, current_slip - absorbed_by_float)
+				if succ_id not in visited:
+					visited.add(succ_id)
+					impacted.append({
+						"task_id": succ_id,
+						"task_name": sched.get("task_name", succ_id),
+						"inherited_slip_days": round(net_slip, 2),
+						"absorbed_by_float_days": round(absorbed_by_float, 2),
+						"is_critical": sched.get("critical", False),
+						"current_total_float": sched.get("total_float", 0.0),
+					})
+				if net_slip > 0:
+					propagation_queue.append((succ_id, net_slip))
+
+		project_slip = max((t["inherited_slip_days"] for t in impacted if t["is_critical"]), default=0.0)
+		self._audit(tenant_id, "dependency_impact_propagated", affected_task_id)
+		return {
+			"project_id": project_id,
+			"affected_task_id": affected_task_id,
+			"slip_days": slip_days,
+			"impacted_task_count": len(impacted),
+			"project_level_slip_days": round(project_slip, 2),
+			"impacted_tasks": sorted(impacted, key=lambda x: -x["inherited_slip_days"]),
+		}
+
+	# ── Multi-baseline variance report ───────────────────────────────────────
+
+	async def baseline_variance_report(
+		self,
+		project_id: str,
+		baseline_name: str,
+	) -> dict[str, Any]:
+		"""Diff current schedule against a stored baseline, returning task-level variances.
+
+		Returns start_slip_days, finish_slip_days, duration_delta, and float_erosion per task.
+		"""
+		assert _present(project_id), "project_id required"
+		assert _present(baseline_name), "baseline_name required"
+		tenant_id = self.tenant_id
+		baseline_key = f"{tenant_id}:{project_id}:{baseline_name}"
+		baseline = self._baselines.get(baseline_key)
+		if baseline is None:
+			return {"project_id": project_id, "baseline_name": baseline_name, "error": "baseline_not_found", "variances": []}
+
+		current_network = await self.schedule_network(project_id)
+		current_map = {s["task_id"]: s for s in current_network.get("schedule", [])}
+		baseline_map = {s["task_id"]: s for s in baseline.get("schedule", [])}
+
+		variances: list[dict[str, Any]] = []
+		for task_id, base_sched in baseline_map.items():
+			curr_sched = current_map.get(task_id)
+			if curr_sched is None:
+				variances.append({"task_id": task_id, "task_name": base_sched["task_name"], "status": "removed"})
+				continue
+			start_slip = round(curr_sched["ES"] - base_sched["ES"], 2)
+			finish_slip = round(curr_sched["EF"] - base_sched["EF"], 2)
+			duration_delta = round(curr_sched["duration_days"] - base_sched["duration_days"], 2)
+			float_erosion = round(base_sched["total_float"] - curr_sched["total_float"], 2)
+			variances.append({
+				"task_id": task_id,
+				"task_name": base_sched["task_name"],
+				"status": "changed" if any([start_slip, finish_slip, duration_delta]) else "on_track",
+				"start_slip_days": start_slip,
+				"finish_slip_days": finish_slip,
+				"duration_delta_days": duration_delta,
+				"float_erosion_days": float_erosion,
+				"baseline_critical": base_sched["critical"],
+				"current_critical": curr_sched["critical"],
+			})
+
+		slipped = [v for v in variances if v.get("finish_slip_days", 0) > 0]
+		project_delta = round(
+			current_network["project_duration_days"] - baseline.get("project_duration_days", 0.0), 2
+		)
+		self._audit(tenant_id, "baseline_variance_reported", project_id)
+		return {
+			"project_id": project_id,
+			"baseline_name": baseline_name,
+			"baseline_saved_at": baseline.get("saved_at"),
+			"project_duration_delta_days": project_delta,
+			"task_count": len(variances),
+			"slipped_task_count": len(slipped),
+			"variances": sorted(variances, key=lambda x: -abs(x.get("finish_slip_days", 0))),
+		}
+
+	# ── Schedule variance trend ───────────────────────────────────────────────
+
+	async def record_schedule_snapshot(self, project_id: str) -> dict[str, Any]:
+		"""Record a timestamped SPI/float snapshot for trend tracking.
+
+		Call daily (e.g., via cron) to build the trend series consumed by
+		schedule_variance_trend().
+		"""
+		assert _present(project_id), "project_id required"
+		tenant_id = self.tenant_id
+		analytics = await self.schedule_analytics(project_id)
+		snapshot = {
+			"date": str(date.today()),
+			"spi": analytics.get("spi", 1.0),
+			"avg_progress_pct": analytics.get("avg_progress_pct", 0.0),
+			"critical_task_count": analytics.get("float_distribution", {}).get("critical", 0),
+			"completed": analytics.get("completed", 0),
+		}
+		snap_key = f"{tenant_id}:{project_id}:snapshots"
+		if snap_key not in self._analytics:
+			self._analytics[snap_key] = {"snapshots": []}
+		self._analytics[snap_key]["snapshots"].append(snapshot)
+		self._audit(tenant_id, "schedule_snapshot_recorded", project_id)
+		return {"project_id": project_id, "snapshot": snapshot}
+
+	async def schedule_variance_trend(
+		self,
+		project_id: str,
+		lookback_days: int = 14,
+	) -> dict[str, Any]:
+		"""Return SPI and progress trend over the last N snapshots.
+
+		Detects deteriorating trajectory: SPI declining over 3+ consecutive snapshots.
+		"""
+		assert _present(project_id), "project_id required"
+		assert 1 <= lookback_days <= 90, "lookback_days must be 1–90"
+		tenant_id = self.tenant_id
+		snap_key = f"{tenant_id}:{project_id}:snapshots"
+		all_snaps = self._analytics.get(snap_key, {}).get("snapshots", [])
+		recent = all_snaps[-lookback_days:] if len(all_snaps) > lookback_days else all_snaps
+
+		deteriorating = False
+		if len(recent) >= 3:
+			spis = [s["spi"] for s in recent[-3:]]
+			deteriorating = spis[0] > spis[1] > spis[2]
+
+		trend = "stable"
+		if deteriorating:
+			trend = "deteriorating"
+		elif recent and recent[-1]["spi"] >= 1.0:
+			trend = "improving"
+
+		return {
+			"project_id": project_id,
+			"lookback_days": lookback_days,
+			"snapshot_count": len(recent),
+			"trend": trend,
+			"deteriorating_trajectory": deteriorating,
+			"latest_spi": recent[-1]["spi"] if recent else None,
+			"snapshots": recent,
+		}
+
+	# ── Critical Chain buffer management ─────────────────────────────────────
+
+	async def critical_chain_buffers(
+		self,
+		project_id: str,
+		buffer_pct: float = 25.0,
+	) -> dict[str, Any]:
+		"""Compute CCPM project buffer and feeding buffers for merge points.
+
+		buffer_pct: percentage of the chain duration to reserve as buffer (default 25%).
+		Returns project buffer, feeding buffers per merge point, and fever-chart zones.
+		"""
+		assert _present(project_id), "project_id required"
+		assert 5.0 <= buffer_pct <= 50.0, "buffer_pct must be 5–50"
+		tenant_id = self.tenant_id
+		network = await self.schedule_network(project_id)
+		schedule = network.get("schedule", [])
+		if not schedule:
+			return {"project_id": project_id, "project_buffer_days": 0.0, "feeding_buffers": []}
+
+		critical_tasks = [s for s in schedule if s["critical"]]
+		non_critical = [s for s in schedule if not s["critical"]]
+
+		critical_chain_duration = sum(t["duration_days"] for t in critical_tasks)
+		project_buffer = round(critical_chain_duration * buffer_pct / 100.0, 2)
+		project_buffer_consumed_pct = 0.0  # would derive from actuals in full implementation
+
+		# Feeding chains: groups of non-critical tasks that feed into the critical chain
+		# Simplified: treat each non-critical task with a critical successor as a feeding chain
+		has_critical_successor: set[str] = set()
+		for dep in self.dependencies.values():
+			if dep.tenant_id == tenant_id and dep.successor_id in {t["task_id"] for t in critical_tasks}:
+				has_critical_successor.add(dep.predecessor_id)
+
+		feeding_buffers: list[dict[str, Any]] = []
+		for nc in non_critical:
+			if nc["task_id"] in has_critical_successor:
+				feeding_dur = nc["duration_days"]
+				fb = round(feeding_dur * buffer_pct / 100.0, 2)
+				# Fever chart zone based on float consumption vs. buffer
+				float_consumed_pct = max(0.0, round((1 - nc["total_float"] / max(feeding_dur, 1)) * 100, 1))
+				zone = "green" if float_consumed_pct < 33 else ("yellow" if float_consumed_pct < 66 else "red")
+				feeding_buffers.append({
+					"feeding_task_id": nc["task_id"],
+					"feeding_task_name": nc["task_name"],
+					"feeding_chain_duration_days": feeding_dur,
+					"buffer_days": fb,
+					"float_consumed_pct": float_consumed_pct,
+					"fever_zone": zone,
+				})
+
+		# Project buffer fever zone
+		pb_zone = "green" if project_buffer_consumed_pct < 33 else ("yellow" if project_buffer_consumed_pct < 66 else "red")
+		self._audit(tenant_id, "ccpm_buffers_computed", project_id)
+		return {
+			"project_id": project_id,
+			"critical_chain_duration_days": round(critical_chain_duration, 2),
+			"buffer_pct": buffer_pct,
+			"project_buffer_days": project_buffer,
+			"project_buffer_consumed_pct": project_buffer_consumed_pct,
+			"project_buffer_fever_zone": pb_zone,
+			"feeding_buffer_count": len(feeding_buffers),
+			"feeding_buffers": feeding_buffers,
+		}
+
+
 PpmPpsService = ProjectPlanningService

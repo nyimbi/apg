@@ -994,6 +994,440 @@ class PoseService:
 			and (not edge_only or m.edge_ready)
 		]
 
+
+	# ------------------------------------------------------------------ #
+	# New async methods — world-class improvements (+8)                   #
+	# ------------------------------------------------------------------ #
+
+	async def extract_joint_angles(
+		self,
+		report_id: str,
+		tenant_id: str,
+		estimate_id: str,
+		skeleton_topology: "list[tuple[str, str, str]] | None" = None,
+	) -> "dict[str, Any]":
+		"""Compute anatomical joint angles from connected keypoint triples.
+
+		Each triple is (proximal, joint, distal) keypoint names. Angles are
+		returned in degrees using the law of cosines. Bilateral symmetry deltas
+		expose left/right asymmetry. Default topology covers major COCO-17 joints.
+		"""
+		self._require_tenant(tenant_id)
+		estimate = self._require_estimate(estimate_id, tenant_id)
+		kp_map = {kp["name"]: kp for kp in estimate.keypoints}
+
+		topology = skeleton_topology or [
+			("left_shoulder", "left_elbow", "left_wrist"),
+			("right_shoulder", "right_elbow", "right_wrist"),
+			("left_hip", "left_knee", "left_ankle"),
+			("right_hip", "right_knee", "right_ankle"),
+			("left_shoulder", "left_hip", "left_knee"),
+			("right_shoulder", "right_hip", "right_knee"),
+		]
+
+		joint_angles = []
+		for proximal, joint, distal in topology:
+			if proximal not in kp_map or joint not in kp_map or distal not in kp_map:
+				continue
+			angle_deg = _angle_from_three_keypoints(kp_map[proximal], kp_map[joint], kp_map[distal])
+			joint_angles.append({
+				"joint": joint,
+				"proximal": proximal,
+				"distal": distal,
+				"angle_degrees": angle_deg,
+				"confidence": round(mean([
+					kp_map[proximal]["confidence"],
+					kp_map[joint]["confidence"],
+					kp_map[distal]["confidence"],
+				]), 4),
+			})
+
+		symmetry = {}
+		for ang in joint_angles:
+			mirror = ang["joint"].replace("left_", "right_") if "left_" in ang["joint"] else ang["joint"].replace("right_", "left_")
+			mirror_angles = [a["angle_degrees"] for a in joint_angles if a["joint"] == mirror]
+			if mirror_angles:
+				symmetry[ang["joint"]] = round(abs(ang["angle_degrees"] - mirror_angles[0]), 2)
+
+		report = {
+			"id": report_id,
+			"tenant_id": tenant_id,
+			"estimate_id": estimate_id,
+			"joint_angles": joint_angles,
+			"symmetry_deltas_degrees": symmetry,
+			"joint_count": len(joint_angles),
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "joint_angles_extracted", report_id, f"Computed {len(joint_angles)} joint angles")
+		return report
+
+	async def fuse_estimates(
+		self,
+		fusion_id: str,
+		tenant_id: str,
+		estimate_ids: "list[str]",
+		outlier_iqr_factor: float = 1.5,
+	) -> "dict[str, Any]":
+		"""Fuse multiple estimates into a confidence-weighted consensus keypoint set.
+
+		Applies IQR-based outlier rejection per keypoint before weighted averaging.
+		Suitable for multi-model ensembling and multi-camera fusion.
+		"""
+		self._require_tenant(tenant_id)
+		if len(estimate_ids) < 2:
+			raise ValueError("at_least_two_estimates_required")
+		estimates = [self._require_estimate(eid, tenant_id) for eid in estimate_ids]
+
+		all_kp_names: set = set()
+		for est in estimates:
+			all_kp_names.update(kp["name"] for kp in est.keypoints)
+
+		fused_keypoints = []
+		for kp_name in sorted(all_kp_names):
+			candidates = [kp for est in estimates for kp in est.keypoints if kp["name"] == kp_name]
+			if candidates:
+				fused_keypoints.append(_weighted_keypoint_consensus(kp_name, candidates, outlier_iqr_factor))
+
+		overall_confidence = round(mean(kp["confidence"] for kp in fused_keypoints), 4) if fused_keypoints else 0.0
+		fusion_record = {
+			"id": fusion_id,
+			"tenant_id": tenant_id,
+			"source_estimate_ids": estimate_ids,
+			"source_count": len(estimates),
+			"fused_keypoints": fused_keypoints,
+			"fused_confidence": overall_confidence,
+			"keypoint_count": len(fused_keypoints),
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "estimates_fused", fusion_id,
+			f"Fused {len(estimates)} estimates into {len(fused_keypoints)} keypoints")
+		return fusion_record
+
+	async def flag_anatomical_anomalies(
+		self,
+		report_id: str,
+		tenant_id: str,
+		estimate_id: str,
+	) -> "dict[str, Any]":
+		"""Validate keypoint topology against anatomical constraints.
+
+		Detects anatomically impossible configurations: knee above hip, shoulder
+		below hip, nose below shoulders. Returns violation records and overall
+		severity: none / low / medium / high.
+		"""
+		self._require_tenant(tenant_id)
+		estimate = self._require_estimate(estimate_id, tenant_id)
+		kp_map = {kp["name"]: kp for kp in estimate.keypoints}
+
+		violations = []
+		for side in ("left", "right"):
+			hip = kp_map.get(f"{side}_hip")
+			knee = kp_map.get(f"{side}_knee")
+			if hip and knee and knee["y"] < hip["y"] - 0.05:
+				violations.append({"constraint": f"{side}_knee_above_{side}_hip",
+					"severity": "high", "delta": round(hip["y"] - knee["y"], 4)})
+		for side in ("left", "right"):
+			shoulder = kp_map.get(f"{side}_shoulder")
+			hip = kp_map.get(f"{side}_hip")
+			if shoulder and hip and shoulder["y"] > hip["y"] + 0.05:
+				violations.append({"constraint": f"{side}_shoulder_below_{side}_hip",
+					"severity": "medium", "delta": round(shoulder["y"] - hip["y"], 4)})
+		nose = kp_map.get("nose")
+		left_shoulder = kp_map.get("left_shoulder")
+		if nose and left_shoulder and nose["y"] > left_shoulder["y"] + 0.1:
+			violations.append({"constraint": "nose_below_shoulders",
+				"severity": "high", "delta": round(nose["y"] - left_shoulder["y"], 4)})
+
+		severity_scores = {"high": 3, "medium": 2, "low": 1}
+		total_score = sum(severity_scores.get(v["severity"], 0) for v in violations)
+		overall = "none" if total_score == 0 else "low" if total_score <= 2 else "medium" if total_score <= 5 else "high"
+		severity_level = "info" if overall == "none" else "medium" if overall in ("low", "medium") else "high"
+		report = {
+			"id": report_id,
+			"tenant_id": tenant_id,
+			"estimate_id": estimate_id,
+			"violations": violations,
+			"violation_count": len(violations),
+			"overall_severity": overall,
+			"anomaly_score": total_score,
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "anatomical_anomalies_flagged", report_id,
+			f"Severity: {overall} ({len(violations)} violations)", severity=severity_level)
+		return report
+
+	async def anonymise_estimate(
+		self,
+		anon_id: str,
+		tenant_id: str,
+		estimate_id: str,
+		noise_scale: float = 0.02,
+		seed: "int | None" = None,
+	) -> "dict[str, Any]":
+		"""Apply Gaussian noise to keypoint coordinates for k-anonymisation.
+
+		Smaller noise_scale = more accurate, larger = more private.
+		Anonymised keypoints are returned but NOT stored to prevent record linkage.
+		"""
+		import random as _rng
+		self._require_tenant(tenant_id)
+		estimate = self._require_estimate(estimate_id, tenant_id)
+		rng = _rng.Random(seed)
+		anon_keypoints = [
+			{**kp,
+			 "x": round(kp["x"] + rng.gauss(0, noise_scale), 4),
+			 "y": round(kp["y"] + rng.gauss(0, noise_scale), 4),
+			 "anonymised": True}
+			for kp in estimate.keypoints
+		]
+		record = {
+			"id": anon_id,
+			"tenant_id": tenant_id,
+			"source_estimate_id": estimate_id,
+			"noise_scale": noise_scale,
+			"seeded": seed is not None,
+			"keypoint_count": len(anon_keypoints),
+			"anonymised_keypoints": anon_keypoints,
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "estimate_anonymised", anon_id,
+			f"Anonymised {len(anon_keypoints)} keypoints with noise_scale={noise_scale}")
+		return record
+
+	async def certify_estimate_quality(
+		self,
+		cert_id: str,
+		tenant_id: str,
+		estimate_id: str,
+		reviewer: str,
+		min_confidence: float = 0.85,
+		min_keypoints: int = 10,
+	) -> "dict[str, Any]":
+		"""Issue a tamper-evident quality certificate with SHA-256 content hash.
+
+		Evaluates confidence threshold, keypoint completeness, and reviewer sign-off.
+		Grade: 'certified' | 'rejected'.
+		"""
+		import json as _json
+		self._require_tenant(tenant_id)
+		if not reviewer.strip():
+			raise PermissionError("reviewer_required_for_certification")
+		estimate = self._require_estimate(estimate_id, tenant_id)
+		passed_confidence = estimate.confidence >= min_confidence
+		passed_keypoints = len(estimate.keypoints) >= min_keypoints
+		passed = passed_confidence and passed_keypoints
+		content_hash = sha256(
+			_json.dumps(estimate.to_dict(), sort_keys=True, ensure_ascii=False).encode()
+		).hexdigest()
+		certificate = {
+			"id": cert_id,
+			"tenant_id": tenant_id,
+			"estimate_id": estimate_id,
+			"reviewer": reviewer,
+			"passed": passed,
+			"checks": {
+				"confidence_threshold": {"required": min_confidence, "actual": estimate.confidence, "passed": passed_confidence},
+				"keypoint_completeness": {"required": min_keypoints, "actual": len(estimate.keypoints), "passed": passed_keypoints},
+				"reviewer_sign_off": {"reviewer": reviewer, "passed": bool(reviewer.strip())},
+			},
+			"content_hash": content_hash,
+			"grade": "certified" if passed else "rejected",
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "estimate_quality_certified", cert_id,
+			f"Grade: {certificate['grade']} | hash: {content_hash[:12]}",
+			severity="info" if passed else "high")
+		return certificate
+
+	async def interpolate_missing_frames(
+		self,
+		interpolation_id: str,
+		tenant_id: str,
+		session_id: str,
+		estimate_ids: "list[str]",
+	) -> "dict[str, Any]":
+		"""Fill temporal gaps in a skeletal track via linear keypoint interpolation.
+
+		Gaps are detected from frame_number discontinuities. Synthetic frames are
+		marked synthetic=True and are NOT persisted as real estimates.
+		"""
+		self._require_tenant(tenant_id)
+		self._require_session(session_id, tenant_id)
+		estimates = [self._require_estimate(eid, tenant_id) for eid in estimate_ids]
+		frame_map = {}
+		for est in estimates:
+			frame = self._frames.get(est.frame_id)
+			if frame:
+				frame_map[frame.frame_number] = est
+		if len(frame_map) < 2:
+			return {
+				"id": interpolation_id, "tenant_id": tenant_id, "session_id": session_id,
+				"interpolated_count": 0,
+				"frames": [{"estimate_id": e.id, "synthetic": False} for e in estimates],
+				"created_at": utc_now_iso(),
+			}
+		sorted_frames = sorted(frame_map.keys())
+		filled_frames = []
+		synthetic_count = 0
+		for i, fn in enumerate(sorted_frames):
+			est = frame_map[fn]
+			filled_frames.append({"frame_number": fn, "estimate_id": est.id,
+				"synthetic": False, "keypoints": est.keypoints})
+			if i < len(sorted_frames) - 1:
+				next_fn = sorted_frames[i + 1]
+				gap = next_fn - fn
+				if gap > 1:
+					next_est = frame_map[next_fn]
+					kp_a = {kp["name"]: kp for kp in est.keypoints}
+					kp_b = {kp["name"]: kp for kp in next_est.keypoints}
+					common = set(kp_a) & set(kp_b)
+					for step in range(1, gap):
+						alpha = step / gap
+						synth_kps = [
+							{"name": nm,
+							 "x": round(kp_a[nm]["x"] * (1 - alpha) + kp_b[nm]["x"] * alpha, 4),
+							 "y": round(kp_a[nm]["y"] * (1 - alpha) + kp_b[nm]["y"] * alpha, 4),
+							 "confidence": round(kp_a[nm]["confidence"] * (1 - alpha) + kp_b[nm]["confidence"] * alpha, 4),
+							 "visibility": 1.0, "synthetic": True}
+							for nm in sorted(common)
+						]
+						filled_frames.append({"frame_number": fn + step, "estimate_id": None,
+							"synthetic": True, "keypoints": synth_kps})
+						synthetic_count += 1
+		result = {
+			"id": interpolation_id, "tenant_id": tenant_id, "session_id": session_id,
+			"total_frames": len(filled_frames),
+			"real_frames": len(filled_frames) - synthetic_count,
+			"interpolated_count": synthetic_count,
+			"frames": filled_frames,
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "frames_interpolated", interpolation_id,
+			f"Filled {synthetic_count} synthetic frames across {len(sorted_frames)} real frames")
+		return result
+
+	async def detect_model_drift(
+		self,
+		report_id: str,
+		tenant_id: str,
+		model_id: str,
+		window_size: int = 30,
+		drift_threshold: float = 0.08,
+	) -> "dict[str, Any]":
+		"""Detect confidence score drift using EWMA control charting.
+
+		Raises a high-severity audit event when deviation from the model's
+		minimum_keypoint_confidence baseline exceeds drift_threshold.
+		"""
+		self._require_tenant(tenant_id)
+		model = self._require_model(model_id, tenant_id)
+		model_estimates = sorted(
+			[e for e in self._estimates.values() if e.tenant_id == tenant_id and e.model_id == model_id],
+			key=lambda e: e.created_at,
+		)
+		if not model_estimates:
+			return {"id": report_id, "tenant_id": tenant_id, "model_id": model_id,
+				"drift_detected": False, "message": "no_estimates_available",
+				"created_at": utc_now_iso()}
+		window = model_estimates[-window_size:]
+		confidences = [e.confidence for e in window]
+		alpha = 2 / (len(confidences) + 1)
+		ewma = confidences[0]
+		ewma_series = [round(ewma, 4)]
+		for c in confidences[1:]:
+			ewma = alpha * c + (1 - alpha) * ewma
+			ewma_series.append(round(ewma, 4))
+		baseline = model.minimum_keypoint_confidence
+		current_ewma = ewma_series[-1]
+		deviation = round(baseline - current_ewma, 4)
+		drift_detected = deviation > drift_threshold
+		report = {
+			"id": report_id, "tenant_id": tenant_id, "model_id": model_id,
+			"model_type": model.model_type, "window_size": len(window),
+			"baseline_confidence": baseline, "current_ewma": current_ewma,
+			"deviation": deviation, "drift_threshold": drift_threshold,
+			"drift_detected": drift_detected, "ewma_series": ewma_series,
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "model_drift_detection", report_id,
+			f"Model {model_id}: drift_detected={drift_detected}, deviation={deviation}",
+			severity="high" if drift_detected else "info")
+		return report
+
+	async def build_skeleton_overlay(
+		self,
+		overlay_id: str,
+		tenant_id: str,
+		estimate_id: str,
+		topology: str = "coco17",
+	) -> "dict[str, Any]":
+		"""Produce display-ready skeleton edge segments for rendering pipelines.
+
+		topology: 'coco17' (default) | 'halpe26' | 'minimal'.
+		Each edge carries coordinates, confidence-derived colour (#hex), and
+		per-edge confidence score for threshold-based display filtering.
+		"""
+		self._require_tenant(tenant_id)
+		estimate = self._require_estimate(estimate_id, tenant_id)
+		kp_map = {kp["name"]: kp for kp in estimate.keypoints}
+		topology_edges = {
+			"coco17": [
+				("nose", "left_eye"), ("nose", "right_eye"),
+				("left_eye", "left_ear"), ("right_eye", "right_ear"),
+				("left_shoulder", "right_shoulder"),
+				("left_shoulder", "left_elbow"), ("right_shoulder", "right_elbow"),
+				("left_elbow", "left_wrist"), ("right_elbow", "right_wrist"),
+				("left_shoulder", "left_hip"), ("right_shoulder", "right_hip"),
+				("left_hip", "right_hip"),
+				("left_hip", "left_knee"), ("right_hip", "right_knee"),
+				("left_knee", "left_ankle"), ("right_knee", "right_ankle"),
+			],
+			"halpe26": [
+				("nose", "left_eye"), ("nose", "right_eye"),
+				("left_eye", "left_ear"), ("right_eye", "right_ear"),
+				("left_shoulder", "right_shoulder"),
+				("left_shoulder", "left_elbow"), ("right_shoulder", "right_elbow"),
+				("left_elbow", "left_wrist"), ("right_elbow", "right_wrist"),
+				("left_wrist", "left_hand"), ("right_wrist", "right_hand"),
+				("left_shoulder", "left_hip"), ("right_shoulder", "right_hip"),
+				("left_hip", "right_hip"),
+				("left_hip", "left_knee"), ("right_hip", "right_knee"),
+				("left_knee", "left_ankle"), ("right_knee", "right_ankle"),
+				("left_ankle", "left_foot"), ("right_ankle", "right_foot"),
+			],
+			"minimal": [
+				("left_shoulder", "right_shoulder"),
+				("left_shoulder", "left_hip"), ("right_shoulder", "right_hip"),
+				("left_hip", "right_hip"),
+				("left_hip", "left_knee"), ("right_hip", "right_knee"),
+				("left_knee", "left_ankle"), ("right_knee", "right_ankle"),
+			],
+		}
+		edges_def = topology_edges.get(topology, topology_edges["coco17"])
+		segments = []
+		for src_name, dst_name in edges_def:
+			src = kp_map.get(src_name)
+			dst = kp_map.get(dst_name)
+			if not src or not dst:
+				continue
+			edge_conf = round(mean([src["confidence"], dst["confidence"]]), 4)
+			colour = "#00cc44" if edge_conf >= 0.8 else "#ffcc00" if edge_conf >= 0.5 else "#ff3300"
+			segments.append({
+				"from": src_name, "to": dst_name,
+				"x1": src["x"], "y1": src["y"],
+				"x2": dst["x"], "y2": dst["y"],
+				"confidence": edge_conf, "colour": colour,
+			})
+		overlay = {
+			"id": overlay_id, "tenant_id": tenant_id, "estimate_id": estimate_id,
+			"topology": topology, "segment_count": len(segments),
+			"segments": segments, "keypoints": estimate.keypoints,
+			"created_at": utc_now_iso(),
+		}
+		self._audit(tenant_id, "skeleton_overlay_built", overlay_id,
+			f"Built {len(segments)} segments ({topology})")
+		return overlay
+
 	# ------------------------------------------------------------------ #
 	# Private helpers                                                      #
 	# ------------------------------------------------------------------ #
@@ -1141,3 +1575,38 @@ def _ergonomics_risk(kp_map: dict[str, dict[str, Any]]) -> int:
 		if neck_tilt > 0.15:
 			score += 2
 	return min(score, 7)
+def _angle_from_three_keypoints(proximal, joint, distal):
+	"""Angle at `joint` formed by proximal-joint-distal, in degrees (law of cosines)."""
+	import math
+	ax, ay = proximal["x"] - joint["x"], proximal["y"] - joint["y"]
+	bx, by = distal["x"] - joint["x"], distal["y"] - joint["y"]
+	dot = ax * bx + ay * by
+	mag_a = math.sqrt(ax ** 2 + ay ** 2)
+	mag_b = math.sqrt(bx ** 2 + by ** 2)
+	if mag_a < 1e-9 or mag_b < 1e-9:
+		return 0.0
+	cos_angle = max(-1.0, min(1.0, dot / (mag_a * mag_b)))
+	return round(math.degrees(math.acos(cos_angle)), 2)
+
+
+def _weighted_keypoint_consensus(name, candidates, iqr_factor=1.5):
+	"""Confidence-weighted average for candidate keypoints with IQR outlier rejection."""
+	from statistics import mean as _mean
+	if not candidates:
+		return {"name": name, "x": 0.0, "y": 0.0, "confidence": 0.0, "visibility": 1.0}
+	confs = sorted(c["confidence"] for c in candidates)
+	if len(confs) >= 4:
+		q1 = confs[len(confs) // 4]
+		q3 = confs[(3 * len(confs)) // 4]
+		iqr = q3 - q1
+		lower, upper = q1 - iqr_factor * iqr, q3 + iqr_factor * iqr
+		candidates = [c for c in candidates if lower <= c["confidence"] <= upper] or candidates
+	total_weight = sum(c["confidence"] for c in candidates) or 1.0
+	wx = sum(c["x"] * c["confidence"] for c in candidates) / total_weight
+	wy = sum(c["y"] * c["confidence"] for c in candidates) / total_weight
+	wc = sum(c["confidence"] for c in candidates) / len(candidates)
+	return {
+		"name": name, "x": round(wx, 4), "y": round(wy, 4),
+		"confidence": round(wc, 4),
+		"visibility": round(_mean(c.get("visibility", 1.0) for c in candidates), 4),
+	}

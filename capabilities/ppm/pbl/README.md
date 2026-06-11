@@ -14,11 +14,18 @@ Project Baseline Management (pbl) establishes and protects the scope, schedule, 
 | cost_baseline_management | Approved cost baseline with budget-at-completion |
 | change_control_workflow | Formal change request, impact assessment, and approval pipeline |
 | earned_value_analysis | PV, EV, AC, SV, CV, SPI, CPI, EAC, ETC, VAC |
+| earned_schedule_analysis | ES, SPI(t), SV(t), IEAC(t) — time-domain EVM metrics |
 | baseline_variance_tracking | Schedule and cost variance with threshold alerting |
 | change_impact_assessment | Schedule, cost, scope, and risk impact quantification |
 | baseline_approval_workflow | Designated approver enforcement for baseline promotion |
-| integrated_baseline_review | Cross-baseline consistency checks |
+| integrated_baseline_review | Cross-baseline consistency checks with IBR health index |
 | performance_measurement_baseline | PMB for EVM reporting |
+| baseline_lock_management | Write-protect approved baselines; enforce freeze periods |
+| cr_dependency_graph | DAG linking change requests via blocks/depends_on/supersedes |
+| completion_forecasting | EAC (3 methods), TCPI, VAC with method recommendation |
+| portfolio_baseline_summary | Cross-project CPI/SPI rollup with risk-tiered project list |
+| baseline_deviation_scoring | Composite BDS for dashboard KPI triage |
+| baseline_version_history | Append-only version snapshots with diff capability |
 
 ## Requires
 | Capability | Reason |
@@ -46,10 +53,20 @@ Project Baseline Management (pbl) establishes and protects the scope, schedule, 
 | Path | Method | Description | Permission |
 |------|--------|-------------|------------|
 | /ppm-pbl/baselines | GET/POST | Baseline list and creation | ppm_pbl:baselines |
+| /ppm-pbl/baselines/lock | POST | Lock/unlock baseline | ppm_pbl:admin |
+| /ppm-pbl/baselines/ibr | GET | Integrated Baseline Review | ppm_pbl:baselines |
+| /ppm-pbl/baselines/versions | GET | Baseline version history | ppm_pbl:baselines |
+| /ppm-pbl/baselines/freeze | POST | Set freeze period | ppm_pbl:admin |
 | /ppm-pbl/changes | GET/POST | Change request queue | ppm_pbl:changes |
+| /ppm-pbl/changes/graph | GET | CR dependency graph | ppm_pbl:changes |
+| /ppm-pbl/changes/link | POST | Link change requests | ppm_pbl:changes |
 | /ppm-pbl/impact | GET/POST | Impact assessment | ppm_pbl:impact |
 | /ppm-pbl/ev | GET/POST | Earned value dashboard | ppm_pbl:ev |
+| /ppm-pbl/ev/forecast | GET | EAC/TCPI/VAC forecast | ppm_pbl:ev |
+| /ppm-pbl/ev/earned-schedule | GET | Earned Schedule metrics | ppm_pbl:ev |
 | /ppm-pbl/variance | GET | Variance report | ppm_pbl:reports |
+| /ppm-pbl/portfolio | GET | Portfolio baseline summary | ppm_pbl:portfolio |
+| /ppm-pbl/bds | GET | Baseline Deviation Scores | ppm_pbl:reports |
 | /ppm-pbl/approvals | GET/POST | Approval console | ppm_pbl:approve |
 | /ppm-pbl/agents | GET/POST | Agent workbench | ppm_pbl:admin |
 

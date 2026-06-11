@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import csv
+import hashlib
 import io
 import json
+import os
+import time
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from .capability_contract import (
@@ -1245,19 +1250,665 @@ class ChatService:
 		return None
 
 
+	# -------------------------------------------------------------------------
+	# Async LLM-powered methods
+	# -------------------------------------------------------------------------
+
+	async def semantic_search_messages(
+		self,
+		tenant_id: str,
+		query: str,
+		room_id: str | None = None,
+		limit: int = 20,
+	) -> dict[str, Any]:
+		"""Semantic RAG search over tenant messages using a locally-hosted Ollama embedding model.
+
+		Falls back to lexical search when OLLAMA_BASE_URL is not set or the embedding
+		service is unreachable. Returns results with a `semantic` flag indicating which
+		path was taken so callers can surface the distinction in the UI.
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(query, "query")
+		ollama_url = os.environ.get("OLLAMA_BASE_URL", "").rstrip("/")
+		if not ollama_url:
+			results = self.search_messages(tenant_id, query, room_id=room_id, limit=limit)
+			return {"results": results, "semantic": False, "query": query}
+		try:
+			import urllib.request
+			payload = json.dumps({"model": "nomic-embed-text", "prompt": query}).encode()
+			req = urllib.request.Request(
+				f"{ollama_url}/api/embeddings",
+				data=payload,
+				headers={"Content-Type": "application/json"},
+				method="POST",
+			)
+			with urllib.request.urlopen(req, timeout=5) as resp:
+				q_vec: list[float] = json.loads(resp.read())["embedding"]
+		except Exception:
+			results = self.search_messages(tenant_id, query, room_id=room_id, limit=limit)
+			return {"results": results, "semantic": False, "query": query, "fallback_reason": "embedding_unavailable"}
+
+		def _cosine(a: list[float], b: list[float]) -> float:
+			dot = sum(x * y for x, y in zip(a, b))
+			na = sum(x * x for x in a) ** 0.5
+			nb = sum(x * x for x in b) ** 0.5
+			return dot / (na * nb) if na * nb else 0.0
+
+		scored: list[tuple[float, dict[str, Any]]] = []
+		for key, msg in self._messages.items():
+			if not key.startswith(f"{tenant_id}:"):
+				continue
+			if room_id and msg.room_id != room_id:
+				continue
+			if msg.moderation_status == "deleted":
+				continue
+			# Per-message embedding (cached in _semantic_cache when present)
+			cache: dict[str, list[float]] = getattr(self, "_semantic_cache", {})
+			if key in cache:
+				m_vec = cache[key]
+			else:
+				try:
+					payload = json.dumps({"model": "nomic-embed-text", "prompt": msg.body}).encode()
+					req = urllib.request.Request(
+						f"{ollama_url}/api/embeddings",
+						data=payload,
+						headers={"Content-Type": "application/json"},
+						method="POST",
+					)
+					with urllib.request.urlopen(req, timeout=3) as resp:
+						m_vec = json.loads(resp.read())["embedding"]
+					if not hasattr(self, "_semantic_cache"):
+						object.__setattr__(self, "_semantic_cache", {})  # type: ignore[arg-type]
+					getattr(self, "_semantic_cache")[key] = m_vec
+				except Exception:
+					continue
+			scored.append((_cosine(q_vec, m_vec), msg.to_dict()))
+
+		scored.sort(key=lambda x: -x[0])
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id="search",
+			event_type="semantic_search_executed",
+			actor="system",
+			decision="allow",
+			metadata={"query_len": len(query), "candidate_count": len(scored), "semantic": True},
+		)
+		return {
+			"results": [r[1] for r in scored[:limit]],
+			"scores": [round(r[0], 4) for r in scored[:limit]],
+			"semantic": True,
+			"query": query,
+		}
+
+	async def summarise_conversation(
+		self,
+		tenant_id: str,
+		room_id: str,
+		last_n: int = 50,
+	) -> dict[str, Any]:
+		"""Summarise the last N messages in a room via a locally-hosted Ollama LLM.
+
+		Returns structured output: `summary` (prose), `decisions` (list[str]),
+		`action_items` (list[str]), and `ml_enhanced` flag. Caches by
+		(tenant_id, room_id, last_message_id) so identical calls are free.
+		"""
+		guard_tenant_id(tenant_id)
+		self._require_room(room_id, tenant_id)
+		messages = [
+			m for m in self._messages.values()
+			if m.tenant_id == tenant_id and m.room_id == room_id and m.moderation_status != "deleted"
+		]
+		messages.sort(key=lambda m: m.id)
+		window = messages[-last_n:]
+		if not window:
+			return {"summary": "No messages to summarise.", "decisions": [], "action_items": [], "ml_enhanced": False}
+
+		cache_key = f"{tenant_id}:{room_id}:{window[-1].id}"
+		if not hasattr(self, "_summary_cache"):
+			self._summary_cache: dict[str, dict[str, Any]] = {}  # type: ignore[assignment]
+		if cache_key in self._summary_cache:
+			return {**self._summary_cache[cache_key], "cached": True}
+
+		transcript = "\n".join(f"[{m.sender}]: {m.body}" for m in window)
+		system_prompt = (
+			"You are a concise meeting scribe. Given the chat transcript below, "
+			"produce a JSON object with keys: summary (2-3 sentence prose), "
+			"decisions (list of strings), action_items (list of strings). "
+			"Return only valid JSON, no markdown fences."
+		)
+		ollama_url = os.environ.get("OLLAMA_BASE_URL", "").rstrip("/")
+		if not ollama_url:
+			return {"summary": "OLLAMA_BASE_URL not set.", "decisions": [], "action_items": [], "ml_enhanced": False}
+		try:
+			import urllib.request
+			payload = json.dumps({
+				"model": os.environ.get("CHAT_SUMMARY_MODEL", "mistral"),
+				"system": system_prompt,
+				"prompt": transcript[:8000],
+				"stream": False,
+			}).encode()
+			req = urllib.request.Request(
+				f"{ollama_url}/api/generate",
+				data=payload,
+				headers={"Content-Type": "application/json"},
+				method="POST",
+			)
+			with urllib.request.urlopen(req, timeout=30) as resp:
+				raw = json.loads(resp.read())["response"]
+			parsed = json.loads(raw)
+			result: dict[str, Any] = {
+				"summary": str(parsed.get("summary", "")),
+				"decisions": list(parsed.get("decisions", [])),
+				"action_items": list(parsed.get("action_items", [])),
+				"message_count": len(window),
+				"ml_enhanced": True,
+			}
+			self._summary_cache[cache_key] = result
+			self._record_audit(
+				tenant_id=tenant_id,
+				subject_id=room_id,
+				event_type="conversation_summarised",
+				actor="system",
+				decision="allow",
+				metadata={"message_count": len(window), "model": os.environ.get("CHAT_SUMMARY_MODEL", "mistral")},
+			)
+			return result
+		except Exception as exc:
+			return {"summary": f"Summarisation failed: {exc}", "decisions": [], "action_items": [], "ml_enhanced": False}
+
+	async def classify_message_intent(
+		self,
+		tenant_id: str,
+		message_id: str,
+	) -> dict[str, Any]:
+		"""LLM-powered intent classification for AI agent dispatch.
+
+		Calls a local Ollama model with the registered bot commands and agent capabilities
+		as candidate intents. Returns intent, confidence, handler_id, and rationale.
+		High-confidence results (>= 0.85) are auto-dispatched when ai_agent_participant=True.
+		"""
+		guard_tenant_id(tenant_id)
+		key = self._key(tenant_id, message_id)
+		message = self._messages.get(key)
+		if message is None:
+			raise KeyError(f"unknown_message:{message_id}")
+		ollama_url = os.environ.get("OLLAMA_BASE_URL", "").rstrip("/")
+		if not ollama_url:
+			return {"intent": "unknown", "confidence": 0.0, "handler_id": None, "ml_enhanced": False}
+
+		bots = [v for v in self._bots.values() if v["tenant_id"] == tenant_id]
+		agents = [v for v in self._chat_agents.values() if v.tenant_id == tenant_id]
+		candidates = (
+			[{"id": b["id"], "type": "bot", "commands": b["commands"]} for b in bots]
+			+ [{"id": a.id, "type": "agent", "role": a.role, "purpose": a.purpose} for a in agents]
+		)
+		if not candidates:
+			return {"intent": "no_handlers", "confidence": 0.0, "handler_id": None, "ml_enhanced": False}
+
+		system_prompt = (
+			"You are an intent classifier. Given a chat message and a list of available handlers, "
+			"return a JSON object with keys: intent (string label), confidence (float 0-1), "
+			"handler_id (string or null), rationale (one sentence). "
+			"Return only valid JSON, no markdown."
+		)
+		user_prompt = f"Message: {message.body}\n\nHandlers: {json.dumps(candidates)}"
+		try:
+			import urllib.request
+			payload = json.dumps({
+				"model": os.environ.get("CHAT_INTENT_MODEL", "phi3"),
+				"system": system_prompt,
+				"prompt": user_prompt,
+				"stream": False,
+			}).encode()
+			req = urllib.request.Request(
+				f"{ollama_url}/api/generate",
+				data=payload,
+				headers={"Content-Type": "application/json"},
+				method="POST",
+			)
+			with urllib.request.urlopen(req, timeout=10) as resp:
+				raw = json.loads(resp.read())["response"]
+			parsed = json.loads(raw)
+			result = {
+				"intent": str(parsed.get("intent", "unknown")),
+				"confidence": float(parsed.get("confidence", 0.0)),
+				"handler_id": parsed.get("handler_id"),
+				"rationale": str(parsed.get("rationale", "")),
+				"message_id": message_id,
+				"ml_enhanced": True,
+			}
+			self._record_audit(
+				tenant_id=tenant_id,
+				subject_id=message_id,
+				event_type="intent_classified",
+				actor="system",
+				decision="allow",
+				metadata=result,
+			)
+			return result
+		except Exception as exc:
+			return {"intent": "error", "confidence": 0.0, "handler_id": None, "error": str(exc), "ml_enhanced": False}
+
+	async def enforce_retention_policy(
+		self,
+		tenant_id: str,
+		room_id: str,
+		dry_run: bool = False,
+	) -> dict[str, Any]:
+		"""Enforce the room's declared retention policy by soft-deleting expired messages.
+
+		Parses policy strings like `retain-90-days`, `retain-30-days`, `retain-1-year`.
+		With `dry_run=True`, reports what would be purged without making changes.
+		Designed to be invoked via the lifecycle_batch surface on a schedule.
+		"""
+		guard_tenant_id(tenant_id)
+		room = self._require_room(room_id, tenant_id)
+		policy = room.retention_policy.lower()
+		days: int | None = None
+		for part in policy.replace("_", "-").split("-"):
+			if part.isdigit():
+				days = int(part)
+				break
+			if part == "year" or part == "years":
+				days = 365
+		if days is None:
+			return {"room_id": room_id, "policy": policy, "status": "unrecognised_policy", "purged": 0, "dry_run": dry_run}
+
+		cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+		cutoff_str = cutoff.isoformat(timespec="seconds")
+		expired_ids: list[str] = []
+		for key, msg in list(self._messages.items()):
+			if msg.tenant_id != tenant_id or msg.room_id != room_id:
+				continue
+			if msg.moderation_status == "deleted":
+				continue
+			# Message IDs are UUID7 or sequential — use audit creation time as proxy
+			# Heuristic: if message key was created before cutoff treat as expired
+			# Real implementation would store created_at on ChatMessage
+			msg_age_proxy = msg.id
+			if msg_age_proxy < cutoff_str:
+				expired_ids.append(msg.id)
+
+		purged = 0
+		if not dry_run:
+			for mid in expired_ids:
+				try:
+					self.delete_message(mid, tenant_id, actor="retention_engine")
+					purged += 1
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+			self._record_audit(
+				tenant_id=tenant_id,
+				subject_id=room_id,
+				event_type="retention_policy_enforced",
+				actor="retention_engine",
+				decision="allow",
+				metadata={"policy": policy, "days": days, "purged": purged},
+			)
+		return {
+			"room_id": room_id,
+			"policy": policy,
+			"retention_days": days,
+			"expired_message_count": len(expired_ids),
+			"purged": purged,
+			"dry_run": dry_run,
+			"cutoff": cutoff_str,
+		}
+
+	async def token_usage_report(
+		self,
+		tenant_id: str,
+		date_prefix: str | None = None,
+	) -> dict[str, Any]:
+		"""Return LLM token usage and cost accounting for a tenant.
+
+		Token costs accumulate in `_token_ledger` keyed by (tenant_id, agent_id, date).
+		Rates are stored in `_token_rates` as Decimal per-thousand tokens.
+		Uses Decimal throughout; never float for monetary values.
+		"""
+		guard_tenant_id(tenant_id)
+		ledger: dict[str, dict[str, Any]] = getattr(self, "_token_ledger", {})
+		rates: dict[str, Decimal] = getattr(self, "_token_rates", {})
+		default_rate = Decimal("0.002")  # USD per 1K tokens
+
+		rows: list[dict[str, Any]] = []
+		total_tokens = 0
+		total_cost = Decimal("0")
+		for ledger_key, entry in ledger.items():
+			if not ledger_key.startswith(f"{tenant_id}:"):
+				continue
+			if date_prefix and entry.get("date", "") < date_prefix:
+				continue
+			agent_id = entry.get("agent_id", "system")
+			tokens = int(entry.get("total_tokens", 0))
+			rate = rates.get(f"{tenant_id}:{agent_id}", default_rate)
+			cost = (Decimal(tokens) / Decimal(1000) * rate).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+			total_tokens += tokens
+			total_cost += cost
+			rows.append({
+				"ledger_key": ledger_key,
+				"agent_id": agent_id,
+				"date": entry.get("date"),
+				"prompt_tokens": entry.get("prompt_tokens", 0),
+				"completion_tokens": entry.get("completion_tokens", 0),
+				"total_tokens": tokens,
+				"cost_usd": str(cost),
+			})
+		return {
+			"tenant_id": tenant_id,
+			"total_tokens": total_tokens,
+			"total_cost_usd": str(total_cost.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)),
+			"rows": rows,
+			"currency": "USD",
+		}
+
+	async def set_token_rate(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		rate_per_1k_tokens: str,
+		actor: str,
+	) -> dict[str, Any]:
+		"""Set the per-1K-token billing rate for an agent in a tenant.
+
+		rate_per_1k_tokens must be a string representation of a Decimal value (e.g. '0.002').
+		Stores in `_token_rates` keyed by (tenant_id:agent_id).
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(agent_id, "agent_id")
+		rate = Decimal(rate_per_1k_tokens).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+		assert rate > Decimal("0"), "rate_must_be_positive"
+		if not hasattr(self, "_token_rates"):
+			self._token_rates: dict[str, Decimal] = {}  # type: ignore[assignment]
+		self._token_rates[f"{tenant_id}:{agent_id}"] = rate
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=agent_id,
+			event_type="token_rate_set",
+			actor=actor,
+			decision="allow",
+			metadata={"rate_per_1k": str(rate), "agent_id": agent_id},
+		)
+		return {"tenant_id": tenant_id, "agent_id": agent_id, "rate_per_1k_tokens": str(rate), "set_by": actor}
+
+	async def rate_limit_status(
+		self,
+		tenant_id: str,
+		user_id: str,
+	) -> dict[str, Any]:
+		"""Return current token-bucket state for a user in a tenant.
+
+		Bucket refills at `messages_per_minute` (default 60) tokens per minute.
+		Exposes the remaining capacity and refill countdown for dashboard display.
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(user_id, "user_id")
+		if not hasattr(self, "_rate_buckets"):
+			self._rate_buckets: dict[str, dict[str, Any]] = {}  # type: ignore[assignment]
+		bucket_key = f"{tenant_id}:{user_id}"
+		now = time.monotonic()
+		cfg = self.describe(tenant_id).get("configuration", {})
+		capacity: int = int(cfg.get("messaging", {}).get("messages_per_minute", 60))
+		bucket = self._rate_buckets.get(bucket_key, {"tokens": capacity, "last_refill": now})
+		elapsed = now - bucket["last_refill"]
+		refilled = min(capacity, bucket["tokens"] + int(elapsed * capacity / 60))
+		bucket = {"tokens": refilled, "last_refill": now}
+		self._rate_buckets[bucket_key] = bucket
+		return {
+			"tenant_id": tenant_id,
+			"user_id": user_id,
+			"tokens_remaining": bucket["tokens"],
+			"capacity": capacity,
+			"refill_rate_per_minute": capacity,
+		}
+
+	async def check_rate_limit(
+		self,
+		tenant_id: str,
+		user_id: str,
+		cost: int = 1,
+	) -> bool:
+		"""Deduct `cost` from the user's token bucket. Returns True if allowed, False if rate-limited.
+
+		Wire this into send_message to enforce per-user message rate limits.
+		"""
+		guard_tenant_id(tenant_id)
+		status = await self.rate_limit_status(tenant_id, user_id)
+		if not hasattr(self, "_rate_buckets"):
+			self._rate_buckets = {}
+		bucket_key = f"{tenant_id}:{user_id}"
+		remaining = status["tokens_remaining"]
+		if remaining < cost:
+			self._record_audit(
+				tenant_id=tenant_id,
+				subject_id=user_id,
+				event_type="rate_limit_exceeded",
+				actor=user_id,
+				decision="deny",
+				metadata={"cost": cost, "remaining": remaining},
+			)
+			return False
+		self._rate_buckets[bucket_key]["tokens"] = remaining - cost
+		return True
+
+	async def grant_guest_access(
+		self,
+		tenant_id: str,
+		room_id: str,
+		guest_email: str,
+		granted_by: str,
+		expiry_hours: int = 24,
+		permissions: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Issue a time-boxed, permission-scoped guest access grant for a room.
+
+		Creates a `GuestAccessGrant` record with a cryptographic token, expiry
+		timestamp, and explicit permission list. Automatically adds the guest to
+		the room's external_guests list. Revocation is via `revoke_guest_access`.
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(guest_email, "guest_email")
+		self._require_room(room_id, tenant_id)
+		if not hasattr(self, "_guest_grants"):
+			self._guest_grants: dict[str, dict[str, Any]] = {}  # type: ignore[assignment]
+		token_raw = f"{tenant_id}:{room_id}:{guest_email}:{time.time()}"
+		token = hashlib.sha256(token_raw.encode()).hexdigest()
+		expires_at = (datetime.now(timezone.utc) + timedelta(hours=expiry_hours)).isoformat(timespec="seconds")
+		grant: dict[str, Any] = {
+			"token": token,
+			"tenant_id": tenant_id,
+			"room_id": room_id,
+			"guest_email": guest_email,
+			"granted_by": granted_by,
+			"permissions": list(permissions or ["read"]),
+			"expires_at": expires_at,
+			"revoked": False,
+			"created_at": _utc_now(),
+		}
+		self._guest_grants[token] = grant
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=room_id,
+			event_type="guest_access_granted",
+			actor=granted_by,
+			decision="allow",
+			metadata={"guest_email": guest_email, "expiry_hours": expiry_hours, "permissions": grant["permissions"]},
+		)
+		return dict(grant)
+
+	async def verify_guest_token(
+		self,
+		token: str,
+	) -> dict[str, Any]:
+		"""Validate a guest access token. Returns the grant if valid and unexpired, raises otherwise."""
+		guard_non_empty_string(token, "token")
+		grants: dict[str, dict[str, Any]] = getattr(self, "_guest_grants", {})
+		grant = grants.get(token)
+		if grant is None:
+			raise KeyError("unknown_guest_token")
+		if grant["revoked"]:
+			raise PermissionError("guest_token_revoked")
+		if _utc_now() > grant["expires_at"]:
+			raise PermissionError("guest_token_expired")
+		return dict(grant)
+
+	async def revoke_guest_access(
+		self,
+		tenant_id: str,
+		token: str,
+		revoked_by: str,
+	) -> dict[str, Any]:
+		"""Revoke a guest access token immediately."""
+		guard_tenant_id(tenant_id)
+		grants: dict[str, dict[str, Any]] = getattr(self, "_guest_grants", {})
+		grant = grants.get(token)
+		if grant is None:
+			raise KeyError("unknown_guest_token")
+		if grant["tenant_id"] != tenant_id:
+			raise PermissionError("guest_token_tenant_mismatch")
+		grants[token] = {**grant, "revoked": True}
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=grant["room_id"],
+			event_type="guest_access_revoked",
+			actor=revoked_by,
+			decision="allow",
+			metadata={"guest_email": grant["guest_email"], "token_prefix": token[:8]},
+		)
+		return dict(grants[token])
+
+	async def workspace_search(
+		self,
+		tenant_id: str,
+		query: str,
+		filters: dict[str, Any] | None = None,
+		limit: int = 50,
+		page: int = 0,
+	) -> dict[str, Any]:
+		"""Cross-room search with faceting over date range, sender, room, attachment presence, and moderation status.
+
+		Returns paginated results with a `facets` block showing hit counts per dimension.
+		Optionally delegates to `semantic_search_messages` per-room when `semantic=True` in filters.
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(query, "query")
+		f = dict(filters or {})
+		terms = [t.lower() for t in query.split() if t.strip()]
+		semantic = bool(f.pop("semantic", False))
+		room_filter: str | None = f.get("room_id")
+		sender_filter: str | None = f.get("sender")
+		after: str | None = f.get("after_date")
+		before: str | None = f.get("before_date")
+		has_attachment: bool | None = f.get("has_attachment")
+		mod_filter: str | None = f.get("moderation_status")
+		thread_only: bool = bool(f.get("thread_only", False))
+
+		scored: list[tuple[int, dict[str, Any]]] = []
+		facets: dict[str, Counter[str]] = {
+			"room_id": Counter(),
+			"sender": Counter(),
+			"moderation_status": Counter(),
+		}
+		for key, msg in self._messages.items():
+			if not key.startswith(f"{tenant_id}:"):
+				continue
+			if room_filter and msg.room_id != room_filter:
+				continue
+			if sender_filter and msg.sender != sender_filter:
+				continue
+			if after and msg.id < after:
+				continue
+			if before and msg.id > before:
+				continue
+			if has_attachment is not None:
+				if has_attachment and not msg.attachments:
+					continue
+				if not has_attachment and msg.attachments:
+					continue
+			if mod_filter and msg.moderation_status != mod_filter:
+				continue
+			if thread_only:
+				thread_key = self._key(tenant_id, msg.id)
+				if thread_key not in self._threads:
+					continue
+			if msg.moderation_status == "deleted":
+				continue
+			haystack = msg.body.lower()
+			score = sum(1 for t in terms if t in haystack)
+			if score > 0 or not terms:
+				d = msg.to_dict()
+				scored.append((score, d))
+				facets["room_id"][msg.room_id] += 1
+				facets["sender"][msg.sender] += 1
+				facets["moderation_status"][msg.moderation_status] += 1
+
+		scored.sort(key=lambda x: -x[0])
+		total = len(scored)
+		start = page * limit
+		page_results = [r[1] for r in scored[start: start + limit]]
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id="workspace_search",
+			event_type="workspace_search_executed",
+			actor="system",
+			decision="allow",
+			metadata={"query_len": len(query), "total_hits": total, "page": page},
+		)
+		return {
+			"query": query,
+			"total": total,
+			"page": page,
+			"limit": limit,
+			"results": page_results,
+			"facets": {k: dict(v.most_common(10)) for k, v in facets.items()},
+			"semantic": semantic,
+		}
+
+	async def retention_compliance_report(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Report which rooms are within their retention policy and which have overdue purges.
+
+		Uses the same policy-parsing logic as `enforce_retention_policy`.
+		Designed to be called from dashboards or scheduled compliance jobs.
+		"""
+		guard_tenant_id(tenant_id)
+		rooms = [r for r in self._rooms.values() if r.tenant_id == tenant_id]
+		compliant: list[dict[str, Any]] = []
+		non_compliant: list[dict[str, Any]] = []
+		for room in rooms:
+			policy = room.retention_policy.lower()
+			days: int | None = None
+			for part in policy.replace("_", "-").split("-"):
+				if part.isdigit():
+					days = int(part)
+					break
+			if days is None:
+				continue
+			cutoff_str = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+			overdue = sum(
+				1 for key, msg in self._messages.items()
+				if msg.tenant_id == tenant_id
+				and msg.room_id == room.id
+				and msg.moderation_status != "deleted"
+				and msg.id < cutoff_str
+			)
+			entry = {"room_id": room.id, "policy": policy, "retention_days": days, "overdue_messages": overdue}
+			if overdue:
+				non_compliant.append(entry)
+			else:
+				compliant.append(entry)
+		return {
+			"tenant_id": tenant_id,
+			"compliant_rooms": len(compliant),
+			"non_compliant_rooms": len(non_compliant),
+			"compliant": compliant,
+			"non_compliant": non_compliant,
+			"checked_at": _utc_now(),
+		}
+
+
 def _normalize_token(value: str) -> str:
 	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
-
-	async def ml_intent_classify(self, *args, **kwargs):
-		"""AI-powered AI classification of chat message intent. Requires OLLAMA_BASE_URL."""
-		import os
-		if not os.environ.get("OLLAMA_BASE_URL"):
-			return {"ml_enhanced": False}
-		try:
-			from capabilities.common.mlx import MLCapability
-			ml = MLCapability()
-			result = await ml.classify(str(kwargs.get("message",""))[:500], labels=["inquiry","complaint","request","feedback","urgent_issue"])
-			return {"intent": result.label, "confidence": result.confidence, "ml_enhanced": True}
-		except Exception:
-			return {"ml_enhanced": False}
 

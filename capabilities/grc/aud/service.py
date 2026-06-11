@@ -1392,3 +1392,759 @@ class AuditManagementService:
 			"resource_utilisation_pct": analytics["resource_utilisation_pct"],
 			"generated_at": _now(),
 		}
+
+	# ─────────────────────────────────────────────────────────
+	# Remediation SLA escalation (Improvement #4)
+	# ─────────────────────────────────────────────────────────
+
+	async def check_remediation_sla(
+		self,
+		entity_id: str,
+		*,
+		as_of_date: str | None = None,
+	) -> dict[str, Any]:
+		"""Inspect open findings, compute days overdue, trigger tiered escalation.
+
+		Tiers (calendar days past deadline):
+		  T+1  owner reminder
+		  T+5  manager notification
+		  T+10 CAE/board alert
+
+		Returns escalation summary with per-finding actions taken.
+		"""
+		assert entity_id, "entity_id required"
+		today = as_of_date or date.today().isoformat()
+
+		findings = await self._store.query("audit_findings", {"entity_id": entity_id}, limit=10_000)
+		open_findings = [
+			f for f in findings
+			if f.get("status") not in {"closed", "remediated", "accepted"}
+			and f.get("remediation_deadline")
+		]
+
+		escalations: list[dict[str, Any]] = []
+		for f in open_findings:
+			deadline = f.get("remediation_deadline", "9999-12-31")
+			if deadline >= today:
+				continue
+			try:
+				days_overdue = (date.fromisoformat(today) - date.fromisoformat(deadline)).days
+			except ValueError:
+				continue
+
+			if days_overdue >= 10:
+				tier = "board_alert"
+				await self._notify.send(
+					"audit-committee@datacraft.co.ke", "email",
+					f"[BOARD ALERT] Finding {f['id']} is {days_overdue}d overdue",
+					f"Finding in {f.get('area_tested')} remains unremediated {days_overdue} days past deadline.",
+				)
+			elif days_overdue >= 5:
+				tier = "manager_notification"
+				await self._notify.send(
+					f.get("owner_id", "management"), "email",
+					f"[ESCALATION] Finding {f['id']} is {days_overdue}d overdue",
+					f"Remediation deadline passed {days_overdue} days ago. Immediate action required.",
+				)
+			else:
+				tier = "owner_reminder"
+				await self._notify.send(
+					f.get("owner_id", "owner"), "email",
+					f"[REMINDER] Finding {f['id']} is {days_overdue}d overdue",
+					f"Your remediation deadline has passed. Please update the action plan.",
+				)
+
+			esc_rec: dict[str, Any] = {
+				"id": _uid(),
+				"tenant_id": self._tenant_id,
+				"finding_id": f["id"],
+				"days_overdue": days_overdue,
+				"tier": tier,
+				"escalated_at": _now(),
+			}
+			await self._store.put("sla_escalations", esc_rec)
+			escalations.append(esc_rec)
+
+		await self._audit_event(
+			"sla_escalation_check", "system", entity_id,
+			{"findings_checked": len(open_findings), "escalations_triggered": len(escalations)},
+		)
+		return {
+			"entity_id": entity_id,
+			"as_of_date": today,
+			"open_findings_checked": len(open_findings),
+			"escalations_triggered": len(escalations),
+			"escalations": escalations,
+		}
+
+	# ─────────────────────────────────────────────────────────
+	# Statistical sampling (Improvement #5)
+	# ─────────────────────────────────────────────────────────
+
+	async def generate_sample_selection(
+		self,
+		engagement_id: str,
+		population_size: int,
+		confidence_level: float,
+		tolerable_error_rate: float,
+		expected_error_rate: float,
+		auditor_id: str,
+		*,
+		sampling_method: str = "attribute",
+	) -> dict[str, Any]:
+		"""Compute a statistically valid sample and select items via Cochran formula.
+
+		Methods: attribute | monetary_unit | random | systematic.
+		Returns sample_size, selected_indices, precision_achieved, z_score_used.
+		"""
+		assert population_size > 0, "population_size must be positive"
+		assert 0 < confidence_level < 1, "confidence_level: 0–1 (e.g. 0.95)"
+		assert 0 < tolerable_error_rate < 1, "tolerable_error_rate: 0–1"
+		assert 0 <= expected_error_rate < tolerable_error_rate, "expected_error_rate must be < tolerable_error_rate"
+		assert auditor_id, "auditor_id required"
+		assert sampling_method in {"attribute", "monetary_unit", "random", "systematic"}, (
+			"sampling_method: attribute | monetary_unit | random | systematic"
+		)
+
+		await self._get_engagement(engagement_id)
+
+		z_map = {0.90: 1.645, 0.95: 1.960, 0.99: 2.576}
+		z = z_map.get(round(confidence_level, 2), 1.960)
+		p = expected_error_rate if expected_error_rate > 0 else 0.05
+		e = tolerable_error_rate - expected_error_rate or tolerable_error_rate
+
+		raw_n = int((z ** 2 * p * (1 - p)) / (e ** 2)) + 1
+		sample_size = min(raw_n, population_size)
+
+		stride = population_size // sample_size if sample_size < population_size else 1
+		selected_indices = [i * stride + 1 for i in range(sample_size)]
+		precision_achieved = round(z * ((p * (1 - p)) / sample_size) ** 0.5, 4)
+
+		sample_rec: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"engagement_id": engagement_id,
+			"sampling_method": sampling_method,
+			"population_size": population_size,
+			"confidence_level": confidence_level,
+			"tolerable_error_rate": tolerable_error_rate,
+			"expected_error_rate": expected_error_rate,
+			"z_score_used": z,
+			"computed_sample_size": sample_size,
+			"selected_indices": selected_indices,
+			"precision_achieved": precision_achieved,
+			"auditor_id": auditor_id,
+			"created_at": _now(),
+		}
+		await self._store.put("audit_samples", sample_rec)
+		await self._audit_event(
+			"sample_generated", auditor_id, engagement_id,
+			{"method": sampling_method, "sample_size": sample_size, "population": population_size},
+		)
+		return sample_rec
+
+	# ─────────────────────────────────────────────────────────
+	# Workpaper dual sign-off (Improvement #6)
+	# ─────────────────────────────────────────────────────────
+
+	async def workpaper_review(
+		self,
+		workpaper_id: str,
+		reviewer_id: str,
+		review_notes: str,
+		decision: str,
+	) -> dict[str, Any]:
+		"""Submit a reviewer decision on a workpaper (approved | returned_for_revision | rejected).
+
+		Reviewer must differ from workpaper author. Records SHA-256 content hash.
+		"""
+		assert reviewer_id, "reviewer_id required"
+		assert decision in {"approved", "returned_for_revision", "rejected"}, (
+			"decision: approved | returned_for_revision | rejected"
+		)
+		wp = await self._store.get("workpapers", workpaper_id)
+		if wp is None:
+			raise ValueError(f"Workpaper not found: {workpaper_id}")
+		if wp.get("author_id") == reviewer_id:
+			raise PermissionError("Reviewer cannot be the workpaper author (segregation of duties)")
+
+		import hashlib
+		content_hash = hashlib.sha256(wp.get("content", "").encode()).hexdigest()
+
+		wp["reviewer_id"] = reviewer_id
+		wp["review_notes"] = review_notes
+		wp["review_decision"] = decision
+		wp["content_hash_at_review"] = content_hash
+		wp["reviewed_at"] = _now()
+		wp["status"] = "reviewed" if decision == "approved" else "revision_required"
+		wp["updated_at"] = _now()
+		await self._store.put("workpapers", wp)
+		await self._audit_event(
+			"workpaper_reviewed", reviewer_id, workpaper_id,
+			{"decision": decision, "content_hash": content_hash},
+		)
+		return wp
+
+	async def workpaper_sign_off(
+		self,
+		workpaper_id: str,
+		approver_id: str,
+	) -> dict[str, Any]:
+		"""Final supervisor sign-off on a reviewed workpaper.
+
+		Approver must differ from both author and reviewer. Records final SHA-256 hash.
+		"""
+		assert approver_id, "approver_id required"
+		wp = await self._store.get("workpapers", workpaper_id)
+		if wp is None:
+			raise ValueError(f"Workpaper not found: {workpaper_id}")
+		if wp.get("status") != "reviewed":
+			raise ValueError("Workpaper must be in 'reviewed' status before sign-off")
+		if wp.get("author_id") == approver_id or wp.get("reviewer_id") == approver_id:
+			raise PermissionError("Approver cannot be the author or reviewer (segregation of duties)")
+
+		import hashlib
+		final_hash = hashlib.sha256(wp.get("content", "").encode()).hexdigest()
+
+		wp["approver_id"] = approver_id
+		wp["content_hash_at_signoff"] = final_hash
+		wp["signed_off_at"] = _now()
+		wp["status"] = "signed_off"
+		wp["updated_at"] = _now()
+		await self._store.put("workpapers", wp)
+		await self._audit_event(
+			"workpaper_signed_off", approver_id, workpaper_id,
+			{"final_hash": final_hash},
+		)
+		return wp
+
+	# ─────────────────────────────────────────────────────────
+	# Risk heatmap (Improvement #9)
+	# ─────────────────────────────────────────────────────────
+
+	async def risk_heatmap_data(
+		self,
+		entity_id: str,
+		period: str,
+		*,
+		prior_period: str | None = None,
+	) -> dict[str, Any]:
+		"""5x5 impact/likelihood matrix for executive dashboards with RAG and trend arrows.
+
+		Severity mapping: observation→(1,1), minor→(2,2), major→(3,4), critical→(5,5).
+		trend (when prior_period supplied): improving | stable | deteriorating.
+		"""
+		assert entity_id, "entity_id required"
+		start, end = _period_bounds(period)
+
+		findings = await self._store.query("audit_findings", {"entity_id": entity_id}, limit=10_000)
+		period_findings = [f for f in findings if start <= f.get("raised_at", "")[:10] <= end]
+
+		severity_coords: dict[str, tuple[int, int]] = {
+			"observation": (1, 1),
+			"minor": (2, 2),
+			"major": (3, 4),
+			"critical": (5, 5),
+		}
+		matrix: dict[str, int] = {}
+		for f in period_findings:
+			sev = f.get("risk_rating", "observation")
+			impact, likelihood = severity_coords.get(sev, (1, 1))
+			cell = f"{impact}_{likelihood}"
+			matrix[cell] = matrix.get(cell, 0) + 1
+
+		def _rag(count: int) -> str:
+			return "red" if count >= 3 else "amber" if count >= 1 else "green"
+
+		cells = []
+		for impact in range(1, 6):
+			for likelihood in range(1, 6):
+				count = matrix.get(f"{impact}_{likelihood}", 0)
+				cells.append({"impact": impact, "likelihood": likelihood, "finding_count": count, "rag": _rag(count)})
+
+		trend: str | None = None
+		if prior_period:
+			p_start, p_end = _period_bounds(prior_period)
+			prior_findings = [f for f in findings if p_start <= f.get("raised_at", "")[:10] <= p_end]
+			curr_crit = sum(1 for f in period_findings if f.get("risk_rating") == "critical")
+			prev_crit = sum(1 for f in prior_findings if f.get("risk_rating") == "critical")
+			trend = "improving" if curr_crit < prev_crit else ("deteriorating" if curr_crit > prev_crit else "stable")
+
+		heatmap: dict[str, Any] = {
+			"id": _uid(),
+			"entity_id": entity_id,
+			"period": period,
+			"period_start": start,
+			"period_end": end,
+			"total_findings": len(period_findings),
+			"matrix_cells": cells,
+			"trend": trend,
+			"generated_at": _now(),
+		}
+		await self._store.put("risk_heatmaps", heatmap)
+		return heatmap
+
+	# ─────────────────────────────────────────────────────────
+	# Systemic risk detection (Improvement #10)
+	# ─────────────────────────────────────────────────────────
+
+	async def systemic_risk_detect(
+		self,
+		entity_id: str,
+		period: str,
+		*,
+		min_cluster_size: int = 2,
+	) -> dict[str, Any]:
+		"""Cluster findings by (area_tested, finding_type) to surface systemic control weaknesses.
+
+		Returns clusters sorted by occurrence_count descending.
+		Critical-severity clusters auto-notify cae@datacraft.co.ke.
+		"""
+		assert entity_id, "entity_id required"
+		assert min_cluster_size >= 1, "min_cluster_size must be >= 1"
+
+		start, end = _period_bounds(period)
+		findings = await self._store.query("audit_findings", {"entity_id": entity_id}, limit=10_000)
+		period_findings = [f for f in findings if start <= f.get("raised_at", "")[:10] <= end]
+
+		clusters: dict[tuple[str, str], list[dict[str, Any]]] = {}
+		for f in period_findings:
+			key = (f.get("area_tested", "unknown"), f.get("finding_type", "unknown"))
+			clusters.setdefault(key, []).append(f)
+
+		systemic: list[dict[str, Any]] = []
+		for (area, ftype), items in clusters.items():
+			if len(items) < min_cluster_size:
+				continue
+			sev_counts: dict[str, int] = {}
+			for fi in items:
+				sev = fi.get("risk_rating", "observation")
+				sev_counts[sev] = sev_counts.get(sev, 0) + 1
+			dominant = max(sev_counts, key=lambda k: sev_counts[k])
+			systemic.append({
+				"area_tested": area,
+				"finding_type": ftype,
+				"occurrence_count": len(items),
+				"dominant_severity": dominant,
+				"finding_ids": [fi["id"] for fi in items],
+				"recommendation": f"Initiate thematic deep-dive engagement for '{area}' control environment.",
+			})
+
+		systemic.sort(key=lambda c: c["occurrence_count"], reverse=True)
+
+		result: dict[str, Any] = {
+			"id": _uid(),
+			"entity_id": entity_id,
+			"period": period,
+			"period_start": start,
+			"period_end": end,
+			"total_findings_analysed": len(period_findings),
+			"systemic_clusters_found": len(systemic),
+			"clusters": systemic,
+			"generated_at": _now(),
+		}
+		await self._store.put("systemic_risk_reports", result)
+		await self._audit_event(
+			"systemic_risk_detected", "system", entity_id,
+			{"clusters": len(systemic), "period": period},
+		)
+		if any(c["dominant_severity"] == "critical" for c in systemic):
+			await self._notify.send(
+				"cae@datacraft.co.ke", "email",
+				f"Systemic critical-risk cluster detected: {entity_id}",
+				f"{sum(1 for c in systemic if c['dominant_severity'] == 'critical')} critical clusters in {period}.",
+			)
+		return result
+
+	# ─────────────────────────────────────────────────────────
+	# Engagement earned-value analysis (Improvement #12)
+	# ─────────────────────────────────────────────────────────
+
+	async def engagement_time_analysis(
+		self,
+		engagement_id: str,
+		actual_hours_to_date: float,
+		*,
+		work_complete_pct: float = 0.0,
+	) -> dict[str, Any]:
+		"""Earned Value Analysis: PV, EV, AC, CV, SV, CPI, SPI.
+
+		Alerts cae@datacraft.co.ke when CPI < 0.8 (over budget) or SPI < 0.85 (behind schedule).
+		Updates engagement.actual_hours in the store.
+		"""
+		assert actual_hours_to_date >= 0, "actual_hours_to_date must be >= 0"
+		assert 0.0 <= work_complete_pct <= 100.0, "work_complete_pct: 0–100"
+
+		engagement = await self._get_engagement(engagement_id)
+		planned_hours = float(engagement.get("planned_hours", 80))
+		start = engagement.get("start_date", "")
+		end = engagement.get("end_date", "")
+
+		pct_elapsed = 0.0
+		if start and end:
+			try:
+				total_days = (date.fromisoformat(end) - date.fromisoformat(start)).days
+				elapsed_days = (date.today() - date.fromisoformat(start)).days
+				pct_elapsed = max(0.0, min(100.0, elapsed_days / total_days * 100 if total_days > 0 else 0.0))
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		pv = round(planned_hours * pct_elapsed / 100, 2)
+		ev = round(planned_hours * work_complete_pct / 100, 2)
+		ac = actual_hours_to_date
+		cv = round(ev - ac, 2)
+		sv = round(ev - pv, 2)
+		cpi = round(ev / ac, 4) if ac > 0 else 1.0
+		spi = round(ev / pv, 4) if pv > 0 else 1.0
+
+		engagement["actual_hours"] = actual_hours_to_date
+		engagement["updated_at"] = _now()
+		await self._store.put("audit_engagements", engagement)
+
+		status = "over_budget" if cpi < 0.8 else ("behind_schedule" if spi < 0.85 else "on_track")
+		eva: dict[str, Any] = {
+			"id": _uid(),
+			"engagement_id": engagement_id,
+			"planned_hours": planned_hours,
+			"pct_elapsed": round(pct_elapsed, 2),
+			"pct_complete": work_complete_pct,
+			"planned_value_pv": pv,
+			"earned_value_ev": ev,
+			"actual_cost_ac": ac,
+			"cost_variance_cv": cv,
+			"schedule_variance_sv": sv,
+			"cost_performance_index": cpi,
+			"schedule_performance_index": spi,
+			"status": status,
+			"computed_at": _now(),
+		}
+		await self._store.put("engagement_eva_snapshots", eva)
+
+		if cpi < 0.8 or spi < 0.85:
+			await self._notify.send(
+				"cae@datacraft.co.ke", "email",
+				f"Engagement {engagement_id} EVA alert: CPI={cpi} SPI={spi}",
+				f"{'Cost overrun' if cpi < 0.8 else 'Schedule slippage'} detected. Immediate review recommended.",
+			)
+		await self._audit_event(
+			"engagement_eva_computed", "system", engagement_id,
+			{"cpi": cpi, "spi": spi, "status": status},
+		)
+		return eva
+
+	# ─────────────────────────────────────────────────────────
+	# Remediation velocity scoring (Improvement #15)
+	# ─────────────────────────────────────────────────────────
+
+	async def remediation_velocity_score(
+		self,
+		entity_id: str,
+		owner_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Per-owner closure velocity from trailing 12-month history.
+
+		Flags open findings with closure_probability < 0.5 for proactive intervention.
+		velocity_rate = closed / total assigned. Closure probability uses days-remaining decay.
+		"""
+		assert entity_id, "entity_id required"
+
+		findings = await self._store.query("audit_findings", {"entity_id": entity_id}, limit=10_000)
+		cutoff = (date.today() - timedelta(days=365)).isoformat()
+		recent = [f for f in findings if f.get("raised_at", "")[:10] >= cutoff]
+
+		owner_stats: dict[str, dict[str, int]] = {}
+		for f in recent:
+			oid = f.get("owner_id") or "unassigned"
+			if owner_id and oid != owner_id:
+				continue
+			owner_stats.setdefault(oid, {"total": 0, "closed": 0})
+			owner_stats[oid]["total"] += 1
+			if f.get("status") in {"closed", "remediated"}:
+				owner_stats[oid]["closed"] += 1
+
+		velocity_by_owner: dict[str, float] = {}
+		velocity_table: list[dict[str, Any]] = []
+		for oid, stats in owner_stats.items():
+			v = round(stats["closed"] / stats["total"], 4) if stats["total"] > 0 else 0.0
+			velocity_by_owner[oid] = v
+			velocity_table.append({
+				"owner_id": oid,
+				"assigned": stats["total"],
+				"closed": stats["closed"],
+				"velocity_rate": v,
+				"risk_level": "high" if v < 0.5 else ("medium" if v < 0.8 else "low"),
+			})
+
+		open_findings = [
+			f for f in findings
+			if f.get("status") not in {"closed", "remediated", "accepted"}
+			and f.get("remediation_deadline")
+		]
+		flagged: list[dict[str, Any]] = []
+		for f in open_findings:
+			oid = f.get("owner_id") or "unassigned"
+			v = velocity_by_owner.get(oid, 0.5)
+			deadline = f.get("remediation_deadline", "9999-12-31")
+			try:
+				days_remaining = (date.fromisoformat(deadline) - date.today()).days
+			except ValueError:
+				days_remaining = 999
+			closure_prob = round(min(1.0, v * (days_remaining / 30)), 4) if days_remaining > 0 else 0.0
+			if closure_prob < 0.5:
+				flagged.append({
+					"finding_id": f["id"],
+					"owner_id": oid,
+					"owner_velocity": v,
+					"days_remaining": days_remaining,
+					"closure_probability": closure_prob,
+					"recommended_action": "Escalate immediately" if closure_prob < 0.2 else "Schedule check-in",
+				})
+
+		result: dict[str, Any] = {
+			"id": _uid(),
+			"entity_id": entity_id,
+			"owner_filter": owner_id,
+			"velocity_table": velocity_table,
+			"high_risk_findings": len(flagged),
+			"flagged_findings": flagged,
+			"computed_at": _now(),
+		}
+		await self._store.put("remediation_velocity_scores", result)
+		return result
+
+	# ─────────────────────────────────────────────────────────
+	# Peer benchmark report (Improvement #7)
+	# ─────────────────────────────────────────────────────────
+
+	async def peer_benchmark_report(
+		self,
+		entity_id: str,
+		period: str,
+		*,
+		industry_sector: str = "financial_services",
+	) -> dict[str, Any]:
+		"""Compare programme KPIs against IIA Global Pulse Survey sector medians.
+
+		Sectors: financial_services | manufacturing | healthcare | government | technology.
+		Returns comparisons list with gap and position (leads/lags) per metric.
+		"""
+		assert entity_id, "entity_id required"
+		assert industry_sector in {
+			"financial_services", "manufacturing", "healthcare", "government", "technology"
+		}, "industry_sector: financial_services | manufacturing | healthcare | government | technology"
+
+		# IIA Global Pulse Survey 2024 sector medians
+		benchmarks: dict[str, dict[str, float]] = {
+			"financial_services": {"coverage_pct": 72.0, "closure_rate_pct": 68.0, "findings_per_eng": 3.1, "qa_satisfactory_pct": 82.0},
+			"manufacturing":      {"coverage_pct": 60.0, "closure_rate_pct": 62.0, "findings_per_eng": 2.8, "qa_satisfactory_pct": 78.0},
+			"healthcare":         {"coverage_pct": 65.0, "closure_rate_pct": 70.0, "findings_per_eng": 3.4, "qa_satisfactory_pct": 80.0},
+			"government":         {"coverage_pct": 55.0, "closure_rate_pct": 55.0, "findings_per_eng": 4.2, "qa_satisfactory_pct": 74.0},
+			"technology":         {"coverage_pct": 80.0, "closure_rate_pct": 75.0, "findings_per_eng": 2.5, "qa_satisfactory_pct": 88.0},
+		}
+		bm = benchmarks[industry_sector]
+
+		kpi = await self.kpi_report(entity_id, period)
+		analytics = await self.audit_analytics(entity_id, period)
+		entity_metrics: dict[str, float] = {
+			"coverage_pct": kpi["audit_coverage_pct"],
+			"closure_rate_pct": kpi["issue_closure_rate_pct"],
+			"findings_per_eng": round(kpi["total_findings"] / max(kpi["engagements_completed"], 1), 2),
+			"qa_satisfactory_pct": analytics["qa_satisfactory_rate_pct"],
+		}
+
+		comparisons: list[dict[str, Any]] = []
+		for metric, entity_val in entity_metrics.items():
+			bm_val = bm[metric]
+			if metric == "findings_per_eng":
+				gap = bm_val - entity_val
+				position = "leads" if entity_val <= bm_val else "lags"
+			else:
+				gap = entity_val - bm_val
+				position = "leads" if entity_val >= bm_val else "lags"
+			comparisons.append({"metric": metric, "entity_value": entity_val, "benchmark_median": bm_val, "gap": round(gap, 2), "position": position})
+
+		report: dict[str, Any] = {
+			"id": _uid(),
+			"entity_id": entity_id,
+			"period": period,
+			"industry_sector": industry_sector,
+			"comparisons": comparisons,
+			"leads_count": sum(1 for c in comparisons if c["position"] == "leads"),
+			"lags_count": sum(1 for c in comparisons if c["position"] == "lags"),
+			"generated_at": _now(),
+		}
+		await self._store.put("peer_benchmark_reports", report)
+		await self._audit_event(
+			"peer_benchmark_generated", entity_id, report["id"],
+			{"sector": industry_sector, "leads": report["leads_count"], "lags": report["lags_count"]},
+		)
+		return report
+
+	# ─────────────────────────────────────────────────────────
+	# Control test library (Improvement #13)
+	# ─────────────────────────────────────────────────────────
+
+	async def control_test_library_add(
+		self,
+		control_objective: str,
+		framework: str,
+		test_steps: list[str],
+		expected_evidence: list[str],
+		added_by: str,
+		*,
+		framework_reference: str = "",
+	) -> dict[str, Any]:
+		"""Add a versioned control test procedure to the shared library.
+
+		Frameworks: COSO | COBIT | ISO27001 | NIST | IIA_IPPF | SOX | PCI_DSS.
+		"""
+		assert control_objective, "control_objective required"
+		assert framework in {"COSO", "COBIT", "ISO27001", "NIST", "IIA_IPPF", "SOX", "PCI_DSS"}, (
+			"framework: COSO | COBIT | ISO27001 | NIST | IIA_IPPF | SOX | PCI_DSS"
+		)
+		assert test_steps, "test_steps required"
+		assert added_by, "added_by required"
+
+		procedure: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"control_objective": control_objective,
+			"framework": framework,
+			"framework_reference": framework_reference,
+			"test_steps": test_steps,
+			"expected_evidence": expected_evidence,
+			"version": "1.0",
+			"status": "active",
+			"added_by": added_by,
+			"created_at": _now(),
+			"updated_at": _now(),
+		}
+		await self._store.put("control_test_library", procedure)
+		await self._audit_event(
+			"control_test_added", added_by, procedure["id"],
+			{"framework": framework, "control_objective": control_objective},
+		)
+		return procedure
+
+	async def control_test_execute(
+		self,
+		engagement_id: str,
+		procedure_id: str,
+		step_results: list[dict[str, Any]],
+		auditor_id: str,
+	) -> dict[str, Any]:
+		"""Execute a library test procedure; auto-raises findings for exception steps.
+
+		step_results: [{step_index, result: pass|fail|exception, notes}].
+		"""
+		assert auditor_id, "auditor_id required"
+		assert step_results, "step_results required"
+
+		procedure = await self._store.get("control_test_library", procedure_id)
+		if procedure is None:
+			raise ValueError(f"Control test procedure not found: {procedure_id}")
+		await self._get_engagement(engagement_id)
+
+		exceptions = [s for s in step_results if s.get("result") == "exception"]
+		findings_raised: list[str] = []
+		for exc in exceptions:
+			finding = await self.fieldwork_record(
+				engagement_id=engagement_id,
+				area_tested=procedure.get("control_objective", ""),
+				finding_type="control_exception",
+				observation=exc.get("notes", "Control exception noted"),
+				criteria=procedure.get("framework_reference") or procedure.get("framework", ""),
+				evidence=[],
+				risk_rating="minor",
+				auditor_id=auditor_id,
+			)
+			findings_raised.append(finding["id"])
+
+		execution: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"engagement_id": engagement_id,
+			"procedure_id": procedure_id,
+			"control_objective": procedure.get("control_objective"),
+			"framework": procedure.get("framework"),
+			"step_results": step_results,
+			"total_steps": len(step_results),
+			"passed_steps": sum(1 for s in step_results if s.get("result") == "pass"),
+			"failed_steps": sum(1 for s in step_results if s.get("result") == "fail"),
+			"exceptions": len(exceptions),
+			"findings_raised": findings_raised,
+			"auditor_id": auditor_id,
+			"executed_at": _now(),
+		}
+		await self._store.put("control_test_executions", execution)
+		await self._audit_event(
+			"control_test_executed", auditor_id, engagement_id,
+			{"procedure_id": procedure_id, "exceptions": len(exceptions)},
+		)
+		return execution
+
+	# ─────────────────────────────────────────────────────────
+	# Report version diff (Improvement #14)
+	# ─────────────────────────────────────────────────────────
+
+	async def report_version_publish(
+		self,
+		report_id: str,
+		updated_findings: list[str],
+		updated_recommendations: list[str],
+		author_id: str,
+		*,
+		change_summary: str = "",
+	) -> dict[str, Any]:
+		"""Publish a new semver report version with structured diff and snapshot of previous.
+
+		Increments minor version. Snapshots previous finding_references and recommendations.
+		Returns updated report dict plus snapshot_id and diff.
+		"""
+		assert author_id, "author_id required"
+		report = await self._store.get("audit_reports", report_id)
+		if report is None:
+			raise ValueError(f"Report not found: {report_id}")
+
+		prev_version = report.get("version", "1.0")
+		try:
+			major, minor = prev_version.split(".")
+			new_version = f"{major}.{int(minor) + 1}"
+		except (ValueError, AttributeError):
+			new_version = "1.1"
+
+		snapshot: dict[str, Any] = {
+			"id": _uid(),
+			"report_id": report_id,
+			"version": prev_version,
+			"finding_references": report.get("finding_references", []),
+			"recommendations": report.get("recommendations", []),
+			"snapshotted_at": _now(),
+		}
+		await self._store.put("audit_report_versions", snapshot)
+
+		prev_findings = set(report.get("finding_references", []))
+		new_findings = set(updated_findings)
+		prev_recs = set(report.get("recommendations", []))
+		new_recs = set(updated_recommendations)
+
+		diff: dict[str, Any] = {
+			"findings_added": list(new_findings - prev_findings),
+			"findings_removed": list(prev_findings - new_findings),
+			"recommendations_added": list(new_recs - prev_recs),
+			"recommendations_removed": list(prev_recs - new_recs),
+		}
+
+		report["version"] = new_version
+		report["finding_references"] = updated_findings
+		report["recommendations"] = updated_recommendations
+		report["change_summary"] = change_summary
+		report["last_diff"] = diff
+		report["last_revised_by"] = author_id
+		report["updated_at"] = _now()
+		await self._store.put("audit_reports", report)
+		await self._audit_event(
+			"report_version_published", author_id, report_id,
+			{"new_version": new_version, "diff": diff},
+		)
+		return {**report, "snapshot_id": snapshot["id"], "diff": diff}

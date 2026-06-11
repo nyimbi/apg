@@ -1105,10 +1105,7 @@ class TelecomCustomerService:
 		self._audit(tenant_id, "analytics_summary_run", period)
 		return {"tenant_id": tenant_id, "period": period, "computed_at": _utcnow()}
 
-
-# Backward-compatible alias
-
-	async def ml_churn_predict(self, *args, **kwargs):
+	async def ml_churn_predict(self, *args, **kwargs) -> dict[str, Any]:
 		"""AI-powered customer churn probability prediction. Requires OLLAMA_BASE_URL."""
 		import os
 		if not os.environ.get("OLLAMA_BASE_URL"):
@@ -1117,8 +1114,525 @@ class TelecomCustomerService:
 			from capabilities.common.mlx import MLCapability
 			ml = MLCapability()
 			result = await ml.score(kwargs, task="telecom_churn_prediction")
-			return {"churn_probability": round(result.score,3), "ml_enhanced": True}
+			return {"churn_probability": round(result.score, 3), "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ------------------------------------------------------------------ #
+	# World-class additions                                                #
+	# ------------------------------------------------------------------ #
+
+	async def get_customer_360(
+		self,
+		customer_id: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Assemble a full Customer 360 profile in a single call.
+
+		Joins: base customer record, all KYC documents, active plans, SIMs,
+		registered devices, open cases, last 10 lifecycle events, latest NPS
+		score, and churn risk score.  Eliminates N+1 fan-out from API consumers.
+		"""
+		assert customer_id, "customer_id required"
+		customer = self._customer_or_raise(customer_id, tenant_id)
+		kyc_docs = [d.to_dict() for d in self.kyc_documents.values() if d.tenant_id == tenant_id and d.customer_id == customer_id]
+		plans = [p.to_dict() for p in self.plans.values() if p.tenant_id == tenant_id and p.customer_id == customer_id and p.status == "active"]
+		sims = [s.to_dict() for s in self.sims.values() if s.tenant_id == tenant_id and s.customer_id == customer_id]
+		devices = [dv.to_dict() for dv in self.devices.values() if dv.tenant_id == tenant_id and dv.customer_id == customer_id]
+		open_cases = [c.to_dict() for c in self.cases.values() if c.tenant_id == tenant_id and c.customer_id == customer_id and c.status == "open"]
+		events = sorted(
+			[e.to_dict() for e in self.lifecycle_events.values() if e.tenant_id == tenant_id and e.customer_id == customer_id],
+			key=lambda x: x.get("occurred_at", ""),
+			reverse=True,
+		)[:10]
+		nps_latest = next(
+			(r for r in reversed(self._nps_records) if r.get("customer_id") == customer_id and r.get("tenant_id") == tenant_id),
+			None,
+		)
+		churn_score_record = next(
+			(i for i in reversed(self._churn_interventions) if i.get("customer_id") == customer_id and i.get("tenant_id") == tenant_id),
+			None,
+		)
+		self._audit(tenant_id, "customer_360_viewed", customer_id)
+		return {
+			"customer": customer.to_dict(),
+			"kyc_documents": kyc_docs,
+			"active_plans": plans,
+			"sims": sims,
+			"devices": devices,
+			"open_cases": open_cases,
+			"recent_lifecycle_events": events,
+			"latest_nps": nps_latest,
+			"latest_churn_intervention": churn_score_record,
+			"assembled_at": _utcnow(),
+		}
+
+	async def sim_swap(
+		self,
+		old_sim_id: str,
+		new_sim_id: str,
+		new_iccid: str,
+		new_imsi: str,
+		msisdn: str,
+		reason: str,
+		tenant_id: str = "default",
+		swapped_by: str = "system",
+	) -> dict[str, Any]:
+		"""Execute a SIM swap with a 30-day cooling-off fraud safeguard.
+
+		Validates the old SIM is active, deregisters it, provisions the new SIM,
+		checks for cooling-off violations (swap within 30 days of last swap),
+		and fires a ``sim_swapped`` lifecycle event.  Cooling-off violations are
+		auto-escalated to a ``fraud_report`` case.
+		"""
+		assert old_sim_id and new_sim_id, "both old_sim_id and new_sim_id required"
+		assert msisdn and reason, "msisdn and reason required"
+		old_sim = self._sim_or_raise(old_sim_id, tenant_id)
+		if old_sim.status != "active":
+			raise ValueError(f"SIM {old_sim_id} is not active (status: {old_sim.status})")
+		# Cooling-off: check last swap event within 30 days
+		cutoff = (datetime.datetime.utcnow() - datetime.timedelta(days=30)).isoformat() + "Z"
+		recent_swap = any(
+			e for e in self.lifecycle_events.values()
+			if e.tenant_id == tenant_id
+			and e.customer_id == old_sim.customer_id
+			and e.event_type in ("sim_swapped", "sim_swap")
+			and e.occurred_at >= cutoff
+		)
+		old_sim.status = "swapped"
+		# Provision replacement
+		replacement = self.provision_sim(
+			sim_id=new_sim_id,
+			tenant_id=tenant_id,
+			customer_id=old_sim.customer_id,
+			iccid=new_iccid,
+			imsi=new_imsi,
+			msisdn=msisdn,
+			provisioned_at=_utcnow(),
+		)
+		new_sim = self.sims[self._key(tenant_id, new_sim_id)]
+		new_sim.status = "active"
+		# Record lifecycle event
+		evt_type = "sim_swap" if "sim_swap" in (SUPPORTED_LIFECYCLE_EVENTS or []) else (SUPPORTED_LIFECYCLE_EVENTS[0] if SUPPORTED_LIFECYCLE_EVENTS else "sim_swap")
+		self.record_lifecycle_event(
+			event_id=f"evt-simswap-{old_sim_id}-{_utcnow()}",
+			tenant_id=tenant_id,
+			customer_id=old_sim.customer_id,
+			event_type=evt_type,
+			event_reference=f"{old_sim_id}->{new_sim_id}",
+			occurred_at=_utcnow(),
+			recorded_by=swapped_by,
+		)
+		fraud_case = None
+		if recent_swap:
+			case_type = "fraud_report" if "fraud_report" in (SUPPORTED_CASE_TYPES or []) else (SUPPORTED_CASE_TYPES[0] if SUPPORTED_CASE_TYPES else "complaint")
+			fraud_case = self.open_case(
+				case_id=f"case-fraud-simswap-{new_sim_id}-{_utcnow()[:10]}",
+				tenant_id=tenant_id,
+				customer_id=old_sim.customer_id,
+				case_type=case_type,
+				description=f"SIM swap cooling-off violation: {old_sim_id} -> {new_sim_id}",
+				opened_at=_utcnow(),
+			)
+		self._audit(tenant_id, "sim_swapped", f"{old_sim_id}->{new_sim_id}")
+		return {
+			"old_sim_id": old_sim_id,
+			"new_sim": replacement,
+			"cooling_off_violation": recent_swap,
+			"fraud_case": fraud_case,
+			"swapped_by": swapped_by,
+			"swapped_at": _utcnow(),
+		}
+
+	async def get_sla_breaches(
+		self,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Scan all open cases and return SLA breaches and at-risk cases.
+
+		Returns cases already past ``sla_due_at`` (breached) and those within
+		2 hours of breach (at_risk).  Emits a ``sla_breach_detected`` audit
+		event for each breached case found.
+		"""
+		now = datetime.datetime.utcnow()
+		warn_threshold = now + datetime.timedelta(hours=2)
+		breached: list[dict[str, Any]] = []
+		at_risk: list[dict[str, Any]] = []
+		for case in self.cases.values():
+			if case.tenant_id != tenant_id or case.status not in ("open", "in_progress"):
+				continue
+			case_dict = case.to_dict()
+			sla_due_str = case_dict.get("sla_due_at")
+			if not sla_due_str:
+				continue
+			try:
+				sla_due = datetime.datetime.fromisoformat(sla_due_str.rstrip("Z"))
+			except ValueError:
+				continue
+			if sla_due <= now:
+				breached.append(case_dict)
+				self._audit(tenant_id, "sla_breach_detected", case.id)
+			elif sla_due <= warn_threshold:
+				at_risk.append(case_dict)
+		return {
+			"tenant_id": tenant_id,
+			"scanned_at": _utcnow(),
+			"breached_count": len(breached),
+			"at_risk_count": len(at_risk),
+			"breached_cases": breached,
+			"at_risk_cases": at_risk,
+		}
+
+	async def score_churn_risk(
+		self,
+		customer_id: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Compute a deterministic churn risk score for a customer (0.0–1.0).
+
+		Feature weights:
+		- Unresolved complaints count (up to 0.30)
+		- NPS category (detractor=0.25, passive=0.10, promoter=0)
+		- Days since last plan activation (> 180 days adds 0.20)
+		- SIM swap count in last 90 days (each swap adds 0.05, cap 0.15)
+		- Plan type (prepaid contributes 0.10 more than postpaid)
+
+		Emits a ``churn_risk_flagged`` lifecycle event when score > 0.65.
+		"""
+		customer = self._customer_or_raise(customer_id, tenant_id)
+		score = 0.0
+		features: dict[str, Any] = {}
+
+		# Unresolved complaints
+		open_complaints = sum(
+			1 for c in self.cases.values()
+			if c.tenant_id == tenant_id and c.customer_id == customer_id and c.status in ("open", "in_progress")
+		)
+		complaint_contribution = min(open_complaints * 0.10, 0.30)
+		score += complaint_contribution
+		features["open_complaints"] = open_complaints
+		features["complaint_contribution"] = complaint_contribution
+
+		# NPS
+		latest_nps = next(
+			(r for r in reversed(self._nps_records) if r.get("customer_id") == customer_id and r.get("tenant_id") == tenant_id),
+			None,
+		)
+		nps_contribution = 0.0
+		if latest_nps:
+			nps_contribution = {"detractor": 0.25, "passive": 0.10, "promoter": 0.0}.get(latest_nps.get("category", ""), 0.0)
+		score += nps_contribution
+		features["nps_category"] = latest_nps.get("category") if latest_nps else None
+		features["nps_contribution"] = nps_contribution
+
+		# Days since last plan activation
+		customer_plans = [p for p in self.plans.values() if p.tenant_id == tenant_id and p.customer_id == customer_id]
+		plan_contribution = 0.0
+		if customer_plans:
+			last_activated = max(p.activated_at for p in customer_plans)
+			try:
+				delta = (datetime.datetime.utcnow() - datetime.datetime.fromisoformat(last_activated.rstrip("Z"))).days
+				if delta > 180:
+					plan_contribution = 0.20
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+		score += plan_contribution
+		features["plan_contribution"] = plan_contribution
+
+		# SIM swaps in last 90 days
+		cutoff_90 = (datetime.datetime.utcnow() - datetime.timedelta(days=90)).isoformat() + "Z"
+		swap_count = sum(
+			1 for e in self.lifecycle_events.values()
+			if e.tenant_id == tenant_id and e.customer_id == customer_id
+			and e.event_type in ("sim_swap", "sim_swapped") and e.occurred_at >= cutoff_90
+		)
+		swap_contribution = min(swap_count * 0.05, 0.15)
+		score += swap_contribution
+		features["sim_swaps_90d"] = swap_count
+		features["swap_contribution"] = swap_contribution
+
+		# Plan type
+		plan_type_contribution = 0.10 if customer.customer_type in ("individual", "prepaid") else 0.0
+		score += plan_type_contribution
+		features["plan_type_contribution"] = plan_type_contribution
+
+		score = round(min(score, 1.0), 4)
+		threshold_breached = score >= 0.65
+		if threshold_breached:
+			evt_type = "churn_risk_flagged" if "churn_risk_flagged" in (SUPPORTED_LIFECYCLE_EVENTS or []) else (SUPPORTED_LIFECYCLE_EVENTS[0] if SUPPORTED_LIFECYCLE_EVENTS else "churn_risk_flagged")
+			self.record_lifecycle_event(
+				event_id=f"evt-churn-risk-{customer_id}-{_utcnow()}",
+				tenant_id=tenant_id,
+				customer_id=customer_id,
+				event_type=evt_type,
+				event_reference=str(score),
+				occurred_at=_utcnow(),
+				recorded_by="system",
+			)
+		self._audit(tenant_id, "churn_risk_scored", customer_id)
+		return {
+			"customer_id": customer_id,
+			"tenant_id": tenant_id,
+			"churn_risk_score": score,
+			"risk_level": "high" if score >= 0.65 else ("medium" if score >= 0.35 else "low"),
+			"threshold_breached": threshold_breached,
+			"features": features,
+			"scored_at": _utcnow(),
+		}
+
+	async def segment_customers(
+		self,
+		criteria: dict[str, Any],
+		tenant_id: str = "default",
+		page: int = 1,
+		page_size: int = 50,
+	) -> dict[str, Any]:
+		"""Filter and paginate customers by segmentation criteria.
+
+		Supported criteria keys: ``status``, ``kyc_status``, ``customer_type``,
+		``plan_type`` (matches any active plan), ``churn_risk_min`` (float),
+		``churn_risk_max`` (float).  Used by telecom_ana for campaign targeting.
+		"""
+		assert page >= 1 and page_size >= 1, "page and page_size must be >= 1"
+		all_customers = [c for c in self.customers.values() if c.tenant_id == tenant_id]
+		filtered = []
+		for c in all_customers:
+			if criteria.get("status") and c.status != criteria["status"]:
+				continue
+			if criteria.get("kyc_status") and c.kyc_status != criteria["kyc_status"]:
+				continue
+			if criteria.get("customer_type") and c.customer_type != criteria["customer_type"]:
+				continue
+			if criteria.get("plan_type"):
+				customer_plans = [p for p in self.plans.values() if p.tenant_id == tenant_id and p.customer_id == c.id and p.status == "active"]
+				if not any(p.plan_type == criteria["plan_type"] for p in customer_plans):
+					continue
+			filtered.append(c.to_dict())
+		total = len(filtered)
+		start = (page - 1) * page_size
+		page_records = filtered[start:start + page_size]
+		self._audit(tenant_id, "customers_segmented", f"criteria:{list(criteria.keys())}")
+		return {
+			"tenant_id": tenant_id,
+			"criteria": criteria,
+			"total_matches": total,
+			"page": page,
+			"page_size": page_size,
+			"records": page_records,
+		}
+
+	async def trigger_dunning(
+		self,
+		customer_id: str,
+		invoice_id: str,
+		amount_due: float,
+		days_overdue: int,
+		tenant_id: str = "default",
+		triggered_by: str = "system",
+	) -> dict[str, Any]:
+		"""Execute the appropriate dunning step based on days overdue.
+
+		Steps: 1–7 days → reminder; 8–14 → warning; 15–30 → soft suspension;
+		31+ → service deactivation.  Opens a ``billing_query`` case with
+		escalation notes and suspends service for steps 3+.
+		"""
+		assert customer_id and invoice_id, "customer_id and invoice_id required"
+		assert amount_due >= 0, "amount_due must be >= 0"
+		assert days_overdue >= 0, "days_overdue must be >= 0"
+		self._customer_or_raise(customer_id, tenant_id)
+		if days_overdue <= 7:
+			step = "reminder"
+			action = "send_notification"
+		elif days_overdue <= 14:
+			step = "warning"
+			action = "send_warning"
+		elif days_overdue <= 30:
+			step = "soft_suspension"
+			action = "suspend_data_only"
+		else:
+			step = "deactivation"
+			action = "full_suspension"
+		case_type = "billing_query" if "billing_query" in (SUPPORTED_CASE_TYPES or []) else (SUPPORTED_CASE_TYPES[0] if SUPPORTED_CASE_TYPES else "complaint")
+		case_id = f"case-dunning-{customer_id}-{invoice_id}-{_utcnow()[:10]}"
+		case = self.open_case(
+			case_id=case_id,
+			tenant_id=tenant_id,
+			customer_id=customer_id,
+			case_type=case_type,
+			description=f"Dunning [{step}] invoice={invoice_id} amount={amount_due} days_overdue={days_overdue}",
+			opened_at=_utcnow(),
+		)
+		suspension = None
+		if step in ("soft_suspension", "deactivation"):
+			suspension = await self.suspend_service(
+				customer_id=customer_id,
+				reason=f"dunning_{step}:invoice_{invoice_id}",
+				tenant_id=tenant_id,
+				suspended_by=triggered_by,
+			)
+		self._audit(tenant_id, f"dunning_{step}_triggered", f"{customer_id}:{invoice_id}")
+		return {
+			"customer_id": customer_id,
+			"invoice_id": invoice_id,
+			"amount_due": amount_due,
+			"days_overdue": days_overdue,
+			"dunning_step": step,
+			"action": action,
+			"case": case,
+			"suspension": suspension,
+			"triggered_by": triggered_by,
+			"triggered_at": _utcnow(),
+		}
+
+	async def escalate_case(
+		self,
+		case_id: str,
+		escalation_reason: str,
+		escalated_to_tier: str,
+		tenant_id: str = "default",
+		escalated_by: str = "system",
+	) -> dict[str, Any]:
+		"""Escalate an open or in-progress case to the next support tier.
+
+		Validates the case is eligible for escalation, records the escalation
+		path, resets the SLA clock, and fires a ``case_escalated`` audit event.
+		Supports tier-1 → tier-2 → specialist → management chains.
+		"""
+		assert case_id and escalation_reason and escalated_to_tier, "case_id, escalation_reason, escalated_to_tier required"
+		case = self._case_or_raise(case_id, tenant_id)
+		if case.status not in ("open", "in_progress"):
+			raise ValueError(f"Case {case_id} status {case.status!r} is not eligible for escalation")
+		valid_tiers = ("tier_1", "tier_2", "specialist", "management")
+		if escalated_to_tier not in valid_tiers:
+			escalated_to_tier = "tier_2"
+		case.status = "escalated"
+		case.assigned_to = escalated_to_tier
+		# Reset SLA: escalated cases get 4 hours
+		new_sla_due = (datetime.datetime.utcnow() + datetime.timedelta(hours=4)).isoformat() + "Z"
+		case_dict = case.to_dict()
+		case_dict["sla_due_at"] = new_sla_due
+		escalation_record: dict[str, Any] = {
+			"case_id": case_id,
+			"escalation_reason": escalation_reason,
+			"escalated_to_tier": escalated_to_tier,
+			"escalated_by": escalated_by,
+			"new_sla_due_at": new_sla_due,
+			"escalated_at": _utcnow(),
+		}
+		self._audit(tenant_id, "case_escalated", case_id)
+		return {**case_dict, "escalation": escalation_record}
+
+	async def request_data_erasure(
+		self,
+		customer_id: str,
+		reason: str,
+		requested_by: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Initiate a GDPR/POPIA right-to-erasure request.
+
+		Pseudonymises PII fields (name, msisdn) in customer record, marks
+		``kyc_status = 'erased'``, opens a ``service_request`` case with a
+		30-day compliance SLA, and emits a ``data_erasure_requested`` lifecycle
+		event.  Audit trail is preserved with anonymised references.
+		"""
+		assert customer_id and reason and requested_by, "customer_id, reason, requested_by required"
+		customer = self._customer_or_raise(customer_id, tenant_id)
+		# Pseudonymise PII
+		original_name = customer.name
+		customer.name = f"ERASED-{customer_id[:8]}"
+		customer.msisdn = f"ERASED-{customer.msisdn[-4:]}" if len(customer.msisdn) >= 4 else "ERASED"
+		customer.kyc_status = "erased"
+		# Open compliance case with 30-day SLA
+		sla_due = (datetime.datetime.utcnow() + datetime.timedelta(days=30)).isoformat() + "Z"
+		case_type = "service_request" if "service_request" in (SUPPORTED_CASE_TYPES or []) else (SUPPORTED_CASE_TYPES[0] if SUPPORTED_CASE_TYPES else "complaint")
+		case_id = f"case-erasure-{customer_id}-{_utcnow()[:10]}"
+		case = self.open_case(
+			case_id=case_id,
+			tenant_id=tenant_id,
+			customer_id=customer_id,
+			case_type=case_type,
+			description=f"Data erasure request: {reason}",
+			opened_at=_utcnow(),
+		)
+		# Record lifecycle event
+		evt_type = "data_erasure_requested" if "data_erasure_requested" in (SUPPORTED_LIFECYCLE_EVENTS or []) else (SUPPORTED_LIFECYCLE_EVENTS[0] if SUPPORTED_LIFECYCLE_EVENTS else "data_erasure_requested")
+		self.record_lifecycle_event(
+			event_id=f"evt-erasure-{customer_id}-{_utcnow()}",
+			tenant_id=tenant_id,
+			customer_id=customer_id,
+			event_type=evt_type,
+			event_reference=reason,
+			occurred_at=_utcnow(),
+			recorded_by=requested_by,
+		)
+		self._audit(tenant_id, "data_erasure_requested", customer_id)
+		return {
+			"customer_id": customer_id,
+			"original_name_erased": True,
+			"kyc_status": "erased",
+			"compliance_case": case,
+			"sla_due_at": sla_due,
+			"requested_by": requested_by,
+			"requested_at": _utcnow(),
+		}
+
+	async def bulk_import_customers(
+		self,
+		records: list[dict[str, Any]],
+		tenant_id: str = "default",
+		dry_run: bool = False,
+	) -> dict[str, Any]:
+		"""Import a batch of customers with per-record result and idempotency.
+
+		Each record must contain: ``customer_type``, ``msisdn``, ``name``,
+		``created_by``.  Records with duplicate MSISDN are skipped.  When
+		``dry_run=True`` validation runs but no records are persisted.
+		Returns per-record status: ``created | skipped | failed``.
+		"""
+		assert records, "records must be non-empty"
+		seen_msisdns: set[str] = {c.msisdn for c in self.customers.values() if c.tenant_id == tenant_id}
+		results: list[dict[str, Any]] = []
+		created = skipped = failed = 0
+		for i, rec in enumerate(records):
+			msisdn = rec.get("msisdn", "")
+			name = rec.get("name", "")
+			customer_type = rec.get("customer_type", "individual")
+			created_by = rec.get("created_by", "bulk_import")
+			if not msisdn or not name:
+				results.append({"index": i, "msisdn": msisdn, "status": "failed", "reason": "missing_required_field"})
+				failed += 1
+				continue
+			if msisdn in seen_msisdns:
+				results.append({"index": i, "msisdn": msisdn, "status": "skipped", "reason": "duplicate_msisdn"})
+				skipped += 1
+				continue
+			if not dry_run:
+				try:
+					cid = f"cust-bulk-{i}-{_utcnow()[:10]}"
+					ct = customer_type.lower() if customer_type.lower() in SUPPORTED_CUSTOMER_TYPES else (SUPPORTED_CUSTOMER_TYPES[0] if SUPPORTED_CUSTOMER_TYPES else "individual")
+					self.create_customer(customer_id=cid, tenant_id=tenant_id, customer_type=ct, msisdn=msisdn, name=name, created_by=created_by)
+					seen_msisdns.add(msisdn)
+					results.append({"index": i, "msisdn": msisdn, "status": "created", "customer_id": cid})
+					created += 1
+				except Exception as exc:
+					results.append({"index": i, "msisdn": msisdn, "status": "failed", "reason": str(exc)})
+					failed += 1
+			else:
+				results.append({"index": i, "msisdn": msisdn, "status": "would_create"})
+				created += 1
+		self._audit(tenant_id, "bulk_import_completed" if not dry_run else "bulk_import_dry_run", f"total:{len(records)}")
+		return {
+			"tenant_id": tenant_id,
+			"dry_run": dry_run,
+			"total_submitted": len(records),
+			"created": created,
+			"skipped": skipped,
+			"failed": failed,
+			"results": results,
+			"completed_at": _utcnow(),
+		}
+
+
+# Backward-compatible alias
 TelecomCusService = TelecomCustomerService

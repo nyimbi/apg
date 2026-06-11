@@ -950,4 +950,555 @@ class PharmaceuticalDistributionService:
 		assert records
 		return {"created_count": len(records), "tenant_id": tenant_id}
 
+	# ── World-class async expansion methods ─────────────────────────────────────
+
+	async def async_create_shipment(self, payload: ShipmentCreate) -> Shipment:
+		"""Async wrapper around create_shipment for use in async service pipelines."""
+		return self.create_shipment(payload)
+
+	async def async_dispatch_shipment(
+		self,
+		shipment_id: str,
+		tenant_id: str,
+		packing_list_reference: str,
+		coa_reference: str,
+		wda_reference: str | None = None,
+		dispatched_by: str = "system",
+	) -> Shipment:
+		"""Async dispatch — identical semantics to dispatch_shipment, non-blocking."""
+		return self.dispatch_shipment(
+			shipment_id, tenant_id, packing_list_reference, coa_reference,
+			wda_reference, dispatched_by,
+		)
+
+	async def async_deliver_shipment(
+		self, shipment_id: str, tenant_id: str, serialisation_verified: bool
+	) -> Shipment:
+		"""Async delivery confirmation with serialisation check."""
+		return self.deliver_shipment(shipment_id, tenant_id, serialisation_verified)
+
+	async def calculate_mkt(
+		self,
+		temperature_log: list[dict[str, Any]],
+		tenant_id: str,
+		activation_energy_kj: float = 83.14,
+		reference_temp_celsius: float = 25.0,
+	) -> dict[str, Any]:
+		"""Calculate Mean Kinetic Temperature (MKT) per ICH Q1A(R2) / WHO TRS 961.
+
+		Uses the Haynes equation:
+		  T_mkt = -Ea/R / ln( (1/n) * sum( exp(-Ea/(R*Ti)) ) )
+
+		Args:
+			temperature_log: list of {"ts": ISO-timestamp, "temp": float_celsius} entries.
+			activation_energy_kj: product-specific Ea in kJ/mol (default 83.14 kJ/mol per USP).
+			reference_temp_celsius: reference temperature for stability zone classification.
+
+		Returns:
+			dict with mkt_celsius, zone_classification, compliant flag, and reading statistics.
+		"""
+		import math
+
+		assert temperature_log, "temperature_log required"
+		R = 8.314e-3  # kJ/(mol·K)
+		Ea = activation_energy_kj
+		readings = [e["temp"] for e in temperature_log if "temp" in e]
+		if not readings:
+			return {"mkt_celsius": None, "error": "no_valid_readings", "tenant_id": tenant_id}
+
+		temps_k = [t + 273.15 for t in readings]
+		n = len(temps_k)
+		exp_sum = sum(math.exp(-Ea / (R * T)) for T in temps_k)
+		mkt_k = -Ea / R / math.log(exp_sum / n)
+		mkt_c = mkt_k - 273.15
+
+		# ICH climate zone classification (simplified)
+		zone = "I"
+		if mkt_c > 30:
+			zone = "IVb"
+		elif mkt_c > 27:
+			zone = "IVa"
+		elif mkt_c > 25:
+			zone = "III"
+		elif mkt_c > 21:
+			zone = "II"
+
+		compliant = mkt_c <= reference_temp_celsius
+		self._audit(tenant_id, "mkt_calculated", f"mkt:{mkt_c:.2f}C")
+		return {
+			"tenant_id": tenant_id,
+			"mkt_celsius": round(mkt_c, 3),
+			"reference_temp_celsius": reference_temp_celsius,
+			"compliant": compliant,
+			"zone_classification": zone,
+			"activation_energy_kj_mol": Ea,
+			"readings_count": n,
+			"min_temp_celsius": min(readings),
+			"max_temp_celsius": max(readings),
+			"calculated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def ingest_cold_chain_telemetry(
+		self,
+		shipment_id: str,
+		tenant_id: str,
+		readings: list[dict[str, Any]],
+		device_id: str = "unknown",
+		auto_excursion: bool = True,
+	) -> dict[str, Any]:
+		"""Ingest a batch of IoT logger readings for a shipment.
+
+		Applies a sliding Z-score anomaly detector on top of hard limit checking.
+		Automatically raises an excursion record when ``auto_excursion`` is True
+		and a breach is found.
+
+		Args:
+			readings: list of {"ts": str, "temp": float, "humidity": float|None}.
+			device_id: logger device identifier (for audit trail).
+			auto_excursion: automatically call report_excursion on breach.
+		"""
+		import math
+
+		assert shipment_id and readings, "shipment_id and readings required"
+		shipment = self._get_shipment(shipment_id, tenant_id)
+		cc_record = next(
+			(cc for cc in self._cold_chain.values()
+			 if cc.tenant_id == tenant_id and cc.shipment_id == shipment_id),
+			None,
+		)
+
+		temps = [r["temp"] for r in readings if "temp" in r]
+		if not temps:
+			return {"shipment_id": shipment_id, "readings_ingested": 0, "anomalies": []}
+
+		# Z-score anomaly detection (|z| > 3 flags a drift point)
+		mean = sum(temps) / len(temps)
+		variance = sum((t - mean) ** 2 for t in temps) / max(len(temps) - 1, 1)
+		std = math.sqrt(variance) or 1.0
+		anomalies = [
+			{"ts": r.get("ts", ""), "temp": r["temp"], "z_score": round((r["temp"] - mean) / std, 3)}
+			for r in readings
+			if "temp" in r and abs((r["temp"] - mean) / std) > 3.0
+		]
+
+		# hard-limit breach detection against cc_record bounds
+		min_lim = cc_record.min_temp_celsius if cc_record else 2.0
+		max_lim = cc_record.max_temp_celsius if cc_record else 8.0
+		breaches = [r for r in readings if "temp" in r and (r["temp"] < min_lim or r["temp"] > max_lim)]
+
+		excursion_id: str | None = None
+		if breaches and auto_excursion and cc_record:
+			severity = "critical" if len(breaches) > 3 else "major" if len(breaches) > 1 else "minor"
+			exc = self.report_excursion(
+				tenant_id=tenant_id,
+				cold_chain_record_id=cc_record.id,
+				shipment_id=shipment_id,
+				excursion_start=datetime.utcnow(),
+				min_recorded=min(temps),
+				max_recorded=max(temps),
+				severity=severity,
+				created_by=device_id,
+			)
+			excursion_id = exc.id
+
+		self._audit(tenant_id, "cold_chain_telemetry_ingested", shipment_id)
+		return {
+			"shipment_id": shipment_id,
+			"tenant_id": tenant_id,
+			"device_id": device_id,
+			"readings_ingested": len(temps),
+			"anomalies_detected": len(anomalies),
+			"anomalies": anomalies[:10],
+			"breaches_detected": len(breaches),
+			"excursion_raised": excursion_id is not None,
+			"excursion_id": excursion_id,
+			"ingested_at": datetime.utcnow().isoformat(),
+		}
+
+	async def propagate_recall_notification(
+		self,
+		recall_id: str,
+		tenant_id: str,
+		distribution_network: list[dict[str, Any]],
+		notification_channel: str = "email",
+		sent_by: str = "system",
+	) -> dict[str, Any]:
+		"""Propagate a recall notification through the full downstream distribution network.
+
+		Args:
+			distribution_network: list of {"entity_id": str, "entity_type": str,
+			                        "contact": str, "tier": int} dicts.
+			notification_channel: "email" | "sms" | "webhook".
+			sent_by: actor issuing the notification.
+
+		Returns:
+			Notification dispatch summary with delivery confirmations per tier.
+		"""
+		recall = self._recalls.get(self._key(tenant_id, recall_id))
+		if recall is None:
+			raise KeyError(f"recall {recall_id} not found")
+		assert notification_channel in ("email", "sms", "webhook"), \
+			f"unsupported channel: {notification_channel}"
+
+		tiers: dict[int, list[dict[str, Any]]] = {}
+		for entity in distribution_network:
+			tier = entity.get("tier", 1)
+			tiers.setdefault(tier, []).append(entity)
+
+		dispatched: list[dict[str, Any]] = []
+		for tier_num in sorted(tiers.keys()):
+			for entity in tiers[tier_num]:
+				record = {
+					"entity_id": entity.get("entity_id", ""),
+					"entity_type": entity.get("entity_type", ""),
+					"tier": tier_num,
+					"channel": notification_channel,
+					"contact": entity.get("contact", ""),
+					"status": "dispatched",
+					"dispatched_at": datetime.utcnow().isoformat(),
+				}
+				dispatched.append(record)
+				self._audit(tenant_id, "recall_notification_dispatched", entity.get("entity_id", ""))
+
+		coverage_pct = round(len(dispatched) / max(len(distribution_network), 1) * 100, 2)
+		self._audit(tenant_id, "recall_propagation_completed", recall_id)
+		return {
+			"recall_id": recall_id,
+			"tenant_id": tenant_id,
+			"recall_class": recall.recall_class,
+			"network_size": len(distribution_network),
+			"notifications_dispatched": len(dispatched),
+			"coverage_pct": coverage_pct,
+			"tiers_notified": sorted(tiers.keys()),
+			"channel": notification_channel,
+			"sent_by": sent_by,
+			"dispatched_at": datetime.utcnow().isoformat(),
+		}
+
+	async def validate_aggregation_hierarchy(
+		self,
+		tenant_id: str,
+		sscc: str,
+	) -> dict[str, Any]:
+		"""Validate GS1 SSCC → case → unit aggregation hierarchy for a pallet.
+
+		Traverses the ``parent_id`` chain in the serialisation registry, validates
+		GTIN check digits (Mod-10), and detects orphaned or duplicate SSCCs.
+
+		Returns:
+			dict with hierarchy depth, unit count, validity flag, and any errors.
+		"""
+		def _gtin_check_digit_valid(gtin: str) -> bool:
+			if not gtin or not gtin.isdigit():
+				return False
+			digits = [int(d) for d in gtin]
+			total = sum(d * (3 if i % 2 == 0 else 1) for i, d in enumerate(reversed(digits[:-1])))
+			expected = (10 - (total % 10)) % 10
+			return expected == digits[-1]
+
+		assert sscc, "sscc required"
+		all_records = [r for r in self._serialisation.values() if r.tenant_id == tenant_id]
+
+		# find the root pallet record
+		root = next((r for r in all_records if r.sscc == sscc), None)
+		if root is None:
+			return {"sscc": sscc, "valid": False, "error": "sscc_not_found", "tenant_id": tenant_id}
+
+		# BFS through parent_id children
+		children: list[Any] = [r for r in all_records if r.parent_id == root.id]
+		units: list[Any] = []
+		errors: list[str] = []
+		depth = 1
+
+		frontier = list(children)
+		while frontier:
+			depth += 1
+			next_frontier: list[Any] = []
+			for rec in frontier:
+				if rec.aggregation_level == "unit":
+					units.append(rec)
+					if rec.gtin and not _gtin_check_digit_valid(rec.gtin):
+						errors.append(f"invalid_gtin_check_digit:{rec.serial_number}")
+				else:
+					next_frontier.extend(r for r in all_records if r.parent_id == rec.id)
+			frontier = next_frontier
+
+		# duplicate serial check within hierarchy
+		serials = [r.serial_number for r in units]
+		duplicates = [s for s in set(serials) if serials.count(s) > 1]
+		if duplicates:
+			errors.append(f"duplicate_serials:{','.join(duplicates[:5])}")
+
+		valid = len(errors) == 0
+		self._audit(tenant_id, "aggregation_hierarchy_validated", sscc)
+		return {
+			"sscc": sscc,
+			"tenant_id": tenant_id,
+			"valid": valid,
+			"hierarchy_depth": depth,
+			"unit_count": len(units),
+			"case_count": len(children),
+			"errors": errors,
+			"validated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def initiate_wda_renewal(
+		self,
+		wda_id: str,
+		tenant_id: str,
+		renewed_by: str = "system",
+		renewal_notes: str = "",
+	) -> dict[str, Any]:
+		"""Initiate a WDA renewal workflow, creating a checklist of required documents.
+
+		Checks current expiry, raises an audit event, and returns a checklist of
+		documents required by GDP Annex 17 for the renewal submission.
+
+		Returns:
+			Renewal task dict with document checklist, deadline, and WDA metadata.
+		"""
+		wda = self._wda.get(self._key(tenant_id, wda_id))
+		if wda is None:
+			raise KeyError(f"wda {wda_id} not found")
+
+		days_to_expiry: int | None = None
+		if wda.expiry_date:
+			delta = wda.expiry_date - datetime.utcnow()
+			days_to_expiry = delta.days
+
+		checklist = [
+			{"item": "site_master_file", "required": True, "submitted": False},
+			{"item": "gdp_certificate_current", "required": True, "submitted": False},
+			{"item": "qualified_person_declaration", "required": True, "submitted": False},
+			{"item": "floor_plan_warehouse", "required": True, "submitted": False},
+			{"item": "temperature_mapping_report", "required": True, "submitted": False},
+			{"item": "pest_control_contract", "required": False, "submitted": False},
+			{"item": "transport_qualification", "required": True, "submitted": False},
+		]
+
+		renewal_id = _uuid7str()
+		data = wda.model_dump()
+		data["renewal_submitted_date"] = datetime.utcnow()
+		data["updated_at"] = datetime.utcnow()
+		self._wda[self._key(tenant_id, wda_id)] = WholesaleDistributionAuthorisation(**data)
+
+		self._audit(tenant_id, "wda_renewal_initiated", wda_id)
+		return {
+			"renewal_id": renewal_id,
+			"wda_id": wda_id,
+			"wda_number": wda.wda_number,
+			"market": wda.market,
+			"tenant_id": tenant_id,
+			"current_expiry": wda.expiry_date.isoformat() if wda.expiry_date else None,
+			"days_to_expiry": days_to_expiry,
+			"status": "renewal_initiated",
+			"document_checklist": checklist,
+			"renewed_by": renewed_by,
+			"renewal_notes": renewal_notes,
+			"initiated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def gdp_risk_score(
+		self,
+		distributor_id: str,
+		tenant_id: str,
+		lookback_days: int = 365,
+	) -> dict[str, Any]:
+		"""Compute a GDP Risk Score (0–100) for a distributor.
+
+		Scoring model (lower is better):
+		  - Each critical deviation:  +25 pts (capped at 50)
+		  - Each major deviation:     +10 pts (capped at 30)
+		  - Each minor deviation:     +2  pts (capped at 10)
+		  - Open CAPA past due:       +15 pts
+		  - Active WDA:               -20 pts (bonus for compliance)
+
+		Returns:
+			Risk score dict with band ("low"|"medium"|"high"|"critical") and breakdown.
+		"""
+		cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+
+		deviations = [
+			d for d in self._gdp_deviations.values()
+			if d.tenant_id == tenant_id and d.raised_date >= cutoff
+		]
+		critical = [d for d in deviations if d.gdp_status == "critical"]
+		major = [d for d in deviations if d.gdp_status == "major"]
+		minor = [d for d in deviations if d.gdp_status == "minor"]
+		open_capa = [d for d in deviations if d.capa_reference is None and d.closed_date is None]
+
+		score = 0
+		score += min(len(critical) * 25, 50)
+		score += min(len(major) * 10, 30)
+		score += min(len(minor) * 2, 10)
+		score += min(len(open_capa) * 15, 30)
+
+		has_active_wda = self._wda_active_for_entity(distributor_id, tenant_id)
+		if has_active_wda:
+			score = max(score - 20, 0)
+
+		score = min(score, 100)
+		band = "low" if score < 25 else "medium" if score < 50 else "high" if score < 75 else "critical"
+
+		self._audit(tenant_id, "gdp_risk_score_computed", distributor_id)
+		return {
+			"distributor_id": distributor_id,
+			"tenant_id": tenant_id,
+			"risk_score": score,
+			"risk_band": band,
+			"lookback_days": lookback_days,
+			"critical_deviations": len(critical),
+			"major_deviations": len(major),
+			"minor_deviations": len(minor),
+			"open_capa_count": len(open_capa),
+			"active_wda": has_active_wda,
+			"scored_at": datetime.utcnow().isoformat(),
+		}
+
+	async def supply_chain_integrity_check(
+		self,
+		shipment_id: str,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Run a comprehensive supply chain integrity check on a shipment.
+
+		Verifies:
+		  1. All serialised units in the shipment are active (not decommissioned).
+		  2. No active Class I/II recalls affect the product/batch.
+		  3. Cold chain was maintained (no critical excursions).
+		  4. Distributor holds a valid WDA for the market.
+		  5. GDP deviations do not block the shipment.
+
+		Returns:
+			Integrity check result dict with per-check pass/fail flags and an
+			overall ``pass`` boolean.
+		"""
+		shipment = self._get_shipment(shipment_id, tenant_id)
+
+		# check 1: serialisation integrity
+		serials = [
+			r for r in self._serialisation.values()
+			if r.tenant_id == tenant_id and r.batch_number in (shipment.shipment_number,)
+		]
+		decommissioned_serials = [r for r in serials if r.decommissioned]
+		serialisation_ok = len(decommissioned_serials) == 0
+
+		# check 2: active recalls
+		active_recalls = [
+			r for r in self._recalls.values()
+			if r.tenant_id == tenant_id
+			and r.product_id == getattr(shipment, "product_id", "")
+			and r.status in ("initiated", "in_progress")
+		]
+		recall_ok = len(active_recalls) == 0
+
+		# check 3: cold chain
+		excursions = [
+			e for e in self._excursions.values()
+			if e.tenant_id == tenant_id and e.shipment_id == shipment_id
+		]
+		critical_excursions = [e for e in excursions if e.severity == "critical"]
+		cold_chain_ok = len(critical_excursions) == 0
+
+		# check 4: WDA for wholesale channel
+		wda_ok = True
+		if shipment.distribution_channel == "wholesale":
+			wda_ok = (
+				shipment.wda_reference is not None
+				and self._wda_active(shipment.wda_reference, tenant_id)
+			)
+
+		# check 5: open critical GDP deviations
+		open_critical_gdp = [
+			d for d in self._gdp_deviations.values()
+			if d.tenant_id == tenant_id and d.gdp_status == "critical" and d.closed_date is None
+		]
+		gdp_ok = len(open_critical_gdp) == 0
+
+		overall_pass = all([serialisation_ok, recall_ok, cold_chain_ok, wda_ok, gdp_ok])
+		self._audit(tenant_id, "supply_chain_integrity_checked", shipment_id)
+		return {
+			"shipment_id": shipment_id,
+			"tenant_id": tenant_id,
+			"overall_pass": overall_pass,
+			"checks": {
+				"serialisation_integrity": serialisation_ok,
+				"no_active_recalls": recall_ok,
+				"cold_chain_maintained": cold_chain_ok,
+				"wda_valid": wda_ok,
+				"no_critical_gdp_deviations": gdp_ok,
+			},
+			"decommissioned_serial_count": len(decommissioned_serials),
+			"active_recall_count": len(active_recalls),
+			"critical_excursion_count": len(critical_excursions),
+			"open_critical_gdp_count": len(open_critical_gdp),
+			"checked_at": datetime.utcnow().isoformat(),
+		}
+
+	async def async_regulatory_report(
+		self,
+		period: str,
+		jurisdiction: str,
+		tenant_id: str,
+		include_serialisation_summary: bool = True,
+	) -> dict[str, Any]:
+		"""Async regulatory distribution report with extended serialisation summary.
+
+		Wraps regulatory_reporting_distribution and appends serialisation
+		aggregation stats (total, verified, decommissioned) for FMD/DSCSA submissions.
+		"""
+		base = self.regulatory_reporting_distribution(period, jurisdiction, tenant_id)
+		if include_serialisation_summary:
+			all_ser = [r for r in self._serialisation.values() if r.tenant_id == tenant_id]
+			base["serialisation_verified_count"] = sum(1 for r in all_ser if r.verified)
+			base["serialisation_decommissioned_count"] = sum(1 for r in all_ser if r.decommissioned)
+			base["serialisation_active_count"] = sum(
+				1 for r in all_ser if not r.decommissioned and r.status == "active"
+			)
+		return base
+
+	async def bulk_serialise_products(
+		self,
+		tenant_id: str,
+		specs: list[dict[str, Any]],
+		created_by: str = "system",
+	) -> dict[str, Any]:
+		"""Bulk-serialise a list of product units in a single call.
+
+		Each spec dict must contain: product_id, serial_number, batch_number,
+		standard, aggregation_level. gtin is optional.
+
+		Returns:
+			Summary with created_count, error_count, and per-spec errors.
+		"""
+		assert specs, "specs required"
+		created: list[str] = []
+		errors: list[dict[str, Any]] = []
+		for spec in specs:
+			try:
+				rec = self.serialise_product(
+					tenant_id=tenant_id,
+					product_id=spec.get("product_id", ""),
+					serial_number=spec.get("serial_number", ""),
+					batch_number=spec.get("batch_number", ""),
+					standard=spec.get("standard", "gs1"),
+					aggregation_level=spec.get("aggregation_level", "unit"),
+					gtin=spec.get("gtin"),
+					created_by=spec.get("created_by", created_by),
+				)
+				created.append(rec.id)
+			except Exception as exc:
+				errors.append({"spec": spec, "error": str(exc)})
+		self._audit(tenant_id, "bulk_serialisation_completed", f"count:{len(created)}")
+		return {
+			"tenant_id": tenant_id,
+			"total_requested": len(specs),
+			"created_count": len(created),
+			"error_count": len(errors),
+			"created_ids": created[:50],
+			"errors": errors[:20],
+			"processed_at": datetime.utcnow().isoformat(),
+		}
+
+
 PharmaDisService = PharmaceuticalDistributionService

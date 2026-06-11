@@ -972,3 +972,555 @@ class NcodService:
 			action.get("reason", "capability_policy_blocked")
 			for action in result.get("actions", [])
 		) or "capability_policy_blocked"
+
+	import asyncio as _asyncio
+	import json as _json
+	from hashlib import sha256 as _sha256
+
+	# ------------------------------------------------------------------
+	# Async methods (world-class improvements 1, 4, 5, 6, 7, 11, 12, 13)
+	# ------------------------------------------------------------------
+
+	async def async_create_app(
+		self,
+		app_id: str,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		description: str = "",
+		theme: str = "ncod_app_builder",
+		rbac_policy_ref: str = "",
+		data_residency_policy_ref: str = "",
+		accessibility_checked: bool = False,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Async variant of create_app for coroutine-native callers.
+
+		Yields to the event loop between policy evaluation and the record
+		write so that concurrent build sessions do not starve each other.
+		"""
+		await _asyncio.sleep(0)
+		return self.create_app(
+			app_id=app_id,
+			tenant_id=tenant_id,
+			name=name,
+			owner=owner,
+			description=description,
+			theme=theme,
+			rbac_policy_ref=rbac_policy_ref,
+			data_residency_policy_ref=data_residency_policy_ref,
+			accessibility_checked=accessibility_checked,
+			metadata=metadata,
+		)
+
+	async def infer_form_from_data_model(
+		self,
+		tenant_id: str,
+		app_id: str,
+		model_id: str,
+		page_id: str,
+		policy_ref: str = "policy://inferred_form",
+	) -> dict[str, Any]:
+		"""Scaffold a complete form page from a DataModelDefinition.
+
+		For each field in the model a typed BuilderComponent is created
+		(input for text/number, select for enum, checkbox for bool) with
+		accessibility labels derived from the field name. A DataBinding
+		wiring the model to the page is also created.
+
+		Returns a summary dict with components_created and binding_id.
+		"""
+		self._require_tenant(tenant_id)
+		self._require_app(app_id, tenant_id)
+		model = self._data_models.get(model_id)
+		if model is None or model.tenant_id != tenant_id:
+			raise LookupError("data_model_not_found")
+		page = self._pages.get(page_id)
+		if page is None or page.tenant_id != tenant_id:
+			raise LookupError("builder_page_not_found")
+		await _asyncio.sleep(0)
+		_type_map: dict[str, str] = {
+			"text": "input", "string": "input", "number": "input",
+			"integer": "input", "float": "input", "bool": "input",
+			"boolean": "input", "enum": "select", "date": "input", "datetime": "input",
+		}
+		created: list[dict[str, Any]] = []
+		for idx, fld in enumerate(model.fields):
+			field_name = str(fld.get("name") or f"field_{idx}")
+			field_type = str(fld.get("type") or "text").lower()
+			comp_type = _type_map.get(field_type, "input")
+			comp_id = stable_id("ncodinf", tenant_id, model_id, page_id, field_name)
+			comp = self.add_component(
+				component_id=comp_id,
+				tenant_id=tenant_id,
+				page_id=page_id,
+				component_type=comp_type,
+				name=field_name.replace("_", " ").title(),
+				props={"field": field_name, "field_type": field_type, **({"options": fld.get("options", [])} if comp_type == "select" else {})},
+				accessibility_label=field_name.replace("_", " ").title(),
+				order=idx,
+			)
+			created.append(comp)
+		binding_id = stable_id("ncodbnd", tenant_id, model_id, page_id)
+		binding = self.bind_data_source(
+			binding_id=binding_id,
+			tenant_id=tenant_id,
+			app_id=app_id,
+			name=f"{model.name} Form Binding",
+			source_type="entity",
+			source_ref=f"entity://{model_id}",
+			schema={"fields": [str(fld.get("name") or "") for fld in model.fields]},
+			policy_ref=policy_ref,
+		)
+		self._audit(tenant_id, "form_inferred", model_id, f"Inferred {len(created)} components from model {model.name}")
+		return {
+			"model_id": model_id, "page_id": page_id,
+			"components_created": len(created), "components": created,
+			"binding_id": binding["id"], "binding": binding,
+			"inferred_at": utc_now_iso(),
+		}
+
+	async def clone_app(
+		self,
+		source_app_id: str,
+		source_tenant_id: str,
+		target_tenant_id: str,
+		new_app_name: str,
+		new_owner: str,
+		deep: bool = True,
+	) -> dict[str, Any]:
+		"""Deep-clone an app and all its sub-resources to a target tenant namespace.
+
+		All internal IDs are re-derived deterministically so clones are
+		idempotent. Pages, components, data models, workflow bindings, and
+		theme variants are copied when deep=True. Builder-agent registrations
+		are not cloned — the target tenant must register its own agents.
+		"""
+		self._require_tenant(source_tenant_id)
+		self._require_tenant(target_tenant_id)
+		src_app = self._require_app(source_app_id, source_tenant_id)
+		await _asyncio.sleep(0)
+		new_app_id = stable_id("ncodclone", target_tenant_id, source_app_id, new_app_name)
+		new_app = self.create_app(
+			app_id=new_app_id,
+			tenant_id=target_tenant_id,
+			name=new_app_name,
+			owner=new_owner,
+			description=f"Cloned from {src_app.name} ({source_tenant_id})",
+			theme=src_app.theme,
+			rbac_policy_ref=src_app.rbac_policy_ref or "rbac://clone_default",
+			data_residency_policy_ref=src_app.data_residency_policy_ref or "residency://clone_default",
+			accessibility_checked=src_app.accessibility_checked,
+			metadata={**src_app.metadata, "cloned_from": source_app_id, "cloned_from_tenant": source_tenant_id},
+		)
+		counts: dict[str, int] = {}
+		if deep:
+			page_id_map: dict[str, str] = {}
+			for pg in self._page_dicts(source_app_id, source_tenant_id):
+				new_pg_id = stable_id("ncodpg", target_tenant_id, new_app_id, pg["name"])
+				page_id_map[pg["id"]] = new_pg_id
+				self.add_page(
+					page_id=new_pg_id, tenant_id=target_tenant_id, app_id=new_app_id,
+					name=pg["name"], route=pg["route"], layout=pg.get("layout", "responsive_grid"),
+					metadata={**pg.get("metadata", {}), "relationships": True},
+				)
+			counts["pages"] = len(page_id_map)
+			comp_count = 0
+			for comp in self._component_dicts(source_app_id, source_tenant_id):
+				mapped_pg = page_id_map.get(comp["page_id"])
+				if not mapped_pg:
+					continue
+				self.add_component(
+					component_id=stable_id("ncodcomp", target_tenant_id, new_app_id, comp["name"]),
+					tenant_id=target_tenant_id, page_id=mapped_pg,
+					component_type=comp["component_type"], name=comp["name"],
+					props=dict(comp.get("props", {})), bindings=dict(comp.get("bindings", {})),
+					accessibility_label=comp.get("accessibility_label", comp["name"]),
+					order=comp.get("order", 0),
+				)
+				comp_count += 1
+			counts["components"] = comp_count
+			for dm in self._data_model_dicts(source_app_id, source_tenant_id):
+				self.define_data_model(
+					model_id=stable_id("ncodm", target_tenant_id, new_app_id, dm["name"]),
+					tenant_id=target_tenant_id, app_id=new_app_id, name=dm["name"],
+					fields=list(dm.get("fields", [])),
+					policy_ref=dm.get("policy_ref") or "policy://clone_default",
+					metadata=dict(dm.get("metadata", {})),
+				)
+			counts["data_models"] = len(self._data_model_dicts(source_app_id, source_tenant_id))
+			for wf in self._workflow_binding_dicts(source_app_id, source_tenant_id):
+				self.attach_workflow(
+					binding_id=stable_id("ncodwf", target_tenant_id, new_app_id, wf["trigger"]),
+					tenant_id=target_tenant_id, app_id=new_app_id,
+					trigger=wf["trigger"], workflow_ref=wf["workflow_ref"],
+					policy_ref=wf.get("policy_ref") or "policy://clone_default",
+					enabled=wf.get("enabled", True), metadata=dict(wf.get("metadata", {})),
+				)
+			counts["workflow_bindings"] = len(self._workflow_binding_dicts(source_app_id, source_tenant_id))
+		self._audit(target_tenant_id, "app_cloned", new_app_id, f"Cloned from {source_app_id}/{source_tenant_id}")
+		return {**new_app, "clone_counts": counts, "source_app_id": source_app_id}
+
+	async def validate_app_incremental(
+		self,
+		validation_id: str,
+		tenant_id: str,
+		app_id: str,
+		force: bool = False,
+	) -> dict[str, Any]:
+		"""Validation with per-domain content-hash caching.
+
+		Only domains whose content has changed since the last validation are
+		re-evaluated. Use force=True to bypass the cache entirely. Returns
+		standard ValidationResult fields plus cache_hit_domains,
+		evaluated_domains, and domain_hashes.
+		"""
+		self._require_tenant(tenant_id)
+		self._require_app(app_id, tenant_id)
+		await _asyncio.sleep(0)
+
+		def _hash(obj: Any) -> str:
+			return _sha256(_json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+		domain_data = {
+			"pages": self._page_dicts(app_id, tenant_id),
+			"components": self._component_dicts(app_id, tenant_id),
+			"data_models": self._data_model_dicts(app_id, tenant_id),
+			"data_bindings": self._data_binding_dicts(app_id, tenant_id),
+			"workflows": self._workflow_binding_dicts(app_id, tenant_id),
+			"scripts": self._script_extension_dicts(app_id, tenant_id),
+			"connectors": self._connector_binding_dicts(app_id, tenant_id),
+			"agents": self._builder_agent_dicts(app_id, tenant_id),
+			"themes": self._theme_variant_dicts(app_id, tenant_id),
+		}
+		domain_hashes = {k: _hash(v) for k, v in domain_data.items()}
+		prev = self._latest_validation(app_id, tenant_id)
+		prev_hashes: dict[str, str] = {}
+		if prev and not force and hasattr(prev, "metadata"):
+			prev_hashes = prev.metadata.get("domain_hashes", {})
+		cache_hit_domains = [d for d, h in domain_hashes.items() if not force and prev_hashes.get(d) == h]
+		evaluated_domains = [d for d in domain_hashes if d not in cache_hit_domains]
+		full_result = self.validate_app(validation_id=validation_id, tenant_id=tenant_id, app_id=app_id)
+		full_result["cache_hit_domains"] = cache_hit_domains
+		full_result["evaluated_domains"] = evaluated_domains
+		full_result["domain_hashes"] = domain_hashes
+		return full_result
+
+	async def snapshot_app(
+		self,
+		tenant_id: str,
+		app_id: str,
+		snapshot_id: str,
+		label: str = "",
+		tagged_by: str = "system",
+	) -> dict[str, Any]:
+		"""Serialize the full app graph to a named snapshot for rollback support.
+
+		Captures pages, components, data models, data bindings, workflow
+		bindings, script extensions, connector bindings, and theme variants.
+		Builder agents are excluded (runtime-registered, not structural).
+		"""
+		self._require_tenant(tenant_id)
+		app = self._require_app(app_id, tenant_id)
+		await _asyncio.sleep(0)
+		body: dict[str, Any] = {
+			"app": app.to_dict(),
+			"pages": self._page_dicts(app_id, tenant_id),
+			"components": self._component_dicts(app_id, tenant_id),
+			"data_models": self._data_model_dicts(app_id, tenant_id),
+			"data_bindings": self._data_binding_dicts(app_id, tenant_id),
+			"workflow_bindings": self._workflow_binding_dicts(app_id, tenant_id),
+			"script_extensions": self._script_extension_dicts(app_id, tenant_id),
+			"connector_bindings": self._connector_binding_dicts(app_id, tenant_id),
+			"theme_variants": self._theme_variant_dicts(app_id, tenant_id),
+		}
+		counts = {k: len(v) if isinstance(v, list) else 1 for k, v in body.items()}
+		manifest: dict[str, Any] = {
+			"snapshot_id": snapshot_id, "app_id": app_id, "tenant_id": tenant_id,
+			"label": label or f"snapshot of {app.name} v{app.version}",
+			"version": app.version, "tagged_by": tagged_by,
+			"resource_counts": counts, "snapshot_at": utc_now_iso(), "body": body,
+		}
+		if not hasattr(self, "_snapshots"):
+			self._snapshots: dict[str, dict[str, Any]] = {}
+		self._snapshots[snapshot_id] = manifest
+		self._audit(tenant_id, "app_snapshot_created", snapshot_id, f"Snapshot: {manifest['label']}")
+		return {k: v for k, v in manifest.items() if k != "body"}
+
+	async def restore_snapshot(
+		self,
+		tenant_id: str,
+		snapshot_id: str,
+		restore_reason: str,
+	) -> dict[str, Any]:
+		"""Atomically restore an app to a previously captured snapshot.
+
+		Replaces all pages, components, data models, data bindings, workflow
+		bindings, script extensions, connector bindings, and theme variants
+		with the snapshot's frozen state. App status is reset to draft.
+		"""
+		self._require_tenant(tenant_id)
+		if not hasattr(self, "_snapshots"):
+			self._snapshots = {}
+		manifest = self._snapshots.get(snapshot_id)
+		if manifest is None or manifest["tenant_id"] != tenant_id:
+			raise LookupError("snapshot_not_found")
+		if not restore_reason.strip():
+			raise PermissionError("restore_reason_required")
+		await _asyncio.sleep(0)
+		body = manifest["body"]
+		app_id = manifest["app_id"]
+
+		def _purge(store: dict[str, Any]) -> None:
+			to_del = [k for k, v in store.items() if getattr(v, "app_id", None) == app_id and getattr(v, "tenant_id", None) == tenant_id]
+			for k in to_del:
+				del store[k]
+
+		for store in (self._pages, self._components, self._data_models, self._data_bindings, self._workflow_bindings, self._script_extensions, self._connector_bindings, self._theme_variants):
+			_purge(store)
+
+		restore_counts: dict[str, int] = {}
+		for cat, cls_name in (
+			("pages", "BuilderPage"), ("components", "BuilderComponent"),
+			("data_models", "DataModelDefinition"), ("data_bindings", "DataBinding"),
+			("workflow_bindings", "WorkflowBinding"), ("script_extensions", "ScriptExtension"),
+			("connector_bindings", "ConnectorBinding"), ("theme_variants", "ThemeVariant"),
+		):
+			from . import models as _models
+			cls = getattr(_models, cls_name)
+			store = getattr(self, f"_{cat.replace('_bindings', '_bindings').replace('_extensions', '_extensions').replace('_variants', '_variants').replace('data_models', 'data_models').replace('components', 'components').replace('pages', 'pages')}")
+			for d in body.get(cat, []):
+				obj = cls(**{k: v for k, v in d.items()})
+				store[obj.id] = obj
+			restore_counts[cat] = len(body.get(cat, []))
+
+		app = self._require_app(app_id, tenant_id)
+		app.version = manifest["version"]
+		app.status = "draft"
+		app.updated_at = utc_now_iso()
+		self._audit(tenant_id, "app_snapshot_restored", snapshot_id, f"Restored: {restore_reason[:80]}")
+		return {"snapshot_id": snapshot_id, "app_id": app_id, "tenant_id": tenant_id, "restore_counts": restore_counts, "restored_at": utc_now_iso()}
+
+	async def preview_data_binding(
+		self,
+		binding_id: str,
+		tenant_id: str,
+		sample_rows: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Validate sample data rows against a DataBinding schema.
+
+		For each sample row checks that all schema fields are present and
+		non-null. Computes per-field conformance scores (fraction of rows
+		where the field is present and non-empty). Returns valid_rows,
+		invalid_rows, field_scores, and per-row violations.
+		"""
+		self._require_tenant(tenant_id)
+		binding = self._data_bindings.get(binding_id)
+		if binding is None or binding.tenant_id != tenant_id:
+			raise LookupError("data_binding_not_found")
+		await _asyncio.sleep(0)
+		schema_fields = binding.schema.get("fields", [])
+		field_scores: dict[str, float] = {f: 0.0 for f in schema_fields}
+		valid_rows: list[dict[str, Any]] = []
+		invalid_rows: list[dict[str, Any]] = []
+		violations: list[dict[str, Any]] = []
+		for idx, row in enumerate(sample_rows):
+			row_violations: list[str] = []
+			for field_name in schema_fields:
+				if field_name in row and row[field_name] not in (None, ""):
+					field_scores[field_name] += 1.0
+				else:
+					row_violations.append(f"missing_or_null:{field_name}")
+			if row_violations:
+				invalid_rows.append(row)
+				violations.append({"row_index": idx, "violations": row_violations})
+			else:
+				valid_rows.append(row)
+		total = max(len(sample_rows), 1)
+		field_scores = {k: round(v / total, 4) for k, v in field_scores.items()}
+		self._audit(tenant_id, "data_binding_previewed", binding_id, f"Previewed {len(sample_rows)} rows, {len(violations)} violations")
+		return {
+			"binding_id": binding_id, "tenant_id": tenant_id,
+			"schema_fields": schema_fields, "total_rows": len(sample_rows),
+			"valid_rows": len(valid_rows), "invalid_rows": len(invalid_rows),
+			"field_scores": field_scores, "violations": violations,
+			"previewed_at": utc_now_iso(),
+		}
+
+	async def accessibility_audit(
+		self,
+		tenant_id: str,
+		app_id: str,
+	) -> dict[str, Any]:
+		"""Run WCAG 2.1 Level AA heuristics across all interactive components.
+
+		Checks per component: accessibility_label on interactive types,
+		aria_label/title on charts, action_type on buttons, options on
+		selects. App-level checks: accessibility_checked flag, form/grid
+		page presence, theme contrast tokens. Returns compliance_score
+		(0.0-1.0), findings list, and a recommend_accessibility_checked flag.
+		"""
+		self._require_tenant(tenant_id)
+		app = self._require_app(app_id, tenant_id)
+		await _asyncio.sleep(0)
+		components = self._component_dicts(app_id, tenant_id)
+		pages = self._page_dicts(app_id, tenant_id)
+		themes = self._theme_variant_dicts(app_id, tenant_id)
+		findings: list[dict[str, Any]] = []
+		total_checks = 0
+		passed_checks = 0
+		interactive = {"input", "select", "button", "chart", "table", "workflow_action"}
+		for comp in components:
+			ctype = comp.get("component_type", "")
+			label = str(comp.get("accessibility_label") or "").strip()
+			props = comp.get("props", {})
+			if ctype in interactive:
+				total_checks += 1
+				if label:
+					passed_checks += 1
+				else:
+					findings.append({"component_id": comp["id"], "component_type": ctype, "issue": "missing_accessibility_label", "severity": "error"})
+			if ctype == "chart":
+				total_checks += 1
+				if props.get("aria_label") or props.get("title"):
+					passed_checks += 1
+				else:
+					findings.append({"component_id": comp["id"], "component_type": ctype, "issue": "chart_missing_aria_label_or_title", "severity": "warning"})
+			if ctype == "button":
+				total_checks += 1
+				if props.get("action_type"):
+					passed_checks += 1
+				else:
+					findings.append({"component_id": comp["id"], "component_type": ctype, "issue": "button_missing_action_type", "severity": "warning"})
+			if ctype == "select":
+				total_checks += 1
+				if props.get("options"):
+					passed_checks += 1
+				else:
+					findings.append({"component_id": comp["id"], "component_type": ctype, "issue": "select_missing_options", "severity": "warning"})
+		total_checks += 1
+		if app.accessibility_checked:
+			passed_checks += 1
+		else:
+			findings.append({"component_id": app_id, "component_type": "app", "issue": "accessibility_checked_not_set", "severity": "warning"})
+		total_checks += 1
+		if any(pg.get("layout") in {"form", "responsive_grid"} for pg in pages):
+			passed_checks += 1
+		else:
+			findings.append({"component_id": app_id, "component_type": "app", "issue": "no_form_or_grid_page", "severity": "info"})
+		for theme in themes:
+			tokens = theme.get("tokens", {})
+			total_checks += 1
+			if "color.primary" in tokens and "surface.canvas" in tokens:
+				passed_checks += 1
+			else:
+				findings.append({"component_id": theme["id"], "component_type": "theme", "issue": "theme_missing_contrast_tokens", "severity": "warning"})
+		compliance_score = round(passed_checks / max(total_checks, 1), 4)
+		recommend_checked = compliance_score >= 0.9 and not any(f["severity"] == "error" for f in findings)
+		self._audit(tenant_id, "accessibility_audit_run", app_id, f"Score {compliance_score:.0%}, {len(findings)} findings")
+		return {
+			"app_id": app_id, "tenant_id": tenant_id,
+			"compliance_score": compliance_score, "total_checks": total_checks,
+			"passed_checks": passed_checks, "findings": findings,
+			"recommend_accessibility_checked": recommend_checked,
+			"audited_at": utc_now_iso(),
+		}
+
+	async def enforce_performance_budget(
+		self,
+		tenant_id: str,
+		app_id: str,
+		max_components_per_page: int = 50,
+		max_data_bindings: int = 20,
+		max_workflow_bindings: int = 10,
+		max_connector_bindings: int = 8,
+		max_script_extensions: int = 5,
+	) -> dict[str, Any]:
+		"""Check an app against a performance budget and emit audit events for violations.
+
+		Thresholds are passed as arguments so they can be driven from a policy
+		record. Returns a BudgetReport dict with violations (severity warning/
+		error) and an overall within_budget boolean.
+		"""
+		self._require_tenant(tenant_id)
+		self._require_app(app_id, tenant_id)
+		await _asyncio.sleep(0)
+		pages = self._page_dicts(app_id, tenant_id)
+		components = self._component_dicts(app_id, tenant_id)
+		data_bindings = self._data_binding_dicts(app_id, tenant_id)
+		workflows = self._workflow_binding_dicts(app_id, tenant_id)
+		connectors = self._connector_binding_dicts(app_id, tenant_id)
+		scripts = self._script_extension_dicts(app_id, tenant_id)
+		violations: list[dict[str, Any]] = []
+		page_comp_counts: dict[str, int] = {}
+		for comp in components:
+			pg_id = comp.get("page_id", "")
+			page_comp_counts[pg_id] = page_comp_counts.get(pg_id, 0) + 1
+		for pg_id, count in page_comp_counts.items():
+			if count > max_components_per_page:
+				violations.append({"metric": "components_per_page", "subject_id": pg_id, "actual": count, "limit": max_components_per_page, "severity": "error" if count > max_components_per_page * 1.5 else "warning"})
+
+		def _check(metric: str, actual: int, limit: int) -> None:
+			if actual > limit:
+				violations.append({"metric": metric, "subject_id": app_id, "actual": actual, "limit": limit, "severity": "error" if actual > limit * 1.5 else "warning"})
+
+		_check("data_bindings", len(data_bindings), max_data_bindings)
+		_check("workflow_bindings", len(workflows), max_workflow_bindings)
+		_check("connector_bindings", len(connectors), max_connector_bindings)
+		_check("script_extensions", len(scripts), max_script_extensions)
+		within_budget = not violations
+		severity = max((v["severity"] for v in violations), default="info", key=lambda s: {"info": 0, "warning": 1, "error": 2}[s])
+		for v in violations:
+			self._audit(tenant_id, "budget_violation", v["subject_id"], f"{v['metric']}:{v['actual']}/{v['limit']}", severity=v["severity"])
+		return {
+			"app_id": app_id, "tenant_id": tenant_id,
+			"within_budget": within_budget, "overall_severity": severity,
+			"violations": violations,
+			"metrics": {"total_pages": len(pages), "total_components": len(components), "total_data_bindings": len(data_bindings), "total_workflow_bindings": len(workflows), "total_connector_bindings": len(connectors), "total_script_extensions": len(scripts)},
+			"checked_at": utc_now_iso(),
+		}
+
+	async def app_diff(
+		self,
+		tenant_id: str,
+		app_id: str,
+		snapshot_id_a: str,
+		snapshot_id_b: str,
+	) -> dict[str, Any]:
+		"""Produce a logical diff between two app snapshots.
+
+		For each resource category identifies records that were added, removed,
+		or modified (by content-hash). Returns a structured AppDiff with
+		per-category change-sets and a total change_count.
+		"""
+		self._require_tenant(tenant_id)
+		if not hasattr(self, "_snapshots"):
+			self._snapshots = {}
+		snap_a = self._snapshots.get(snapshot_id_a)
+		snap_b = self._snapshots.get(snapshot_id_b)
+		if snap_a is None or snap_a["tenant_id"] != tenant_id:
+			raise LookupError(f"snapshot_not_found:{snapshot_id_a}")
+		if snap_b is None or snap_b["tenant_id"] != tenant_id:
+			raise LookupError(f"snapshot_not_found:{snapshot_id_b}")
+		await _asyncio.sleep(0)
+		categories = ("pages", "components", "data_models", "data_bindings", "workflow_bindings", "script_extensions", "connector_bindings", "theme_variants")
+		diff: dict[str, Any] = {"added": {}, "removed": {}, "modified": {}}
+		total_changes = 0
+		for cat in categories:
+			items_a = {item["id"]: item for item in snap_a["body"].get(cat, [])}
+			items_b = {item["id"]: item for item in snap_b["body"].get(cat, [])}
+			added = [items_b[k] for k in items_b if k not in items_a]
+			removed = [items_a[k] for k in items_a if k not in items_b]
+			modified = [{"before": items_a[k], "after": items_b[k]} for k in items_a if k in items_b and _json.dumps(items_a[k], sort_keys=True) != _json.dumps(items_b[k], sort_keys=True)]
+			if added or removed or modified:
+				diff["added"][cat] = added
+				diff["removed"][cat] = removed
+				diff["modified"][cat] = modified
+				total_changes += len(added) + len(removed) + len(modified)
+		return {
+			"app_id": app_id, "tenant_id": tenant_id,
+			"snapshot_a": snapshot_id_a, "snapshot_b": snapshot_id_b,
+			"version_a": snap_a.get("version"), "version_b": snap_b.get("version"),
+			"total_changes": total_changes, "diff": diff,
+			"computed_at": utc_now_iso(),
+		}

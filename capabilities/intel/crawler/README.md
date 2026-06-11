@@ -15,6 +15,17 @@
 - Deterministic rules for operational guardrails.
 - Bytewax lifecycle stream metadata.
 - UI route and theme metadata for APG composition.
+- robots.txt compliance enforcement (strict / advisory / disabled modes).
+- Content change detection with structural diffing and skip-on-similarity.
+- Social media streaming ingest: Twitter, Reddit, Mastodon, Telegram, RSS.
+- Multilingual language detection with Unicode block frequency analysis.
+- Structured data extraction: JSON-LD, OpenGraph, Microdata.
+- PII scrubbing with regex patterns for email, phone, national ID, IP, credit card.
+- Source reputation index from extraction quality and validation confidence.
+- Resumable crawl checkpointing for fault-tolerant deep crawls.
+- Cross-source entity deduplication with fingerprint-blocking near-duplicate detection.
+- Outbound webhook bus with HMAC-SHA256 signing for push notifications.
+- Semantic near-duplicate report using fingerprint-prefix proximity.
 
 ## Quick Start
 
@@ -47,7 +58,40 @@ service.complete_validation_session("tenant-a", validation["id"], 0.91, "approve
 dataset = service.publish_dataset("dataset-1", "tenant-a", extraction["id"], validation_recorded=True)
 service.record_rag_plan("rag-1", "tenant-a", dataset["id"], "heading-aware", 1200, "text-embedding")
 summary = service.dashboard_summary("tenant-a")
+
+# --- new async methods ---
+import asyncio
+
+async def run():
+    svc = service  # same instance
+    schedule = await svc.schedule_crawl("https://example.com", depth=3, frequency="daily", keywords=["AI"])
+    robots  = await svc.check_robots_compliance("https://example.com/news", compliance_mode="strict")
+    scrub   = await svc.scrub_pii(extraction["id"], "Contact nyimbi@gmail.com or +254712345678")
+    rep     = await svc.compute_source_reputation(source["id"])
+    ckpt    = await svc.create_crawl_checkpoint(job["id"], visited_urls=["https://example.com/1"], queued_urls=["https://example.com/2"])
+    hook    = await svc.register_webhook("hook-1", "https://hooks.example.com/intel", events=["crawl_job_completed"], secret="s3cr3t")
+    dedup   = await svc.cross_source_dedup()
+    print(dedup)
+
+asyncio.run(run())
 ```
+
+## New Async Methods
+
+| Method | Description |
+|---|---|
+| `check_robots_compliance(url, mode)` | Evaluate URL against robots.txt rules; modes: `strict`, `advisory`, `disabled` |
+| `detect_content_changes(url, content)` | Diff new content against fingerprint registry; returns similarity and skip recommendation |
+| `ingest_social_media(platform, items, source_id)` | Store social-media items (Twitter, Reddit, Mastodon, Telegram, RSS) |
+| `detect_language(extraction_id, text)` | Unicode-block language detection; tags extraction record with ISO-639-1 code |
+| `extract_structured_data(extraction_id, html)` | Parse JSON-LD, OpenGraph, and Microdata from raw HTML |
+| `scrub_pii(extraction_id, text)` | Regex PII detection and placeholder substitution (email, phone, national ID, IP, CC) |
+| `compute_source_reputation(source_id)` | Weighted reputation score from extraction quality + validation confidence + HTTPS ratio |
+| `create_crawl_checkpoint(job_id, visited, queued)` | Persist resumable frontier checkpoint |
+| `resume_from_checkpoint(job_id)` | Return latest checkpoint for frontier rebuild on failure |
+| `cross_source_dedup(tenant_id)` | Near-duplicate detection across all sources using fingerprint blocking |
+| `register_webhook(id, url, events, secret)` | Register HMAC-SHA256 signed push-notification webhook |
+| `semantic_dedup_report(threshold)` | Near-duplicate report using fingerprint-prefix proximity as cosine-similarity proxy |
 
 ## Contract
 

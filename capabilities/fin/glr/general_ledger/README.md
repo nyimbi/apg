@@ -33,6 +33,27 @@ with the standard APG toolchain.
 - Bytewax lifecycle metadata for accounts, periods, journals, postings,
   reversals, trial balances, allocations, and agent events.
 
+## New in This Release
+
+### Advanced Financial Analysis
+
+- **`financial_ratios`** — Full suite of liquidity, leverage, profitability, and efficiency ratios derived from live GL data. Optional prior-period comparison for trend analysis.
+- **`dimensional_report`** — Multi-dimensional P&L analysis using free-form line-level dimension tags (cost_center, geography, product_line, project). No chart proliferation required.
+- **`account_ageing_analysis`** — Age any AR or AP account by time elapsed since posting, with configurable day buckets and line-level detail.
+- **`audit_intelligence_scan`** — Behavioural anomaly detection: Benford's Law analysis of posting amounts, round-number bias detection, and dormant-account reactivation alerting.
+
+### Compliance and Regulatory
+
+- **`compute_deferred_tax`** — IAS 12 / ASC 740 deferred tax computation: temporary differences per account, DTA/DTL classification, enacted-rate application, and net balance summary.
+- **`hyperinflation_restatement`** — IAS 29 non-monetary asset restatement using a configurable General Price Index ratio. Posts the restatement journal automatically; nets to a designated restatement-reserve account.
+- **`multi_gaap_adjustment`** — Record GAAP-difference adjustment journals (US GAAP, UK GAAP, OHADA, or any target GAAP) against the base IFRS ledger.
+- **`statutory_financial_statements`** — Derive statutory balance sheet and income statement under any registered GAAP by combining the base ledger with applicable GAAP adjustment journals.
+
+### Automation
+
+- **`create_recurring_template`** — Create a recurring journal template with optional `amount_resolver` for zero-touch accrual computation (prepaid-schedule, depreciation-run).
+- **`run_smart_recurring`** — Execute all active recurring templates for a period with automatic per-period amount resolution. Returns a run record per template, including any failures.
+
 ## Composition Contract
 
 The executable contract lives in `capability_contract.py`.

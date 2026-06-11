@@ -75,6 +75,72 @@ svc._account_adapter  = PostgresAccountAdapter(db_session)
 
 See `domain/adapters.py` for the full Protocol definitions.
 
+## New Features (v2)
+
+### Penalty Interest on Overdue Loans
+Accrues contractual penalty interest (2× normal rate, min 5 % p.a.) on overdue instalments daily. Posts to `Penalty Interest Income` GL.
+
+```python
+result = asyncio.run(svc.compute_penalty_interest("my_bank", "2026-06-11"))
+print(result["total_penalty_accrued"])   # "1234.56"
+```
+
+### IFRS 9 ECL Staging
+Classifies every loan into Stage 1 / 2 / 3 and posts provision deltas to `Impairment Expense / Loan Loss Reserve`. Triggered as part of the loan repayment batch.
+
+```python
+result = asyncio.run(svc.run_ifrs9_ecl_staging("my_bank", "2026-06-30"))
+print(result["stage_counts"], result["provision_delta"])
+```
+
+### Basel III LCR Computation
+Computes the Liquidity Coverage Ratio daily. Emits a CRITICAL exception if LCR < 100 % and a warning if < 105 %.
+
+```python
+result = asyncio.run(svc.compute_liquidity_coverage_ratio("my_bank", "2026-06-11"))
+print(result["lcr_ratio"], result["status"])   # "1.1523"  "compliant"
+```
+
+### Nostro Reconciliation
+Matches GL nostro entries against SWIFT MT940/camt.053 statement lines. Unmatched items exceeding the configured threshold are raised as CRITICAL exceptions.
+
+```python
+result = asyncio.run(svc.run_nostro_reconciliation("my_bank", "2026-06-11"))
+print(result["unmatched"], result["unmatched_value"])
+```
+
+### ZBA Sweeps (Zero-Balance Accounting)
+Concentrates cash from sub-accounts into a master account after all EOD postings. Funds sub-accounts from master when below their minimum balance.
+
+```python
+result = asyncio.run(svc.run_zba_sweeps("my_bank", "2026-06-11"))
+print(result["groups_processed"], result["total_swept"])
+```
+
+### NPA Classification
+Promotes loans with DPD ≥ 90 to Non-Performing Asset status. Suspends P&L accrual, reverses uncollected interest to sundry, and posts 100 % provision.
+
+```python
+result = asyncio.run(svc.classify_npa_accounts("my_bank", "2026-06-11", dpd_threshold=90))
+print(result["newly_classified"], result["provision_posted"])
+```
+
+### SLA Compliance Monitoring
+Evaluates whether EOD completed within the configured processing window. Raises `SLA_AT_RISK` exception if > 70 % of the window is consumed with < 50 % of jobs complete.
+
+```python
+result = asyncio.run(svc.check_sla_compliance("my_bank", "2026-06-11", sla_window_minutes=360))
+print(result["status"], result["elapsed_seconds"])   # "met"  187.4
+```
+
+### Regulatory Returns Generation
+Renders CBK BSL02/BSL03 (month-end), Capital Adequacy / Large Exposure (quarter-end), and Annual Supervisory Return / AML Report (year-end). Validates totals before filing.
+
+```python
+result = asyncio.run(svc.generate_regulatory_returns("my_bank", "2026-06-30"))
+print(result["returns_generated"])   # ["BSL02_BALANCE_SHEET", "BSL03_CREDIT_EXPOSURE", ...]
+```
+
 ## Running tests
 
 ```bash

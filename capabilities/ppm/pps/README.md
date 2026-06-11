@@ -52,6 +52,14 @@ Project Planning & Scheduling (pps) manages the full project schedule lifecycle:
 | /ppm-pps/projects/<id>/critical-path | GET/POST | Critical path | ppm_pps:critical_path |
 | /ppm-pps/projects/<id>/dependencies | GET/POST | Dependency graph | ppm_pps:dependencies |
 | /ppm-pps/projects/<id>/levelling | POST | Resource levelling | ppm_pps:levelling |
+| /ppm-pps/projects/<id>/pert | POST | PERT three-point estimation | ppm_pps:analysis |
+| /ppm-pps/projects/<id>/monte-carlo | POST | Monte Carlo simulation | ppm_pps:analysis |
+| /ppm-pps/projects/<id>/evm | POST | Earned Value metrics | ppm_pps:analysis |
+| /ppm-pps/projects/<id>/quality | GET | Schedule quality index | ppm_pps:analysis |
+| /ppm-pps/projects/<id>/impact | POST | Dependency impact propagation | ppm_pps:analysis |
+| /ppm-pps/projects/<id>/baseline-variance | GET | Baseline variance report | ppm_pps:analysis |
+| /ppm-pps/projects/<id>/trend | GET | Schedule variance trend | ppm_pps:analysis |
+| /ppm-pps/projects/<id>/ccpm-buffers | GET | CCPM buffer management | ppm_pps:analysis |
 | /ppm-pps/milestones | GET | Milestone tracker | ppm_pps:milestones |
 | /ppm-pps/calendars | GET/POST | Calendar manager | ppm_pps:calendars |
 | /ppm-pps/agents | GET/POST | Agent workbench | ppm_pps:admin |
@@ -78,6 +86,19 @@ Project Planning & Scheduling (pps) manages the full project schedule lifecycle:
 - **ProjectCalendar** — id, name, calendar_type, working_hours_per_day, working_days
 - **ScheduleAgent** — id, name, runtime, role, scope
 
+## Advanced Analysis Methods (v1.1)
+| Method | Description |
+|--------|-------------|
+| `pert_estimate(project_id, task_estimates)` | Three-point PERT estimation with P50/P80/P90 per task |
+| `monte_carlo_simulation(project_id, simulations)` | Probabilistic completion date distribution |
+| `earned_value_metrics(project_id, pv, ac)` | Full EVM: SPI, CPI, EAC, VAC, TCPI |
+| `schedule_quality_index(project_id)` | DCMA-style 0–100 health score with findings |
+| `dependency_impact_propagation(project_id, task_id, slip_days)` | Forward-propagate slip through network |
+| `baseline_variance_report(project_id, baseline_name)` | Task-level diff vs. stored baseline |
+| `record_schedule_snapshot(project_id)` | Record daily SPI/progress snapshot for trend tracking |
+| `schedule_variance_trend(project_id, lookback_days)` | SPI trend with deterioration detection |
+| `critical_chain_buffers(project_id, buffer_pct)` | CCPM project + feeding buffers with fever zones |
+
 ## Streaming Events
 - `project_created`, `project_updated`, `wbs_element_added`, `task_status_changed`
 - `dependency_linked`, `critical_path_recalculated`, `resource_levelling_completed`
@@ -94,3 +115,6 @@ Project Planning & Scheduling (pps) manages the full project schedule lifecycle:
 - Schedule data is exported to **ppm_pbl** to create approved schedule baselines
 - Resource assignments feed back into **ppm_res** for allocation and utilisation tracking
 - Milestone events trigger **ntfy** notifications and **wflo** status transitions
+- EVM metrics feed **ppm_ctr** for contract performance reporting
+- Monte Carlo P80/P90 dates feed **risk** capability for schedule risk register entries
+- CCPM fever-chart zones feed **ntfy** for proactive buffer-breach alerts

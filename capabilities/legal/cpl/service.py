@@ -2,9 +2,14 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import hashlib
+import io
+import json
 import logging
 from copy import deepcopy
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 from uuid import uuid4
 
@@ -35,6 +40,10 @@ class LegalComplianceService:
 		self.assessments: dict[str, dict[str, Any]] = {}
 		self.remediation_plans: dict[str, dict[str, Any]] = {}
 		self.notifications: dict[str, dict[str, Any]] = {}
+		self.regulator_comms: dict[str, dict[str, Any]] = {}  # I11: regulator communication log
+		self.cost_entries: dict[str, dict[str, Any]] = {}     # I12: compliance cost tracking
+		self.attestations: dict[str, dict[str, Any]] = {}     # I15: attestation workflow
+		self._score_snapshots: dict[str, dict[str, Any]] = {} # I4: compliance trend history
 		self._audit_events: list[dict[str, Any]] = []
 
 	def _now(self) -> str:
@@ -49,14 +58,19 @@ class LegalComplianceService:
 		return val
 
 	def _emit(self, tenant_id: str, event_type: str, entity_id: str, details: dict[str, Any] | None = None) -> None:
-		self._audit_events.append({
+		# I13 (security): SHA-256 chain hash over previous event content — tamper-evident audit trail
+		prev_hash = self._audit_events[-1].get("chain_hash", "") if self._audit_events else ""
+		event: dict[str, Any] = {
 			"id": self._id("evt-"),
 			"tenant_id": tenant_id,
 			"event_type": event_type,
 			"entity_id": entity_id,
 			"details": details or {},
 			"created_at": self._now(),
-		})
+		}
+		chain_input = prev_hash + json.dumps(event, sort_keys=True, default=str)
+		event["chain_hash"] = hashlib.sha256(chain_input.encode()).hexdigest()
+		self._audit_events.append(event)
 
 	# ── Health & Describe ────────────────────────────────────────────────────
 
@@ -339,6 +353,9 @@ class LegalComplianceService:
 			"collection_date": collection_date,
 			"valid_until": valid_until,
 			"status": "active",
+			"custody_chain": [  # I5: chain-of-custody for regulatory enforceability
+				{"actor_id": collected_by_id, "action": "created", "timestamp": self._now(), "field_delta": {}}
+			],
 			"created_at": self._now(),
 		}
 		self.evidence[ev["id"]] = ev
@@ -360,26 +377,47 @@ class LegalComplianceService:
 			if e["tenant_id"] == tenant and e["requirement_id"] == requirement_id
 		]
 
-	async def update_evidence(self, tenant_id: str, evidence_id: str, **updates: Any) -> dict[str, Any]:
+	async def update_evidence(self, tenant_id: str, evidence_id: str, actor_id: str = "system", **updates: Any) -> dict[str, Any]:
 		tenant = self._tenant(tenant_id)
 		ev = self.evidence.get(evidence_id)
 		if not ev or ev["tenant_id"] != tenant:
 			raise KeyError(f"evidence {evidence_id} not found")
 		allowed = {"title", "description", "valid_until", "file_reference"}
+		delta: dict[str, Any] = {}
 		for k, v in updates.items():
 			if k in allowed and v is not None:
+				delta[k] = {"old": ev.get(k), "new": v}
 				ev[k] = v
+		# I5: append mutation to chain-of-custody so every evidence change is traceable
+		ev.setdefault("custody_chain", []).append(
+			{"actor_id": actor_id, "action": "updated", "timestamp": self._now(), "field_delta": delta}
+		)
 		self._emit(tenant, "evidence_updated", evidence_id, updates)
 		return deepcopy(ev)
 
-	async def delete_evidence(self, tenant_id: str, evidence_id: str) -> dict[str, Any]:
+	async def delete_evidence(self, tenant_id: str, evidence_id: str, actor_id: str = "system") -> dict[str, Any]:
 		tenant = self._tenant(tenant_id)
 		ev = self.evidence.get(evidence_id)
 		if not ev or ev["tenant_id"] != tenant:
 			raise KeyError(f"evidence {evidence_id} not found")
 		ev["status"] = "archived"
+		# I5: record archival in chain-of-custody
+		ev.setdefault("custody_chain", []).append(
+			{"actor_id": actor_id, "action": "archived", "timestamp": self._now(), "field_delta": {}}
+		)
 		self._emit(tenant, "evidence_archived", evidence_id)
 		return deepcopy(ev)
+
+	async def get_evidence_chain(self, tenant_id: str, evidence_id: str) -> list[dict[str, Any]]:
+		"""I5: Return the immutable chain-of-custody log for an evidence item.
+
+		Enables legal teams to demonstrate evidence integrity in enforcement proceedings.
+		"""
+		tenant = self._tenant(tenant_id)
+		ev = self.evidence.get(evidence_id)
+		if not ev or ev["tenant_id"] != tenant:
+			raise KeyError(f"evidence {evidence_id} not found")
+		return deepcopy(ev.get("custody_chain", []))
 
 	# ── Breach Reporting ─────────────────────────────────────────────────────
 
@@ -421,6 +459,16 @@ class LegalComplianceService:
 			"reported_at": None,
 			"created_at": self._now(),
 		}
+		# I8: compute 72-hour regulatory notification SLA at creation time (GDPR Art.33 / Kenya DPA s.43)
+		if notification_required:
+			try:
+				disc_dt = datetime.fromisoformat(discovery_date)
+			except ValueError:
+				disc_dt = datetime.utcnow()
+			breach["notification_sla_expires_at"] = (disc_dt + timedelta(hours=72)).isoformat(timespec="seconds") + "Z"
+		else:
+			breach["notification_sla_expires_at"] = None
+
 		self.breaches[breach["id"]] = breach
 		# Auto-flag requirement as non-compliant
 		r["status"] = "non_compliant"
@@ -430,6 +478,30 @@ class LegalComplianceService:
 			"severity": severity,
 			"notification_required": notification_required,
 		})
+
+		# I7: auto-generate structured remediation plan (collapses 5-day manual effort to minutes)
+		sla_hours = {"critical": 4, "high": 24, "medium": 72, "low": 168}
+		base_hours = sla_hours.get(severity, 72)
+		plan: dict[str, Any] = {
+			"id": self._id("rpl-"),
+			"tenant_id": tenant,
+			"breach_id": breach["id"],
+			"requirement_id": requirement_id,
+			"status": "active",
+			"auto_generated": True,
+			"milestones": [
+				{"step": 1, "title": "Notify DPO / Compliance Officer", "sla_hours": 1, "status": "pending"},
+				{"step": 2, "title": "Assess scope and affected records", "sla_hours": base_hours // 4 or 1, "status": "pending"},
+				{"step": 3, "title": "Contain breach and prevent further exposure", "sla_hours": base_hours // 2 or 2, "status": "pending"},
+				{"step": 4, "title": "Notify regulator if required", "sla_hours": 72, "status": "pending" if notification_required else "n/a"},
+				{"step": 5, "title": "Implement corrective controls", "sla_hours": base_hours, "status": "pending"},
+				{"step": 6, "title": "Post-incident review and lessons learned", "sla_hours": base_hours * 2, "status": "pending"},
+			],
+			"created_at": self._now(),
+		}
+		self.remediation_plans[plan["id"]] = plan
+		breach["remediation_plan_id"] = plan["id"]
+
 		_log.warning("compliance breach reported tenant=%s id=%s severity=%s", tenant, breach["id"], severity)
 		return deepcopy(breach)
 
@@ -576,3 +648,466 @@ class LegalComplianceService:
 		tenant = self._tenant(tenant_id)
 		events = [deepcopy(e) for e in self._audit_events if e["tenant_id"] == tenant]
 		return events[-limit:]
+
+	async def verify_audit_chain(self, tenant_id: str) -> dict[str, Any]:
+		"""Verify the SHA-256 chain-hash integrity of the audit trail.
+
+		Detects any tampering by re-computing each event's expected hash.
+		Returns {valid: bool, checked: int, first_broken_index: int | None}.
+		"""
+		tenant = self._tenant(tenant_id)
+		events = [e for e in self._audit_events if e["tenant_id"] == tenant]
+		prev_hash = ""
+		for i, evt in enumerate(events):
+			evt_body = {k: v for k, v in evt.items() if k != "chain_hash"}
+			chain_input = prev_hash + json.dumps(evt_body, sort_keys=True, default=str)
+			expected = hashlib.sha256(chain_input.encode()).hexdigest()
+			if evt.get("chain_hash") != expected:
+				return {"valid": False, "checked": i + 1, "first_broken_index": i}
+			prev_hash = evt["chain_hash"]
+		return {"valid": True, "checked": len(events), "first_broken_index": None}
+
+	# ── I3: Regulatory Penalty Exposure Calculator ───────────────────────────
+
+	async def calculate_penalty_exposure(
+		self,
+		tenant_id: str,
+		annual_turnover: Decimal,
+		currency: str = "USD",
+	) -> dict[str, Any]:
+		"""I3: Convert non-compliant requirements into board-ready financial risk figures.
+
+		Maps each non-compliant requirement's regulation to a penalty schedule and returns
+		per-requirement and aggregate maximum exposure. Turns a risk conversation from
+		qualitative to quantitative — replicates LogicGate's premium calculator feature.
+		"""
+		tenant = self._tenant(tenant_id)
+		if annual_turnover <= Decimal("0"):
+			raise ValueError("annual_turnover must be positive")
+
+		# Simplified penalty schedule: {regulation_prefix: (pct_of_turnover, fixed_cap_usd)}
+		_PENALTY_SCHEDULE: dict[str, tuple[Decimal, Decimal]] = {
+			"GDPR":    (Decimal("0.04"), Decimal("20_000_000")),
+			"DPA":     (Decimal("0.04"), Decimal("5_000_000")),
+			"PCIDSS":  (Decimal("0.00"), Decimal("500_000")),
+			"HIPAA":   (Decimal("0.00"), Decimal("1_900_000")),
+			"AML":     (Decimal("0.10"), Decimal("10_000_000")),
+			"DEFAULT": (Decimal("0.02"), Decimal("1_000_000")),
+		}
+
+		non_compliant = [
+			r for r in self.requirements.values()
+			if r["tenant_id"] == tenant and r["status"] == "non_compliant"
+		]
+
+		line_items: list[dict[str, Any]] = []
+		total_max = Decimal("0")
+
+		for r in non_compliant:
+			reg_key = r["regulation"].upper().split()[0] if r.get("regulation") else "DEFAULT"
+			pct, cap = _PENALTY_SCHEDULE.get(reg_key, _PENALTY_SCHEDULE["DEFAULT"])
+			pct_amount = (annual_turnover * pct).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+			max_exposure = min(pct_amount, cap) if pct_amount > Decimal("0") else cap
+			# Likely exposure: 30% of max for active, 80% for confirmed non-compliant
+			likely_multiplier = Decimal("0.80") if r["status"] == "non_compliant" else Decimal("0.30")
+			likely_exposure = (max_exposure * likely_multiplier).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+			total_max += max_exposure
+			line_items.append({
+				"requirement_id": r["id"],
+				"title": r["title"],
+				"regulation": r["regulation"],
+				"risk_level": r["risk_level"],
+				"max_exposure": str(max_exposure),
+				"likely_exposure": str(likely_exposure),
+				"currency": currency,
+			})
+
+		return {
+			"tenant_id": tenant,
+			"currency": currency,
+			"annual_turnover": str(annual_turnover),
+			"non_compliant_count": len(non_compliant),
+			"aggregate_max_exposure": str(total_max),
+			"line_items": sorted(line_items, key=lambda x: Decimal(x["max_exposure"]), reverse=True),
+			"calculated_at": self._now(),
+		}
+
+	# ── I4: Compliance Score Trend History ───────────────────────────────────
+
+	async def record_compliance_snapshot(self, tenant_id: str) -> dict[str, Any]:
+		"""I4: Persist today's compliance score for trend reporting.
+
+		Call daily (e.g., via a cron job) to build the historical dataset boards demand.
+		Drata and Vanta use weekly trend charts as their primary retention hook.
+		"""
+		tenant = self._tenant(tenant_id)
+		today = date.today().isoformat()
+		reqs = [r for r in self.requirements.values() if r["tenant_id"] == tenant]
+		compliant = sum(1 for r in reqs if r["status"] == "compliant")
+		rate = round(100 * compliant / len(reqs), 1) if reqs else 0.0
+		open_breaches = sum(1 for b in self.breaches.values() if b["tenant_id"] == tenant and b["status"] in {"open", "investigating"})
+		critical = sum(1 for r in reqs if r["risk_level"] == "critical" and r["status"] != "compliant")
+		snap = {
+			"date": today,
+			"tenant_id": tenant,
+			"compliance_rate_pct": rate,
+			"compliant_count": compliant,
+			"total_requirements": len(reqs),
+			"open_breaches": open_breaches,
+			"critical_non_compliant": critical,
+			"recorded_at": self._now(),
+		}
+		self._score_snapshots[f"{tenant}:{today}"] = snap
+		return deepcopy(snap)
+
+	async def get_compliance_trend(self, tenant_id: str, days: int = 90) -> dict[str, Any]:
+		"""I4: Return time-series compliance score data for board trend charts.
+
+		Returns snapshots within the requested window with delta and direction indicators.
+		"""
+		tenant = self._tenant(tenant_id)
+		if days < 1:
+			raise ValueError("days must be >= 1")
+		cutoff = (date.today() - timedelta(days=days)).isoformat()
+		snaps = sorted(
+			[s for k, s in self._score_snapshots.items() if k.startswith(f"{tenant}:") and s["date"] >= cutoff],
+			key=lambda s: s["date"],
+		)
+		# Compute delta vs previous snapshot
+		for i, s in enumerate(snaps):
+			if i > 0:
+				s["delta_pct"] = round(s["compliance_rate_pct"] - snaps[i - 1]["compliance_rate_pct"], 1)
+				s["direction"] = "up" if s["delta_pct"] > 0 else ("down" if s["delta_pct"] < 0 else "flat")
+			else:
+				s["delta_pct"] = None
+				s["direction"] = "baseline"
+		return {
+			"tenant_id": tenant,
+			"days": days,
+			"snapshot_count": len(snaps),
+			"snapshots": snaps,
+			"latest_rate_pct": snaps[-1]["compliance_rate_pct"] if snaps else None,
+		}
+
+	# ── I8: Breach Notification SLA Countdown ────────────────────────────────
+
+	async def get_breach_sla_status(self, tenant_id: str, breach_id: str) -> dict[str, Any]:
+		"""I8: Real-time countdown to GDPR/DPA 72-hour regulatory notification deadline.
+
+		Missing the notification SLA triggers fines that dwarf the original breach penalty.
+		Returns hours_remaining, is_overdue, and sla_status: green | amber | red.
+		"""
+		tenant = self._tenant(tenant_id)
+		b = self.breaches.get(breach_id)
+		if not b or b["tenant_id"] != tenant:
+			raise KeyError(f"breach {breach_id} not found")
+		if not b.get("notification_sla_expires_at"):
+			return {
+				"breach_id": breach_id,
+				"notification_required": False,
+				"sla_status": "n/a",
+				"hours_remaining": None,
+				"is_overdue": False,
+			}
+		expires_at = datetime.fromisoformat(b["notification_sla_expires_at"].rstrip("Z"))
+		now = datetime.utcnow()
+		diff_hours = (expires_at - now).total_seconds() / 3600
+		hours_remaining = round(diff_hours, 1)
+		is_overdue = hours_remaining < 0
+		if is_overdue:
+			sla_status = "red"
+		elif hours_remaining <= 24:
+			sla_status = "amber"
+		else:
+			sla_status = "green"
+		return {
+			"breach_id": breach_id,
+			"notification_required": True,
+			"sla_expires_at": b["notification_sla_expires_at"],
+			"hours_remaining": hours_remaining,
+			"is_overdue": is_overdue,
+			"sla_status": sla_status,
+			"notification_filed": b.get("reported_at") is not None,
+			"checked_at": self._now(),
+		}
+
+	# ── I10: Evidence Expiry and Gap Analysis ────────────────────────────────
+
+	async def get_evidence_gap_report(self, tenant_id: str) -> dict[str, Any]:
+		"""I10: Continuous audit-readiness scan — finds requirements with missing or expiring evidence.
+
+		Drata and Qualys use this pattern to guarantee audit-readiness 365 days a year
+		rather than scrambling on audit day.
+		"""
+		tenant = self._tenant(tenant_id)
+		today = date.today().isoformat()
+		horizon = (date.today() + timedelta(days=30)).isoformat()
+
+		reqs = [r for r in self.requirements.values() if r["tenant_id"] == tenant and r["status"] != "archived"]
+		evidence_by_req: dict[str, list[dict[str, Any]]] = {}
+		for ev in self.evidence.values():
+			if ev["tenant_id"] == tenant:
+				evidence_by_req.setdefault(ev["requirement_id"], []).append(ev)
+
+		items: list[dict[str, Any]] = []
+		total_gaps = 0
+		for r in reqs:
+			evs = evidence_by_req.get(r["id"], [])
+			active_evs = [e for e in evs if e["status"] == "active"]
+			valid_evs = [e for e in active_evs if not e.get("valid_until") or e["valid_until"] >= today]
+			expired_evs = [e for e in active_evs if e.get("valid_until") and e["valid_until"] < today]
+			expiring_soon = [e["id"] for e in valid_evs if e.get("valid_until") and e["valid_until"] <= horizon]
+			has_valid = len(valid_evs) > 0
+			if not has_valid:
+				total_gaps += 1
+			items.append({
+				"requirement_id": r["id"],
+				"title": r["title"],
+				"risk_level": r["risk_level"],
+				"has_valid_evidence": has_valid,
+				"valid_evidence_count": len(valid_evs),
+				"expired_count": len(expired_evs),
+				"expiring_in_30d": expiring_soon,
+				"gap": not has_valid,
+			})
+
+		items.sort(key=lambda x: (not x["gap"], x["risk_level"] == "low", x["title"]))
+		return {
+			"tenant_id": tenant,
+			"total_requirements": len(reqs),
+			"requirements_with_gaps": total_gaps,
+			"gap_rate_pct": round(100 * total_gaps / len(reqs), 1) if reqs else 0.0,
+			"items": items,
+			"generated_at": self._now(),
+		}
+
+	# ── I11: Regulator Communication Log ─────────────────────────────────────
+
+	async def log_regulator_communication(
+		self,
+		tenant_id: str,
+		entity_id: str,
+		regulator: str,
+		direction: str,
+		summary: str,
+		medium: str = "email",
+		reference: str = "",
+		actor_id: str = "",
+	) -> dict[str, Any]:
+		"""I11: Log correspondence with a regulator for litigation-ready audit records.
+
+		Every FCA, DPA, or CBK communication must be preserved with metadata.
+		Aderant and iManage are built around this concept; ad-hoc email folders don't
+		survive staff turnover and fail discovery requests.
+		"""
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(regulator, "regulator")
+		guard_non_empty_string(summary, "summary")
+		if direction not in {"inbound", "outbound"}:
+			raise ValueError("direction must be 'inbound' or 'outbound'")
+		comm: dict[str, Any] = {
+			"id": self._id("comm-"),
+			"tenant_id": tenant,
+			"entity_id": entity_id,
+			"regulator": regulator,
+			"direction": direction,
+			"summary": summary,
+			"medium": medium,
+			"reference": reference,
+			"actor_id": actor_id,
+			"logged_at": self._now(),
+		}
+		self.regulator_comms[comm["id"]] = comm
+		self._emit(tenant, "regulator_comm_logged", comm["id"], {"regulator": regulator, "direction": direction})
+		_log.info("regulator comm logged tenant=%s regulator=%s direction=%s", tenant, regulator, direction)
+		return deepcopy(comm)
+
+	async def list_regulator_comms(
+		self,
+		tenant_id: str,
+		entity_id: str | None = None,
+		regulator: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""I11: Return chronological regulator communication log for an entity or across all entities."""
+		tenant = self._tenant(tenant_id)
+		items = [deepcopy(c) for c in self.regulator_comms.values() if c["tenant_id"] == tenant]
+		if entity_id:
+			items = [c for c in items if c["entity_id"] == entity_id]
+		if regulator:
+			items = [c for c in items if c["regulator"] == regulator]
+		return sorted(items, key=lambda c: c["logged_at"])
+
+	# ── I12: Compliance Cost Tracking ────────────────────────────────────────
+
+	async def log_compliance_cost(
+		self,
+		tenant_id: str,
+		requirement_id: str,
+		amount: Decimal,
+		currency: str,
+		cost_type: str,
+		period: str,
+		recorded_by: str,
+	) -> dict[str, Any]:
+		"""I12: Track auditor fees, tool licenses, and staff time per requirement.
+
+		CFOs demand ROI on compliance spend; 80% of companies track this in spreadsheets.
+		MetricStream and Riskonnect embed cost modules — this brings that to APG at no
+		additional per-seat cost.
+		"""
+		tenant = self._tenant(tenant_id)
+		r = self.requirements.get(requirement_id)
+		if not r or r["tenant_id"] != tenant:
+			raise KeyError(f"requirement {requirement_id} not found")
+		if amount <= Decimal("0"):
+			raise ValueError("amount must be positive")
+		guard_non_empty_string(currency, "currency")
+		entry: dict[str, Any] = {
+			"id": self._id("cost-"),
+			"tenant_id": tenant,
+			"requirement_id": requirement_id,
+			"regulation": r["regulation"],
+			"category": r["category"],
+			"amount": str(amount),
+			"currency": currency,
+			"cost_type": cost_type,
+			"period": period,
+			"recorded_by": recorded_by,
+			"recorded_at": self._now(),
+		}
+		self.cost_entries[entry["id"]] = entry
+		self._emit(tenant, "compliance_cost_logged", entry["id"], {"amount": str(amount), "currency": currency})
+		return deepcopy(entry)
+
+	async def get_compliance_cost_summary(self, tenant_id: str, currency: str | None = None) -> dict[str, Any]:
+		"""I12: Return per-regulation and per-category compliance cost totals as Decimal.
+
+		Provides legal ops with a clear budget defence and identifies highest-cost regulations.
+		"""
+		tenant = self._tenant(tenant_id)
+		entries = [e for e in self.cost_entries.values() if e["tenant_id"] == tenant]
+		if currency:
+			entries = [e for e in entries if e["currency"] == currency]
+
+		by_regulation: dict[str, Decimal] = {}
+		by_category: dict[str, Decimal] = {}
+		total = Decimal("0")
+
+		for e in entries:
+			amt = Decimal(e["amount"])
+			reg = e.get("regulation", "unknown")
+			cat = e.get("category", "unknown")
+			by_regulation[reg] = by_regulation.get(reg, Decimal("0")) + amt
+			by_category[cat] = by_category.get(cat, Decimal("0")) + amt
+			total += amt
+
+		return {
+			"tenant_id": tenant,
+			"currency_filter": currency,
+			"total": str(total),
+			"by_regulation": {k: str(v) for k, v in sorted(by_regulation.items(), key=lambda x: x[1], reverse=True)},
+			"by_category": {k: str(v) for k, v in sorted(by_category.items(), key=lambda x: x[1], reverse=True)},
+			"entry_count": len(entries),
+			"generated_at": self._now(),
+		}
+
+	# ── I13: Owner Workload Balancing ─────────────────────────────────────────
+
+	async def get_owner_workload(self, tenant_id: str) -> dict[str, Any]:
+		"""I13: Surface per-owner compliance workload to prevent single points of failure.
+
+		Without workload visibility, overburdened owners miss deadlines silently.
+		Navex Global and SAI360 both surface per-owner workload — this closes the
+		people-management gap in compliance operations.
+		"""
+		tenant = self._tenant(tenant_id)
+		today = date.today().isoformat()
+		reqs = [r for r in self.requirements.values() if r["tenant_id"] == tenant]
+		breaches = [b for b in self.breaches.values() if b["tenant_id"] == tenant]
+		calendars = [c for c in self.calendar_entries.values() if c["tenant_id"] == tenant]
+
+		owners: dict[str, dict[str, Any]] = {}
+
+		for r in reqs:
+			owner = r.get("owner_id", "unassigned")
+			if owner not in owners:
+				owners[owner] = {
+					"owner_id": owner,
+					"active_requirements": 0,
+					"non_compliant": 0,
+					"overdue_calendar": 0,
+					"open_breaches": 0,
+					"compliance_rate_pct": 0.0,
+					"_compliant": 0,
+					"_total": 0,
+				}
+			o = owners[owner]
+			o["_total"] += 1
+			if r["status"] == "active":
+				o["active_requirements"] += 1
+			if r["status"] == "non_compliant":
+				o["non_compliant"] += 1
+			if r["status"] == "compliant":
+				o["_compliant"] += 1
+
+		for c in calendars:
+			r = self.requirements.get(c.get("requirement_id", ""))
+			owner = r.get("owner_id", "unassigned") if r else c.get("assigned_to_id", "unassigned")
+			if owner in owners and c["status"] == "pending" and c["scheduled_date"] < today:
+				owners[owner]["overdue_calendar"] += 1
+
+		# Associate breaches with requirement owners
+		for b in breaches:
+			if b["status"] not in {"open", "investigating"}:
+				continue
+			r = self.requirements.get(b.get("requirement_id", ""))
+			owner = r.get("owner_id", "unassigned") if r else "unassigned"
+			if owner in owners:
+				owners[owner]["open_breaches"] += 1
+
+		# Compute compliance rate per owner
+		for o in owners.values():
+			if o["_total"] > 0:
+				o["compliance_rate_pct"] = round(100 * o["_compliant"] / o["_total"], 1)
+			del o["_compliant"]
+			del o["_total"]
+
+		return {
+			"tenant_id": tenant,
+			"owner_count": len(owners),
+			"workloads": sorted(owners.values(), key=lambda o: o["non_compliant"], reverse=True),
+			"generated_at": self._now(),
+		}
+
+	async def reassign_requirement(
+		self,
+		tenant_id: str,
+		requirement_id: str,
+		new_owner_id: str,
+		reason: str = "",
+		reassign_calendar: bool = True,
+	) -> dict[str, Any]:
+		"""I13: Transfer requirement ownership with full audit trail.
+
+		Ensures accountability during staff transitions and prevents compliance gaps
+		from orphaned requirements.
+		"""
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(new_owner_id, "new_owner_id")
+		r = self.requirements.get(requirement_id)
+		if not r or r["tenant_id"] != tenant:
+			raise KeyError(f"requirement {requirement_id} not found")
+		old_owner = r.get("owner_id")
+		r["owner_id"] = new_owner_id
+		r["updated_at"] = self._now()
+		if reassign_calendar:
+			for c in self.calendar_entries.values():
+				if c["tenant_id"] == tenant and c["requirement_id"] == requirement_id and c["status"] == "pending":
+					c["assigned_to_id"] = new_owner_id
+		self._emit(tenant, "requirement_reassigned", requirement_id, {
+			"old_owner": old_owner,
+			"new_owner": new_owner_id,
+			"reason": reason,
+		})
+		_log.info("requirement reassigned tenant=%s id=%s from=%s to=%s", tenant, requirement_id, old_owner, new_owner_id)
+		return deepcopy(r)

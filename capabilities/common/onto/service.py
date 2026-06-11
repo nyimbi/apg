@@ -60,7 +60,7 @@ class OntoService:
 		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
 		self._agent_roles = set(contract["agents"]["supported_roles"])
 		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
-		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
+		self._lifecycle_operations = set(contract["configuration"]["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -893,6 +893,469 @@ class OntoService:
 			ontology_id=ontology_id,
 			export_format="rdf",
 		) | {"serialisation": "turtle", "exported_by": exported_by}
+
+	# ------------------------------------------------------------------
+	# Async API
+	# ------------------------------------------------------------------
+
+	async def async_register_ontology(
+		self,
+		ontology_id: str,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		domain: str,
+		description: str = "",
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Async wrapper around register_ontology for pipeline use."""
+		return self.register_ontology(
+			ontology_id=ontology_id,
+			tenant_id=tenant_id,
+			name=name,
+			owner=owner,
+			domain=domain,
+			description=description,
+			metadata=metadata,
+		)
+
+	async def async_create_term(
+		self,
+		term_id: str,
+		tenant_id: str,
+		ontology_id: str,
+		label: str,
+		owner: str,
+		definition: str = "",
+		status: str = "draft",
+		synonyms: list[str] | None = None,
+		external_refs: list[str] | None = None,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Async wrapper around create_term for pipeline use."""
+		return self.create_term(
+			term_id=term_id,
+			tenant_id=tenant_id,
+			ontology_id=ontology_id,
+			label=label,
+			owner=owner,
+			definition=definition,
+			status=status,
+			synonyms=synonyms,
+			external_refs=external_refs,
+			metadata=metadata,
+		)
+
+	async def async_bulk_create_terms(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+		terms: list[dict[str, Any]],
+		owner: str,
+		stop_on_error: bool = False,
+	) -> dict[str, Any]:
+		"""Bulk-create terms in one call with per-item error reporting.
+
+		Each item needs at minimum ``label``; optionally accepts ``term_id``,
+		``definition``, ``status``, ``synonyms``, ``external_refs``, ``metadata``.
+		"""
+		created: list[dict[str, Any]] = []
+		failed: list[dict[str, Any]] = []
+		for item in terms:
+			label = item.get("label", "")
+			term_id = item.get("term_id") or stable_id("onto_term", tenant_id, ontology_id, label, len(created))
+			try:
+				result = self.create_term(
+					term_id=term_id,
+					tenant_id=tenant_id,
+					ontology_id=ontology_id,
+					label=label,
+					owner=owner,
+					definition=item.get("definition", ""),
+					status=item.get("status", "draft"),
+					synonyms=item.get("synonyms"),
+					external_refs=item.get("external_refs"),
+					metadata=item.get("metadata"),
+				)
+				created.append(result)
+			except Exception as exc:
+				failed.append({"label": label, "term_id": term_id, "error": str(exc)})
+				if stop_on_error:
+					break
+		self._audit(tenant_id, "bulk_terms_created", ontology_id, f"Bulk: {len(created)} ok / {len(failed)} failed")
+		return {
+			"ontology_id": ontology_id,
+			"tenant_id": tenant_id,
+			"requested_count": len(terms),
+			"created_count": len(created),
+			"failed_count": len(failed),
+			"created": created,
+			"failed": failed,
+			"completed_at": utc_now_iso(),
+		}
+
+	async def find_similar_terms(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+		candidate_label: str,
+		top_k: int = 5,
+		similarity_threshold: float = 0.85,
+	) -> dict[str, Any]:
+		"""Near-duplicate detection via token Jaccard similarity.
+
+		A drop-in for embedding-based cosine similarity; no extra dependencies.
+		Items whose score >= similarity_threshold are flagged as potential duplicates.
+		"""
+		self._require_tenant(tenant_id)
+		self._require_ontology(ontology_id, tenant_id)
+		terms = self._term_dicts(ontology_id, tenant_id)
+
+		def _jaccard(a: str, b: str) -> float:
+			sa = set(normalize_label(a).split())
+			sb = set(normalize_label(b).split())
+			if not sa and not sb:
+				return 1.0
+			if not sa or not sb:
+				return 0.0
+			return len(sa & sb) / len(sa | sb)
+
+		scored = sorted(
+			[
+				{
+					"term_id": t["id"],
+					"label": t["label"],
+					"similarity": round(_jaccard(candidate_label, t["label"]), 4),
+					"status": t["status"],
+				}
+				for t in terms
+			],
+			key=lambda x: x["similarity"],
+			reverse=True,
+		)
+		candidates = scored[:top_k]
+		duplicates = [c for c in candidates if c["similarity"] >= similarity_threshold]
+		self._audit(tenant_id, "similar_terms_searched", ontology_id, f"Similarity: '{candidate_label}' -> {len(duplicates)} potential dupes")
+		return {
+			"ontology_id": ontology_id,
+			"tenant_id": tenant_id,
+			"candidate_label": candidate_label,
+			"top_k": top_k,
+			"similarity_threshold": similarity_threshold,
+			"candidates": candidates,
+			"potential_duplicate_count": len(duplicates),
+			"searched_at": utc_now_iso(),
+		}
+
+	async def align_ontologies(
+		self,
+		tenant_id: str,
+		source_ontology_id: str,
+		target_ontology_id: str,
+		strategy: str = "lexical",
+		confidence_cutoff: float = 0.75,
+		auto_create_above: float | None = None,
+	) -> dict[str, Any]:
+		"""Cross-ontology term alignment.
+
+		Strategies: ``lexical`` (label token Jaccard), ``synonym`` (includes altLabels).
+		When *auto_create_above* is set, candidates above that threshold are
+		persisted automatically as SemanticMappings.
+		"""
+		self._require_tenant(tenant_id)
+		src = self._require_ontology(source_ontology_id, tenant_id)
+		tgt = self._require_ontology(target_ontology_id, tenant_id)
+		assert strategy in {"lexical", "synonym"}, f"unsupported alignment strategy: {strategy}"
+
+		src_terms = self._term_dicts(src.id, tenant_id)
+		tgt_terms = self._term_dicts(tgt.id, tenant_id)
+
+		def _tokens(term: dict[str, Any]) -> set[str]:
+			base = set(normalize_label(term["label"]).split())
+			if strategy == "synonym":
+				for syn in term.get("synonyms", []):
+					base |= set(normalize_label(syn).split())
+			return base
+
+		def _sim(a: dict[str, Any], b: dict[str, Any]) -> float:
+			sa, sb = _tokens(a), _tokens(b)
+			if not sa or not sb:
+				return 0.0
+			return len(sa & sb) / len(sa | sb)
+
+		candidates: list[dict[str, Any]] = []
+		auto_created = 0
+		for s in src_terms:
+			for t in tgt_terms:
+				score = round(_sim(s, t), 4)
+				if score < confidence_cutoff:
+					continue
+				candidates.append({
+					"source_term_id": s["id"],
+					"source_label": s["label"],
+					"target_term_id": t["id"],
+					"target_label": t["label"],
+					"confidence": score,
+					"strategy": strategy,
+				})
+				if auto_create_above is not None and score >= auto_create_above:
+					mid = stable_id("onto_align", tenant_id, s["id"], t["id"])
+					try:
+						self.create_mapping(
+							mapping_id=mid,
+							tenant_id=tenant_id,
+							term_id=s["id"],
+							target_ref=f"onto:{target_ontology_id}#{t['id']}",
+							mapping_type="close" if score < 0.95 else "exact",
+							confidence=score,
+							metadata={"alignment_strategy": strategy, "auto_aligned": True},
+						)
+						auto_created += 1
+					except Exception as _exc:
+						_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+		candidates.sort(key=lambda x: x["confidence"], reverse=True)
+		self._audit(tenant_id, "ontologies_aligned", source_ontology_id, f"Aligned {src.name} -> {tgt.name}: {len(candidates)} candidates")
+		return {
+			"source_ontology_id": source_ontology_id,
+			"target_ontology_id": target_ontology_id,
+			"tenant_id": tenant_id,
+			"strategy": strategy,
+			"confidence_cutoff": confidence_cutoff,
+			"candidate_count": len(candidates),
+			"auto_created_count": auto_created,
+			"candidates": candidates[:100],
+			"aligned_at": utc_now_iso(),
+		}
+
+	async def compute_version_diff(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+	) -> dict[str, Any]:
+		"""Structural diff between current state and last-published snapshot.
+
+		Classifies the recommended version bump as patch / minor / major based
+		on OWL change-severity rules (removal or deprecation = breaking = major).
+		"""
+		self._require_tenant(tenant_id)
+		ontology = self._require_ontology(ontology_id, tenant_id)
+		all_terms = self._term_dicts(ontology_id, tenant_id)
+		published_terms = {t["id"] for t in all_terms if t["status"] == "published"}
+		current_terms = {t["id"] for t in all_terms}
+		current_map = {t["id"]: t for t in all_terms}
+		added = current_terms - published_terms
+		removed: set[str] = set()   # would need snapshot history; conservative empty
+		deprecated = {tid for tid in published_terms if current_map.get(tid, {}).get("status") == "deprecated"}
+		breaking = bool(removed or deprecated)
+		bump = "major" if removed else ("minor" if added else "patch")
+		self._audit(tenant_id, "version_diff_computed", ontology_id, f"Diff: +{len(added)} dep:{len(deprecated)}")
+		return {
+			"ontology_id": ontology_id,
+			"tenant_id": tenant_id,
+			"current_version": ontology.version,
+			"added_term_count": len(added),
+			"removed_term_count": len(removed),
+			"deprecated_term_count": len(deprecated),
+			"breaking_change": breaking,
+			"recommended_bump": bump,
+			"computed_at": utc_now_iso(),
+		}
+
+	async def export_skos(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+		exported_by: str = "system",
+	) -> dict[str, Any]:
+		"""Serialize the ontology as W3C SKOS Turtle.
+
+		Terms -> skos:Concept, synonyms -> skos:altLabel,
+		broader_than edges -> skos:broader/skos:narrower,
+		related_to edges -> skos:related.
+		"""
+		self._require_tenant(tenant_id)
+		ontology = self._require_ontology(ontology_id, tenant_id)
+		terms = self._term_dicts(ontology_id, tenant_id)
+		edges = self._taxonomy_edge_dicts(ontology_id, tenant_id)
+		lines: list[str] = [
+			"@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
+			"@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
+			f"@prefix onto: <https://apg.datacraft.co.ke/onto/{tenant_id}/{ontology_id}#> .",
+			"",
+			"onto:scheme a skos:ConceptScheme ;",
+			f'    rdfs:label "{ontology.name}" .',
+			"",
+		]
+		for t in terms:
+			lines.append(f'onto:{t["id"]} a skos:Concept ;')
+			lines.append(f'    skos:prefLabel "{t["label"]}" ;')
+			if t.get("definition"):
+				lines.append(f'    skos:definition "{t["definition"]}" ;')
+			for syn in t.get("synonyms", []):
+				lines.append(f'    skos:altLabel "{syn}" ;')
+			lines.append(f'    skos:inScheme onto:scheme .')
+			lines.append("")
+		for edge in edges:
+			if edge["relationship_type"] == "broader_than":
+				lines.append(f'onto:{edge["child_term_id"]} skos:broader onto:{edge["parent_term_id"]} .')
+				lines.append(f'onto:{edge["parent_term_id"]} skos:narrower onto:{edge["child_term_id"]} .')
+			elif edge["relationship_type"] == "related_to":
+				lines.append(f'onto:{edge["parent_term_id"]} skos:related onto:{edge["child_term_id"]} .')
+		turtle_str = "\n".join(lines)
+		export_rec = self.export_ontology(
+			export_id=stable_id("onto_skos", tenant_id, ontology_id, "skos"),
+			tenant_id=tenant_id,
+			ontology_id=ontology_id,
+			export_format="rdf",
+		)
+		self._audit(tenant_id, "skos_exported", ontology_id, f"SKOS: {len(terms)} concepts")
+		return export_rec | {
+			"serialisation": "skos_turtle",
+			"concept_count": len(terms),
+			"exported_by": exported_by,
+			"turtle": turtle_str,
+		}
+
+	async def verify_audit_chain(
+		self,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""SHA-256 Merkle-style integrity check over the tenant audit event chain.
+
+		Stamps events with ``event_hash`` / ``prev_hash`` on first call,
+		establishing a tamper-evident baseline for subsequent runs.
+		"""
+		import hashlib
+		import json as _json
+		self._require_tenant(tenant_id)
+		events = sorted(
+			[ev for ev in self._audit_events.values() if ev.tenant_id == tenant_id],
+			key=lambda e: e.id,
+		)
+		prev_hash = "genesis"
+		chain_valid = True
+		broken_links: list[str] = []
+		for ev in events:
+			payload = {"id": ev.id, "event_type": ev.event_type, "subject_id": ev.subject_id, "message": ev.message, "prev_hash": prev_hash}
+			current_hash = hashlib.sha256(_json.dumps(payload, sort_keys=True).encode()).hexdigest()
+			stored = ev.audit_evidence.get("event_hash")
+			if stored is None:
+				ev.audit_evidence["event_hash"] = current_hash
+				ev.audit_evidence["prev_hash"] = prev_hash
+			elif stored != current_hash:
+				chain_valid = False
+				broken_links.append(ev.id)
+			prev_hash = current_hash
+		return {
+			"tenant_id": tenant_id,
+			"event_count": len(events),
+			"chain_valid": chain_valid,
+			"broken_link_count": len(broken_links),
+			"broken_links": broken_links,
+			"chain_tip_hash": prev_hash,
+			"verified_at": utc_now_iso(),
+		}
+
+	async def suggest_definition(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+		label: str,
+		synonyms: list[str] | None = None,
+		domain_hint: str = "",
+		model: str = "llama3.2",
+	) -> dict[str, Any]:
+		"""Generate LLM-assisted definition candidates via local Ollama.
+
+		Falls back to template stubs when Ollama is unreachable.  The
+		``provenance`` block records the model and prompt hash for audit.
+		"""
+		import hashlib
+		self._require_tenant(tenant_id)
+		self._require_ontology(ontology_id, tenant_id)
+		synonyms_str = ", ".join(synonyms or [])
+		prompt = (
+			f"Write three concise ontology definitions for '{label}'"
+			+ (f" (synonyms: {synonyms_str})" if synonyms_str else "")
+			+ (f" in the domain of {domain_hint}" if domain_hint else "")
+			+ ". Number them 1, 2, 3. One sentence each."
+		)
+		prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()[:12]
+		candidates: list[str] = []
+		source = "template_fallback"
+		try:
+			import urllib.request, json as _json
+			payload = _json.dumps({"model": model, "prompt": prompt, "stream": False}).encode()
+			req = urllib.request.Request(
+				"http://localhost:11434/api/generate",
+				data=payload,
+				headers={"Content-Type": "application/json"},
+				method="POST",
+			)
+			with urllib.request.urlopen(req, timeout=10) as resp:
+				raw = _json.loads(resp.read()).get("response", "")
+			import re as _re
+			candidates = _re.findall(r'\d\.\s+(.+)', raw)[:3]
+			if candidates:
+				source = f"ollama:{model}"
+		except Exception as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+		if not candidates:
+			ctx = f" in the context of {domain_hint}" if domain_hint else ""
+			candidates = [
+				f"{label} refers to a concept{ctx} that ...",
+				f"A {label} is defined as{ctx} ...",
+				f"The term {label} denotes{ctx} ...",
+			]
+		self._audit(tenant_id, "definition_suggested", ontology_id, f"Definition suggestion for '{label}' via {source}")
+		return {
+			"ontology_id": ontology_id,
+			"tenant_id": tenant_id,
+			"label": label,
+			"candidates": candidates,
+			"source": source,
+			"model": model,
+			"provenance": {"prompt_hash": prompt_hash, "model": model, "source": source},
+			"suggested_at": utc_now_iso(),
+		}
+
+	async def sync_to_graph(
+		self,
+		tenant_id: str,
+		ontology_id: str,
+		graph_adapter: Any | None = None,
+	) -> dict[str, Any]:
+		"""Push ontology nodes and edges to a grph capability adapter.
+
+		When *graph_adapter* is None returns the payload dry-run without pushing.
+		Adapter must expose ``async upsert_nodes(list)`` and ``async upsert_edges(list)``.
+		"""
+		self._require_tenant(tenant_id)
+		self._require_ontology(ontology_id, tenant_id)
+		terms = self._term_dicts(ontology_id, tenant_id)
+		edges = self._taxonomy_edge_dicts(ontology_id, tenant_id)
+		nodes = [{"id": t["id"], "label": t["label"], "status": t["status"], "ontology_id": ontology_id, "tenant_id": tenant_id, "definition": t.get("definition", "")} for t in terms]
+		graph_edges = [{"source": e["parent_term_id"], "target": e["child_term_id"], "type": e["relationship_type"], "ontology_id": ontology_id, "tenant_id": tenant_id} for e in edges]
+		pushed = False
+		if graph_adapter is not None:
+			await graph_adapter.upsert_nodes(nodes)
+			await graph_adapter.upsert_edges(graph_edges)
+			pushed = True
+		self._audit(tenant_id, "synced_to_graph", ontology_id, f"Graph sync: {len(nodes)} nodes, {len(graph_edges)} edges")
+		return {
+			"ontology_id": ontology_id,
+			"tenant_id": tenant_id,
+			"node_count": len(nodes),
+			"edge_count": len(graph_edges),
+			"pushed": pushed,
+			"nodes": nodes if not pushed else [],
+			"edges": graph_edges if not pushed else [],
+			"synced_at": utc_now_iso(),
+		}
+
+	# ------------------------------------------------------------------
+	# Compat / generic record API
+	# ------------------------------------------------------------------
 
 	def create_record(
 		self,

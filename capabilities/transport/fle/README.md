@@ -40,6 +40,17 @@ The Fleet Management capability handles the complete vehicle lifecycle from regi
 | /transport-fleet/telematics | GET | Telematics events | transport_fle:telematics |
 | /transport-fleet/compliance | GET | Compliance records | transport_fle:compliance |
 | /transport-fleet/utilisation | GET | Utilisation analytics | transport_fle:utilisation |
+| /api/fle/v1/fuel/<id>/audit | POST | Fuel fraud anomaly audit | transport_fle:audit |
+| /api/fle/v1/drivers/<id>/fatigue-risk | GET | Driver fatigue risk score | transport_fle:drivers |
+| /api/fle/v1/vehicles/<id>/disposal | GET | Disposal/replacement recommendation | transport_fle:vehicles |
+| /api/fle/v1/shifts/optimise | POST | HOS-constrained shift assignment | transport_fle:dispatch |
+| /api/fle/v1/reports/budget-variance | POST | MTD budget burn-rate variance | transport_fle:reports |
+| /api/fle/v1/incidents/<id>/claim-pack | GET | Insurance claim evidence pack | transport_fle:incidents |
+| /api/fle/v1/geofence/event | POST | Geofence workflow trigger | transport_fle:telematics |
+| /api/fle/v1/telematics/<id>/coaching | POST | In-cab coaching event | transport_fle:telematics |
+| /api/fle/v1/vehicles/<id>/health | GET | 360-degree vehicle health snapshot | transport_fle:vehicles |
+| /api/fle/v1/reports/driver-leaderboard | GET | Driver behaviour leaderboard | transport_fle:reports |
+| /api/fle/v1/maintenance/<id>/defer | POST | Defer maintenance with audit trail | transport_fle:maintenance |
 
 ## Business Rules
 
@@ -68,5 +79,23 @@ The Fleet Management capability handles the complete vehicle lifecycle from regi
 - Telematics provider must be on the supported list to prevent rogue data ingestion
 - CPC expiry tracked independently from licence validity
 
+## Advanced Analytics Methods
+
+| Service Method | Description |
+|----------------|-------------|
+| `audit_fuel_record(id)` | Statistical fraud detection: price deviation, volume anomaly, duplicate receipt |
+| `assess_driver_fatigue_risk(driver_id, days)` | Tachograph-pattern fatigue risk score without hardware |
+| `disposal_recommendation(vehicle_id, market_value)` | Data-driven replace/monitor/retain recommendation |
+| `optimise_shift_assignments(date)` | Greedy HOS-constrained driver–trip assignment |
+| `fleet_budget_variance(fuel_budget, maint_budget)` | MTD burn-rate vs budget with projected month-end |
+| `generate_incident_claim_pack(incident_id)` | Automated insurance claim evidence package |
+| `process_geofence_event(vehicle_id, fence, type)` | Geofence workflow trigger with step execution |
+| `generate_driver_coaching_event(telematics_id)` | Contextual in-cab micro-coaching message |
+| `vehicle_health_snapshot(vehicle_id)` | 360-degree health score + all risk signals in one call |
+| `driver_leaderboard(top_n)` | Ranked driver behaviour leaderboard for gamification |
+| `deferred_maintenance(id, new_date, reason)` | Defer scheduled maintenance with full audit trail |
+
 ## Composability Notes
 Acts as the master registry for `transport_dis` (driver and vehicle assignment), `transport_mai` (maintenance scheduling), `transport_fue` (fuel transaction attribution), and `transport_tra` (asset tracking linkage via vehicle ID).
+
+Emits domain events consumed by: `ntfy` (compliance and budget alerts), `wflo` (geofence workflows, post-trip inspections), `bia` (ESG/emissions dashboard), `schd` (shift schedule feed), `scm` (parts availability for predictive maintenance).

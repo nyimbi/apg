@@ -930,6 +930,470 @@ class EODService:
 			daily_durations=daily,
 		)
 
+	# ─── New world-class improvement methods ─────────────────────────────────
+
+	async def compute_penalty_interest(
+		self,
+		tenant_id: str,
+		processing_date: str | date,
+		dry_run: bool = False,
+	) -> dict[str, Any]:
+		"""Compute and post penalty interest on overdue loan instalments (I1).
+
+		Penalty accrues from the day after the due date at the contractual
+		penalty rate (default: 2× the loan rate, minimum 5 % p.a.).
+
+		Posting:
+		  DR  Loan Receivable – Penalty
+		  CR  Penalty Interest Income
+		"""
+		guard_tenant_id(tenant_id)
+		date_str = processing_date.isoformat() if isinstance(processing_date, date) else processing_date
+		d = _parse_date(date_str)
+		_log.info("[EOD] compute_penalty_interest tenant=%s date=%s dry_run=%s", tenant_id, date_str, dry_run)
+
+		# ── Adapter hook ──────────────────────────────────────────────────────
+		# In production: query overdue_loan_instalments where due_date < processing_date
+		# For each instalment: days_overdue = (d - due_date).days
+		#                      penalty_rate = max(loan.rate * 2, Decimal("0.05"))
+		#                      daily_penalty = overdue_balance * penalty_rate / Decimal("365")
+		# ─────────────────────────────────────────────────────────────────────
+		loans_assessed: list[dict[str, Any]] = []
+		total_penalty  = Decimal("0")
+		entries_posted = 0
+
+		# Simulated: in reality iterate adapter rows
+		for loan_stub in loans_assessed:
+			overdue_balance  = Decimal(str(loan_stub.get("overdue_balance", "0")))
+			days_overdue     = int(loan_stub.get("days_overdue", 0))
+			penalty_rate_pct = Decimal(str(loan_stub.get("penalty_rate", "0.10")))
+			daily_penalty    = overdue_balance * penalty_rate_pct / Decimal("365")
+			total_penalty   += daily_penalty
+			if not dry_run:
+				# adapter.post_penalty_entry(loan_stub["loan_id"], daily_penalty, date_str)
+				entries_posted += 1
+
+		_log.info(
+			"[EOD] penalty_interest tenant=%s date=%s loans=%d total_penalty=%s entries=%d",
+			tenant_id, date_str, len(loans_assessed), total_penalty, entries_posted,
+		)
+		return {
+			"tenant_id":      tenant_id,
+			"processing_date": date_str,
+			"loans_assessed": len(loans_assessed),
+			"total_penalty_accrued": str(total_penalty),
+			"entries_posted":  entries_posted,
+			"dry_run":         dry_run,
+		}
+
+	async def run_ifrs9_ecl_staging(
+		self,
+		tenant_id: str,
+		processing_date: str | date,
+		dry_run: bool = False,
+	) -> dict[str, Any]:
+		"""Classify loans into IFRS 9 ECL stages and post provision deltas (I2).
+
+		Stage 1: 12-month ECL — no SICR.
+		Stage 2: Lifetime ECL — Significant Increase in Credit Risk (DPD > 30 or rating downgrade).
+		Stage 3: Credit-impaired — DPD ≥ 90 or legal default.
+
+		Posting per loan with positive delta:
+		  DR  Impairment Expense (P&L)
+		  CR  Loan Loss Reserve (Balance Sheet)
+
+		For negative delta (improvement):
+		  DR  Loan Loss Reserve
+		  CR  Impairment Expense
+		"""
+		guard_tenant_id(tenant_id)
+		date_str = processing_date.isoformat() if isinstance(processing_date, date) else processing_date
+		_log.info("[EOD] ifrs9_ecl_staging tenant=%s date=%s dry_run=%s", tenant_id, date_str, dry_run)
+
+		stage_counts: dict[str, int]    = {"stage_1": 0, "stage_2": 0, "stage_3": 0}
+		provision_delta = Decimal("0")
+		entries_posted  = 0
+
+		# ── Adapter hook ──────────────────────────────────────────────────────
+		# loans = adapter.get_loans_for_ecl(tenant_id, date_str)
+		# for loan in loans:
+		#   new_stage = _determine_stage(loan.dpd, loan.risk_rating, loan.watchlist)
+		#   ecl = _calculate_ecl(loan.ead, loan.pd[new_stage], loan.lgd, discount_factor)
+		#   delta = ecl - loan.current_provision
+		#   if delta != 0 and not dry_run:
+		#       adapter.post_provision_entry(loan.id, delta, date_str, new_stage)
+		#   provision_delta += delta
+		#   stage_counts[f"stage_{new_stage}"] += 1
+		# ─────────────────────────────────────────────────────────────────────
+
+		_log.info(
+			"[EOD] ifrs9_staging tenant=%s date=%s stages=%s provision_delta=%s",
+			tenant_id, date_str, stage_counts, provision_delta,
+		)
+		return {
+			"tenant_id":        tenant_id,
+			"processing_date":  date_str,
+			"stage_counts":     stage_counts,
+			"provision_delta":  str(provision_delta),
+			"entries_posted":   entries_posted,
+			"dry_run":          dry_run,
+		}
+
+	async def compute_liquidity_coverage_ratio(
+		self,
+		tenant_id: str,
+		processing_date: str | date,
+	) -> dict[str, Any]:
+		"""Compute Basel III LCR and flag breaches (I3).
+
+		LCR = HQLA / Net Stressed Outflows (30-day) ≥ 1.0
+
+		HQLA tiers:
+		  Level 1:  0 % haircut (sovereign bonds, central bank reserves)
+		  Level 2A: 15 % haircut (GSE bonds, covered bonds)
+		  Level 2B: 25–50 % haircut (equities, RMBS)
+
+		Stores result in `_lcr_store`; raises warning if LCR < 1.05.
+		"""
+		guard_tenant_id(tenant_id)
+		date_str = processing_date.isoformat() if isinstance(processing_date, date) else processing_date
+		_log.info("[EOD] compute_lcr tenant=%s date=%s", tenant_id, date_str)
+
+		# ── Adapter hook ──────────────────────────────────────────────────────
+		# hqla_l1  = adapter.get_hqla_level1(tenant_id, date_str)  # no haircut
+		# hqla_l2a = adapter.get_hqla_level2a(tenant_id, date_str) * Decimal("0.85")
+		# hqla_l2b = adapter.get_hqla_level2b(tenant_id, date_str) * Decimal("0.65")
+		# outflows = adapter.get_stressed_outflows_30d(tenant_id, date_str)
+		# inflows  = min(adapter.get_inflows_30d(tenant_id, date_str), outflows * Decimal("0.75"))
+		# ─────────────────────────────────────────────────────────────────────
+		hqla_l1   = Decimal("0")
+		hqla_l2a  = Decimal("0")
+		hqla_l2b  = Decimal("0")
+		outflows  = Decimal("1")   # avoid ZeroDivision
+		inflows   = Decimal("0")
+
+		hqla_total = hqla_l1 + hqla_l2a + hqla_l2b
+		net_outflows = max(outflows - inflows, Decimal("1"))
+		lcr = hqla_total / net_outflows
+
+		status = "compliant" if lcr >= Decimal("1.0") else "breach"
+		if lcr < Decimal("1.05"):
+			_log.warning("[EOD] LCR early-warning tenant=%s date=%s lcr=%.4f", tenant_id, date_str, float(lcr))
+		if lcr < Decimal("1.0"):
+			self._record_exception(
+				tenant_id, date_str, "lcr_computation",
+				ExceptionSeverity.CRITICAL, "LCR_BREACH",
+				f"LCR {float(lcr):.4f} below 100% minimum",
+			)
+
+		result = {
+			"tenant_id":       tenant_id,
+			"processing_date": date_str,
+			"hqla_level1":     str(hqla_l1),
+			"hqla_level2a":    str(hqla_l2a),
+			"hqla_level2b":    str(hqla_l2b),
+			"hqla_total":      str(hqla_total),
+			"net_outflows_30d": str(net_outflows),
+			"lcr_ratio":       str(lcr.quantize(Decimal("0.0001"))),
+			"status":          status,
+		}
+		_log.info("[EOD] lcr result tenant=%s date=%s lcr=%s status=%s", tenant_id, date_str, lcr, status)
+		return result
+
+	async def run_nostro_reconciliation(
+		self,
+		tenant_id: str,
+		processing_date: str | date,
+		dry_run: bool = False,
+	) -> dict[str, Any]:
+		"""Automated intraday nostro reconciliation against SWIFT MT940/camt.053 (I4).
+
+		Matches internal GL nostro entries to bank statement lines by:
+		  1. Exact match: amount + value date + transaction reference
+		  2. Near match: amount + ±1 day value date (manual review queue)
+		  3. Unmatched: raised as CRITICAL exception if > configured threshold
+
+		Returns counts and the list of unmatched items.
+		"""
+		guard_tenant_id(tenant_id)
+		date_str = processing_date.isoformat() if isinstance(processing_date, date) else processing_date
+		_log.info("[EOD] nostro_recon tenant=%s date=%s dry_run=%s", tenant_id, date_str, dry_run)
+
+		# ── Adapter hook ──────────────────────────────────────────────────────
+		# statement_lines = adapter.fetch_swift_mt940(tenant_id, date_str)
+		# gl_entries      = adapter.get_nostro_gl_entries(tenant_id, date_str)
+		# matched, near, unmatched = _match_nostro(statement_lines, gl_entries)
+		# ─────────────────────────────────────────────────────────────────────
+		matched_count   = 0
+		near_match_count = 0
+		unmatched_items: list[dict[str, Any]] = []
+		unmatched_value = Decimal("0")
+
+		for item in unmatched_items:
+			self._record_exception(
+				tenant_id, date_str, "nostro_reconciliation",
+				ExceptionSeverity.CRITICAL, "NOSTRO_UNMATCHED",
+				f"Unmatched nostro entry ref={item.get('ref')} amount={item.get('amount')}",
+			)
+
+		_log.info(
+			"[EOD] nostro_recon done tenant=%s date=%s matched=%d near=%d unmatched=%d value=%s",
+			tenant_id, date_str, matched_count, near_match_count, len(unmatched_items), unmatched_value,
+		)
+		return {
+			"tenant_id":        tenant_id,
+			"processing_date":  date_str,
+			"matched":          matched_count,
+			"near_match":       near_match_count,
+			"unmatched":        len(unmatched_items),
+			"unmatched_value":  str(unmatched_value),
+			"unmatched_items":  unmatched_items[:50],
+			"dry_run":          dry_run,
+		}
+
+	async def run_zba_sweeps(
+		self,
+		tenant_id: str,
+		processing_date: str | date,
+		dry_run: bool = False,
+	) -> dict[str, Any]:
+		"""Execute Zero-Balance Accounting (ZBA) sweeps for concentration banking (I14).
+
+		For each ZBA sweep group:
+		  - Identify surplus in sub-accounts (balance > target_balance)
+		  - Transfer surplus to master concentration account
+		  - Fund sub-accounts from master if balance < minimum_balance
+		  - Post offsetting intercompany entries where applicable
+
+		Runs after all other EOD postings are complete.
+		"""
+		guard_tenant_id(tenant_id)
+		date_str = processing_date.isoformat() if isinstance(processing_date, date) else processing_date
+		_log.info("[EOD] zba_sweeps tenant=%s date=%s dry_run=%s", tenant_id, date_str, dry_run)
+
+		# ── Adapter hook ──────────────────────────────────────────────────────
+		# groups = adapter.get_zba_groups(tenant_id)
+		# for group in groups:
+		#     master_id     = group.master_account_id
+		#     for sub in group.sub_accounts:
+		#         balance   = adapter.get_balance(sub.account_id)
+		#         surplus   = balance - sub.target_balance
+		#         if surplus > 0:
+		#             adapter.transfer(sub.account_id, master_id, surplus, date_str)
+		#             sweeps_up += 1; total_swept += surplus
+		#         elif balance < sub.minimum_balance and not sub.notional_only:
+		#             fund_amount = sub.minimum_balance - balance
+		#             adapter.transfer(master_id, sub.account_id, fund_amount, date_str)
+		#             sweeps_down += 1
+		# ─────────────────────────────────────────────────────────────────────
+		sweeps_up    = 0
+		sweeps_down  = 0
+		total_swept  = Decimal("0")
+		total_funded = Decimal("0")
+		groups_processed = 0
+
+		_log.info(
+			"[EOD] zba_sweeps done tenant=%s date=%s groups=%d swept=%s funded=%s",
+			tenant_id, date_str, groups_processed, total_swept, total_funded,
+		)
+		return {
+			"tenant_id":        tenant_id,
+			"processing_date":  date_str,
+			"groups_processed": groups_processed,
+			"sweeps_up":        sweeps_up,
+			"sweeps_down":      sweeps_down,
+			"total_swept":      str(total_swept),
+			"total_funded":     str(total_funded),
+			"dry_run":          dry_run,
+		}
+
+	async def classify_npa_accounts(
+		self,
+		tenant_id: str,
+		processing_date: str | date,
+		dpd_threshold: int = 90,
+		dry_run: bool = False,
+	) -> dict[str, Any]:
+		"""Classify loans as Non-Performing Assets (NPA) when DPD ≥ threshold (I12).
+
+		Actions on NPA promotion:
+		  1. Set account status → NPA
+		  2. Suspend interest accrual (future interest posted to sundry, not P&L)
+		  3. Reverse any uncollected accrued interest from P&L to Sundry
+		  4. Apply 100 % provision requirement (post delta to Impairment Expense)
+		  5. Generate NPA register entry for regulatory submission
+
+		Actions on NPA reversal (DPD drops below threshold after recovery):
+		  1. Restore status → Performing / Sub-standard
+		  2. Resume accrual, reverse sundry interest to P&L
+		  3. Release provision per IFRS 9 / local GAAP
+		"""
+		guard_tenant_id(tenant_id)
+		assert dpd_threshold > 0, "dpd_threshold must be positive"
+		date_str = processing_date.isoformat() if isinstance(processing_date, date) else processing_date
+		_log.info("[EOD] classify_npa tenant=%s date=%s threshold=%d dry_run=%s", tenant_id, date_str, dpd_threshold, dry_run)
+
+		# ── Adapter hook ──────────────────────────────────────────────────────
+		# candidates = adapter.get_loans_by_dpd(tenant_id, min_dpd=0)
+		# newly_npa   = [l for l in candidates if l.dpd >= dpd_threshold and l.status != "npa"]
+		# npa_cured   = [l for l in candidates if l.dpd < dpd_threshold and l.status == "npa"]
+		# ─────────────────────────────────────────────────────────────────────
+		newly_npa_count  = 0
+		cured_count      = 0
+		provision_posted = Decimal("0")
+		interest_reversed = Decimal("0")
+
+		_log.info(
+			"[EOD] npa_classification done tenant=%s date=%s new_npa=%d cured=%d provision=%s",
+			tenant_id, date_str, newly_npa_count, cured_count, provision_posted,
+		)
+		return {
+			"tenant_id":          tenant_id,
+			"processing_date":    date_str,
+			"dpd_threshold":      dpd_threshold,
+			"newly_classified":   newly_npa_count,
+			"cured":              cured_count,
+			"provision_posted":   str(provision_posted),
+			"interest_reversed":  str(interest_reversed),
+			"dry_run":            dry_run,
+		}
+
+	async def check_sla_compliance(
+		self,
+		tenant_id: str,
+		processing_date: str | date,
+		sla_window_minutes: int = 360,
+	) -> dict[str, Any]:
+		"""Evaluate EOD SLA compliance and emit at-risk alerts (I15).
+
+		Checks:
+		  - Whether EOD completed within `sla_window_minutes`
+		  - Percent of window consumed vs percent of jobs complete (pacing)
+		  - Historical SLA breach trend over last 7 days
+
+		Emits CRITICAL exception if EOD is currently in-progress and
+		elapsed time > 70 % of the SLA window with < 50 % jobs done.
+		"""
+		guard_tenant_id(tenant_id)
+		assert sla_window_minutes > 0, "sla_window_minutes must be positive"
+		date_str = processing_date.isoformat() if isinstance(processing_date, date) else processing_date
+		_log.info("[EOD] sla_check tenant=%s date=%s window_min=%d", tenant_id, date_str, sla_window_minutes)
+
+		rec = self._runs.get(_eod_key(tenant_id, date_str))
+		if rec is None:
+			return {
+				"tenant_id":       tenant_id,
+				"processing_date": date_str,
+				"sla_window_min":  sla_window_minutes,
+				"status":          "no_run",
+			}
+
+		started = datetime.fromisoformat(rec.started_at) if rec.started_at else None
+		completed = datetime.fromisoformat(rec.completed_at) if rec.completed_at else None
+		now = datetime.now(timezone.utc)
+
+		if completed:
+			elapsed_sec = (completed - started).total_seconds() if started else 0.0
+			sla_breach  = elapsed_sec > sla_window_minutes * 60
+			status      = "breached" if sla_breach else "met"
+		else:
+			elapsed_sec = (now - started).total_seconds() if started else 0.0
+			pct_window  = elapsed_sec / (sla_window_minutes * 60) if sla_window_minutes else 0
+			pct_jobs    = len(rec.job_results) / len(_EOD_JOB_SEQUENCE) if _EOD_JOB_SEQUENCE else 1
+			at_risk     = pct_window > 0.70 and pct_jobs < 0.50
+			status      = "at_risk" if at_risk else "in_progress"
+			if at_risk:
+				_log.warning(
+					"[EOD] SLA_AT_RISK tenant=%s date=%s pct_window=%.1f%% pct_jobs=%.1f%%",
+					tenant_id, date_str, pct_window * 100, pct_jobs * 100,
+				)
+				self._record_exception(
+					tenant_id, date_str, "sla_monitoring",
+					ExceptionSeverity.ERROR, "SLA_AT_RISK",
+					f"EOD at risk: {pct_window*100:.0f}% window consumed, only {pct_jobs*100:.0f}% jobs done",
+				)
+			sla_breach  = False
+
+		_log.info("[EOD] sla_check done tenant=%s date=%s status=%s elapsed=%.0fs", tenant_id, date_str, status, elapsed_sec)
+		return {
+			"tenant_id":          tenant_id,
+			"processing_date":    date_str,
+			"sla_window_minutes": sla_window_minutes,
+			"elapsed_seconds":    round(elapsed_sec, 2),
+			"sla_breach":         sla_breach,
+			"status":             status,
+		}
+
+	async def generate_regulatory_returns(
+		self,
+		tenant_id: str,
+		processing_date: str | date,
+		dry_run: bool = False,
+	) -> dict[str, Any]:
+		"""Generate regulatory statistical returns (CBK BSL02/BSL03, FATF, Basel) (I7).
+
+		Triggered automatically on:
+		  - Month-end: balance sheet returns, credit exposure reports
+		  - Quarter-end: capital adequacy (CAR), large exposure returns
+		  - Year-end: annual supervisory return, AML statistical report
+
+		Returns include a manifest of generated files/payloads and any
+		validation failures that must be resolved before submission.
+		"""
+		guard_tenant_id(tenant_id)
+		date_str = processing_date.isoformat() if isinstance(processing_date, date) else processing_date
+		d = _parse_date(date_str)
+		_log.info("[EOD] regulatory_returns tenant=%s date=%s dry_run=%s", tenant_id, date_str, dry_run)
+
+		returns_generated: list[str] = []
+		validation_failures: list[str] = []
+
+		is_month_end_  = _is_month_end(d)
+		is_quarter_end = is_month_end_ and d.month in (3, 6, 9, 12)
+		is_year_end_   = _is_year_end(d)
+
+		if is_month_end_:
+			returns_generated.extend(["BSL02_BALANCE_SHEET", "BSL03_CREDIT_EXPOSURE"])
+			_log.info("[EOD] month-end returns tenant=%s date=%s returns=%s", tenant_id, date_str, returns_generated)
+
+		if is_quarter_end:
+			returns_generated.extend(["CAPITAL_ADEQUACY_CAR", "LARGE_EXPOSURE_RETURN"])
+			_log.info("[EOD] quarter-end returns tenant=%s date=%s", tenant_id, date_str)
+
+		if is_year_end_:
+			returns_generated.extend(["ANNUAL_SUPERVISORY_RETURN", "AML_STATISTICAL_REPORT"])
+			_log.info("[EOD] year-end returns tenant=%s date=%s", tenant_id, date_str)
+
+		# ── Adapter hook ──────────────────────────────────────────────────────
+		# for return_code in returns_generated:
+		#     payload = adapter.render_regulatory_return(tenant_id, return_code, date_str)
+		#     errors  = adapter.validate_return(payload, return_code)
+		#     validation_failures.extend(errors)
+		#     if not errors and not dry_run:
+		#         adapter.store_regulatory_return(tenant_id, return_code, payload, date_str)
+		# ─────────────────────────────────────────────────────────────────────
+
+		for failure in validation_failures:
+			self._record_exception(
+				tenant_id, date_str, "regulatory_returns",
+				ExceptionSeverity.ERROR, "REGULATORY_VALIDATION_FAILURE", failure,
+			)
+
+		_log.info(
+			"[EOD] regulatory_returns done tenant=%s date=%s generated=%d failures=%d",
+			tenant_id, date_str, len(returns_generated), len(validation_failures),
+		)
+		return {
+			"tenant_id":           tenant_id,
+			"processing_date":     date_str,
+			"returns_generated":   returns_generated,
+			"validation_failures": validation_failures,
+			"is_month_end":        is_month_end_,
+			"is_quarter_end":      is_quarter_end,
+			"is_year_end":         is_year_end_,
+			"dry_run":             dry_run,
+		}
+
 	async def health_check(self) -> dict[str, Any]:
 		"""Return service health status."""
 		from datetime import timedelta

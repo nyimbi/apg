@@ -146,3 +146,77 @@ service.add_watchlist_subject(
 FREC depends on `biop`, `cvsn`, `aicr`, `encr`, `audl`, `conf`, and `mfau`. Optional adapters include `auth`, `moni`, and `cach`. Batch recognition and lifecycle events should use Bytewax through the `event_stream` and lifecycle stream contracts.
 
 Generated applications should compose FREC through the contract and dependency-light helper modules. Production web views, database integrations, real model inference, camera capture, and hardware integrations remain adapter concerns.
+
+## New Capabilities (v1.1)
+
+### Watchlist Management
+
+```python
+wl = await svc.create_watchlist("wl-deny", "Deny list", policy_id="pol-1",
+                                 owner="security", reason="access control", match_threshold=0.90)
+await svc.add_watchlist_subject("wl-deny", subject_id="suspect-007", added_by="officer", reason="court order")
+result = await svc.watchlist_match(probe_image, "wl-deny")
+# → {"hit_count": 1, "hits": [{"subject_id": "suspect-007", "score": 0.94}]}
+```
+
+### Deepfake and Morphing Attack Detection
+
+```python
+df = await svc.deepfake_detect(image)         # FFT spectral + DCT artifact analysis
+morph = await svc.morphing_attack_detect(image)  # landmark asymmetry + seam scoring
+```
+
+### Demographic Bias Audit (ISO/IEC 19795-10)
+
+```python
+report = await svc.bias_audit_report(cohort_field="demographic_group", min_samples=30)
+print(report["bias_flags"])  # cohorts with > 5pp differential FAR/FRR
+```
+
+### GDPR Explainability (Art. 22)
+
+```python
+exp = await svc.explain_verification(verification_id)
+print(exp["plain_language_summary"])
+```
+
+### Template Aging and Re-enrollment
+
+```python
+aging = await svc.template_aging_report("gallery-staff", drift_threshold=0.05)
+await svc.reenroll_subject("alice-001", new_image, reason="drift_detected")
+```
+
+### Continuous Ambient Re-authentication
+
+```python
+async for event in svc.continuous_auth_stream("alice", frames, interval_frames=30, revoke_on_fail_count=3):
+    if event["status"] == "revoked":
+        revoke_access(event["subject_id"])
+```
+
+### Cross-Tenant Federated Identification
+
+```python
+result = await svc.federated_identify(probe, [
+    {"tenant_id": "org-a", "gallery_id": "gal-a", "consent_proof": "cp-1"},
+    {"tenant_id": "org-b", "gallery_id": "gal-b", "consent_proof": "cp-2"},
+])
+```
+
+### Consent Portability (GDPR Art. 20)
+
+```python
+exported = await svc.export_consent_portable("alice")   # W3C VC JSON-LD
+imported = await svc.import_consent_portable("alice", exported["credential"])
+```
+
+### ISO/IEC 30107-3 Compliance Report
+
+```python
+report = await svc.liveness_compliance_report(labelled_test_results)
+print(report["compliant"], report["APCER"], report["BPCER"])
+# Level 4: APCER <= 0.5%, BPCER <= 0.5%
+```
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for 15 architectural improvement areas and `docs/user_guide.md` for complete API reference.

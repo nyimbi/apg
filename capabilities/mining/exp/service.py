@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from datetime import datetime
 from typing import Any
 
@@ -51,6 +52,13 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 		self._new_resource_estimates: dict[str, dict[str, Any]] = {}
 		self._geophysics_surveys: dict[str, dict[str, Any]] = {}
 		self._exploration_targets: dict[str, dict[str, Any]] = {}
+		# World-class capability stores
+		self._downhole_surveys: dict[str, dict[str, Any]] = {}
+		self._bulk_density: dict[str, dict[str, Any]] = {}
+		self._competent_persons: dict[str, dict[str, Any]] = {}
+		self._core_photos: dict[str, dict[str, Any]] = {}
+		self._expenditures: dict[str, dict[str, Any]] = {}
+		self._resource_domains: dict[str, dict[str, Any]] = {}
 
 	# ── Logging helpers ────────────────────────────────────────────────────────
 
@@ -969,4 +977,674 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 			"jorc_compliant_estimates": jorc_compliant_count,
 			"licence_expiry": licence["expiry"],
 			"licence_status": licence["status"],
+		}
+
+	# ── Downhole Survey (Deviation) ────────────────────────────────────────────
+
+	async def record_downhole_survey(
+		self,
+		hole_id: str,
+		depth_m: float,
+		azimuth_deg: float,
+		dip_deg: float,
+		survey_tool: str,
+		surveyed_by: str,
+	) -> dict[str, Any]:
+		"""
+		Record a downhole deviation survey station. Multiple stations per hole allowed.
+		Validates hole existence, azimuth [0, 360) and dip [-90, 0].
+		"""
+		hole = await self.get_drill_hole(hole_id)
+		if hole is None:
+			raise KeyError(f"Drill hole '{hole_id}' not found; create it first")
+		assert 0.0 <= depth_m <= hole["total_depth_m"], (
+			f"depth_m {depth_m} outside hole range [0, {hole['total_depth_m']}]"
+		)
+		assert 0.0 <= azimuth_deg < 360.0, "azimuth_deg must be in [0, 360)"
+		assert -90.0 <= dip_deg <= 0.0, "dip_deg must be in [-90, 0] (downward negative)"
+		rec_id = uuid7str()
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"hole_id": hole_id,
+			"depth_m": depth_m,
+			"azimuth_deg": azimuth_deg,
+			"dip_deg": dip_deg,
+			"survey_tool": survey_tool,
+			"surveyed_by": surveyed_by,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._downhole_surveys[rec_id] = rec
+		self._log_op("record_downhole_survey", "downhole_survey", rec_id)
+		return rec
+
+	async def desurvey_hole(self, hole_id: str) -> list[dict[str, Any]]:
+		"""
+		Apply minimum-curvature desurveying to all survey stations for a hole.
+
+		Returns a list of dicts with:
+		  depth_m, easting, northing, elevation_m, azimuth_deg, dip_deg
+
+		Requires ≥ 2 survey stations including the collar (depth_m=0).
+		The collar location is sourced from the drill_hole record.
+		Uses the SPWLA minimum-curvature algorithm:
+		  RF = 2/DL * tan(DL/2)  where DL is dogleg angle in radians.
+		"""
+		hole = await self.get_drill_hole(hole_id)
+		if hole is None:
+			raise KeyError(f"Drill hole '{hole_id}' not found")
+		stations = sorted(
+			[r for r in self._downhole_surveys.values()
+			 if r["hole_id"] == hole_id and r["tenant_id"] == self.tenant_id],
+			key=lambda x: x["depth_m"],
+		)
+		if not stations:
+			raise ValueError(f"No downhole survey stations for hole '{hole_id}'")
+		# Seed from collar
+		loc = hole.get("location", {})
+		e0 = float(loc.get("easting", loc.get("x", 0.0)))
+		n0 = float(loc.get("northing", loc.get("y", 0.0)))
+		z0 = float(loc.get("elevation_m", loc.get("z", 0.0)))
+
+		result: list[dict[str, Any]] = [
+			{
+				"depth_m": 0.0,
+				"easting": e0,
+				"northing": n0,
+				"elevation_m": z0,
+				"azimuth_deg": stations[0]["azimuth_deg"],
+				"dip_deg": stations[0]["dip_deg"],
+			}
+		]
+		cur_e, cur_n, cur_z = e0, n0, z0
+		for i in range(1, len(stations)):
+			s0, s1 = stations[i - 1], stations[i]
+			md = s1["depth_m"] - s0["depth_m"]
+			az0 = math.radians(s0["azimuth_deg"])
+			dip0 = math.radians(s0["dip_deg"])  # negative downward
+			az1 = math.radians(s1["azimuth_deg"])
+			dip1 = math.radians(s1["dip_deg"])
+			# Direction cosines (inc = -dip, downward positive for calculation)
+			inc0, inc1 = -dip0, -dip1
+			# Dogleg angle
+			dl = math.acos(
+				min(1.0, max(-1.0,
+					math.cos(inc1 - inc0) - math.sin(inc0) * math.sin(inc1) * (1 - math.cos(az1 - az0))
+				))
+			)
+			rf = (2.0 / dl * math.tan(dl / 2.0)) if dl > 1e-9 else 1.0
+			cur_n += md / 2.0 * (math.sin(inc0) * math.cos(az0) + math.sin(inc1) * math.cos(az1)) * rf
+			cur_e += md / 2.0 * (math.sin(inc0) * math.sin(az0) + math.sin(inc1) * math.sin(az1)) * rf
+			cur_z -= md / 2.0 * (math.cos(inc0) + math.cos(inc1)) * rf  # z decreases downward
+			result.append({
+				"depth_m": s1["depth_m"],
+				"easting": round(cur_e, 3),
+				"northing": round(cur_n, 3),
+				"elevation_m": round(cur_z, 3),
+				"azimuth_deg": s1["azimuth_deg"],
+				"dip_deg": s1["dip_deg"],
+			})
+		self._log_op("desurvey_hole", "downhole_survey", hole_id)
+		return result
+
+	# ── Composite Interval Calculator ─────────────────────────────────────────
+
+	async def composite_assay_intervals(
+		self,
+		hole_id: str,
+		element: str,
+		composite_length_m: float,
+		from_depth_m: float = 0.0,
+		to_depth_m: float | None = None,
+	) -> list[dict[str, Any]]:
+		"""
+		Produce fixed-length grade composites (bench compositing) for a hole and element.
+
+		- Weighted-average grade within each composite window.
+		- Windows shorter than 50% of composite_length_m are flagged as partial.
+		- Only intervals with `grade >= 0` contribute to the composite.
+
+		Returns list of:
+		  {composite_from_m, composite_to_m, length_m, element, composite_grade,
+		   unit, sample_count, partial}
+		"""
+		assert composite_length_m > 0, "composite_length_m must be positive"
+		raw = await self.list_assay_results_for_hole(hole_id, element=element)
+		if not raw:
+			return []
+		if to_depth_m is None:
+			to_depth_m = raw[-1]["to_depth_m"]
+		assert to_depth_m > from_depth_m, "to_depth_m must exceed from_depth_m"
+
+		composites: list[dict[str, Any]] = []
+		comp_start = from_depth_m
+		while comp_start < to_depth_m:
+			comp_end = min(comp_start + composite_length_m, to_depth_m)
+			# Collect intervals that overlap this composite window
+			grade_x_len: float = 0.0
+			total_len: float = 0.0
+			count = 0
+			unit = ""
+			for r in raw:
+				iv_from = max(r["from_depth_m"], comp_start)
+				iv_to = min(r["to_depth_m"], comp_end)
+				if iv_to > iv_from:
+					seg_len = iv_to - iv_from
+					grade_x_len += r["grade"] * seg_len
+					total_len += seg_len
+					count += 1
+					unit = r.get("unit", "")
+			if total_len > 0:
+				composites.append({
+					"composite_from_m": round(comp_start, 3),
+					"composite_to_m": round(comp_end, 3),
+					"length_m": round(comp_end - comp_start, 3),
+					"element": element.upper(),
+					"composite_grade": round(grade_x_len / total_len, 6),
+					"unit": unit,
+					"sample_count": count,
+					"partial": (comp_end - comp_start) < 0.5 * composite_length_m,
+				})
+			comp_start = comp_end
+		self._log_op("composite_assay_intervals", "composite", hole_id)
+		return composites
+
+	# ── Sampling Gap Detection ─────────────────────────────────────────────────
+
+	async def detect_sampling_gaps(
+		self,
+		hole_id: str,
+		gap_threshold_m: float = 0.1,
+		expected_to_depth_m: float | None = None,
+	) -> dict[str, Any]:
+		"""
+		Detect unsampled depth intervals in a drillhole's assay record.
+
+		Walks sorted assay intervals for the hole, identifies:
+		  - Gaps > gap_threshold_m between consecutive intervals
+		  - Unsampled depth from last interval to expected_to_depth_m
+
+		Returns:
+		  total_assayed_m, total_gap_m, gap_pct, gaps (list of {from_m, to_m, gap_m})
+		"""
+		hole = await self.get_drill_hole(hole_id)
+		if hole is None:
+			raise KeyError(f"Drill hole '{hole_id}' not found")
+		if expected_to_depth_m is None:
+			expected_to_depth_m = hole.get("total_depth_m", 0.0)
+		raw = await self.list_assay_results_for_hole(hole_id)
+		if not raw:
+			return {
+				"hole_id": hole_id,
+				"total_assayed_m": 0.0,
+				"total_gap_m": expected_to_depth_m,
+				"gap_pct": 100.0,
+				"gaps": [{"from_m": 0.0, "to_m": expected_to_depth_m, "gap_m": expected_to_depth_m}],
+			}
+		sorted_raw = sorted(raw, key=lambda r: r["from_depth_m"])
+		gaps: list[dict[str, float]] = []
+		total_assayed = 0.0
+		cursor = 0.0
+		for r in sorted_raw:
+			gap = r["from_depth_m"] - cursor
+			if gap > gap_threshold_m:
+				gaps.append({"from_m": round(cursor, 3), "to_m": round(r["from_depth_m"], 3), "gap_m": round(gap, 3)})
+			cursor = max(cursor, r["to_depth_m"])
+			total_assayed += r["to_depth_m"] - r["from_depth_m"]
+		# Terminal gap
+		tail_gap = expected_to_depth_m - cursor
+		if tail_gap > gap_threshold_m:
+			gaps.append({"from_m": round(cursor, 3), "to_m": round(expected_to_depth_m, 3), "gap_m": round(tail_gap, 3)})
+		total_gap = sum(g["gap_m"] for g in gaps)
+		self._log_op("detect_sampling_gaps", "sampling_gap", hole_id)
+		return {
+			"hole_id": hole_id,
+			"expected_to_depth_m": expected_to_depth_m,
+			"total_assayed_m": round(total_assayed, 3),
+			"total_gap_m": round(total_gap, 3),
+			"gap_pct": round(100.0 * total_gap / expected_to_depth_m, 2) if expected_to_depth_m > 0 else 0.0,
+			"gap_count": len(gaps),
+			"gaps": gaps,
+		}
+
+	# ── Competent Person Registry ──────────────────────────────────────────────
+
+	async def register_competent_person(
+		self,
+		cp_id: str,
+		full_name: str,
+		professional_body: str,
+		membership_number: str,
+		commodity_specialisations: list[str],
+		credential_expiry: datetime,
+		email: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Register a Competent Person (CP) in the credential registry.
+
+		professional_body examples: AusIMM, SME, MMSA, AIPG, APCOM, PGeo.
+		Credential expiry is tracked; expired CPs cannot sign new estimates.
+		"""
+		assert full_name, "full_name required"
+		assert professional_body, "professional_body required"
+		assert membership_number, "membership_number required"
+		assert commodity_specialisations, "at least one commodity_specialisation required"
+		# Idempotent: update existing by cp_id
+		for rec in self._competent_persons.values():
+			if rec["cp_id"] == cp_id and rec["tenant_id"] == self.tenant_id:
+				rec.update({
+					"full_name": full_name,
+					"credential_expiry": credential_expiry.isoformat(),
+					"updated_at": datetime.utcnow().isoformat(),
+				})
+				self._log_op("register_cp_update", "competent_person", rec["id"])
+				return rec
+		rec_id = uuid7str()
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"cp_id": cp_id,
+			"full_name": full_name,
+			"professional_body": professional_body,
+			"membership_number": membership_number,
+			"commodity_specialisations": commodity_specialisations,
+			"credential_expiry": credential_expiry.isoformat(),
+			"email": email,
+			"active": True,
+			"created_at": datetime.utcnow().isoformat(),
+			"updated_at": datetime.utcnow().isoformat(),
+		}
+		self._competent_persons[rec_id] = rec
+		self._log_op("register_competent_person", "competent_person", rec_id)
+		return rec
+
+	async def validate_competent_person(
+		self, cp_id: str, commodity: str | None = None
+	) -> dict[str, Any]:
+		"""
+		Validate that a CP exists, is active, credential is not expired,
+		and optionally holds a specialisation in the given commodity.
+
+		Returns: {valid, cp_id, full_name, days_to_expiry, issues}
+		"""
+		now = datetime.utcnow()
+		rec = next(
+			(r for r in self._competent_persons.values()
+			 if r["cp_id"] == cp_id and r["tenant_id"] == self.tenant_id),
+			None,
+		)
+		if rec is None:
+			return {"valid": False, "cp_id": cp_id, "issues": ["CP not registered"]}
+		expiry = datetime.fromisoformat(rec["credential_expiry"])
+		days_remaining = (expiry - now).days
+		issues: list[str] = []
+		if not rec.get("active"):
+			issues.append("CP record marked inactive")
+		if days_remaining < 0:
+			issues.append(f"Credential expired {abs(days_remaining)} days ago")
+		elif days_remaining < 30:
+			issues.append(f"Credential expiring in {days_remaining} days — renew urgently")
+		if commodity and commodity.lower() not in [s.lower() for s in rec.get("commodity_specialisations", [])]:
+			issues.append(f"CP has no declared specialisation in '{commodity}'")
+		return {
+			"valid": len(issues) == 0,
+			"cp_id": cp_id,
+			"full_name": rec["full_name"],
+			"professional_body": rec["professional_body"],
+			"days_to_expiry": days_remaining,
+			"issues": issues,
+		}
+
+	# ── Bulk Density Registry ──────────────────────────────────────────────────
+
+	async def record_bulk_density(
+		self,
+		hole_id: str,
+		from_m: float,
+		to_m: float,
+		method: str,
+		value_t_m3: float,
+		lithology_code: str | None = None,
+		measured_by: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Record a bulk density measurement for a core interval.
+
+		method examples: wax_and_immersion, ACIS (automated core imaging system),
+		  water_immersion, caliper, pycnometer.
+		value_t_m3 must be in [1.0, 5.5] — physical bounds for geological materials.
+		"""
+		assert from_m >= 0 and to_m > from_m, "Invalid depth interval"
+		assert 1.0 <= value_t_m3 <= 5.5, f"value_t_m3={value_t_m3} outside physical bounds [1.0, 5.5]"
+		assert method, "method required"
+		hole = await self.get_drill_hole(hole_id)
+		if hole is None:
+			raise KeyError(f"Drill hole '{hole_id}' not found")
+		rec_id = uuid7str()
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"hole_id": hole_id,
+			"from_m": from_m,
+			"to_m": to_m,
+			"interval_m": round(to_m - from_m, 3),
+			"method": method,
+			"value_t_m3": value_t_m3,
+			"lithology_code": lithology_code,
+			"measured_by": measured_by,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._bulk_density[rec_id] = rec
+		self._log_op("record_bulk_density", "bulk_density", rec_id)
+		return rec
+
+	async def summarise_bulk_density(
+		self, hole_ids: list[str] | None = None, lithology_code: str | None = None
+	) -> dict[str, Any]:
+		"""
+		Summarise bulk density statistics across holes/lithologies.
+		Returns: count, mean, std_dev, min, max, coverage_m per lithology_code.
+		"""
+		recs = [
+			r for r in self._bulk_density.values() if r["tenant_id"] == self.tenant_id
+		]
+		if hole_ids:
+			recs = [r for r in recs if r["hole_id"] in hole_ids]
+		if lithology_code:
+			recs = [r for r in recs if r.get("lithology_code") == lithology_code]
+		if not recs:
+			return {"count": 0, "mean": None, "std_dev": None, "min": None, "max": None}
+		vals = [r["value_t_m3"] for r in recs]
+		n = len(vals)
+		mean = sum(vals) / n
+		variance = sum((v - mean) ** 2 for v in vals) / n
+		by_lith: dict[str, Any] = {}
+		for r in recs:
+			lc = r.get("lithology_code") or "unclassified"
+			by_lith.setdefault(lc, {"values": [], "coverage_m": 0.0})
+			by_lith[lc]["values"].append(r["value_t_m3"])
+			by_lith[lc]["coverage_m"] += r["interval_m"]
+		lith_stats = {
+			lc: {
+				"count": len(v["values"]),
+				"mean": round(sum(v["values"]) / len(v["values"]), 4),
+				"coverage_m": round(v["coverage_m"], 2),
+			}
+			for lc, v in by_lith.items()
+		}
+		return {
+			"count": n,
+			"mean": round(mean, 4),
+			"std_dev": round(math.sqrt(variance), 4),
+			"min": round(min(vals), 4),
+			"max": round(max(vals), 4),
+			"by_lithology": lith_stats,
+		}
+
+	# ── Spatial Constraint: Licence Boundary Check ─────────────────────────────
+
+	async def check_collar_within_licence(
+		self, hole_id: str, licence_id: str
+	) -> dict[str, Any]:
+		"""
+		Verify a drill hole collar falls within a registered licence polygon boundary.
+		Uses the ray-casting point-in-polygon algorithm on lon/lat coords.
+
+		Returns: {inside, hole_id, licence_id, easting, northing, message}
+		"""
+		hole = await self.get_drill_hole(hole_id)
+		if hole is None:
+			raise KeyError(f"Drill hole '{hole_id}' not found")
+		licence = await self.get_licence(licence_id)
+		if licence is None:
+			raise KeyError(f"Licence '{licence_id}' not found")
+		loc = hole.get("location", {})
+		px = float(loc.get("easting", loc.get("x", 0.0)))
+		py = float(loc.get("northing", loc.get("y", 0.0)))
+		coords: list[dict[str, float]] = licence["area_coords"]
+		inside = self._point_in_polygon(px, py, coords)
+		msg = (
+			"Collar is within the licence boundary."
+			if inside
+			else "WARNING: Collar is OUTSIDE the licence boundary — regulatory breach risk."
+		)
+		self._log_op("check_collar_within_licence", "spatial_check", hole_id)
+		return {
+			"inside": inside,
+			"hole_id": hole_id,
+			"licence_id": licence_id,
+			"licence_number": licence["licence_number"],
+			"easting": px,
+			"northing": py,
+			"message": msg,
+		}
+
+	def _point_in_polygon(
+		self, px: float, py: float, coords: list[dict[str, float]]
+	) -> bool:
+		"""Ray-casting algorithm for point-in-polygon test. coords use 'lon'/'lat' keys."""
+		n = len(coords)
+		inside = False
+		j = n - 1
+		for i in range(n):
+			xi, yi = coords[i].get("lon", coords[i].get("x", 0.0)), coords[i].get("lat", coords[i].get("y", 0.0))
+			xj, yj = coords[j].get("lon", coords[j].get("x", 0.0)), coords[j].get("lat", coords[j].get("y", 0.0))
+			if ((yi > py) != (yj > py)) and (px < (xj - xi) * (py - yi) / (yj - yi + 1e-15) + xi):
+				inside = not inside
+			j = i
+		return inside
+
+	async def validate_programme_against_licence(
+		self, licence_id: str
+	) -> dict[str, Any]:
+		"""
+		Batch-validate all drill holes assigned to a licence.
+		Returns summary and list of holes outside the licence boundary.
+		"""
+		licence = await self.get_licence(licence_id)
+		if licence is None:
+			raise KeyError(f"Licence '{licence_id}' not found")
+		holes = await self.list_drill_holes(licence_id=licence_id)
+		results = await asyncio.gather(
+			*[self.check_collar_within_licence(h["hole_id"], licence_id) for h in holes],
+			return_exceptions=True
+		)
+		outside = [r for r in results if not r["inside"]]
+		return {
+			"licence_id": licence_id,
+			"licence_number": licence["licence_number"],
+			"holes_checked": len(holes),
+			"holes_inside": len(holes) - len(outside),
+			"holes_outside": len(outside),
+			"outside_details": outside,
+			"all_within_boundary": len(outside) == 0,
+		}
+
+	# ── Exploration Expenditure Tracking ──────────────────────────────────────
+
+	async def record_expenditure(
+		self,
+		licence_id: str,
+		period: str,
+		category: str,
+		amount_usd: float,
+		currency: str = "USD",
+		exchange_rate: float = 1.0,
+		notes: str | None = None,
+		recorded_by: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Record an exploration expenditure line item for a licence and period.
+
+		category options: drilling, geophysics, assaying, geochemistry,
+		  overhead, permitting, geological_mapping, remote_sensing, admin.
+		period: "YYYY-MM" or "YYYY-QN".
+		amount_usd: the amount converted to USD at exchange_rate.
+		"""
+		assert amount_usd > 0, "amount_usd must be positive"
+		assert currency, "currency required"
+		assert exchange_rate > 0, "exchange_rate must be positive"
+		licence = await self.get_licence(licence_id)
+		if licence is None:
+			raise KeyError(f"Licence '{licence_id}' not found")
+		valid_categories = {
+			"drilling", "geophysics", "assaying", "geochemistry",
+			"overhead", "permitting", "geological_mapping", "remote_sensing", "admin",
+		}
+		if category not in valid_categories:
+			self._log_warn(f"Non-standard expenditure category '{category}'; recorded as-is")
+		rec_id = uuid7str()
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"licence_id": licence_id,
+			"period": period,
+			"category": category,
+			"amount_usd": round(amount_usd, 2),
+			"currency": currency.upper(),
+			"exchange_rate": exchange_rate,
+			"notes": notes,
+			"recorded_by": recorded_by,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._expenditures[rec_id] = rec
+		self._log_op("record_expenditure", "expenditure", rec_id)
+		return rec
+
+	async def compute_cost_per_resource_unit(
+		self,
+		licence_id: str,
+		period: str,
+		commodity: str,
+	) -> dict[str, Any]:
+		"""
+		Compute cost-per-ounce-equivalent (or cost-per-tonne) for a licence and period.
+
+		Divides total USD expenditure for the period by newly published resource units
+		(contained_metal for oz-equivalent commodities, tonnes otherwise).
+		Returns a dict with total spend, resource units added, and cost per unit.
+		"""
+		assert licence_id and period and commodity, "licence_id, period, and commodity required"
+		# Total spend
+		spend_recs = [
+			r for r in self._expenditures.values()
+			if r["licence_id"] == licence_id
+			and r["period"] == period
+			and r["tenant_id"] == self.tenant_id
+		]
+		total_spend = sum(r["amount_usd"] for r in spend_recs)
+		by_category: dict[str, float] = {}
+		for r in spend_recs:
+			by_category[r["category"]] = by_category.get(r["category"], 0.0) + r["amount_usd"]
+
+		# Published resource units for the commodity (use new resource estimates)
+		res_recs = [
+			r for r in self._new_resource_estimates.values()
+			if r["tenant_id"] == self.tenant_id
+			and r.get("published")
+			and r.get("commodity", "").lower() == commodity.lower()
+		]
+		oz_equiv_commodities = {"au", "ag", "gold", "silver", "platinum", "palladium", "pt", "pd"}
+		use_metal = commodity.lower() in oz_equiv_commodities
+		resource_units = sum(
+			r.get("contained_metal", 0.0) if use_metal else r.get("tonnes", 0.0)
+			for r in res_recs
+		)
+		cost_per_unit = (total_spend / resource_units) if resource_units > 0 else None
+		unit_label = "oz" if use_metal else "t"
+		return {
+			"licence_id": licence_id,
+			"period": period,
+			"commodity": commodity,
+			"total_spend_usd": round(total_spend, 2),
+			"spend_by_category": {k: round(v, 2) for k, v in by_category.items()},
+			"resource_units_added": round(resource_units, 2),
+			"unit_label": unit_label,
+			"cost_per_unit_usd": round(cost_per_unit, 4) if cost_per_unit is not None else None,
+			"resource_estimate_count": len(res_recs),
+		}
+
+	# ── Resource Domain Management ─────────────────────────────────────────────
+
+	async def define_resource_domain(
+		self,
+		name: str,
+		lithology_codes: list[str],
+		commodity: str,
+		cut_off_grade: float,
+		grade_unit: str,
+		notes: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Define a geological resource domain by lithology code membership.
+
+		Domains partition the deposit for separate resource estimation.
+		cut_off_grade is the lower economic cutoff applied within the domain.
+		"""
+		assert name, "name required"
+		assert lithology_codes, "at least one lithology_code required"
+		assert cut_off_grade >= 0, "cut_off_grade must be non-negative"
+		# No duplicate domain names within tenant
+		for rec in self._resource_domains.values():
+			if rec["name"] == name and rec["tenant_id"] == self.tenant_id:
+				raise ValueError(f"Resource domain '{name}' already exists")
+		rec_id = uuid7str()
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"name": name,
+			"lithology_codes": lithology_codes,
+			"commodity": commodity,
+			"cut_off_grade": cut_off_grade,
+			"grade_unit": grade_unit,
+			"notes": notes,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._resource_domains[rec_id] = rec
+		self._log_op("define_resource_domain", "resource_domain", rec_id)
+		return rec
+
+	async def assign_intervals_to_domains(
+		self, hole_ids: list[str]
+	) -> dict[str, Any]:
+		"""
+		Assign each geology interval across the given holes to a resource domain
+		based on lithology_code membership.
+
+		Returns a summary of assigned vs. unassigned intervals per domain.
+		Intervals matching multiple domains are flagged.
+		"""
+		assert hole_ids, "hole_ids required"
+		domains = [r for r in self._resource_domains.values() if r["tenant_id"] == self.tenant_id]
+		domain_lookup: dict[str, list[str]] = {}  # lithology_code -> [domain_name]
+		for d in domains:
+			for lc in d["lithology_codes"]:
+				domain_lookup.setdefault(lc, []).append(d["name"])
+
+		intervals_all = [
+			r for r in self._geology.values()
+			if r["hole_id"] in hole_ids and r["tenant_id"] == self.tenant_id
+		]
+		assigned: dict[str, int] = {d["name"]: 0 for d in domains}
+		unassigned = 0
+		multi_domain = 0
+		for iv in intervals_all:
+			lc = iv.get("lithology_code", "")
+			matched = domain_lookup.get(lc, [])
+			if len(matched) == 0:
+				unassigned += 1
+			elif len(matched) > 1:
+				multi_domain += 1
+				for m in matched:
+					assigned[m] = assigned.get(m, 0) + 1
+			else:
+				assigned[matched[0]] = assigned.get(matched[0], 0) + 1
+
+		self._log_op("assign_intervals_to_domains", "resource_domain", ",".join(hole_ids[:3]))
+		return {
+			"holes_processed": len(hole_ids),
+			"total_intervals": len(intervals_all),
+			"unassigned_intervals": unassigned,
+			"multi_domain_intervals": multi_domain,
+			"assigned_by_domain": assigned,
 		}

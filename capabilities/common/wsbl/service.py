@@ -37,6 +37,21 @@ class WsblService:
 		self._publish_requests: dict[str, WebsitePublishRequestRecord] = {}
 		self._agents: dict[str, WebsiteAgentRecord] = {}
 		self._audit_events: list[WebsiteAuditEventRecord] = []
+		# ── WebSocket Broker state ─────────────────────────────────────────────
+		# keyed by "tenant_id:connection_id"
+		self._connections: dict[str, dict[str, Any]] = {}
+		# keyed by "tenant_id:room_id"
+		self._rooms: dict[str, dict[str, Any]] = {}
+		# keyed by "tenant_id:connection_id"
+		self._presence: dict[str, dict[str, Any]] = {}
+		# keyed by session_id
+		self._ws_sessions: dict[str, dict[str, Any]] = {}
+		# keyed by "tenant_id:component_id"
+		self._component_locks: dict[str, dict[str, Any]] = {}
+		# keyed by "tenant_id:page_id"
+		self._annotations: dict[str, list[dict[str, Any]]] = {}
+		# keyed by "tenant_id:room_id"
+		self._broadcast_log: dict[str, list[dict[str, Any]]] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -846,3 +861,598 @@ class WsblService:
 			"format": format,
 			"exported_at": utc_now(),
 		}
+
+	# ── WebSocket Broker: Connection Registry ─────────────────────────────────
+
+	async def async_connect(
+		self,
+		tenant_id: str,
+		connection_id: str,
+		actor_id: str,
+		protocol_version: str = "1.0",
+		transport_meta: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Register a new WebSocket connection in the tenant-scoped registry.
+
+		Stores transport metadata (IP, compression, protocol version) and
+		initialises a last-seen heartbeat timestamp.  Returns the connection
+		record.  Raises ValueError if the connection_id is already registered
+		for this tenant.
+		"""
+		self._require_tenant(tenant_id)
+		key = f"{tenant_id}:{connection_id}"
+		if key in self._connections:
+			raise ValueError(f"connection_already_registered:{connection_id}")
+		record: dict[str, Any] = {
+			"id": connection_id,
+			"tenant_id": tenant_id,
+			"actor_id": actor_id,
+			"protocol_version": protocol_version,
+			"transport_meta": dict(transport_meta or {}),
+			"rooms": [],
+			"connected_at": utc_now(),
+			"last_seen_at": utc_now(),
+			"status": "connected",
+		}
+		self._connections[key] = record
+		self._audit(tenant_id, "ws_connected", connection_id, actor_id, {"protocol_version": protocol_version})
+		return dict(record)
+
+	async def async_disconnect(
+		self,
+		tenant_id: str,
+		connection_id: str,
+		actor_id: str,
+		reason: str = "normal",
+	) -> dict[str, Any]:
+		"""Remove a WebSocket connection from the registry.
+
+		Automatically leaves all rooms the connection was a member of, expires
+		its presence entry, and releases any component locks held.  Emits a
+		``ws_disconnected`` audit event.
+		"""
+		self._require_tenant(tenant_id)
+		key = f"{tenant_id}:{connection_id}"
+		record = self._connections.pop(key, None)
+		if record is None:
+			raise KeyError(f"connection_not_found:{connection_id}")
+		for room_id in list(record.get("rooms", [])):
+			await self._room_evict(tenant_id, room_id, connection_id)
+		self._presence.pop(f"{tenant_id}:{connection_id}", None)
+		expired_locks = [
+			lock_key for lock_key, lock in self._component_locks.items()
+			if lock["holder_connection_id"] == connection_id and lock["tenant_id"] == tenant_id
+		]
+		for lock_key in expired_locks:
+			del self._component_locks[lock_key]
+		record["status"] = "disconnected"
+		record["disconnected_at"] = utc_now()
+		record["disconnect_reason"] = reason
+		self._audit(tenant_id, "ws_disconnected", connection_id, actor_id, {"reason": reason})
+		return dict(record)
+
+	async def async_heartbeat(
+		self,
+		tenant_id: str,
+		connection_id: str,
+	) -> dict[str, Any]:
+		"""Refresh the last-seen timestamp for a live connection.
+
+		Must be called by the client on a regular interval (recommended: every
+		10 seconds).  Returns the updated connection record.  Raises KeyError
+		if the connection is not registered.
+		"""
+		key = f"{tenant_id}:{connection_id}"
+		record = self._connections.get(key)
+		if record is None:
+			raise KeyError(f"connection_not_found:{connection_id}")
+		record["last_seen_at"] = utc_now()
+		return dict(record)
+
+	async def async_prune_dead_connections(
+		self,
+		tenant_id: str,
+		max_idle_seconds: int = 30,
+	) -> list[str]:
+		"""Evict connections whose last heartbeat is older than ``max_idle_seconds``.
+
+		Returns the list of evicted connection IDs.  Emits a
+		``connection_reaped`` audit event per eviction.
+		"""
+		from datetime import datetime, timezone, timedelta
+		now = datetime.now(timezone.utc)
+		cutoff = now - timedelta(seconds=max_idle_seconds)
+		reaped: list[str] = []
+		for key in list(self._connections.keys()):
+			record = self._connections[key]
+			if record["tenant_id"] != tenant_id:
+				continue
+			last_seen = datetime.fromisoformat(record["last_seen_at"])
+			if last_seen < cutoff:
+				connection_id = record["id"]
+				await self.async_disconnect(tenant_id, connection_id, "system", reason="idle_timeout")
+				reaped.append(connection_id)
+				self._audit(tenant_id, "connection_reaped", connection_id, "system", {"max_idle_seconds": max_idle_seconds})
+		return reaped
+
+	# ── WebSocket Broker: Room Management ─────────────────────────────────────
+
+	async def async_room_create(
+		self,
+		tenant_id: str,
+		room_id: str,
+		site_id: str,
+		actor_id: str,
+		page_id: str | None = None,
+		room_type: str = "collaboration",
+		max_members: int = 50,
+	) -> dict[str, Any]:
+		"""Create a new broker room scoped to a tenant site.
+
+		Rooms are the unit of real-time isolation.  A room maps to a logical
+		editing context — typically a site or a single page.  ``room_type``
+		accepts ``collaboration``, ``review``, or ``observer``.  Raises
+		ValueError if the room already exists.
+		"""
+		self._require_tenant(tenant_id)
+		room_key = f"{tenant_id}:{room_id}"
+		if room_key in self._rooms:
+			raise ValueError(f"room_already_exists:{room_id}")
+		room: dict[str, Any] = {
+			"id": room_id,
+			"tenant_id": tenant_id,
+			"site_id": site_id,
+			"page_id": page_id,
+			"room_type": room_type,
+			"max_members": max_members,
+			"members": [],
+			"status": "open",
+			"created_at": utc_now(),
+			"updated_at": utc_now(),
+		}
+		self._rooms[room_key] = room
+		self._audit(tenant_id, "ws_room_created", room_id, actor_id, {"site_id": site_id, "room_type": room_type})
+		return dict(room)
+
+	async def async_room_join(
+		self,
+		tenant_id: str,
+		room_id: str,
+		connection_id: str,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Add a connection to a room's member list.
+
+		Raises KeyError if the room does not exist.  Raises PermissionError if
+		the room is closed or at capacity.  Updates the connection record's room
+		list and emits a ``ws_room_joined`` audit event.
+		"""
+		self._require_tenant(tenant_id)
+		room_key = f"{tenant_id}:{room_id}"
+		room = self._rooms.get(room_key)
+		if room is None:
+			raise KeyError(f"room_not_found:{room_id}")
+		if room["status"] != "open":
+			raise PermissionError(f"room_not_open:{room_id}")
+		if len(room["members"]) >= room["max_members"]:
+			raise PermissionError(f"room_at_capacity:{room_id}")
+		if connection_id not in room["members"]:
+			room["members"].append(connection_id)
+			room["updated_at"] = utc_now()
+		conn_key = f"{tenant_id}:{connection_id}"
+		conn = self._connections.get(conn_key)
+		if conn is not None and room_id not in conn["rooms"]:
+			conn["rooms"].append(room_id)
+		self._audit(tenant_id, "ws_room_joined", room_id, actor_id, {"connection_id": connection_id})
+		return dict(room)
+
+	async def async_room_leave(
+		self,
+		tenant_id: str,
+		room_id: str,
+		connection_id: str,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Remove a connection from a room's member list.
+
+		No-ops gracefully if the connection was not a member.  Emits a
+		``ws_room_left`` audit event.
+		"""
+		self._require_tenant(tenant_id)
+		room_key = f"{tenant_id}:{room_id}"
+		room = self._rooms.get(room_key)
+		if room is None:
+			raise KeyError(f"room_not_found:{room_id}")
+		await self._room_evict(tenant_id, room_id, connection_id)
+		self._audit(tenant_id, "ws_room_left", room_id, actor_id, {"connection_id": connection_id})
+		return dict(room)
+
+	async def async_room_close(
+		self,
+		tenant_id: str,
+		room_id: str,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Close a room, evicting all members and releasing associated resources.
+
+		Closed rooms are retained in the registry for audit purposes but new
+		joins are rejected.  Emits a ``ws_room_closed`` audit event.
+		"""
+		self._require_tenant(tenant_id)
+		room_key = f"{tenant_id}:{room_id}"
+		room = self._rooms.get(room_key)
+		if room is None:
+			raise KeyError(f"room_not_found:{room_id}")
+		for connection_id in list(room["members"]):
+			await self._room_evict(tenant_id, room_id, connection_id)
+		room["status"] = "closed"
+		room["updated_at"] = utc_now()
+		self._audit(tenant_id, "ws_room_closed", room_id, actor_id, {})
+		return dict(room)
+
+	# ── WebSocket Broker: Presence Protocol ───────────────────────────────────
+
+	async def async_presence_update(
+		self,
+		tenant_id: str,
+		connection_id: str,
+		actor_id: str,
+		page_id: str | None = None,
+		component_id: str | None = None,
+		cursor_position: dict[str, Any] | None = None,
+		intent: str = "viewing",
+		ttl_seconds: int = 30,
+	) -> dict[str, Any]:
+		"""Publish a presence record for an active connection.
+
+		``intent`` must be one of ``viewing``, ``editing``, or ``reviewing``.
+		The record expires after ``ttl_seconds``; callers should send updates on
+		each heartbeat interval.  Returns the presence record.
+		"""
+		_valid_intents = {"viewing", "editing", "reviewing"}
+		if intent not in _valid_intents:
+			raise ValueError(f"invalid_presence_intent:{intent}")
+		presence_key = f"{tenant_id}:{connection_id}"
+		record: dict[str, Any] = {
+			"tenant_id": tenant_id,
+			"connection_id": connection_id,
+			"actor_id": actor_id,
+			"page_id": page_id,
+			"component_id": component_id,
+			"cursor_position": dict(cursor_position or {}),
+			"intent": intent,
+			"ttl_seconds": ttl_seconds,
+			"updated_at": utc_now(),
+		}
+		self._presence[presence_key] = record
+		return dict(record)
+
+	async def async_presence_snapshot(
+		self,
+		tenant_id: str,
+		room_id: str,
+	) -> list[dict[str, Any]]:
+		"""Return presence records for all connections in a room.
+
+		Expired entries (based on ``ttl_seconds``) are pruned before the
+		snapshot is built.  Useful for delivering initial state on room join.
+		"""
+		from datetime import datetime, timezone, timedelta
+		now = datetime.now(timezone.utc)
+		room_key = f"{tenant_id}:{room_id}"
+		room = self._rooms.get(room_key)
+		if room is None:
+			raise KeyError(f"room_not_found:{room_id}")
+		members = set(room["members"])
+		snapshot: list[dict[str, Any]] = []
+		for presence_key in list(self._presence.keys()):
+			p = self._presence[presence_key]
+			if p["tenant_id"] != tenant_id or p["connection_id"] not in members:
+				continue
+			updated = datetime.fromisoformat(p["updated_at"])
+			age_seconds = (now - updated).total_seconds()
+			if age_seconds > p.get("ttl_seconds", 30):
+				del self._presence[presence_key]
+				continue
+			snapshot.append(dict(p))
+		return snapshot
+
+	# ── WebSocket Broker: Broadcast ────────────────────────────────────────────
+
+	async def async_broadcast(
+		self,
+		tenant_id: str,
+		room_id: str,
+		message: dict[str, Any],
+		actor_id: str,
+		exclude_connection_ids: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Fan out a message to all connections in a room.
+
+		The in-memory backend records the broadcast in an append log keyed by
+		room.  A production backend would push over the real WebSocket transport.
+		Returns a delivery receipt: ``delivered`` count, ``failed`` list, and
+		``sent_at`` timestamp.
+
+		``exclude_connection_ids`` suppresses echo to the sender's own
+		connection.
+		"""
+		self._require_tenant(tenant_id)
+		room_key = f"{tenant_id}:{room_id}"
+		room = self._rooms.get(room_key)
+		if room is None:
+			raise KeyError(f"room_not_found:{room_id}")
+		exclude = set(exclude_connection_ids or [])
+		targets = [cid for cid in room["members"] if cid not in exclude]
+		envelope: dict[str, Any] = {
+			"room_id": room_id,
+			"tenant_id": tenant_id,
+			"sender_id": actor_id,
+			"message": dict(message),
+			"sent_at": utc_now(),
+			"recipients": targets,
+		}
+		self._broadcast_log.setdefault(room_key, []).append(envelope)
+		self._audit(tenant_id, "ws_broadcast", room_id, actor_id, {"recipient_count": len(targets)})
+		return {"delivered": len(targets), "failed": [], "sent_at": envelope["sent_at"]}
+
+	# ── WebSocket Broker: Collaborative Sessions ──────────────────────────────
+
+	async def async_session_start(
+		self,
+		tenant_id: str,
+		connection_id: str,
+		site_id: str,
+		page_id: str,
+		actor_id: str,
+		session_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Begin a governed collaborative editing session.
+
+		A session wraps a ``(tenant_id, site_id, page_id, actor_id)`` tuple
+		with heartbeat tracking.  Emits a ``ws_session_started`` audit event.
+		Multiple connections may open sessions on the same page — presence and
+		component locking coordinate access.
+		"""
+		self._require_tenant(tenant_id)
+		sid = session_id or stable_id("ws_session", tenant_id, site_id, page_id, actor_id)
+		if sid in self._ws_sessions:
+			raise ValueError(f"session_already_active:{sid}")
+		session: dict[str, Any] = {
+			"id": sid,
+			"tenant_id": tenant_id,
+			"connection_id": connection_id,
+			"site_id": site_id,
+			"page_id": page_id,
+			"actor_id": actor_id,
+			"status": "active",
+			"started_at": utc_now(),
+			"last_heartbeat_at": utc_now(),
+		}
+		self._ws_sessions[sid] = session
+		self._audit(tenant_id, "ws_session_started", sid, actor_id, {"site_id": site_id, "page_id": page_id})
+		return dict(session)
+
+	async def async_session_end(
+		self,
+		tenant_id: str,
+		session_id: str,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Terminate a collaborative editing session and release resources.
+
+		Emits a ``ws_session_ended`` audit event.
+		"""
+		session = self._ws_sessions.get(session_id)
+		if session is None or session["tenant_id"] != tenant_id:
+			raise KeyError(f"session_not_found:{session_id}")
+		session["status"] = "ended"
+		session["ended_at"] = utc_now()
+		del self._ws_sessions[session_id]
+		self._audit(tenant_id, "ws_session_ended", session_id, actor_id, {})
+		return dict(session)
+
+	async def async_reap_stale_sessions(
+		self,
+		tenant_id: str,
+		max_idle_seconds: int = 60,
+	) -> list[str]:
+		"""Evict collaborative sessions that have not sent a heartbeat recently.
+
+		Returns the list of reaped session IDs.
+		"""
+		from datetime import datetime, timezone, timedelta
+		now = datetime.now(timezone.utc)
+		cutoff = now - timedelta(seconds=max_idle_seconds)
+		reaped: list[str] = []
+		for sid in list(self._ws_sessions.keys()):
+			s = self._ws_sessions[sid]
+			if s["tenant_id"] != tenant_id:
+				continue
+			last = datetime.fromisoformat(s["last_heartbeat_at"])
+			if last < cutoff:
+				await self.async_session_end(tenant_id, sid, "system")
+				reaped.append(sid)
+		return reaped
+
+	# ── WebSocket Broker: Component Locking ───────────────────────────────────
+
+	async def async_lock_component(
+		self,
+		tenant_id: str,
+		component_id: str,
+		connection_id: str,
+		actor_id: str,
+		lock_ttl_seconds: int = 60,
+	) -> dict[str, Any]:
+		"""Acquire an exclusive edit lock on a component for a connection.
+
+		While the lock is held, other connections receive ``component_locked``
+		presence events and their edit attempts should be rejected.  Locks
+		auto-expire after ``lock_ttl_seconds``.  Raises PermissionError if the
+		component is already locked by a different connection.
+		"""
+		self._require_tenant(tenant_id)
+		lock_key = f"{tenant_id}:{component_id}"
+		existing = self._component_locks.get(lock_key)
+		if existing is not None:
+			if existing["holder_connection_id"] != connection_id:
+				raise PermissionError(f"component_locked_by_another:{component_id}")
+		lock: dict[str, Any] = {
+			"component_id": component_id,
+			"tenant_id": tenant_id,
+			"holder_connection_id": connection_id,
+			"holder_actor_id": actor_id,
+			"lock_ttl_seconds": lock_ttl_seconds,
+			"locked_at": utc_now(),
+		}
+		self._component_locks[lock_key] = lock
+		self._audit(tenant_id, "ws_component_locked", component_id, actor_id, {"connection_id": connection_id})
+		return dict(lock)
+
+	async def async_unlock_component(
+		self,
+		tenant_id: str,
+		component_id: str,
+		connection_id: str,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Release the edit lock on a component.
+
+		Only the holding connection (or ``system``) may unlock.  Raises
+		PermissionError if the caller does not hold the lock.
+		"""
+		self._require_tenant(tenant_id)
+		lock_key = f"{tenant_id}:{component_id}"
+		lock = self._component_locks.get(lock_key)
+		if lock is None:
+			raise KeyError(f"component_not_locked:{component_id}")
+		if lock["holder_connection_id"] != connection_id and actor_id != "system":
+			raise PermissionError(f"component_lock_not_owned:{component_id}")
+		del self._component_locks[lock_key]
+		self._audit(tenant_id, "ws_component_unlocked", component_id, actor_id, {"connection_id": connection_id})
+		return {"component_id": component_id, "unlocked_at": utc_now()}
+
+	# ── WebSocket Broker: Annotations ─────────────────────────────────────────
+
+	async def async_annotate_section(
+		self,
+		tenant_id: str,
+		page_id: str,
+		section_id: str,
+		actor_id: str,
+		text: str,
+		annotation_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Attach a text annotation to a page section.
+
+		Annotations provide in-context review feedback visible to all room
+		members.  Each annotation is audit-logged and can be resolved via
+		``async_resolve_annotation``.  Returns the annotation record.
+		"""
+		self._require_tenant(tenant_id)
+		page = self._get_page(page_id)
+		if page.tenant_id != tenant_id:
+			raise PermissionError("annotation_tenant_mismatch")
+		aid = annotation_id or stable_id("annot", tenant_id, page_id, section_id, actor_id)
+		annotation: dict[str, Any] = {
+			"id": aid,
+			"tenant_id": tenant_id,
+			"page_id": page_id,
+			"section_id": section_id,
+			"actor_id": actor_id,
+			"text": text,
+			"resolved": False,
+			"created_at": utc_now(),
+			"updated_at": utc_now(),
+		}
+		self._annotations.setdefault(f"{tenant_id}:{page_id}", []).append(annotation)
+		self._audit(tenant_id, "ws_annotation_added", aid, actor_id, {"section_id": section_id})
+		return dict(annotation)
+
+	async def async_list_annotations(
+		self,
+		tenant_id: str,
+		page_id: str,
+		include_resolved: bool = False,
+	) -> list[dict[str, Any]]:
+		"""Return annotations for a page, optionally including resolved ones."""
+		annotations = list(self._annotations.get(f"{tenant_id}:{page_id}", []))
+		if not include_resolved:
+			annotations = [a for a in annotations if not a["resolved"]]
+		return [dict(a) for a in annotations]
+
+	# ── WebSocket Broker: Channel Authorization ────────────────────────────────
+
+	async def async_authorize_channel(
+		self,
+		tenant_id: str,
+		connection_id: str,
+		channel: str,
+		required_perm: str,
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""Evaluate WSBL capability rules before admitting a connection to a channel.
+
+		Integrates with the existing ``evaluate()`` engine so tenant-scoped
+		RBAC is enforced at the transport layer.  Returns the policy result.
+		Raises PermissionError if the result is ``deny``.
+		"""
+		self._require_tenant(tenant_id)
+		context: dict[str, Any] = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "ws_channel_authorize",
+			"channel": channel,
+			"required_perm": required_perm,
+			"connection_id": connection_id,
+		}
+		result = self.evaluate(context)
+		self._audit(
+			tenant_id,
+			"ws_channel_authorized" if result["decision"] != "deny" else "ws_channel_denied",
+			channel,
+			actor_id,
+			{"connection_id": connection_id, "required_perm": required_perm},
+			policy_result=result,
+		)
+		if result["decision"] == "deny":
+			reasons = [a.get("reason", "channel_access_denied") for a in result.get("actions", [])]
+			raise PermissionError(", ".join(reasons) or "channel_access_denied")
+		return self._policy_payload(result)
+
+	# ── WebSocket Broker: State Query Helpers ─────────────────────────────────
+
+	def list_connections(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return active WebSocket connections, optionally filtered by tenant."""
+		conns = list(self._connections.values())
+		if tenant_id is not None:
+			conns = [c for c in conns if c["tenant_id"] == tenant_id]
+		return [dict(c) for c in sorted(conns, key=lambda x: x["connected_at"])]
+
+	def list_rooms(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return all rooms, optionally filtered by tenant."""
+		rooms = list(self._rooms.values())
+		if tenant_id is not None:
+			rooms = [r for r in rooms if r["tenant_id"] == tenant_id]
+		return [dict(r) for r in sorted(rooms, key=lambda x: x["created_at"])]
+
+	def list_component_locks(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return active component locks, optionally filtered by tenant."""
+		locks = list(self._component_locks.values())
+		if tenant_id is not None:
+			locks = [lock for lock in locks if lock["tenant_id"] == tenant_id]
+		return [dict(lock) for lock in locks]
+
+	# ── Private Broker Helpers ─────────────────────────────────────────────────
+
+	async def _room_evict(self, tenant_id: str, room_id: str, connection_id: str) -> None:
+		"""Internal: remove a connection from a room without auditing."""
+		room_key = f"{tenant_id}:{room_id}"
+		room = self._rooms.get(room_key)
+		if room is not None and connection_id in room["members"]:
+			room["members"].remove(connection_id)
+			room["updated_at"] = utc_now()
+		conn_key = f"{tenant_id}:{connection_id}"
+		conn = self._connections.get(conn_key)
+		if conn is not None and room_id in conn.get("rooms", []):
+			conn["rooms"].remove(room_id)

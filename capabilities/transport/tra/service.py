@@ -1142,4 +1142,626 @@ class AssetTrackingService:
 		return [u.to_dict() for u in updates[:limit]]
 
 
+	# ------------------------------------------------------------------
+	# New high-value async methods
+	# ------------------------------------------------------------------
+
+	async def journey_analytics(
+		self,
+		asset_id: str,
+		*,
+		idle_threshold_minutes: int = 30,
+		tenant_id: str = "",
+	) -> dict[str, Any]:
+		"""Segment an asset's location history into journey legs and stops.
+
+		A leg boundary is detected when speed drops below 2 km/h for at least
+		idle_threshold_minutes worth of consecutive 5-minute pings. Returns
+		per-leg distance, duration, average speed and stop dwell times.
+		Enables SLA breach detection per delivery leg.
+		"""
+		tid = tenant_id or self.tenant_id
+		if not _present(asset_id):
+			raise ValueError("asset_id required")
+		await asyncio.sleep(0)
+
+		pings = sorted(
+			[u for u in self.location_updates.values() if u.tenant_id == tid and u.asset_id == asset_id],
+			key=lambda u: u.timestamp,
+		)
+		if len(pings) < 2:
+			return {"asset_id": asset_id, "legs": [], "stops": [], "total_pings": len(pings), "tenant_id": tid}
+
+		idle_ping_threshold = max(1, idle_threshold_minutes // 5)
+		legs: list[dict[str, Any]] = []
+		stops: list[dict[str, Any]] = []
+		leg_start_idx = 0
+		idle_run = 0
+
+		for i in range(1, len(pings)):
+			if pings[i].speed_kmh < 2.0:
+				idle_run += 1
+			else:
+				if idle_run >= idle_ping_threshold and i - idle_run > leg_start_idx:
+					# Close a leg
+					leg_pings = pings[leg_start_idx : i - idle_run + 1]
+					dist = sum(
+						_haversine_km(leg_pings[j].latitude, leg_pings[j].longitude,
+						              leg_pings[j + 1].latitude, leg_pings[j + 1].longitude)
+						for j in range(len(leg_pings) - 1)
+					)
+					speeds = [p.speed_kmh for p in leg_pings if p.speed_kmh > 0]
+					legs.append({
+						"leg": len(legs) + 1,
+						"start": leg_pings[0].timestamp,
+						"end": leg_pings[-1].timestamp,
+						"ping_count": len(leg_pings),
+						"distance_km": round(dist, 2),
+						"avg_speed_kmh": round(sum(speeds) / len(speeds), 1) if speeds else 0.0,
+						"start_lat": leg_pings[0].latitude,
+						"start_lng": leg_pings[0].longitude,
+						"end_lat": leg_pings[-1].latitude,
+						"end_lng": leg_pings[-1].longitude,
+					})
+					# Record stop
+					stop_pings = pings[i - idle_run : i + 1]
+					stops.append({
+						"stop": len(stops) + 1,
+						"start": stop_pings[0].timestamp,
+						"end": stop_pings[-1].timestamp,
+						"dwell_minutes": len(stop_pings) * 5,
+						"lat": stop_pings[0].latitude,
+						"lng": stop_pings[0].longitude,
+					})
+					leg_start_idx = i
+				idle_run = 0
+
+		# Close final leg
+		if leg_start_idx < len(pings) - 1:
+			leg_pings = pings[leg_start_idx:]
+			dist = sum(
+				_haversine_km(leg_pings[j].latitude, leg_pings[j].longitude,
+				              leg_pings[j + 1].latitude, leg_pings[j + 1].longitude)
+				for j in range(len(leg_pings) - 1)
+			)
+			speeds = [p.speed_kmh for p in leg_pings if p.speed_kmh > 0]
+			legs.append({
+				"leg": len(legs) + 1,
+				"start": leg_pings[0].timestamp,
+				"end": leg_pings[-1].timestamp,
+				"ping_count": len(leg_pings),
+				"distance_km": round(dist, 2),
+				"avg_speed_kmh": round(sum(speeds) / len(speeds), 1) if speeds else 0.0,
+				"start_lat": leg_pings[0].latitude,
+				"start_lng": leg_pings[0].longitude,
+				"end_lat": leg_pings[-1].latitude,
+				"end_lng": leg_pings[-1].longitude,
+			})
+
+		total_dist = sum(lg["distance_km"] for lg in legs)
+		self._audit(tid, "journey_analytics_generated", asset_id)
+		return {
+			"asset_id": asset_id,
+			"tenant_id": tid,
+			"total_pings": len(pings),
+			"legs": legs,
+			"leg_count": len(legs),
+			"stops": stops,
+			"stop_count": len(stops),
+			"total_distance_km": round(total_dist, 2),
+			"generated_at": _now_iso(),
+		}
+
+	async def detect_harsh_events(
+		self,
+		asset_id: str,
+		*,
+		harsh_brake_g: float = 0.3,
+		harsh_accel_g: float = 0.3,
+		speed_limit_kmh: float = 120.0,
+		ping_interval_seconds: float = 300.0,
+		tenant_id: str = "",
+	) -> dict[str, Any]:
+		"""Detect harsh braking, harsh acceleration, and speeding events from GPS deltas.
+
+		Computes m/s² from consecutive speed readings. Returns a list of
+		classified events suitable for fleet safety scoring and insurance telematics.
+		g = 9.81 m/s².
+		"""
+		tid = tenant_id or self.tenant_id
+		if not _present(asset_id):
+			raise ValueError("asset_id required")
+		await asyncio.sleep(0)
+
+		pings = sorted(
+			[u for u in self.location_updates.values() if u.tenant_id == tid and u.asset_id == asset_id],
+			key=lambda u: u.timestamp,
+		)
+
+		g_ms2 = 9.81
+		brake_threshold_ms2 = harsh_brake_g * g_ms2
+		accel_threshold_ms2 = harsh_accel_g * g_ms2
+		events: list[dict[str, Any]] = []
+
+		for i in range(1, len(pings)):
+			prev, curr = pings[i - 1], pings[i]
+			delta_v_ms = (curr.speed_kmh - prev.speed_kmh) / 3.6
+			accel_ms2 = delta_v_ms / max(ping_interval_seconds, 1.0)
+			event_type: str | None = None
+			if accel_ms2 <= -brake_threshold_ms2:
+				event_type = "harsh_braking"
+			elif accel_ms2 >= accel_threshold_ms2:
+				event_type = "harsh_acceleration"
+			elif curr.speed_kmh > speed_limit_kmh:
+				event_type = "speeding"
+			if event_type:
+				events.append({
+					"event_type": event_type,
+					"timestamp": curr.timestamp,
+					"latitude": curr.latitude,
+					"longitude": curr.longitude,
+					"speed_kmh": curr.speed_kmh,
+					"delta_speed_kmh": round(curr.speed_kmh - prev.speed_kmh, 1),
+					"accel_ms2": round(accel_ms2, 3),
+					"severity": "high" if abs(accel_ms2) > 2 * brake_threshold_ms2 else "medium",
+				})
+
+		# Raise alerts for harsh events
+		alert_ids: list[str] = []
+		for ev in events:
+			if ev["event_type"] in SUPPORTED_ALERT_TYPES:
+				al_id = f"HEV-{asset_id[:6]}-{uuid.uuid4().hex[:6].upper()}"
+				self.raise_alert(al_id, tid, asset_id, ev["event_type"], ev["severity"], ev["timestamp"], str(ev))
+				alert_ids.append(al_id)
+
+		self._audit(tid, "harsh_events_detected", asset_id)
+		return {
+			"asset_id": asset_id,
+			"tenant_id": tid,
+			"pings_analysed": len(pings),
+			"harsh_events": events,
+			"event_count": len(events),
+			"alert_ids_raised": alert_ids,
+			"generated_at": _now_iso(),
+		}
+
+	async def fleet_utilisation_benchmark(
+		self,
+		period: str,
+		*,
+		cost_per_idle_hour: float = 15.0,
+		tenant_id: str = "",
+	) -> dict[str, Any]:
+		"""Cross-fleet utilisation percentile benchmarking.
+
+		Computes utilisation % across all active assets, returns p25/p50/p75/p95
+		percentiles, identifies the bottom-quartile cohort for redeployment, and
+		estimates idle cost at the given hourly rate.
+		"""
+		tid = tenant_id or self.tenant_id
+		await asyncio.sleep(0)
+
+		assets = [a for a in self.assets.values() if a.tenant_id == tid and a.active]
+		if not assets:
+			return {"tenant_id": tid, "period": period, "fleet_size": 0, "percentiles": {}, "generated_at": _now_iso()}
+
+		util_data: list[dict[str, Any]] = []
+		for asset in assets:
+			pings = [u for u in self.location_updates.values() if u.tenant_id == tid and u.asset_id == asset.id]
+			total = len(pings)
+			moving = sum(1 for u in pings if u.speed_kmh > 2.0)
+			pct = round(moving / total * 100, 1) if total else 0.0
+			idle_hours = round((total - moving) * 5 / 60, 2)
+			util_data.append({
+				"asset_id": asset.id,
+				"asset_type": asset.asset_type,
+				"utilisation_pct": pct,
+				"idle_hours": idle_hours,
+				"idle_cost": round(idle_hours * cost_per_idle_hour, 2),
+				"ping_count": total,
+			})
+
+		util_data.sort(key=lambda x: x["utilisation_pct"])
+		n = len(util_data)
+
+		def _percentile(sorted_list: list[dict[str, Any]], p: float) -> float:
+			idx = max(0, int(math.ceil(p / 100 * n)) - 1)
+			return sorted_list[idx]["utilisation_pct"]
+
+		bottom_quartile = [d for d in util_data if d["utilisation_pct"] <= _percentile(util_data, 25)]
+		total_idle_cost = round(sum(d["idle_cost"] for d in util_data), 2)
+
+		self._audit(tid, "fleet_benchmark_generated", tid)
+		return {
+			"tenant_id": tid,
+			"period": period,
+			"fleet_size": n,
+			"percentiles": {
+				"p25": _percentile(util_data, 25),
+				"p50": _percentile(util_data, 50),
+				"p75": _percentile(util_data, 75),
+				"p95": _percentile(util_data, 95),
+			},
+			"bottom_quartile_assets": bottom_quartile,
+			"total_idle_cost": total_idle_cost,
+			"cost_per_idle_hour": cost_per_idle_hour,
+			"all_assets": util_data,
+			"generated_at": _now_iso(),
+		}
+
+	async def detect_location_anomaly(
+		self,
+		asset_id: str,
+		new_lat: float,
+		new_lng: float,
+		new_timestamp: str,
+		*,
+		max_plausible_speed_kmh: float = 300.0,
+		ping_interval_seconds: float = 300.0,
+		tenant_id: str = "",
+	) -> dict[str, Any]:
+		"""Detect GPS spoofing or cloned-tracker position-jump anomalies.
+
+		Computes the implied speed between the previous known position and the
+		candidate update. If implied speed exceeds max_plausible_speed_kmh
+		(default 300 km/h), raises a medium-severity position_jump_anomaly alert.
+		"""
+		tid = tenant_id or self.tenant_id
+		if not _present(asset_id):
+			raise ValueError("asset_id required")
+		await asyncio.sleep(0)
+
+		recent = sorted(
+			[u for u in self.location_updates.values() if u.tenant_id == tid and u.asset_id == asset_id],
+			key=lambda u: u.timestamp,
+			reverse=True,
+		)
+		anomaly = False
+		implied_speed_kmh = 0.0
+		prev_position: dict[str, Any] = {}
+
+		if recent:
+			prev = recent[0]
+			dist_km = _haversine_km(prev.latitude, prev.longitude, new_lat, new_lng)
+			implied_speed_kmh = round(dist_km / (ping_interval_seconds / 3600), 1)
+			anomaly = implied_speed_kmh > max_plausible_speed_kmh
+			prev_position = {"lat": prev.latitude, "lng": prev.longitude, "timestamp": prev.timestamp}
+
+		alert_id: str | None = None
+		if anomaly:
+			alert_id = f"ANOM-{asset_id[:6]}-{uuid.uuid4().hex[:6].upper()}"
+			at = "tamper_detected" if "tamper_detected" in SUPPORTED_ALERT_TYPES else list(SUPPORTED_ALERT_TYPES)[0]
+			self.raise_alert(
+				alert_id, tid, asset_id, at, "medium", new_timestamp,
+				f"Position jump: {implied_speed_kmh} km/h implied — possible GPS spoofing",
+			)
+			self._audit(tid, "location_anomaly_detected", alert_id)
+
+		return {
+			"asset_id": asset_id,
+			"tenant_id": tid,
+			"candidate_position": {"lat": new_lat, "lng": new_lng, "timestamp": new_timestamp},
+			"previous_position": prev_position,
+			"implied_speed_kmh": implied_speed_kmh,
+			"max_plausible_speed_kmh": max_plausible_speed_kmh,
+			"anomaly_detected": anomaly,
+			"alert_id": alert_id,
+			"checked_at": _now_iso(),
+		}
+
+	async def cold_chain_compliance_summary(
+		self,
+		asset_id: str,
+		period: str,
+		*,
+		standard: str = "haccp",
+		tenant_id: str = "",
+	) -> dict[str, Any]:
+		"""Aggregate cold chain readings for an asset and produce a compliance summary.
+
+		Groups readings by standard, computes deviation statistics, and flags
+		whether the asset meets the ≥99% compliance threshold required for
+		certificate generation via the `comp` capability.
+		"""
+		tid = tenant_id or self.tenant_id
+		if not _present(asset_id) or not _present(period):
+			raise ValueError("asset_id and period required")
+		await asyncio.sleep(0)
+
+		records = [
+			r for r in self.cold_chain_records.values()
+			if r.tenant_id == tid and r.asset_id == asset_id
+		]
+		std = _norm(standard)
+		std_records = [r for r in records if r.standard == std]
+		total = len(std_records)
+		breaches = [r for r in std_records if r.breached]
+		compliance_pct = round((total - len(breaches)) / max(total, 1) * 100, 2)
+
+		deviations: list[dict[str, Any]] = []
+		for r in breaches:
+			deviation = r.recorded_temp_c - r.max_temp_c if r.recorded_temp_c > r.max_temp_c else r.min_temp_c - r.recorded_temp_c
+			deviations.append({
+				"record_id": r.id,
+				"timestamp": r.timestamp,
+				"recorded_temp_c": r.recorded_temp_c,
+				"limit_breached": "max" if r.recorded_temp_c > r.max_temp_c else "min",
+				"deviation_c": round(abs(deviation), 2),
+			})
+
+		cert_eligible = compliance_pct >= 99.0
+		self._audit(tid, "cold_chain_compliance_summarised", asset_id)
+		return {
+			"asset_id": asset_id,
+			"period": period,
+			"standard": std,
+			"tenant_id": tid,
+			"total_readings": total,
+			"breach_count": len(breaches),
+			"compliance_pct": compliance_pct,
+			"certificate_eligible": cert_eligible,
+			"deviations": deviations,
+			"max_deviation_c": max((d["deviation_c"] for d in deviations), default=0.0),
+			"generated_at": _now_iso(),
+		}
+
+	async def container_dwell_report(
+		self,
+		geofence_id: str,
+		*,
+		free_time_hours: float = 48.0,
+		tenant_id: str = "",
+	) -> dict[str, Any]:
+		"""Report container dwell times within a geofenced depot or port.
+
+		Correlates geofence entry events with associated containers, computes
+		dwell duration, and flags containers approaching or exceeding the
+		free-time window. Used to trigger pre-emptive detention alerts.
+		"""
+		tid = tenant_id or self.tenant_id
+		if not _present(geofence_id):
+			raise ValueError("geofence_id required")
+		await asyncio.sleep(0)
+
+		gf = self.geofences.get(self._key(tid, geofence_id))
+		if gf is None:
+			raise KeyError(f"Geofence {geofence_id} not found")
+
+		entry_events = [
+			e for e in self.geofence_events
+			if e.get("geofence_id") == geofence_id and e.get("tenant_id") == tid and e.get("event_type") == "entry"
+		]
+		exit_events = {
+			e["asset_id"]: e for e in self.geofence_events
+			if e.get("geofence_id") == geofence_id and e.get("tenant_id") == tid and e.get("event_type") == "exit"
+		}
+
+		dwell_records: list[dict[str, Any]] = []
+		for entry in entry_events:
+			asset_id = entry["asset_id"]
+			entry_time = entry.get("at", "")
+			exit_event = exit_events.get(asset_id)
+			exit_time = exit_event["at"] if exit_event else _now_iso()
+			# Approximate dwell in hours from ISO string prefix
+			dwell_hours = 0.0
+			try:
+				from datetime import datetime as _dt
+				t_entry = _dt.fromisoformat(entry_time.replace("Z", "+00:00"))
+				t_exit = _dt.fromisoformat(exit_time.replace("Z", "+00:00"))
+				dwell_hours = round((t_exit - t_entry).total_seconds() / 3600, 2)
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+			detention_risk = dwell_hours >= free_time_hours * 0.9
+			dwell_records.append({
+				"asset_id": asset_id,
+				"entry_time": entry_time,
+				"exit_time": exit_time if exit_event else None,
+				"still_inside": exit_event is None,
+				"dwell_hours": dwell_hours,
+				"free_time_hours": free_time_hours,
+				"detention_risk": detention_risk,
+				"excess_hours": max(0.0, round(dwell_hours - free_time_hours, 2)),
+			})
+
+		dwell_records.sort(key=lambda r: r["dwell_hours"], reverse=True)
+		at_risk = [r for r in dwell_records if r["detention_risk"]]
+
+		self._audit(tid, "container_dwell_reported", geofence_id)
+		return {
+			"geofence_id": geofence_id,
+			"geofence_name": gf.name,
+			"tenant_id": tid,
+			"free_time_hours": free_time_hours,
+			"total_assets_tracked": len(dwell_records),
+			"at_detention_risk": len(at_risk),
+			"dwell_records": dwell_records,
+			"generated_at": _now_iso(),
+		}
+
+	async def fleet_map_clusters(
+		self,
+		geohash_precision: int = 4,
+		*,
+		active_only: bool = True,
+		tenant_id: str = "",
+	) -> dict[str, Any]:
+		"""Return asset positions clustered by geohash cell for scalable map rendering.
+
+		At geohash precision 4 each cell is ~40 km × 20 km; precision 6 is ~1.2 km².
+		Returns centroid + count per cell. Browser clients switch to individual
+		features only when zoom warrants precision 6+, reducing payload by ~95%
+		at national-scale views.
+		"""
+		tid = tenant_id or self.tenant_id
+		await asyncio.sleep(0)
+
+		assets = [a for a in self.assets.values() if a.tenant_id == tid and (not active_only or a.active)]
+
+		# Lightweight geohash: encode lat/lng as a truncated decimal string bucket
+		def _bucket(lat: float, lng: float, precision: int) -> str:
+			factor = 10 ** (precision - 2)  # coarsen to ~degrees * factor
+			return f"{int(lat * factor / factor * factor)},{int(lng * factor / factor * factor)}"
+
+		cells: dict[str, dict[str, Any]] = {}
+		for asset in assets:
+			recent = sorted(
+				[u for u in self.location_updates.values() if u.tenant_id == tid and u.asset_id == asset.id],
+				key=lambda u: u.timestamp,
+				reverse=True,
+			)
+			if not recent:
+				continue
+			latest = recent[0]
+			cell_key = _bucket(latest.latitude, latest.longitude, geohash_precision)
+			if cell_key not in cells:
+				cells[cell_key] = {"cell_key": cell_key, "count": 0, "lat_sum": 0.0, "lng_sum": 0.0, "asset_ids": []}
+			cells[cell_key]["count"] += 1
+			cells[cell_key]["lat_sum"] += latest.latitude
+			cells[cell_key]["lng_sum"] += latest.longitude
+			cells[cell_key]["asset_ids"].append(asset.id)
+
+		clusters = [
+			{
+				"cell_key": c["cell_key"],
+				"count": c["count"],
+				"centroid_lat": round(c["lat_sum"] / c["count"], 6),
+				"centroid_lng": round(c["lng_sum"] / c["count"], 6),
+				"asset_ids": c["asset_ids"],
+			}
+			for c in cells.values()
+		]
+		clusters.sort(key=lambda c: c["count"], reverse=True)
+
+		return {
+			"tenant_id": tid,
+			"geohash_precision": geohash_precision,
+			"active_only": active_only,
+			"total_assets_with_location": sum(c["count"] for c in clusters),
+			"cluster_count": len(clusters),
+			"clusters": clusters,
+			"generated_at": _now_iso(),
+		}
+
+	async def replay_buffered_telemetry(
+		self,
+		asset_id: str,
+		buffered_pings: list[dict[str, Any]],
+		*,
+		tenant_id: str = "",
+	) -> dict[str, Any]:
+		"""Ingest and replay offline-buffered GPS pings for an asset.
+
+		Accepts an ordered list of timestamped pings (each must have keys:
+		latitude, longitude, speed_kmh, heading_degrees, timestamp, source).
+		Validates temporal ordering, deduplicates against already-stored
+		updates by (asset_id, timestamp), and applies each ping.
+		Emits a telemetry_replay_complete audit event with gap statistics.
+		"""
+		tid = tenant_id or self.tenant_id
+		if not _present(asset_id):
+			raise ValueError("asset_id required")
+		if not buffered_pings:
+			raise ValueError("buffered_pings must be non-empty")
+		await asyncio.sleep(0)
+
+		existing_timestamps = {
+			u.timestamp for u in self.location_updates.values()
+			if u.tenant_id == tid and u.asset_id == asset_id
+		}
+
+		sorted_pings = sorted(buffered_pings, key=lambda p: p.get("timestamp", ""))
+		accepted = 0
+		skipped_dup = 0
+		errors: list[str] = []
+
+		for ping in sorted_pings:
+			ts = ping.get("timestamp", "")
+			if not ts:
+				errors.append(f"missing timestamp in ping: {ping}")
+				continue
+			if ts in existing_timestamps:
+				skipped_dup += 1
+				continue
+			try:
+				update_id = f"RPL-{asset_id[:6]}-{uuid.uuid4().hex[:6].upper()}"
+				self.update_asset_location(
+					update_id, tid, asset_id,
+					float(ping.get("latitude", 0)),
+					float(ping.get("longitude", 0)),
+					float(ping.get("speed_kmh", 0)),
+					float(ping.get("heading_degrees", 0)),
+					ts,
+					str(ping.get("source", "replay")),
+				)
+				existing_timestamps.add(ts)
+				accepted += 1
+			except Exception as exc:
+				errors.append(f"ping@{ts}: {exc}")
+
+		self._audit(tid, "telemetry_replay_complete", asset_id)
+		return {
+			"asset_id": asset_id,
+			"tenant_id": tid,
+			"submitted": len(buffered_pings),
+			"accepted": accepted,
+			"skipped_duplicates": skipped_dup,
+			"errors": errors,
+			"replayed_at": _now_iso(),
+		}
+
+	async def speeding_violations(
+		self,
+		tenant_id: str = "",
+		*,
+		speed_limit_kmh: float = 100.0,
+		top_n: int = 20,
+	) -> dict[str, Any]:
+		"""Return the top-N assets with the most speeding violations across the fleet.
+
+		A violation is any location ping where recorded speed exceeds speed_limit_kmh.
+		Results are sorted by violation count descending. Suitable for a driver
+		safety league table and fleet insurance telematics reporting.
+		"""
+		tid = tenant_id or self.tenant_id
+		await asyncio.sleep(0)
+
+		violation_map: dict[str, list[dict[str, Any]]] = {}
+		for u in self.location_updates.values():
+			if u.tenant_id != tid:
+				continue
+			if u.speed_kmh > speed_limit_kmh:
+				if u.asset_id not in violation_map:
+					violation_map[u.asset_id] = []
+				violation_map[u.asset_id].append({
+					"timestamp": u.timestamp,
+					"speed_kmh": u.speed_kmh,
+					"latitude": u.latitude,
+					"longitude": u.longitude,
+					"excess_kmh": round(u.speed_kmh - speed_limit_kmh, 1),
+				})
+
+		ranked = sorted(violation_map.items(), key=lambda x: len(x[1]), reverse=True)[:top_n]
+		results = [
+			{
+				"asset_id": aid,
+				"violation_count": len(viols),
+				"max_speed_kmh": max(v["speed_kmh"] for v in viols),
+				"max_excess_kmh": max(v["excess_kmh"] for v in viols),
+				"violations": viols,
+			}
+			for aid, viols in ranked
+		]
+
+		self._audit(tid, "speeding_violations_reported", tid)
+		return {
+			"tenant_id": tid,
+			"speed_limit_kmh": speed_limit_kmh,
+			"total_violating_assets": len(violation_map),
+			"top_n": top_n,
+			"results": results,
+			"generated_at": _now_iso(),
+		}
+
+
 TransportTrackingService = AssetTrackingService

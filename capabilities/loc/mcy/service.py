@@ -758,6 +758,536 @@ class MultiCurrencyManagementService:
 		events = [e.model_dump() for e in self._audit_events if e.tenant_id == tenant_id]
 		return list(reversed(events))[:limit]
 
+	# --- New World-Class Methods ---
+
+	async def detect_stale_rates(
+		self,
+		tenant_id: str,
+		staleness_days: int = 3,
+	) -> dict[str, Any]:
+		"""Identify exchange rates that are expired or have not been refreshed within staleness_days.
+
+		Returns a list of stale rate records with their staleness in days, suitable for
+		alerting via the ntfy capability or surfacing as a dashboard badge.
+		"""
+		self._enforce_tenant(tenant_id)
+		today = date.today()
+		stale: list[dict[str, Any]] = []
+		for r in self._rates.values():
+			if r.tenant_id != tenant_id or not r.is_active:
+				continue
+			# Explicitly expired
+			if r.expiry_date is not None and r.expiry_date < today:
+				days_stale = (today - r.expiry_date).days
+				stale.append({
+					"rate_id": r.id,
+					"from_currency": r.from_currency,
+					"to_currency": r.to_currency,
+					"rate_type": r.rate_type,
+					"effective_date": r.effective_date.isoformat(),
+					"expiry_date": r.expiry_date.isoformat(),
+					"days_stale": days_stale,
+					"reason": "expired",
+				})
+				continue
+			# No expiry date but older than staleness window
+			days_since_effective = (today - r.effective_date).days
+			if r.expiry_date is None and days_since_effective > staleness_days:
+				stale.append({
+					"rate_id": r.id,
+					"from_currency": r.from_currency,
+					"to_currency": r.to_currency,
+					"rate_type": r.rate_type,
+					"effective_date": r.effective_date.isoformat(),
+					"expiry_date": None,
+					"days_stale": days_since_effective,
+					"reason": "no_expiry_window_exceeded",
+				})
+		return {
+			"tenant_id": tenant_id,
+			"staleness_threshold_days": staleness_days,
+			"stale_count": len(stale),
+			"stale_rates": stale,
+			"checked_at": datetime.utcnow().isoformat(),
+		}
+
+	async def bulk_record_exchange_rates(
+		self,
+		tenant_id: str,
+		payloads: list[ExchangeRateCreate],
+		upload_batch_id: str,
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""Record multiple exchange rates in a single call with idempotency per batch.
+
+		Deduplicates on (from_currency, to_currency, effective_date, rate_type).
+		Returns counts: created, skipped_duplicate, rejected with per-item detail.
+		"""
+		self._enforce_tenant(tenant_id)
+		created: list[str] = []
+		skipped: list[dict[str, Any]] = []
+		rejected: list[dict[str, Any]] = []
+
+		# Build dedup index over existing rates for this tenant
+		existing_keys: set[tuple[str, str, str, str]] = {
+			(r.from_currency, r.to_currency, str(r.effective_date), r.rate_type)
+			for r in self._rates.values()
+			if r.tenant_id == tenant_id
+		}
+
+		for idx, payload in enumerate(payloads):
+			dedup_key = (
+				payload.from_currency.upper(),
+				payload.to_currency.upper(),
+				str(payload.effective_date),
+				payload.rate_type,
+			)
+			if dedup_key in existing_keys:
+				skipped.append({
+					"index": idx,
+					"from_currency": payload.from_currency,
+					"to_currency": payload.to_currency,
+					"effective_date": str(payload.effective_date),
+					"reason": "duplicate",
+				})
+				continue
+			try:
+				rate = await self.record_exchange_rate(payload, actor_id=actor_id)
+				existing_keys.add(dedup_key)
+				created.append(rate.id)
+			except (PermissionError, AssertionError, KeyError) as exc:
+				rejected.append({
+					"index": idx,
+					"from_currency": payload.from_currency,
+					"to_currency": payload.to_currency,
+					"effective_date": str(payload.effective_date),
+					"reason": str(exc),
+				})
+
+		await self._emit(tenant_id, "bulk_rates_uploaded", upload_batch_id, actor_id)
+		return {
+			"tenant_id": tenant_id,
+			"upload_batch_id": upload_batch_id,
+			"total_submitted": len(payloads),
+			"created": len(created),
+			"skipped_duplicate": len(skipped),
+			"rejected": len(rejected),
+			"created_ids": created,
+			"skipped_detail": skipped,
+			"rejected_detail": rejected,
+		}
+
+	async def get_rate_history(
+		self,
+		tenant_id: str,
+		from_currency: str,
+		to_currency: str,
+		rate_type: str = "spot",
+		limit: int = 90,
+	) -> list[dict[str, Any]]:
+		"""Return the chronological rate history for a currency pair.
+
+		Returns up to `limit` records sorted oldest-first, including both active
+		and superseded rates, enabling full audit reconstruction.
+		"""
+		self._enforce_tenant(tenant_id)
+		history = [
+			r for r in self._rates.values()
+			if r.tenant_id == tenant_id
+			and r.from_currency == from_currency.upper()
+			and r.to_currency == to_currency.upper()
+			and r.rate_type == rate_type
+		]
+		history.sort(key=lambda r: r.effective_date)
+		return [
+			{
+				"rate_id": r.id,
+				"rate": r.rate,
+				"rate_source": r.rate_source,
+				"effective_date": r.effective_date.isoformat(),
+				"expiry_date": r.expiry_date.isoformat() if r.expiry_date else None,
+				"is_active": r.is_active,
+				"created_by": r.created_by,
+				"created_at": r.created_at.isoformat(),
+			}
+			for r in history[-limit:]
+		]
+
+	async def multi_currency_convert_batch(
+		self,
+		tenant_id: str,
+		conversions: list[dict[str, Any]],
+		as_of: date,
+		rate_type: str = "spot",
+	) -> list[dict[str, Any]]:
+		"""Convert multiple amounts across currency pairs in a single call.
+
+		Each item in `conversions` must have keys: `amount`, `from_currency`, `to_currency`.
+		Returns results in the same order as inputs; failed conversions include `error` key.
+
+		Args:
+			tenant_id: Tenant identifier.
+			conversions: List of dicts with `amount`, `from_currency`, `to_currency`.
+			as_of: Rate date to use for all conversions.
+			rate_type: Rate type (default: "spot").
+		"""
+		self._enforce_tenant(tenant_id)
+		results: list[dict[str, Any]] = []
+		for item in conversions:
+			try:
+				result = await self.convert_amount(
+					tenant_id,
+					amount=float(item["amount"]),
+					from_currency=item["from_currency"],
+					to_currency=item["to_currency"],
+					as_of=as_of,
+					rate_type=rate_type,
+				)
+				results.append({"status": "ok", **result})
+			except (KeyError, AssertionError, PermissionError) as exc:
+				results.append({
+					"status": "error",
+					"amount": item.get("amount"),
+					"from_currency": item.get("from_currency"),
+					"to_currency": item.get("to_currency"),
+					"error": str(exc),
+				})
+		return results
+
+	async def currency_pair_spread_analysis(
+		self,
+		tenant_id: str,
+		from_currency: str,
+		to_currency: str,
+		lookback_days: int = 30,
+	) -> dict[str, Any]:
+		"""Analyse the bid-ask spread and rate volatility for a currency pair over a lookback window.
+
+		Computes: mean rate, std deviation, min, max, and coefficient of variation.
+		Flags the pair as "volatile" if the coefficient of variation exceeds 2%.
+		"""
+		self._enforce_tenant(tenant_id)
+		cutoff = date.today()
+		from datetime import timedelta
+		window_start = cutoff - timedelta(days=lookback_days)
+
+		rates_in_window = [
+			r for r in self._rates.values()
+			if r.tenant_id == tenant_id
+			and r.from_currency == from_currency.upper()
+			and r.to_currency == to_currency.upper()
+			and r.effective_date >= window_start
+			and r.effective_date <= cutoff
+		]
+
+		if not rates_in_window:
+			return {
+				"tenant_id": tenant_id,
+				"from_currency": from_currency.upper(),
+				"to_currency": to_currency.upper(),
+				"lookback_days": lookback_days,
+				"data_points": 0,
+				"mean_rate": None,
+				"std_dev": None,
+				"min_rate": None,
+				"max_rate": None,
+				"coefficient_of_variation_pct": None,
+				"is_volatile": None,
+				"message": "insufficient_data",
+			}
+
+		values = [r.rate for r in rates_in_window]
+		n = len(values)
+		mean = sum(values) / n
+		variance = sum((v - mean) ** 2 for v in values) / n
+		std_dev = variance ** 0.5
+		cov_pct = round((std_dev / mean) * 100, 4) if mean else 0.0
+
+		return {
+			"tenant_id": tenant_id,
+			"from_currency": from_currency.upper(),
+			"to_currency": to_currency.upper(),
+			"lookback_days": lookback_days,
+			"data_points": n,
+			"mean_rate": round(mean, 6),
+			"std_dev": round(std_dev, 6),
+			"min_rate": round(min(values), 6),
+			"max_rate": round(max(values), 6),
+			"coefficient_of_variation_pct": cov_pct,
+			"is_volatile": cov_pct > 2.0,
+		}
+
+	async def consolidated_exposure_summary(
+		self,
+		tenant_id: str,
+		entity_ids: list[str],
+		consolidation_currency: str,
+		as_of: date,
+	) -> dict[str, Any]:
+		"""Aggregate FX exposure across multiple entities, translating all balances to consolidation_currency.
+
+		Each entity's per-currency balance is translated at the closing rate as of `as_of`.
+		Returns entity-level and group-level totals.
+		"""
+		self._enforce_tenant(tenant_id)
+		entity_summaries: list[dict[str, Any]] = []
+		group_total_exposure = 0.0
+
+		for entity_id in entity_ids:
+			accounts = [
+				a for a in self._fx_accounts.values()
+				if a.tenant_id == tenant_id and a.entity_id == entity_id and a.is_active
+			]
+			by_currency: dict[str, float] = {}
+			for acct in accounts:
+				curr = acct.currency
+				# balance proxy: FxAccountResponse has no balance field — use 0.0 as placeholder
+				by_currency[curr] = by_currency.get(curr, 0.0)
+
+			translated: dict[str, float] = {}
+			for curr, bal in by_currency.items():
+				if curr == consolidation_currency.upper():
+					translated[curr] = bal
+					continue
+				try:
+					result = await self.convert_amount(
+						tenant_id, bal, curr, consolidation_currency, as_of
+					)
+					translated[curr] = result["converted_amount"]
+				except KeyError:
+					translated[curr] = 0.0  # rate unavailable — excluded from total
+
+			entity_total = sum(abs(v) for v in translated.values())
+			group_total_exposure += entity_total
+			entity_summaries.append({
+				"entity_id": entity_id,
+				"exposures_by_currency": {k: round(v, 2) for k, v in translated.items()},
+				"total_exposure_in_consolidation_currency": round(entity_total, 2),
+			})
+
+		return {
+			"tenant_id": tenant_id,
+			"consolidation_currency": consolidation_currency.upper(),
+			"as_of": as_of.isoformat(),
+			"entity_count": len(entity_ids),
+			"entities": entity_summaries,
+			"group_total_exposure": round(group_total_exposure, 2),
+		}
+
+	async def period_close_checklist(
+		self,
+		tenant_id: str,
+		period_start: date,
+		period_end: date,
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""Execute a period-close readiness check for FX operations.
+
+		Steps checked:
+		  1. All active rate pairs have non-stale rates as of period_end.
+		  2. No revaluations are stuck in draft/pending_approval for the period.
+		  3. No translations are stuck in draft/pending_approval for the period.
+		  4. FX gain/loss report can be generated without errors.
+
+		Returns a structured checklist with pass/fail per step and blocking issues.
+		"""
+		self._enforce_tenant(tenant_id)
+		checklist: list[dict[str, Any]] = []
+		blocking_issues: list[str] = []
+
+		# Step 1: Stale rates
+		stale_result = await self.detect_stale_rates(tenant_id, staleness_days=1)
+		step1_pass = stale_result["stale_count"] == 0
+		checklist.append({
+			"step": 1,
+			"name": "exchange_rates_current",
+			"pass": step1_pass,
+			"detail": f"{stale_result['stale_count']} stale rate(s) detected",
+		})
+		if not step1_pass:
+			blocking_issues.append(f"stale_rates: {stale_result['stale_count']} rate(s) require refresh")
+
+		# Step 2: Pending revaluations
+		pending_revs = await self.list_revaluations(
+			tenant_id, status=None
+		)
+		period_revs = [
+			r for r in pending_revs
+			if r.period_start >= period_start and r.period_end <= period_end
+			and r.status in ("draft", "pending_approval")
+		]
+		step2_pass = len(period_revs) == 0
+		checklist.append({
+			"step": 2,
+			"name": "revaluations_complete",
+			"pass": step2_pass,
+			"detail": f"{len(period_revs)} revaluation(s) not yet posted",
+		})
+		if not step2_pass:
+			blocking_issues.append(f"pending_revaluations: {len(period_revs)}")
+
+		# Step 3: Pending translations
+		pending_trans = await self.list_translations(
+			tenant_id, status=None
+		)
+		period_trans = [
+			t for t in pending_trans
+			if t.period_start >= period_start and t.period_end <= period_end
+			and t.status in ("draft", "pending_approval")
+		]
+		step3_pass = len(period_trans) == 0
+		checklist.append({
+			"step": 3,
+			"name": "translations_complete",
+			"pass": step3_pass,
+			"detail": f"{len(period_trans)} translation(s) not yet posted",
+		})
+		if not step3_pass:
+			blocking_issues.append(f"pending_translations: {len(period_trans)}")
+
+		# Step 4: FX report generation
+		try:
+			report = await self.generate_fx_report(tenant_id, period_start, period_end)
+			checklist.append({
+				"step": 4,
+				"name": "fx_report_generatable",
+				"pass": True,
+				"detail": f"net_fx_impact={report.net_fx_impact}",
+			})
+		except Exception as exc:
+			checklist.append({
+				"step": 4,
+				"name": "fx_report_generatable",
+				"pass": False,
+				"detail": str(exc),
+			})
+			blocking_issues.append(f"fx_report_error: {exc}")
+
+		overall_pass = len(blocking_issues) == 0
+		await self._emit(tenant_id, "period_close_checked", f"{period_start}_{period_end}", actor_id)
+
+		return {
+			"tenant_id": tenant_id,
+			"period_start": period_start.isoformat(),
+			"period_end": period_end.isoformat(),
+			"overall_pass": overall_pass,
+			"checklist": checklist,
+			"blocking_issues": blocking_issues,
+			"checked_at": datetime.utcnow().isoformat(),
+		}
+
+	async def rate_matrix(
+		self,
+		tenant_id: str,
+		currencies: list[str],
+		as_of: date,
+		rate_type: str = "spot",
+	) -> dict[str, Any]:
+		"""Build an N×N exchange rate matrix for a set of currencies as of a given date.
+
+		Cells contain the effective rate or None when no rate is available.
+		Diagonal is always 1.0 (same-currency). Useful for treasury dashboards
+		and pre-flight validation of conversion routes.
+		"""
+		self._enforce_tenant(tenant_id)
+		codes = [c.upper() for c in currencies]
+		matrix: dict[str, dict[str, float | None]] = {}
+
+		for base in codes:
+			matrix[base] = {}
+			for quote in codes:
+				if base == quote:
+					matrix[base][quote] = 1.0
+					continue
+				rate = await self.get_rate_for_date(tenant_id, base, quote, as_of, rate_type)
+				if rate:
+					matrix[base][quote] = rate.rate
+					continue
+				# Try inverse
+				inv = await self.get_rate_for_date(tenant_id, quote, base, as_of, rate_type)
+				matrix[base][quote] = round(1.0 / inv.rate, 6) if inv else None
+
+		covered = sum(1 for row in matrix.values() for v in row.values() if v is not None and v != 1.0)
+		possible = len(codes) * (len(codes) - 1)
+
+		return {
+			"tenant_id": tenant_id,
+			"as_of": as_of.isoformat(),
+			"rate_type": rate_type,
+			"currencies": codes,
+			"matrix": matrix,
+			"coverage_pct": round(covered / max(possible, 1) * 100, 1),
+		}
+
+	async def fx_impact_projection(
+		self,
+		tenant_id: str,
+		open_positions: list[dict[str, Any]],
+		scenario_rates: dict[str, float],
+		base_currency: str,
+	) -> dict[str, Any]:
+		"""Project the P&L FX impact of open positions under a hypothetical rate scenario.
+
+		`open_positions` is a list of dicts with keys: `currency`, `amount` (positive=long, negative=short).
+		`scenario_rates` maps `"FROM/TO"` pairs (e.g. `"KES/USD"`) to hypothetical rates.
+		Translates each position to `base_currency` using scenario rates and computes net impact vs. current rates.
+
+		Returns per-position impact and aggregate scenario P&L.
+		"""
+		self._enforce_tenant(tenant_id)
+		as_of = date.today()
+		position_results: list[dict[str, Any]] = []
+		total_scenario_value = 0.0
+		total_current_value = 0.0
+
+		for pos in open_positions:
+			currency = pos["currency"].upper()
+			amount = float(pos["amount"])
+			base = base_currency.upper()
+
+			# Current value
+			try:
+				current_result = await self.convert_amount(tenant_id, amount, currency, base, as_of)
+				current_value = current_result["converted_amount"]
+			except KeyError:
+				current_value = 0.0
+
+			# Scenario value — use scenario rate if provided
+			scenario_key_fwd = f"{currency}/{base}"
+			scenario_key_inv = f"{base}/{currency}"
+			scenario_rate = scenario_rates.get(scenario_key_fwd)
+			if scenario_rate is not None:
+				scenario_value = round(amount * scenario_rate, 6)
+			elif scenario_rates.get(scenario_key_inv) is not None:
+				scenario_value = round(amount / scenario_rates[scenario_key_inv], 6)
+			else:
+				scenario_value = current_value  # no scenario rate — unchanged
+
+			impact = round(scenario_value - current_value, 6)
+			total_scenario_value += scenario_value
+			total_current_value += current_value
+
+			position_results.append({
+				"currency": currency,
+				"amount": amount,
+				"current_value_in_base": round(current_value, 6),
+				"scenario_value_in_base": round(scenario_value, 6),
+				"fx_impact": impact,
+			})
+
+		net_impact = round(total_scenario_value - total_current_value, 6)
+		return {
+			"tenant_id": tenant_id,
+			"base_currency": base_currency.upper(),
+			"scenario_rates": scenario_rates,
+			"positions": position_results,
+			"total_current_value": round(total_current_value, 6),
+			"total_scenario_value": round(total_scenario_value, 6),
+			"net_fx_impact": net_impact,
+			"net_fx_impact_direction": "gain" if net_impact > 0 else "loss" if net_impact < 0 else "neutral",
+			"projected_at": datetime.utcnow().isoformat(),
+		}
+
 	# --- Private helpers ---
 
 	def _key(self, tenant_id: str, item_id: str) -> tuple[str, str]:

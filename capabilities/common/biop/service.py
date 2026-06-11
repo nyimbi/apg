@@ -17,6 +17,7 @@ import json
 import logging
 import statistics
 from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_HALF_EVEN
 from typing import Any
 
 from uuid6 import uuid7
@@ -74,6 +75,15 @@ class BiometricService:
 		self._gallery:     dict[tuple[str, str], _R] = {}
 		self._consent:     dict[tuple[str, str], _R] = {}
 		self._audit_log:   list[_R] = []
+		# extended stores (methods 43–50)
+		self._fido2_credentials:  dict[tuple[str, str], _R] = {}
+		self._billing:            dict[tuple[str, str], _R] = {}
+		self._cost_schedules:     dict[tuple[str, str], _R] = {}
+		self._retention_policies: dict[tuple[str, str], _R] = {}
+		self._step_up_sessions:   dict[tuple[str, str], _R] = {}
+		self._biometric_agents:   dict[tuple[str, str], _R] = {}
+		self._agent_invocations:  list[_R] = []
+		self._pad_evidence_chains: dict[tuple[str, str], _R] = {}
 
 	# ------------------------------------------------------------------
 	# helpers
@@ -1166,3 +1176,600 @@ class BiometricService:
 		)
 		await self._audit("risk_scored", user_id, {"risk_score": risk})
 		return result
+
+	# ------------------------------------------------------------------
+	# 43. FIDO2 credential registration
+	# ------------------------------------------------------------------
+
+	async def fido2_credential_register(
+		self,
+		user_id: str,
+		credential_id: str,
+		aaguid: str,
+		public_key_cbor: str,
+		attestation_type: str,
+		transports: list[str] | None = None,
+		backup_eligible: bool = False,
+		uv_flag: bool = True,
+	) -> _R:
+		"""Register a FIDO2/WebAuthn credential.
+
+		Stores AAGUID, credential_id, public_key_cbor, attestation_type, and
+		CTAP 2.2 backup eligibility flags.  sign_count initialised to 0;
+		incremented monotonically on each successful assertion.
+		"""
+		guard_tenant_id(self.tenant_id)
+		guard_non_empty_string(credential_id, "credential_id")
+		guard_non_empty_string(aaguid, "aaguid")
+		self._require_user(user_id)
+		ALLOWED = {"packed", "tpm", "android-key", "android-safetynet", "fido-u2f", "none"}
+		assert attestation_type in ALLOWED, f"unsupported attestation_type: {attestation_type}"
+		record = _R(
+			credential_id=credential_id,
+			user_id=user_id,
+			tenant_id=self.tenant_id,
+			aaguid=aaguid,
+			public_key_cbor=public_key_cbor,
+			attestation_type=attestation_type,
+			transports=transports or [],
+			backup_eligible=backup_eligible,
+			uv_flag=uv_flag,
+			sign_count=0,
+			status="active",
+			registered_at=_ts(),
+		)
+		self._fido2_credentials[self._key(self.tenant_id, credential_id)] = record
+		await self._audit(
+			"fido2_credential_registered",
+			credential_id,
+			{"user_id": user_id, "aaguid": aaguid, "attestation_type": attestation_type},
+		)
+		return record
+
+	# ------------------------------------------------------------------
+	# 44. FIDO2 assertion verification
+	# ------------------------------------------------------------------
+
+	async def fido2_assertion_verify(
+		self,
+		credential_id: str,
+		authenticator_data_hex: str,
+		client_data_hash_hex: str,
+		signature_valid: bool,
+		new_sign_count: int,
+	) -> _R:
+		"""Verify a FIDO2 assertion.
+
+		Enforces sign_count monotonicity (CTAP 2.2) to detect credential cloning.
+		``signature_valid`` is the caller's ECDSA verification result — this service
+		does not import a cryptography library.
+		"""
+		guard_tenant_id(self.tenant_id)
+		cred = self._fido2_credentials.get(self._key(self.tenant_id, credential_id))
+		assert cred is not None, f"FIDO2 credential not found: {credential_id}"
+		assert cred["status"] == "active", "credential is not active"
+		if not signature_valid:
+			await self._audit("fido2_assertion_failed", credential_id, {"reason": "invalid_signature"})
+			return _R(credential_id=credential_id, decision="reject", reason="invalid_signature", verified_at=_ts())
+		counter_rollback = new_sign_count <= cred["sign_count"] and cred["sign_count"] != 0
+		if counter_rollback:
+			cred["status"] = "compromised"
+			await self._audit(
+				"fido2_counter_rollback_detected",
+				credential_id,
+				{"stored": cred["sign_count"], "received": new_sign_count},
+			)
+			return _R(credential_id=credential_id, decision="reject", reason="counter_rollback", verified_at=_ts())
+		cred["sign_count"] = new_sign_count
+		cred["last_used_at"] = _ts()
+		assertion_id = uuid7str()
+		result = _R(
+			assertion_id=assertion_id,
+			credential_id=credential_id,
+			user_id=cred["user_id"],
+			decision="accept",
+			new_sign_count=new_sign_count,
+			verified_at=_ts(),
+		)
+		await self._audit(
+			"fido2_assertion_verified",
+			credential_id,
+			{"assertion_id": assertion_id, "sign_count": new_sign_count},
+		)
+		return result
+
+	# ------------------------------------------------------------------
+	# 45. Retention policy and sweep
+	# ------------------------------------------------------------------
+
+	async def retention_policy_set(
+		self,
+		modality: str,
+		retention_days: int,
+		legal_basis: str,
+		jurisdiction: str,
+	) -> _R:
+		"""Set a per-tenant, per-modality data-retention policy."""
+		guard_tenant_id(self.tenant_id)
+		guard_non_empty_string(modality, "modality")
+		assert retention_days > 0, "retention_days must be positive"
+		policy_id = uuid7str()
+		record = _R(
+			policy_id=policy_id,
+			tenant_id=self.tenant_id,
+			modality=modality,
+			retention_days=retention_days,
+			legal_basis=legal_basis,
+			jurisdiction=jurisdiction,
+			effective_from=_ts(),
+		)
+		self._retention_policies[self._key(self.tenant_id, modality)] = record
+		await self._audit(
+			"retention_policy_set",
+			policy_id,
+			{"modality": modality, "retention_days": retention_days},
+		)
+		return record
+
+	async def retention_sweep(self) -> _R:
+		"""Revoke all templates that have exceeded their modality retention period.
+
+		Uses per-modality retention policy when available; defaults to 730 days
+		(GDPR / BIPA conservative standard).  Suitable for nightly cron execution.
+		"""
+		guard_tenant_id(self.tenant_id)
+		default_days = 730
+		expired: list[str] = []
+		affected_users: list[str] = []
+		now = datetime.utcnow()
+		for _key_t, template in list(self._templates.items()):
+			if template["tenant_id"] != self.tenant_id or template["status"] in {"deleted", "revoked"}:
+				continue
+			modality = template["modality"]
+			policy = self._retention_policies.get(self._key(self.tenant_id, modality))
+			max_days = policy["retention_days"] if policy else default_days
+			enrolled_dt = datetime.fromisoformat(template["enrolled_at"])
+			age_days = (now - enrolled_dt).days
+			if age_days > max_days:
+				template["status"] = "revoked"
+				template["revoked_at"] = _ts()
+				template["revoke_reason"] = f"retention_expired_after_{max_days}d"
+				expired.append(template["template_id"])
+				if template["user_id"] not in affected_users:
+					affected_users.append(template["user_id"])
+		result = _R(
+			tenant_id=self.tenant_id,
+			swept_at=_ts(),
+			expired_templates=len(expired),
+			template_ids=expired,
+			affected_user_count=len(affected_users),
+		)
+		await self._audit("retention_sweep", "system", {"expired": len(expired)})
+		return result
+
+	# ------------------------------------------------------------------
+	# 46. Billing with Decimal accounting
+	# ------------------------------------------------------------------
+
+	async def verification_cost_record(
+		self,
+		verification_id: str,
+		currency: str = "USD",
+	) -> _R:
+		"""Record a billing line for a completed verification.
+
+		Looks up tenant+modality cost schedule; defaults to $0.05/verification.
+		All monetary values use ``Decimal`` with ROUND_HALF_EVEN.
+		"""
+		guard_tenant_id(self.tenant_id)
+		verification = self._verifications.get(self._key(self.tenant_id, verification_id))
+		assert verification is not None, f"verification not found: {verification_id}"
+		modality = verification["modality"]
+		schedule = self._cost_schedules.get(self._key(self.tenant_id, modality))
+		unit_cost: Decimal = Decimal(str(schedule["unit_cost"])) if schedule else Decimal("0.05")
+		quantity = Decimal("1")
+		line_total = (unit_cost * quantity).quantize(Decimal("0.0001"), rounding=ROUND_HALF_EVEN)
+		billing_id = uuid7str()
+		record = _R(
+			billing_id=billing_id,
+			tenant_id=self.tenant_id,
+			verification_id=verification_id,
+			modality=modality,
+			unit_cost=str(unit_cost),
+			quantity=str(quantity),
+			line_total=str(line_total),
+			currency=currency,
+			recorded_at=_ts(),
+		)
+		self._billing[self._key(self.tenant_id, billing_id)] = record
+		await self._audit(
+			"billing_recorded",
+			billing_id,
+			{"verification_id": verification_id, "line_total": str(line_total)},
+		)
+		return record
+
+	async def billing_summary(
+		self,
+		from_date: str | None = None,
+		to_date: str | None = None,
+		currency: str = "USD",
+	) -> _R:
+		"""Aggregate billing records for a date range.
+
+		``from_date`` / ``to_date`` are ISO date strings ("YYYY-MM-DD").
+		Returns ``total_cost`` and ``by_modality`` as str-encoded Decimals.
+		"""
+		guard_tenant_id(self.tenant_id)
+		records = [
+			b for (tid, _), b in self._billing.items()
+			if tid == self.tenant_id and b["currency"] == currency
+		]
+		if from_date:
+			records = [b for b in records if b["recorded_at"][:10] >= from_date]
+		if to_date:
+			records = [b for b in records if b["recorded_at"][:10] <= to_date]
+		total = Decimal("0")
+		by_modality: dict[str, Decimal] = {}
+		for rec in records:
+			lt = Decimal(rec["line_total"])
+			total += lt
+			mod = rec["modality"]
+			by_modality[mod] = by_modality.get(mod, Decimal("0")) + lt
+		precision = Decimal("0.0001")
+		result = _R(
+			tenant_id=self.tenant_id,
+			currency=currency,
+			from_date=from_date,
+			to_date=to_date,
+			total_cost=str(total.quantize(precision, rounding=ROUND_HALF_EVEN)),
+			by_modality={k: str(v.quantize(precision, rounding=ROUND_HALF_EVEN)) for k, v in by_modality.items()},
+			record_count=len(records),
+			generated_at=_ts(),
+		)
+		await self._audit("billing_summary_generated", "system", {"total": str(total)})
+		return result
+
+	# ------------------------------------------------------------------
+	# 47. Step-up authentication sessions
+	# ------------------------------------------------------------------
+
+	async def step_up_session_create(
+		self,
+		user_id: str,
+		initial_modality: str,
+		initial_score: float,
+		required_confidence: float = 0.90,
+		step_up_modalities: list[str] | None = None,
+		ttl_seconds: int = 300,
+	) -> _R:
+		"""Create a step-up authentication session.
+
+		If ``initial_score`` already meets ``required_confidence`` the session
+		is immediately ``satisfied``.  Otherwise ``next_modality`` is the first
+		entry in ``step_up_modalities``.
+		"""
+		guard_tenant_id(self.tenant_id)
+		self._require_user(user_id)
+		assert 0.0 <= initial_score <= 1.0, "initial_score must be in [0, 1]"
+		session_id = uuid7str()
+		expires_at = (datetime.utcnow() + timedelta(seconds=ttl_seconds)).isoformat()
+		modalities_remaining = list(step_up_modalities or [])
+		status = "satisfied" if initial_score >= required_confidence else "step_up_required"
+		next_modality = modalities_remaining[0] if status == "step_up_required" and modalities_remaining else None
+		record = _R(
+			session_id=session_id,
+			user_id=user_id,
+			tenant_id=self.tenant_id,
+			initial_modality=initial_modality,
+			current_confidence=round(initial_score, 4),
+			required_confidence=required_confidence,
+			step_up_modalities=modalities_remaining,
+			status=status,
+			next_modality=next_modality,
+			verification_ids=[],
+			expires_at=expires_at,
+			created_at=_ts(),
+		)
+		self._step_up_sessions[self._key(self.tenant_id, session_id)] = record
+		await self._audit(
+			"step_up_session_created",
+			session_id,
+			{"user_id": user_id, "status": status, "initial_score": initial_score},
+		)
+		return record
+
+	async def step_up_session_evaluate(
+		self,
+		session_id: str,
+		verification_id: str,
+		new_score: float,
+	) -> _R:
+		"""Incorporate a new verification into an active step-up session.
+
+		Fuses ``new_score`` with ``current_confidence`` via max fusion.
+		Returns updated session record.
+		"""
+		guard_tenant_id(self.tenant_id)
+		session = self._step_up_sessions.get(self._key(self.tenant_id, session_id))
+		assert session is not None, f"step-up session not found: {session_id}"
+		assert session["status"] not in {"satisfied", "failed", "expired"}, "session already terminal"
+		if _ts() > session["expires_at"]:
+			session["status"] = "expired"
+			await self._audit("step_up_session_expired", session_id, {})
+			return session
+		assert 0.0 <= new_score <= 1.0, "new_score must be in [0, 1]"
+		fused = round(max(session["current_confidence"], new_score), 4)
+		session["current_confidence"] = fused
+		session["verification_ids"].append(verification_id)
+		if fused >= session["required_confidence"]:
+			session["status"] = "satisfied"
+			session["next_modality"] = None
+		else:
+			tried = session.setdefault("_tried_modalities", [])
+			if session.get("next_modality"):
+				tried.append(session["next_modality"])
+			remaining = [m for m in session["step_up_modalities"] if m not in tried]
+			if remaining:
+				session["next_modality"] = remaining[0]
+			else:
+				session["status"] = "failed"
+				session["next_modality"] = None
+		session["updated_at"] = _ts()
+		await self._audit(
+			"step_up_session_evaluated",
+			session_id,
+			{"fused_confidence": fused, "status": session["status"]},
+		)
+		return session
+
+	# ------------------------------------------------------------------
+	# 48. Biometric governance agent registration and invocation logging
+	# ------------------------------------------------------------------
+
+	async def biometric_agent_register(
+		self,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool,
+		human_approval_required: bool = False,
+	) -> _R:
+		"""Register an AI agent in the biometric decision pipeline.
+
+		Supported runtimes: codex, claude_code, opencode, pi.
+		Supported roles: pad_classifier, match_reviewer, anomaly_detector,
+		                 compliance_checker, consent_evaluator.
+		Privileged agents with human_approval_required stored as pending_review.
+		"""
+		guard_tenant_id(self.tenant_id)
+		guard_non_empty_string(agent_id, "agent_id")
+		RUNTIMES = {"codex", "claude_code", "opencode", "pi"}
+		ROLES = {"pad_classifier", "match_reviewer", "anomaly_detector", "compliance_checker", "consent_evaluator"}
+		assert runtime in RUNTIMES, f"unsupported runtime: {runtime}"
+		assert role in ROLES, f"unsupported role: {role}"
+		assert scope, "scope must not be empty"
+		assert owner, "owner must not be empty"
+		assert purpose, "purpose must not be empty"
+		status = "pending_review" if human_approval_required else "active"
+		record = _R(
+			agent_id=agent_id,
+			tenant_id=self.tenant_id,
+			name=name,
+			runtime=runtime,
+			role=role,
+			scope=scope,
+			owner=owner,
+			purpose=purpose,
+			contribution_disclosed=contribution_disclosed,
+			human_approval_required=human_approval_required,
+			status=status,
+			registered_at=_ts(),
+		)
+		self._biometric_agents[self._key(self.tenant_id, agent_id)] = record
+		await self._audit(
+			"biometric_agent_registered",
+			agent_id,
+			{"runtime": runtime, "role": role, "status": status},
+		)
+		return record
+
+	async def biometric_agent_invoke_log(
+		self,
+		agent_id: str,
+		operation: str,
+		linked_record_id: str,
+		input_summary: str,
+		output_summary: str,
+		latency_ms: int,
+		confidence_score: float | None = None,
+	) -> _R:
+		"""Append an immutable invocation record for a biometric governance agent.
+
+		Raw biometric bytes must never appear in ``input_summary`` or
+		``output_summary`` — callers are responsible for redaction.
+		"""
+		guard_tenant_id(self.tenant_id)
+		agent = self._biometric_agents.get(self._key(self.tenant_id, agent_id))
+		assert agent is not None, f"agent not found: {agent_id}"
+		assert agent["status"] == "active", f"agent {agent_id} is not active"
+		invocation_id = uuid7str()
+		record = _R(
+			invocation_id=invocation_id,
+			agent_id=agent_id,
+			tenant_id=self.tenant_id,
+			operation=operation,
+			linked_record_id=linked_record_id,
+			input_summary=input_summary,
+			output_summary=output_summary,
+			latency_ms=latency_ms,
+			confidence_score=confidence_score,
+			invoked_at=_ts(),
+		)
+		self._agent_invocations.append(record)
+		await self._audit(
+			"agent_invocation_logged",
+			invocation_id,
+			{"agent_id": agent_id, "operation": operation, "latency_ms": latency_ms},
+		)
+		return record
+
+	# ------------------------------------------------------------------
+	# 49. PAD evidence chain with cryptographic binding
+	# ------------------------------------------------------------------
+
+	async def pad_evidence_chain_create(
+		self,
+		verification_id: str,
+		challenge_id: str,
+		pad_indicators: list[str] | None = None,
+	) -> _R:
+		"""SHA-256 bind PAD indicators + challenge nonce to a verification record.
+
+		Input to hash: ``verification_id|nonce|sorted_indicators|chained_at``.
+		The resulting ``chain_hash`` can be independently audited with
+		``pad_evidence_chain_verify``.
+		"""
+		guard_tenant_id(self.tenant_id)
+		verification = self._verifications.get(self._key(self.tenant_id, verification_id))
+		assert verification is not None, f"verification not found: {verification_id}"
+		challenge = self._liveness_challenges.get(self._key(self.tenant_id, challenge_id))
+		assert challenge is not None, f"challenge not found: {challenge_id}"
+		indicators = sorted(pad_indicators or [])
+		chained_at = _ts()
+		raw = "|".join([verification_id, challenge.get("nonce", ""), ",".join(indicators), chained_at])
+		chain_hash = hashlib.sha256(raw.encode()).hexdigest()
+		chain_id = uuid7str()
+		record = _R(
+			chain_id=chain_id,
+			tenant_id=self.tenant_id,
+			verification_id=verification_id,
+			challenge_id=challenge_id,
+			pad_indicators=indicators,
+			nonce=challenge.get("nonce", ""),
+			chain_hash=chain_hash,
+			algorithm="SHA-256",
+			chained_at=chained_at,
+		)
+		self._pad_evidence_chains[self._key(self.tenant_id, chain_id)] = record
+		await self._audit(
+			"pad_evidence_chain_created",
+			chain_id,
+			{"verification_id": verification_id, "chain_hash": chain_hash[:16]},
+		)
+		return record
+
+	async def pad_evidence_chain_verify(self, chain_id: str) -> _R:
+		"""Recompute SHA-256 digest and confirm stored chain integrity.
+
+		Returns ``integrity_verified: False`` when the stored hash does not match,
+		indicating potential tampering.
+		"""
+		guard_tenant_id(self.tenant_id)
+		chain = self._pad_evidence_chains.get(self._key(self.tenant_id, chain_id))
+		assert chain is not None, f"evidence chain not found: {chain_id}"
+		raw = "|".join([
+			chain["verification_id"],
+			chain["nonce"],
+			",".join(chain["pad_indicators"]),
+			chain["chained_at"],
+		])
+		recomputed = hashlib.sha256(raw.encode()).hexdigest()
+		integrity_verified = recomputed == chain["chain_hash"]
+		result = _R(
+			chain_id=chain_id,
+			integrity_verified=integrity_verified,
+			stored_hash=chain["chain_hash"],
+			recomputed_hash=recomputed,
+			verified_at=_ts(),
+		)
+		await self._audit(
+			"pad_evidence_chain_verified",
+			chain_id,
+			{"integrity_verified": integrity_verified},
+		)
+		return result
+
+	# ------------------------------------------------------------------
+	# 50. Match confidence with uncertainty quantification
+	# ------------------------------------------------------------------
+
+	async def match_confidence_with_uncertainty(
+		self,
+		user_id: str,
+		modality: str,
+		probe_bytes: bytes,
+		threshold: float = 0.85,
+		n_windows: int = 16,
+	) -> _R:
+		"""1:1 verification with 90% CI via bit-window bootstrap sampling.
+
+		Samples ``n_windows`` equal-length sub-windows of the SHA-256 hash
+		comparison.  ``confidence_interval`` is [p5, p95] of the per-window
+		match scores.  ``high_uncertainty=True`` when CI width > 0.15.
+
+		High-uncertainty accepts emit an additional ``uncertainty_review_needed``
+		audit event so reviewers can intervene.
+		"""
+		guard_tenant_id(self.tenant_id)
+		self._require_user(user_id)
+		probe_hash = hashlib.sha256(probe_bytes).hexdigest()
+		templates = [
+			t for (_, _), t in self._templates.items()
+			if t["user_id"] == user_id and t["modality"] == modality
+			and t["status"] == "active" and t["tenant_id"] == self.tenant_id
+		]
+		assert templates, f"no active {modality} template for user {user_id}"
+		template_hash = templates[-1]["template_hash"]
+		window_size = max(1, len(probe_hash) // n_windows)
+		scores: list[float] = []
+		for i in range(n_windows):
+			start = (i * window_size) % (len(probe_hash) - window_size + 1)
+			ph_w = probe_hash[start: start + window_size]
+			th_w = template_hash[start: start + window_size]
+			match_chars = sum(a == b for a, b in zip(ph_w, th_w))
+			scores.append(match_chars / window_size)
+		scores_sorted = sorted(scores)
+		mean_score = round(statistics.mean(scores), 4)
+		ci_lo = round(scores_sorted[max(0, int(0.05 * n_windows))], 4)
+		ci_hi = round(scores_sorted[min(n_windows - 1, int(0.95 * n_windows))], 4)
+		ci_width = round(ci_hi - ci_lo, 4)
+		high_uncertainty = ci_width > 0.15
+		decision = "accept" if mean_score >= threshold else "reject"
+		verification_id = uuid7str()
+		record = _R(
+			verification_id=verification_id,
+			user_id=user_id,
+			tenant_id=self.tenant_id,
+			modality=modality,
+			match_score=mean_score,
+			confidence_interval=[ci_lo, ci_hi],
+			uncertainty_width=ci_width,
+			high_uncertainty=high_uncertainty,
+			threshold=threshold,
+			decision=decision,
+			verified_at=_ts(),
+		)
+		self._verifications[self._key(self.tenant_id, verification_id)] = record
+		await self._audit(
+			"verification_with_uncertainty",
+			verification_id,
+			{
+				"user_id": user_id,
+				"modality": modality,
+				"decision": decision,
+				"mean_score": mean_score,
+				"high_uncertainty": high_uncertainty,
+			},
+		)
+		if high_uncertainty and decision == "accept":
+			await self._audit(
+				"uncertainty_review_needed",
+				verification_id,
+				{"ci_width": ci_width, "mean_score": mean_score},
+			)
+		return record

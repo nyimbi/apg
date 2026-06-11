@@ -987,4 +987,613 @@ class ProjectAccountingService:
 		assert query
 		return {"query": query, "results": [], "tenant_id": t}
 
+	# ── World-class enhancements ─────────────────────────────────────────────
+
+	async def cash_flow_forecast(
+		self, project_id: str, periods: list[str]
+	) -> dict[str, Any]:
+		"""Project period-by-period cash flow from committed POs, labour, and milestone invoices.
+
+		Each period entry yields inflow (milestone invoices scheduled), outflow (PO + labour
+		commitments), net, and cumulative running balance.  Periods should be ISO year-month
+		strings such as '2026-07'.
+		"""
+		assert _present(project_id), "project_id required"
+		assert periods, "at least one period required"
+		account = self._account_by_project(project_id, self.tenant_id)
+		assert account is not None, f"no account found for project {project_id}"
+		account_id = account.id if hasattr(account, "id") else ""
+		bac = account.budget_amount if hasattr(account, "budget_amount") else 0.0
+
+		# Outstanding PO commitment spread evenly across remaining periods
+		po_entries = self._purchase_orders.get(account_id, [])
+		open_po_total = sum(
+			po["total"] for po in po_entries if po.get("status") == "raised"
+		)
+		# Milestone inflows from raised invoices per period (keyed by milestone_reference)
+		invoice_map: dict[str, float] = {}
+		for inv in self.invoices.values():
+			if inv.tenant_id == self.tenant_id and inv.account_id == account_id:
+				ref = getattr(inv, "milestone_reference", "")
+				invoice_map[ref] = invoice_map.get(ref, 0.0) + getattr(inv, "amount", 0.0)
+
+		n = len(periods)
+		per_period_outflow = round(open_po_total / n, 2) if n else 0.0
+		per_period_inflow = round(sum(invoice_map.values()) / n, 2) if n else 0.0
+
+		series: list[dict[str, Any]] = []
+		cumulative = 0.0
+		for period in periods:
+			net = round(per_period_inflow - per_period_outflow, 2)
+			cumulative = round(cumulative + net, 2)
+			series.append({
+				"period": period,
+				"inflow": per_period_inflow,
+				"outflow": per_period_outflow,
+				"net": net,
+				"cumulative": cumulative,
+			})
+
+		self._audit(self.tenant_id, "cash_flow_forecast_generated", project_id)
+		return {
+			"project_id": project_id,
+			"account_id": account_id,
+			"bac": bac,
+			"open_po_commitment": open_po_total,
+			"periods": series,
+			"generated_at": str(date.today()),
+		}
+
+	async def check_budget_thresholds(
+		self, project_id: str, warn_pct: float = 80.0, critical_pct: float = 95.0
+	) -> dict[str, Any]:
+		"""Evaluate every cost code for budget utilisation and return structured alerts.
+
+		Returns a list of BudgetAlert dicts with severity 'ok' | 'warn' | 'critical' and
+		supporting utilisation metrics.  Post-write side effect: emits audit events for any
+		code breaching warn_pct.
+		"""
+		assert _present(project_id), "project_id required"
+		assert 0 < warn_pct < critical_pct <= 100, "thresholds must satisfy 0 < warn < critical <= 100"
+		account = self._account_by_project(project_id, self.tenant_id)
+		assert account is not None, f"no account found for project {project_id}"
+
+		alerts: list[dict[str, Any]] = []
+		for key, cc in self._cost_codes.items():
+			if cc["project_id"] != project_id or cc["tenant_id"] != self.tenant_id:
+				continue
+			budget = cc["budget"]
+			actual = cc["actual"]
+			utilisation_pct = round((actual / budget * 100) if budget else 0.0, 2)
+			if utilisation_pct >= critical_pct:
+				severity = "critical"
+			elif utilisation_pct >= warn_pct:
+				severity = "warn"
+			else:
+				severity = "ok"
+			alert = {
+				"cost_code": cc["code"],
+				"description": cc["description"],
+				"budget": budget,
+				"actual": actual,
+				"utilisation_pct": utilisation_pct,
+				"severity": severity,
+				"remaining": round(budget - actual, 2),
+			}
+			alerts.append(alert)
+			if severity != "ok":
+				self._audit(self.tenant_id, f"budget_threshold_{severity}", cc["code"])
+
+		over_budget = [a for a in alerts if a["severity"] == "critical"]
+		at_risk = [a for a in alerts if a["severity"] == "warn"]
+		return {
+			"project_id": project_id,
+			"warn_pct": warn_pct,
+			"critical_pct": critical_pct,
+			"total_codes": len(alerts),
+			"critical_count": len(over_budget),
+			"warn_count": len(at_risk),
+			"ok_count": len(alerts) - len(over_budget) - len(at_risk),
+			"alerts": alerts,
+			"evaluated_at": str(date.today()),
+		}
+
+	async def ev_trend_analysis(
+		self, project_id: str, periods: list[str] | None = None
+	) -> dict[str, Any]:
+		"""Return a time-series of EVM metrics across stored snapshots plus trend indicators.
+
+		Computes CPI trend direction (improving / degrading / stable) and a simple
+		at-completion confidence band derived from CPI standard deviation across periods.
+		"""
+		assert _present(project_id), "project_id required"
+		account = self._account_by_project(project_id, self.tenant_id)
+		assert account is not None, f"no account found for project {project_id}"
+		account_id = account.id if hasattr(account, "id") else ""
+		bac = account.budget_amount if hasattr(account, "budget_amount") else 0.0
+
+		snaps = self._ev_snapshots.get(account_id, [])
+		if periods:
+			snaps = [s for s in snaps if s.get("period") in periods]
+
+		if not snaps:
+			return {
+				"project_id": project_id,
+				"account_id": account_id,
+				"snapshots": [],
+				"cpi_trend": "no_data",
+				"spi_trend": "no_data",
+				"eac_p50": bac,
+				"eac_p80": bac,
+				"computed_at": str(date.today()),
+			}
+
+		cpi_values = [s["cpi"] for s in snaps]
+		spi_values = [s["spi"] for s in snaps]
+
+		def _trend(values: list[float]) -> str:
+			if len(values) < 2:
+				return "insufficient_data"
+			delta = values[-1] - values[0]
+			if abs(delta) < 0.02:
+				return "stable"
+			return "improving" if delta > 0 else "degrading"
+
+		import math
+		mean_cpi = sum(cpi_values) / len(cpi_values)
+		std_cpi = math.sqrt(
+			sum((c - mean_cpi) ** 2 for c in cpi_values) / len(cpi_values)
+		) if len(cpi_values) > 1 else 0.0
+
+		latest_cpi = cpi_values[-1] if cpi_values else 1.0
+		eac_p50 = round(bac / latest_cpi, 2) if latest_cpi else bac
+		pessimistic_cpi = max(latest_cpi - std_cpi, 0.01)
+		eac_p80 = round(bac / pessimistic_cpi, 2)
+
+		self._audit(self.tenant_id, "ev_trend_analysed", project_id)
+		return {
+			"project_id": project_id,
+			"account_id": account_id,
+			"snapshots": snaps,
+			"cpi_trend": _trend(cpi_values),
+			"spi_trend": _trend(spi_values),
+			"mean_cpi": round(mean_cpi, 3),
+			"std_cpi": round(std_cpi, 3),
+			"eac_p50": eac_p50,
+			"eac_p80": eac_p80,
+			"computed_at": str(date.today()),
+		}
+
+	async def post_accrual(
+		self,
+		project_id: str,
+		cost_code: str,
+		amount: float,
+		accrual_type: str,
+		period: str,
+		reversal_period: str,
+		description: str = "",
+	) -> dict[str, Any]:
+		"""Post a period-end accrual that auto-reverses in reversal_period.
+
+		accrual_type: 'labour' | 'grni' | 'overhead' | 'other'
+		Entries carry status 'open' until reversal_period is processed.
+		"""
+		assert _present(project_id), "project_id required"
+		assert _positive(amount), "amount must be positive"
+		assert _present(period), "period required"
+		assert _present(reversal_period), "reversal_period required"
+		assert period != reversal_period, "accrual and reversal must be different periods"
+		assert accrual_type in {"labour", "grni", "overhead", "other"}, \
+			f"accrual_type must be one of labour, grni, overhead, other"
+
+		account = self._account_by_project(project_id, self.tenant_id)
+		assert account is not None, f"no account found for project {project_id}"
+		account_id = account.id if hasattr(account, "id") else ""
+
+		accrual_id = f"accr_{project_id}_{cost_code}_{period}"
+		entry = {
+			"accrual_id": accrual_id,
+			"project_id": project_id,
+			"account_id": account_id,
+			"cost_code": cost_code,
+			"accrual_type": accrual_type,
+			"amount": amount,
+			"description": description,
+			"period": period,
+			"reversal_period": reversal_period,
+			"status": "open",
+			"created_at": str(date.today()),
+		}
+
+		# Store accruals alongside timesheets cost for aggregation
+		self._timesheets_cost.setdefault(account_id, []).append(
+			{**entry, "hours": 0.0, "rate": 0.0, "entry_id": accrual_id, "posted_at": str(date.today())}
+		)
+		code_key = f"{self.tenant_id}:{project_id}:{cost_code}"
+		if code_key in self._cost_codes:
+			self._cost_codes[code_key]["actual"] += amount
+			self._cost_codes[code_key]["variance"] = (
+				self._cost_codes[code_key]["budget"] - self._cost_codes[code_key]["actual"]
+			)
+
+		self._audit(self.tenant_id, "accrual_posted", accrual_id)
+		return entry
+
+	async def classify_variance(
+		self, project_id: str, cost_code: str
+	) -> dict[str, Any]:
+		"""Classify budget variance for a cost code using heuristic rules.
+
+		Returns one of: scope_creep | rate_variance | volume_variance |
+		timing_variance | true_overrun | on_track.
+		Provides supporting evidence dict for each classification.
+		"""
+		assert _present(project_id), "project_id required"
+		assert _present(cost_code), "cost_code required"
+		code_key = f"{self.tenant_id}:{project_id}:{cost_code}"
+		assert code_key in self._cost_codes, f"cost code {cost_code} not found for project {project_id}"
+
+		cc = self._cost_codes[code_key]
+		budget = cc["budget"]
+		actual = cc["actual"]
+		committed = cc["committed"]
+		variance = cc["variance"]
+
+		if variance >= 0:
+			classification = "on_track"
+			confidence = "high"
+			evidence: dict[str, Any] = {"budget": budget, "actual": actual, "variance": variance}
+		else:
+			overrun = abs(variance)
+			# Heuristic rules applied in priority order
+			if committed > 0 and committed >= overrun * 0.8:
+				# Most of the overrun is committed but not yet invoiced — timing
+				classification = "timing_variance"
+				confidence = "medium"
+				evidence = {
+					"committed_amount": committed,
+					"overrun": overrun,
+					"committed_covers_pct": round(committed / overrun * 100, 1),
+					"expectation": "Will self-correct when PO is closed or GRN matched",
+				}
+			elif actual > budget * 1.20:
+				# Actual significantly exceeds budget — likely scope or true overrun
+				tc_entries = [
+					e for e in self._timesheets_cost.get(
+						self._account_by_project(project_id, self.tenant_id).id
+						if self._account_by_project(project_id, self.tenant_id) else "", []
+					)
+					if e.get("cost_code") == cost_code
+				]
+				total_hours = sum(e.get("hours", 0.0) for e in tc_entries)
+				budget_hours_est = budget / max(tc_entries[0].get("rate", 1.0), 1.0) if tc_entries else 0
+				if total_hours > budget_hours_est * 1.10:
+					classification = "scope_creep"
+					confidence = "medium"
+					evidence = {
+						"budget_hours_estimate": round(budget_hours_est, 1),
+						"actual_hours": round(total_hours, 1),
+						"volume_excess_pct": round((total_hours / max(budget_hours_est, 1) - 1) * 100, 1),
+					}
+				else:
+					classification = "true_overrun"
+					confidence = "high"
+					evidence = {
+						"budget": budget,
+						"actual": actual,
+						"overrun_amount": overrun,
+						"overrun_pct": round(overrun / budget * 100, 1),
+					}
+			else:
+				classification = "rate_variance"
+				confidence = "low"
+				evidence = {
+					"budget": budget,
+					"actual": actual,
+					"variance": variance,
+					"note": "Insufficient data to distinguish rate vs volume — manual review recommended",
+				}
+
+		self._audit(self.tenant_id, "variance_classified", f"{project_id}:{cost_code}")
+		return {
+			"project_id": project_id,
+			"cost_code": cost_code,
+			"classification": classification,
+			"confidence": confidence,
+			"budget": budget,
+			"actual": actual,
+			"variance": variance,
+			"evidence": evidence,
+			"analysed_at": str(date.today()),
+		}
+
+	async def three_point_eac(
+		self,
+		project_id: str,
+		optimistic_cpi: float,
+		pessimistic_cpi: float,
+	) -> dict[str, Any]:
+		"""PERT-weighted Estimate at Completion with confidence percentiles.
+
+		Uses most-likely CPI from latest EV snapshot; optimistic and pessimistic CPIs
+		are supplied by the caller (e.g. derived from risk register or historical range).
+		Returns {expected, p50, p80, std_dev}.
+		"""
+		assert _present(project_id), "project_id required"
+		assert _positive(optimistic_cpi), "optimistic_cpi must be positive"
+		assert _positive(pessimistic_cpi), "pessimistic_cpi must be positive"
+		assert optimistic_cpi >= pessimistic_cpi, \
+			"optimistic_cpi must be >= pessimistic_cpi (optimistic = higher CPI = lower cost)"
+
+		account = self._account_by_project(project_id, self.tenant_id)
+		assert account is not None, f"no account found for project {project_id}"
+		account_id = account.id if hasattr(account, "id") else ""
+		bac = account.budget_amount if hasattr(account, "budget_amount") else 0.0
+
+		snaps = self._ev_snapshots.get(account_id, [])
+		most_likely_cpi = snaps[-1]["cpi"] if snaps else 1.0
+
+		# PERT: E(CPI) = (O + 4M + P) / 6
+		pert_cpi = (optimistic_cpi + 4 * most_likely_cpi + pessimistic_cpi) / 6
+		import math
+		std_cpi = (optimistic_cpi - pessimistic_cpi) / 6
+
+		eac_expected = round(bac / pert_cpi, 2) if pert_cpi else bac
+		eac_optimistic = round(bac / optimistic_cpi, 2)
+		eac_pessimistic = round(bac / pessimistic_cpi, 2)
+		# P80: EAC + 0.842 * std_eac (normal approximation)
+		std_eac = abs(eac_pessimistic - eac_optimistic) / 6
+		eac_p80 = round(eac_expected + 0.842 * std_eac, 2)
+		eac_p90 = round(eac_expected + 1.282 * std_eac, 2)
+
+		self._audit(self.tenant_id, "three_point_eac_computed", project_id)
+		return {
+			"project_id": project_id,
+			"bac": bac,
+			"most_likely_cpi": round(most_likely_cpi, 3),
+			"optimistic_cpi": optimistic_cpi,
+			"pessimistic_cpi": pessimistic_cpi,
+			"pert_cpi": round(pert_cpi, 3),
+			"std_cpi": round(std_cpi, 3),
+			"eac_optimistic": eac_optimistic,
+			"eac_expected": eac_expected,
+			"eac_p80": eac_p80,
+			"eac_p90": eac_p90,
+			"eac_pessimistic": eac_pessimistic,
+			"std_eac": round(std_eac, 2),
+			"computed_at": str(date.today()),
+		}
+
+	async def reconcile_with_external_ledger(
+		self,
+		project_id: str,
+		external_entries: list[dict[str, Any]],
+		tolerance_pct: float = 0.5,
+	) -> dict[str, Any]:
+		"""Match external ERP ledger entries against internal cost transactions.
+
+		external_entries: [{cost_code, period, amount, external_ref}]
+		tolerance_pct: amount match tolerance as percentage (default 0.5%).
+		Returns matched, unmatched_internal, unmatched_external, and total_variance.
+		"""
+		assert _present(project_id), "project_id required"
+		assert external_entries, "external_entries must not be empty"
+		assert 0 <= tolerance_pct <= 10, "tolerance_pct must be 0–10"
+
+		account = self._account_by_project(project_id, self.tenant_id)
+		assert account is not None, f"no account found for project {project_id}"
+		account_id = account.id if hasattr(account, "id") else ""
+
+		# Internal: flatten timesheets + expenses for this account
+		internal: list[dict[str, Any]] = []
+		for e in self._timesheets_cost.get(account_id, []):
+			internal.append({
+				"cost_code": e.get("cost_code", ""),
+				"period": e.get("period", ""),
+				"amount": e.get("amount", 0.0),
+				"internal_id": e.get("entry_id", e.get("accrual_id", "")),
+			})
+		for e in self._expenses.get(account_id, []):
+			internal.append({
+				"cost_code": e.get("cost_code", ""),
+				"period": e.get("recorded_at", ""),
+				"amount": e.get("amount", 0.0),
+				"internal_id": e.get("expense_id", ""),
+			})
+
+		matched: list[dict[str, Any]] = []
+		unmatched_internal = list(internal)
+		unmatched_external: list[dict[str, Any]] = []
+		total_variance = 0.0
+
+		for ext in external_entries:
+			ext_code = ext.get("cost_code", "")
+			ext_period = ext.get("period", "")
+			ext_amount = float(ext.get("amount", 0))
+			tol = ext_amount * tolerance_pct / 100
+
+			best_match: dict[str, Any] | None = None
+			for i_entry in unmatched_internal:
+				if i_entry["cost_code"] == ext_code and abs(i_entry["amount"] - ext_amount) <= tol:
+					best_match = i_entry
+					break
+
+			if best_match:
+				variance = round(ext_amount - best_match["amount"], 2)
+				matched.append({
+					"external_ref": ext.get("external_ref", ""),
+					"internal_id": best_match["internal_id"],
+					"cost_code": ext_code,
+					"external_amount": ext_amount,
+					"internal_amount": best_match["amount"],
+					"variance": variance,
+				})
+				unmatched_internal.remove(best_match)
+				total_variance += abs(variance)
+			else:
+				unmatched_external.append(ext)
+				total_variance += ext_amount
+
+		self._audit(self.tenant_id, "reconciliation_complete", project_id)
+		return {
+			"project_id": project_id,
+			"account_id": account_id,
+			"tolerance_pct": tolerance_pct,
+			"matched_count": len(matched),
+			"unmatched_internal_count": len(unmatched_internal),
+			"unmatched_external_count": len(unmatched_external),
+			"total_variance": round(total_variance, 2),
+			"matched": matched,
+			"unmatched_internal": unmatched_internal,
+			"unmatched_external": unmatched_external,
+			"reconciled_at": str(date.today()),
+		}
+
+	async def create_intercompany_recharge(
+		self,
+		from_project_id: str,
+		to_project_id: str,
+		cost_code: str,
+		amount: float,
+		markup_pct: float,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		"""Recharge costs from one project to another with optional markup.
+
+		Creates paired debit (to_project) / credit (from_project) cost transactions
+		linked by a shared recharge_id for intercompany elimination.
+		markup_pct: transfer pricing markup, 0.0 for at-cost.
+		"""
+		assert _present(from_project_id), "from_project_id required"
+		assert _present(to_project_id), "to_project_id required"
+		assert from_project_id != to_project_id, "cannot recharge a project to itself"
+		assert _positive(amount), "amount must be positive"
+		assert markup_pct >= 0, "markup_pct cannot be negative"
+		assert _present(evidence_reference), "evidence_reference required"
+
+		from_account = self._account_by_project(from_project_id, self.tenant_id)
+		assert from_account is not None, f"no account found for project {from_project_id}"
+		to_account = self._account_by_project(to_project_id, self.tenant_id)
+		assert to_account is not None, f"no account found for project {to_project_id}"
+
+		recharge_id = f"icr_{from_project_id}_{to_project_id}_{str(date.today())}"
+		recharge_amount = round(amount * (1 + markup_pct / 100), 2)
+
+		# Credit entry on originating project
+		credit_entry = {
+			"recharge_id": recharge_id,
+			"type": "credit",
+			"project_id": from_project_id,
+			"account_id": from_account.id if hasattr(from_account, "id") else "",
+			"cost_code": cost_code,
+			"amount": amount,
+			"recorded_at": str(date.today()),
+		}
+		from_id = from_account.id if hasattr(from_account, "id") else ""
+		self._expenses.setdefault(from_id, []).append({
+			**credit_entry,
+			"expense_id": f"{recharge_id}_credit",
+			"category": "intercompany_recharge_credit",
+			"approved_by": self.actor_id,
+			"status": "approved",
+		})
+
+		# Debit entry on receiving project
+		debit_entry = {
+			"recharge_id": recharge_id,
+			"type": "debit",
+			"project_id": to_project_id,
+			"account_id": to_account.id if hasattr(to_account, "id") else "",
+			"cost_code": cost_code,
+			"amount": recharge_amount,
+			"recorded_at": str(date.today()),
+		}
+		to_id = to_account.id if hasattr(to_account, "id") else ""
+		self._expenses.setdefault(to_id, []).append({
+			**debit_entry,
+			"expense_id": f"{recharge_id}_debit",
+			"category": "intercompany_recharge_debit",
+			"approved_by": self.actor_id,
+			"status": "approved",
+		})
+
+		# Update cost codes if registered on both sides
+		for pid, entry_amount, factor in [
+			(from_project_id, amount, -1),
+			(to_project_id, recharge_amount, 1),
+		]:
+			ck = f"{self.tenant_id}:{pid}:{cost_code}"
+			if ck in self._cost_codes:
+				self._cost_codes[ck]["actual"] = round(
+					self._cost_codes[ck]["actual"] + factor * entry_amount, 2
+				)
+				self._cost_codes[ck]["variance"] = round(
+					self._cost_codes[ck]["budget"] - self._cost_codes[ck]["actual"], 2
+				)
+
+		self._audit(self.tenant_id, "intercompany_recharge_posted", recharge_id)
+		return {
+			"recharge_id": recharge_id,
+			"from_project_id": from_project_id,
+			"to_project_id": to_project_id,
+			"cost_code": cost_code,
+			"original_amount": amount,
+			"markup_pct": markup_pct,
+			"recharge_amount": recharge_amount,
+			"evidence_reference": evidence_reference,
+			"credit_entry": credit_entry,
+			"debit_entry": debit_entry,
+			"posted_at": str(date.today()),
+		}
+
+	async def period_cost_summary(
+		self, project_id: str, periods: list[str]
+	) -> dict[str, Any]:
+		"""Aggregate actual costs by period for trend and burn-rate analysis.
+
+		periods: list of ISO year-month strings matching the 'period' field on timesheet
+		cost entries.  Returns per-period totals and an overall burn rate (cost/period).
+		"""
+		assert _present(project_id), "project_id required"
+		assert periods, "periods list must not be empty"
+
+		account = self._account_by_project(project_id, self.tenant_id)
+		assert account is not None, f"no account found for project {project_id}"
+		account_id = account.id if hasattr(account, "id") else ""
+		bac = account.budget_amount if hasattr(account, "budget_amount") else 0.0
+
+		period_totals: dict[str, float] = {p: 0.0 for p in periods}
+		for entry in self._timesheets_cost.get(account_id, []):
+			p = entry.get("period", "")
+			if p in period_totals:
+				period_totals[p] = round(period_totals[p] + entry.get("amount", 0.0), 2)
+		for entry in self._expenses.get(account_id, []):
+			p = entry.get("recorded_at", "")[:7]  # year-month prefix
+			if p in period_totals:
+				period_totals[p] = round(period_totals[p] + entry.get("amount", 0.0), 2)
+
+		total_actual = round(sum(period_totals.values()), 2)
+		n_active = sum(1 for v in period_totals.values() if v > 0)
+		burn_rate = round(total_actual / n_active, 2) if n_active else 0.0
+		periods_to_completion = round((bac - total_actual) / burn_rate, 1) if burn_rate else None
+
+		series = [
+			{"period": p, "actual": period_totals[p]}
+			for p in periods
+		]
+
+		self._audit(self.tenant_id, "period_cost_summary_generated", project_id)
+		return {
+			"project_id": project_id,
+			"account_id": account_id,
+			"bac": bac,
+			"periods_analysed": len(periods),
+			"total_actual": total_actual,
+			"burn_rate_per_period": burn_rate,
+			"estimated_periods_to_completion": periods_to_completion,
+			"series": series,
+			"generated_at": str(date.today()),
+		}
+
 PpmPacService = ProjectAccountingService

@@ -656,3 +656,360 @@ class SCPService:
 			"talent_readiness": pool_report if not isinstance(pool_report, Exception) else {},
 			"generated_at": self._now(),
 		}
+
+	# ── Succession Depth Scoring ──────────────────────────────────────────────
+
+	async def succession_depth_score(self, tenant_id: str, role_id: str) -> dict[str, Any]:
+		"""Compute a 0–10 succession depth score for a role across active scenarios.
+
+		Weights: ready_now * 3, ready_in_1_year * 1.5, developing * 0.5.
+		Normalised to 10 based on an ideal slate of 3 ready_now successors (score=9).
+		"""
+		t = self._tenant(tenant_id)
+		guard_non_empty_string(role_id, "role_id")
+		scenarios = [
+			s for s in self.succession_scenarios.values()
+			if s["tenant_id"] == t and s["role_id"] == role_id and s["status"] == "active"
+		]
+		counts: dict[str, int] = {"ready_now": 0, "ready_in_1_year": 0, "developing": 0}
+		for scenario in scenarios:
+			for successor in scenario.get("successors", []):
+				level = successor.get("readiness", "developing")
+				if level in counts:
+					counts[level] += 1
+		raw = counts["ready_now"] * 3 + counts["ready_in_1_year"] * 1.5 + counts["developing"] * 0.5
+		score = round(min(raw / 9.0 * 10, 10.0), 2)
+		return {
+			"role_id": role_id,
+			"tenant_id": t,
+			"score": score,
+			"ready_now": counts["ready_now"],
+			"ready_in_1_year": counts["ready_in_1_year"],
+			"developing": counts["developing"],
+			"total_successors": sum(counts.values()),
+			"risk_tier": "low" if score >= 7 else ("medium" if score >= 4 else "high"),
+			"computed_at": self._now(),
+		}
+
+	# ── Bench Strength Index ──────────────────────────────────────────────────
+
+	async def bench_strength_index(self, tenant_id: str, pool_id: str | None = None) -> dict[str, Any]:
+		"""Compute Bench Strength Index (BSI) across all or a specific talent pool.
+
+		BSI = (ready_now + 0.5 * ready_in_1_year) / total_members * 100.
+		Returns 0.0 when the pool is empty.
+		"""
+		t = self._tenant(tenant_id)
+		members = [
+			m for m in self.pool_members.values()
+			if m["tenant_id"] == t and m["status"] == "active"
+			and (pool_id is None or m["pool_id"] == pool_id)
+		]
+		ready_now = sum(1 for m in members if m["readiness_level"] == "ready_now")
+		ready_in_1 = sum(1 for m in members if m["readiness_level"] == "ready_in_1_year")
+		developing = sum(1 for m in members if m["readiness_level"] == "developing")
+		total = len(members)
+		bsi = round((ready_now + 0.5 * ready_in_1) / total * 100, 1) if total else 0.0
+		return {
+			"tenant_id": t,
+			"pool_id": pool_id,
+			"bsi": bsi,
+			"ready_now": ready_now,
+			"ready_in_1_year": ready_in_1,
+			"developing": developing,
+			"total_members": total,
+			"grade": "A" if bsi >= 70 else ("B" if bsi >= 50 else ("C" if bsi >= 30 else "D")),
+			"computed_at": self._now(),
+		}
+
+	# ── Nine-Box Movement History ─────────────────────────────────────────────
+
+	async def get_nine_box_movement_history(self, tenant_id: str, employee_id: str) -> dict[str, Any]:
+		"""Return the chronological nine-box placement history and movement vectors for an employee."""
+		t = self._tenant(tenant_id)
+		guard_non_empty_string(employee_id, "employee_id")
+		entries = sorted(
+			[
+				deepcopy(e) for e in self.nine_box_entries.values()
+				if e["tenant_id"] == t and e["employee_id"] == employee_id
+			],
+			key=lambda e: e["created_at"],
+		)
+		movements: list[dict[str, Any]] = []
+		for i in range(1, len(entries)):
+			prev, curr = entries[i - 1], entries[i]
+			changed = prev["quadrant"] != curr["quadrant"]
+			movements.append({
+				"from_cycle": prev["review_cycle"],
+				"to_cycle": curr["review_cycle"],
+				"from_quadrant": prev["quadrant"],
+				"to_quadrant": curr["quadrant"],
+				"performance_delta": round(curr["performance_axis"] - prev["performance_axis"], 2),
+				"potential_delta": round(curr["potential_axis"] - prev["potential_axis"], 2),
+				"quadrant_changed": changed,
+			})
+		return {
+			"employee_id": employee_id,
+			"tenant_id": t,
+			"placements": entries,
+			"movements": movements,
+			"current_quadrant": entries[-1]["quadrant"] if entries else None,
+			"total_placements": len(entries),
+		}
+
+	# ── Scenario Simulation ───────────────────────────────────────────────────
+
+	async def simulate_vacancy(self, tenant_id: str, role_id: str, incumbent_employee_id: str) -> dict[str, Any]:
+		"""Simulate sudden vacancy of a role — returns coverage snapshot without persisting changes.
+
+		Models emergency scenario: removes the incumbent from all successor slates for the role
+		and re-scores depth/coverage.  No state mutation occurs.
+		"""
+		t = self._tenant(tenant_id)
+		guard_non_empty_string(role_id, "role_id")
+		guard_non_empty_string(incumbent_employee_id, "incumbent_employee_id")
+		# Deep-copy relevant scenarios to avoid mutation
+		scenarios = [
+			deepcopy(s) for s in self.succession_scenarios.values()
+			if s["tenant_id"] == t and s["role_id"] == role_id and s["status"] == "active"
+		]
+		# Strip incumbent from successor lists
+		for scenario in scenarios:
+			scenario["successors"] = [
+				s for s in scenario.get("successors", [])
+				if s["employee_id"] != incumbent_employee_id
+			]
+		counts: dict[str, int] = {"ready_now": 0, "ready_in_1_year": 0, "developing": 0}
+		for scenario in scenarios:
+			for successor in scenario["successors"]:
+				level = successor.get("readiness", "developing")
+				if level in counts:
+					counts[level] += 1
+		raw = counts["ready_now"] * 3 + counts["ready_in_1_year"] * 1.5 + counts["developing"] * 0.5
+		score = round(min(raw / 9.0 * 10, 10.0), 2)
+		return {
+			"simulation": "vacancy",
+			"role_id": role_id,
+			"tenant_id": t,
+			"incumbent_removed": incumbent_employee_id,
+			"remaining_successors": sum(len(s["successors"]) for s in scenarios),
+			"depth_score_post_vacancy": score,
+			"ready_now": counts["ready_now"],
+			"ready_in_1_year": counts["ready_in_1_year"],
+			"developing": counts["developing"],
+			"risk_tier": "low" if score >= 7 else ("medium" if score >= 4 else "high"),
+			"simulated_at": self._now(),
+		}
+
+	# ── Overdue Reviews ───────────────────────────────────────────────────────
+
+	async def get_overdue_reviews(self, tenant_id: str, as_of: str | None = None) -> dict[str, Any]:
+		"""Return succession scenarios and critical roles past their review_due_date.
+
+		``as_of`` is an ISO-8601 date string; defaults to today.  Records missing
+		``review_due_date`` are excluded (they are not yet subject to cadence enforcement).
+		"""
+		t = self._tenant(tenant_id)
+		cutoff = as_of or self._now()[:10]  # YYYY-MM-DD
+		overdue_scenarios: list[dict[str, Any]] = []
+		for s in self.succession_scenarios.values():
+			if s["tenant_id"] != t:
+				continue
+			due = s.get("review_due_date")
+			if due and due < cutoff and s["status"] == "active":
+				overdue_scenarios.append(deepcopy(s))
+		overdue_roles: list[dict[str, Any]] = []
+		for r in self.critical_roles.values():
+			if r["tenant_id"] != t:
+				continue
+			due = r.get("review_due_date")
+			if due and due < cutoff and r["status"] == "active":
+				overdue_roles.append(deepcopy(r))
+		return {
+			"tenant_id": t,
+			"as_of": cutoff,
+			"overdue_scenarios": overdue_scenarios,
+			"overdue_critical_roles": overdue_roles,
+			"total_overdue": len(overdue_scenarios) + len(overdue_roles),
+		}
+
+	# ── Bulk Assessment Import ────────────────────────────────────────────────
+
+	async def bulk_create_readiness_assessments(
+		self,
+		tenant_id: str,
+		assessments: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Validate and commit multiple readiness assessments in one call.
+
+		Each item in ``assessments`` must conform to the same field contract as
+		``create_readiness_assessment``.  Returns a batch result with per-record
+		success/failure; partial failures do not roll back successful records.
+		"""
+		t = self._tenant(tenant_id)
+		results: list[dict[str, Any]] = []
+		required = {"employee_id", "target_role_id", "readiness_level", "performance_rating", "potential_rating", "assessed_by"}
+		succeeded = 0
+		failed = 0
+		for i, item in enumerate(assessments):
+			missing = required - item.keys()
+			if missing:
+				results.append({"index": i, "status": "error", "error": f"missing fields: {sorted(missing)}"})
+				failed += 1
+				continue
+			try:
+				record = await self.create_readiness_assessment(
+					tenant_id=t,
+					employee_id=item["employee_id"],
+					target_role_id=item["target_role_id"],
+					readiness_level=item["readiness_level"],
+					performance_rating=item["performance_rating"],
+					potential_rating=item["potential_rating"],
+					assessed_by=item["assessed_by"],
+					development_needs=item.get("development_needs"),
+					risks=item.get("risks"),
+					notes=item.get("notes"),
+				)
+				results.append({"index": i, "status": "ok", "id": record["id"]})
+				succeeded += 1
+			except Exception as exc:
+				results.append({"index": i, "status": "error", "error": str(exc)})
+				failed += 1
+		_log.info("bulk_create_readiness_assessments: %d ok, %d failed", succeeded, failed)
+		return {
+			"tenant_id": t,
+			"total": len(assessments),
+			"succeeded": succeeded,
+			"failed": failed,
+			"results": results,
+		}
+
+	# ── Retention Risk Alerts ─────────────────────────────────────────────────
+
+	async def get_retention_risk_alerts(
+		self,
+		tenant_id: str,
+		stale_months_threshold: int = 18,
+		depth_score_threshold: float = 3.0,
+	) -> dict[str, Any]:
+		"""Surface retention and succession risk alerts.
+
+		Emits alerts for:
+		  (a) ready_now pool members with tenure > stale_months_threshold months
+			  (high retention risk — stuck without progression).
+		  (b) critical roles whose succession depth score < depth_score_threshold.
+		  (c) nine-box stars not reassessed within 12 months.
+
+		Thresholds are configurable per call.
+		"""
+		t = self._tenant(tenant_id)
+		now_str = self._now()
+		now_dt = datetime.fromisoformat(now_str.rstrip("Z"))
+
+		alerts: list[dict[str, Any]] = []
+
+		# (a) Stale ready_now pool members
+		for m in self.pool_members.values():
+			if m["tenant_id"] != t or m["status"] != "active" or m["readiness_level"] != "ready_now":
+				continue
+			added_dt = datetime.fromisoformat(m["added_at"].rstrip("Z"))
+			months_in_pool = (now_dt - added_dt).days / 30.44
+			if months_in_pool > stale_months_threshold:
+				alerts.append({
+					"alert_type": "stale_ready_now_successor",
+					"severity": "high",
+					"employee_id": m["employee_id"],
+					"pool_id": m["pool_id"],
+					"months_in_pool": round(months_in_pool, 1),
+					"message": f"Employee {m['employee_id']} has been 'ready_now' for {round(months_in_pool, 1)} months without progression.",
+				})
+
+		# (b) Critical roles with low depth score
+		for r in self.critical_roles.values():
+			if r["tenant_id"] != t or r["status"] != "active":
+				continue
+			depth = await self.succession_depth_score(t, r["role_id"])
+			if depth["score"] < depth_score_threshold:
+				alerts.append({
+					"alert_type": "low_succession_depth",
+					"severity": "critical" if r["impact_if_vacant"] == "critical" else "high",
+					"role_id": r["role_id"],
+					"role_title": r["role_title"],
+					"depth_score": depth["score"],
+					"threshold": depth_score_threshold,
+					"message": f"Critical role '{r['role_title']}' has succession depth {depth['score']} < threshold {depth_score_threshold}.",
+				})
+
+		# (c) Nine-box stars not reassessed in 12 months
+		star_last_seen: dict[str, datetime] = {}
+		for e in self.nine_box_entries.values():
+			if e["tenant_id"] != t or e["quadrant"] != "star":
+				continue
+			emp = e["employee_id"]
+			entry_dt = datetime.fromisoformat(e["created_at"].rstrip("Z"))
+			if emp not in star_last_seen or entry_dt > star_last_seen[emp]:
+				star_last_seen[emp] = entry_dt
+		for emp_id, last_dt in star_last_seen.items():
+			months_ago = (now_dt - last_dt).days / 30.44
+			if months_ago > 12:
+				alerts.append({
+					"alert_type": "star_not_reassessed",
+					"severity": "medium",
+					"employee_id": emp_id,
+					"last_assessed_months_ago": round(months_ago, 1),
+					"message": f"Nine-box star {emp_id} has not been reassessed for {round(months_ago, 1)} months.",
+				})
+
+		self._emit(t, "retention_risk_alerts_generated", "alerts", "batch", {"count": len(alerts)})
+		return {
+			"tenant_id": t,
+			"total_alerts": len(alerts),
+			"critical": sum(1 for a in alerts if a["severity"] == "critical"),
+			"high": sum(1 for a in alerts if a["severity"] == "high"),
+			"medium": sum(1 for a in alerts if a["severity"] == "medium"),
+			"alerts": alerts,
+			"generated_at": now_str,
+		}
+
+	# ── Role Risk Registry ────────────────────────────────────────────────────
+
+	async def role_risk_registry(self, tenant_id: str) -> dict[str, Any]:
+		"""Produce a prioritised role risk registry for all active critical roles.
+
+		Composite risk score combines:
+		  - impact_if_vacant weight (critical=4, high=3, medium=2, low=1)
+		  - succession depth score contribution (inverse: 10 - depth_score)
+		  - time_to_fill normalised contribution (days / 365 * 3, capped at 3)
+
+		Roles are sorted descending by composite risk score.
+		"""
+		t = self._tenant(tenant_id)
+		impact_weights = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+		registry: list[dict[str, Any]] = []
+
+		roles = await self.list_critical_roles(t, status="active")
+		depth_tasks = [self.succession_depth_score(t, r["role_id"]) for r in roles]
+		depths = await asyncio.gather(*depth_tasks, return_exceptions=True)
+
+		for role, depth in zip(roles, depths):
+			impact_w = impact_weights.get(role["impact_if_vacant"], 1)
+			depth_w = 10 - depth["score"]  # higher when fewer successors
+			fill_w = min(role.get("time_to_fill_estimate_days", 90) / 365 * 3, 3.0)
+			composite = round(impact_w * 0.4 + depth_w * 0.4 + fill_w * 0.2, 2)
+			registry.append({
+				"role_id": role["role_id"],
+				"role_title": role["role_title"],
+				"impact_if_vacant": role["impact_if_vacant"],
+				"succession_depth_score": depth["score"],
+				"time_to_fill_days": role.get("time_to_fill_estimate_days", 90),
+				"composite_risk_score": composite,
+				"risk_tier": "critical" if composite >= 6 else ("high" if composite >= 4 else ("medium" if composite >= 2 else "low")),
+			})
+
+		registry.sort(key=lambda r: r["composite_risk_score"], reverse=True)
+		return {
+			"tenant_id": t,
+			"total_critical_roles": len(registry),
+			"registry": registry,
+			"generated_at": self._now(),
+		}

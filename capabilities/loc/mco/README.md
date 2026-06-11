@@ -112,6 +112,19 @@ Multi-Country Operations (MCO) provides country entity management, local regulat
 | `McoAgentResponse` | id, tenant_id, name, runtime, role, scope |
 | `McoAuditEvent` | id, tenant_id, event_type, reference_id, actor_id, processor, stream, occurred_at |
 
+## Extended API (v1.1+)
+
+| Method | Description |
+|--------|-------------|
+| `register_entities_bulk(payloads, actor_id)` | Parallel bulk entity registration with per-item error reporting |
+| `compliance_review_alerts(tenant_id, lookahead_days)` | Surface compliance mappings due for review within N days |
+| `get_entity_hierarchy(tenant_id, root_entity_id)` | BFS ownership tree from a root entity |
+| `intercompany_exposure_summary(tenant_id, reporting_currency, fx_rates)` | FX-normalised outstanding intercompany exposure |
+| `get_compliance_mapping_history(tenant_id, mapping_id)` | Ordered audit-event history for a compliance mapping |
+| `escalate_overdue_reports(tenant_id, escalation_owner_id)` | Escalate all overdue statutory reports to a named owner |
+| `generate_cbcr_report(tenant_id, fiscal_year)` | OECD BEPS Action 13 Country-by-Country Report (Table I & II) |
+| `holding_consolidation_with_elimination(tenant_id, parent_id, subsidiaries, period)` | IFRS 10-correct consolidation with intercompany elimination |
+
 ## Streaming Events
 
 | Event | Trigger |
@@ -120,16 +133,21 @@ Multi-Country Operations (MCO) provides country entity management, local regulat
 | `country_updated` | Country record updated |
 | `entity_registered` | New legal entity registered |
 | `entity_updated` | Entity record updated |
+| `entities_bulk_registered` | Bulk entity registration completed |
 | `compliance_mapping_recorded` | New compliance mapping created |
 | `compliance_status_updated` | Compliance status changed |
+| `compliance_review_due` | Compliance mapping approaching review deadline |
 | `intercompany_transaction_created` | New ICT created |
 | `intercompany_transaction_approved` | ICT approved |
 | `intercompany_transaction_settled` | ICT settled |
 | `statutory_report_created` | Report created |
 | `statutory_report_filed` | Report filed with authorities |
 | `statutory_report_accepted` | Report accepted by authorities |
+| `statutory_report_escalated` | Overdue report escalated to named owner |
 | `transfer_pricing_validated` | TP method validated |
 | `agent_registered` | MCO agent registered |
+| `holding_consolidated` | Group consolidation run completed |
+| `cbcr_report_generated` | OECD CbCR report generated (includes content hash) |
 
 ## Edge Cases Handled
 

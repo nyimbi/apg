@@ -33,16 +33,48 @@ Redis, Flask-AppBuilder, AI services, or optional compression packages.
 - Adapter boundaries for memory, Redis-compatible stores, edge caches, CDNs,
   application-local query caches, and future APG integrations.
 
+### New in v1.1 — World-Class Enhancements
+
+- **Stale-While-Revalidate (SWR)**: `cache_set_swr` / `cache_get_swr` serve
+  stale values immediately during the grace window while triggering async
+  background revalidation via a registered refresh callback.
+- **Adaptive TTL**: `adaptive_ttl_configure` + `cache_get_adaptive` extend TTL
+  on each hit (up to `ttl_max`) and let cold entries expire naturally.
+- **Schema-Versioned Writes**: `cache_set_versioned` / `cache_get_versioned`
+  tag entries with a schema version; stale-schema hits auto-invalidate.
+- **Cascading Tag Invalidation**: `register_tag_hierarchy` + `tag_invalidate_cascade`
+  perform BFS traversal of the tag graph to invalidate all descendant tags in
+  one call.
+- **Streaming Cache Warm**: `warm_cache_stream` accepts any `AsyncIterator[tuple[key, value]]`,
+  processes in configurable batches, and reports progress via callback —
+  eliminating memory spikes on large warm-up datasets.
+- **Monetary Value Cache**: `cache_set_money` / `cache_get_money` store
+  `Decimal` amounts as strings to preserve precision; returned as `Decimal`.
+- **XFetch Stampede Protection**: `xfetch_get` uses the Vattani et al. (2015)
+  probabilistic early-expiry algorithm to distribute recompute load before
+  expiry, eliminating thundering-herd failures.
+- **Tenant Quota Enforcement**: `set_tenant_quota` + `quota_usage_report`
+  enforce soft-warning and hard-limit byte quotas per tenant.
+- **Tier Statistics**: `tier_stats` reports L1 (hot) vs L2 (warm/cold) entry
+  distribution and overall hit rates per namespace.
+- **Write-Behind Mode**: `cache_set_write_behind` + `write_behind_flush`
+  decouple cache writes from backend persistence, reducing write latency to
+  in-memory speeds.
+
 ## Key Files
 
 - `SPECIFICATION.md` - full functional and guardrail specification.
 - `PLAN.md` - implementation plan and deferred runtime work.
+- `WORLD_CLASS_IMPROVEMENTS.md` - 15 detailed improvement proposals with
+  justification, implementation notes, and competitor references.
 - `capability_contract.py` - configuration, rule engine, UI routes, and theme.
-- `service.py` - existing async cache runtime plus dependency-light governance
-  records and lifecycle service.
+- `service.py` - 63-method async cache runtime: governance, SWR, adaptive TTL,
+  schema versioning, cascading tag invalidation, streaming warm, monetary cache,
+  XFetch anti-stampede, tenant quotas, tier stats, and write-behind.
 - `api.py` - FastAPI routes plus direct helper functions for generated apps.
 - `view_models.py` - generated-application UI model builders.
 - `app.py` - APG package entrypoint and semantic model.
+- `docs/user_guide.md` - comprehensive user guide with usage examples.
 - `semantic_model.json` - publishable semantic-model evidence.
 - `release_report.json` - focused release evidence.
 - `tests/` - focused package and contract coverage.
@@ -198,6 +230,121 @@ CACH does not require a specific backend. A production adapter should:
 5. Respect encryption, TTL, invalidation, freshness, and eviction decisions.
 6. Preserve CACH policy evidence fields when moving records between durable
    storage and runtime adapters.
+
+## New Feature Usage Examples
+
+### Stale-While-Revalidate
+
+```python
+from capabilities.common.cach.service import CacheService
+
+svc = CacheService(actor_id="api", tenant_id="acme")
+
+# Register a refresh callback
+async def my_refresh(namespace, key):
+    return await db.fetch(key)
+
+await svc.register_refresh_callback("products", my_refresh)
+
+# Write with a 60-second SWR grace window
+await svc.cache_set_swr("products", "prod:42", {"name": "Widget"}, ttl_seconds=300, swr_grace_seconds=60)
+
+# Read — stale=True triggers background revalidation within the grace window
+result = await svc.cache_get_swr("products", "prod:42")
+assert result["hit"] is True
+# result["stale"] is True if entry was expired but within grace window
+```
+
+### Adaptive TTL
+
+```python
+await svc.adaptive_ttl_configure("session", ttl_min_seconds=120, ttl_max_seconds=7200, growth_factor=1.5)
+await svc.cache_set("session", "user:99", {"role": "admin"}, ttl_seconds=300)
+
+# TTL extends by 1.5x on each hit (up to 7200s)
+result = await svc.cache_get_adaptive("session", "user:99")
+# result["ttl_extended_to_seconds"] present when TTL was grown
+```
+
+### Schema-Versioned Cache
+
+```python
+await svc.cache_set_versioned("orders", "order:1001", {"id": 1001, "v": 2}, schema_version="2")
+
+# Stale-schema entries auto-invalidate
+r = await svc.cache_get_versioned("orders", "order:1001", expected_version="2")
+assert r["version_mismatch"] is False
+
+r_old = await svc.cache_get_versioned("orders", "order:1001", expected_version="1")
+assert r_old["version_mismatch"] is True  # entry deleted, forces re-populate
+```
+
+### Cascading Tag Invalidation
+
+```python
+await svc.register_tag_hierarchy("catalog", "user:42", ["user:42:orders", "user:42:profile"])
+await svc.cache_set("catalog", "k1", "v1", tags=["user:42:orders"])
+await svc.cache_set("catalog", "k2", "v2", tags=["user:42:profile"])
+
+result = await svc.tag_invalidate_cascade("catalog", "user:42")
+# result["total_invalidated"] == 2 (both child-tag entries removed)
+```
+
+### Streaming Cache Warm
+
+```python
+async def db_cursor():
+    async for row in db.stream("SELECT id, data FROM products"):
+        yield (f"prod:{row.id}", row.data)
+
+result = await svc.warm_cache_stream(
+    "products", db_cursor(), ttl_seconds=3600, batch_size=200,
+    progress_callback=lambda loaded, failed, ms: print(f"{loaded} loaded"),
+)
+print(result["loaded"], result["elapsed_ms"])
+```
+
+### Monetary Value Cache
+
+```python
+from decimal import Decimal
+
+await svc.cache_set_money("pricing", "price:USD:prod42", Decimal("19.99"), "USD")
+
+r = await svc.cache_get_money("pricing", "price:USD:prod42")
+assert isinstance(r["amount"], Decimal)
+assert r["amount"] == Decimal("19.99")
+```
+
+### XFetch Stampede Protection
+
+```python
+# beta=1.0 is standard; increase for more aggressive early recompute
+r = await svc.xfetch_get("products", "prod:42", beta=1.0)
+if not r["hit"]:
+    # recompute and re-cache — safely distributed over time
+    new_val = await source.fetch("prod:42")
+    await svc.cache_set("products", "prod:42", new_val, ttl_seconds=600)
+```
+
+### Tenant Quota Enforcement
+
+```python
+await svc.set_tenant_quota("acme", soft_bytes=50_000_000, hard_bytes=100_000_000)
+report = await svc.quota_usage_report("acme")
+print(report["utilisation_pct"], "%")
+```
+
+### Write-Behind Mode
+
+```python
+# Fast write to cache, backend write deferred
+await svc.cache_set_write_behind("orders", "order:9999", order_data, ttl_seconds=900)
+
+# Drain the queue (call from a background task or scheduler)
+result = await svc.write_behind_flush(backend_fn=async_db_writer)
+print(result["flushed"], "writes persisted")
+```
 
 ## Verification
 

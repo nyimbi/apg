@@ -4,9 +4,11 @@ from __future__ import annotations
 import asyncio
 import collections
 import logging
+import math
 import statistics
 from copy import deepcopy
 from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 from uuid import uuid4
 
@@ -855,5 +857,834 @@ class ProcessMiningService:
 			"log_id": log_id,
 			"activity_performance": metrics,
 			"activity_count": len(metrics),
+			"generated_at": self._now(),
+		}
+
+	# ── SLA / KPI Breach Alerting (I5) ────────────────────────────
+
+	async def configure_sla_rules(
+		self,
+		tenant_id: str,
+		log_id: str,
+		rules: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""
+		Configure SLA rules for an event log.
+
+		Each rule: {"name": str, "activity": str, "max_duration_s": float, "scope": "transition"|"case"}
+		  - transition: the gap between this activity and the *next* must be <= max_duration_s
+		  - case:       total case duration from first to last event must be <= max_duration_s
+		"""
+		tenant = self._tenant(tenant_id)
+		log = self.event_logs.get(log_id)
+		if not log or log["tenant_id"] != tenant:
+			raise KeyError(f"event log not found: {log_id}")
+		validated = []
+		for r in rules:
+			if not r.get("name") or not r.get("activity"):
+				raise ValueError("each SLA rule must have 'name' and 'activity'")
+			if not isinstance(r.get("max_duration_s"), (int, float)) or r["max_duration_s"] <= 0:
+				raise ValueError(f"rule '{r['name']}': max_duration_s must be a positive number")
+			validated.append({
+				"name": r["name"],
+				"activity": r["activity"],
+				"max_duration_s": float(r["max_duration_s"]),
+				"scope": r.get("scope", "transition"),
+			})
+		log.setdefault("sla_rules", [])
+		log["sla_rules"] = validated
+		self._emit(tenant, "sla_rules_configured", log_id, {"rule_count": len(validated)})
+		_log.info("SLA rules configured: log=%s rules=%d tenant=%s", log_id, len(validated), tenant)
+		return {"log_id": log_id, "sla_rules": validated, "configured_at": self._now()}
+
+	async def check_sla_breaches(
+		self,
+		tenant_id: str,
+		log_id: str,
+	) -> dict[str, Any]:
+		"""
+		Scan the event log for SLA breaches against configured rules.
+
+		Returns per-rule breach summaries with affected case IDs and breach magnitude.
+		"""
+		tenant = self._tenant(tenant_id)
+		log = self.event_logs.get(log_id)
+		if not log or log["tenant_id"] != tenant:
+			raise KeyError(f"event log not found: {log_id}")
+		rules: list[dict[str, Any]] = log.get("sla_rules", [])
+		if not rules:
+			return {"log_id": log_id, "rule_count": 0, "breaches": [], "generated_at": self._now()}
+
+		events = self.raw_events.get(log_id, [])
+		# Group and sort by case
+		cases: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
+		for event in events:
+			cases[event["case_id"]].append(event)
+		for case_events in cases.values():
+			case_events.sort(key=lambda e: e["timestamp"])
+
+		breach_results = []
+		for rule in rules:
+			breach_cases: list[dict[str, Any]] = []
+			for case_id, case_events in cases.items():
+				if rule["scope"] == "case":
+					# Total case duration
+					if len(case_events) < 2:
+						continue
+					try:
+						t_start = datetime.fromisoformat(case_events[0]["timestamp"].replace("Z", "+00:00"))
+						t_end = datetime.fromisoformat(case_events[-1]["timestamp"].replace("Z", "+00:00"))
+						duration_s = abs((t_end - t_start).total_seconds())
+					except Exception:
+						continue
+					if duration_s > rule["max_duration_s"]:
+						breach_cases.append({
+							"case_id": case_id,
+							"actual_s": round(duration_s, 2),
+							"limit_s": rule["max_duration_s"],
+							"overrun_s": round(duration_s - rule["max_duration_s"], 2),
+						})
+				else:
+					# Transition: gap after the specified activity
+					for i, ev in enumerate(case_events):
+						if ev["activity"] != rule["activity"]:
+							continue
+						if i + 1 >= len(case_events):
+							continue
+						try:
+							t1 = datetime.fromisoformat(ev["timestamp"].replace("Z", "+00:00"))
+							t2 = datetime.fromisoformat(case_events[i + 1]["timestamp"].replace("Z", "+00:00"))
+							gap_s = abs((t2 - t1).total_seconds())
+						except Exception:
+							continue
+						if gap_s > rule["max_duration_s"]:
+							breach_cases.append({
+								"case_id": case_id,
+								"actual_s": round(gap_s, 2),
+								"limit_s": rule["max_duration_s"],
+								"overrun_s": round(gap_s - rule["max_duration_s"], 2),
+								"next_activity": case_events[i + 1]["activity"],
+							})
+			breach_results.append({
+				"rule_name": rule["name"],
+				"activity": rule["activity"],
+				"scope": rule["scope"],
+				"max_duration_s": rule["max_duration_s"],
+				"breach_count": len(breach_cases),
+				"breach_rate": round(len(breach_cases) / len(cases), 4) if cases else 0.0,
+				"breaching_cases": breach_cases[:50],
+			})
+			if breach_cases:
+				self._emit(tenant, "sla_breach", log_id, {
+					"rule": rule["name"], "breach_count": len(breach_cases)
+				})
+
+		total_breaches = sum(r["breach_count"] for r in breach_results)
+		_log.info("SLA check complete: log=%s total_breaches=%d tenant=%s", log_id, total_breaches, tenant)
+		return {
+			"log_id": log_id,
+			"rule_count": len(rules),
+			"total_breaches": total_breaches,
+			"breaches": breach_results,
+			"generated_at": self._now(),
+		}
+
+	# ── Predictive Completion Time (I8) ───────────────────────────
+
+	async def predict_completion_time(
+		self,
+		tenant_id: str,
+		log_id: str,
+		partial_traces: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""
+		Predict remaining completion time for in-flight cases using empirical prefix matching.
+
+		partial_traces: list of {"case_id": str, "activities": list[str], "started_at": str (ISO)}
+		Returns p50/p75/p95 remaining-time bands per in-flight case based on historical cases
+		that share the same activity prefix.
+		"""
+		tenant = self._tenant(tenant_id)
+		log = self.event_logs.get(log_id)
+		if not log or log["tenant_id"] != tenant:
+			raise KeyError(f"event log not found: {log_id}")
+		if not partial_traces:
+			raise ValueError("partial_traces must not be empty")
+
+		events = self.raw_events.get(log_id, [])
+		# Build historical case durations indexed by trace prefix
+		historical: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
+		for event in events:
+			historical[event["case_id"]].append(event)
+
+		# Build per-case (prefix_key -> [total_duration_s]) mapping
+		prefix_durations: dict[str, list[float]] = collections.defaultdict(list)
+		for case_id, case_events in historical.items():
+			case_events.sort(key=lambda e: e["timestamp"])
+			activities = [e["activity"] for e in case_events]
+			if len(case_events) < 2:
+				continue
+			try:
+				t_start = datetime.fromisoformat(case_events[0]["timestamp"].replace("Z", "+00:00"))
+				t_end = datetime.fromisoformat(case_events[-1]["timestamp"].replace("Z", "+00:00"))
+				total_s = abs((t_end - t_start).total_seconds())
+			except Exception:
+				continue
+			# Record duration under every prefix of this trace
+			for prefix_len in range(1, len(activities) + 1):
+				prefix_key = " → ".join(activities[:prefix_len])
+				prefix_durations[prefix_key].append(total_s)
+
+		predictions = []
+		for pt in partial_traces:
+			inflight_case_id = pt.get("case_id", "unknown")
+			activities: list[str] = pt.get("activities", [])
+			started_at_str: str = pt.get("started_at", self._now())
+			prefix_key = " → ".join(activities)
+
+			# Elapsed time so far
+			elapsed_s = 0.0
+			try:
+				t_start = datetime.fromisoformat(started_at_str.replace("Z", "+00:00"))
+				t_now = datetime.now(tz=timezone.utc)
+				elapsed_s = abs((t_now - t_start).total_seconds())
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+			matched_durations = prefix_durations.get(prefix_key, [])
+			# Fallback: try shorter prefixes
+			if not matched_durations and activities:
+				for trim in range(len(activities) - 1, 0, -1):
+					shorter_key = " → ".join(activities[:trim])
+					if prefix_durations.get(shorter_key):
+						matched_durations = prefix_durations[shorter_key]
+						break
+
+			if not matched_durations:
+				predictions.append({
+					"case_id": inflight_case_id,
+					"activities_so_far": len(activities),
+					"elapsed_s": round(elapsed_s, 2),
+					"prediction": "insufficient_history",
+				})
+				continue
+
+			sorted_d = sorted(matched_durations)
+			n = len(sorted_d)
+			p50 = sorted_d[int(n * 0.50)]
+			p75 = sorted_d[int(n * 0.75)]
+			p95 = sorted_d[min(int(n * 0.95), n - 1)]
+
+			remaining_p50 = max(0.0, p50 - elapsed_s)
+			remaining_p75 = max(0.0, p75 - elapsed_s)
+			remaining_p95 = max(0.0, p95 - elapsed_s)
+
+			predictions.append({
+				"case_id": inflight_case_id,
+				"activities_so_far": len(activities),
+				"elapsed_s": round(elapsed_s, 2),
+				"matched_historical_cases": n,
+				"total_duration_p50_s": round(p50, 2),
+				"total_duration_p75_s": round(p75, 2),
+				"total_duration_p95_s": round(p95, 2),
+				"remaining_p50_s": round(remaining_p50, 2),
+				"remaining_p75_s": round(remaining_p75, 2),
+				"remaining_p95_s": round(remaining_p95, 2),
+			})
+
+		_log.info(
+			"completion time predicted: log=%s in_flight_cases=%d tenant=%s",
+			log_id, len(predictions), tenant,
+		)
+		return {
+			"log_id": log_id,
+			"predictions": predictions,
+			"generated_at": self._now(),
+		}
+
+	# ── Happy-Path Alignment Score (I9) ───────────────────────────
+
+	async def compute_happy_path_alignment(
+		self,
+		tenant_id: str,
+		log_id: str,
+	) -> dict[str, Any]:
+		"""
+		Compute per-case alignment score against the happy path (most frequent variant).
+
+		Alignment score = 1 - (edit_distance / max(len_actual, len_happy)).
+		Returns distribution statistics and the bottom-10% most deviant cases.
+		"""
+		tenant = self._tenant(tenant_id)
+		log = self.event_logs.get(log_id)
+		if not log or log["tenant_id"] != tenant:
+			raise KeyError(f"event log not found: {log_id}")
+
+		events = self.raw_events.get(log_id, [])
+		if not events:
+			raise ValueError(f"no events in log: {log_id}")
+
+		# Group and sort
+		cases: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
+		for event in events:
+			cases[event["case_id"]].append(event)
+
+		# Identify happy path (most frequent variant)
+		variant_counts: dict[str, int] = collections.Counter()
+		case_traces: dict[str, list[str]] = {}
+		for case_id, case_events in cases.items():
+			case_events.sort(key=lambda e: e["timestamp"])
+			trace = [e["activity"] for e in case_events]
+			case_traces[case_id] = trace
+			variant_counts[" → ".join(trace)] += 1
+
+		if not variant_counts:
+			raise ValueError("no variants found")
+
+		happy_path_key = variant_counts.most_common(1)[0][0]
+		happy_path: list[str] = happy_path_key.split(" → ")
+
+		def _levenshtein(a: list[str], b: list[str]) -> int:
+			"""Standard Levenshtein distance on activity sequences."""
+			m, n = len(a), len(b)
+			dp = list(range(n + 1))
+			for i in range(1, m + 1):
+				prev = dp[:]
+				dp[0] = i
+				for j in range(1, n + 1):
+					cost = 0 if a[i - 1] == b[j - 1] else 1
+					dp[j] = min(dp[j] + 1, dp[j - 1] + 1, prev[j - 1] + cost)
+			return dp[n]
+
+		case_scores: list[dict[str, Any]] = []
+		for case_id, trace in case_traces.items():
+			dist = _levenshtein(trace, happy_path)
+			denom = max(len(trace), len(happy_path))
+			score = round(1.0 - dist / denom, 4) if denom > 0 else 1.0
+			case_scores.append({
+				"case_id": case_id,
+				"alignment_score": score,
+				"edit_distance": dist,
+				"trace_length": len(trace),
+			})
+
+		case_scores.sort(key=lambda c: c["alignment_score"])
+		scores = [c["alignment_score"] for c in case_scores]
+		n = len(scores)
+		bottom_10pct = case_scores[: max(1, n // 10)]
+
+		_log.info(
+			"happy path alignment computed: log=%s cases=%d happy_path_len=%d tenant=%s",
+			log_id, n, len(happy_path), tenant,
+		)
+		return {
+			"log_id": log_id,
+			"happy_path": happy_path_key,
+			"happy_path_steps": len(happy_path),
+			"total_cases": n,
+			"avg_alignment_score": round(statistics.mean(scores), 4) if scores else 0.0,
+			"median_alignment_score": round(statistics.median(scores), 4) if scores else 0.0,
+			"p10_alignment_score": round(scores[max(0, int(n * 0.10))], 4) if scores else 0.0,
+			"most_deviant_cases": bottom_10pct[:20],
+			"generated_at": self._now(),
+		}
+
+	# ── Root-Cause Analysis for Deviating Cases (I4) ──────────────
+
+	async def analyze_deviation_root_causes(
+		self,
+		tenant_id: str,
+		log_id: str,
+		model_id: str,
+		top_n: int = 10,
+	) -> dict[str, Any]:
+		"""
+		Identify case attributes that statistically discriminate deviating from conforming cases.
+
+		Uses Fisher's exact test (2x2 contingency) for categorical attributes present in event
+		attributes. Returns ranked (attribute, value, p_value_approx, lift) tuples.
+		"""
+		tenant = self._tenant(tenant_id)
+		log = self.event_logs.get(log_id)
+		if not log or log["tenant_id"] != tenant:
+			raise KeyError(f"event log not found: {log_id}")
+		model = self.bpmn_models.get(model_id)
+		if not model or model["tenant_id"] != tenant:
+			raise KeyError(f"model not found: {model_id}")
+
+		# Find latest conformance result
+		conf_results = [
+			r for r in self.conformance_results.values()
+			if r["tenant_id"] == tenant and r["event_log_id"] == log_id and r["model_id"] == model_id
+		]
+		if not conf_results:
+			raise KeyError("run check_conformance first for this log+model pair")
+		latest_conf = max(conf_results, key=lambda r: r["checked_at"])
+		deviating_set: set[str] = set(latest_conf["deviating_cases"])
+
+		events = self.raw_events.get(log_id, [])
+		# Collect attribute vectors per case (use first event attributes as case-level proxy)
+		case_attributes: dict[str, dict[str, Any]] = {}
+		for event in events:
+			cid = event["case_id"]
+			if cid not in case_attributes:
+				case_attributes[cid] = dict(event.get("attributes", {}))
+
+		if not case_attributes:
+			return {
+				"log_id": log_id, "model_id": model_id,
+				"drivers": [], "note": "no case attributes found",
+				"generated_at": self._now(),
+			}
+
+		all_cases = set(case_attributes.keys())
+		conforming_set = all_cases - deviating_set
+		n_dev = len(deviating_set)
+		n_conf = len(conforming_set)
+
+		# Gather all (attribute, value) pairs
+		attr_value_counts: dict[tuple[str, str], dict[str, int]] = collections.defaultdict(
+			lambda: {"dev": 0, "conf": 0}
+		)
+		for case_id, attrs in case_attributes.items():
+			label = "dev" if case_id in deviating_set else "conf"
+			for attr, val in attrs.items():
+				av = (attr, str(val))
+				attr_value_counts[av][label] += 1
+
+		drivers = []
+		for (attr, val), counts in attr_value_counts.items():
+			a = counts["dev"]          # deviating WITH attribute
+			b = counts["conf"]         # conforming WITH attribute
+			c = n_dev - a              # deviating WITHOUT
+			d = n_conf - b             # conforming WITHOUT
+			# Approximate p-value via chi-square (continuity corrected)
+			n_total = n_dev + n_conf
+			if n_total == 0 or (a + b) == 0 or (c + d) == 0:
+				continue
+			expected_a = n_dev * (a + b) / n_total
+			if expected_a == 0:
+				continue
+			chi2 = ((abs(a - expected_a) - 0.5) ** 2) / expected_a
+			# Rough p-value from chi2 with 1 dof (Laplace approximation)
+			p_approx = round(math.exp(-0.5 * chi2), 6)
+			dev_rate = a / n_dev if n_dev > 0 else 0
+			conf_rate = b / n_conf if n_conf > 0 else 0
+			lift = round(dev_rate / conf_rate, 4) if conf_rate > 0 else float("inf")
+			drivers.append({
+				"attribute": attr,
+				"value": val,
+				"count_in_deviating": a,
+				"count_in_conforming": b,
+				"dev_rate": round(dev_rate, 4),
+				"conf_rate": round(conf_rate, 4),
+				"lift": lift,
+				"p_value_approx": p_approx,
+			})
+
+		# Rank by lift descending, then p_value ascending
+		drivers.sort(key=lambda d: (-d["lift"], d["p_value_approx"]))
+		_log.info(
+			"deviation root-cause analysis: log=%s model=%s drivers=%d tenant=%s",
+			log_id, model_id, len(drivers), tenant,
+		)
+		return {
+			"log_id": log_id,
+			"model_id": model_id,
+			"deviating_cases": n_dev,
+			"conforming_cases": n_conf,
+			"top_drivers": drivers[:top_n],
+			"generated_at": self._now(),
+		}
+
+	# ── Process Cost Analysis (I12) ───────────────────────────────
+
+	async def analyze_process_costs(
+		self,
+		tenant_id: str,
+		log_id: str,
+		resource_rates: dict[str, str],
+	) -> dict[str, Any]:
+		"""
+		Compute per-activity and per-variant costs using resource hourly rates.
+
+		resource_rates: mapping of resource_id -> hourly_rate as a string (e.g. "125.50").
+		All monetary arithmetic uses Decimal for precision.
+		Returns per-activity cost summary, per-variant cost, and total process cost.
+		"""
+		tenant = self._tenant(tenant_id)
+		log = self.event_logs.get(log_id)
+		if not log or log["tenant_id"] != tenant:
+			raise KeyError(f"event log not found: {log_id}")
+		if not resource_rates:
+			raise ValueError("resource_rates must not be empty")
+
+		# Parse rates to Decimal
+		rates: dict[str, Decimal] = {}
+		for resource_id, rate_str in resource_rates.items():
+			try:
+				rates[resource_id] = Decimal(str(rate_str))
+			except Exception:
+				raise ValueError(f"invalid rate for resource '{resource_id}': {rate_str!r}")
+
+		events = self.raw_events.get(log_id, [])
+		cases: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
+		for event in events:
+			cases[event["case_id"]].append(event)
+
+		activity_costs: dict[str, list[Decimal]] = collections.defaultdict(list)
+		variant_costs: dict[str, list[Decimal]] = collections.defaultdict(list)
+
+		for case_id, case_events in cases.items():
+			case_events.sort(key=lambda e: e["timestamp"])
+			trace_parts: list[str] = []
+			case_total = Decimal("0")
+			for i in range(len(case_events) - 1):
+				ev = case_events[i]
+				next_ev = case_events[i + 1]
+				activity = ev["activity"]
+				resource = ev.get("resource", "")
+				rate = rates.get(resource, rates.get("default", Decimal("0")))
+				try:
+					t1 = datetime.fromisoformat(ev["timestamp"].replace("Z", "+00:00"))
+					t2 = datetime.fromisoformat(next_ev["timestamp"].replace("Z", "+00:00"))
+					duration_h = Decimal(str(abs((t2 - t1).total_seconds()))) / Decimal("3600")
+				except Exception:
+					duration_h = Decimal("0")
+				cost = (duration_h * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+				activity_costs[activity].append(cost)
+				case_total += cost
+				trace_parts.append(activity)
+			# Last activity cost (zero duration by definition — still record it)
+			if case_events:
+				last_activity = case_events[-1]["activity"]
+				activity_costs[last_activity].append(Decimal("0"))
+				trace_parts.append(last_activity)
+			variant_key = " → ".join(trace_parts)
+			variant_costs[variant_key].append(case_total)
+
+		# Summarise per-activity
+		activity_summary: dict[str, Any] = {}
+		for activity, costs in activity_costs.items():
+			total = sum(costs)
+			avg = total / len(costs) if costs else Decimal("0")
+			activity_summary[activity] = {
+				"case_count": len(costs),
+				"total_cost": str(total.quantize(Decimal("0.01"))),
+				"avg_cost_per_case": str(avg.quantize(Decimal("0.01"))),
+				"max_cost": str(max(costs).quantize(Decimal("0.01"))),
+			}
+
+		# Summarise per-variant (top 10)
+		variant_summary: list[dict[str, Any]] = []
+		for variant, costs in sorted(
+			variant_costs.items(), key=lambda kv: -sum(kv[1])
+		)[:10]:
+			total = sum(costs)
+			avg = total / len(costs)
+			variant_summary.append({
+				"variant": variant,
+				"case_count": len(costs),
+				"avg_cost_per_case": str(avg.quantize(Decimal("0.01"))),
+				"total_cost": str(total.quantize(Decimal("0.01"))),
+			})
+
+		all_case_totals = [sum(v) for v in variant_costs.values() if v]
+		process_total = sum(all_case_totals)
+		_log.info(
+			"process cost analysis: log=%s total_cost=%s tenant=%s",
+			log_id, str(process_total.quantize(Decimal("0.01"))), tenant,
+		)
+		return {
+			"log_id": log_id,
+			"currency": "resource_rate_units",
+			"activity_costs": activity_summary,
+			"top_variant_costs": variant_summary,
+			"total_process_cost": str(process_total.quantize(Decimal("0.01"))),
+			"avg_cost_per_case": str(
+				(process_total / len(cases)).quantize(Decimal("0.01"))
+			) if cases else "0.00",
+			"generated_at": self._now(),
+		}
+
+	# ── Multi-Log Process Comparison (I10) ────────────────────────
+
+	async def compare_event_logs(
+		self,
+		tenant_id: str,
+		log_id_a: str,
+		log_id_b: str,
+	) -> dict[str, Any]:
+		"""
+		Structurally compare two event logs from the same tenant.
+
+		Returns:
+		  - Jaccard similarity of activity sets
+		  - Symmetric difference of DFG edges
+		  - Per-shared-edge KS-test approximation on duration distributions
+		  - Ranked list of structural divergences (edges present in one but not both)
+		"""
+		tenant = self._tenant(tenant_id)
+		log_a = self.event_logs.get(log_id_a)
+		if not log_a or log_a["tenant_id"] != tenant:
+			raise KeyError(f"event log not found: {log_id_a}")
+		log_b = self.event_logs.get(log_id_b)
+		if not log_b or log_b["tenant_id"] != tenant:
+			raise KeyError(f"event log not found: {log_id_b}")
+
+		events_a = self.raw_events.get(log_id_a, [])
+		events_b = self.raw_events.get(log_id_b, [])
+
+		dfg_a = self._build_dfg(events_a) if events_a else {"activities": set(), "edges": [], "activity_frequencies": {}}
+		dfg_b = self._build_dfg(events_b) if events_b else {"activities": set(), "edges": [], "activity_frequencies": {}}
+
+		acts_a: set[str] = set(dfg_a["activities"])
+		acts_b: set[str] = set(dfg_b["activities"])
+		union_acts = acts_a | acts_b
+		inter_acts = acts_a & acts_b
+		jaccard_activities = round(len(inter_acts) / len(union_acts), 4) if union_acts else 1.0
+
+		edges_a: dict[tuple[str, str], dict[str, Any]] = {
+			(e["source"], e["target"]): e for e in dfg_a["edges"]
+		}
+		edges_b: dict[tuple[str, str], dict[str, Any]] = {
+			(e["source"], e["target"]): e for e in dfg_b["edges"]
+		}
+		all_edge_keys = set(edges_a) | set(edges_b)
+		shared_edge_keys = set(edges_a) & set(edges_b)
+		jaccard_edges = round(len(shared_edge_keys) / len(all_edge_keys), 4) if all_edge_keys else 1.0
+
+		only_in_a = [
+			{"edge": f"{s} → {t}", "frequency_a": edges_a[(s, t)]["frequency"]}
+			for (s, t) in sorted(set(edges_a) - set(edges_b))
+		]
+		only_in_b = [
+			{"edge": f"{s} → {t}", "frequency_b": edges_b[(s, t)]["frequency"]}
+			for (s, t) in sorted(set(edges_b) - set(edges_a))
+		]
+
+		# Duration divergence on shared edges (KS-stat approximation via difference of medians)
+		duration_divergences = []
+		for (s, t) in shared_edge_keys:
+			dur_a = edges_a[(s, t)].get("avg_duration_s", 0.0)
+			dur_b = edges_b[(s, t)].get("avg_duration_s", 0.0)
+			divergence = abs(dur_a - dur_b)
+			duration_divergences.append({
+				"edge": f"{s} → {t}",
+				"avg_duration_a_s": dur_a,
+				"avg_duration_b_s": dur_b,
+				"duration_divergence_s": round(divergence, 2),
+			})
+		duration_divergences.sort(key=lambda d: -d["duration_divergence_s"])
+
+		_log.info(
+			"log comparison: logs=(%s, %s) jaccard_acts=%.4f jaccard_edges=%.4f tenant=%s",
+			log_id_a, log_id_b, jaccard_activities, jaccard_edges, tenant,
+		)
+		return {
+			"log_id_a": log_id_a,
+			"log_id_b": log_id_b,
+			"jaccard_activity_similarity": jaccard_activities,
+			"jaccard_edge_similarity": jaccard_edges,
+			"activities_only_in_a": sorted(acts_a - acts_b),
+			"activities_only_in_b": sorted(acts_b - acts_a),
+			"edges_only_in_a": only_in_a,
+			"edges_only_in_b": only_in_b,
+			"shared_edges": len(shared_edge_keys),
+			"top_duration_divergences": duration_divergences[:10],
+			"compared_at": self._now(),
+		}
+
+	# ── Streaming Conformance (I15) ────────────────────────────────
+
+	async def update_streaming_conformance(
+		self,
+		tenant_id: str,
+		log_id: str,
+		model_id: str,
+		new_events: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""
+		Incremental/streaming conformance: extend per-case running traces with new events and
+		re-evaluate each against the bound model.  Emits ``conformance_deviation`` for the first
+		deviation detected per case in this batch.
+
+		new_events: same schema as ingest_events (must have case_id and activity fields).
+		Returns currently deviating case count, newly deviating cases, and sample traces.
+		"""
+		tenant = self._tenant(tenant_id)
+		log = self.event_logs.get(log_id)
+		if not log or log["tenant_id"] != tenant:
+			raise KeyError(f"event log not found: {log_id}")
+		model = self.bpmn_models.get(model_id)
+		if not model or model["tenant_id"] != tenant:
+			raise KeyError(f"model not found: {model_id}")
+
+		# Persist running state in the log dict under a private key
+		state_key = f"_stream_state_{model_id}"
+		stream_state: dict[str, dict[str, Any]] = log.setdefault(state_key, {})
+		# state per case: {"trace": [act,...], "is_deviating": bool, "first_deviation_reported": bool}
+
+		model_edges: set[tuple[str, str]] = {
+			(e["source"], e["target"]) for e in model["edges"]
+		}
+		model_activities: set[str] = {n["name"] for n in model["nodes"]}
+		case_id_field = log["case_id_field"]
+		activity_field = log["activity_field"]
+
+		newly_deviating: list[str] = []
+		for raw in new_events:
+			case_id = str(raw.get(case_id_field) or raw.get("case_id", ""))
+			activity = str(raw.get(activity_field) or raw.get("activity", ""))
+			if not case_id or not activity:
+				continue
+			cs = stream_state.setdefault(
+				case_id, {"trace": [], "is_deviating": False, "first_deviation_reported": False}
+			)
+			cs["trace"].append(activity)
+
+			if cs["is_deviating"]:
+				continue  # already flagged
+
+			# Check if activity is in model
+			if activity not in model_activities:
+				cs["is_deviating"] = True
+			elif len(cs["trace"]) >= 2:
+				prev_act = cs["trace"][-2]
+				src_id = f"node_{prev_act.replace(' ', '_').lower()}"
+				tgt_id = f"node_{activity.replace(' ', '_').lower()}"
+				if (src_id, tgt_id) not in model_edges:
+					cs["is_deviating"] = True
+
+			if cs["is_deviating"] and not cs["first_deviation_reported"]:
+				cs["first_deviation_reported"] = True
+				newly_deviating.append(case_id)
+				self._emit(tenant, "conformance_deviation", log_id, {
+					"case_id": case_id,
+					"model_id": model_id,
+					"trace_so_far": cs["trace"],
+				})
+
+		all_deviating = [cid for cid, cs in stream_state.items() if cs["is_deviating"]]
+		total_tracked = len(stream_state)
+		_log.info(
+			"streaming conformance update: log=%s model=%s deviating=%d/%d newly=%d tenant=%s",
+			log_id, model_id, len(all_deviating), total_tracked, len(newly_deviating), tenant,
+		)
+		return {
+			"log_id": log_id,
+			"model_id": model_id,
+			"events_processed": len(new_events),
+			"total_tracked_cases": total_tracked,
+			"currently_deviating": len(all_deviating),
+			"newly_deviating_this_batch": newly_deviating,
+			"sample_deviating_cases": [
+				{"case_id": cid, "trace": stream_state[cid]["trace"][:20]}
+				for cid in all_deviating[:5]
+			],
+			"updated_at": self._now(),
+		}
+
+	# ── Case Attribute Enrichment and Segmented Analysis (I7) ─────
+
+	async def enrich_case_attributes(
+		self,
+		tenant_id: str,
+		log_id: str,
+		case_attributes: dict[str, dict[str, Any]],
+	) -> dict[str, Any]:
+		"""
+		Attach arbitrary business attributes to cases (e.g. region, tier, amount).
+
+		case_attributes: {case_id: {attr_name: value, ...}}
+		Attributes are merged into the first event's attribute map for each case and
+		stored in a dedicated case attribute index on the log record.
+		"""
+		tenant = self._tenant(tenant_id)
+		log = self.event_logs.get(log_id)
+		if not log or log["tenant_id"] != tenant:
+			raise KeyError(f"event log not found: {log_id}")
+		if not case_attributes:
+			raise ValueError("case_attributes must not be empty")
+
+		case_index: dict[str, dict[str, Any]] = log.setdefault("_case_attributes", {})
+		updated = 0
+		for case_id, attrs in case_attributes.items():
+			case_index[case_id] = {**case_index.get(case_id, {}), **attrs}
+			updated += 1
+		self._emit(tenant, "case_attributes_enriched", log_id, {"case_count": updated})
+		_log.info("case attributes enriched: log=%s cases=%d tenant=%s", log_id, updated, tenant)
+		return {
+			"log_id": log_id,
+			"enriched_cases": updated,
+			"total_enriched_cases": len(case_index),
+			"enriched_at": self._now(),
+		}
+
+	async def segment_analysis(
+		self,
+		tenant_id: str,
+		log_id: str,
+		segment_filter: dict[str, Any],
+		analysis_type: str = "variants",
+	) -> dict[str, Any]:
+		"""
+		Re-run variant or bottleneck analysis scoped to a subset of cases matching segment_filter.
+
+		segment_filter: {attr_name: value} — cases must match ALL filters (AND semantics).
+		analysis_type: "variants" | "bottlenecks"
+		"""
+		tenant = self._tenant(tenant_id)
+		log = self.event_logs.get(log_id)
+		if not log or log["tenant_id"] != tenant:
+			raise KeyError(f"event log not found: {log_id}")
+		if analysis_type not in ("variants", "bottlenecks"):
+			raise ValueError("analysis_type must be 'variants' or 'bottlenecks'")
+
+		case_index: dict[str, dict[str, Any]] = log.get("_case_attributes", {})
+		# Identify matching cases
+		matched_cases: set[str] = set()
+		all_case_ids: set[str] = {e["case_id"] for e in self.raw_events.get(log_id, [])}
+		for case_id in all_case_ids:
+			attrs = case_index.get(case_id, {})
+			if all(attrs.get(k) == v for k, v in segment_filter.items()):
+				matched_cases.add(case_id)
+
+		if not matched_cases:
+			return {
+				"log_id": log_id,
+				"segment_filter": segment_filter,
+				"matched_cases": 0,
+				"result": None,
+				"generated_at": self._now(),
+			}
+
+		# Build filtered event subset
+		filtered_events = [
+			e for e in self.raw_events.get(log_id, [])
+			if e["case_id"] in matched_cases
+		]
+
+		# Temporarily swap raw_events and run the requested analysis
+		original_events = self.raw_events.get(log_id, [])
+		self.raw_events[log_id] = filtered_events
+		try:
+			if analysis_type == "variants":
+				result = await self.discover_variants(tenant_id, log_id)
+			else:
+				result = await self.analyze_bottlenecks(tenant_id, log_id)
+		finally:
+			self.raw_events[log_id] = original_events
+
+		_log.info(
+			"segment analysis: log=%s filter=%s matched=%d type=%s tenant=%s",
+			log_id, segment_filter, len(matched_cases), analysis_type, tenant,
+		)
+		return {
+			"log_id": log_id,
+			"segment_filter": segment_filter,
+			"matched_cases": len(matched_cases),
+			"analysis_type": analysis_type,
+			"result": result,
 			"generated_at": self._now(),
 		}

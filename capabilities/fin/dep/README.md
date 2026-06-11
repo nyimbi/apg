@@ -77,6 +77,70 @@ print(batch.accounts_processed, batch.total_accrued)
 
 ---
 
+## New Features (v1.1)
+
+| Feature | Method | Improvement |
+|---|---|---|
+| **Product Cloning** | `clone_product()` | Deep-copy any product with optional field overrides; full rate-history init |
+| **Multi-Product Comparison** | `compare_products()` | Fan-out simulation across N products in one call, ranked by net interest |
+| **Effective Annual Yield** | `get_effective_annual_yield()` | EAY with WHT, mandatory CBK/CMA disclosure text |
+| **Dormancy Classification** | `classify_dormant_accounts()` | CBK/PG/01 dormancy sweep with fee assessment |
+| **Dormancy Reactivation** | `reactivate_account()` | Reverse dormant classification with audit trail |
+| **Batch Maturity Sweep** | `batch_process_maturities()` | EOD sweep for all term deposits maturing on/before a date |
+| **Accrual Reversal** | `reverse_accrual()` | Negating GL entry for corrections; prevents ledger divergence |
+| **Account Statement** | `generate_account_statement()` | Opening balance, line items, running balance, closing balance |
+| **Interest Disposition** | `set_interest_disposition()` | CAPITALIZE or PAY_OUT to a linked account per depositor |
+
+### Usage examples (v1.1)
+
+```python
+import asyncio
+from decimal import Decimal
+from datetime import date
+from capabilities.fin.dep.service import DepositProductsService
+
+svc = DepositProductsService()
+
+# Clone a product with a higher rate
+async def demo():
+    await svc.clone_product(
+        "bank1", "SAV001", "SAV-PREMIUM", "Premium Savings",
+        overrides={"interest_config": interest_cfg_8pct},
+    )
+
+    # Compare 3 products for a 90-day, KES 500,000 deposit
+    rankings = await svc.compare_products("bank1", Decimal("500000"), 90,
+        ["TD001", "TD002", "TD003"])
+    best = rankings[0]  # highest net interest first
+
+    # Regulatory yield disclosure
+    eay = await svc.get_effective_annual_yield("bank1", "TD001", Decimal("500000"))
+    print(eay["disclosure_text"])
+
+    # EOD dormancy sweep
+    dormancy_report = await svc.classify_dormant_accounts("bank1", date.today(), 365)
+
+    # EOD maturity sweep
+    maturity_report = await svc.batch_process_maturities("bank1", date.today())
+
+    # Reverse a bad accrual
+    await svc.reverse_accrual("bank1", "ACC-001", date(2026, 5, 31),
+        reason="rate_correction", reversed_by="ops_team")
+
+    # Generate statement for Q1 2026
+    stmt = await svc.generate_account_statement(
+        "bank1", "ACC-001", date(2026, 1, 1), date(2026, 3, 31))
+    print(stmt["opening_balance"], stmt["closing_balance"])
+
+    # Set interest pay-out to a linked current account
+    await svc.set_interest_disposition(
+        "bank1", "ACC-001", "PAY_OUT", linked_payout_account="CHQ-001")
+
+asyncio.run(demo())
+```
+
+---
+
 ## API reference summary
 
 All API functions live in `capabilities.fin.dep.api` and accept plain dicts.
@@ -104,6 +168,15 @@ All API functions live in `capabilities.fin.dep.api` and accept plain dicts.
 | `batch_accrue_interest(payload)` | Idempotent nightly accrual |
 | `get_withholding_tax_report(tenant_id, period_id)` | WHT report by period |
 | `health()` | Service health check |
+| `clone_product(payload)` | Deep-copy product with optional overrides |
+| `compare_products(payload)` | Multi-product simulation ranked by net interest |
+| `get_effective_annual_yield(payload)` | EAY with WHT for regulatory disclosure |
+| `classify_dormant_accounts(payload)` | CBK dormancy sweep with fee assessment |
+| `reactivate_account(tenant_id, account_id)` | Reverse dormant classification |
+| `batch_process_maturities(payload)` | EOD sweep for all maturing term deposits |
+| `reverse_accrual(payload)` | GL-correcting accrual reversal |
+| `generate_account_statement(payload)` | Full period statement with running balance |
+| `set_interest_disposition(payload)` | CAPITALIZE or PAY_OUT interest per account |
 
 ---
 

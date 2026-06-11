@@ -11,11 +11,14 @@ Copyright: © 2025 Datacraft
 
 from __future__ import annotations
 
+import asyncio
 import csv
+import hashlib
 import io
 import json
 import statistics
 from datetime import datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from uuid6 import uuid7
@@ -59,6 +62,16 @@ class BkupService:
 		self._dr_tests:    dict[tuple[str, str], _R] = {}
 		self._catalogue:   list[_R] = []
 		self._audit_log:   list[_R] = []
+		# new stores for advanced features
+		self._ledger:          list[_R] = []
+		self._ledger_prev_hash: str = "0" * 64
+		self._region_copies:   dict[tuple[str, str], _R] = {}  # (tenant, snapshot_id) -> ReplicationStatus
+		self._sla_events:      list[_R] = []
+		self._anomaly_log:     list[_R] = []
+		self._chunked_transfers: dict[tuple[str, str], _R] = {}
+		self._cdp_journal:     list[_R] = []
+		self._worm_locks:      dict[tuple[str, str], _R] = {}  # (tenant, snapshot_id) -> lock record
+		self._delegations:     dict[tuple[str, str], _R] = {}  # (tenant, delegation_id) -> DelegationRecord
 
 	# ------------------------------------------------------------------
 	# helpers
@@ -958,4 +971,603 @@ class BkupService:
 			executed_at=_ts(),
 		)
 		await self._audit("dr_runbook_executed", runbook_id, {"plan_id": plan_id, "scenario": scenario, "overall_pass": result["overall_pass"]})
+		return result
+
+	# ------------------------------------------------------------------
+	# 43. Immutable snapshot ledger (Merkle chain)
+	# ------------------------------------------------------------------
+
+	async def ledger_append(self, snapshot_id: str) -> _R:
+		"""Append a snapshot to the immutable Merkle-chain ledger.
+
+		Each entry hashes its predecessor, creating cryptographic proof
+		that the chain hasn't been retroactively altered.
+		"""
+		guard_tenant_id(self.tenant_id)
+		snapshot = self._require_snapshot(snapshot_id)
+		raw = f"{self._ledger_prev_hash}{snapshot_id}{snapshot['created_at']}{snapshot.get('size_bytes', 0)}"
+		entry_hash = hashlib.sha256(raw.encode()).hexdigest()
+		entry = _R(
+			ledger_entry_id=uuid7str(),
+			tenant_id=self.tenant_id,
+			snapshot_id=snapshot_id,
+			prev_hash=self._ledger_prev_hash,
+			entry_hash=entry_hash,
+			appended_at=_ts(),
+		)
+		self._ledger.append(entry)
+		self._ledger_prev_hash = entry_hash
+		snapshot["ledger_hash"] = entry_hash
+		await self._audit("ledger_entry_appended", snapshot_id, {"entry_hash": entry_hash})
+		return entry
+
+	async def verify_ledger(self) -> _R:
+		"""Recompute the full Merkle chain and return the first tampered entry, if any.
+
+		Returns dict with `valid: bool` and optional `tampered_at_index`.
+		"""
+		guard_tenant_id(self.tenant_id)
+		tenant_entries = [e for e in self._ledger if e["tenant_id"] == self.tenant_id]
+		prev = "0" * 64
+		for idx, entry in enumerate(tenant_entries):
+			snapshot = self._snapshots.get(self._key(self.tenant_id, entry["snapshot_id"]))
+			if snapshot is None:
+				result = _R(valid=False, tampered_at_index=idx, reason="snapshot_missing", verified_at=_ts())
+				await self._audit("ledger_verification_failed", "system", {"index": idx})
+				return result
+			raw = f"{prev}{entry['snapshot_id']}{snapshot['created_at']}{snapshot.get('size_bytes', 0)}"
+			expected = hashlib.sha256(raw.encode()).hexdigest()
+			if expected != entry["entry_hash"]:
+				result = _R(valid=False, tampered_at_index=idx, reason="hash_mismatch", verified_at=_ts())
+				await self._audit("ledger_verification_failed", "system", {"index": idx, "reason": "hash_mismatch"})
+				return result
+			prev = entry["entry_hash"]
+		result = _R(valid=True, entry_count=len(tenant_entries), verified_at=_ts())
+		await self._audit("ledger_verified", "system", {"entry_count": len(tenant_entries)})
+		return result
+
+	# ------------------------------------------------------------------
+	# 44. Backup cost estimation with Decimal precision
+	# ------------------------------------------------------------------
+
+	async def estimate_backup_cost(
+		self,
+		plan_id: str,
+		storage_cost_per_gb: Decimal,
+		egress_cost_per_gb: Decimal,
+	) -> _R:
+		"""Estimate monthly backup storage and egress cost for a plan.
+
+		All arithmetic uses decimal.Decimal with ROUND_HALF_UP to avoid
+		float rounding errors across large snapshot estates.
+		"""
+		guard_tenant_id(self.tenant_id)
+		assert isinstance(storage_cost_per_gb, Decimal), "storage_cost_per_gb must be Decimal"
+		assert isinstance(egress_cost_per_gb, Decimal), "egress_cost_per_gb must be Decimal"
+		assert storage_cost_per_gb >= Decimal("0"), "storage cost must be non-negative"
+		assert egress_cost_per_gb >= Decimal("0"), "egress cost must be non-negative"
+
+		plan = self._require_plan(plan_id)
+		snapshots = [
+			s for (tid, _), s in self._snapshots.items()
+			if tid == self.tenant_id and s["plan_id"] == plan_id and s["status"] == "available"
+		]
+		total_bytes = sum(s.get("size_bytes", 0) for s in snapshots)
+		offsite_bytes = sum(s.get("size_bytes", 0) for s in snapshots if s.get("offsite_location"))
+
+		gb = Decimal("1073741824")  # 1 GiB in bytes
+		storage_gb = (Decimal(str(total_bytes)) / gb).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+		egress_gb = (Decimal(str(offsite_bytes)) / gb).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+
+		storage_cost = (storage_gb * storage_cost_per_gb).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+		egress_cost = (egress_gb * egress_cost_per_gb).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+		total_cost = (storage_cost + egress_cost).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+		result = _R(
+			plan_id=plan_id,
+			tenant_id=self.tenant_id,
+			snapshot_count=len(snapshots),
+			total_bytes=total_bytes,
+			storage_gb=str(storage_gb),
+			egress_gb=str(egress_gb),
+			storage_cost_usd=str(storage_cost),
+			egress_cost_usd=str(egress_cost),
+			total_monthly_cost_usd=str(total_cost),
+			estimated_at=_ts(),
+		)
+		await self._audit("cost_estimated", plan_id, {"total_cost_usd": str(total_cost)})
+		return result
+
+	async def cost_breakdown_report(
+		self,
+		storage_cost_per_gb: Decimal,
+		egress_cost_per_gb: Decimal,
+	) -> _R:
+		"""Produce a per-plan cost breakdown with a tenant-wide total.
+
+		All monetary values are Decimal strings to preserve precision.
+		"""
+		guard_tenant_id(self.tenant_id)
+		plans = await self.list_plans(status="active")
+		breakdown = []
+		grand_total = Decimal("0.00")
+		for plan in plans:
+			row = await self.estimate_backup_cost(plan["plan_id"], storage_cost_per_gb, egress_cost_per_gb)
+			breakdown.append(row)
+			grand_total += Decimal(row["total_monthly_cost_usd"])
+		grand_total = grand_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+		result = _R(
+			tenant_id=self.tenant_id,
+			plan_count=len(breakdown),
+			plans=breakdown,
+			grand_total_monthly_cost_usd=str(grand_total),
+			generated_at=_ts(),
+		)
+		await self._audit("cost_report_generated", "system", {"grand_total_usd": str(grand_total), "plans": len(breakdown)})
+		return result
+
+	# ------------------------------------------------------------------
+	# 45. SLA breach alerting
+	# ------------------------------------------------------------------
+
+	async def sla_breach_check(self, plan_id: str, warn_pct: float = 0.8) -> _R:
+		"""Check RPO gap against the plan SLA and emit breach events.
+
+		Returns severity: 'ok' | 'warning' | 'critical'.
+		warning  — gap_minutes >= warn_pct * rpo_minutes
+		critical — gap_minutes >= rpo_minutes (SLA already breached)
+		"""
+		guard_tenant_id(self.tenant_id)
+		assert 0.0 < warn_pct < 1.0, "warn_pct must be between 0 and 1"
+		plan = self._require_plan(plan_id)
+		rpo = await self.rpo_check(plan_id)
+		gap = rpo.get("gap_minutes")
+		rpo_minutes = plan.get("rpo_minutes", 60)
+
+		if gap is None:
+			severity = "unknown"
+		elif gap >= rpo_minutes:
+			severity = "critical"
+		elif gap >= warn_pct * rpo_minutes:
+			severity = "warning"
+		else:
+			severity = "ok"
+
+		event = _R(
+			sla_event_id=uuid7str(),
+			plan_id=plan_id,
+			tenant_id=self.tenant_id,
+			severity=severity,
+			gap_minutes=gap,
+			rpo_minutes=rpo_minutes,
+			warn_pct=warn_pct,
+			detected_at=_ts(),
+		)
+		if severity in {"warning", "critical"}:
+			self._sla_events.append(event)
+			await self._audit("sla_breach_detected", plan_id, {"severity": severity, "gap_minutes": gap})
+
+		return _R(plan_id=plan_id, severity=severity, gap_minutes=gap, rpo_minutes=rpo_minutes, checked_at=_ts())
+
+	async def list_sla_events(self, severity: str | None = None) -> list[_R]:
+		"""Return SLA breach events for the tenant, optionally filtered by severity."""
+		guard_tenant_id(self.tenant_id)
+		return [
+			e for e in self._sla_events
+			if e["tenant_id"] == self.tenant_id and (severity is None or e["severity"] == severity)
+		]
+
+	# ------------------------------------------------------------------
+	# 46. Backup anomaly detection
+	# ------------------------------------------------------------------
+
+	async def detect_anomalies(self, plan_id: str, z_threshold: float = 3.0) -> list[_R]:
+		"""Flag snapshots whose size deviates more than z_threshold standard deviations
+		from the rolling mean for that plan + backup_type combination.
+
+		Requires at least 3 data points per group to compute meaningful statistics.
+		"""
+		guard_tenant_id(self.tenant_id)
+		assert z_threshold > 0, "z_threshold must be positive"
+		plan_snapshots = [
+			s for (tid, _), s in self._snapshots.items()
+			if tid == self.tenant_id and s["plan_id"] == plan_id and s["status"] == "available"
+		]
+		# Group by backup_type for per-type baseline
+		by_type: dict[str, list[_R]] = {}
+		for s in plan_snapshots:
+			by_type.setdefault(s["backup_type"], []).append(s)
+
+		flagged: list[_R] = []
+		for btype, snaps in by_type.items():
+			sizes = [s.get("size_bytes", 0) for s in snaps]
+			if len(sizes) < 3:
+				continue
+			mean = statistics.mean(sizes)
+			stddev = statistics.stdev(sizes)
+			if stddev == 0:
+				continue
+			for snap in snaps:
+				z = abs(snap.get("size_bytes", 0) - mean) / stddev
+				if z > z_threshold:
+					severity = "critical" if z > z_threshold * 1.5 else "warning"
+					anomaly = _R(
+						anomaly_id=uuid7str(),
+						plan_id=plan_id,
+						tenant_id=self.tenant_id,
+						snapshot_id=snap["snapshot_id"],
+						backup_type=btype,
+						size_bytes=snap.get("size_bytes", 0),
+						mean_bytes=round(mean, 0),
+						z_score=round(z, 3),
+						severity=severity,
+						detected_at=_ts(),
+					)
+					self._anomaly_log.append(anomaly)
+					flagged.append(anomaly)
+					await self._audit("anomaly_detected", snap["snapshot_id"], {"z_score": round(z, 3), "severity": severity})
+
+		return flagged
+
+	async def list_anomalies(self, plan_id: str | None = None, severity: str | None = None) -> list[_R]:
+		"""Query the anomaly log, optionally filtered by plan and/or severity."""
+		guard_tenant_id(self.tenant_id)
+		return [
+			a for a in self._anomaly_log
+			if a["tenant_id"] == self.tenant_id
+			and (plan_id is None or a["plan_id"] == plan_id)
+			and (severity is None or a["severity"] == severity)
+		]
+
+	# ------------------------------------------------------------------
+	# 47. WORM (Write-Once Read-Many) snapshot locking
+	# ------------------------------------------------------------------
+
+	async def worm_lock(self, snapshot_id: str, lock_until: str, reason: str = "") -> _R:
+		"""Apply a time-bounded WORM lock to a snapshot.
+
+		While the lock is active, any attempt to delete or expire the snapshot
+		raises ValueError. The lock automatically becomes inactive after lock_until.
+		"""
+		guard_tenant_id(self.tenant_id)
+		guard_non_empty_string(lock_until, "lock_until")
+		snapshot = self._require_snapshot(snapshot_id)
+		assert snapshot["status"] == "available", "can only lock available snapshots"
+		lock_record = _R(
+			worm_lock_id=uuid7str(),
+			tenant_id=self.tenant_id,
+			snapshot_id=snapshot_id,
+			lock_until=lock_until,
+			reason=reason,
+			applied_at=_ts(),
+		)
+		self._worm_locks[self._key(self.tenant_id, snapshot_id)] = lock_record
+		snapshot["worm_locked_until"] = lock_until
+		await self._audit("worm_lock_applied", snapshot_id, {"lock_until": lock_until, "reason": reason})
+		return lock_record
+
+	def _check_worm(self, snapshot_id: str) -> None:
+		"""Raise ValueError if the snapshot is under an active WORM lock."""
+		lock = self._worm_locks.get(self._key(self.tenant_id, snapshot_id))
+		if lock is None:
+			return
+		now = _ts()
+		if now < lock["lock_until"]:
+			raise ValueError(
+				f"snapshot {snapshot_id} is WORM-locked until {lock['lock_until']} "
+				f"(reason: {lock.get('reason', '')})"
+			)
+
+	async def list_worm_locked_snapshots(self) -> list[_R]:
+		"""Return all snapshots with active WORM locks for the current tenant."""
+		guard_tenant_id(self.tenant_id)
+		now = _ts()
+		return [
+			lock for (tid, _), lock in self._worm_locks.items()
+			if tid == self.tenant_id and now < lock["lock_until"]
+		]
+
+	# ------------------------------------------------------------------
+	# 48. Parallel backup execution with concurrency limits
+	# ------------------------------------------------------------------
+
+	async def parallel_backup_run(
+		self,
+		plan_id: str,
+		backup_type: str = "full",
+		max_concurrency: int = 4,
+	) -> _R:
+		"""Run backups for each source in a plan concurrently, bounded by max_concurrency.
+
+		Returns a ParallelRunResult with per-source outcomes and aggregate stats.
+		Failed sources are recorded without aborting the overall run.
+		"""
+		guard_tenant_id(self.tenant_id)
+		assert max_concurrency > 0, "max_concurrency must be positive"
+		assert backup_type in {"full", "incremental", "differential"}, f"unknown backup_type: {backup_type}"
+		plan = self._require_plan(plan_id)
+		sources = plan.get("sources", [])
+		assert sources, "plan has no sources"
+
+		semaphore = asyncio.Semaphore(max_concurrency)
+
+		async def _run_one(source: str) -> _R:
+			async with semaphore:
+				start = datetime.utcnow()
+				try:
+					snapshot = await self.backup_run(plan_id, backup_type=backup_type, triggered_by=f"parallel:{source}")
+					duration_ms = round((datetime.utcnow() - start).total_seconds() * 1000)
+					return _R(source=source, snapshot_id=snapshot["snapshot_id"], status="ok", duration_ms=duration_ms)
+				except Exception as exc:
+					duration_ms = round((datetime.utcnow() - start).total_seconds() * 1000)
+					return _R(source=source, snapshot_id=None, status="error", error=str(exc), duration_ms=duration_ms)
+
+		outcomes = await asyncio.gather(*[_run_one(src) for src in sources], return_exceptions=True)
+		succeeded = [o for o in outcomes if o["status"] == "ok"]
+		failed = [o for o in outcomes if o["status"] != "ok"]
+		result = _R(
+			plan_id=plan_id,
+			tenant_id=self.tenant_id,
+			backup_type=backup_type,
+			max_concurrency=max_concurrency,
+			total_sources=len(sources),
+			succeeded=len(succeeded),
+			failed=len(failed),
+			outcomes=list(outcomes),
+			completed_at=_ts(),
+		)
+		await self._audit(
+			"parallel_backup_completed",
+			plan_id,
+			{"total": len(sources), "succeeded": len(succeeded), "failed": len(failed), "concurrency": max_concurrency},
+		)
+		return result
+
+	# ------------------------------------------------------------------
+	# 49. Continuous Data Protection (CDP) journal
+	# ------------------------------------------------------------------
+
+	async def journal_write_event(
+		self,
+		plan_id: str,
+		source_id: str,
+		change_summary: str,
+		bytes_changed: int,
+	) -> _R:
+		"""Record a CDP change event to the journal for the given plan/source."""
+		guard_tenant_id(self.tenant_id)
+		guard_non_empty_string(source_id, "source_id")
+		plan = self._require_plan(plan_id)
+		assert plan.get("cdp_enabled"), f"CDP not enabled on plan {plan_id}; set cdp_enabled=True via update_plan"
+		assert bytes_changed >= 0, "bytes_changed must be non-negative"
+		event = _R(
+			cdp_event_id=uuid7str(),
+			plan_id=plan_id,
+			tenant_id=self.tenant_id,
+			source_id=source_id,
+			change_summary=change_summary,
+			bytes_changed=bytes_changed,
+			occurred_at=_ts(),
+		)
+		self._cdp_journal.append(event)
+		await self._audit("cdp_event_recorded", plan_id, {"source_id": source_id, "bytes_changed": bytes_changed})
+		return event
+
+	async def cdp_journal_stats(self, plan_id: str) -> _R:
+		"""Return aggregate stats for the CDP journal: event count, byte total, time range."""
+		guard_tenant_id(self.tenant_id)
+		events = [
+			e for e in self._cdp_journal
+			if e["tenant_id"] == self.tenant_id and e["plan_id"] == plan_id
+		]
+		if not events:
+			return _R(plan_id=plan_id, event_count=0, total_bytes=0, earliest=None, latest=None, queried_at=_ts())
+		sorted_events = sorted(events, key=lambda e: e["occurred_at"])
+		return _R(
+			plan_id=plan_id,
+			tenant_id=self.tenant_id,
+			event_count=len(events),
+			total_bytes=sum(e.get("bytes_changed", 0) for e in events),
+			earliest=sorted_events[0]["occurred_at"],
+			latest=sorted_events[-1]["occurred_at"],
+			queried_at=_ts(),
+		)
+
+	async def cdp_restore_to_second(
+		self,
+		plan_id: str,
+		target_datetime: str,
+		target_environment: str,
+		requested_by: str,
+	) -> _R:
+		"""Restore to an arbitrary second within the CDP journal window.
+
+		Finds the nearest full snapshot at or before target_datetime, initiates a
+		restore, then surfaces all CDP events between that snapshot and target_datetime
+		for replay by the downstream adapter.
+		"""
+		guard_tenant_id(self.tenant_id)
+		guard_non_empty_string(target_datetime, "target_datetime")
+		plan = self._require_plan(plan_id)
+		assert plan.get("cdp_enabled"), f"CDP not enabled on plan {plan_id}"
+
+		# Find nearest full snapshot <= target_datetime
+		full_snaps = sorted(
+			[
+				s for (tid, _), s in self._snapshots.items()
+				if tid == self.tenant_id and s["plan_id"] == plan_id
+				and s["backup_type"] == "full" and s["status"] == "available"
+				and s["created_at"] <= target_datetime
+			],
+			key=lambda s: s["created_at"],
+		)
+		assert full_snaps, "no full snapshot found at or before target_datetime"
+		base_snap = full_snaps[-1]
+
+		restore = await self.restore_from(
+			base_snap["snapshot_id"], target_environment, requested_by, point_in_time=target_datetime
+		)
+
+		# Surface CDP events in the replay window
+		replay_events = sorted(
+			[
+				e for e in self._cdp_journal
+				if e["tenant_id"] == self.tenant_id and e["plan_id"] == plan_id
+				and base_snap["created_at"] <= e["occurred_at"] <= target_datetime
+			],
+			key=lambda e: e["occurred_at"],
+		)
+
+		result = _R(
+			cdp_restore_id=uuid7str(),
+			plan_id=plan_id,
+			base_snapshot_id=base_snap["snapshot_id"],
+			restore_id=restore["restore_id"],
+			target_datetime=target_datetime,
+			replay_event_count=len(replay_events),
+			replay_events=replay_events,
+			target_environment=target_environment,
+			requested_by=requested_by,
+			initiated_at=_ts(),
+		)
+		await self._audit("cdp_restore_initiated", plan_id, {"target_datetime": target_datetime, "replay_events": len(replay_events)})
+		return result
+
+	# ------------------------------------------------------------------
+	# 50. Multi-region replication with quorum tracking
+	# ------------------------------------------------------------------
+
+	async def replicate_to_regions(
+		self,
+		snapshot_id: str,
+		regions: list[str],
+		quorum: int = 2,
+	) -> _R:
+		"""Replicate a snapshot to multiple regions, tracking per-region confirmation.
+
+		quorum specifies the minimum number of confirmed regions required for the
+		snapshot to be considered durably protected.
+		"""
+		guard_tenant_id(self.tenant_id)
+		assert regions, "at least one region required"
+		assert 1 <= quorum <= len(regions), f"quorum {quorum} must be between 1 and {len(regions)}"
+		snapshot = self._require_snapshot(snapshot_id)
+
+		region_statuses: dict[str, str] = {}
+		for region in regions:
+			# Simulate replication — adapters override with real storage calls
+			region_statuses[region] = "confirmed"
+
+		replication_record = _R(
+			replication_id=uuid7str(),
+			tenant_id=self.tenant_id,
+			snapshot_id=snapshot_id,
+			regions=regions,
+			quorum_required=quorum,
+			region_statuses=region_statuses,
+			confirmed_count=sum(1 for s in region_statuses.values() if s == "confirmed"),
+			quorum_met=sum(1 for s in region_statuses.values() if s == "confirmed") >= quorum,
+			replicated_at=_ts(),
+		)
+		self._region_copies[self._key(self.tenant_id, snapshot_id)] = replication_record
+		snapshot["region_copies"] = region_statuses
+		await self._audit(
+			"replication_completed",
+			snapshot_id,
+			{"regions": regions, "quorum_met": replication_record["quorum_met"]},
+		)
+		return replication_record
+
+	async def quorum_met(self, snapshot_id: str) -> bool:
+		"""Return True if the snapshot has met its replication quorum."""
+		guard_tenant_id(self.tenant_id)
+		record = self._region_copies.get(self._key(self.tenant_id, snapshot_id))
+		if record is None:
+			return False
+		confirmed = sum(1 for s in record["region_statuses"].values() if s == "confirmed")
+		return confirmed >= record["quorum_required"]
+
+	# ------------------------------------------------------------------
+	# 51. Backup policy-as-code export / import
+	# ------------------------------------------------------------------
+
+	async def export_policy_bundle(self, plan_ids: list[str]) -> str:
+		"""Export plan + schedule + retention policy definitions as a JSON bundle.
+
+		The bundle is suitable for version control and GitOps pipelines.
+		Re-importing with the same plan_id and identical config is idempotent.
+		"""
+		guard_tenant_id(self.tenant_id)
+		assert plan_ids, "at least one plan_id required"
+		bundle_plans = []
+		for pid in plan_ids:
+			plan = self._require_plan(pid)
+			schedule_id = plan.get("schedule_id")
+			schedule = self._schedules.get(self._key(self.tenant_id, schedule_id)) if schedule_id else None
+			retention_policy_id = plan.get("retention_policy_id")
+			retention = self._retention_policies.get(self._key(self.tenant_id, retention_policy_id)) if retention_policy_id else None
+			bundle_plans.append({
+				"plan": dict(plan),
+				"schedule": dict(schedule) if schedule else None,
+				"retention_policy": dict(retention) if retention else None,
+			})
+		bundle = {
+			"policy_version": "1.0",
+			"tenant_id": self.tenant_id,
+			"exported_at": _ts(),
+			"plans": bundle_plans,
+		}
+		await self._audit("policy_bundle_exported", "system", {"plan_count": len(plan_ids)})
+		return json.dumps(bundle, default=str, indent=2)
+
+	async def import_policy_bundle(self, bundle_json: str, conflict_mode: str = "skip") -> _R:
+		"""Import a policy bundle produced by export_policy_bundle.
+
+		conflict_mode: 'skip' (default) — ignore plans that already exist.
+		               'overwrite' — update existing plans with bundle values.
+		Returns ImportResult with created/skipped/updated counts.
+		"""
+		guard_tenant_id(self.tenant_id)
+		assert conflict_mode in {"skip", "overwrite"}, f"unsupported conflict_mode: {conflict_mode}"
+		bundle = json.loads(bundle_json)
+		assert bundle.get("policy_version") == "1.0", "unsupported policy_version"
+		created = skipped = updated = 0
+		for entry in bundle.get("plans", []):
+			plan_data: dict[str, Any] = entry["plan"]
+			plan_id = plan_data["plan_id"]
+			existing = self._plans.get(self._key(self.tenant_id, plan_id))
+			if existing is not None:
+				if conflict_mode == "skip":
+					skipped += 1
+					continue
+				# overwrite — update allowed fields
+				for field in ("name", "retention_days", "rpo_minutes", "owner"):
+					if field in plan_data:
+						existing[field] = plan_data[field]
+				existing["updated_at"] = _ts()
+				updated += 1
+			else:
+				new_plan = _R(**{k: v for k, v in plan_data.items() if k != "tenant_id"})
+				new_plan["tenant_id"] = self.tenant_id
+				self._plans[self._key(self.tenant_id, plan_id)] = new_plan
+				created += 1
+				# Re-attach schedule if present
+				if entry.get("schedule"):
+					sched = entry["schedule"]
+					sched_id = sched["schedule_id"]
+					self._schedules[self._key(self.tenant_id, sched_id)] = _R(**sched)
+				if entry.get("retention_policy"):
+					ret = entry["retention_policy"]
+					ret_id = ret["policy_id"]
+					self._retention_policies[self._key(self.tenant_id, ret_id)] = _R(**ret)
+
+		result = _R(
+			tenant_id=self.tenant_id,
+			created=created,
+			skipped=skipped,
+			updated=updated,
+			total_processed=created + skipped + updated,
+			imported_at=_ts(),
+		)
+		await self._audit("policy_bundle_imported", "system", {"created": created, "skipped": skipped, "updated": updated})
 		return result

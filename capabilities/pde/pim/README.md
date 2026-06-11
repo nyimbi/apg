@@ -6,9 +6,11 @@ Product Information Management (PIM) is the APG capability packet that owns the 
 
 The capability is designed for multi-channel, multi-locale product operations. It integrates with commerce channels, ERP item masters, media asset systems, translation memory, and taxonomy services through APG composition adapters, keeping the core import-time dependency surface minimal. AI-assisted review agents (Codex, Claude Code, OpenCode, Pi) operate within a bounded, human-in-the-loop governance model and can inspect, prepare, and recommend but cannot autonomously commit privileged state changes.
 
+Version 2.2.0 adds a full async method layer enabling concurrent enrichment pipelines, parallel marketplace syndication, and non-blocking quality scoring — all composable with `asyncio.gather` in async web handlers and agent runtimes.
+
 ## Capability ID
 
-`pde_pim`  Version: 2.1.0
+`pde_pim`  Version: 2.2.0
 
 ## Provides
 
@@ -27,6 +29,10 @@ The capability is designed for multi-channel, multi-locale product operations. I
 | product_change_workflow | Change request lifecycle with mandatory reason, approver recording, and full audit trail |
 | pim_dashboard_service | Aggregate health, coverage, and readiness metrics across catalogs and channels |
 | pim_agents | Managed AI review agents for catalog, data quality, enrichment, channel, compliance, and product query roles |
+| async_enrichment_pipeline | Concurrent attribute enrichment across multiple SKUs via asyncio.gather with semaphore-bounded concurrency |
+| async_syndication | Parallel marketplace publication with pre-flight channel quality gate per channel |
+| async_localisation | Multi-locale content application for a single SKU in one non-blocking call |
+| quality_remediation_plan | Ordered, actionable remediation plan with per-dimension effort estimates and score-gain priorities |
 
 ## Requires
 
@@ -199,15 +205,51 @@ Events emitted to the `apg.pde.pim.lifecycle` event stream via Bytewax. Delivery
 
 ## Quick Start
 
+### Synchronous API
+
 ```python
 from capabilities.pde.pim.service import ProductInformationLifecycleService
 
-service = ProductInformationLifecycleService()
-catalog = service.create_catalog("cat-1", "tenant-a", "MAIN", "Main Catalog", "owner-1")
-product = service.create_product("prod-1", "tenant-a", catalog["id"], "SKU-1", "Solar Charger", "physical", "owner-1")
-attribute = service.define_attribute("attr-1", "tenant-a", "description", "Description", "rich_text", "owner-1")
-service.set_attribute_value("val-1", "tenant-a", product["id"], attribute["id"], "Portable charger", "en")
-content = service.enrich_content("content-1", "tenant-a", product["id"], "en", "Solar Charger", "Portable charger", True, "reviewer-1")
-channel = service.create_channel_listing("listing-1", "tenant-a", product["id"], "web", "web-sku-1", "approver-1")
-service.publish_product("pub-1", "tenant-a", product["id"], content["id"], channel["id"], "approver-2")
+svc = ProductInformationLifecycleService(tenant_id="tenant-a")
+svc.create_catalog("cat-1", "tenant-a", "MAIN", "Main Catalog", "owner-1")
+product = svc.create_product("SKU-001", "Solar Charger 20W", "Electronics", {"weight_g": 180}, tenant_id="tenant-a")
+svc.update_attributes("SKU-001", {"colour": "black", "warranty_years": 2}, tenant_id="tenant-a")
+svc.add_media("SKU-001", "image", "https://cdn.example.com/sku001-hero.jpg", "Hero shot", tenant_id="tenant-a")
+svc.product_categorisation("SKU-001", ["Electronics", "Solar", "Chargers"], tenant_id="tenant-a")
+score = svc.data_quality_score("SKU-001", tenant_id="tenant-a")
+svc.publish_to_channel("SKU-001", "web", tenant_id="tenant-a", approved_by="catalog_manager")
+```
+
+### Async API (v2.2.0+)
+
+```python
+import asyncio
+from capabilities.pde.pim.service import ProductInformationLifecycleService
+
+async def main():
+    svc = ProductInformationLifecycleService(tenant_id="tenant-a")
+    # Create product in async context
+    product = await svc.async_create_product(
+        "SKU-001", "Solar Charger 20W", "Electronics",
+        {"weight_g": 180}, tenant_id="tenant-a",
+    )
+    # Enrich 100 products concurrently (semaphore-bounded to 10 at a time)
+    tasks = [{"sku": f"SKU-{i:03d}", "attributes": {"batch": "2026-Q2"}} for i in range(100)]
+    result = await svc.async_bulk_enrich(tasks, tenant_id="tenant-a", concurrency=10)
+    # Quality score + remediation plan
+    plan = await svc.async_quality_remediation_plan("SKU-001", tenant_id="tenant-a")
+    # Localise in three markets simultaneously
+    await svc.async_localise_product("SKU-001", [
+        {"locale": "en", "title": "Solar Charger 20W", "description": "Portable solar charging."},
+        {"locale": "fr", "title": "Chargeur Solaire 20W", "description": "Chargeur solaire portable."},
+        {"locale": "sw", "title": "Chaja ya Jua 20W", "description": "Chaja ya jua inayobebeka."},
+    ], tenant_id="tenant-a")
+    # Syndicate to marketplaces in parallel
+    syndication = await svc.async_syndicate_marketplaces(
+        "SKU-001", ["marketplace_amazon", "web", "mobile"],
+        tenant_id="tenant-a", approved_by="catalog_manager",
+    )
+    print(syndication)
+
+asyncio.run(main())
 ```

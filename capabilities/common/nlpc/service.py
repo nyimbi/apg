@@ -1554,3 +1554,548 @@ class NLPCoreService:
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ------------------------------------------------------------------
+	# detect_pii — regex + spaCy PII detection
+	# ------------------------------------------------------------------
+
+	async def detect_pii(
+		self,
+		text: str,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Detect personally identifiable information spans in *text*.
+
+		Regex battery: EMAIL, PHONE, PHONE_KE, CREDIT_CARD, IBAN, IP_ADDRESS,
+		NATIONAL_ID.  When spaCy is available, PERSON and ORG entity spans are
+		also flagged.  Overlapping spans are deduplicated (highest-confidence wins).
+
+		Returns ``{"document_id", "spans", "has_pii", "pii_types"}``.
+		Each span: {start, end, text, pii_type, confidence}.
+		"""
+		assert_text_not_empty(text)
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("detect_pii", doc_id)
+
+		spans: list[dict[str, Any]] = []
+		_pii_patterns: list[tuple[str, str, float]] = [
+			(r'\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b', "EMAIL", 0.99),
+			(r'\b(?:\+?254|0)[-.\s]?(?:7\d{2}|1\d{2})[-.\s]?\d{3}[-.\s]?\d{3}\b', "PHONE_KE", 0.92),
+			(r'\b(?:\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b', "PHONE", 0.80),
+			(r'\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\b', "CREDIT_CARD", 0.95),
+			(r'\b[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7}[A-Z0-9]{0,16}\b', "IBAN", 0.90),
+			(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', "IP_ADDRESS", 0.85),
+			(r'\b[A-Z]{1,2}\d{6}[A-Z]?\b', "NATIONAL_ID", 0.70),
+		]
+		for pattern, pii_type, confidence in _pii_patterns:
+			for m in re.finditer(pattern, text):
+				spans.append({"start": m.start(), "end": m.end(), "text": m.group(), "pii_type": pii_type, "confidence": confidence})
+
+		nlp = self._get_spacy_model("en")
+		if nlp is not None:
+			try:
+				doc = nlp(text)
+				for ent in doc.ents:
+					if ent.label_ in {"PERSON", "ORG"}:
+						spans.append({"start": ent.start_char, "end": ent.end_char, "text": ent.text, "pii_type": ent.label_, "confidence": 0.75})
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		spans.sort(key=lambda s: (s["start"], -s["confidence"]))
+		deduped: list[dict[str, Any]] = []
+		last_end = -1
+		for s in spans:
+			if s["start"] >= last_end:
+				deduped.append(s)
+				last_end = s["end"]
+
+		pii_types = sorted({s["pii_type"] for s in deduped})
+		self._emit_event("nlpc.pii.detected", {"document_id": doc_id, "count": len(deduped), "types": pii_types})
+		self._log_task_done("detect_pii", (time.perf_counter() - t0) * 1000)
+		return {"document_id": doc_id, "spans": deduped, "has_pii": len(deduped) > 0, "pii_types": pii_types}
+
+	async def redact_pii(
+		self,
+		text: str,
+		strategy: str = "mask",
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Redact PII from *text*.
+
+		strategy: ``"mask"`` → ``[REDACTED]`` | ``"type"`` → ``[EMAIL]`` etc. |
+		``"hash"`` → first 8 chars of sha256(span).
+
+		Returns ``{"document_id", "redacted_text", "redaction_count", "strategy"}``.
+		"""
+		assert_text_not_empty(text)
+		doc_id = document_id or uuid7str()
+		pii = await self.detect_pii(text, doc_id)
+		spans = sorted(pii["spans"], key=lambda s: s["start"], reverse=True)
+		result = text
+		for span in spans:
+			orig = span["text"]
+			if strategy == "type":
+				repl = f"[{span['pii_type']}]"
+			elif strategy == "hash":
+				repl = f"[{hashlib.sha256(orig.encode()).hexdigest()[:8]}]"
+			else:
+				repl = "[REDACTED]"
+			result = result[: span["start"]] + repl + result[span["end"]:]
+		self._emit_event("nlpc.pii.redacted", {"document_id": doc_id, "count": len(spans)})
+		return {"document_id": doc_id, "original_length": len(text), "redacted_text": result, "redaction_count": len(spans), "strategy": strategy}
+
+	# ------------------------------------------------------------------
+	# semantic_search — cosine nearest-neighbour over stored embeddings
+	# ------------------------------------------------------------------
+
+	async def semantic_search(
+		self,
+		query: str,
+		top_k: int = 10,
+		threshold: float = 0.0,
+	) -> list[dict[str, Any]]:
+		"""
+		Embed *query* and rank stored embeddings by cosine similarity.
+
+		Returns up to *top_k* hits with score >= *threshold*.
+		Each result: {document_id, embedding_id, score, vector_preview}.
+		"""
+		assert_text_not_empty(query)
+		assert top_k >= 1, "top_k must be >= 1"
+		t0 = time.perf_counter()
+		self._log_task_start("semantic_search", "query")
+
+		if _httpx is not None:
+			try:
+				q_vec = await self._ollama_embed(query, "nomic-embed-text")
+			except Exception:
+				q_vec = self._tfidf_embed(query)
+		else:
+			q_vec = self._tfidf_embed(query)
+
+		import math
+
+		def _cosine(a: list[float], b: list[float]) -> float:
+			if len(a) != len(b) or not a:
+				return 0.0
+			dot = sum(x * y for x, y in zip(a, b))
+			na = math.sqrt(sum(x * x for x in a))
+			nb = math.sqrt(sum(x * x for x in b))
+			return dot / (na * nb) if na and nb else 0.0
+
+		results: list[dict[str, Any]] = []
+		for rec in _col("nlpc_embeddings").values():
+			if rec.get("tenant_id") != self._tenant_id or rec.get("is_deleted"):
+				continue
+			score = _cosine(q_vec, rec.get("vector", []))
+			if score >= threshold:
+				results.append({"document_id": rec.get("document_id"), "embedding_id": rec.get("id"), "score": round(score, 6), "vector_preview": rec.get("vector", [])[:8]})
+
+		results.sort(key=lambda r: r["score"], reverse=True)
+		top = results[:top_k]
+		self._emit_event("nlpc.search.completed", {"query_len": len(query), "hits": len(top)})
+		self._log_task_done("semantic_search", (time.perf_counter() - t0) * 1000)
+		return top
+
+	# ------------------------------------------------------------------
+	# chunk_and_embed — sentence-boundary chunking + per-chunk embeddings
+	# ------------------------------------------------------------------
+
+	async def chunk_and_embed(
+		self,
+		text: str,
+		chunk_size: int = 200,
+		overlap: int = 40,
+		model: str = "nomic-embed-text",
+		document_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""
+		Split *text* at sentence boundaries into overlapping chunks and embed each.
+
+		Returns list of {chunk_index, text, word_count, embedding_id, dims}.
+		Uses asyncio.gather for parallel embedding calls.
+		"""
+		assert_text_not_empty(text)
+		assert chunk_size >= 10, "chunk_size must be >= 10"
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+
+		sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+		chunks: list[str] = []
+		current: list[str] = []
+		current_wc = 0
+		for sent in sentences:
+			wc = calculate_word_count(sent)
+			if current_wc + wc > chunk_size and current:
+				chunks.append(" ".join(current))
+				overlap_words = " ".join(current).split()[-overlap:]
+				current = [" ".join(overlap_words)] if overlap_words else []
+				current_wc = len(overlap_words)
+			current.append(sent)
+			current_wc += wc
+		if current:
+			chunks.append(" ".join(current))
+
+		emb_tasks = [self.embed_text(chunk, model=model, document_id=doc_id) for chunk in chunks]
+		embeddings = await asyncio.gather(*emb_tasks, return_exceptions=True)
+		results: list[dict[str, Any]] = []
+		for idx, (chunk, emb) in enumerate(zip(chunks, embeddings)):
+			if isinstance(emb, Exception):
+				results.append({"chunk_index": idx, "text": chunk[:100], "error": str(emb)})
+			else:
+				results.append({"chunk_index": idx, "text": chunk[:120], "word_count": calculate_word_count(chunk), "embedding_id": emb.id, "dims": emb.dimensions})
+
+		self._emit_event("nlpc.chunks.embedded", {"document_id": doc_id, "chunks": len(chunks)})
+		self._log_task_done("chunk_and_embed", (time.perf_counter() - t0) * 1000)
+		return results
+
+	# ------------------------------------------------------------------
+	# dependency_parse — token head/dep/pos triples per sentence
+	# ------------------------------------------------------------------
+
+	async def dependency_parse(
+		self,
+		text: str,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Return dependency parse triples for each sentence.
+
+		Uses spaCy ``parser`` pipe when loaded; falls back to a POS heuristic
+		that labels subject/ROOT/object by token position and suffix.
+
+		Returns {document_id, sentences: [{text, tokens: [{token, lemma, pos, dep, head_index, index}]}], model_used}.
+		"""
+		assert_text_not_empty(text)
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("dependency_parse", doc_id)
+
+		sentences_out: list[dict[str, Any]] = []
+		model_used = "stub"
+
+		nlp = self._get_spacy_model("en")
+		if nlp is not None and hasattr(nlp, "pipe_names") and "parser" in nlp.pipe_names:
+			try:
+				spacy_doc = nlp(text)
+				for sent in spacy_doc.sents:
+					tokens = [{"token": tok.text, "lemma": tok.lemma_, "pos": tok.pos_, "dep": tok.dep_, "head_index": tok.head.i - sent.start, "index": tok.i - sent.start} for tok in sent]
+					sentences_out.append({"text": sent.text, "tokens": tokens})
+				model_used = "spacy"
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		if not sentences_out:
+			for raw_sent in re.split(r'(?<=[.!?])\s+', text.strip()):
+				toks = raw_sent.split()
+				token_out: list[dict[str, Any]] = []
+				for i, tok in enumerate(toks):
+					if i == 0:
+						dep, pos = "nsubj", ("PROPN" if tok and tok[0].isupper() else "NOUN")
+					elif tok.lower() in {"is", "are", "was", "were", "has", "have", "had"}:
+						dep, pos = "ROOT", "AUX"
+					elif tok.endswith("ing") or tok.endswith("ed"):
+						dep, pos = "ROOT", "VERB"
+					else:
+						dep, pos = "dobj", "NOUN"
+					token_out.append({"token": tok, "lemma": tok.lower(), "pos": pos, "dep": dep, "head_index": 0, "index": i})
+				sentences_out.append({"text": raw_sent, "tokens": token_out})
+
+		self._emit_event("nlpc.dependency.parsed", {"document_id": doc_id, "sentences": len(sentences_out)})
+		self._log_task_done("dependency_parse", (time.perf_counter() - t0) * 1000)
+		return {"document_id": doc_id, "sentences": sentences_out, "model_used": model_used}
+
+	# ------------------------------------------------------------------
+	# extract_temporal_expressions — TIMEX3-style extraction
+	# ------------------------------------------------------------------
+
+	async def extract_temporal_expressions(
+		self,
+		text: str,
+		reference_date: str | None = None,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Extract and ISO-8601-normalise temporal expressions from *text*.
+
+		TIMEX3 types: DATE, TIME, DURATION, SET.
+		Uses ``dateutil.parser`` when available for normalisation.
+
+		Returns {document_id, expressions: [{text, start, end, timex_type, normalized_value, confidence}], count, reference_date}.
+		"""
+		assert_text_not_empty(text)
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("extract_temporal_expressions", doc_id)
+
+		_dateutil = _try_import("dateutil.parser")
+		expressions: list[dict[str, Any]] = []
+		_patterns: list[tuple[str, str, float]] = [
+			(r'\b\d{4}-\d{2}-\d{2}\b', "DATE", 0.99),
+			(r'\b\d{1,2}/\d{1,2}/\d{2,4}\b', "DATE", 0.90),
+			(r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?,?\s*\d{4}\b', "DATE", 0.95),
+			(r'\b\d{1,2}:\d{2}(?::\d{2})?(?:\s?[AP]M)?\b', "TIME", 0.92),
+			(r'\b(?:yesterday|today|tomorrow|now)\b', "DATE", 0.88),
+			(r'\b(?:last|next|this)\s+(?:week|month|year|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b', "DATE", 0.80),
+			(r'\b\d+\s+(?:days?|weeks?|months?|years?)\s+(?:ago|from now|later|earlier)\b', "DURATION", 0.82),
+			(r'\b(?:for|over|during|within)\s+\d+\s+(?:days?|weeks?|months?|years?)\b', "DURATION", 0.75),
+			(r'\b(?:every|each)\s+(?:day|week|month|year|Monday|morning|evening)\b', "SET", 0.78),
+		]
+		for pattern, timex_type, confidence in _patterns:
+			for m in re.finditer(pattern, text, re.IGNORECASE):
+				raw = m.group()
+				normalized = raw
+				if _dateutil is not None and timex_type in {"DATE", "TIME"}:
+					try:
+						import dateutil.parser as _dp  # type: ignore
+						normalized = _dp.parse(raw, fuzzy=True).isoformat()
+					except Exception as _exc:
+						_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+				expressions.append({"text": raw, "start": m.start(), "end": m.end(), "timex_type": timex_type, "normalized_value": normalized, "confidence": confidence})
+
+		expressions.sort(key=lambda e: (e["start"], -e["confidence"]))
+		deduped: list[dict[str, Any]] = []
+		last_end = -1
+		for expr in expressions:
+			if expr["start"] >= last_end:
+				deduped.append(expr)
+				last_end = expr["end"]
+
+		self._emit_event("nlpc.temporal.extracted", {"document_id": doc_id, "count": len(deduped)})
+		self._log_task_done("extract_temporal_expressions", (time.perf_counter() - t0) * 1000)
+		return {"document_id": doc_id, "expressions": deduped, "count": len(deduped), "reference_date": reference_date}
+
+	# ------------------------------------------------------------------
+	# multi_label_classify — threshold-gated multi-label classification
+	# ------------------------------------------------------------------
+
+	async def multi_label_classify(
+		self,
+		text: str,
+		taxonomy: ClassificationTaxonomy,
+		labels: list[str] | None = None,
+		threshold: float = 0.15,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Return all labels whose score >= *threshold* (supports overlapping categories).
+
+		Uses ``facebook/bart-large-mnli`` with ``multi_label=True`` when transformers
+		is present; otherwise keyword-overlap scores.
+
+		Returns {document_id, taxonomy, matched_labels, all_scores, threshold, model_used}.
+		"""
+		assert_text_not_empty(text)
+		assert 0.0 < threshold <= 1.0, "threshold must be in (0, 1]"
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("multi_label_classify", doc_id)
+
+		default_labels: dict[ClassificationTaxonomy, list[str]] = {
+			ClassificationTaxonomy.TOPICS: ["technology", "politics", "sports", "business", "health", "entertainment", "legal", "finance"],
+			ClassificationTaxonomy.SENTIMENT: ["positive", "negative", "neutral"],
+			ClassificationTaxonomy.INTENT: ["question", "statement", "command", "complaint", "compliment"],
+			ClassificationTaxonomy.LANGUAGE: list(AFRICAN_LANGUAGE_CODES)[:8],
+			ClassificationTaxonomy.CUSTOM: labels or ["category_a", "category_b"],
+		}
+		candidate_labels = labels or default_labels.get(taxonomy, ["general"])
+		all_scores: dict[str, float] = {}
+		model_used = "keyword_overlap"
+
+		if _transformers is not None:
+			try:
+				from transformers import pipeline as hf_pipeline  # type: ignore
+				zs = hf_pipeline("zero-shot-classification", model="facebook/bart-large-mnli", multi_label=True, truncation=True)
+				result = zs(text[:512], candidate_labels=candidate_labels)
+				all_scores = dict(zip(result["labels"], result["scores"]))
+				model_used = "zero-shot/bart-mnli"
+			except Exception:
+				all_scores = self._keyword_intent_scores(text, candidate_labels)
+		else:
+			all_scores = self._keyword_intent_scores(text, candidate_labels)
+
+		matched = [lbl for lbl, score in all_scores.items() if score >= threshold]
+		self._emit_event("nlpc.multi_label.classified", {"document_id": doc_id, "matched": len(matched)})
+		self._log_task_done("multi_label_classify", (time.perf_counter() - t0) * 1000)
+		return {"document_id": doc_id, "taxonomy": taxonomy, "matched_labels": matched, "all_scores": all_scores, "threshold": threshold, "model_used": model_used}
+
+	# ------------------------------------------------------------------
+	# extract_arguments — claim / premise / evidence mining
+	# ------------------------------------------------------------------
+
+	async def extract_arguments(
+		self,
+		text: str,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Identify argumentative segments per sentence.
+
+		Roles: claim, premise, evidence, background.  Uses zero-shot
+		classification when transformers is present; falls back to discourse
+		connective markers (because → premise, therefore → claim, etc.).
+
+		Returns {document_id, arguments: [{text, start_char, end_char, role, confidence}], claim_count, premise_count, model_used}.
+		"""
+		assert_text_not_empty(text)
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("extract_arguments", doc_id)
+
+		arg_labels = ["claim", "premise", "evidence", "background"]
+		sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+		model_used = "keyword_heuristic"
+		arguments: list[dict[str, Any]] = []
+
+		_connectives: dict[str, str] = {
+			"because": "premise", "since": "premise",
+			"therefore": "claim", "thus": "claim", "hence": "claim",
+			"however": "claim", "although": "background",
+			"for example": "evidence", "for instance": "evidence", "in fact": "evidence",
+		}
+
+		if _transformers is not None:
+			try:
+				from transformers import pipeline as hf_pipeline  # type: ignore
+				zs = hf_pipeline("zero-shot-classification", truncation=True)
+				pos = 0
+				for sent in sentences:
+					result = zs(sent[:256], candidate_labels=arg_labels)
+					role, conf = result["labels"][0], result["scores"][0]
+					start = text.find(sent, pos)
+					arguments.append({"text": sent, "start_char": start, "end_char": start + len(sent), "role": role, "confidence": round(conf, 4)})
+					pos = start + len(sent)
+				model_used = "zero-shot-classification"
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		if not arguments:
+			pos = 0
+			for sent in sentences:
+				lower = sent.lower()
+				role, confidence = "background", 0.4
+				for marker, r in _connectives.items():
+					if marker in lower:
+						role, confidence = r, 0.65
+						break
+				start = text.find(sent, pos)
+				arguments.append({"text": sent, "start_char": start, "end_char": start + len(sent), "role": role, "confidence": confidence})
+				pos = start + len(sent)
+
+		claim_count = sum(1 for a in arguments if a["role"] == "claim")
+		premise_count = sum(1 for a in arguments if a["role"] == "premise")
+		self._emit_event("nlpc.arguments.extracted", {"document_id": doc_id, "claims": claim_count, "premises": premise_count})
+		self._log_task_done("extract_arguments", (time.perf_counter() - t0) * 1000)
+		return {"document_id": doc_id, "arguments": arguments, "claim_count": claim_count, "premise_count": premise_count, "model_used": model_used}
+
+	# ------------------------------------------------------------------
+	# score_coherence — entity-grid + TF-IDF coherence scoring
+	# ------------------------------------------------------------------
+
+	async def score_coherence(
+		self,
+		text: str,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Measure local and global discourse coherence of *text*.
+
+		Local: entity-grid continuity (fraction of adjacent sentence pairs sharing
+		an entity mention).  Global: mean cosine similarity of adjacent
+		sentence bag-of-words vectors.
+
+		Returns {document_id, local_coherence, global_coherence, overall_score,
+		sentence_scores, model_used}.  All scores in [0, 1].
+		"""
+		assert_text_not_empty(text)
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("score_coherence", doc_id)
+
+		import math
+
+		sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+		if len(sentences) < 2:
+			return {"document_id": doc_id, "local_coherence": 1.0, "global_coherence": 1.0, "overall_score": 1.0, "sentence_scores": [], "model_used": "entity_grid+tfidf"}
+
+		grids = [{w.lower() for w in re.findall(r'\b[A-Z][a-z]+\b|\b\w{4,}\b', s)} for s in sentences]
+		continuations = sum(1 for i in range(len(grids) - 1) if grids[i] & grids[i + 1])
+		local_coherence = continuations / max(1, len(sentences) - 1)
+
+		vocab = list({w for s in sentences for w in re.findall(r'\b\w{3,}\b', s.lower())})
+
+		def _bow(sent: str) -> list[float]:
+			tokens = set(re.findall(r'\b\w+\b', sent.lower()))
+			return [1.0 if w in tokens else 0.0 for w in vocab]
+
+		def _cosine(a: list[float], b: list[float]) -> float:
+			dot = sum(x * y for x, y in zip(a, b))
+			na = math.sqrt(sum(x * x for x in a))
+			nb = math.sqrt(sum(x * x for x in b))
+			return dot / (na * nb) if na and nb else 0.0
+
+		vecs = [_bow(s) for s in sentences]
+		pair_scores = [_cosine(vecs[i], vecs[i + 1]) for i in range(len(vecs) - 1)]
+		global_coherence = sum(pair_scores) / len(pair_scores) if pair_scores else 0.0
+		overall = (local_coherence + global_coherence) / 2.0
+		sentence_scores = [{"sentence": sentences[i][:80], "coherence_with_next": round(pair_scores[i], 4)} for i in range(len(pair_scores))]
+
+		self._emit_event("nlpc.coherence.scored", {"document_id": doc_id, "score": round(overall, 4)})
+		self._log_task_done("score_coherence", (time.perf_counter() - t0) * 1000)
+		return {"document_id": doc_id, "local_coherence": round(local_coherence, 4), "global_coherence": round(global_coherence, 4), "overall_score": round(overall, 4), "sentence_scores": sentence_scores, "model_used": "entity_grid+tfidf"}
+
+	# ------------------------------------------------------------------
+	# parallel_process — concurrent fan-out of NLP tasks
+	# ------------------------------------------------------------------
+
+	async def parallel_process(
+		self,
+		text: str,
+		tasks: list[NLPTask],
+		max_concurrent: int = 4,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Execute multiple NLP tasks on *text* concurrently.
+
+		Uses ``asyncio.gather`` with a bounded semaphore of *max_concurrent*.
+		Returns {document_id, task_count, results: {task_name → result | error}}.
+		"""
+		assert_text_not_empty(text)
+		assert tasks, "tasks list must not be empty"
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("parallel_process", doc_id)
+
+		sem = asyncio.Semaphore(max_concurrent)
+		mock_doc = _ParallelDoc(doc_id, text, self._tenant_id)
+
+		async def _run_one(task: NLPTask) -> tuple[str, Any]:
+			async with sem:
+				try:
+					res = await self._dispatch_task(task, mock_doc)  # type: ignore[arg-type]
+					return task.value, res
+				except Exception as exc:
+					return task.value, {"error": str(exc)}
+
+		pairs = await asyncio.gather(*[_run_one(t) for t in tasks], return_exceptions=True)
+		results: dict[str, Any] = dict(pairs)
+		self._emit_event("nlpc.parallel.processed", {"document_id": doc_id, "tasks": [t.value for t in tasks]})
+		self._log_task_done("parallel_process", (time.perf_counter() - t0) * 1000)
+		return {"document_id": doc_id, "task_count": len(tasks), "results": results}
+
+
+# ---------------------------------------------------------------------------
+# Internal lightweight document stand-in for parallel_process
+# ---------------------------------------------------------------------------
+
+class _ParallelDoc:
+	"""Minimal NLPDocument-compatible object used by _dispatch_task."""
+
+	def __init__(self, doc_id: str, content: str, tenant_id: str) -> None:
+		self.id = doc_id
+		self.content = content
+		self.tenant_id = tenant_id
+

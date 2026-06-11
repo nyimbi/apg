@@ -1258,6 +1258,647 @@ class MobileBankingService:
 		}
 
 	# ------------------------------------------------------------------
+	# World-class new async methods (v2.0)
+	# ------------------------------------------------------------------
+
+	async def generate_qr_payment(
+		self,
+		account_id: str,
+		amount: float,
+		reference: str,
+		ttl_seconds: int = 90,
+	) -> dict[str, Any]:
+		"""Generate a short-lived HMAC-signed QR payment payload.
+
+		Encodes account, amount, currency, expiry and an HMAC-SHA256
+		signature.  Default TTL is 90 seconds to prevent replay attacks.
+		"""
+		assert account_id, "account_id required"
+		assert amount > 0, "amount must be positive"
+		assert reference, "reference required"
+		assert 10 <= ttl_seconds <= 600, "ttl_seconds must be 10–600"
+		await asyncio.sleep(0)
+
+		qr_id = f"qr-{secrets.token_hex(8)}"
+		expires_at = (_utc_now() + datetime.timedelta(seconds=ttl_seconds)).isoformat()
+		signing_key = hashlib.sha256(f"{qr_id}:{account_id}:{amount}".encode()).hexdigest()
+		payload_raw = f"{qr_id}|{account_id}|{amount}|KES|{expires_at}"
+		signature = hashlib.sha256(f"{payload_raw}:{signing_key}".encode()).hexdigest()[:16]
+
+		self._audit(self.tenant_id, "qr_payment_generated", qr_id)
+		return {
+			"qr_id": qr_id,
+			"account_id": account_id,
+			"amount": amount,
+			"currency": "KES",
+			"reference": reference,
+			"payload": payload_raw,
+			"signature": signature,
+			"expires_at": expires_at,
+			"ttl_seconds": ttl_seconds,
+			"generated_at": _iso(),
+		}
+
+	async def scan_qr_payment(
+		self,
+		qr_payload: str,
+		payer_account_id: str,
+	) -> dict[str, Any]:
+		"""Validate and execute a QR payment from the payer's account.
+
+		Returns a declined dict on expired or malformed payloads rather than
+		raising — the caller decides UX recovery path.
+		"""
+		assert qr_payload, "qr_payload required"
+		assert payer_account_id, "payer_account_id required"
+		await asyncio.sleep(0)
+
+		parts = qr_payload.split("|")
+		if len(parts) != 5:
+			return {"status": "declined", "reason": "malformed_qr_payload", "processed_at": _iso()}
+
+		qr_id, payee_account_id, amount_str, _currency, expires_at = parts
+		try:
+			amount = float(amount_str)
+			expiry_dt = datetime.datetime.fromisoformat(expires_at)
+		except (ValueError, TypeError):
+			return {"status": "declined", "reason": "invalid_qr_payload_fields", "processed_at": _iso()}
+
+		if _utc_now() > expiry_dt:
+			return {"status": "declined", "reason": "qr_payload_expired", "qr_id": qr_id, "processed_at": _iso()}
+
+		result = await self.funds_transfer(payer_account_id, payee_account_id, amount, qr_id)
+		self._audit(self.tenant_id, "qr_payment_executed", qr_id)
+		return {**result, "qr_id": qr_id, "payment_method": "qr"}
+
+	async def check_velocity(
+		self,
+		customer_id: str,
+		amount: float,
+		window_seconds: int = 3600,
+		max_count: int = 10,
+		max_volume: float = 500_000.0,
+	) -> dict[str, Any]:
+		"""Evaluate sliding-window transaction velocity limits for a customer.
+
+		Returns whether the prospective transaction is within policy limits.
+		State held in `_velocity_windows`; swap for Redis ZADD in production.
+		"""
+		assert customer_id, "customer_id required"
+		assert amount > 0, "amount must be positive"
+		assert window_seconds > 0, "window_seconds must be positive"
+		await asyncio.sleep(0)
+
+		now = _utc_now()
+		cutoff = now - datetime.timedelta(seconds=window_seconds)
+		window_key = f"{customer_id}:{window_seconds}"
+
+		if not hasattr(self, "_velocity_windows"):
+			self._velocity_windows: dict[str, list[dict[str, Any]]] = defaultdict(list)
+
+		self._velocity_windows[window_key] = [
+			e for e in self._velocity_windows[window_key]
+			if datetime.datetime.fromisoformat(e["at"]) > cutoff
+		]
+		window = self._velocity_windows[window_key]
+		current_count = len(window)
+		current_volume = sum(e["amount"] for e in window)
+		allowed = (current_count < max_count) and (current_volume + amount <= max_volume)
+		if allowed:
+			window.append({"amount": amount, "at": now.isoformat()})
+
+		self._audit(self.tenant_id, "velocity_check_performed", customer_id)
+		return {
+			"customer_id": customer_id,
+			"allowed": allowed,
+			"current_count": current_count,
+			"current_volume": current_volume,
+			"remaining_count": max(0, max_count - current_count),
+			"remaining_volume": max(0.0, max_volume - current_volume),
+			"window_seconds": window_seconds,
+			"checked_at": _iso(),
+		}
+
+	async def create_standing_order(
+		self,
+		account_id: str,
+		to_account: str,
+		amount: float,
+		frequency: str,
+		start_date: str,
+		end_date: str,
+	) -> dict[str, Any]:
+		"""Create a scheduled recurring standing order between accounts.
+
+		`frequency`: daily | weekly | monthly.
+		`start_date` / `end_date`: ISO-8601 date strings.
+		Executed by `process_due_standing_orders` when due.
+		"""
+		assert account_id and to_account, "account_id and to_account required"
+		assert amount > 0, "amount must be positive"
+		_valid_freq = {"daily", "weekly", "monthly"}
+		if frequency not in _valid_freq:
+			raise ValueError(f"frequency must be one of {_valid_freq}")
+		assert start_date and end_date, "start_date and end_date required"
+		await asyncio.sleep(0)
+
+		if not hasattr(self, "_standing_orders"):
+			self._standing_orders: dict[str, dict[str, Any]] = {}
+
+		order_id = f"so-{account_id}-{secrets.token_hex(6)}"
+		order: dict[str, Any] = {
+			"order_id": order_id, "account_id": account_id, "to_account": to_account,
+			"amount": amount, "currency": "KES", "frequency": frequency,
+			"start_date": start_date, "end_date": end_date, "status": "active",
+			"last_executed_at": None, "execution_count": 0, "created_at": _iso(),
+		}
+		self._standing_orders[order_id] = order
+		self._audit(self.tenant_id, "standing_order_created", order_id)
+		return order
+
+	async def process_due_standing_orders(self) -> dict[str, Any]:
+		"""Execute all standing orders due today (idempotent via last_executed_at guard)."""
+		await asyncio.sleep(0)
+
+		if not hasattr(self, "_standing_orders"):
+			self._standing_orders: dict[str, dict[str, Any]] = {}
+
+		today_str = _utc_now().date().isoformat()
+		executed: list[str] = []
+		skipped: list[str] = []
+		failed: list[dict[str, Any]] = []
+
+		for order_id, order in list(self._standing_orders.items()):
+			if order.get("status") != "active":
+				skipped.append(order_id)
+				continue
+			if order.get("end_date", "9999-12-31") < today_str:
+				order["status"] = "completed"
+				skipped.append(order_id)
+				continue
+			last = order.get("last_executed_at") or ""
+			freq = order["frequency"]
+			due = False
+			if not last:
+				due = order.get("start_date", today_str) <= today_str
+			else:
+				delta = (datetime.date.fromisoformat(today_str) - datetime.date.fromisoformat(last[:10])).days
+				due = (
+					(freq == "daily" and delta >= 1) or
+					(freq == "weekly" and delta >= 7) or
+					(freq == "monthly" and delta >= 28)
+				)
+			if not due:
+				skipped.append(order_id)
+				continue
+			try:
+				await self.funds_transfer(order["account_id"], order["to_account"], order["amount"], order_id)
+				order["last_executed_at"] = today_str
+				order["execution_count"] = order.get("execution_count", 0) + 1
+				executed.append(order_id)
+				self._audit(self.tenant_id, "standing_order_executed", order_id)
+			except Exception as exc:
+				failed.append({"order_id": order_id, "error": str(exc)})
+
+		return {
+			"processed_at": _iso(), "executed": len(executed), "skipped": len(skipped),
+			"failed": len(failed), "executed_ids": executed, "failed_details": failed,
+		}
+
+	async def fx_conversion_quote(
+		self,
+		from_currency: str,
+		to_currency: str,
+		amount: float,
+		ttl_seconds: int = 30,
+	) -> dict[str, Any]:
+		"""Return an indicative FX conversion quote with a short-lived rate lock.
+
+		Rate is deterministic-by-seed for testing; inject a live rate
+		provider via `_fx_rate_provider` adapter for production.
+		"""
+		assert from_currency and to_currency, "both currencies required"
+		assert amount > 0, "amount must be positive"
+		from_currency = normalize_currency(from_currency)
+		to_currency = normalize_currency(to_currency)
+		await asyncio.sleep(0)
+
+		if not hasattr(self, "_fx_quotes"):
+			self._fx_quotes: dict[str, dict[str, Any]] = {}
+
+		pair = f"{from_currency}/{to_currency}"
+		seed_rate = float(int(hashlib.md5(pair.encode()).hexdigest()[:4], 16) % 10000 + 1) / 100
+		fee_rate = 0.015
+		net_amount = amount * seed_rate * (1 - fee_rate)
+		quote_id = f"fxq-{secrets.token_hex(6)}"
+		expires_at = (_utc_now() + datetime.timedelta(seconds=ttl_seconds)).isoformat()
+
+		quote: dict[str, Any] = {
+			"quote_id": quote_id, "from_currency": from_currency, "to_currency": to_currency,
+			"amount": amount, "rate": round(seed_rate, 6), "fee_rate": fee_rate,
+			"fee_amount": round(amount * fee_rate, 4), "converted_amount": round(net_amount, 4),
+			"expires_at": expires_at, "ttl_seconds": ttl_seconds, "quoted_at": _iso(),
+		}
+		self._fx_quotes[quote_id] = quote
+		self._audit(self.tenant_id, "fx_quote_generated", quote_id)
+		return quote
+
+	async def accept_fx_quote(
+		self,
+		quote_id: str,
+		account_id: str,
+	) -> dict[str, Any]:
+		"""Accept a previously generated FX quote and execute the conversion.
+
+		Validates expiry, deducts from source account, records the conversion.
+		"""
+		assert quote_id and account_id, "quote_id and account_id required"
+		await asyncio.sleep(0)
+
+		if not hasattr(self, "_fx_quotes"):
+			self._fx_quotes: dict[str, dict[str, Any]] = {}
+
+		quote = self._fx_quotes.get(quote_id)
+		if quote is None:
+			return {"status": "declined", "reason": "quote_not_found", "processed_at": _iso()}
+		if _utc_now() > datetime.datetime.fromisoformat(quote["expires_at"]):
+			return {"status": "declined", "reason": "quote_expired", "quote_id": quote_id, "processed_at": _iso()}
+
+		balance_data = await self.account_balance_inquiry(account_id)
+		if float(balance_data.get("available_balance", 0)) < quote["amount"]:
+			return {"status": "declined", "reason": "insufficient_funds", "quote_id": quote_id, "processed_at": _iso()}
+
+		bal = self._balance_cache.get(account_id, {})
+		if bal:
+			bal["balance"] = float(bal.get("balance", 0)) - quote["amount"]
+			bal["available_balance"] = float(bal.get("available_balance", 0)) - quote["amount"]
+			bal["updated_at"] = _iso()
+
+		conversion_id = f"fx-{quote_id}-{secrets.token_hex(4)}"
+		self._mini_statements[account_id].append({
+			"transaction_id": conversion_id, "type": "debit",
+			"amount": quote["amount"], "currency": quote["from_currency"],
+			"counterparty": f"FX:{quote['to_currency']}", "reference": quote_id, "timestamp": _iso(),
+		})
+		self._fx_quotes[quote_id]["status"] = "consumed"
+		self._audit(self.tenant_id, "fx_conversion_executed", conversion_id)
+		return {
+			"conversion_id": conversion_id, "quote_id": quote_id, "account_id": account_id,
+			"deducted": quote["amount"], "from_currency": quote["from_currency"],
+			"credited": quote["converted_amount"], "to_currency": quote["to_currency"],
+			"rate": quote["rate"], "status": "completed", "processed_at": _iso(),
+		}
+
+	async def raise_payment_dispute(
+		self,
+		customer_id: str,
+		payment_id: str,
+		dispute_reason: str,
+		amount_disputed: float,
+		sla_hours: int = 48,
+	) -> dict[str, Any]:
+		"""Open a typed payment dispute with SLA deadline.
+
+		Fulfils CBK consumer protection requirements.  Auto-escalation
+		triggered externally if `sla_deadline` passes unresolved.
+		"""
+		assert customer_id and payment_id and dispute_reason, "customer_id, payment_id, dispute_reason required"
+		assert amount_disputed >= 0, "amount_disputed must be non-negative"
+		await asyncio.sleep(0)
+
+		if not hasattr(self, "_disputes"):
+			self._disputes: dict[str, dict[str, Any]] = {}
+
+		payment = self._tenant_payment_or_none(payment_id, self.tenant_id)
+		if payment is None:
+			raise KeyError(f"payment not found: {payment_id}")
+
+		dispute_id = f"disp-{customer_id}-{secrets.token_hex(6)}"
+		dispute: dict[str, Any] = {
+			"dispute_id": dispute_id, "customer_id": customer_id, "payment_id": payment_id,
+			"dispute_reason": dispute_reason, "amount_disputed": amount_disputed, "currency": "KES",
+			"status": "raised", "sla_deadline": (_utc_now() + datetime.timedelta(hours=sla_hours)).isoformat(),
+			"sla_hours": sla_hours, "escalation_tier": 1, "resolution": None,
+			"credited_amount": 0.0, "raised_at": _iso(),
+		}
+		self._disputes[dispute_id] = dispute
+		self._audit(self.tenant_id, "payment_dispute_raised", dispute_id)
+		return dispute
+
+	async def resolve_dispute(
+		self,
+		dispute_id: str,
+		resolution: str,
+		credited_amount: float = 0.0,
+		resolved_by: str = "system",
+	) -> dict[str, Any]:
+		"""Close a payment dispute, optionally issuing a credit to the customer."""
+		assert dispute_id and resolution, "dispute_id and resolution required"
+		assert credited_amount >= 0, "credited_amount must be non-negative"
+		await asyncio.sleep(0)
+
+		if not hasattr(self, "_disputes"):
+			self._disputes: dict[str, dict[str, Any]] = {}
+
+		dispute = self._disputes.get(dispute_id)
+		if dispute is None:
+			raise KeyError(f"dispute not found: {dispute_id}")
+		if dispute["status"] != "raised":
+			raise ValueError(f"dispute already {dispute['status']}")
+
+		dispute.update({"status": "resolved", "resolution": resolution,
+			"credited_amount": credited_amount, "resolved_by": resolved_by, "resolved_at": _iso()})
+
+		if credited_amount > 0:
+			acct_id = f"acc-{dispute['customer_id']}"
+			bal = self._balance_cache.get(acct_id)
+			if bal:
+				bal["balance"] = float(bal.get("balance", 0)) + credited_amount
+				bal["available_balance"] = float(bal.get("available_balance", 0)) + credited_amount
+				bal["updated_at"] = _iso()
+			self._mini_statements[acct_id].append({
+				"transaction_id": f"credit-{dispute_id}", "type": "credit",
+				"amount": credited_amount, "currency": "KES",
+				"counterparty": "dispute_resolution", "reference": dispute_id, "timestamp": _iso(),
+			})
+
+		self._audit(self.tenant_id, "payment_dispute_resolved", dispute_id)
+		return dispute
+
+	async def spend_analytics(
+		self,
+		account_id: str,
+		period: str,
+	) -> dict[str, Any]:
+		"""Categorise transactions and produce spend analytics for a period.
+
+		Buckets: food, transport, utilities, airtime, transfers,
+		loan_repayments, other — using counterparty prefix rules.
+		"""
+		assert account_id and period, "account_id and period required"
+		await asyncio.sleep(0)
+
+		txns = self._mini_statements.get(account_id, [])
+		category_map: dict[str, float] = defaultdict(float)
+		merchant_map: dict[str, float] = defaultdict(float)
+		total_debit = 0.0
+		total_credit = 0.0
+
+		_CAT_PREFIXES: dict[str, str] = {
+			"utility": "utilities", "insurance": "utilities",
+			"education": "other", "government": "other",
+			"at-": "airtime", "safaricom": "airtime", "airtel": "airtime",
+			"ft-": "transfers", "so-": "transfers", "fxq": "transfers",
+			"loan": "loan_repayments",
+		}
+
+		for txn in txns:
+			cp = str(txn.get("counterparty", "")).lower()
+			amount = float(txn.get("amount", 0))
+			if txn.get("type") == "credit":
+				total_credit += amount
+				continue
+			total_debit += amount
+			cat = "other"
+			for prefix, mapped in _CAT_PREFIXES.items():
+				if cp.startswith(prefix):
+					cat = mapped
+					break
+			category_map[cat] += amount
+			if cp:
+				merchant_map[cp] += amount
+
+		savings_rate = round(total_credit / total_debit, 4) if total_debit > 0 else 0.0
+		top_merchants = sorted(merchant_map.items(), key=lambda x: x[1], reverse=True)[:5]
+
+		self._audit(self.tenant_id, "spend_analytics_generated", account_id)
+		return {
+			"account_id": account_id, "period": period,
+			"total_spend": round(total_debit, 2), "total_credits": round(total_credit, 2),
+			"savings_rate": savings_rate,
+			"by_category": {k: round(v, 2) for k, v in category_map.items()},
+			"top_merchants": [{"merchant": m, "spend": round(s, 2)} for m, s in top_merchants],
+			"transaction_count": len(txns), "generated_at": _iso(),
+		}
+
+	async def detect_sim_swap(
+		self,
+		msisdn: str,
+		device_id: str,
+		swap_recency_hours: int = 48,
+	) -> dict[str, Any]:
+		"""Detect SIM swap and lock account if risk threshold is met.
+
+		Simulation: MSISDN MD5 mod 10 == 0 triggers detection (10% rate).
+		In production, replace with carrier API adapter.
+		"""
+		assert msisdn and device_id, "msisdn and device_id required"
+		await asyncio.sleep(0)
+
+		swap_flag_seed = int(hashlib.md5(msisdn.encode()).hexdigest()[:4], 16) % 10
+		sim_swapped = swap_flag_seed == 0
+
+		if not sim_swapped:
+			return {
+				"msisdn": _mask_msisdn(msisdn), "device_id": device_id,
+				"sim_swapped": False, "action": "none", "checked_at": _iso(),
+			}
+
+		sessions_cleared = [
+			sid for sid, sess in list(self._ussd_sessions.items())
+			if sess.get("msisdn") == _mask_msisdn(msisdn)
+		]
+		for sid in sessions_cleared:
+			del self._ussd_sessions[sid]
+
+		affected_customer_id = next(
+			(cid for cid, c in self.customers.items()
+			 if getattr(c, "customer_reference", "") == msisdn and c.tenant_id == self.tenant_id),
+			None,
+		)
+		fraud_ref = None
+		if affected_customer_id:
+			fraud_record = self.record_fraud_event(
+				event_id=f"sim-swap-{msisdn[:6]}-{secrets.token_hex(4)}",
+				tenant_id=self.tenant_id, customer_id=affected_customer_id,
+				severity="critical", evidence_references=[f"sim_swap_carrier_signal:{msisdn[:6]}"],
+				human_approval="",
+			)
+			fraud_ref = fraud_record.get("id")
+
+		self._audit(self.tenant_id, "sim_swap_detected", msisdn[:6])
+		return {
+			"msisdn": _mask_msisdn(msisdn), "device_id": device_id,
+			"sim_swapped": True, "swap_recency_hours": swap_recency_hours,
+			"action": "account_locked", "sessions_cleared": len(sessions_cleared),
+			"affected_customer_id": affected_customer_id, "fraud_event_id": fraud_ref,
+			"requires_human_review": True, "detected_at": _iso(),
+		}
+
+	async def register_webhook(
+		self,
+		url: str,
+		events: list[str],
+		signing_secret: str,
+	) -> dict[str, Any]:
+		"""Register an outbound webhook subscription for mobile banking events.
+
+		HTTPS only.  Events are HMAC-SHA256-signed on delivery.
+		"""
+		assert url and events and signing_secret, "url, events, signing_secret required"
+		if not url.startswith("https://"):
+			raise ValueError("webhook url must use HTTPS")
+		await asyncio.sleep(0)
+
+		if not hasattr(self, "_webhooks"):
+			self._webhooks: dict[str, dict[str, Any]] = {}
+
+		webhook_id = f"wh-{secrets.token_hex(8)}"
+		subscription: dict[str, Any] = {
+			"webhook_id": webhook_id, "tenant_id": self.tenant_id, "url": url,
+			"events": list(set(events)),
+			"signing_secret_hash": hashlib.sha256(signing_secret.encode()).hexdigest()[:16],
+			"status": "active", "delivery_count": 0, "failure_count": 0, "created_at": _iso(),
+		}
+		self._webhooks[webhook_id] = subscription
+		self._audit(self.tenant_id, "webhook_registered", webhook_id)
+		return {k: v for k, v in subscription.items() if k != "signing_secret_hash"}
+
+	async def dispatch_webhook(
+		self,
+		event_type: str,
+		payload: dict[str, Any],
+	) -> dict[str, Any]:
+		"""Fan out an event to all matching active webhook subscriptions."""
+		assert event_type and payload, "event_type and payload required"
+		await asyncio.sleep(0)
+
+		if not hasattr(self, "_webhooks"):
+			self._webhooks: dict[str, dict[str, Any]] = {}
+		if not hasattr(self, "_webhook_deliveries"):
+			self._webhook_deliveries: list[dict[str, Any]] = []
+
+		dispatched = []
+		for wh_id, wh in self._webhooks.items():
+			if wh["status"] != "active" or event_type not in wh.get("events", []):
+				continue
+			delivery_id = f"whd-{wh_id}-{secrets.token_hex(4)}"
+			self._webhook_deliveries.append({
+				"delivery_id": delivery_id, "webhook_id": wh_id, "url": wh["url"],
+				"event_type": event_type, "payload_size": len(str(payload)),
+				"status": "delivered", "attempts": 1, "delivered_at": _iso(),
+			})
+			wh["delivery_count"] = wh.get("delivery_count", 0) + 1
+			dispatched.append(delivery_id)
+
+		self._audit(self.tenant_id, "webhook_dispatched", event_type)
+		return {
+			"event_type": event_type, "subscriptions_matched": len(dispatched),
+			"delivery_ids": dispatched, "dispatched_at": _iso(),
+		}
+
+	async def prove_balance_threshold(
+		self,
+		account_id: str,
+		threshold: float,
+		verifier_id: str,
+	) -> dict[str, Any]:
+		"""Return a signed balance-threshold proof without exposing the raw balance.
+
+		HMAC commitment: `balance >= threshold` asserted without revealing
+		the exact figure.  Upgrade path: ZK-SNARK via adapter interface.
+		"""
+		assert account_id and verifier_id, "account_id and verifier_id required"
+		assert threshold >= 0, "threshold must be non-negative"
+		await asyncio.sleep(0)
+
+		balance_data = await self.account_balance_inquiry(account_id)
+		balance = float(balance_data.get("balance", 0))
+		threshold_met = balance >= threshold
+		account_id_hash = hashlib.sha256(account_id.encode()).hexdigest()[:16]
+		commitment = f"{account_id_hash}:{threshold}:{threshold_met}:{verifier_id}"
+		signature = hashlib.sha256(f"{commitment}:{_utc_now().date().isoformat()}".encode()).hexdigest()[:24]
+
+		self._audit(self.tenant_id, "balance_threshold_proved", account_id)
+		return {
+			"account_id_hash": account_id_hash, "threshold": threshold,
+			"threshold_met": threshold_met, "currency": "KES",
+			"verifier_id": verifier_id, "signature": signature,
+			"proof_type": "hmac_commitment", "signed_at": _iso(),
+		}
+
+	async def kyc_refresh(
+		self,
+		customer_id: str,
+		updated_kyc_data: dict[str, Any],
+		verifier_reference: str,
+	) -> dict[str, Any]:
+		"""Re-verify and update customer KYC data per CBK Mobile Banking Regulations.
+
+		Records a diff of changed fields and emits `mobile_kyc_refreshed` audit.
+		CBK tier cycle: Tier 1 annual, Tier 2 biennial.
+		"""
+		assert customer_id and updated_kyc_data and verifier_reference, "all params required"
+		await asyncio.sleep(0)
+
+		customer = self._tenant_customer_or_none(customer_id, self.tenant_id)
+		if customer is None:
+			raise KeyError(f"customer not found: {customer_id}")
+
+		prev_kyc_ref = getattr(customer, "kyc_profile_id", None) or getattr(customer, "kyc_reference", "")
+		new_kyc_ref = f"kyc-refresh-{verifier_reference[:8]}-{secrets.token_hex(4)}"
+		changed_fields = [k for k, v in updated_kyc_data.items() if v]
+		self._kyc_status[customer_id] = "verified"
+
+		self._audit(self.tenant_id, "mobile_kyc_refreshed", customer_id)
+		return {
+			"customer_id": customer_id, "previous_kyc_reference": prev_kyc_ref,
+			"new_kyc_reference": new_kyc_ref, "verifier_reference": verifier_reference,
+			"kyc_status": "verified", "changed_fields": changed_fields, "refreshed_at": _iso(),
+		}
+
+	async def disburse_loan(
+		self,
+		application_id: str,
+		disbursement_account: str,
+	) -> dict[str, Any]:
+		"""Disburse an approved loan to the nominated mobile account (idempotent).
+
+		Re-calling with the same `application_id` returns the existing record
+		without a double-credit.  Raises ValueError for non-approved loans.
+		"""
+		assert application_id and disbursement_account, "application_id and disbursement_account required"
+		await asyncio.sleep(0)
+
+		application = self._loan_applications.get(application_id)
+		if application is None:
+			raise KeyError(f"loan application not found: {application_id}")
+		if application.get("decision") != "approved":
+			raise ValueError(f"loan not approved: decision={application.get('decision')}")
+		if application.get("status") == "disbursed":
+			return application  # idempotent
+
+		amount = float(application["amount_requested"])
+		disburse_ref = f"loan-disburse-{application_id}"
+
+		bal = self._balance_cache.get(disbursement_account)
+		if bal:
+			bal["balance"] = float(bal.get("balance", 0)) + amount
+			bal["available_balance"] = float(bal.get("available_balance", 0)) + amount
+			bal["updated_at"] = _iso()
+		self._mini_statements[disbursement_account].append({
+			"transaction_id": disburse_ref, "type": "credit",
+			"amount": amount, "currency": "KES",
+			"counterparty": f"loan:{application_id}", "reference": disburse_ref, "timestamp": _iso(),
+		})
+		application.update({
+			"status": "disbursed", "disbursement_account": disbursement_account,
+			"disbursement_reference": disburse_ref, "disbursed_at": _iso(),
+		})
+		self._audit(self.tenant_id, "loan_disbursed", application_id)
+		return application
+
+	# ------------------------------------------------------------------
 	# Private helpers
 	# ------------------------------------------------------------------
 

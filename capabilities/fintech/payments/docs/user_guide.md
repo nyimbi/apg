@@ -167,6 +167,161 @@ All reports accept `period_from` and `period_to` (YYYY-MM-DD).
 
 ---
 
+---
+
+## Recurring Payments (Mandates)
+
+Create a server-side recurring payment mandate — no card-on-file required.
+
+```bash
+# Register a monthly loan repayment mandate
+curl -X POST /api/v1/payments/mandates \
+  -d '{
+    "customer_ref": "254712345678",
+    "method": "mpesa_stk",
+    "amount": "5000",
+    "currency": "KES",
+    "schedule": "monthly",
+    "start_date": "2026-07-01",
+    "max_occurrences": 12
+  }'
+```
+
+Response includes `mandate_id` and `next_due_date`.
+
+Execute one billing cycle manually (or via cron):
+```bash
+curl -X POST /api/v1/payments/mandates/<mandate_id>/execute
+```
+
+Cancel a mandate:
+```bash
+curl -X DELETE /api/v1/payments/mandates/<mandate_id> \
+  -d '{"reason": "customer_request"}'
+```
+
+Supported schedules: `daily`, `weekly`, `monthly`, `custom`.
+
+---
+
+## Network Fraud Scoring
+
+Detect coordinated fraud rings that evade per-account limits:
+
+```bash
+curl -X POST /api/v1/payments/fraud/network-score \
+  -d '{"receiver_id": "254700000001", "window_hours": 24}'
+```
+
+Response:
+```json
+{
+  "fraud_score": 0.82,
+  "pattern": "fan_in",
+  "recommended_action": "review",
+  "sender_count_in_window": 35,
+  "total_received_in_window": "450000.00"
+}
+```
+
+Scores ≥ 0.85 → `block`. Scores 0.60–0.85 → `review`. Below 0.60 → `allow`.
+
+---
+
+## Payment Approval Workflow
+
+Submit high-value payments for multi-party approval before execution:
+
+```bash
+# Step 1: submit for approval (CFO must approve within 24h)
+curl -X POST /api/v1/payments/approvals \
+  -d '{
+    "transaction_id": "<txn-id>",
+    "approval_policy_id": "cfo_approval_policy",
+    "requestor_id": "finance_ops_01",
+    "required_approvers": ["cfo@acme.ke"],
+    "quorum": 1,
+    "timeout_hours": 24
+  }'
+
+# Step 2: CFO approves
+curl -X POST /api/v1/payments/approvals/<request_id>/decide \
+  -d '{"approver_id": "cfo@acme.ke", "decision": "approve", "reason": "Budget approved"}'
+```
+
+Payment transitions: `initiated` → `awaiting_approval` → `initiated` (on approval) or `failed` (on rejection or timeout).
+
+---
+
+## Real-Time Health Monitoring
+
+Check live payment health across all methods:
+
+```bash
+curl /api/v1/payments/health?window_minutes=5
+```
+
+Response:
+```json
+{
+  "health_status": "healthy",
+  "overall_success_rate": 0.9823,
+  "tpm": 142.6,
+  "by_method": {
+    "mpesa_stk": {"success_rate": 0.985, "tpm": 98.3},
+    "bank_eft":  {"success_rate": 0.999, "tpm": 12.1}
+  },
+  "anomalies": []
+}
+```
+
+Register an alert rule to fire when M-Pesa success rate drops below 90%:
+```bash
+curl -X POST /api/v1/payments/health/alerts \
+  -d '{
+    "alert_name": "mpesa_degraded",
+    "metric": "success_rate",
+    "threshold": 0.90,
+    "comparison": "lt",
+    "notify_channel": "sms",
+    "notify_recipient": "254700000001"
+  }'
+```
+
+---
+
+## Cross-Border Corridor Cost Estimation
+
+Compare SWIFT vs stablecoin bridge for a cross-border transfer:
+
+```bash
+curl "/api/v1/payments/fx/corridor-cost?from_currency=KES&to_currency=USD&amount=1000000"
+```
+
+Response:
+```json
+{
+  "options": [
+    {
+      "method": "stablecoin_bridge",
+      "total_cost": "20000.00",
+      "cost_pct": "2.00",
+      "eta_seconds": 45
+    },
+    {
+      "method": "swift",
+      "total_cost": "53250.00",
+      "cost_pct": "5.33",
+      "eta_hours": 48
+    }
+  ],
+  "recommended": "stablecoin_bridge",
+  "max_savings": "33250.00"
+}
+```
+
+---
+
 ## Error Codes
 
 | HTTP | Code | Meaning |
@@ -175,6 +330,8 @@ All reports accept `period_from` and `period_to` (YYYY-MM-DD).
 | 403 | `permission_denied` | Cross-tenant access or policy violation |
 | 422 | `validation_error` | Business rule violation (e.g. limit exceeded) |
 | 422 | `missing_field` | Required field absent from body |
+| 422 | `approval_required` | Transaction requires multi-party approval before proceeding |
+| 422 | `mandate_not_active` | Mandate execution attempted on non-active mandate |
 | 500 | `internal_error` | Unexpected server error — retry with backoff |
 
 ---

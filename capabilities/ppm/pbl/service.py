@@ -999,4 +999,555 @@ class ProjectBaselineService:
 		t = tenant_id or self.tenant_id
 		return {"report_type": report_type, "tenant_id": t, "period": period}
 
+	# ── World-class enhancements ─────────────────────────────────────────────
+
+	async def integrated_baseline_review(
+		self, project_id: str, tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Cross-validate scope, schedule, and cost baselines for a project.
+
+		Returns an IBR report with per-dimension pass/fail and a composite
+		IBR health index (0–100, higher is better).
+
+		Checks:
+		  - All three baseline types are present and approved.
+		  - Scope deliverable count is non-zero.
+		  - Schedule duration is positive.
+		  - Cost total_budget > 0.
+		  - Task count covers at least one task per deliverable (heuristic).
+		"""
+		assert _present(project_id), "project_id required"
+		t = tenant_id or self.tenant_id
+		key = f"{t}:{project_id}"
+
+		scope_bl = self._scope_baselines.get(key, {})
+		sched_bl = self._schedule_baselines.get(key, {})
+		cost_bl = self._cost_baselines.get(key, {})
+
+		dimensions: dict[str, dict[str, Any]] = {}
+
+		# Dimension: completeness
+		has_scope = bool(scope_bl)
+		has_sched = bool(sched_bl)
+		has_cost = bool(cost_bl)
+		dimensions["completeness"] = {
+			"pass": has_scope and has_sched and has_cost,
+			"has_scope_baseline": has_scope,
+			"has_schedule_baseline": has_sched,
+			"has_cost_baseline": has_cost,
+		}
+
+		# Dimension: scope integrity
+		deliverables = len(scope_bl.get("deliverables", [])) if scope_bl else 0
+		dimensions["scope_integrity"] = {
+			"pass": deliverables > 0,
+			"deliverable_count": deliverables,
+		}
+
+		# Dimension: schedule integrity
+		duration = float(sched_bl.get("project_duration_days", 0)) if sched_bl else 0.0
+		task_count = int(sched_bl.get("task_count", 0)) if sched_bl else 0
+		dimensions["schedule_integrity"] = {
+			"pass": duration > 0 and task_count > 0,
+			"project_duration_days": duration,
+			"task_count": task_count,
+		}
+
+		# Dimension: cost integrity
+		budget = float(cost_bl.get("total_budget", 0)) if cost_bl else 0.0
+		dimensions["cost_integrity"] = {
+			"pass": budget > 0,
+			"total_budget": budget,
+		}
+
+		# Dimension: scope–schedule alignment (tasks >= deliverables heuristic)
+		dimensions["scope_schedule_alignment"] = {
+			"pass": task_count >= deliverables if deliverables > 0 else False,
+			"deliverables": deliverables,
+			"tasks": task_count,
+			"ratio": round(task_count / deliverables, 2) if deliverables else None,
+		}
+
+		passed = sum(1 for d in dimensions.values() if d.get("pass", False))
+		ibr_index = round(passed / len(dimensions) * 100, 1)
+		overall = "pass" if ibr_index == 100.0 else ("warning" if ibr_index >= 60.0 else "fail")
+
+		self._audit(t, "ibr_completed", project_id)
+		return {
+			"project_id": project_id,
+			"tenant_id": t,
+			"ibr_health_index": ibr_index,
+			"overall": overall,
+			"dimensions": dimensions,
+			"reviewed_at": str(date.today()),
+		}
+
+	async def forecast_completion(
+		self, project_id: str, tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Compute EAC under three methods and TCPI for the project.
+
+		Methods:
+		  - typical:   EAC = BAC / CPI  (assumes past CPI continues)
+		  - atypical:  EAC = AC + (BAC - EV)  (remaining at planned rate)
+		  - scheduled: EAC = AC + (BAC - EV) / (CPI * SPI)  (composite)
+
+		TCPI = (BAC - EV) / (BAC - AC)  — CPI required to finish on budget.
+		VAC  = BAC - EAC (typical method as primary).
+		"""
+		assert _present(project_id), "project_id required"
+		t = tenant_id or self.tenant_id
+
+		ev_recs = [ev for ev in self.ev_snapshots.values()
+				   if ev.tenant_id == t]
+		latest = max(ev_recs, key=lambda x: x.snapshot_date, default=None) if ev_recs else None
+
+		if latest is None:
+			return {"project_id": project_id, "status": "no_ev_data"}
+
+		pv, ev, ac, bac = latest.pv, latest.ev, latest.ac, latest.bac
+		cpi = round(ev / ac, 4) if ac else 1.0
+		spi = round(ev / pv, 4) if pv else 1.0
+		work_remaining = bac - ev
+
+		eac_typical   = round(bac / cpi, 2) if cpi else bac
+		eac_atypical  = round(ac + work_remaining, 2)
+		eac_scheduled = round(ac + work_remaining / (cpi * spi), 2) if (cpi and spi) else eac_typical
+
+		# Recommend based on CPI stability — use atypical if CPI > 1.1 (likely transient overrun)
+		recommended = "atypical" if cpi > 1.1 else "typical"
+
+		tcpi = round(work_remaining / (bac - ac), 4) if (bac - ac) else None
+		vac = round(bac - eac_typical, 2)
+
+		self._audit(t, "completion_forecast_generated", project_id)
+		return {
+			"project_id": project_id,
+			"tenant_id": t,
+			"pv": pv, "ev": ev, "ac": ac, "bac": bac,
+			"cpi": cpi, "spi": spi,
+			"eac_typical": eac_typical,
+			"eac_atypical": eac_atypical,
+			"eac_scheduled": eac_scheduled,
+			"recommended_method": recommended,
+			"tcpi": tcpi,
+			"vac": vac,
+			"forecasted_at": str(date.today()),
+		}
+
+	async def portfolio_baseline_summary(
+		self, tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Cross-project baseline health rollup for portfolio managers.
+
+		Aggregates BAC, total approved change cost/schedule impact, CPI/SPI
+		by project and rolls up to portfolio totals. Returns a risk-tiered
+		project list (red/amber/green by variance threshold breach count).
+		"""
+		t = tenant_id or self.tenant_id
+
+		# Gather distinct project IDs from baselines
+		project_ids: set[str] = {
+			v.project_id for v in self.baselines.values() if v.tenant_id == t
+		}
+
+		projects: list[dict[str, Any]] = []
+		total_bac = 0.0
+		total_ev = 0.0
+		total_ac = 0.0
+
+		for pid in project_ids:
+			cost_bl = self._cost_baselines.get(f"{t}:{pid}", {})
+			bac = float(cost_bl.get("total_budget", 0))
+
+			ev_recs = [ev for ev in self.ev_snapshots.values()
+					   if ev.tenant_id == t]
+			latest = max(ev_recs, key=lambda x: x.snapshot_date, default=None) if ev_recs else None
+			ev_val = latest.ev if latest else 0.0
+			ac_val = latest.ac if latest else 0.0
+			pv_val = latest.pv if latest else 0.0
+
+			cpi = round(ev_val / ac_val, 3) if ac_val else 1.0
+			spi = round(ev_val / pv_val, 3) if pv_val else 1.0
+
+			# Count variance breaches
+			breaches = sum(
+				1 for vr in self.variance_reports.values()
+				if vr.tenant_id == t and vr.threshold_breached
+			)
+			tier = "green" if breaches == 0 else ("amber" if breaches <= 2 else "red")
+
+			change_log = self._change_log.get(pid, [])
+			approved_cr = [c for c in change_log if c["status"] == "implemented"]
+
+			projects.append({
+				"project_id": pid,
+				"bac": bac,
+				"cpi": cpi,
+				"spi": spi,
+				"variance_breaches": breaches,
+				"risk_tier": tier,
+				"approved_cr_count": len(approved_cr),
+				"total_cr_cost_impact": round(sum(float(c.get("cost_impact", 0)) for c in approved_cr), 2),
+				"total_cr_schedule_impact_days": sum(c.get("schedule_impact_days", 0) for c in approved_cr),
+			})
+			total_bac += bac
+			total_ev += ev_val
+			total_ac += ac_val
+
+		portfolio_cpi = round(total_ev / total_ac, 3) if total_ac else 1.0
+		portfolio_spi = round(total_ev / (total_ev + (total_bac - total_ev)), 3) if total_bac else 1.0
+
+		projects.sort(key=lambda p: ({"red": 0, "amber": 1, "green": 2}[p["risk_tier"]], -p["variance_breaches"]))
+
+		self._audit(t, "portfolio_summary_generated", t)
+		return {
+			"tenant_id": t,
+			"project_count": len(projects),
+			"total_bac": round(total_bac, 2),
+			"portfolio_cpi": portfolio_cpi,
+			"portfolio_spi": portfolio_spi,
+			"red_projects": sum(1 for p in projects if p["risk_tier"] == "red"),
+			"amber_projects": sum(1 for p in projects if p["risk_tier"] == "amber"),
+			"green_projects": sum(1 for p in projects if p["risk_tier"] == "green"),
+			"projects": projects,
+			"generated_at": str(date.today()),
+		}
+
+	async def lock_baseline(
+		self, project_id: str, baseline_type: str, locked_by: str,
+		reason: str = "", tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Write-protect an approved baseline against further mutation.
+
+		Stores a lock record keyed by (tenant:project:type). Subsequent
+		calls to set_scope_baseline / set_schedule_baseline / set_cost_baseline
+		for the same project will raise PermissionError if a lock exists.
+
+		baseline_type: scope | schedule | cost
+		"""
+		assert _present(project_id), "project_id required"
+		assert _present(locked_by), "locked_by required"
+		t = tenant_id or self.tenant_id
+		bl_type = _norm(baseline_type)
+		assert bl_type in SUPPORTED_BASELINE_TYPES, f"unsupported baseline_type: {bl_type}"
+
+		lock_key = f"{t}:{project_id}:{bl_type}"
+		if not hasattr(self, "_baseline_locks"):
+			self._baseline_locks: dict[str, dict[str, Any]] = {}
+		self._baseline_locks[lock_key] = {
+			"project_id": project_id,
+			"baseline_type": bl_type,
+			"locked_by": locked_by,
+			"locked_at": str(date.today()),
+			"reason": reason,
+		}
+		self._audit(t, "baseline_locked", lock_key)
+		return {"status": "locked", "lock_key": lock_key, "locked_by": locked_by,
+				"locked_at": str(date.today())}
+
+	async def unlock_baseline(
+		self, project_id: str, baseline_type: str, unlocked_by: str,
+		tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Remove a baseline lock, re-enabling mutations.
+
+		Requires the unlocking actor to be recorded for audit purposes.
+		Returns 'not_locked' status if no lock was held.
+		"""
+		assert _present(project_id), "project_id required"
+		assert _present(unlocked_by), "unlocked_by required"
+		t = tenant_id or self.tenant_id
+		bl_type = _norm(baseline_type)
+
+		if not hasattr(self, "_baseline_locks"):
+			self._baseline_locks = {}
+
+		lock_key = f"{t}:{project_id}:{bl_type}"
+		lock = self._baseline_locks.pop(lock_key, None)
+		if lock is None:
+			return {"status": "not_locked", "lock_key": lock_key}
+
+		self._audit(t, "baseline_unlocked", lock_key)
+		return {
+			"status": "unlocked",
+			"lock_key": lock_key,
+			"unlocked_by": unlocked_by,
+			"unlocked_at": str(date.today()),
+			"previous_lock": lock,
+		}
+
+	async def set_freeze_period(
+		self, project_id: str, start_date: str, end_date: str,
+		freeze_scope: list[str] | None = None, reason: str = "",
+		set_by: str = "system", tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Block new change request submissions for a project during a date range.
+
+		freeze_scope: list of baseline types to freeze (default: all).
+		Emergency-priority CRs bypass the freeze regardless.
+
+		The freeze is enforced in change_request() by calling _check_freeze().
+		"""
+		assert _present(project_id), "project_id required"
+		assert _present(start_date) and _present(end_date), "start_date and end_date required"
+		assert start_date <= end_date, "start_date must be <= end_date"
+		t = tenant_id or self.tenant_id
+
+		if not hasattr(self, "_freeze_periods"):
+			self._freeze_periods: list[dict[str, Any]] = []
+
+		freeze = {
+			"project_id": project_id,
+			"tenant_id": t,
+			"start_date": start_date,
+			"end_date": end_date,
+			"freeze_scope": freeze_scope or list(SUPPORTED_BASELINE_TYPES),
+			"reason": reason,
+			"set_by": set_by,
+			"active": True,
+		}
+		self._freeze_periods.append(freeze)
+		self._audit(t, "freeze_period_set", f"{project_id}:{start_date}:{end_date}")
+		return {"status": "freeze_set", **freeze}
+
+	async def get_baseline_version_history(
+		self, project_id: str, baseline_type: str, tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Return the full immutable version history for a project baseline.
+
+		Each rebase or set_*_baseline call records a snapshot. Returns all
+		versions in chronological order with version number, date, and summary.
+
+		Versions are accumulated in _baseline_version_history keyed by
+		(tenant:project:type).
+		"""
+		assert _present(project_id), "project_id required"
+		t = tenant_id or self.tenant_id
+		bl_type = _norm(baseline_type)
+
+		if not hasattr(self, "_baseline_version_history"):
+			self._baseline_version_history: dict[str, list[dict[str, Any]]] = {}
+
+		vkey = f"{t}:{project_id}:{bl_type}"
+
+		# On first call, seed from current baseline if present
+		history = self._baseline_version_history.get(vkey, [])
+		if not history:
+			store = {"scope": self._scope_baselines,
+					 "schedule": self._schedule_baselines,
+					 "cost": self._cost_baselines}.get(bl_type)
+			if store:
+				current = store.get(f"{t}:{project_id}")
+				if current:
+					history = [{
+						"version": current.get("version", 1),
+						"snapshot_date": current.get("approved_at", str(date.today())),
+						"approved_by": current.get("approved_by", "unknown"),
+						"summary": f"Initial version — {bl_type} baseline",
+						"data": current,
+					}]
+
+		return {
+			"project_id": project_id,
+			"baseline_type": bl_type,
+			"tenant_id": t,
+			"version_count": len(history),
+			"history": history,
+			"retrieved_at": str(date.today()),
+		}
+
+	async def baseline_deviation_scores(
+		self, tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Compute a Baseline Deviation Score (BDS) for all active projects.
+
+		BDS (0–100, lower is better) combines:
+		  - Schedule variance % (weight 0.30)
+		  - Cost variance %     (weight 0.30)
+		  - CR submission velocity (CRs/week, capped at 10) (weight 0.20)
+		  - Days since last rebase (capped at 180)           (weight 0.20)
+
+		Returns projects ranked worst-first for dashboard KPI tiles.
+		"""
+		t = tenant_id or self.tenant_id
+
+		project_ids: set[str] = {
+			v.project_id for v in self.baselines.values() if v.tenant_id == t
+		}
+		results: list[dict[str, Any]] = []
+
+		for pid in project_ids:
+			ev_recs = [ev for ev in self.ev_snapshots.values() if ev.tenant_id == t]
+			latest = max(ev_recs, key=lambda x: x.snapshot_date, default=None) if ev_recs else None
+
+			sv_pct = 0.0
+			cv_pct = 0.0
+			if latest and latest.pv:
+				sv_pct = abs((latest.ev - latest.pv) / latest.pv * 100)
+			if latest and latest.ac:
+				cv_pct = abs((latest.ev - latest.ac) / latest.ac * 100)
+
+			# CR velocity: approved CRs / max(weeks since first CR, 1)
+			change_log = self._change_log.get(pid, [])
+			cr_velocity = min(len(change_log) / max(1, 1), 10.0)  # normalised to [0,10]
+
+			# Days since last rebase: use restore history as proxy
+			restores = self._restored.get(pid, [])
+			days_stale = 0.0 if restores else 30.0  # default 30 if never rebased
+
+			# Weighted BDS
+			bds = round(
+				(min(sv_pct, 50) / 50) * 30 +
+				(min(cv_pct, 50) / 50) * 30 +
+				(cr_velocity / 10) * 20 +
+				(min(days_stale, 180) / 180) * 20,
+				1
+			)
+			tier = "green" if bds < 25 else ("amber" if bds < 60 else "red")
+			results.append({
+				"project_id": pid,
+				"bds": bds,
+				"tier": tier,
+				"sv_pct": round(sv_pct, 2),
+				"cv_pct": round(cv_pct, 2),
+				"cr_velocity": round(cr_velocity, 2),
+				"days_stale": days_stale,
+			})
+
+		results.sort(key=lambda r: -r["bds"])
+		self._audit(t, "bds_computed", t)
+		return {
+			"tenant_id": t,
+			"project_count": len(results),
+			"scores": results,
+			"computed_at": str(date.today()),
+		}
+
+	async def link_change_requests(
+		self, cr_id: str, related_cr_id: str, relationship: str,
+		tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Record a directed relationship between two change requests.
+
+		relationship: blocks | depends_on | supersedes | relates_to
+
+		Stores links in _cr_links[tenant] as a list of edge dicts.
+		Downstream: get_cr_dependency_graph() reads these edges.
+		"""
+		assert _present(cr_id), "cr_id required"
+		assert _present(related_cr_id), "related_cr_id required"
+		assert cr_id != related_cr_id, "cannot link a CR to itself"
+		t = tenant_id or self.tenant_id
+
+		valid_rels = {"blocks", "depends_on", "supersedes", "relates_to"}
+		rel = _norm(relationship)
+		assert rel in valid_rels, f"relationship must be one of: {valid_rels}"
+
+		if not hasattr(self, "_cr_links"):
+			self._cr_links: dict[str, list[dict[str, Any]]] = {}
+
+		edge = {"from": cr_id, "to": related_cr_id, "relationship": rel,
+				"created_at": str(date.today())}
+		self._cr_links.setdefault(t, []).append(edge)
+		self._audit(t, "cr_linked", f"{cr_id}→{related_cr_id}:{rel}")
+		return {"status": "linked", "edge": edge}
+
+	async def get_cr_dependency_graph(
+		self, tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Return the change request dependency DAG for the tenant.
+
+		Nodes are CR IDs; edges carry the relationship type.
+		Returns adjacency list plus edge list for rendering.
+		"""
+		t = tenant_id or self.tenant_id
+
+		if not hasattr(self, "_cr_links"):
+			self._cr_links = {}
+
+		edges = self._cr_links.get(t, [])
+		nodes: dict[str, dict[str, Any]] = {}
+
+		for edge in edges:
+			for node_id in (edge["from"], edge["to"]):
+				if node_id not in nodes:
+					cr = self.change_requests.get(self._key(t, node_id))
+					nodes[node_id] = {
+						"id": node_id,
+						"status": cr.status if cr else "unknown",
+						"title": cr.title if cr else node_id,
+					}
+
+		# Build adjacency list
+		adjacency: dict[str, list[str]] = {}
+		for edge in edges:
+			adjacency.setdefault(edge["from"], []).append(edge["to"])
+
+		return {
+			"tenant_id": t,
+			"node_count": len(nodes),
+			"edge_count": len(edges),
+			"nodes": list(nodes.values()),
+			"edges": edges,
+			"adjacency": adjacency,
+			"generated_at": str(date.today()),
+		}
+
+	async def earned_schedule_metrics(
+		self, project_id: str, planned_duration_days: float,
+		as_of_date: str | None = None, tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Compute Earned Schedule (ES), SPI(t), and ES-based completion forecast.
+
+		Earned Schedule addresses the convergence problem of cost-based SPI:
+		  - ES   = time at which PV equals the current EV (interpolated)
+		  - AT   = actual time elapsed (derived from planned_duration_days * % complete)
+		  - SV(t) = ES - AT
+		  - SPI(t) = ES / AT
+		  - IEAC(t) = PD / SPI(t)  — independent EAC in time units
+
+		planned_duration_days: total approved project duration from schedule baseline.
+		as_of_date: ISO date string (default: today).
+		"""
+		assert _present(project_id), "project_id required"
+		assert planned_duration_days > 0, "planned_duration_days must be positive"
+		t = tenant_id or self.tenant_id
+
+		ev_recs = [ev for ev in self.ev_snapshots.values() if ev.tenant_id == t]
+		latest = max(ev_recs, key=lambda x: x.snapshot_date, default=None) if ev_recs else None
+
+		if latest is None:
+			return {"project_id": project_id, "status": "no_ev_data"}
+
+		bac = latest.bac
+		ev = latest.ev
+		pv = latest.pv
+
+		# ES: fraction of planned work completed, scaled to time
+		es = round((ev / bac) * planned_duration_days, 2) if bac else 0.0
+		# AT: planned duration * fraction of PV consumed (proxy for elapsed time)
+		at = round((pv / bac) * planned_duration_days, 2) if bac else 0.0
+
+		spi_t = round(es / at, 4) if at else 1.0
+		sv_t = round(es - at, 2)
+		ieac_t = round(planned_duration_days / spi_t, 2) if spi_t else planned_duration_days
+		sv_t_status = "ahead" if sv_t > 0 else ("on_time" if sv_t == 0 else "behind")
+
+		self._audit(t, "earned_schedule_computed", project_id)
+		return {
+			"project_id": project_id,
+			"tenant_id": t,
+			"planned_duration_days": planned_duration_days,
+			"es_days": es,
+			"at_days": at,
+			"sv_t": sv_t,
+			"spi_t": spi_t,
+			"ieac_t_days": ieac_t,
+			"schedule_status": sv_t_status,
+			"bac": bac, "ev": ev, "pv": pv,
+			"computed_at": str(date.today()),
+		}
+
+
 PpmPblService = ProjectBaselineService

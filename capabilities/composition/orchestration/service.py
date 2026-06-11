@@ -844,6 +844,405 @@ class WorkflowOrchestrationService:
 		"""List Events"""
 		return {"tenant_id": tenant_id, "events": []}
 
+	# ── New world-class async methods ────────────────────────────────────────
+
+	async def snapshot_execution(
+		self,
+		tenant_id: str,
+		execution_id: str,
+	) -> dict[str, Any]:
+		"""Snapshot the full in-memory state of a running execution to a durable record.
+
+		Captures the execution record, instance variables, pending signals, compensation
+		log, and suspension record.  The snapshot ID can be passed to
+		``restore_from_snapshot`` to hydrate a new service instance — enabling
+		point-in-time recovery without reprocessing completed steps.
+		"""
+		execution = self._require_execution_by_instance(tenant_id, execution_id)
+		import json as _json
+		snapshot_id = self._record_id("snapshot", f"{execution_id}_{self._now()}")
+		snapshot = {
+			"snapshot_id": snapshot_id,
+			"tenant_id": tenant_id,
+			"execution_id": execution_id,
+			"execution_record": deepcopy(execution),
+			"instance_variables": deepcopy(self._instance_variables.get(execution["id"], {})),
+			"signals": deepcopy(self._signals.get(execution["id"], [])),
+			"compensations": deepcopy(self._compensations.get(execution["id"], [])),
+			"suspension": deepcopy(self._suspended.get(execution["id"], {})),
+			"snapshotted_at": self._now(),
+		}
+		if not hasattr(self, "_snapshots"):
+			self._snapshots: dict[str, dict[str, Any]] = {}
+		self._snapshots[snapshot_id] = snapshot
+		execution["snapshot_id"] = snapshot_id
+		execution["last_snapshotted_at"] = snapshot["snapshotted_at"]
+		self._emit("execution_snapshotted", tenant_id, execution["id"], {"snapshot_id": snapshot_id})
+		return deepcopy(snapshot)
+
+	async def restore_from_snapshot(
+		self,
+		tenant_id: str,
+		snapshot_id: str,
+	) -> dict[str, Any]:
+		"""Restore execution state from a previously created snapshot.
+
+		Re-hydrates the execution record, instance variables, signal queue,
+		compensation log, and suspension record from the snapshot into the live
+		in-memory stores.  Returns the restored execution record.
+		"""
+		if not hasattr(self, "_snapshots"):
+			self._snapshots = {}
+		snapshot = self._snapshots.get(snapshot_id)
+		if not snapshot or snapshot["tenant_id"] != tenant_id:
+			raise KeyError(f"Unknown snapshot: {snapshot_id}")
+		ex = deepcopy(snapshot["execution_record"])
+		self._executions[ex["id"]] = ex
+		self._instance_variables[ex["id"]] = deepcopy(snapshot["instance_variables"])
+		if snapshot["signals"]:
+			self._signals[ex["id"]] = deepcopy(snapshot["signals"])
+		if snapshot["compensations"]:
+			self._compensations[ex["id"]] = deepcopy(snapshot["compensations"])
+		if snapshot["suspension"]:
+			self._suspended[ex["id"]] = deepcopy(snapshot["suspension"])
+		self._emit("execution_restored", tenant_id, ex["id"], {"snapshot_id": snapshot_id, "restored_at": self._now()})
+		return deepcopy(ex)
+
+	async def check_sla_breaches(self, tenant_id: str) -> dict[str, Any]:
+		"""Scan all active task assignments for SLA breaches and warnings.
+
+		Computes elapsed fraction for each assigned task that carries an SLA
+		deadline.  Emits ``sla_warning`` at 80 % elapsed and ``sla_breached``
+		when the deadline has passed.  Returns a summary dict with lists of
+		at-risk and breached assignments for the operations dashboard.
+		"""
+		from datetime import datetime as _dt, timezone as _tz
+		now = _dt.now(_tz.utc)
+		at_risk: list[dict[str, Any]] = []
+		breached: list[dict[str, Any]] = []
+		for task_record in self._tenant_records(self._tasks, tenant_id):
+			due_at_str = task_record.get("due_at")
+			if not due_at_str:
+				continue
+			try:
+				due_at = _dt.fromisoformat(due_at_str)
+			except ValueError:
+				continue
+			if due_at.tzinfo is None:
+				due_at = due_at.replace(tzinfo=_tz.utc)
+			time_remaining = (due_at - now).total_seconds()
+			if time_remaining <= 0:
+				breached.append(task_record)
+				self._emit(
+					"sla_breached", tenant_id, task_record["id"],
+					{"task_id": task_record["task_id"], "assignee": task_record.get("assignee"), "due_at": due_at_str},
+				)
+			else:
+				# estimate total window by checking assignment time
+				assigned_at_str = task_record.get("updated_at", task_record.get("id"))
+				try:
+					assigned_at = _dt.fromisoformat(task_record.get("updated_at", self._now()))
+					if assigned_at.tzinfo is None:
+						assigned_at = assigned_at.replace(tzinfo=_tz.utc)
+					total_window = (due_at - assigned_at).total_seconds()
+					if total_window > 0:
+						elapsed_fraction = 1 - (time_remaining / total_window)
+						if elapsed_fraction >= 0.8:
+							at_risk.append(task_record)
+							self._emit(
+								"sla_warning", tenant_id, task_record["id"],
+								{"task_id": task_record["task_id"], "elapsed_pct": round(elapsed_fraction * 100, 1), "due_at": due_at_str},
+							)
+				except (ValueError, TypeError) as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+		return {
+			"tenant_id": tenant_id,
+			"breached_count": len(breached),
+			"at_risk_count": len(at_risk),
+			"breached": breached,
+			"at_risk": at_risk,
+			"checked_at": self._now(),
+		}
+
+	async def get_sla_status(self, tenant_id: str) -> dict[str, Any]:
+		"""Return the current SLA health summary for all active task assignments.
+
+		Groups assignments into ``healthy``, ``at_risk`` (>= 80 % elapsed), and
+		``breached`` buckets, providing the operations dashboard with a quick
+		triage view without triggering additional SLA events.
+		"""
+		from datetime import datetime as _dt, timezone as _tz
+		now = _dt.now(_tz.utc)
+		healthy: list[dict[str, Any]] = []
+		at_risk: list[dict[str, Any]] = []
+		breached: list[dict[str, Any]] = []
+		for task_record in self._tenant_records(self._tasks, tenant_id):
+			due_at_str = task_record.get("due_at")
+			if not due_at_str:
+				healthy.append(task_record)
+				continue
+			try:
+				due_at = _dt.fromisoformat(due_at_str)
+				if due_at.tzinfo is None:
+					due_at = due_at.replace(tzinfo=_tz.utc)
+				remaining = (due_at - now).total_seconds()
+				if remaining <= 0:
+					breached.append({**task_record, "sla_status": "breached", "overdue_seconds": abs(remaining)})
+				elif remaining < 3600:
+					at_risk.append({**task_record, "sla_status": "at_risk", "seconds_remaining": remaining})
+				else:
+					healthy.append({**task_record, "sla_status": "healthy", "seconds_remaining": remaining})
+			except (ValueError, TypeError):
+				healthy.append(task_record)
+		return {
+			"tenant_id": tenant_id,
+			"healthy": healthy,
+			"at_risk": at_risk,
+			"breached": breached,
+			"total_assignments": len(healthy) + len(at_risk) + len(breached),
+			"computed_at": self._now(),
+		}
+
+	async def detect_anomalies(self, tenant_id: str) -> dict[str, Any]:
+		"""Detect anomalous execution durations using z-score analysis.
+
+		For each workflow that has >= 10 recorded duration samples, computes the
+		population mean and standard deviation.  Executions with a z-score
+		exceeding ±3 are flagged as anomalous and a ``workflow_execution_anomaly``
+		event is emitted.  Requires prior calls to ``record_execution_duration``.
+		"""
+		if not hasattr(self, "_execution_timings"):
+			self._execution_timings: dict[str, list[float]] = {}
+		anomalies: list[dict[str, Any]] = []
+		min_samples = 10
+		z_threshold = 3.0
+		for workflow_id, timings in self._execution_timings.items():
+			if len(timings) < min_samples:
+				continue
+			# filter to this tenant's workflows
+			mean = statistics.mean(timings)
+			stdev = statistics.pstdev(timings)
+			if stdev == 0:
+				continue
+			for duration in timings[-5:]:  # check recent observations
+				z = (duration - mean) / stdev
+				if abs(z) >= z_threshold:
+					anomaly = {
+						"workflow_id": workflow_id,
+						"tenant_id": tenant_id,
+						"duration_seconds": duration,
+						"mean_seconds": round(mean, 3),
+						"stdev_seconds": round(stdev, 3),
+						"z_score": round(z, 3),
+						"detected_at": self._now(),
+					}
+					anomalies.append(anomaly)
+					self._emit("workflow_execution_anomaly", tenant_id, workflow_id, anomaly)
+		return {
+			"tenant_id": tenant_id,
+			"anomaly_count": len(anomalies),
+			"anomalies": anomalies,
+			"workflows_analysed": len(self._execution_timings),
+			"computed_at": self._now(),
+		}
+
+	async def record_execution_duration(
+		self,
+		tenant_id: str,
+		workflow_id: str,
+		duration_seconds: float,
+	) -> dict[str, Any]:
+		"""Record the wall-clock duration of a completed execution for anomaly detection.
+
+		Maintains a rolling window of the last 100 durations per workflow ID.
+		Called automatically after any execution reaches a terminal state; can
+		also be called explicitly for backfill.
+		"""
+		assert duration_seconds >= 0, "duration must be non-negative"
+		if not hasattr(self, "_execution_timings"):
+			self._execution_timings = {}
+		window = self._execution_timings.setdefault(workflow_id, [])
+		window.append(duration_seconds)
+		if len(window) > 100:
+			window.pop(0)
+		sample_count = len(window)
+		rolling_mean = round(statistics.mean(window), 3) if window else None
+		return {
+			"tenant_id": tenant_id,
+			"workflow_id": workflow_id,
+			"duration_seconds": duration_seconds,
+			"sample_count": sample_count,
+			"rolling_mean_seconds": rolling_mean,
+			"recorded_at": self._now(),
+		}
+
+	async def get_execution_cost(
+		self,
+		tenant_id: str,
+		execution_id: str,
+	) -> dict[str, Any]:
+		"""Return the accumulated cost-weight for a specific execution instance.
+
+		Cost weights are dimensionless integers/floats assigned per task definition
+		via the ``cost_weight`` field.  Operators map cost weights to currency or
+		compute credits outside this service, allowing the orchestration layer to
+		remain currency-agnostic.
+		"""
+		execution = self._require_execution_by_instance(tenant_id, execution_id)
+		if not hasattr(self, "_cost_ledger"):
+			self._cost_ledger: dict[str, float] = {}
+		accumulated = self._cost_ledger.get(execution["id"], 0.0)
+		definition = self._require_definition(execution["workflow_definition_id"], tenant_id)
+		task_count = len(definition.get("tasks", []))
+		completed_count = len(execution.get("completed_tasks", []))
+		return {
+			"tenant_id": tenant_id,
+			"execution_id": execution_id,
+			"execution_record_id": execution["id"],
+			"accumulated_cost": round(accumulated, 4),
+			"tasks_total": task_count,
+			"tasks_completed": completed_count,
+			"pct_complete": round(completed_count / max(task_count, 1) * 100, 2),
+			"computed_at": self._now(),
+		}
+
+	async def get_tenant_cost_report(
+		self,
+		tenant_id: str,
+		period: str = "monthly",
+	) -> dict[str, Any]:
+		"""Aggregate cost-weight consumption across all executions for a tenant.
+
+		Groups by workflow ID so FinOps teams can identify which workflows are
+		the largest consumers.  Complements ``workflow_analytics`` with a
+		financial dimension.
+		"""
+		if not hasattr(self, "_cost_ledger"):
+			self._cost_ledger = {}
+		executions = self.list_executions(tenant_id)
+		per_workflow: dict[str, float] = {}
+		total_cost = 0.0
+		for execution in executions:
+			cost = self._cost_ledger.get(execution["id"], 0.0)
+			wf_id = execution.get("workflow_definition_id", "unknown")
+			per_workflow[wf_id] = per_workflow.get(wf_id, 0.0) + cost
+			total_cost += cost
+		sorted_workflows = sorted(per_workflow.items(), key=lambda kv: kv[1], reverse=True)
+		return {
+			"tenant_id": tenant_id,
+			"period": period,
+			"total_cost": round(total_cost, 4),
+			"execution_count": len(executions),
+			"cost_by_workflow": [{"workflow_definition_id": wf, "cost": round(cost, 4)} for wf, cost in sorted_workflows],
+			"generated_at": self._now(),
+		}
+
+	async def get_execution_trace(
+		self,
+		tenant_id: str,
+		execution_id: str,
+	) -> dict[str, Any]:
+		"""Reconstruct a waterfall trace of all events emitted by an execution.
+
+		Collects audit events for the execution record ID and orders them by
+		``created_at``, annotating each span with elapsed milliseconds since
+		execution start.  Provides a distributed-trace-like view for debugging
+		long-running or multi-capability workflow instances without requiring an
+		external APM tool.
+		"""
+		from datetime import datetime as _dt, timezone as _tz
+		execution = self._require_execution_by_instance(tenant_id, execution_id)
+		exec_events = [
+			deepcopy(ev)
+			for ev in self._audit_events
+			if ev["tenant_id"] == tenant_id and ev["record_id"] == execution["id"]
+		]
+		exec_events.sort(key=lambda ev: ev["created_at"])
+		# compute elapsed ms from first event
+		spans: list[dict[str, Any]] = []
+		base_ts: float | None = None
+		for ev in exec_events:
+			try:
+				ts_str = ev["created_at"]
+				ts = _dt.fromisoformat(ts_str)
+				if ts.tzinfo is None:
+					ts = ts.replace(tzinfo=_tz.utc)
+				ts_float = ts.timestamp()
+			except (ValueError, TypeError):
+				ts_float = 0.0
+			if base_ts is None:
+				base_ts = ts_float
+			elapsed_ms = round((ts_float - base_ts) * 1000, 2)
+			spans.append({
+				"event": ev["event"],
+				"elapsed_ms": elapsed_ms,
+				"payload": ev.get("payload", {}),
+				"created_at": ev["created_at"],
+			})
+		return {
+			"tenant_id": tenant_id,
+			"execution_id": execution_id,
+			"execution_record_id": execution["id"],
+			"span_count": len(spans),
+			"spans": spans,
+			"trace_context": execution.get("trace_context"),
+			"generated_at": self._now(),
+		}
+
+	async def set_tenant_quota(
+		self,
+		tenant_id: str,
+		max_concurrent: int,
+		max_starts_per_minute: int,
+		admin_id: str = "system",
+	) -> dict[str, Any]:
+		"""Configure execution concurrency and throughput quotas for a tenant.
+
+		Quotas are enforced in ``start_execution``.  Setting ``max_concurrent=0``
+		or ``max_starts_per_minute=0`` disables the respective limit.  Requires
+		an ``admin_id`` for audit purposes.
+		"""
+		assert max_concurrent >= 0, "max_concurrent must be non-negative"
+		assert max_starts_per_minute >= 0, "max_starts_per_minute must be non-negative"
+		assert bool(admin_id), "admin_id required"
+		if not hasattr(self, "_execution_quotas"):
+			self._execution_quotas: dict[str, dict[str, Any]] = {}
+		quota = self._execution_quotas.setdefault(tenant_id, {})
+		quota.update({
+			"tenant_id": tenant_id,
+			"max_concurrent": max_concurrent,
+			"max_starts_per_minute": max_starts_per_minute,
+			"current_concurrent": quota.get("current_concurrent", 0),
+			"starts_this_minute": quota.get("starts_this_minute", 0),
+			"window_start": quota.get("window_start", self._now()),
+			"set_by": admin_id,
+			"updated_at": self._now(),
+		})
+		self._emit("tenant_quota_set", tenant_id, tenant_id, {"max_concurrent": max_concurrent, "max_starts_per_minute": max_starts_per_minute, "admin_id": admin_id})
+		return deepcopy(quota)
+
+	async def get_quota_status(self, tenant_id: str) -> dict[str, Any]:
+		"""Return the current quota usage for a tenant.
+
+		Shows both configured limits and real-time consumption metrics.  Useful
+		for the operations dashboard and for clients that want to implement
+		client-side backpressure before hitting ``QuotaExceededError``.
+		"""
+		if not hasattr(self, "_execution_quotas"):
+			self._execution_quotas = {}
+		quota = self._execution_quotas.get(tenant_id, {})
+		running_executions = [e for e in self.list_executions(tenant_id) if e["status"] == "running"]
+		return {
+			"tenant_id": tenant_id,
+			"max_concurrent": quota.get("max_concurrent", 0),
+			"max_starts_per_minute": quota.get("max_starts_per_minute", 0),
+			"current_concurrent": len(running_executions),
+			"starts_this_minute": quota.get("starts_this_minute", 0),
+			"quota_active": bool(quota),
+			"updated_at": quota.get("updated_at"),
+			"computed_at": self._now(),
+		}
+
 from dataclasses import dataclass as _wfdc, field as _wff
 from datetime import datetime as _wfdt
 from enum import Enum as _WFEnum

@@ -681,6 +681,401 @@ class GrcDocService:
 		retention = self.list_records("retention_policies", tenant)
 		return {"tenant_id": tenant, "total_documents": len(docs), "approved": approved, "published": published, "on_legal_hold": legal_hold, "retention_policies": len(retention), "compliance_rate_pct": round((approved + published) / max(len(docs), 1) * 100, 1), "generated_at": self._now()}
 
+	# ------------------------------------------------------------------
+	# Async methods — world-class document-control enhancements
+	# ------------------------------------------------------------------
+
+	async def async_create_document(
+		self,
+		document_id: str,
+		tenant_id: str,
+		title: str,
+		owner_id: str,
+		content: str | None = None,
+		document_type: str = "record",
+		classification: str = "internal",
+		template_id: str | None = None,
+		reviewed_by: str | None = None,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Async variant of create_document for non-blocking I/O paths."""
+		import asyncio
+		return await asyncio.get_event_loop().run_in_executor(
+			None,
+			lambda: self.create_document(
+				document_id, tenant_id, title, owner_id, content,
+				document_type, classification, template_id, reviewed_by, metadata,
+			),
+		)
+
+	async def async_approve_document(
+		self,
+		document_id: str,
+		tenant_id: str,
+		approver_id: str,
+		approval_note: str,
+	) -> dict[str, Any]:
+		"""Async approval step — safe to call from async approval-workflow engines."""
+		import asyncio
+		return await asyncio.get_event_loop().run_in_executor(
+			None,
+			lambda: self.approve_document(document_id, tenant_id, approver_id, approval_note),
+		)
+
+	async def async_publish_document(
+		self,
+		document_id: str,
+		tenant_id: str,
+		published_by: str,
+	) -> dict[str, Any]:
+		"""Async publication — enables awaitable publication pipelines."""
+		import asyncio
+		return await asyncio.get_event_loop().run_in_executor(
+			None,
+			lambda: self.publish_document(document_id, tenant_id, published_by),
+		)
+
+	async def async_create_revision(
+		self,
+		revision_id: str,
+		tenant_id: str,
+		document_id: str,
+		editor_id: str,
+		content: str,
+		change_summary: str,
+		reviewed_by: str | None = None,
+	) -> dict[str, Any]:
+		"""Async revision creation for integration with collaborative editing loops."""
+		import asyncio
+		return await asyncio.get_event_loop().run_in_executor(
+			None,
+			lambda: self.create_revision(
+				revision_id, tenant_id, document_id, editor_id, content, change_summary, reviewed_by,
+			),
+		)
+
+	async def async_document_search(
+		self,
+		tenant_id: str,
+		query: str,
+		document_type: str | None = None,
+		classification: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Async full-text search — ready to swap for Tantivy/Meilisearch adapter."""
+		import asyncio
+		return await asyncio.get_event_loop().run_in_executor(
+			None,
+			lambda: self.document_search(tenant_id, query, document_type, classification),
+		)
+
+	async def async_bulk_archive(
+		self,
+		document_ids: list[str],
+		tenant_id: str,
+		archived_by: str,
+	) -> dict[str, Any]:
+		"""Archive multiple documents concurrently using asyncio.gather.
+
+		Failures are collected and returned without aborting the batch.
+		"""
+		import asyncio
+
+		async def _archive_one(did: str) -> dict[str, Any]:
+			try:
+				return await asyncio.get_event_loop().run_in_executor(
+					None,
+					lambda d=did: self.archive_document(d, tenant_id, archived_by),
+				)
+			except Exception as exc:  # noqa: BLE001
+				return {"document_id": did, "error": str(exc), "status": "failed"}
+
+		results = await asyncio.gather(*[_archive_one(did) for did in document_ids], return_exceptions=True)
+		archived = [r["id"] for r in results if r and "error" not in r]
+		failed = [r for r in results if r and "error" in r]
+		return {
+			"archived": len(archived),
+			"failed": len(failed),
+			"failures": failed,
+			"archived_at": self._now(),
+		}
+
+	async def async_compliance_report(self, tenant_id: str) -> dict[str, Any]:
+		"""Generate compliance report asynchronously."""
+		import asyncio
+		report = await asyncio.get_event_loop().run_in_executor(
+			None,
+			lambda: self.compliance_report_doc(tenant_id),
+		)
+		report["async_generated"] = True
+		return report
+
+	async def async_enforce_retention(self, tenant_id: str) -> dict[str, Any]:
+		"""Async retention enforcement — suitable for scheduled background tasks.
+
+		Emits a structured lifecycle event for each flagged document so downstream
+		Bytewax topologies can drive automated disposition queues.
+		"""
+		import asyncio
+		result = await asyncio.get_event_loop().run_in_executor(
+			None,
+			lambda: self.retention_enforce(tenant_id),
+		)
+		tenant = self._tenant(tenant_id)
+		for item in result.get("flagged_documents", []):
+			self._emit(tenant, "document_retention_expired", {
+				"id": item["document_id"],
+				"type": "grc_document",
+				"status": "retention_expired",
+				**item,
+			})
+		result["events_emitted"] = len(result.get("flagged_documents", []))
+		return result
+
+	async def async_disposition_execute(
+		self,
+		document_id: str,
+		tenant_id: str,
+		disposition: str,
+		executed_by: str,
+	) -> dict[str, Any]:
+		"""Execute disposition asynchronously. Types: destroy | transfer | preserve."""
+		import asyncio
+		return await asyncio.get_event_loop().run_in_executor(
+			None,
+			lambda: self.disposition_execute(document_id, tenant_id, disposition, executed_by),
+		)
+
+	async def async_grant_access(
+		self,
+		grant_id: str,
+		tenant_id: str,
+		document_id: str,
+		principal_id: str,
+		permission: str,
+		expires_on: str | None = None,
+	) -> dict[str, Any]:
+		"""Async access grant — integrates with ABAC policy engines without blocking."""
+		import asyncio
+		return await asyncio.get_event_loop().run_in_executor(
+			None,
+			lambda: self.grant_access(grant_id, tenant_id, document_id, principal_id, permission, expires_on),
+		)
+
+	async def async_dashboard_summary(self, tenant_id: str) -> dict[str, Any]:
+		"""Async dashboard summary for non-blocking analytics endpoints."""
+		import asyncio
+		return await asyncio.get_event_loop().run_in_executor(
+			None,
+			lambda: self.dashboard_summary(tenant_id),
+		)
+
+	async def async_register_processing_job(
+		self,
+		job_id: str,
+		tenant_id: str,
+		document_id: str,
+		job_type: str,
+		processor: str = "bytewax",
+	) -> dict[str, Any]:
+		"""Register a processing job asynchronously and return a job handle with poll_url hint."""
+		import asyncio
+		record = await asyncio.get_event_loop().run_in_executor(
+			None,
+			lambda: self.register_processing_job(job_id, tenant_id, document_id, job_type, processor),
+		)
+		record["poll_url"] = f"/api/v1/grc/doc/jobs/{record['id']}"
+		return record
+
+	async def async_document_lineage(
+		self,
+		document_id: str,
+		tenant_id: str,
+		depth: int = 3,
+	) -> dict[str, Any]:
+		"""Return upstream and downstream document lineage up to `depth` hops.
+
+		Traverses `_links` (populated by document_link) and returns a directed
+		adjacency list for graph visualization or impact-analysis tooling.
+		"""
+		tenant = self._tenant(tenant_id)
+		links: list[dict[str, Any]] = getattr(self, "_links", [])
+		tenant_links = [lk for lk in links if lk.get("tenant_id") == tenant]
+
+		def _walk(node_id: str, direction: str, hops: int) -> list[str]:
+			if hops <= 0:
+				return []
+			neighbors = []
+			for lk in tenant_links:
+				if direction == "downstream" and lk.get("source_doc_id") == node_id:
+					neighbors.append(lk["target_doc_id"])
+				elif direction == "upstream" and lk.get("target_doc_id") == node_id:
+					neighbors.append(lk["source_doc_id"])
+			result = list(neighbors)
+			for n in neighbors:
+				result.extend(_walk(n, direction, hops - 1))
+			return list(dict.fromkeys(result))
+
+		return {
+			"document_id": document_id,
+			"tenant_id": tenant,
+			"upstream": _walk(document_id, "upstream", depth),
+			"downstream": _walk(document_id, "downstream", depth),
+			"link_count": len(tenant_links),
+			"retrieved_at": self._now(),
+		}
+
+	async def async_sign_document(
+		self,
+		document_id: str,
+		tenant_id: str,
+		signer_id: str,
+		signature_metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Record a digital-signature attestation on a document.
+
+		Stores a structured attestation record (signer, time, metadata).
+		Production deployments should bind an HSM / KMS signing adapter here.
+		"""
+		tenant = self._tenant(tenant_id)
+		doc = self.documents.get(document_id)
+		if not doc or doc["tenant_id"] != tenant:
+			raise PermissionError("document_required")
+		sig_id = self._record_id("sig")
+		attestation = {
+			"id": sig_id,
+			"type": "grc_document_signature",
+			"kind": "signature",
+			"tenant_id": tenant,
+			"document_id": document_id,
+			"signer_id": signer_id,
+			"document_version": doc.get("version", 1),
+			"metadata": deepcopy(signature_metadata or {}),
+			"status": "signed",
+			"signed_at": self._now(),
+		}
+		if not hasattr(self, "_signatures"):
+			self._signatures: list[dict[str, Any]] = []
+		self._signatures.append(attestation)
+		doc["signature_id"] = sig_id
+		doc["signed_by"] = signer_id
+		doc["signed_at"] = attestation["signed_at"]
+		self._emit(tenant, "document_signed", attestation)
+		return deepcopy(attestation)
+
+	async def async_watermark_document(
+		self,
+		document_id: str,
+		tenant_id: str,
+		recipient_id: str,
+		watermark_text: str | None = None,
+	) -> dict[str, Any]:
+		"""Produce a watermarked derivative of a document for controlled distribution.
+
+		Creates a new derivative document record linked to the source via a
+		'watermarked_copy_of' lineage edge. The watermark string encodes
+		tenant + recipient + timestamp so any leaked copy is traceable.
+		"""
+		tenant = self._tenant(tenant_id)
+		doc = self.documents.get(document_id)
+		if not doc or doc["tenant_id"] != tenant:
+			raise PermissionError("document_required")
+		stamp = watermark_text or f"CONFIDENTIAL | {tenant} | {recipient_id} | {self._now()}"
+		derivative_id = self._record_id("wmdoc")
+		derivative = {
+			"id": derivative_id,
+			"type": "grc_document",
+			"kind": "document",
+			"tenant_id": tenant,
+			"title": f"[WATERMARKED] {doc['title']}",
+			"owner_id": doc["owner_id"],
+			"content": f"{stamp}\n\n{doc.get('content', '')}",
+			"document_type": doc.get("document_type", "record"),
+			"classification": doc.get("classification", "internal"),
+			"version": 1,
+			"source_document_id": document_id,
+			"watermark": stamp,
+			"recipient_id": recipient_id,
+			"legal_hold": False,
+			"metadata": {"watermarked": True, "source_document_id": document_id},
+			"status": "published",
+			"created_at": self._now(),
+			"updated_at": self._now(),
+		}
+		self.documents[derivative_id] = derivative
+		if not hasattr(self, "_links"):
+			self._links: list[dict[str, Any]] = []
+		self._links.append({
+			"link_id": self._record_id("link"),
+			"tenant_id": tenant,
+			"source_doc_id": document_id,
+			"target_doc_id": derivative_id,
+			"link_type": "watermarked_copy_of",
+			"created_at": self._now(),
+		})
+		self._emit(tenant, "document_watermarked", derivative)
+		return deepcopy(derivative)
+
+	async def async_record_operation_metric(
+		self,
+		operation: str,
+		duration_ms: float,
+		tenant_id: str,
+		status: str = "success",
+	) -> dict[str, Any]:
+		"""Record an operation latency metric for SLA monitoring.
+
+		Metrics are stored in `_metrics`. Production deployments should forward
+		these to Prometheus, InfluxDB, or a time-series table via a metrics adapter.
+		"""
+		tenant = self._tenant(tenant_id)
+		if not hasattr(self, "_metrics"):
+			self._metrics: list[dict[str, Any]] = []
+		metric = {
+			"tenant_id": tenant,
+			"operation": operation,
+			"duration_ms": duration_ms,
+			"status": status,
+			"recorded_at": self._now(),
+		}
+		self._metrics.append(metric)
+		return {"recorded": True, **metric}
+
+	async def async_sla_report(
+		self,
+		tenant_id: str,
+		period_days: int = 30,
+	) -> dict[str, Any]:
+		"""Return P50/P95/P99 latency and approval cycle-time SLA report.
+
+		Reads from `_metrics` accumulated by `async_record_operation_metric`.
+		"""
+		tenant = self._tenant(tenant_id)
+		metrics: list[dict[str, Any]] = [
+			m for m in getattr(self, "_metrics", [])
+			if m.get("tenant_id") == tenant
+		]
+		durations = sorted(m["duration_ms"] for m in metrics if "duration_ms" in m)
+
+		def _percentile(data: list[float], p: float) -> float | None:
+			if not data:
+				return None
+			idx = max(0, int(len(data) * p / 100) - 1)
+			return data[idx]
+
+		docs = self.list_records("documents", tenant)
+		return {
+			"tenant_id": tenant,
+			"period_days": period_days,
+			"operation_count": len(metrics),
+			"p50_ms": _percentile(durations, 50),
+			"p95_ms": _percentile(durations, 95),
+			"p99_ms": _percentile(durations, 99),
+			"approved_document_count": sum(1 for d in docs if d.get("approved_by")),
+			"published_document_count": sum(1 for d in docs if d.get("status") == "published"),
+			"on_legal_hold_count": sum(1 for d in docs if d.get("legal_hold")),
+			"generated_at": self._now(),
+		}
+
 	async def health_check(self) -> dict[str, Any]:
 		return {"healthy": True, "service": "grc_doc", "stream": DOC_EVENT_STREAM, "processor": "bytewax"}
 

@@ -115,3 +115,63 @@ Provides anonymised in-store analytics: foot traffic counting with multi-sensor 
 - **retail_prm** promotion placement can be guided by planogram compliance data
 - **retail_loy** CLV segments can enrich shopper journey attribution
 - Heatmaps and zone dwell data inform planogram and category placement decisions
+
+## Key Service Methods
+
+### Store & Zone Management
+| Method | Description |
+|---|---|
+| `create_store()` / `get_store()` / `list_stores()` | Store CRUD |
+| `create_zone()` / `list_zones()` | Zone management |
+
+### Sensors
+| Method | Description |
+|---|---|
+| `register_sensor()` / `sensor_heartbeat()` | Sensor lifecycle |
+| `sensor_network_health()` | Network health score (0–100), heartbeat age, uncovered zones |
+
+### Foot Traffic & Occupancy
+| Method | Description |
+|---|---|
+| `foot_traffic_record()` / `record_traffic_count()` | Ingest traffic counts |
+| `get_traffic_summary()` / `conversion_rate()` | Traffic aggregation |
+| `check_occupancy_compliance()` | Fire-code capacity breach detection and warnings |
+
+### Planogram Compliance
+| Method | Description |
+|---|---|
+| `record_planogram_audit()` / `list_planogram_audits()` | Audit lifecycle |
+| `get_store_compliance_rate()` | Weighted average compliance score |
+| `planogram_compliance_check()` | Trigger audit for a store/category |
+
+### Shelf Availability & Loss Prevention
+| Method | Description |
+|---|---|
+| `raise_shelf_alert()` / `resolve_shelf_alert()` / `trigger_replenishment()` | Alert lifecycle |
+| `shelf_availability_scan()` | Batch OOS scan |
+| `report_lp_incident()` / `escalate_lp_incident()` / `close_lp_incident()` | LP incident lifecycle |
+| `list_lp_incidents()` | LP incident query |
+
+### Conversion & Shopper Journeys
+| Method | Description |
+|---|---|
+| `record_conversion_event()` / `get_conversion_funnel()` | Funnel tracking |
+| `stitch_shopper_journey()` | Ordered zone-path reconstruction per session |
+
+### Analytics, KPIs & Benchmarking
+| Method | Description |
+|---|---|
+| `heat_map_analytics()` / `create_heatmap()` | Heatmap generation |
+| `compute_heatmap_diff()` | Signed intensity delta between two heatmap snapshots |
+| `record_kpi_snapshot()` / `list_kpi_snapshots()` | KPI time series |
+| `detect_kpi_trends()` | Linear trend + R² + weeks-to-breach estimate |
+| `benchmark_peer_group()` | Percentile rank vs. format-matched peer group |
+| `sales_density()` / `staff_productivity()` / `store_ranking()` | Operational KPIs |
+| `forecast_staffing_demand()` | Demand-driven headcount schedule by day-of-week |
+| `competitor_price_monitoring()` | Price index tracking |
+
+### Reporting
+| Method | Description |
+|---|---|
+| `store_performance_summary()` | Dashboard aggregate |
+| `store_diagnostics_report()` | Full diagnostics: traffic, compliance, alerts, staff, density |

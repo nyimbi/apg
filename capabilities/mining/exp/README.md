@@ -51,6 +51,10 @@ Manages the full lifecycle of mineral exploration data from drill-hole collar lo
 | /api/mining-exp/drillholes | POST | Create collar | mining_exp:write |
 | /api/mining-exp/drillholes/:id | GET | Get collar | mining_exp:view |
 | /api/mining-exp/drillholes/:id/depth | PATCH | Update actual depth | mining_exp:write |
+| /api/mining-exp/drillholes/:id/desurvey | GET | 3D desurveyed path | mining_exp:view |
+| /api/mining-exp/drillholes/:id/surveys | POST | Record deviation survey | mining_exp:write |
+| /api/mining-exp/drillholes/:id/gaps | GET | Detect sampling gaps | mining_exp:view |
+| /api/mining-exp/drillholes/:id/composites | GET | Fixed-length grade composites | mining_exp:view |
 | /api/mining-exp/assays | GET | List assay results | mining_exp:view |
 | /api/mining-exp/assays/import | POST | Bulk import assays | mining_exp:write |
 | /api/mining-exp/assays/hole/:hole_id | GET | Assays for a hole | mining_exp:view |
@@ -60,10 +64,19 @@ Manages the full lifecycle of mineral exploration data from drill-hole collar lo
 | /api/mining-exp/resources | GET/POST | List/create resource estimates | mining_exp:resources |
 | /api/mining-exp/resources/:id/approve | POST | Approve estimate | mining_exp:resources |
 | /api/mining-exp/resources/:id/publish | POST | Publish estimate | mining_exp:resources |
+| /api/mining-exp/resources/domains | GET/POST | List/create resource domains | mining_exp:resources |
+| /api/mining-exp/resources/domains/assign | POST | Assign intervals to domains | mining_exp:resources |
 | /api/mining-exp/reports | GET/POST | List/create compliance reports | mining_exp:reports |
 | /api/mining-exp/reports/:id/sign-off | POST | CP sign-off | mining_exp:reports |
 | /api/mining-exp/reports/:id/publish | POST | Publish report | mining_exp:reports |
 | /api/mining-exp/summary | GET | KPI summary | mining_exp:view |
+| /api/mining-exp/licences/:id/validate-programme | GET | Spatial boundary validation | mining_exp:spatial |
+| /api/mining-exp/competent-persons | POST | Register CP | mining_exp:admin |
+| /api/mining-exp/competent-persons/:id/validate | GET | Validate CP credential | mining_exp:view |
+| /api/mining-exp/bulk-density | POST | Record bulk density measurement | mining_exp:write |
+| /api/mining-exp/bulk-density/summary | GET | BD statistics by lithology | mining_exp:view |
+| /api/mining-exp/expenditures | POST | Record expenditure line item | mining_exp:finance |
+| /api/mining-exp/expenditures/cost-per-unit | GET | Cost per resource unit | mining_exp:finance |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -115,3 +128,6 @@ Manages the full lifecycle of mineral exploration data from drill-hole collar lo
 - JORC reports referenced in `mining_env` ESG and closure documentation
 - Integrates with `geos` for spatial indexing and map tile serving
 - Assay data consumed by `ragn` for geological RAG queries
+- Expenditure data feeds `mining_fin` for exploration budget reporting
+- Desurveyed 3D collar paths exported to `mining_3d` for block model alignment
+- CP credential registry consumed by `wflo` for automated approval gating

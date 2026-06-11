@@ -44,9 +44,17 @@ Manages the complete pharmacovigilance lifecycle from adverse event intake throu
 |------|--------|-------------|------------|
 | /pharma-pvi/api/v1/cases | POST | Create AE case | pharma_pvi:cases |
 | /pharma-pvi/api/v1/cases/<id>/process | POST | Process case with MedDRA | pharma_pvi:cases |
+| /pharma-pvi/api/v1/cases/<id>/narrative | POST | Generate AI case narrative | pharma_pvi:cases |
+| /pharma-pvi/api/v1/cases/<id>/duplicates | GET | Auto-detect duplicate cases | pharma_pvi:cases |
 | /pharma-pvi/api/v1/submissions | POST | Submit ICSR | pharma_pvi:submissions |
+| /pharma-pvi/api/v1/submissions/batch | POST | Batch submit ICSRs | pharma_pvi:submissions |
+| /pharma-pvi/api/v1/submissions/timeline | GET | Check timeline compliance | pharma_pvi:submissions |
 | /pharma-pvi/api/v1/signals | POST | Create safety signal | pharma_pvi:signals |
 | /pharma-pvi/api/v1/psur | POST | Create PSUR report | pharma_pvi:psur |
+| /pharma-pvi/api/v1/psur/eurd-check | GET | PSUR EURD deadline check | pharma_pvi:psur |
+| /pharma-pvi/api/v1/dsur | POST | Generate DSUR (ICH E2F) | pharma_pvi:psur |
+| /pharma-pvi/api/v1/susar-listing | GET | SUSAR line listing for EudraCT | pharma_pvi:submissions |
+| /pharma-pvi/api/v1/rmp/<id>/safety-concern | POST | Update RMP safety concern | pharma_pvi:signals |
 | /pharma-pvi/api/v1/follow-ups | POST | Request follow-up | pharma_pvi:follow_up |
 | /pharma-pvi/api/v1/literature | GET | List literature records | pharma_pvi:literature |
 
@@ -82,5 +90,17 @@ Manages the complete pharmacovigilance lifecycle from adverse event intake throu
 - PSUR benefit-risk assessment must be affirmative before submission regardless of DLP deadline
 - Closed signals require clinical review even when disproportionality signals are refuted
 
+## New Async Methods (v1.1)
+| Method | Description |
+|--------|-------------|
+| `check_timeline_compliance(tenant_id, case_id?, product_id?)` | ICH E2A deadline compliance scores with breach records |
+| `auto_detect_duplicates(case_id, tenant_id, threshold?)` | Similarity-scored duplicate candidate ranking |
+| `generate_case_narrative(case_id, tenant_id, model?)` | Ollama LLM-drafted ICH E2B(R3) G.k.9 narrative |
+| `generate_dsur(drug_id, trial_id, period, tenant_id, ...)` | DSUR report structure per ICH E2F |
+| `generate_susar_line_listing(trial_id, tenant_id, ...)` | EudraCT/CTIS-formatted SUSAR line listing |
+| `update_rmp_safety_concern(rmp_id, concern_id, signal_id, ...)` | Link confirmed signal to EU RMP safety concern |
+| `batch_submit_icsrs(tenant_id, case_ids, regulatory_database, ...)` | Concurrent ICSR batch submission with partial-failure handling |
+| `psur_eurd_deadline_check(tenant_id, drug_id, active_substance, ibrd, ...)` | EMA EURD deadline computation with urgency classification |
+
 ## Composability Notes
-Receives adverse event signals from `pharma_ctr` for clinical trial SAEs. Feeds signal data to `pharma_rec` for post-market surveillance reports. PSUR submissions link to `pharma_reg` product registration lifecycle. Integrates with `nlpc` for automated narrative drafting assistance.
+Receives adverse event signals from `pharma_ctr` for clinical trial SAEs. Feeds signal data to `pharma_rec` for post-market surveillance reports. PSUR submissions link to `pharma_reg` product registration lifecycle. Integrates with `nlpc` for automated narrative drafting assistance. RMP safety concern updates emit `rmp_update_required` to `pharma_reg`.

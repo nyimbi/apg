@@ -161,6 +161,104 @@ service.validate_batch_backup_mutation(
 )
 ```
 
+## Advanced Features (v1.1)
+
+### Immutable Merkle Ledger
+
+Every snapshot can be appended to a SHA-256 Merkle chain. `verify_ledger()` recomputes
+hashes end-to-end and returns the first tampered entry index if the chain is broken.
+
+```python
+import asyncio
+from capabilities.common.bkup.service import BkupService
+
+svc = BkupService(tenant_id="acme")
+
+async def demo():
+    plan = await svc.create_backup_plan("ledger-plan", ["db-primary"])
+    snap = await svc.backup_run(plan["plan_id"])
+    await svc.ledger_append(snap["snapshot_id"])
+    result = await svc.verify_ledger()
+    assert result["valid"] is True
+
+asyncio.run(demo())
+```
+
+### Decimal-Precise Cost Estimation
+
+```python
+from decimal import Decimal
+
+async def cost_demo():
+    report = await svc.cost_breakdown_report(
+        storage_cost_per_gb=Decimal("0.023"),
+        egress_cost_per_gb=Decimal("0.009"),
+    )
+    print(report["grand_total_monthly_cost_usd"])  # e.g. "1.47"
+```
+
+### SLA Breach Alerting
+
+```python
+async def sla_demo():
+    result = await svc.sla_breach_check(plan_id, warn_pct=0.8)
+    # result["severity"] in {"ok", "warning", "critical", "unknown"}
+    events = await svc.list_sla_events(severity="critical")
+```
+
+### Statistical Anomaly Detection
+
+Flags snapshots whose `size_bytes` deviates more than `z_threshold` standard
+deviations from the per-type rolling mean — a signal of ransomware staging or
+misconfiguration.
+
+```python
+anomalies = await svc.detect_anomalies(plan_id, z_threshold=3.0)
+```
+
+### WORM Compliance Locking
+
+```python
+await svc.worm_lock(snapshot_id, lock_until="2027-01-01T00:00:00", reason="SEC-17a4")
+locked = await svc.list_worm_locked_snapshots()
+# attempting bulk_delete_snapshots on a locked snapshot raises ValueError
+```
+
+### Parallel Backup Execution
+
+```python
+result = await svc.parallel_backup_run(plan_id, backup_type="full", max_concurrency=4)
+print(result["succeeded"], "/", result["total_sources"])
+```
+
+### Continuous Data Protection (CDP)
+
+Enable CDP on a plan then stream change events for sub-second RPO:
+
+```python
+await svc.update_plan(plan_id, cdp_enabled=True)
+await svc.journal_write_event(plan_id, "db-primary", "row-level-change", bytes_changed=512)
+stats = await svc.cdp_journal_stats(plan_id)
+restore = await svc.cdp_restore_to_second(plan_id, "2026-06-11T14:30:45", "staging", "ops")
+```
+
+### Multi-Region Replication with Quorum
+
+```python
+rep = await svc.replicate_to_regions(snapshot_id, regions=["us-east-1", "eu-west-1", "ap-southeast-1"], quorum=2)
+assert rep["quorum_met"] is True
+assert await svc.quorum_met(snapshot_id) is True
+```
+
+### Backup Policy as Code (BPaC)
+
+```python
+bundle_json = await svc.export_policy_bundle([plan_id])
+# commit bundle_json to git, then on another tenant:
+result = await svc.import_policy_bundle(bundle_json, conflict_mode="skip")
+print(result["created"], "plans imported")
+```
+
 ## Composition Contract
 
 `get_capability_contract()` returns the executable APG contract:

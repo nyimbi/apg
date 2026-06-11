@@ -57,8 +57,14 @@ Multi-Currency Management (MCY) provides full lifecycle management of currencies
 | `/loc-mcy/api/v1/currencies/<id>` | PUT | Update currency | `loc_mcy:currencies_write` |
 | `/loc-mcy/api/v1/exchange-rates` | GET | List exchange rates | `loc_mcy:exchange_rates` |
 | `/loc-mcy/api/v1/exchange-rates` | POST | Record exchange rate | `loc_mcy:exchange_rates_write` |
+| `/loc-mcy/api/v1/exchange-rates/bulk` | POST | Bulk record exchange rates | `loc_mcy:exchange_rates_write` |
 | `/loc-mcy/api/v1/exchange-rates/<id>` | GET | Get exchange rate | `loc_mcy:exchange_rates` |
+| `/loc-mcy/api/v1/exchange-rates/history` | GET | Rate history for a pair | `loc_mcy:exchange_rates` |
+| `/loc-mcy/api/v1/exchange-rates/stale` | GET | Detect stale rates | `loc_mcy:exchange_rates` |
+| `/loc-mcy/api/v1/exchange-rates/matrix` | GET | Rate matrix for a currency set | `loc_mcy:exchange_rates` |
+| `/loc-mcy/api/v1/exchange-rates/spread-analysis` | GET | Spread & volatility analysis | `loc_mcy:exchange_rates` |
 | `/loc-mcy/api/v1/convert` | GET | Convert currency amount | `loc_mcy:exchange_rates` |
+| `/loc-mcy/api/v1/convert/batch` | POST | Batch currency conversion | `loc_mcy:exchange_rates` |
 | `/loc-mcy/api/v1/fx-accounts` | GET | List FX accounts | `loc_mcy:fx_accounts` |
 | `/loc-mcy/api/v1/fx-accounts` | POST | Register FX account | `loc_mcy:fx_accounts` |
 | `/loc-mcy/api/v1/fx-accounts/<id>` | GET | Get FX account | `loc_mcy:fx_accounts` |
@@ -72,6 +78,9 @@ Multi-Currency Management (MCY) provides full lifecycle management of currencies
 | `/loc-mcy/api/v1/translation/<id>` | GET | Get translation | `loc_mcy:translation` |
 | `/loc-mcy/api/v1/translation/<id>/post` | POST | Post translation | `loc_mcy:translation_write` |
 | `/loc-mcy/api/v1/fx-reporting` | GET | FX gain/loss report | `loc_mcy:fx_reporting` |
+| `/loc-mcy/api/v1/fx-reporting/projection` | POST | FX impact projection | `loc_mcy:fx_reporting` |
+| `/loc-mcy/api/v1/exposure/consolidated` | GET | Consolidated multi-entity exposure | `loc_mcy:fx_reporting` |
+| `/loc-mcy/api/v1/period-close/checklist` | GET | Period-close readiness check | `loc_mcy:revaluation_write` |
 | `/loc-mcy/api/v1/agents` | GET | List agents | `loc_mcy:admin` |
 | `/loc-mcy/api/v1/agents` | POST | Register agent | `loc_mcy:admin` |
 | `/loc-mcy/api/v1/dashboard` | GET | Dashboard summary | `loc_mcy:view` |
@@ -112,6 +121,7 @@ Multi-Currency Management (MCY) provides full lifecycle management of currencies
 |-------|---------|
 | `currency_configured` | New currency configured |
 | `exchange_rate_recorded` | Rate recorded |
+| `bulk_rates_uploaded` | Bulk rate upload batch completed |
 | `revaluation_created` | Revaluation run created |
 | `revaluation_approved` | Revaluation approved |
 | `revaluation_posted` | Revaluation posted to ledger |
@@ -119,6 +129,7 @@ Multi-Currency Management (MCY) provides full lifecycle management of currencies
 | `translation_created` | Translation run created |
 | `translation_posted` | Translation posted |
 | `fx_gain_loss_calculated` | FX report generated |
+| `period_close_checked` | Period-close checklist executed |
 | `agent_registered` | Agent registered |
 
 ## Edge Cases Handled

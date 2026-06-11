@@ -1189,6 +1189,627 @@ class TelecomSecurityService:
 		"""Get Kpis"""
 		return {"tenant_id": tenant_id, "period": period, "computed_at": _utcnow()}
 
+	# ------------------------------------------------------------------ #
+	# New world-class async methods                                        #
+	# ------------------------------------------------------------------ #
+
+	async def evaluate_fraud_risk_score(
+		self,
+		msisdn: str,
+		features: dict[str, Any],
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Compute a composite fraud risk score for an MSISDN using multi-signal fusion.
+
+		Combines velocity signals (calls per hour, SMS per hour), geographic
+		anomaly score, historical fraud flags, SIM swap history, and active
+		threat intel IOC matches into a single 0.0–1.0 risk score.
+		Returns score, contributing signals, recommended action, and whether
+		the score exceeds the auto-block threshold (0.85).
+
+		Args:
+			msisdn: Target subscriber number.
+			features: Dict with keys: calls_per_hour, sms_per_hour,
+				geo_anomaly_score (0–1), is_roaming, recent_fraud_flag,
+				account_age_days.
+			tenant_id: Tenant scope.
+		"""
+		assert msisdn, "msisdn required"
+		assert features, "features required"
+
+		calls_ph = float(features.get("calls_per_hour", 0))
+		sms_ph = float(features.get("sms_per_hour", 0))
+		geo_anomaly = float(features.get("geo_anomaly_score", 0.0))
+		is_roaming = bool(features.get("is_roaming", False))
+		recent_fraud_flag = bool(features.get("recent_fraud_flag", False))
+		account_age_days = int(features.get("account_age_days", 365))
+
+		signals: dict[str, float] = {}
+		score = 0.0
+
+		# Velocity: >50 calls/h is anomalous
+		call_velocity_score = min(1.0, calls_ph / 100.0)
+		signals["call_velocity"] = round(call_velocity_score, 3)
+		score += call_velocity_score * 0.20
+
+		# SMS velocity: >200/h
+		sms_velocity_score = min(1.0, sms_ph / 200.0)
+		signals["sms_velocity"] = round(sms_velocity_score, 3)
+		score += sms_velocity_score * 0.15
+
+		# Geographic anomaly
+		signals["geo_anomaly"] = round(geo_anomaly, 3)
+		score += geo_anomaly * 0.25
+
+		# Roaming adds moderate risk
+		if is_roaming:
+			signals["roaming"] = 0.15
+			score += 0.15
+
+		# Prior fraud flag is strong signal
+		if recent_fraud_flag:
+			signals["recent_fraud_flag"] = 0.40
+			score += 0.40
+
+		# New accounts (< 30 days) are higher risk
+		if account_age_days < 30:
+			signals["new_account"] = 0.20
+			score += 0.20
+
+		# Active SIM swap history
+		prior_swaps = sum(
+			1 for e in self._sim_swap_events
+			if e.get("msisdn") == msisdn and e.get("tenant_id") == tenant_id
+		)
+		if prior_swaps > 0:
+			swap_signal = min(0.30, prior_swaps * 0.10)
+			signals["sim_swap_history"] = round(swap_signal, 3)
+			score += swap_signal
+
+		# Threat intel IOC match
+		ioc_match = any(
+			intel.ioc_value == msisdn
+			for intel in self.threat_intel.values()
+			if intel.tenant_id == tenant_id and intel.ioc_type in ("msisdn", "phone")
+		)
+		if ioc_match:
+			signals["ioc_match"] = 0.50
+			score += 0.50
+
+		score = min(1.0, round(score, 3))
+		auto_block_threshold = 0.85
+		action = "block" if score >= auto_block_threshold else ("review" if score >= 0.50 else "allow")
+
+		result: dict[str, Any] = {
+			"msisdn": msisdn,
+			"tenant_id": tenant_id,
+			"risk_score": score,
+			"contributing_signals": signals,
+			"recommended_action": action,
+			"auto_block": score >= auto_block_threshold,
+			"ioc_match": ioc_match,
+			"sim_swap_count": prior_swaps,
+			"assessed_at": _utcnow(),
+		}
+		if action == "block":
+			self._audit(tenant_id, "fraud_auto_block_triggered", msisdn)
+		return result
+
+	async def correlate_signaling_attacks(
+		self,
+		tenant_id: str = "default",
+		window_minutes: int = 60,
+	) -> dict[str, Any]:
+		"""Correlate SS7 and Diameter attacks within a time window to identify coordinated campaigns.
+
+		Groups attacks by source reference and attack type to detect multi-vector
+		campaigns. Returns clusters of correlated attacks with an aggregate
+		confidence score and a suggested incident severity.
+
+		Args:
+			tenant_id: Tenant scope.
+			window_minutes: Look-back window in minutes (max 1440).
+		"""
+		assert 1 <= window_minutes <= 1440, "window_minutes must be 1–1440"
+
+		ss7 = [a for a in self.ss7_attacks.values() if a.tenant_id == tenant_id]
+		diameter = [a for a in self.diameter_attacks.values() if a.tenant_id == tenant_id]
+
+		# Group SS7 by source
+		ss7_by_source: dict[str, list[str]] = {}
+		for a in ss7:
+			ss7_by_source.setdefault(a.source_reference, []).append(a.attack_type)
+
+		# Group Diameter by source realm
+		dia_by_realm: dict[str, list[str]] = {}
+		for a in diameter:
+			dia_by_realm.setdefault(a.source_realm, []).append(a.attack_type)
+
+		clusters: list[dict[str, Any]] = []
+		# Sources that appear in both SS7 and Diameter — likely coordinated
+		common_sources = set(ss7_by_source) & set(dia_by_realm)
+		for src in common_sources:
+			attack_types = list(set(ss7_by_source[src] + dia_by_realm[src]))
+			clusters.append({
+				"source": src,
+				"ss7_attack_types": ss7_by_source[src],
+				"diameter_attack_types": dia_by_realm[src],
+				"combined_attack_types": attack_types,
+				"vector_count": len(attack_types),
+				"coordinated": True,
+				"confidence": min(0.95, 0.50 + len(attack_types) * 0.10),
+			})
+
+		# Single-protocol clusters (>1 attack type from same source)
+		for src, types in ss7_by_source.items():
+			if src in common_sources:
+				continue
+			if len(types) > 1:
+				clusters.append({
+					"source": src,
+					"ss7_attack_types": types,
+					"diameter_attack_types": [],
+					"combined_attack_types": list(set(types)),
+					"vector_count": len(set(types)),
+					"coordinated": False,
+					"confidence": min(0.80, 0.30 + len(set(types)) * 0.10),
+				})
+
+		severity = "critical" if any(c["coordinated"] for c in clusters) else (
+			"high" if clusters else "low"
+		)
+		result: dict[str, Any] = {
+			"tenant_id": tenant_id,
+			"window_minutes": window_minutes,
+			"ss7_attack_total": len(ss7),
+			"diameter_attack_total": len(diameter),
+			"cluster_count": len(clusters),
+			"coordinated_campaign_detected": any(c["coordinated"] for c in clusters),
+			"suggested_severity": severity,
+			"clusters": clusters,
+			"correlated_at": _utcnow(),
+		}
+		if clusters:
+			self._audit(tenant_id, "signaling_attack_correlation_run", f"clusters:{len(clusters)}")
+		return result
+
+	async def generate_security_posture_score(
+		self,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Compute a unified 0–100 Security Posture Score for a tenant.
+
+		Aggregates: open critical incidents, unmitigated SS7/Diameter attacks,
+		fraud case velocity, active intercept compliance, stale threat intel,
+		and recent intrusion detections.  Lower score = weaker posture.
+		Returns score, dimension breakdown, and a human-readable grade.
+		"""
+		# --- Incident dimension (0–25) ---
+		total_incidents = [i for i in self.incidents.values() if i.tenant_id == tenant_id]
+		open_critical = sum(1 for i in total_incidents if i.status in ("new", "under_investigation") and i.severity == "critical")
+		open_high = sum(1 for i in total_incidents if i.status in ("new", "under_investigation") and i.severity == "high")
+		incident_penalty = min(25, open_critical * 10 + open_high * 5)
+		incident_score = 25 - incident_penalty
+
+		# --- Signaling dimension (0–25) ---
+		ss7_count = self._count(self.ss7_attacks, tenant_id)
+		dia_count = self._count(self.diameter_attacks, tenant_id)
+		signaling_penalty = min(25, (ss7_count + dia_count) * 2)
+		signaling_score = 25 - signaling_penalty
+
+		# --- Fraud dimension (0–25) ---
+		open_fraud = sum(1 for f in self.fraud_cases.values() if f.tenant_id == tenant_id and f.status == "open")
+		fraud_penalty = min(25, open_fraud * 3)
+		fraud_score = 25 - fraud_penalty
+
+		# --- Compliance dimension (0–25) ---
+		total_intercepts = [ic for ic in self.intercepts.values() if ic.tenant_id == tenant_id]
+		expired_intercepts = sum(1 for ic in total_intercepts if ic.status == "expired")
+		stale_intel = sum(
+			1 for ti in self.threat_intel.values()
+			if ti.tenant_id == tenant_id and ti.valid_to and ti.valid_to < _utcnow()
+		)
+		compliance_penalty = min(25, expired_intercepts * 5 + stale_intel * 1)
+		compliance_score = 25 - compliance_penalty
+
+		total_score = incident_score + signaling_score + fraud_score + compliance_score
+		grade = (
+			"A" if total_score >= 90 else
+			"B" if total_score >= 75 else
+			"C" if total_score >= 60 else
+			"D" if total_score >= 45 else
+			"F"
+		)
+		result: dict[str, Any] = {
+			"tenant_id": tenant_id,
+			"posture_score": total_score,
+			"grade": grade,
+			"dimensions": {
+				"incident_management": incident_score,
+				"signaling_security": signaling_score,
+				"fraud_control": fraud_score,
+				"compliance": compliance_score,
+			},
+			"open_critical_incidents": open_critical,
+			"open_fraud_cases": open_fraud,
+			"expired_intercepts": expired_intercepts,
+			"stale_threat_intel": stale_intel,
+			"computed_at": _utcnow(),
+		}
+		self._audit(tenant_id, "security_posture_score_computed", f"score:{total_score}")
+		return result
+
+	async def enrich_threat_intel_ioc(
+		self,
+		ioc_value: str,
+		ioc_type: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Enrich a threat IOC by cross-referencing all internal signal stores.
+
+		Checks: fraud case history, SS7 source references, intrusion events,
+		SIM swap events, and existing threat intel entries.  Returns a
+		consolidated enrichment record with all correlated findings and
+		an enriched confidence score.
+
+		Args:
+			ioc_value: The IOC to enrich (IP, MSISDN, IMSI, realm, etc.).
+			ioc_type: One of ipv4, ipv6, msisdn, imsi, domain, realm.
+			tenant_id: Tenant scope.
+		"""
+		assert ioc_value, "ioc_value required"
+		assert ioc_type, "ioc_type required"
+
+		correlations: list[dict[str, Any]] = []
+
+		# Check fraud cases
+		for fc in self.fraud_cases.values():
+			if fc.tenant_id == tenant_id and ioc_value in (fc.msisdn, fc.evidence_reference):
+				correlations.append({"source": "fraud_case", "id": fc.id, "type": fc.fraud_type, "status": fc.status})
+
+		# Check SS7 attacks
+		for atk in self.ss7_attacks.values():
+			if atk.tenant_id == tenant_id and ioc_value in (atk.source_reference, atk.target_reference):
+				correlations.append({"source": "ss7_attack", "id": atk.id, "type": atk.attack_type})
+
+		# Check Diameter attacks
+		for atk in self.diameter_attacks.values():
+			if atk.tenant_id == tenant_id and ioc_value in (atk.source_realm, atk.target_realm):
+				correlations.append({"source": "diameter_attack", "id": atk.id, "type": atk.attack_type})
+
+		# Check intrusion events
+		for ev in self._intrusion_events:
+			if ev.get("tenant_id") == tenant_id and ioc_value in (ev.get("source_ip", ""), ev.get("event_id", "")):
+				correlations.append({"source": "intrusion", "id": ev.get("event_id"), "threat_score": ev.get("threat_score")})
+
+		# Check existing threat intel for same IOC
+		existing_intel = [
+			ti.to_dict() for ti in self.threat_intel.values()
+			if ti.tenant_id == tenant_id and ti.ioc_value == ioc_value
+		]
+
+		# Confidence: number of corroborating sources
+		base_confidence = min(1.0, len(correlations) * 0.15 + (0.40 if existing_intel else 0.0))
+
+		result: dict[str, Any] = {
+			"ioc_value": ioc_value,
+			"ioc_type": ioc_type,
+			"tenant_id": tenant_id,
+			"correlation_count": len(correlations),
+			"correlations": correlations,
+			"existing_intel_entries": existing_intel,
+			"enriched_confidence": round(base_confidence, 3),
+			"recommended_tlp": "red" if base_confidence >= 0.75 else ("amber" if base_confidence >= 0.40 else "green"),
+			"enriched_at": _utcnow(),
+		}
+		self._audit(tenant_id, "threat_ioc_enriched", ioc_value)
+		return result
+
+	async def run_red_team_scenario(
+		self,
+		scenario_name: str,
+		tenant_id: str = "default",
+		dry_run: bool = True,
+	) -> dict[str, Any]:
+		"""Replay a known GSMA attack scenario against the live detection logic.
+
+		Built-in scenarios: gsma_sri_tracking, wangiri_burst, irsf_highrate,
+		sim_swap_chain, ss7_location_hijack, diameter_realm_spoof.
+		Each scenario fires synthetic events through the relevant detection
+		method and checks that the expected verdict is produced.
+		Returns pass/fail result and detection coverage metrics.
+
+		Args:
+			scenario_name: Name of the scenario to run.
+			dry_run: If True, events are not persisted to audit log.
+			tenant_id: Tenant scope.
+		"""
+		scenarios: dict[str, dict[str, Any]] = {
+			"gsma_sri_tracking": {
+				"method": "ss7_attack_detection",
+				"payload": {"message_type": "sendRoutingInfo", "source_gt": "447799000001", "opcode": "sri", "imsi": "63400000000001"},
+				"expected_detected": True,
+				"expected_attack_type": "location_tracking",
+			},
+			"ss7_location_hijack": {
+				"method": "ss7_attack_detection",
+				"payload": {"message_type": "updateLocation", "source_gt": "123456789", "opcode": "ul", "imsi": "63400000000002"},
+				"expected_detected": True,
+				"expected_attack_type": "location_hijacking",
+			},
+			"diameter_realm_spoof": {
+				"method": "diameter_fraud_detection",
+				"payload": {"command_code": 321, "origin_realm": "evil.example.com", "destination_realm": "mobile.safaricom.com", "avp_list": []},
+				"expected_detected": True,
+				"expected_attack_type": "realm_spoofing",
+			},
+			"irsf_highrate": {
+				"method": "voip_fraud_detection",
+				"payload": {"cdr_id": "rt-001", "destination": "+8810000001", "duration_secs": 300, "call_count_last_hour": 5, "calling_number": "+254700000001"},
+				"expected_detected": True,
+				"expected_fraud_type": "irsf",
+			},
+			"wangiri_burst": {
+				"method": "voip_fraud_detection",
+				"payload": {"cdr_id": "rt-002", "destination": "+44700000001", "duration_secs": 2, "call_count_last_hour": 15, "calling_number": "+254700000002"},
+				"expected_detected": True,
+				"expected_fraud_type": "wangiri",
+			},
+			"sim_swap_chain": {
+				"method": "sim_swap_detection",
+				"payload": {"recent_password_reset": True, "geographic_anomaly": True, "high_value_transaction_after": True},
+				"customer_id": "rt-cust-001",
+				"expected_verdict": "suspicious",
+			},
+		}
+
+		if scenario_name not in scenarios:
+			raise ValueError(f"Unknown scenario {scenario_name!r}. Known: {list(scenarios)}")
+
+		scenario = scenarios[scenario_name]
+		method_name = scenario["method"]
+		payload = scenario["payload"]
+
+		# Execute the detection method
+		method = getattr(self, method_name)
+		if method_name in ("ss7_attack_detection", "diameter_fraud_detection", "voip_fraud_detection"):
+			result_data = await method(payload, tenant_id=tenant_id if not dry_run else "redteam_dryrun")
+			detected = result_data.get("detected", False)
+			actual_type = result_data.get("attack_type") or result_data.get("fraud_type")
+			expected_detected = scenario.get("expected_detected", True)
+			expected_type = scenario.get("expected_attack_type") or scenario.get("expected_fraud_type")
+			passed = detected == expected_detected and (expected_type is None or actual_type == expected_type)
+		elif method_name == "sim_swap_detection":
+			result_data = await self.sim_swap_detection(
+				customer_id=scenario.get("customer_id", "rt-cust"),
+				event=payload,
+				tenant_id=tenant_id if not dry_run else "redteam_dryrun",
+			)
+			actual_verdict = result_data.get("verdict", result_data.get("suspicious"))
+			expected_verdict = scenario.get("expected_verdict")
+			passed = (actual_verdict == expected_verdict) if expected_verdict else True
+		else:
+			passed = False
+			result_data = {}
+
+		result: dict[str, Any] = {
+			"scenario": scenario_name,
+			"tenant_id": tenant_id,
+			"dry_run": dry_run,
+			"passed": passed,
+			"result_data": result_data,
+			"run_at": _utcnow(),
+		}
+		if not dry_run:
+			self._audit(tenant_id, "red_team_scenario_run", f"{scenario_name}:{'pass' if passed else 'fail'}")
+		return result
+
+	async def manage_intercept_expiry(
+		self,
+		tenant_id: str = "default",
+		warn_days_before: int = 7,
+	) -> dict[str, Any]:
+		"""Audit lawful intercept expiry and return pre-expiry warnings and expired records.
+
+		Intercepts expired as of now are returned as `expired_intercepts`.
+		Intercepts expiring within `warn_days_before` days are returned as
+		`expiring_soon`.  Expired records have their status updated to `expired`.
+		This method is safe to call repeatedly — idempotent on already-expired entries.
+
+		Args:
+			tenant_id: Tenant scope.
+			warn_days_before: Days before expiry to generate a warning (default 7).
+		"""
+		assert 1 <= warn_days_before <= 90, "warn_days_before must be 1–90"
+		now = datetime.datetime.utcnow()
+		warn_cutoff = now + datetime.timedelta(days=warn_days_before)
+
+		expired: list[dict[str, Any]] = []
+		expiring_soon: list[dict[str, Any]] = []
+
+		for intercept in self.intercepts.values():
+			if intercept.tenant_id != tenant_id:
+				continue
+			try:
+				expiry_dt = datetime.datetime.fromisoformat(intercept.expires_at.replace("Z", ""))
+			except Exception:
+				continue
+
+			if expiry_dt <= now:
+				if intercept.status != "expired":
+					intercept.status = "expired"
+					self._audit(tenant_id, "intercept_expired", intercept.id)
+				expired.append(intercept.to_dict())
+			elif expiry_dt <= warn_cutoff:
+				days_remaining = (expiry_dt - now).days
+				rec = intercept.to_dict()
+				rec["days_until_expiry"] = days_remaining
+				expiring_soon.append(rec)
+
+		result: dict[str, Any] = {
+			"tenant_id": tenant_id,
+			"warn_days_before": warn_days_before,
+			"expired_count": len(expired),
+			"expiring_soon_count": len(expiring_soon),
+			"expired_intercepts": expired,
+			"expiring_soon": expiring_soon,
+			"checked_at": _utcnow(),
+		}
+		self._audit(tenant_id, "intercept_expiry_audit_run", f"expired:{len(expired)},soon:{len(expiring_soon)}")
+		return result
+
+	async def multi_jurisdiction_compliance_matrix(
+		self,
+		tenant_id: str = "default",
+		jurisdictions: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Evaluate compliance across multiple jurisdictions simultaneously.
+
+		For each jurisdiction, checks: data retention, intercept warrant
+		completeness, evidence chain integrity (reference present),
+		and whether mandatory audit trail is populated.
+		Returns a per-jurisdiction compliance matrix and an overall status.
+
+		Args:
+			tenant_id: Tenant scope.
+			jurisdictions: List of jurisdiction codes to check. Defaults to
+				["KE", "TZ", "UG", "ZA", "EU"].
+		"""
+		if jurisdictions is None:
+			jurisdictions = ["KE", "TZ", "UG", "ZA", "EU"]
+
+		jurisdiction_policies: dict[str, dict[str, Any]] = {
+			"KE": {"retention_days": 90, "warrant_required": True, "right_to_erasure": False, "act": "Kenya Communications Act 2009"},
+			"TZ": {"retention_days": 180, "warrant_required": True, "right_to_erasure": False, "act": "EPOCA 2010"},
+			"UG": {"retention_days": 90, "warrant_required": True, "right_to_erasure": False, "act": "Uganda DNPPA 2019"},
+			"ZA": {"retention_days": 3650, "warrant_required": True, "right_to_erasure": False, "act": "RICA 2002 / POPIA 2020"},
+			"EU": {"retention_days": 730, "warrant_required": True, "right_to_erasure": True, "act": "GDPR / ePrivacy Directive"},
+			"US": {"retention_days": 365, "warrant_required": True, "right_to_erasure": False, "act": "CALEA / ECPA"},
+		}
+
+		now = datetime.datetime.utcnow()
+		matrix: list[dict[str, Any]] = []
+		overall_compliant = True
+
+		for jur in jurisdictions:
+			policy = jurisdiction_policies.get(jur.upper())
+			if policy is None:
+				matrix.append({"jurisdiction": jur, "status": "unknown", "reason": "no_policy_defined"})
+				continue
+
+			issues: list[str] = []
+			retention_days = policy["retention_days"]
+
+			# Check intercept warrant completeness
+			for ic in self.intercepts.values():
+				if ic.tenant_id != tenant_id:
+					continue
+				if not ic.warrant_reference:
+					issues.append(f"intercept:{ic.id}:missing_warrant")
+				if not ic.regulatory_authority:
+					issues.append(f"intercept:{ic.id}:missing_authority")
+
+			# Check retention: intercepts older than retention_days
+			for ic in self.intercepts.values():
+				if ic.tenant_id != tenant_id or not ic.activated_at:
+					continue
+				try:
+					age = (now - datetime.datetime.fromisoformat(ic.activated_at.replace("Z", ""))).days
+					if age > retention_days:
+						issues.append(f"intercept:{ic.id}:over_retention_{age}d")
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+			# Audit trail check: must have at least one audit event
+			audit_count = sum(1 for e in self.audit_events if e["tenant_id"] == tenant_id)
+			if audit_count == 0:
+				issues.append("no_audit_trail")
+
+			compliant = len(issues) == 0
+			if not compliant:
+				overall_compliant = False
+
+			matrix.append({
+				"jurisdiction": jur.upper(),
+				"act": policy["act"],
+				"retention_days": retention_days,
+				"warrant_required": policy["warrant_required"],
+				"right_to_erasure": policy["right_to_erasure"],
+				"compliant": compliant,
+				"issue_count": len(issues),
+				"issues": issues[:10],
+			})
+
+		result: dict[str, Any] = {
+			"tenant_id": tenant_id,
+			"overall_compliant": overall_compliant,
+			"jurisdiction_count": len(matrix),
+			"non_compliant_count": sum(1 for m in matrix if not m.get("compliant", True)),
+			"matrix": matrix,
+			"evaluated_at": _utcnow(),
+		}
+		self._audit(tenant_id, "multi_jurisdiction_compliance_matrix_run", f"jurisdictions:{','.join(jurisdictions)}")
+		return result
+
+	async def subscriber_anomaly_detection(
+		self,
+		msisdn: str,
+		current_metrics: dict[str, Any],
+		baseline_metrics: dict[str, Any],
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Detect subscriber behavioral anomalies by z-scoring current vs baseline metrics.
+
+		Computes z-scores for: call_volume, data_usage_mb, sms_count,
+		roaming_duration_min, international_call_ratio.  Any metric with
+		|z| > 3.0 is flagged as anomalous.  Returns per-metric z-scores,
+		flagged dimensions, and an overall anomaly verdict.
+
+		Args:
+			msisdn: Subscriber identifier.
+			current_metrics: Dict of current-period metric values.
+			baseline_metrics: Dict with p50 (mean) and p90 (used to infer std)
+				per metric: {metric_name: {"mean": float, "std": float}}.
+			tenant_id: Tenant scope.
+		"""
+		assert msisdn, "msisdn required"
+		assert current_metrics, "current_metrics required"
+		assert baseline_metrics, "baseline_metrics required"
+
+		METRIC_NAMES = ["call_volume", "data_usage_mb", "sms_count", "roaming_duration_min", "international_call_ratio"]
+		z_scores: dict[str, float] = {}
+		flagged: list[str] = []
+		ANOMALY_THRESHOLD = 3.0
+
+		for metric in METRIC_NAMES:
+			current_val = float(current_metrics.get(metric, 0))
+			baseline = baseline_metrics.get(metric, {})
+			mean = float(baseline.get("mean", 0))
+			std = float(baseline.get("std", 1))
+			if std <= 0:
+				std = 1.0  # prevent division by zero
+			z = (current_val - mean) / std
+			z_scores[metric] = round(z, 3)
+			if abs(z) > ANOMALY_THRESHOLD:
+				flagged.append(metric)
+
+		anomaly_detected = len(flagged) > 0
+		severity = "critical" if len(flagged) >= 3 else ("high" if len(flagged) == 2 else ("medium" if len(flagged) == 1 else "none"))
+
+		result: dict[str, Any] = {
+			"msisdn": msisdn,
+			"tenant_id": tenant_id,
+			"anomaly_detected": anomaly_detected,
+			"severity": severity,
+			"flagged_dimensions": flagged,
+			"z_scores": z_scores,
+			"anomaly_threshold": ANOMALY_THRESHOLD,
+			"assessed_at": _utcnow(),
+		}
+		if anomaly_detected:
+			self._audit(tenant_id, "subscriber_anomaly_detected", f"{msisdn}:{','.join(flagged)}")
+		return result
+
 
 # Backward-compatible alias
 TelecomSecService = TelecomSecurityService

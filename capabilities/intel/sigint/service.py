@@ -995,6 +995,592 @@ class SIGINTService:
 		"""Alias for direction_finding with cleaner name."""
 		return await self.direction_finding(signal_id, sensor_positions)
 
+	# ------------------------------------------------------------------
+	# World-class new async methods (improvement items 2, 3, 5, 8, 9, 13, 14, 15)
+	# ------------------------------------------------------------------
+
+	async def emitter_fingerprint(
+		self,
+		signal_id: str,
+		rf_features: dict[str, float],
+	) -> dict[str, Any]:
+		"""Compute and store an RF emitter fingerprint from measured signal features.
+
+		Accepts measured RF imperfection metrics:
+		  - frequency_offset_ppm: carrier frequency offset relative to nominal
+		  - phase_noise_dbc_hz: phase noise at 10 kHz offset (dBc/Hz)
+		  - startup_transient_us: duration of startup transient in microseconds
+		  - modulation_error_ratio_db: MER in dB (higher = cleaner)
+		  - harmonic_distortion_db: THD in dB (lower magnitude = cleaner)
+
+		Computes a deterministic fingerprint hash and a quality confidence score.
+		Stores fingerprint for subsequent emitter re-identification via
+		`emitter_reidentify`.
+		"""
+		assert present(signal_id), "signal_id required"
+		assert rf_features, "rf_features must be non-empty"
+
+		signal = self._signals.get(signal_id)
+		if signal is None:
+			raise KeyError(f"signal_id {signal_id!r} not found")
+
+		freq_offset_ppm = float(rf_features.get("frequency_offset_ppm", 0.0))
+		phase_noise = float(rf_features.get("phase_noise_dbc_hz", -100.0))
+		transient_us = float(rf_features.get("startup_transient_us", 0.0))
+		mer_db = float(rf_features.get("modulation_error_ratio_db", 20.0))
+		thd_db = float(rf_features.get("harmonic_distortion_db", -40.0))
+
+		# Fingerprint quality: higher MER + lower phase noise = more discriminating
+		discrimination_score = round(
+			min(1.0, (mer_db / 40.0) * (1.0 - min(1.0, abs(phase_noise + 100) / 60.0))),
+			4,
+		)
+
+		# Fingerprint vector as hex digest of feature values
+		feature_str = f"{freq_offset_ppm:.6f}|{phase_noise:.2f}|{transient_us:.3f}|{mer_db:.2f}|{thd_db:.2f}"
+		fingerprint_hash = _fingerprint(signal_id, feature_str)
+
+		fp_record: dict[str, Any] = {
+			"fingerprint_id": fingerprint_hash,
+			"signal_id": signal_id,
+			"rf_features": rf_features,
+			"frequency_offset_ppm": freq_offset_ppm,
+			"phase_noise_dbc_hz": phase_noise,
+			"startup_transient_us": transient_us,
+			"modulation_error_ratio_db": mer_db,
+			"harmonic_distortion_db": thd_db,
+			"discrimination_score": discrimination_score,
+			"fingerprinted_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+			"actor_id": self.actor_id,
+		}
+		# Store in emitters dict under fingerprint_hash for re-identification use
+		self._emitters[fingerprint_hash] = fp_record
+		self._audit(self.tenant_id, "sigint_emitter_fingerprinted", fingerprint_hash)
+		return fp_record
+
+	async def emitter_reidentify(
+		self,
+		rf_features: dict[str, float],
+		tolerance_ppm: float = 2.0,
+	) -> dict[str, Any]:
+		"""Attempt to re-identify an emitter by matching measured RF features against stored fingerprints.
+
+		Searches the fingerprint store for the closest match within tolerance_ppm
+		frequency offset tolerance. Returns best match with similarity score, or
+		`matched: False` when no fingerprint falls within tolerance.
+
+		tolerance_ppm: acceptable frequency offset delta in parts-per-million.
+		"""
+		assert rf_features, "rf_features required"
+		assert tolerance_ppm > 0, "tolerance_ppm must be positive"
+
+		target_offset = float(rf_features.get("frequency_offset_ppm", 0.0))
+		target_mer = float(rf_features.get("modulation_error_ratio_db", 20.0))
+		target_phase = float(rf_features.get("phase_noise_dbc_hz", -100.0))
+
+		best_match: dict[str, Any] | None = None
+		best_score = -1.0
+
+		tenant = self.tenant_id
+		for fp in self._emitters.values():
+			if fp.get("tenant_id") != tenant:
+				continue
+			stored_offset = float(fp.get("frequency_offset_ppm", 999.0))
+			if abs(stored_offset - target_offset) > tolerance_ppm:
+				continue
+			# Euclidean distance in normalised feature space
+			delta_offset = abs(stored_offset - target_offset) / max(tolerance_ppm, 1e-9)
+			delta_mer = abs(float(fp.get("modulation_error_ratio_db", 20.0)) - target_mer) / 40.0
+			delta_phase = abs(float(fp.get("phase_noise_dbc_hz", -100.0)) - target_phase) / 60.0
+			similarity = round(1.0 - (delta_offset + delta_mer + delta_phase) / 3.0, 4)
+			if similarity > best_score:
+				best_score = similarity
+				best_match = fp
+
+		result: dict[str, Any] = {
+			"matched": best_match is not None,
+			"similarity_score": best_score if best_match else 0.0,
+			"matched_fingerprint_id": best_match["fingerprint_id"] if best_match else None,
+			"matched_signal_id": best_match.get("signal_id") if best_match else None,
+			"queried_at": _utcnow(),
+			"tenant_id": tenant,
+		}
+		self._audit(tenant, "sigint_emitter_reidentified", result.get("matched_fingerprint_id") or "no_match")
+		return result
+
+	async def elint_pdw_extract(
+		self,
+		observation_id: str,
+		raw_pulse_data: list[dict[str, float]],
+	) -> dict[str, Any]:
+		"""Extract Pulse Descriptor Words (PDWs) from radar observation pulse data.
+
+		Each entry in raw_pulse_data must contain:
+		  - toa_us: time of arrival in microseconds
+		  - pw_us: pulse width in microseconds
+		  - rf_mhz: radio frequency in MHz
+		  - amplitude_dbm: received amplitude in dBm
+
+		Computes:
+		  - PRI (Pulse Repetition Interval) statistics
+		  - duty cycle
+		  - scan period estimate (if amplitude modulation is periodic)
+		  - emitter category (search radar, tracking radar, fire control, navigation)
+		"""
+		assert present(observation_id), "observation_id required"
+		assert raw_pulse_data, "raw_pulse_data must be non-empty"
+		assert len(raw_pulse_data) <= 10_000, "raw_pulse_data cap: 10,000 pulses"
+
+		required_keys = {"toa_us", "pw_us", "rf_mhz", "amplitude_dbm"}
+		for i, pulse in enumerate(raw_pulse_data):
+			missing = required_keys - pulse.keys()
+			assert not missing, f"raw_pulse_data[{i}] missing keys: {missing}"
+
+		toas = sorted(p["toa_us"] for p in raw_pulse_data)
+		pws = [p["pw_us"] for p in raw_pulse_data]
+		rfs = [p["rf_mhz"] for p in raw_pulse_data]
+		amplitudes = [p["amplitude_dbm"] for p in raw_pulse_data]
+
+		# PRI statistics
+		if len(toas) >= 2:
+			pris = [toas[i] - toas[i - 1] for i in range(1, len(toas))]
+			mean_pri_us = statistics.mean(pris)
+			stdev_pri_us = statistics.stdev(pris) if len(pris) > 1 else 0.0
+			pri_agility = stdev_pri_us / mean_pri_us if mean_pri_us else 0.0
+		else:
+			mean_pri_us = 0.0
+			stdev_pri_us = 0.0
+			pri_agility = 0.0
+
+		mean_pw_us = statistics.mean(pws)
+		mean_rf_mhz = statistics.mean(rfs)
+		mean_amp_dbm = statistics.mean(amplitudes)
+		duty_cycle = mean_pw_us / mean_pri_us if mean_pri_us else 0.0
+
+		# Emitter category from duty cycle and PRI agility
+		if duty_cycle < 0.001 and pri_agility < 0.05:
+			emitter_category = "LONG_RANGE_SEARCH_RADAR"
+		elif duty_cycle < 0.05 and pri_agility < 0.15:
+			emitter_category = "MEDIUM_RANGE_SEARCH_RADAR"
+		elif pri_agility > 0.5:
+			emitter_category = "STAGGERED_PRI_TRACKING_RADAR"
+		elif duty_cycle > 0.1:
+			emitter_category = "FIRE_CONTROL_RADAR"
+		elif mean_rf_mhz < 500:
+			emitter_category = "NAVIGATION_RADAR"
+		else:
+			emitter_category = "UNCLASSIFIED_RADAR"
+
+		pdw_id = _fingerprint(observation_id, str(len(raw_pulse_data)), _utcnow())
+		result: dict[str, Any] = {
+			"pdw_id": pdw_id,
+			"observation_id": observation_id,
+			"pulse_count": len(raw_pulse_data),
+			"mean_pri_us": round(mean_pri_us, 3),
+			"stdev_pri_us": round(stdev_pri_us, 3),
+			"pri_agility": round(pri_agility, 4),
+			"mean_pw_us": round(mean_pw_us, 3),
+			"duty_cycle": round(duty_cycle, 6),
+			"mean_rf_mhz": round(mean_rf_mhz, 3),
+			"mean_amplitude_dbm": round(mean_amp_dbm, 2),
+			"emitter_category": emitter_category,
+			"extracted_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+			"actor_id": self.actor_id,
+		}
+		self._audit(self.tenant_id, "sigint_elint_pdw_extracted", pdw_id)
+		return result
+
+	async def task_from_natural_language(
+		self,
+		instruction: str,
+		authority_id: str,
+	) -> dict[str, Any]:
+		"""Parse a plain-language collection tasking instruction into a structured task record.
+
+		Extracts band, frequency hints, collection mode, and retention intent from free text.
+		Uses rule-based keyword extraction (no external LLM dependency in this sync stub;
+		swap `_parse_tasking_instruction` for an Ollama call in production).
+
+		instruction: free-text order, e.g. "Monitor VHF 136-174 MHz for burst transmissions"
+		authority_id: must reference a registered authority for the tenant.
+		"""
+		assert present(instruction), "instruction required"
+		assert present(authority_id), "authority_id required"
+
+		authority = self._tenant_authority_or_none(authority_id, self.tenant_id)
+		if authority is None:
+			raise PermissionError(f"authority_id {authority_id!r} not registered for tenant {self.tenant_id!r}")
+
+		parsed = self._parse_tasking_instruction(instruction)
+
+		task_id = _fingerprint(instruction[:64], authority_id, _utcnow())
+		result: dict[str, Any] = {
+			"task_id": task_id,
+			"instruction": instruction,
+			"authority_id": authority_id,
+			"parsed": parsed,
+			"created_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+			"actor_id": self.actor_id,
+			"status": "draft",
+		}
+		self._audit(self.tenant_id, "sigint_nl_task_created", task_id)
+		return result
+
+	def _parse_tasking_instruction(self, text: str) -> dict[str, Any]:
+		"""Rule-based extraction of tasking parameters from free text.
+
+		Production systems should replace this with an Ollama-hosted constrained
+		grammar sampler for guaranteed schema validity.
+		"""
+		import re
+		text_lower = text.lower()
+
+		# Band detection
+		band_keywords = {
+			"ELF": ["elf", "extremely low"], "VLF": ["vlf", "very low"],
+			"LF": [" lf ", "low frequency"], "MF": [" mf ", "medium frequency"],
+			"HF": [" hf ", "shortwave", "high frequency"],
+			"VHF": ["vhf", "very high"], "UHF": ["uhf", "ultra high"],
+			"SHF": ["shf", "super high", "microwave"], "EHF": ["ehf", "millimetre"],
+		}
+		detected_band = "UNKNOWN"
+		for band, keys in band_keywords.items():
+			if any(k in text_lower for k in keys):
+				detected_band = band
+				break
+
+		# Frequency range extraction (e.g. "136-174 MHz" or "2.4 GHz")
+		freq_re = re.compile(r"(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*(mhz|ghz|khz)", re.IGNORECASE)
+		single_re = re.compile(r"(\d+(?:\.\d+)?)\s*(mhz|ghz|khz)", re.IGNORECASE)
+
+		freq_range: dict[str, Any] = {}
+		m = freq_re.search(text)
+		if m:
+			unit_mult = {"mhz": 1e6, "ghz": 1e9, "khz": 1e3}.get(m.group(3).lower(), 1e6)
+			freq_range = {
+				"start_hz": float(m.group(1)) * unit_mult,
+				"stop_hz": float(m.group(2)) * unit_mult,
+				"unit": m.group(3).upper(),
+			}
+		else:
+			m2 = single_re.search(text)
+			if m2:
+				unit_mult = {"mhz": 1e6, "ghz": 1e9, "khz": 1e3}.get(m2.group(2).lower(), 1e6)
+				freq_range = {
+					"centre_hz": float(m2.group(1)) * unit_mult,
+					"unit": m2.group(2).upper(),
+				}
+
+		# Collection mode from keywords
+		mode_map = {
+			"burst": "burst", "continuous": "continuous", "scan": "scan",
+			"sweep": "sweep", "spot": "spot", "search": "search",
+		}
+		detected_mode = "spot"
+		for kw, mode in mode_map.items():
+			if kw in text_lower:
+				detected_mode = mode
+				break
+
+		# Retention hint
+		retention_days = 30
+		ret_re = re.compile(r"(\d+)\s*(day|week|month)", re.IGNORECASE)
+		rm = ret_re.search(text)
+		if rm:
+			n = int(rm.group(1))
+			unit = rm.group(2).lower()
+			retention_days = n * (7 if unit == "week" else 30 if unit == "month" else 1)
+
+		return {
+			"detected_band": detected_band,
+			"frequency_range": freq_range,
+			"collection_mode": detected_mode,
+			"retention_days": retention_days,
+		}
+
+	async def signal_triage(
+		self,
+		signal_ids: list[str],
+	) -> list[dict[str, Any]]:
+		"""Triage a batch of signals into cleartext / encrypted / compressed / noise categories.
+
+		Uses Shannon entropy of the signal_type string as a proxy for actual byte entropy.
+		Production implementation should operate on raw IQ or decoded byte arrays.
+
+		Categories:
+		  - noise:      entropy < 1.0
+		  - cleartext:  1.0 <= entropy < 2.5
+		  - compressed: 2.5 <= entropy < 3.5
+		  - encrypted:  entropy >= 3.5
+
+		Returns a triage record per signal with routing recommendation.
+		"""
+		assert signal_ids, "signal_ids must be non-empty"
+
+		def _shannon_entropy(s: str) -> float:
+			if not s:
+				return 0.0
+			freq: dict[str, int] = {}
+			for c in s:
+				freq[c] = freq.get(c, 0) + 1
+			n = len(s)
+			return -sum((v / n) * math.log2(v / n) for v in freq.values() if v > 0)
+
+		results: list[dict[str, Any]] = []
+		for sid in signal_ids:
+			signal = self._signals.get(sid)
+			if signal is None:
+				results.append({"signal_id": sid, "category": "not_found", "routing": "discard"})
+				continue
+
+			# Proxy: combine signal_type + source for entropy estimate
+			proxy_text = signal.get("signal_type", "") + signal.get("source", "")
+			entropy = _shannon_entropy(proxy_text)
+
+			if entropy < 1.0:
+				category = "noise"
+				routing = "discard"
+				priority = 0
+			elif entropy < 2.5:
+				category = "cleartext"
+				routing = "pattern_analysis"
+				priority = 2
+			elif entropy < 3.5:
+				category = "compressed"
+				routing = "decompression_queue"
+				priority = 3
+			else:
+				category = "encrypted"
+				routing = "decryption_queue"
+				priority = 4
+
+			triage_id = _fingerprint(sid, _utcnow())
+			record: dict[str, Any] = {
+				"triage_id": triage_id,
+				"signal_id": sid,
+				"entropy": round(entropy, 4),
+				"category": category,
+				"routing": routing,
+				"priority": priority,
+				"triaged_at": _utcnow(),
+				"tenant_id": self.tenant_id,
+			}
+			self._audit(self.tenant_id, "sigint_signal_triaged", triage_id)
+			results.append(record)
+
+		return results
+
+	async def satellite_link_budget(
+		self,
+		centre_frequency_hz: float,
+		distance_km: float,
+		tx_eirp_dbw: float,
+		rx_gain_dbi: float,
+		system_noise_temp_k: float = 290.0,
+		bandwidth_hz: float = 1e6,
+	) -> dict[str, Any]:
+		"""Compute satellite intercept link budget and feasibility.
+
+		Parameters
+		----------
+		centre_frequency_hz: carrier frequency in Hz
+		distance_km: slant range to satellite in km
+		tx_eirp_dbw: transmit EIRP in dBW
+		rx_gain_dbi: receive antenna gain in dBi
+		system_noise_temp_k: system noise temperature in Kelvin (default 290 K)
+		bandwidth_hz: signal bandwidth in Hz (default 1 MHz)
+
+		Returns free-space path loss, received power, noise power, C/N, Eb/N0,
+		Shannon capacity, and a feasibility verdict (minimum C/N threshold: 3 dB).
+		"""
+		assert centre_frequency_hz > 0, "centre_frequency_hz must be positive"
+		assert distance_km > 0, "distance_km must be positive"
+		assert bandwidth_hz > 0, "bandwidth_hz must be positive"
+		assert system_noise_temp_k > 0, "system_noise_temp_k must be positive"
+
+		c = 3e8  # speed of light m/s
+		k_boltzmann = 1.380649e-23  # J/K
+
+		wavelength_m = c / centre_frequency_hz
+		distance_m = distance_km * 1e3
+
+		# Free-space path loss (dB)
+		fspl_db = 20 * math.log10(4 * math.pi * distance_m / wavelength_m)
+
+		# Received power (dBW)
+		rx_power_dbw = tx_eirp_dbw - fspl_db + rx_gain_dbi
+
+		# Thermal noise power (dBW)
+		noise_power_dbw = 10 * math.log10(k_boltzmann * system_noise_temp_k * bandwidth_hz)
+
+		# Carrier-to-noise ratio (dB)
+		cn_db = rx_power_dbw - noise_power_dbw
+
+		# Eb/N0 (dB) — assume BPSK (1 bit/symbol) as worst-case
+		eb_n0_db = cn_db - 10 * math.log10(bandwidth_hz)
+
+		# Shannon capacity (bits/s) — theoretical maximum
+		cn_linear = 10 ** (cn_db / 10)
+		shannon_capacity_bps = bandwidth_hz * math.log2(1 + cn_linear)
+
+		feasible = cn_db >= 3.0  # minimum 3 dB C/N for practical demodulation
+
+		budget_id = _fingerprint(
+			str(centre_frequency_hz), str(distance_km), str(tx_eirp_dbw), _utcnow()
+		)
+		result: dict[str, Any] = {
+			"budget_id": budget_id,
+			"centre_frequency_hz": centre_frequency_hz,
+			"distance_km": distance_km,
+			"tx_eirp_dbw": tx_eirp_dbw,
+			"rx_gain_dbi": rx_gain_dbi,
+			"fspl_db": round(fspl_db, 2),
+			"rx_power_dbw": round(rx_power_dbw, 2),
+			"noise_power_dbw": round(noise_power_dbw, 2),
+			"cn_db": round(cn_db, 2),
+			"eb_n0_db": round(eb_n0_db, 2),
+			"shannon_capacity_bps": round(shannon_capacity_bps, 0),
+			"feasible": feasible,
+			"computed_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+			"actor_id": self.actor_id,
+		}
+		self._audit(self.tenant_id, "sigint_link_budget_computed", budget_id)
+		return result
+
+	async def differential_privacy_analytics(
+		self,
+		epsilon: float = 1.0,
+	) -> dict[str, Any]:
+		"""Export tenant analytics with Laplace-noise differential privacy (epsilon-DP).
+
+		Applies calibrated Laplace noise (sensitivity / epsilon) to integer counts.
+		Sensitivity for counts = 1 (adding or removing one tenant's signals changes
+		any count by at most 1).
+
+		epsilon: privacy budget (smaller = more noise = stronger privacy). Default 1.0.
+
+		Returns noised counts alongside exact counts and the applied epsilon, so
+		recipients can verify the privacy guarantee without seeing raw values.
+
+		Note: the noised values are rounded to non-negative integers.
+		"""
+		assert epsilon > 0, "epsilon must be positive"
+
+		import random
+
+		def _laplace_noise(sensitivity: float, eps: float) -> float:
+			"""Sample Laplace(0, sensitivity/eps) noise."""
+			scale = sensitivity / eps
+			u = random.uniform(-0.5, 0.5)
+			return -scale * math.copysign(1, u) * math.log(1 - 2 * abs(u))
+
+		sensitivity = 1.0
+		tenant = self.tenant_id
+
+		exact_counts = {
+			"signals_collected": len([s for s in self._signals.values() if s.get("tenant_id") == tenant]),
+			"active_intercepts": sum(1 for i in self._intercepts.values() if i.get("tenant_id") == tenant and i.get("status") == "active"),
+			"emitters_identified": sum(1 for e in self._emitters.values() if e.get("tenant_id") == tenant),
+			"direction_fixes": sum(1 for f in self._df_fixes.values() if f.get("tenant_id") == tenant),
+			"reports_generated": sum(1 for r in self._reports.values() if r.get("tenant_id") == tenant),
+			"observations": self._count(self.observations, tenant),
+			"patterns": self._count(self.patterns, tenant),
+			"assessments": self._count(self.assessments, tenant),
+		}
+
+		noised_counts = {
+			k: max(0, round(v + _laplace_noise(sensitivity, epsilon)))
+			for k, v in exact_counts.items()
+		}
+
+		dp_id = _fingerprint(tenant, str(epsilon), _utcnow())
+		result: dict[str, Any] = {
+			"dp_id": dp_id,
+			"epsilon": epsilon,
+			"sensitivity": sensitivity,
+			"mechanism": "laplace",
+			"noised_counts": noised_counts,
+			"exact_counts": exact_counts,
+			"privacy_guarantee": f"epsilon-DP with epsilon={epsilon}",
+			"computed_at": _utcnow(),
+			"tenant_id": tenant,
+			"actor_id": self.actor_id,
+		}
+		self._audit(tenant, "sigint_dp_analytics_exported", dp_id)
+		return result
+
+	async def spectrum_anomaly_detect(
+		self,
+		band: str,
+		window_size: int = 24,
+		sigma_threshold: float = 3.0,
+	) -> dict[str, Any]:
+		"""Detect anomalous signal activity in *band* using a rolling statistical baseline.
+
+		Buckets signal counts by hour-of-day over the stored signal history for this
+		tenant and band. Flags the most recent bucket as anomalous if its count
+		exceeds mean + sigma_threshold * stdev of the baseline distribution.
+
+		window_size: number of historical hour-buckets to use as baseline (default 24).
+		sigma_threshold: standard-deviation multiplier for anomaly threshold (default 3.0).
+		"""
+		assert present(band), "band required"
+		assert window_size >= 2, "window_size must be >= 2"
+		assert sigma_threshold > 0, "sigma_threshold must be positive"
+
+		tenant = self.tenant_id
+		matching = [
+			s for s in self._signals.values()
+			if s.get("tenant_id") == tenant and s.get("band") == band
+		]
+
+		# Bucket by hour
+		hourly: dict[int, int] = {}
+		for sig in matching:
+			raw_ts = sig.get("collected_at", "T00:")
+			try:
+				hour = int(raw_ts[11:13])
+			except (ValueError, IndexError):
+				hour = 0
+			hourly[hour] = hourly.get(hour, 0) + 1
+
+		counts = list(hourly.values()) if hourly else [0]
+		baseline = counts[:-1] if len(counts) > 1 else counts
+		current_count = counts[-1] if counts else 0
+
+		if len(baseline) >= 2:
+			baseline_mean = statistics.mean(baseline)
+			baseline_std = statistics.stdev(baseline)
+		else:
+			baseline_mean = float(baseline[0]) if baseline else 0.0
+			baseline_std = 0.0
+
+		threshold = baseline_mean + sigma_threshold * baseline_std
+		anomaly_detected = current_count > threshold
+
+		anomaly_id = _fingerprint(band, str(window_size), _utcnow())
+		result: dict[str, Any] = {
+			"anomaly_id": anomaly_id,
+			"band": band,
+			"window_size": window_size,
+			"sigma_threshold": sigma_threshold,
+			"baseline_mean": round(baseline_mean, 4),
+			"baseline_std": round(baseline_std, 4),
+			"threshold": round(threshold, 4),
+			"current_count": current_count,
+			"anomaly_detected": anomaly_detected,
+			"total_signals_in_band": len(matching),
+			"assessed_at": _utcnow(),
+			"tenant_id": tenant,
+		}
+		if anomaly_detected:
+			self._audit(tenant, "sigint_spectrum_anomaly_detected", anomaly_id)
+		return result
+
 	async def cross_band_correlate(
 		self,
 		band_a: str,
@@ -1104,7 +1690,7 @@ class SIGINTService:
 			)
 			for s in signals
 		]
-		return list(await asyncio.gather(*tasks), return_exceptions=True)
+		return list(await asyncio.gather(*tasks, return_exceptions=True))
 
 	async def spectrum_sweep(
 		self,

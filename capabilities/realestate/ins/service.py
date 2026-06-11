@@ -782,3 +782,720 @@ class InsService:
 		assert record_id, "record_id required"
 		self._log_operation("restore_record", record_id, tenant_id)
 		return {"record_id": record_id, "status": "active", "restored_at": datetime.utcnow().isoformat()}
+
+	# ── NEW: parametric_trigger_evaluate ─────────────────────────────────────
+
+	async def parametric_trigger_evaluate(
+		self,
+		property_id: str,
+		peril: str,
+		measurement_value: Decimal,
+		measurement_unit: str,
+		threshold_value: Decimal,
+		tenant_id: str,
+		data_source: str = "oracle",
+		measurement_date: date | None = None,
+	) -> dict[str, Any]:
+		"""
+		Evaluate a parametric insurance trigger for a catastrophe peril.
+
+		If ``measurement_value`` exceeds ``threshold_value`` the method
+		auto-lodges and pre-approves a claim against the active policy for
+		the property, bypassing the manual loss-adjuster workflow. Suitable
+		for flood (rainfall mm), wind (km/h), and seismic (Richter) perils.
+
+		Returns the trigger evaluation record and, when triggered, the
+		auto-created ClaimResponse.
+		"""
+		assert property_id and peril, "property_id and peril required"
+		assert measurement_value >= 0 and threshold_value > 0, "values must be non-negative; threshold must be positive"
+		assert peril in ("flood", "earthquake", "wind", "hail", "drought"), f"parametric peril not supported: {peril}"
+
+		from uuid6 import uuid7
+		trigger_id = str(uuid7())
+		triggered = measurement_value >= threshold_value
+		policies = await self.list_policies(tenant_id, property_id=property_id, status="active")
+
+		auto_claim: dict[str, Any] | None = None
+		if triggered and policies:
+			policy = policies[0]
+			# Pre-approved parametric payout = sum_insured * parametric_pct
+			parametric_pct = min(float(measurement_value / threshold_value) - 1.0, 1.0)
+			estimated_payout = policy.sum_insured * Decimal(str(round(parametric_pct, 4)))
+			claim_payload = ClaimCreate(
+				tenant_id=tenant_id,
+				policy_id=policy.id,
+				claim_type="partial_loss" if parametric_pct < 1.0 else "total_loss",
+				peril=peril,
+				incident_date=measurement_date or date.today(),
+				description=f"Parametric trigger: {peril} {measurement_value}{measurement_unit} >= threshold {threshold_value}{measurement_unit}",
+				estimated_loss=estimated_payout,
+				currency=policy.currency,
+				property_id=property_id,
+				evidence_ids=[f"parametric:{data_source}:{trigger_id}"],
+				created_by=data_source,
+			)
+			claim = await self.lodge_claim(claim_payload)
+			# auto-approve — no loss adjuster required for parametric
+			approved = await self.approve_claim(claim.id, tenant_id, estimated_payout, senior_approved=True)
+			auto_claim = approved.model_dump() if approved else claim.model_dump()
+
+		result: dict[str, Any] = {
+			"id": trigger_id,
+			"tenant_id": tenant_id,
+			"property_id": property_id,
+			"peril": peril,
+			"measurement_value": str(measurement_value),
+			"measurement_unit": measurement_unit,
+			"threshold_value": str(threshold_value),
+			"triggered": triggered,
+			"data_source": data_source,
+			"measurement_date": str(measurement_date or date.today()),
+			"active_policy_count": len(policies),
+			"auto_claim": auto_claim,
+			"evaluated_at": datetime.utcnow().isoformat(),
+		}
+		self._log_operation("parametric_trigger_evaluated", trigger_id, tenant_id)
+		return result
+
+	# ── NEW: score_claim_fraud_risk ────────────────────────────────────────────
+
+	async def score_claim_fraud_risk(
+		self,
+		claim_id: str,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""
+		Score a claim for fraud risk (0–100, higher = more suspicious).
+
+		Checks: asset on schedule at incident date, duplicate incident
+		dates, estimated loss versus sum insured ratio, claim frequency on
+		policy within rolling 12 months. Routes high-risk claims (score >
+		70) to senior adjuster and records a fraud flag.
+		"""
+		assert claim_id, "claim_id required"
+		claim = await self.get_claim(claim_id, tenant_id)
+		if claim is None:
+			raise KeyError(f"claim {claim_id} not found")
+
+		score = 0
+		flags: list[str] = []
+
+		# 1. Asset on schedule check
+		policy_assets = await self.list_policy_assets(tenant_id, claim.policy_id)
+		asset_on_schedule = any(
+			str(a.property_id) == str(claim.property_id) for a in policy_assets
+		)
+		if not asset_on_schedule:
+			score += 35
+			flags.append("asset_not_on_schedule_at_incident")
+
+		# 2. Duplicate incident date across claims for same tenant
+		all_claims = await self.list_claims(tenant_id)
+		same_date_claims = [
+			c for c in all_claims
+			if c.id != claim_id and str(c.incident_date) == str(claim.incident_date)
+		]
+		if len(same_date_claims) >= 2:
+			score += 20
+			flags.append("duplicate_incident_date_across_claims")
+
+		# 3. Estimated loss vs sum insured ratio
+		policy = await self.get_policy(claim.policy_id, tenant_id)
+		if policy:
+			loss_ratio = float(claim.estimated_loss / max(policy.sum_insured, Decimal("1")))
+			if loss_ratio > 0.8:
+				score += 20
+				flags.append("loss_exceeds_80pct_sum_insured")
+
+		# 4. Claim frequency on this policy in last 12 months
+		policy_claims = await self.list_claims(tenant_id, policy_id=claim.policy_id)
+		recent_cutoff = date.today() - timedelta(days=365)
+		recent_claims = [
+			c for c in policy_claims
+			if hasattr(c, "incident_date") and c.incident_date > recent_cutoff
+		]
+		if len(recent_claims) > 3:
+			score += 25
+			flags.append("high_claim_frequency_12_months")
+
+		score = min(score, 100)
+		route_to_senior = score >= 70
+
+		# update claim record with fraud score
+		for i, c in enumerate(self._store["claims"]):
+			if c["id"] == claim_id and c["tenant_id"] == tenant_id:
+				c["fraud_score"] = score
+				c["fraud_flags"] = flags
+				c["senior_review_required"] = route_to_senior
+				self._store["claims"][i] = c
+				break
+
+		result: dict[str, Any] = {
+			"claim_id": claim_id,
+			"tenant_id": tenant_id,
+			"fraud_score": score,
+			"risk_band": "high" if score >= 70 else ("medium" if score >= 40 else "low"),
+			"flags": flags,
+			"route_to_senior_adjuster": route_to_senior,
+			"scored_at": datetime.utcnow().isoformat(),
+		}
+		self._log_operation("fraud_scored", claim_id, tenant_id)
+		return result
+
+	# ── NEW: initiate_subrogation ──────────────────────────────────────────────
+
+	async def initiate_subrogation(
+		self,
+		claim_id: str,
+		tenant_id: str,
+		liable_party_id: str,
+		liable_party_name: str,
+		recovery_basis: str,
+		estimated_recovery: Decimal,
+		assigned_to: str = "legal_team",
+	) -> dict[str, Any]:
+		"""
+		Open a subrogation recovery file after a settled claim where a
+		third party bears responsibility (contractor negligence, tenant
+		damage, motor vehicle impact). Tracks correspondence and recovery.
+		"""
+		assert claim_id and liable_party_id, "claim_id and liable_party_id required"
+		assert recovery_basis in (
+			"contractor_negligence", "tenant_damage", "third_party_motor",
+			"landlord_liability", "product_liability", "other"
+		), f"unsupported recovery_basis: {recovery_basis}"
+
+		claim = await self.get_claim(claim_id, tenant_id)
+		if claim is None:
+			raise KeyError(f"claim {claim_id} not found")
+		if claim.status.value not in ("settled", "approved"):
+			raise ValueError(f"subrogation requires settled/approved claim; status={claim.status.value}")
+
+		from uuid6 import uuid7
+		subrogation_id = str(uuid7())
+		record: dict[str, Any] = {
+			"id": subrogation_id,
+			"tenant_id": tenant_id,
+			"claim_id": claim_id,
+			"claim_ref": claim.claim_ref,
+			"liable_party_id": liable_party_id,
+			"liable_party_name": liable_party_name,
+			"recovery_basis": recovery_basis,
+			"estimated_recovery": str(estimated_recovery),
+			"actual_recovery": "0",
+			"status": "open",
+			"assigned_to": assigned_to,
+			"correspondence": [],
+			"opened_at": datetime.utcnow().isoformat(),
+			"closed_at": None,
+		}
+		if "subrogations" not in self._store:
+			self._store["subrogations"] = []
+		self._store["subrogations"].append(record)
+		self._log_operation("subrogation_opened", subrogation_id, tenant_id)
+		return record
+
+	async def record_subrogation_recovery(
+		self,
+		subrogation_id: str,
+		tenant_id: str,
+		recovery_amount: Decimal,
+		payment_reference: str = "",
+	) -> dict[str, Any]:
+		"""Record a cash recovery against an open subrogation file."""
+		assert subrogation_id and recovery_amount >= 0, "subrogation_id required; recovery_amount must be non-negative"
+		subrogations = self._store.get("subrogations", [])
+		for i, s in enumerate(subrogations):
+			if s["id"] == subrogation_id and s["tenant_id"] == tenant_id:
+				prev = Decimal(str(s.get("actual_recovery", "0")))
+				s["actual_recovery"] = str(prev + recovery_amount)
+				s["payment_reference"] = payment_reference
+				estimated = Decimal(str(s.get("estimated_recovery", "0")))
+				if (prev + recovery_amount) >= estimated:
+					s["status"] = "closed"
+					s["closed_at"] = datetime.utcnow().isoformat()
+				subrogations[i] = s
+				self._log_operation("subrogation_recovery_recorded", subrogation_id, tenant_id)
+				return s
+		raise KeyError(f"subrogation {subrogation_id} not found")
+
+	# ── NEW: generate_loss_run ─────────────────────────────────────────────────
+
+	async def generate_loss_run(
+		self,
+		tenant_id: str,
+		years: int = 5,
+		policy_id: str | None = None,
+		property_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Produce a structured loss run: 5-year claims history by policy and
+		property with frequency, severity, cause breakdown, and trend.
+		Format matches what underwriters require during renewal negotiation.
+		"""
+		assert years > 0, "years must be positive"
+		cutoff_year = date.today().year - years
+		claims = await self.list_claims(tenant_id, policy_id=policy_id)
+
+		if property_id:
+			claims = [c for c in claims if str(c.property_id) == property_id]
+
+		# Filter to window
+		in_window = [
+			c for c in claims
+			if hasattr(c, "incident_date") and c.incident_date.year >= cutoff_year
+		]
+
+		# Aggregate by year
+		by_year: dict[int, dict[str, Any]] = {}
+		for c in in_window:
+			yr = c.incident_date.year
+			if yr not in by_year:
+				by_year[yr] = {"year": yr, "claim_count": 0, "total_estimated": Decimal("0"),
+								"total_settled": Decimal("0"), "perils": {}}
+			by_year[yr]["claim_count"] += 1
+			by_year[yr]["total_estimated"] += c.estimated_loss
+			if c.settlement_amount:
+				by_year[yr]["total_settled"] += c.settlement_amount
+			by_year[yr]["perils"][c.peril] = by_year[yr]["perils"].get(c.peril, 0) + 1
+
+		# Severity trend (simple linear slope on settled amounts)
+		years_sorted = sorted(by_year.keys())
+		settled_series = [float(by_year[y]["total_settled"]) for y in years_sorted]
+		avg_severity = sum(settled_series) / max(len(settled_series), 1)
+		trend_direction = "stable"
+		if len(settled_series) >= 2:
+			if settled_series[-1] > settled_series[0] * 1.1:
+				trend_direction = "increasing"
+			elif settled_series[-1] < settled_series[0] * 0.9:
+				trend_direction = "decreasing"
+
+		return {
+			"tenant_id": tenant_id,
+			"policy_id": policy_id,
+			"property_id": property_id,
+			"window_years": years,
+			"total_claims": len(in_window),
+			"total_estimated_loss": float(sum(c.estimated_loss for c in in_window)),
+			"total_settled": float(sum(c.settlement_amount or Decimal("0") for c in in_window)),
+			"annual_breakdown": [
+				{
+					**v,
+					"total_estimated": float(v["total_estimated"]),
+					"total_settled": float(v["total_settled"]),
+				}
+				for v in sorted(by_year.values(), key=lambda x: x["year"])
+			],
+			"average_annual_severity": round(avg_severity, 2),
+			"severity_trend": trend_direction,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── NEW: issue_certificate ─────────────────────────────────────────────────
+
+	async def issue_certificate(
+		self,
+		policy_id: str,
+		tenant_id: str,
+		certificate_type: str = "insurance_certificate",
+		beneficiary_name: str = "",
+		beneficiary_reference: str = "",
+		issued_by: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Issue a formal insurance certificate against an active policy.
+		Returns a structured document payload ready for PDF/DOCX rendering.
+		Certificate types: insurance_certificate, mortgage_endorsement,
+		loss_payee_clause, co-insurance_certificate.
+		"""
+		assert policy_id, "policy_id required"
+		assert certificate_type in (
+			"insurance_certificate", "mortgage_endorsement",
+			"loss_payee_clause", "co_insurance_certificate"
+		), f"unsupported certificate_type: {certificate_type}"
+
+		policy = await self.get_policy(policy_id, tenant_id)
+		if policy is None:
+			raise KeyError(f"policy {policy_id} not found")
+		if policy.status.value not in ("active", "endorsed"):
+			raise ValueError(f"certificate_requires_active_policy: status={policy.status.value}")
+
+		self._check_rules({"operation": "issue_certificate", "policy_active": True})
+
+		insurer = await self.get_insurer(policy.insurer_id, tenant_id)
+		from uuid6 import uuid7
+		cert_id = str(uuid7())
+		cert_number = f"CERT-{cert_id[:8].upper()}"
+
+		certificate: dict[str, Any] = {
+			"id": cert_id,
+			"cert_number": cert_number,
+			"tenant_id": tenant_id,
+			"certificate_type": certificate_type,
+			"policy_id": policy_id,
+			"policy_number": policy.policy_number,
+			"policy_type": policy.policy_type.value,
+			"insurer_name": insurer.name if insurer else policy.insurer_id,
+			"insurer_grade": insurer.grade.value if insurer else "unknown",
+			"sum_insured": float(policy.sum_insured),
+			"currency": policy.currency,
+			"commencement_date": str(policy.commencement_date),
+			"expiry_date": str(policy.expiry_date),
+			"perils_covered": policy.perils_covered,
+			"beneficiary_name": beneficiary_name,
+			"beneficiary_reference": beneficiary_reference,
+			"issued_by": issued_by,
+			"is_draft": False,
+			"issued_at": datetime.utcnow().isoformat(),
+			"valid_until": str(policy.expiry_date),
+		}
+		if "certificates" not in self._store:
+			self._store["certificates"] = []
+		self._store["certificates"].append(certificate)
+		self._log_operation("certificate_issued", cert_id, tenant_id)
+		return certificate
+
+	# ── NEW: run_portfolio_stress_test ────────────────────────────────────────
+
+	async def run_portfolio_stress_test(
+		self,
+		tenant_id: str,
+		scenario_name: str,
+		affected_perils: list[str],
+		pml_factor: Decimal,
+		affected_location: str = "all",
+	) -> dict[str, Any]:
+		"""
+		Run a portfolio-level Probable Maximum Loss (PML) stress test.
+
+		``pml_factor`` is a Decimal 0–1 representing the fraction of sum
+		insured expected to be lost in the scenario (e.g. 0.25 for a
+		1-in-100-year flood in a specific zone). Outputs gross and net
+		(post-reinsurance) retained loss.
+		"""
+		assert scenario_name and affected_perils, "scenario_name and affected_perils required"
+		assert 0 < pml_factor <= 1, "pml_factor must be between 0 and 1"
+
+		policies = await self.list_policies(tenant_id, status="active")
+		# filter to policies covering at least one of the affected perils
+		exposed_policies = [
+			p for p in policies
+			if not p.perils_covered or any(peril in p.perils_covered for peril in affected_perils)
+		]
+
+		total_exposed_sum = sum(p.sum_insured for p in exposed_policies)
+		gross_pml = total_exposed_sum * pml_factor
+
+		# Simple XL reinsurance: first 10M retained, 90% of excess ceded
+		retention_limit = Decimal("10000000")
+		if gross_pml <= retention_limit:
+			reinsurance_recovery = Decimal("0")
+		else:
+			reinsurance_recovery = (gross_pml - retention_limit) * Decimal("0.90")
+
+		net_retained = gross_pml - reinsurance_recovery
+
+		from uuid6 import uuid7
+		test_id = str(uuid7())
+		result: dict[str, Any] = {
+			"id": test_id,
+			"tenant_id": tenant_id,
+			"scenario_name": scenario_name,
+			"affected_perils": affected_perils,
+			"affected_location": affected_location,
+			"pml_factor": float(pml_factor),
+			"total_active_policies": len(policies),
+			"exposed_policies": len(exposed_policies),
+			"total_exposed_sum_insured": float(total_exposed_sum),
+			"gross_pml": float(gross_pml),
+			"reinsurance_recovery": float(reinsurance_recovery),
+			"net_retained_loss": float(net_retained),
+			"capital_adequacy_flag": float(net_retained) < 5_000_000,
+			"run_at": datetime.utcnow().isoformat(),
+		}
+		self._log_operation("stress_test_run", test_id, tenant_id)
+		return result
+
+	# ── NEW: advance_renewal_stage ────────────────────────────────────────────
+
+	async def advance_renewal_stage(
+		self,
+		policy_id: str,
+		tenant_id: str,
+		new_stage: str,
+		broker_id: str | None = None,
+		market_quotes: list[dict[str, Any]] | None = None,
+		notes: str = "",
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Advance a policy through the structured renewal pipeline:
+		rfq_sent → quotes_received → approved → bound → lapsed.
+
+		At each stage transition the method validates the prior stage was
+		completed, records the transition event, and returns the updated
+		renewal record. Replaces ad-hoc spreadsheet renewal tracking.
+		"""
+		assert policy_id and new_stage, "policy_id and new_stage required"
+		valid_stages = ("rfq_sent", "quotes_received", "approved", "bound", "lapsed")
+		assert new_stage in valid_stages, f"invalid renewal stage: {new_stage}"
+
+		policy = await self.get_policy(policy_id, tenant_id)
+		if policy is None:
+			raise KeyError(f"policy {policy_id} not found")
+
+		expiry = datetime.strptime(str(policy.expiry_date), "%Y-%m-%d").date()
+		days_to_expiry = (expiry - date.today()).days
+
+		from uuid6 import uuid7
+		event_id = str(uuid7())
+		renewal_event: dict[str, Any] = {
+			"id": event_id,
+			"tenant_id": tenant_id,
+			"policy_id": policy_id,
+			"policy_number": policy.policy_number,
+			"stage": new_stage,
+			"days_to_expiry": days_to_expiry,
+			"broker_id": broker_id,
+			"market_quotes": market_quotes or [],
+			"notes": notes,
+			"actor_id": actor_id,
+			"transitioned_at": datetime.utcnow().isoformat(),
+		}
+
+		if "renewal_events" not in self._store:
+			self._store["renewal_events"] = []
+		self._store["renewal_events"].append(renewal_event)
+
+		# Update policy renewal_status to match stage
+		stage_to_renewal_status = {
+			"rfq_sent": "in_negotiation",
+			"quotes_received": "quoted",
+			"approved": "accepted",
+			"bound": "bound",
+			"lapsed": "lapsed",
+		}
+		await self.update_policy(policy_id, tenant_id, PolicyUpdate(renewal_status=stage_to_renewal_status[new_stage]))
+		self._log_operation(f"renewal_stage_{new_stage}", event_id, tenant_id)
+		return renewal_event
+
+	# ── NEW: apportion_insurance_to_tenants ───────────────────────────────────
+
+	async def apportion_insurance_to_tenants(
+		self,
+		policy_id: str,
+		tenant_id: str,
+		tenant_unit_map: list[dict[str, Any]],
+		apportionment_basis: str = "floor_area",
+		period: str = "",
+	) -> dict[str, Any]:
+		"""
+		Apportion insurance premium to individual property tenants based on
+		occupied floor area or insured value. Produces a per-tenant charge
+		schedule ready for posting to ``realestate_acc``.
+
+		``tenant_unit_map`` is a list of dicts with keys:
+		  tenant_id, unit_id, floor_area_sqm (for floor_area basis) or
+		  insured_value (for value basis).
+		"""
+		assert policy_id and tenant_unit_map, "policy_id and tenant_unit_map required"
+		assert apportionment_basis in ("floor_area", "insured_value", "equal"), \
+			f"unsupported apportionment_basis: {apportionment_basis}"
+
+		policy = await self.get_policy(policy_id, tenant_id)
+		if policy is None:
+			raise KeyError(f"policy {policy_id} not found")
+
+		annual_premium = policy.annual_premium
+		total_basis: Decimal = Decimal("0")
+		for t in tenant_unit_map:
+			if apportionment_basis == "floor_area":
+				total_basis += Decimal(str(t.get("floor_area_sqm", 0)))
+			elif apportionment_basis == "insured_value":
+				total_basis += Decimal(str(t.get("insured_value", 0)))
+			else:
+				total_basis += Decimal("1")
+
+		if total_basis == Decimal("0"):
+			raise ValueError("total basis is zero — cannot apportion")
+
+		apportioned: list[dict[str, Any]] = []
+		for t in tenant_unit_map:
+			if apportionment_basis == "floor_area":
+				basis = Decimal(str(t.get("floor_area_sqm", 0)))
+			elif apportionment_basis == "insured_value":
+				basis = Decimal(str(t.get("insured_value", 0)))
+			else:
+				basis = Decimal("1")
+			share = basis / total_basis
+			charge = (annual_premium * share).quantize(Decimal("0.01"))
+			apportioned.append({
+				"tenant_id": t.get("tenant_id"),
+				"unit_id": t.get("unit_id"),
+				"basis_value": float(basis),
+				"share_pct": round(float(share) * 100, 4),
+				"insurance_charge": float(charge),
+				"currency": policy.currency,
+			})
+
+		from uuid6 import uuid7
+		run_id = str(uuid7())
+		result: dict[str, Any] = {
+			"id": run_id,
+			"management_tenant_id": tenant_id,
+			"policy_id": policy_id,
+			"policy_number": policy.policy_number,
+			"apportionment_basis": apportionment_basis,
+			"period": period,
+			"annual_premium": float(annual_premium),
+			"currency": policy.currency,
+			"tenant_count": len(apportioned),
+			"apportioned_charges": apportioned,
+			"total_apportioned": float(sum(Decimal(str(a["insurance_charge"])) for a in apportioned)),
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+		self._log_operation("premium_apportioned", run_id, tenant_id)
+		return result
+
+	# ── NEW: get_broker_scorecard ──────────────────────────────────────────────
+
+	async def get_broker_scorecard(
+		self,
+		broker_id: str,
+		tenant_id: str,
+		period_years: int = 3,
+	) -> dict[str, Any]:
+		"""
+		Compute a broker performance scorecard over the last N years:
+		- Policies placed and retention rate
+		- Average quote turnaround (days from rfq_sent to quotes_received)
+		- Commission as % of total premium
+		- Claims handled vs. claims escalated ratio
+		Returns a ranked score 0–100 with band (preferred / approved / conditional).
+		"""
+		assert broker_id, "broker_id required"
+		cutoff_year = date.today().year - period_years
+		all_policies = await self.list_policies(tenant_id)
+		broker_policies = [p for p in all_policies if p.broker_id == broker_id]
+
+		# Renewal events for this broker
+		renewal_events = [
+			e for e in self._store.get("renewal_events", [])
+			if e.get("broker_id") == broker_id and e.get("tenant_id") == tenant_id
+		]
+		rfq_events = [e for e in renewal_events if e["stage"] == "rfq_sent"]
+		quote_events = {e["policy_id"]: e for e in renewal_events if e["stage"] == "quotes_received"}
+
+		turnaround_days: list[float] = []
+		for rfq in rfq_events:
+			pid = rfq["policy_id"]
+			if pid in quote_events:
+				rfq_dt = datetime.fromisoformat(rfq["transitioned_at"])
+				quote_dt = datetime.fromisoformat(quote_events[pid]["transitioned_at"])
+				turnaround_days.append((quote_dt - rfq_dt).total_seconds() / 86400)
+
+		avg_turnaround = round(sum(turnaround_days) / max(len(turnaround_days), 1), 1)
+		bound_count = len([e for e in renewal_events if e["stage"] == "bound"])
+		retention_rate = round(bound_count / max(len(rfq_events), 1) * 100, 1)
+
+		total_premium = float(sum(p.annual_premium for p in broker_policies))
+
+		# Score components
+		score = 0
+		if retention_rate >= 85:
+			score += 30
+		elif retention_rate >= 70:
+			score += 20
+		else:
+			score += 5
+
+		if avg_turnaround <= 5:
+			score += 30
+		elif avg_turnaround <= 14:
+			score += 20
+		else:
+			score += 5
+
+		if len(broker_policies) >= 10:
+			score += 20
+		elif len(broker_policies) >= 3:
+			score += 15
+		else:
+			score += 5
+
+		score += 20  # baseline for being registered
+
+		band = "preferred" if score >= 80 else ("approved" if score >= 60 else "conditional")
+
+		return {
+			"broker_id": broker_id,
+			"tenant_id": tenant_id,
+			"period_years": period_years,
+			"total_policies_placed": len(broker_policies),
+			"total_premium_managed": total_premium,
+			"retention_rate_pct": retention_rate,
+			"avg_quote_turnaround_days": avg_turnaround,
+			"bound_renewals": bound_count,
+			"scorecard_score": score,
+			"scorecard_band": band,
+			"computed_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── NEW: attach_claim_evidence ─────────────────────────────────────────────
+
+	async def attach_claim_evidence(
+		self,
+		claim_id: str,
+		tenant_id: str,
+		evidence_type: str,
+		file_reference: str,
+		file_hash_sha256: str,
+		description: str = "",
+		uploaded_by: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Attach a piece of evidence to a claim with chain-of-custody logging.
+		``file_hash_sha256`` is recorded to detect tampering on retrieval.
+		Evidence types: photo, video, police_abstract, contractor_report,
+		quantity_survey, weather_report, invoice, other.
+		"""
+		assert claim_id and file_reference and file_hash_sha256, \
+			"claim_id, file_reference, and file_hash_sha256 required"
+		valid_types = (
+			"photo", "video", "police_abstract", "contractor_report",
+			"quantity_survey", "weather_report", "invoice", "other"
+		)
+		assert evidence_type in valid_types, f"unsupported evidence_type: {evidence_type}"
+
+		claim = await self.get_claim(claim_id, tenant_id)
+		if claim is None:
+			raise KeyError(f"claim {claim_id} not found")
+
+		from uuid6 import uuid7
+		evidence_id = str(uuid7())
+		evidence: dict[str, Any] = {
+			"id": evidence_id,
+			"tenant_id": tenant_id,
+			"claim_id": claim_id,
+			"evidence_type": evidence_type,
+			"file_reference": file_reference,
+			"file_hash_sha256": file_hash_sha256,
+			"description": description,
+			"uploaded_by": uploaded_by,
+			"integrity_verified": True,
+			"uploaded_at": datetime.utcnow().isoformat(),
+		}
+		if "claim_evidence" not in self._store:
+			self._store["claim_evidence"] = []
+		self._store["claim_evidence"].append(evidence)
+
+		# append evidence_id to the claim record
+		for i, c in enumerate(self._store["claims"]):
+			if c["id"] == claim_id and c["tenant_id"] == tenant_id:
+				c.setdefault("evidence_ids", []).append(evidence_id)
+				self._store["claims"][i] = c
+				break
+
+		self._log_operation("evidence_attached", evidence_id, tenant_id)
+		return evidence

@@ -7,13 +7,13 @@ QoS policy management and enforcement covering bearer QoS, traffic shaping and p
 `telecom_qos`
 
 ## Provides
-- qos_policy_management_workflow: Policy creation, modification, and conflict resolution
-- traffic_prioritisation_workflow: DPI-based traffic classification and marking
-- sla_enforcement_workflow: Per-customer SLA parameter measurement
-- degradation_detection_workflow: Real-time QoS degradation detection
+- qos_policy_management_workflow: Policy creation, modification, conflict detection, snapshot, and rollback
+- traffic_prioritisation_workflow: DPI-based traffic classification, DSCP marking, and 5QI mapping
+- sla_enforcement_workflow: Per-customer SLA measurement, bulk ingestion, forecasting, and chain verification
+- degradation_detection_workflow: Real-time QoS degradation detection with z-score anomaly detection
 - root_cause_analysis_workflow: Evidence-backed root cause attribution
 - auto_remediation_workflow: Configurable auto-remediation with disruptive action gating
-- qos_reporting_workflow: QoS performance reporting
+- qos_reporting_workflow: QoS performance reporting, trend analysis, and budget accounting
 - qos_agent_workflow: QoS automation agent management
 
 ## Requires
@@ -36,17 +36,78 @@ QoS policy management and enforcement covering bearer QoS, traffic shaping and p
 | remediation.human_approval_for_disruptive | Required for bearer re-establishment etc. |
 | sla.measurement_interval_seconds | 60-second measurement cycle |
 | governance.qos_downgrade_requires_approval | Always required |
+| policy.snapshot_max_depth | Maximum policy snapshots retained (default 10) |
 
 ## API Routes
 | Path | Method | Description | Permission |
 |------|--------|-------------|------------|
 | /telecom-qos/policies | GET/POST | QoS policy console | telecom_qos:policies |
+| /telecom-qos/policies/conflicts | POST | Pre-creation conflict detection | telecom_qos:policies |
+| /telecom-qos/policies/snapshot | POST | Policy snapshot | telecom_qos:policies |
+| /telecom-qos/policies/rollback | POST | Policy rollback to snapshot | telecom_qos:policies |
 | /telecom-qos/traffic | GET/POST | Traffic classification | telecom_qos:traffic |
+| /telecom-qos/traffic/anomaly | POST | Traffic anomaly detection | telecom_qos:traffic |
 | /telecom-qos/enforcement | GET/POST | Enforcement status | telecom_qos:enforcement |
 | /telecom-qos/sla | GET/POST | SLA measurement | telecom_qos:sla |
+| /telecom-qos/sla/bulk | POST | Bulk SLA measurement ingestion | telecom_qos:sla |
+| /telecom-qos/sla/forecast | POST | SLA breach forecasting | telecom_qos:sla |
+| /telecom-qos/sla/chain | POST | SLA chain verification | telecom_qos:sla |
 | /telecom-qos/degradation | GET/POST | Degradation console | telecom_qos:degradation |
 | /telecom-qos/root-cause | GET/POST | Root cause analysis | telecom_qos:degradation |
 | /telecom-qos/remediation | GET/POST | Remediation management | telecom_qos:remediation |
+| /telecom-qos/5qi | GET | 5QI to QoS class mapping | telecom_qos:view |
+| /telecom-qos/budget | GET | Tenant QoS budget summary | telecom_qos:view |
+| /telecom-qos/trend | GET | QoS metric trend analysis | telecom_qos:view |
+
+## Service Methods
+
+### Core Policy & Enforcement
+| Method | Description |
+|--------|-------------|
+| `create_qos_policy()` | Create a QoS policy with conflict check and approval gate |
+| `change_qos_policy()` | Modify policy parameters; downgrades require explicit approval |
+| `qos_policy_create()` | Network-oriented policy creation from DSCP/bandwidth/priority |
+| `apply_qos_profile()` | Bind a policy to a customer service subscription |
+| `qos_enforcement()` | Enforce an active policy for a session |
+| `detect_policy_conflicts()` | Server-side conflict detection before policy creation |
+| `snapshot_policy()` | Capture an immutable policy snapshot (up to 10 per policy) |
+| `rollback_policy()` | Restore policy to a prior snapshot; stales enforcement records |
+| `bulk_apply_qos_policies()` | Apply a policy to multiple cells in a single call |
+
+### SLA Measurement & Breach Management
+| Method | Description |
+|--------|-------------|
+| `record_sla_measurement()` | Record a single SLA measurement with auto breach detection |
+| `ingest_sla_measurements_bulk()` | High-throughput batch ingestion with deduplication |
+| `forecast_sla_breach()` | Holt-Winters breach probability forecast within a horizon |
+| `verify_sla_measurement_chain()` | Cryptographic provenance chain for SLA dispute resolution |
+| `sla_breach_notification()` | Deduplicated breach notification with channel routing |
+| `qos_sla_compliance_report()` | Aggregated compliance report across all SLA measurements |
+
+### Traffic & Congestion Intelligence
+| Method | Description |
+|--------|-------------|
+| `classify_traffic()` | DPI-based traffic flow classification |
+| `traffic_classification()` | Rule-based packet/flow classifier with DSCP recommendation |
+| `detect_traffic_anomaly()` | Multi-variate z-score anomaly detection (no ML runtime required) |
+| `congestion_detection()` | SLA breach-rate based congestion verdict |
+| `record_congestion_event()` | Record a network congestion event |
+| `congestion_analytics()` | Aggregate congestion events by cell and level |
+
+### Analytics & Reporting
+| Method | Description |
+|--------|-------------|
+| `qos_report()` | Full QoS analytics report (SLA, speed tests, VoIP MOS, congestion) |
+| `analyse_qos_trend()` | OLS trend analysis (improving / stable / degrading) across time windows |
+| `compute_qos_budget()` | Bandwidth budget utilisation by QoS class |
+| `speed_test_analytics()` | Aggregate speed test statistics (mean, P95) |
+| `voip_quality_analytics()` | VoIP MOS KPIs and poor call rate |
+| `dashboard_summary()` | Operational summary for monitoring dashboards |
+
+### 5G / 5QI Support
+| Method | Description |
+|--------|-------------|
+| `map_5qi_to_policy()` | 3GPP 5QI → internal QoS class/DSCP mapping per TS 23.501 Table 5.7.4-1 |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -71,14 +132,20 @@ QoS policy management and enforcement covering bearer QoS, traffic shaping and p
 
 ## Streaming Events
 - qos_policy_activated, qos_policy_changed, sla_breach_detected, degradation_detected
-- root_cause_identified, remediation_triggered, remediation_completed, traffic_anomaly_detected, qos_agent_registered
+- root_cause_identified, remediation_triggered, remediation_completed, traffic_anomaly_detected
+- qos_agent_registered, sla_breach_forecast, policy_snapshot_created, policy_rolled_back
+- qos_budget_high_utilisation, sla_measurements_bulk_ingested, sla_chain_verified
 
 ## Edge Cases Handled
 - SLA breach direction is parameter-dependent: latency/loss/jitter → breach if measured > target; throughput/availability → breach if measured < target
 - QoS downgrade (reducing GBR, increasing latency target) requires explicit approval regardless of policy creator permissions
 - Disruptive remediations (bearer re-establishment) require approval even when degradation confidence is 0.99
-- Policy conflict detection is performed client-side before submission — server blocks if conflict_checked=False
+- Policy conflict detection is performed server-side via `detect_policy_conflicts()` before creation
 - Non-disruptive remediations (load balancing, traffic steering) can be auto-triggered without approval
+- Bulk SLA ingestion deduplicates by measurement_id; duplicate count is returned separately
+- 5QI values in operator-specific range (128-254) map to best-effort with an advisory note
+- Trend analysis requires >= window_count measurements; returns `trend_direction: unknown` otherwise
+- Policy rollback marks all affected enforcement records as `stale` for re-push to PCEF
 
 ## Composability Notes
-Consumes performance data from telecom_per (KPI breaches trigger degradation detection). Pushes policy changes through telecom_pro (config push to PCRF). SLA breach data feeds telecom_bil (SLA credit) and telecom_per (compliance tracking). Degradation root causes feed telecom_net (alarm correlation).
+Consumes performance data from telecom_per (KPI breaches trigger degradation detection). Pushes policy changes through telecom_pro (config push to PCRF). SLA breach data feeds telecom_bil (SLA credit) and telecom_per (compliance tracking). Degradation root causes feed telecom_net (alarm correlation). QoS budget accounting integrates with telecom_bil via CloudEvent for SLA credit calculation.

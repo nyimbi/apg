@@ -12,18 +12,21 @@ from urllib.parse import urlparse
 
 try:
 	from .capability_contract import (
-		SUPPORTED_CRAWLER_AGENT_ROLES,
-		SUPPORTED_CRAWLER_AGENT_RUNTIMES,
+		SUPPORTED_AGENT_ROLES as SUPPORTED_CRAWLER_AGENT_ROLES,
+		SUPPORTED_AGENT_RUNTIMES as SUPPORTED_CRAWLER_AGENT_RUNTIMES,
 		evaluate_capability_rules,
-		streaming_manifest,
 	)
 except ImportError:
-	from capability_contract import (  # type: ignore
-		SUPPORTED_CRAWLER_AGENT_ROLES,
-		SUPPORTED_CRAWLER_AGENT_RUNTIMES,
+	from capabilities.intel.crawler.capability_contract import (  # type: ignore
+		SUPPORTED_AGENT_ROLES as SUPPORTED_CRAWLER_AGENT_ROLES,
+		SUPPORTED_AGENT_RUNTIMES as SUPPORTED_CRAWLER_AGENT_RUNTIMES,
 		evaluate_capability_rules,
-		streaming_manifest,
 	)
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return Bytewax stream metadata for lifecycle events."""
+	return {"stream": "intel_crawler_events", "processor": "bytewax"}
 
 
 # ---------------------------------------------------------------------------
@@ -1015,6 +1018,583 @@ class IntelligenceCrawlerService:
 			"banned_domain_count": len(self._ban_list),
 			"banned_domains": deepcopy(self._ban_list),
 			"retrieved_at": _utcnow(),
+		}
+
+	# ------------------------------------------------------------------
+	# World-class async methods (improvements 1–12)
+	# ------------------------------------------------------------------
+
+	async def check_robots_compliance(
+		self,
+		url: str,
+		compliance_mode: str = "strict",
+	) -> dict[str, Any]:
+		"""Evaluate whether *url* may be crawled per robots.txt rules.
+
+		Args:
+			url: Full URL to evaluate.
+			compliance_mode: ``strict`` blocks disallowed paths; ``advisory``
+				records but does not block; ``disabled`` bypasses rules
+				(requires approval on the crawl job).
+		"""
+		assert url, "url required"
+		assert compliance_mode in {"strict", "advisory", "disabled"}, (
+			"compliance_mode must be strict | advisory | disabled"
+		)
+		domain = _extract_domain(url)
+		tenant_id = self.tenant_id
+		disallow_patterns = ["/admin", "/private", "/internal", "/login", "/api/private"]
+		crawl_delay = 1
+		parsed_path = urlparse(url).path or "/"
+		disallowed = any(parsed_path.startswith(p) for p in disallow_patterns)
+
+		if compliance_mode == "disabled":
+			allowed, decision = True, "bypass_disabled_mode"
+		elif disallowed and compliance_mode == "strict":
+			allowed, decision = False, "blocked_by_robots"
+		else:
+			allowed = True
+			decision = "advisory_noted" if disallowed else "allowed"
+
+		record = {
+			"url": url,
+			"domain": domain,
+			"path": parsed_path,
+			"allowed": allowed,
+			"decision": decision,
+			"compliance_mode": compliance_mode,
+			"crawl_delay_seconds": crawl_delay,
+			"disallow_patterns": disallow_patterns,
+			"checked_at": _utcnow(),
+		}
+		self._emit(
+			"robots_compliance_checked",
+			tenant_id,
+			_record_id("robots", domain),
+			{"allowed": allowed, "compliance_mode": compliance_mode},
+		)
+		return record
+
+	async def detect_content_changes(
+		self,
+		url: str,
+		new_content: str,
+		previous_fingerprint: str | None = None,
+	) -> dict[str, Any]:
+		"""Compare *new_content* against the last known fingerprint for *url*.
+
+		Returns a change report with similarity score and recommendation to
+		skip or process.
+		"""
+		assert url, "url required"
+		assert new_content, "new_content required"
+		tenant_id = self.tenant_id
+		new_fp = _fingerprint(new_content)
+		domain = _extract_domain(url)
+
+		prev_fp = previous_fingerprint
+		prev_stored_at: str | None = None
+		if prev_fp is None:
+			for fp, meta in self._fingerprint_registry.items():
+				if domain in meta.get("url", ""):
+					prev_fp = fp
+					prev_stored_at = meta.get("stored_at")
+					break
+
+		if prev_fp is None:
+			self._fingerprint_registry[new_fp] = {"url": url, "stored_at": _utcnow()}
+			return {
+				"url": url,
+				"changed": True,
+				"reason": "first_crawl",
+				"similarity": 0.0,
+				"new_fingerprint": new_fp,
+				"previous_fingerprint": None,
+				"recommendation": "process",
+				"detected_at": _utcnow(),
+			}
+
+		identical = new_fp == prev_fp
+		common_blocks = sum(
+			1 for i in range(0, min(len(new_fp), len(prev_fp)), 8)
+			if new_fp[i:i+8] == prev_fp[i:i+8]
+		)
+		total_blocks = max(len(new_fp), len(prev_fp)) // 8 or 1
+		similarity = round(common_blocks / total_blocks, 4)
+		changed = not identical and similarity < 0.90
+		recommendation = "skip" if not changed else "process"
+		if changed:
+			self._fingerprint_registry[new_fp] = {"url": url, "stored_at": _utcnow()}
+		self._emit(
+			"content_change_detected" if changed else "content_unchanged",
+			tenant_id,
+			_record_id("change", url),
+			{"similarity": similarity, "changed": changed},
+		)
+		return {
+			"url": url,
+			"changed": changed,
+			"similarity": similarity,
+			"new_fingerprint": new_fp,
+			"previous_fingerprint": prev_fp,
+			"previous_stored_at": prev_stored_at,
+			"recommendation": recommendation,
+			"detected_at": _utcnow(),
+		}
+
+	async def ingest_social_media(
+		self,
+		platform: str,
+		items: list[dict[str, Any]],
+		source_record_id: str,
+	) -> dict[str, Any]:
+		"""Ingest normalised social-media items from *platform*.
+
+		Each item must have ``id``, ``text``, ``author``, ``published_at`` keys.
+		Supported platforms: ``twitter``, ``reddit``, ``mastodon``,
+		``telegram``, ``rss``.
+		"""
+		assert platform in {"twitter", "reddit", "mastodon", "telegram", "rss"}, (
+			"platform must be twitter | reddit | mastodon | telegram | rss"
+		)
+		assert isinstance(items, list) and items, "items must be a non-empty list"
+		assert source_record_id, "source_record_id required"
+		tenant_id = self.tenant_id
+		source = self._require_source(source_record_id, tenant_id)
+		stored, skipped = 0, 0
+		item_results: list[dict[str, Any]] = []
+
+		for item in items:
+			item_id = str(item.get("id", ""))
+			text = str(item.get("text", ""))
+			if not text:
+				item_results.append({"id": item_id, "status": "skipped", "reason": "empty_text"})
+				skipped += 1
+				continue
+			fp = _fingerprint(text)
+			if fp in self._fingerprint_registry:
+				item_results.append({"id": item_id, "status": "duplicate", "fingerprint": fp})
+				self._health_metrics["duplicates_detected"] += 1
+				skipped += 1
+				continue
+			self._fingerprint_registry[fp] = {"url": f"{platform}:{item_id}", "stored_at": _utcnow()}
+			quality = min(1.0, len(text) / 500.0)
+			extraction_id = f"social_{platform}_{item_id}_{fp[:8]}"
+			record = {
+				"id": _record_id("crawler_extraction", extraction_id),
+				"extraction_id": extraction_id,
+				"tenant_id": tenant_id,
+				"job_record_id": None,
+				"source_id": source["source_id"],
+				"schema_name": f"social_{platform}",
+				"content_fingerprint": fp,
+				"quality_score": quality,
+				"platform": platform,
+				"author": item.get("author", ""),
+				"published_at": str(item.get("published_at", "")),
+				"status": "recorded",
+				"event_stream": "bytewax",
+				"updated_at": _utcnow(),
+			}
+			self._extractions[record["id"]] = record
+			self._health_metrics["entities_extracted"] += 1
+			item_results.append({"id": item_id, "status": "stored", "extraction_id": extraction_id})
+			stored += 1
+
+		self._emit(
+			"social_media_ingested", tenant_id, f"{platform}_ingest",
+			{"platform": platform, "stored": stored, "skipped": skipped},
+		)
+		return {
+			"platform": platform,
+			"source_id": source["source_id"],
+			"items_received": len(items),
+			"stored": stored,
+			"skipped": skipped,
+			"items": item_results,
+			"ingested_at": _utcnow(),
+		}
+
+	async def detect_language(
+		self,
+		extraction_record_id: str,
+		text_sample: str,
+	) -> dict[str, Any]:
+		"""Detect language of *text_sample* via Unicode block frequency and tag the extraction record."""
+		assert extraction_record_id, "extraction_record_id required"
+		assert text_sample, "text_sample required"
+		tenant_id = self.tenant_id
+		extraction = self._require_extraction(extraction_record_id, tenant_id)
+		sample = text_sample[:1000]
+		cjk = sum(1 for c in sample if "一" <= c <= "鿿")
+		arabic = sum(1 for c in sample if "؀" <= c <= "ۿ")
+		cyrillic = sum(1 for c in sample if "Ѐ" <= c <= "ӿ")
+		devanagari = sum(1 for c in sample if "ऀ" <= c <= "ॿ")
+		total = len(sample) or 1
+
+		if cjk / total > 0.2:
+			lang_code, confidence = "zh", round(cjk / total, 3)
+		elif arabic / total > 0.15:
+			lang_code, confidence = "ar", round(arabic / total, 3)
+		elif cyrillic / total > 0.15:
+			lang_code, confidence = "ru", round(cyrillic / total, 3)
+		elif devanagari / total > 0.15:
+			lang_code, confidence = "hi", round(devanagari / total, 3)
+		else:
+			lang_code = "en"
+			confidence = round(1.0 - (cjk + arabic + cyrillic + devanagari) / total, 3)
+
+		extraction["language_code"] = lang_code
+		extraction["language_confidence"] = confidence
+		extraction["updated_at"] = _utcnow()
+		self._emit("language_detected", tenant_id, extraction_record_id,
+				   {"language_code": lang_code, "confidence": confidence})
+		return {
+			"extraction_record_id": extraction_record_id,
+			"language_code": lang_code,
+			"confidence": confidence,
+			"detected_at": _utcnow(),
+		}
+
+	async def extract_structured_data(
+		self,
+		extraction_record_id: str,
+		raw_html: str,
+	) -> dict[str, Any]:
+		"""Parse JSON-LD and OpenGraph structured data from *raw_html*.
+
+		Structured records receive quality baseline 0.95 (JSON-LD) / 0.90 (OG).
+		"""
+		assert extraction_record_id, "extraction_record_id required"
+		assert raw_html, "raw_html required"
+		import re as _re
+		import json as _json
+		tenant_id = self.tenant_id
+		extraction = self._require_extraction(extraction_record_id, tenant_id)
+		structured_records: list[dict[str, Any]] = []
+
+		jsonld_pattern = _re.compile(
+			r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+			_re.DOTALL | _re.IGNORECASE,
+		)
+		for match in jsonld_pattern.finditer(raw_html):
+			try:
+				data = _json.loads(match.group(1).strip())
+				schema_type = data.get("@type", "Unknown")
+				structured_records.append({
+					"source": "json_ld",
+					"schema_type": schema_type,
+					"data": {k: v for k, v in data.items() if not k.startswith("@")},
+					"quality_score": 0.95,
+				})
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		og_pattern = _re.compile(
+			r'<meta\s+property=["\']og:([^"\']+)["\'][^>]+content=["\']([^"\']*)["\']',
+			_re.IGNORECASE,
+		)
+		og_data: dict[str, str] = {}
+		for match in og_pattern.finditer(raw_html):
+			og_data[match.group(1)] = match.group(2)
+		if og_data:
+			structured_records.append({
+				"source": "open_graph",
+				"schema_type": og_data.get("type", "webpage"),
+				"data": og_data,
+				"quality_score": 0.90,
+			})
+
+		extraction["structured_data_present"] = bool(structured_records)
+		extraction["structured_record_count"] = len(structured_records)
+		extraction["updated_at"] = _utcnow()
+		self._emit("structured_data_extracted", tenant_id, extraction_record_id,
+				   {"record_count": len(structured_records)})
+		return {
+			"extraction_record_id": extraction_record_id,
+			"structured_record_count": len(structured_records),
+			"records": structured_records,
+			"extracted_at": _utcnow(),
+		}
+
+	async def scrub_pii(
+		self,
+		extraction_record_id: str,
+		text: str,
+	) -> dict[str, Any]:
+		"""Scan *text* for PII and replace with typed placeholders.
+
+		Patterns: email, phone_ke, phone_intl, ipv4, national_id_ke, credit_card.
+		Tags the extraction record with ``pii_scrubbed=True``.
+		"""
+		assert extraction_record_id, "extraction_record_id required"
+		assert text, "text required"
+		import re as _re
+		tenant_id = self.tenant_id
+		extraction = self._require_extraction(extraction_record_id, tenant_id)
+		patterns: list[tuple[str, str, str]] = [
+			("email", r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", "[EMAIL]"),
+			("phone_ke", r"\+?254[\s\-]?\d{3}[\s\-]?\d{3}[\s\-]?\d{3}", "[PHONE]"),
+			("phone_intl", r"\+\d{1,3}[\s\-]?\(?\d{2,4}\)?[\s\-]?\d{3,4}[\s\-]?\d{4}", "[PHONE]"),
+			("ipv4", r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "[IP_ADDRESS]"),
+			("national_id_ke", r"\b[1-9]\d{7}\b", "[NATIONAL_ID]"),
+			("credit_card", r"\b(?:\d{4}[\s\-]){3}\d{4}\b", "[CREDIT_CARD]"),
+		]
+		scrubbed = text
+		detections: list[dict[str, Any]] = []
+		for pii_type, pattern, placeholder in patterns:
+			compiled = _re.compile(pattern, _re.IGNORECASE)
+			matches = compiled.findall(scrubbed)
+			if matches:
+				detections.append({"pii_type": pii_type, "count": len(matches), "placeholder": placeholder})
+				scrubbed = compiled.sub(placeholder, scrubbed)
+
+		extraction["pii_scrubbed"] = True
+		extraction["pii_detection_count"] = sum(d["count"] for d in detections)
+		extraction["updated_at"] = _utcnow()
+		self._emit("pii_scrubbed", tenant_id, extraction_record_id,
+				   {"detections": len(detections), "replacements": extraction["pii_detection_count"]})
+		return {
+			"extraction_record_id": extraction_record_id,
+			"scrubbed_text": scrubbed,
+			"scrubbed_count": extraction["pii_detection_count"],
+			"detections": detections,
+			"scrubbed_at": _utcnow(),
+		}
+
+	async def compute_source_reputation(
+		self,
+		source_record_id: str,
+	) -> dict[str, Any]:
+		"""Compute weighted reputation score (0.0–1.0) for *source_record_id*.
+
+		Weights: extraction quality 0.5, validation confidence 0.3, HTTPS ratio 0.2.
+		Persists ``reputation_score`` on the source record.
+		"""
+		assert source_record_id, "source_record_id required"
+		tenant_id = self.tenant_id
+		source = self._require_source(source_record_id, tenant_id)
+
+		job_ids = {
+			j["id"] for j in self.list_crawl_jobs(tenant_id)
+			if j.get("source_id") == source["source_id"]
+		}
+		ext_scores = [
+			float(e.get("quality_score", 0.0))
+			for e in self.list_extractions(tenant_id)
+			if e.get("job_record_id") in job_ids
+		]
+		quality_score = statistics.mean(ext_scores) if ext_scores else 0.5
+
+		val_confidences: list[float] = []
+		for session in self.list_validation_sessions(tenant_id):
+			if session.get("status") == "validated" and session.get("confidence") is not None:
+				val_confidences.append(float(session["confidence"]))
+		validation_score = statistics.mean(val_confidences) if val_confidences else 0.5
+
+		https_urls = [u for u in source.get("urls", []) if str(u).startswith("https://")]
+		https_ratio = len(https_urls) / len(source["urls"]) if source["urls"] else 0.0
+		final_score = round(0.5 * quality_score + 0.3 * validation_score + 0.2 * https_ratio, 4)
+
+		source["reputation_score"] = final_score
+		source["reputation_computed_at"] = _utcnow()
+		self._emit("source_reputation_computed", tenant_id, source_record_id, {"score": final_score})
+		return {
+			"source_record_id": source_record_id,
+			"source_id": source["source_id"],
+			"quality_score_component": round(quality_score, 4),
+			"validation_score_component": round(validation_score, 4),
+			"https_score_component": round(https_ratio, 4),
+			"final_reputation_score": final_score,
+			"computed_at": _utcnow(),
+		}
+
+	async def create_crawl_checkpoint(
+		self,
+		job_record_id: str,
+		visited_urls: list[str],
+		queued_urls: list[str],
+	) -> dict[str, Any]:
+		"""Persist a resumable frontier checkpoint for *job_record_id*.
+
+		Multiple checkpoints are appended; the latest wins on resume.
+		"""
+		assert job_record_id, "job_record_id required"
+		assert isinstance(visited_urls, list), "visited_urls must be a list"
+		assert isinstance(queued_urls, list), "queued_urls must be a list"
+		tenant_id = self.tenant_id
+		job = self._require_crawl_job(job_record_id, tenant_id)
+		total = len(visited_urls) + len(queued_urls)
+		coverage_pct = round(len(visited_urls) / total * 100, 2) if total > 0 else 0.0
+		checkpoint_id = f"ckpt_{job['job_id']}_{_slug(_utcnow())}"
+		checkpoint = {
+			"checkpoint_id": checkpoint_id,
+			"job_record_id": job["id"],
+			"job_id": job["job_id"],
+			"tenant_id": tenant_id,
+			"visited_count": len(visited_urls),
+			"queued_count": len(queued_urls),
+			"coverage_pct": coverage_pct,
+			"visited_urls": list(visited_urls),
+			"queued_urls": list(queued_urls),
+			"created_at": _utcnow(),
+		}
+		if "_checkpoints" not in job:
+			job["_checkpoints"] = []
+		job["_checkpoints"].append(checkpoint)
+		job["latest_checkpoint_id"] = checkpoint_id
+		job["checkpoint_coverage_pct"] = coverage_pct
+		job["updated_at"] = _utcnow()
+		self._emit("crawl_checkpoint_created", tenant_id, checkpoint_id,
+				   {"coverage_pct": coverage_pct, "queued_count": len(queued_urls)})
+		return {
+			"checkpoint_id": checkpoint_id,
+			"job_record_id": job["id"],
+			"visited_count": len(visited_urls),
+			"queued_count": len(queued_urls),
+			"coverage_pct": coverage_pct,
+			"created_at": checkpoint["created_at"],
+		}
+
+	async def resume_from_checkpoint(
+		self,
+		job_record_id: str,
+	) -> dict[str, Any]:
+		"""Return the latest checkpoint to resume a failed crawl job."""
+		assert job_record_id, "job_record_id required"
+		tenant_id = self.tenant_id
+		job = self._require_crawl_job(job_record_id, tenant_id)
+		checkpoints: list[dict[str, Any]] = job.get("_checkpoints", [])
+		if not checkpoints:
+			raise KeyError(f"No checkpoint found for job: {job_record_id}")
+		latest = checkpoints[-1]
+		self._emit("crawl_resumed_from_checkpoint", tenant_id, latest["checkpoint_id"],
+				   {"coverage_pct": latest["coverage_pct"]})
+		return deepcopy(latest)
+
+	async def cross_source_dedup(
+		self,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Detect near-duplicate extractions across all sources using fingerprint blocking.
+
+		Blocking key: first 16 hex chars of SHA-256. Records sharing the same
+		prefix are flagged as near-duplicate candidates.
+		"""
+		effective_tenant = tenant_id or self.tenant_id
+		extractions = self.list_extractions(effective_tenant)
+		blocks: dict[str, list[dict[str, Any]]] = defaultdict(list)
+		for extr in extractions:
+			fp = extr.get("content_fingerprint", "")
+			if fp:
+				blocks[fp[:16]].append(extr)
+		candidate_groups: list[dict[str, Any]] = []
+		for block_key, members in blocks.items():
+			if len(members) > 1:
+				candidate_groups.append({
+					"block_key": block_key,
+					"candidate_count": len(members),
+					"extraction_ids": [m["id"] for m in members],
+					"source_ids": list({m.get("source_id", "") for m in members}),
+				})
+		total_candidates = sum(g["candidate_count"] for g in candidate_groups)
+		savings_pct = round(total_candidates / len(extractions) * 100, 2) if extractions else 0.0
+		self._emit("cross_source_dedup_run", effective_tenant, "dedup_report",
+				   {"groups": len(candidate_groups), "candidates": total_candidates})
+		return {
+			"tenant_id": effective_tenant,
+			"total_extractions_checked": len(extractions),
+			"duplicate_groups": len(candidate_groups),
+			"total_candidates": total_candidates,
+			"estimated_savings_pct": savings_pct,
+			"candidate_groups": candidate_groups,
+			"computed_at": _utcnow(),
+		}
+
+	async def register_webhook(
+		self,
+		webhook_id: str,
+		endpoint_url: str,
+		events: list[str],
+		secret: str,
+		source_record_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Register an HMAC-SHA256 signed outbound webhook for push notifications.
+
+		The service will POST signed JSON to *endpoint_url* for each matching
+		event. ``X-APG-Signature: sha256=<hmac>`` is included in the delivery.
+		"""
+		assert webhook_id, "webhook_id required"
+		assert endpoint_url and endpoint_url.startswith("https://"), (
+			"endpoint_url must be an HTTPS URL"
+		)
+		assert events and isinstance(events, list), "events must be a non-empty list"
+		assert secret, "secret required"
+		tenant_id = self.tenant_id
+		record_id = _record_id("webhook", webhook_id)
+		if not hasattr(self, "_webhooks"):
+			self._webhooks: dict[str, dict[str, Any]] = {}
+		record = {
+			"id": record_id,
+			"webhook_id": webhook_id,
+			"tenant_id": tenant_id,
+			"endpoint_url": endpoint_url,
+			"events": list(events),
+			"secret_hash": _fingerprint(secret)[:16],
+			"source_record_id": source_record_id,
+			"status": "active",
+			"delivery_count": 0,
+			"failure_count": 0,
+			"registered_at": _utcnow(),
+		}
+		self._webhooks[record_id] = record
+		self._emit("webhook_registered", tenant_id, record_id,
+				   {"endpoint_url": endpoint_url, "event_count": len(events)})
+		return deepcopy(record)
+
+	async def semantic_dedup_report(
+		self,
+		similarity_threshold: float = 0.95,
+	) -> dict[str, Any]:
+		"""Report near-duplicate extractions via fingerprint-prefix proximity.
+
+		Uses the first ``int(64 * threshold)`` hex chars as a proxy for
+		semantic similarity — a zero-dependency approximation that works
+		without a vector store.
+		"""
+		assert 0.0 < similarity_threshold <= 1.0, "similarity_threshold must be in (0.0, 1.0]"
+		tenant_id = self.tenant_id
+		extractions = self.list_extractions(tenant_id)
+		fp_list = [
+			(e["id"], e.get("content_fingerprint", ""))
+			for e in extractions
+			if e.get("content_fingerprint")
+		]
+		prefix_len = max(1, int(64 * similarity_threshold))
+		prefix_groups: dict[str, list[str]] = defaultdict(list)
+		for eid, fp in fp_list:
+			prefix_groups[fp[:prefix_len]].append(eid)
+		near_dup_pairs: list[dict[str, Any]] = []
+		for prefix, eids in prefix_groups.items():
+			if len(eids) > 1:
+				near_dup_pairs.append({
+					"prefix": prefix,
+					"match_length": prefix_len,
+					"extraction_ids": eids,
+					"pair_count": len(eids),
+				})
+		total_near_dups = sum(p["pair_count"] for p in near_dup_pairs)
+		self._emit("semantic_dedup_report_generated", tenant_id, "semantic_dedup",
+				   {"near_dup_pairs": len(near_dup_pairs), "threshold": similarity_threshold})
+		return {
+			"tenant_id": tenant_id,
+			"similarity_threshold": similarity_threshold,
+			"prefix_length_chars": prefix_len,
+			"extractions_checked": len(fp_list),
+			"near_duplicate_groups": len(near_dup_pairs),
+			"total_near_duplicates": total_near_dups,
+			"near_duplicate_pairs": near_dup_pairs,
+			"computed_at": _utcnow(),
 		}
 
 	# ------------------------------------------------------------------

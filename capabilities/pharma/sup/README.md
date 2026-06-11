@@ -1,7 +1,7 @@
 # Pharmaceutical Supply Chain
 
 ## Overview
-Manages the pharmaceutical supply chain from active ingredient sourcing through CMO management, demand planning, import licensing, supply security monitoring, purchase order management, and supply contract lifecycle. Enforces approved supplier list requirements, quality agreement obligations, import license verification, and dual sourcing requirements for high-risk products.
+Manages the pharmaceutical supply chain from active ingredient sourcing through CMO management, demand planning, import licensing, supply security monitoring, purchase order management, and supply contract lifecycle. Enforces approved supplier list requirements, quality agreement obligations, import license verification, dual sourcing requirements, GDP compliance, GS1 serialisation (FMD/DSCSA), cold chain monitoring, recall management, and proactive shortage risk prediction.
 
 ## Capability ID
 `pharma_sup`
@@ -17,6 +17,13 @@ Manages the pharmaceutical supply chain from active ingredient sourcing through 
 - supply_contract_workflow: Contract approval, version control, and 60-day renewal alert
 - approved_supplier_list_workflow: ASL maintenance with qualification status enforcement
 - supply_risk_workflow: Dual sourcing requirement enforcement for high-risk products
+- serialisation_workflow: GS1-EPCIS unit-level serialisation, FMD/DSCSA serial verification, decommissioning
+- cold_chain_workflow: Continuous temperature monitoring, MKT excursion evaluation, stability budget tracking
+- gdp_compliance_workflow: Pre-shipment GDP gate (EMA 2013/C 343/01): carrier, mode, logger, documents
+- recall_management_workflow: Class I/II/III recall initiation, effectiveness tracking (21 CFR Part 7 / EMA Annex 16)
+- supplier_scorecard_workflow: Weighted KPI scorecard driving automated re-qualification triggers
+- shortage_prediction_workflow: 90-day forward shortage risk probability via supply signal triangulation
+- regulatory_intelligence_workflow: EMA/FDA/WHO feed ingestion for proactive supply disruption alerts
 
 ## Requires
 | Capability | Reason |
@@ -45,11 +52,21 @@ Manages the pharmaceutical supply chain from active ingredient sourcing through 
 |------|--------|-------------|------------|
 | /pharma-sup/api/v1/suppliers | POST | Create supplier | pharma_sup:suppliers |
 | /pharma-sup/api/v1/suppliers/<id>/qualify | POST | Qualify supplier | pharma_sup:suppliers |
+| /pharma-sup/api/v1/suppliers/<id>/scorecard | GET | Supplier KPI scorecard | pharma_sup:suppliers |
 | /pharma-sup/api/v1/asl | GET | Approved Supplier List | pharma_sup:asl |
 | /pharma-sup/api/v1/cmo | POST | Activate CMO | pharma_sup:cmo |
 | /pharma-sup/api/v1/orders | POST | Place purchase order | pharma_sup:orders |
+| /pharma-sup/api/v1/orders/<id>/gdp-gate | POST | GDP compliance gate | pharma_sup:orders |
 | /pharma-sup/api/v1/import-licenses | POST | Apply for import license | pharma_sup:import |
 | /pharma-sup/api/v1/import-licenses/expiry-alerts | GET | License expiry alerts | pharma_sup:import |
+| /pharma-sup/api/v1/serialisation/batches | POST | Serialise batch (GS1-EPCIS) | pharma_sup:serialisation |
+| /pharma-sup/api/v1/serialisation/verify | POST | Verify serial number (FMD) | pharma_sup:serialisation |
+| /pharma-sup/api/v1/cold-chain/readings | POST | Record temperature data point | pharma_sup:cold_chain |
+| /pharma-sup/api/v1/cold-chain/<shipment_id>/excursion | GET | Evaluate excursion impact | pharma_sup:cold_chain |
+| /pharma-sup/api/v1/recalls | POST | Initiate product recall | pharma_sup:recall |
+| /pharma-sup/api/v1/recalls/<id>/progress | PUT | Update recall effectiveness | pharma_sup:recall |
+| /pharma-sup/api/v1/shortage-risk/<product_id> | GET | Predict shortage risk (90-day) | pharma_sup:security |
+| /pharma-sup/api/v1/regulatory-intelligence | POST | Ingest regulatory feed alerts | pharma_sup:admin |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -61,6 +78,12 @@ Manages the pharmaceutical supply chain from active ingredient sourcing through 
 | high_risk_dual_sourcing_required | High-risk product without dual source | Deny — identify alternate supplier |
 | shortage_reporting_required | Shortage status set without regulatory notification | Deny — notify authority |
 | order_coa_required | Order received without Certificate of Analysis | Deny — obtain CoA |
+| gdp_gate_required | Shipment placed without GDP compliance clearance | Deny — pass GDP gate first |
+| serialisation_required | Finished batch released without GS1 serial assignment | Deny — serialise batch |
+| serial_verification_required | Dispensing unit with unverified or decommissioned serial | Deny — verify serial (FMD) |
+| cold_chain_logger_required | Cold-chain shipment without commissioned temperature logger | Deny — commission logger |
+| recall_class_i_notification | Class I recall initiated without 24h regulatory notification | Alert — notify authority immediately |
+| supplier_scorecard_requalification | Supplier weighted score < 70 | Trigger requalification workflow |
 
 ## Data Models
 - Supplier: supplier_code, supplier_type, qualification_status, quality_agreement_reference, on_approved_supplier_list
@@ -72,13 +95,19 @@ Manages the pharmaceutical supply chain from active ingredient sourcing through 
 - SupplyContract: contract_number, contract_type, version, approved, expiry_date
 
 ## Streaming Events
-- supplier_qualified, supplier_suspended, supplier_audit_completed
+- supplier_qualified, supplier_suspended, supplier_audit_completed, supplier_requalification_triggered
+- supplier_scorecard_calculated
 - cmo_activated, cmo_agreement_signed
 - demand_forecast_updated, sop_completed
 - order_placed, order_received
+- gdp_compliance_gate_evaluated, gdp_compliance_gate_failed
 - import_license_granted, import_license_expiring, import_license_expired
-- supply_shortage_detected, supply_risk_escalated
+- supply_shortage_detected, supply_risk_escalated, shortage_risk_predicted
 - contract_approved, contract_expiring
+- batch_serialised, serial_verification_failed
+- cold_chain_excursion_detected, cold_chain_stability_budget_exceeded
+- recall_initiated, recall_effectiveness_updated, recall_closed_effective
+- regulatory_intelligence_alert_created
 
 ## Edge Cases Handled
 - A suspended supplier's materials already in quarantine are not automatically rejected; they require manual disposition

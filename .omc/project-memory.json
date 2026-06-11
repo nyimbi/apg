@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "python3 -c \"\ncontent = open('capabilities/fin/gl/tests/test_service.py').read()\ncontent = content.replace('err.total_debits == Decimal(\\\"10000.00\\\")', 'err.debits == Decimal(\\\"10000.00\\\")')\ncontent = content.replace('err.total_credits == Decimal(\\\"9999.00\\\")', 'err.credits == Decimal(\\\"9999.00\\\")')\nopen('capabilities/fin/gl/tests/test_service.py', 'w').write(content)\nimport py_compile; py_compile.compile('capabilities/fin/gl/tests/test_service.py', doraise=True)\nprint('Fixed test back to .debits/.credits')\n\" && uv run pytest capabilities/fin/gl/tests/test_service.py tests/test_auth_hub.py -q --tb=short 2>&1 | tail -4",
+    "testCommand": "uv run pytest capabilities/agriculture/ capabilities/insurance/ capabilities/legal/ capabilities/hospitality/ capabilities/ngo/ -q --tb=short 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -392,8 +392,8 @@
   "hotPaths": [
     {
       "path": "capabilities/common/mlx/service.py",
-      "accessCount": 16,
-      "lastAccessed": 1781112045748,
+      "accessCount": 25,
+      "lastAccessed": 1781178370542,
       "type": "file"
     },
     {
@@ -421,6 +421,12 @@
       "type": "file"
     },
     {
+      "path": "capabilities/common/phi/service.py",
+      "accessCount": 7,
+      "lastAccessed": 1781178158781,
+      "type": "file"
+    },
+    {
       "path": "compiler/semantic_analyzer.py",
       "accessCount": 6,
       "lastAccessed": 1781111150999,
@@ -436,12 +442,6 @@
       "path": "capabilities/common/esig/api.py",
       "accessCount": 5,
       "lastAccessed": 1781038294107,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/phi/service.py",
-      "accessCount": 5,
-      "lastAccessed": 1781110935620,
       "type": "file"
     },
     {
@@ -466,6 +466,12 @@
       "path": "tests/test_compiler_baseline.py",
       "accessCount": 3,
       "lastAccessed": 1781039134903,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/common/mlx/docs/user_guide.md",
+      "accessCount": 3,
+      "lastAccessed": 1781178462496,
       "type": "file"
     },
     {
@@ -508,6 +514,12 @@
       "path": "capabilities/common/esig/models.py",
       "accessCount": 2,
       "lastAccessed": 1781111291446,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/common/phi/docs/user_guide.md",
+      "accessCount": 2,
+      "lastAccessed": 1781178251867,
       "type": "file"
     },
     {
@@ -598,18 +610,6 @@
       "path": "capabilities/common/temporal/docs/user_guide.md",
       "accessCount": 1,
       "lastAccessed": 1781038549753,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/mlx/docs/user_guide.md",
-      "accessCount": 1,
-      "lastAccessed": 1781038571154,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/phi/docs/user_guide.md",
-      "accessCount": 1,
-      "lastAccessed": 1781038587048,
       "type": "file"
     },
     {

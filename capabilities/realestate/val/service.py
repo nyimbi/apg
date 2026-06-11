@@ -905,3 +905,700 @@ class ValService:
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ── NEW: compute_irr ────────────────────────────────────────────────────────
+
+	def _compute_irr(self, cash_flows: list[Decimal], purchase_price: Decimal, max_iter: int = 200, tol: float = 1e-6) -> Decimal | None:
+		"""Solve for IRR via bisection between 0.001 and 0.999.
+
+		cash_flows: year-by-year income (positive) — does NOT include the initial outlay.
+		purchase_price: the acquisition cost (added as t=0 negative cash flow).
+		Returns IRR as a decimal fraction (0.08 = 8%) or None if no solution.
+		"""
+		def npv_at_rate(r: float) -> float:
+			total = -float(purchase_price)
+			for t, cf in enumerate(cash_flows, start=1):
+				total += float(cf) / (1 + r) ** t
+			return total
+
+		lo, hi = 0.001, 0.999
+		npv_lo = npv_at_rate(lo)
+		npv_hi = npv_at_rate(hi)
+		if npv_lo * npv_hi > 0:
+			return None  # no sign change — IRR not in range
+		for _ in range(max_iter):
+			mid = (lo + hi) / 2
+			npv_mid = npv_at_rate(mid)
+			if abs(npv_mid) < tol:
+				break
+			if npv_lo * npv_mid < 0:
+				hi = mid
+			else:
+				lo = mid
+				npv_lo = npv_mid
+		return Decimal(str(round((lo + hi) / 2, 8)))
+
+	# ── NEW: dcf_sensitivity_analysis ──────────────────────────────────────────
+
+	async def dcf_sensitivity_analysis(
+		self,
+		property_id: str,
+		cash_flows: list[dict[str, Any]],
+		base_discount_rate: float,
+		base_exit_yield: float,
+		tenant_id: str,
+		dr_steps_bps: list[int] | None = None,
+		ey_steps_bps: list[int] | None = None,
+		purchasers_costs_pct: float = 0.0575,
+	) -> dict[str, Any]:
+		"""Produce a 2-D capital value sensitivity grid sweeping discount rate and exit yield.
+
+		Returns a grid keyed by (dr_pct, ey_pct) with capital value at each intersection,
+		plus recommended_range_low/high at ±1 standard deviation across all scenarios.
+		"""
+		assert property_id and cash_flows, "property_id and cash_flows required"
+		assert 0.01 <= base_discount_rate <= 0.30, "base_discount_rate out of range"
+		assert 0.01 <= base_exit_yield <= 0.20, "base_exit_yield out of range"
+
+		dr_offsets = dr_steps_bps or [-150, -100, -50, 0, 50, 100, 150]
+		ey_offsets = ey_steps_bps or [-150, -100, -50, 0, 50, 100, 150]
+
+		grid: list[dict[str, Any]] = []
+		values: list[float] = []
+
+		for dr_bps in dr_offsets:
+			dr = max(0.01, base_discount_rate + dr_bps / 10000)
+			for ey_bps in ey_offsets:
+				ey = max(0.005, base_exit_yield + ey_bps / 10000)
+				result = await self.dcf_valuation(
+					property_id=property_id,
+					cash_flows=cash_flows,
+					discount_rate=dr,
+					terminal_yield=ey,
+					tenant_id=tenant_id,
+					purchasers_costs_pct=purchasers_costs_pct,
+				)
+				cv = result["net_capital_value"]
+				values.append(cv)
+				grid.append({
+					"discount_rate_pct": round(dr * 100, 3),
+					"exit_yield_pct": round(ey * 100, 3),
+					"dr_shift_bps": dr_bps,
+					"ey_shift_bps": ey_bps,
+					"net_capital_value": cv,
+				})
+
+		import math
+		mean_val = sum(values) / len(values)
+		variance = sum((v - mean_val) ** 2 for v in values) / len(values)
+		std_dev = math.sqrt(variance)
+		from uuid6 import uuid7
+		analysis_id = str(uuid7())
+		return {
+			"analysis_id": analysis_id,
+			"property_id": property_id,
+			"tenant_id": tenant_id,
+			"base_discount_rate_pct": base_discount_rate * 100,
+			"base_exit_yield_pct": base_exit_yield * 100,
+			"scenarios": len(grid),
+			"grid": grid,
+			"base_case_value": next(
+				(g["net_capital_value"] for g in grid if g["dr_shift_bps"] == 0 and g["ey_shift_bps"] == 0), None
+			),
+			"min_value": round(min(values), 2),
+			"max_value": round(max(values), 2),
+			"mean_value": round(mean_val, 2),
+			"std_dev": round(std_dev, 2),
+			"recommended_range_low": round(mean_val - std_dev, 2),
+			"recommended_range_high": round(mean_val + std_dev, 2),
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── NEW: residual_land_valuation ────────────────────────────────────────────
+
+	async def residual_land_valuation(
+		self,
+		property_id: str,
+		gross_development_value: Decimal,
+		build_cost: Decimal,
+		tenant_id: str,
+		finance_rate: Decimal = Decimal("0.06"),
+		build_period_years: float = 1.5,
+		developer_profit_pct: Decimal = Decimal("0.20"),
+		professional_fees_pct: Decimal = Decimal("0.12"),
+		transaction_costs_pct: Decimal = Decimal("0.06"),
+		marketing_costs: Decimal = Decimal("0"),
+		currency: str = "KES",
+	) -> dict[str, Any]:
+		"""Compute residual land value: GDV minus all development costs and profit.
+
+		Formula: RLV = GDV - build_cost - professional_fees - finance_cost
+		               - developer_profit - transaction_costs - marketing_costs
+		"""
+		assert gross_development_value > 0, "gross_development_value must be positive"
+		assert build_cost >= 0, "build_cost must be non-negative"
+
+		professional_fees = build_cost * professional_fees_pct
+		total_cost_before_finance = build_cost + professional_fees + marketing_costs
+		# simple interest finance on half the build cost for the build period
+		finance_cost = total_cost_before_finance * finance_rate * Decimal(str(build_period_years / 2))
+		total_development_cost = total_cost_before_finance + finance_cost
+		developer_profit = gross_development_value * developer_profit_pct
+		transaction_costs = gross_development_value * transaction_costs_pct
+		residual_land_value = (
+			gross_development_value
+			- total_development_cost
+			- developer_profit
+			- transaction_costs
+		).quantize(Decimal("0.01"))
+
+		from uuid6 import uuid7
+		analysis_id = str(uuid7())
+		result: dict[str, Any] = {
+			"analysis_id": analysis_id,
+			"property_id": property_id,
+			"tenant_id": tenant_id,
+			"currency": currency,
+			"gross_development_value": float(gross_development_value),
+			"build_cost": float(build_cost),
+			"professional_fees": float(professional_fees.quantize(Decimal("0.01"))),
+			"finance_cost": float(finance_cost.quantize(Decimal("0.01"))),
+			"marketing_costs": float(marketing_costs),
+			"total_development_cost": float(total_development_cost.quantize(Decimal("0.01"))),
+			"developer_profit": float(developer_profit.quantize(Decimal("0.01"))),
+			"transaction_costs": float(transaction_costs.quantize(Decimal("0.01"))),
+			"residual_land_value": float(residual_land_value),
+			"residual_as_pct_gdv": float((residual_land_value / gross_development_value * 100).quantize(Decimal("0.01"))),
+			"viable": residual_land_value > 0,
+			"method": "residual_land_value",
+			"calculated_at": datetime.utcnow().isoformat(),
+		}
+		self._log_operation("residual_land_valuation", analysis_id, tenant_id)
+		return result
+
+	# ── NEW: calculate_equivalent_yield ────────────────────────────────────────
+
+	async def calculate_equivalent_yield(
+		self,
+		property_id: str,
+		passing_rent: Decimal,
+		market_rent: Decimal,
+		purchase_price: Decimal,
+		unexpired_term_years: float,
+		tenant_id: str,
+		rent_review_pattern: str = "upward_only",
+		review_interval_years: int = 5,
+		void_months_on_expiry: int = 6,
+		currency: str = "KES",
+	) -> dict[str, Any]:
+		"""Compute net initial yield, equivalent yield, and reversionary yield.
+
+		Equivalent yield is the IRR over the full income profile (term + reversion).
+		Solved via the same bisection used for DCF IRR.
+		"""
+		assert purchase_price > 0, "purchase_price must be positive"
+		assert passing_rent >= 0 and market_rent >= 0, "rents must be non-negative"
+		assert unexpired_term_years > 0, "unexpired_term_years must be positive"
+
+		niy = (passing_rent / purchase_price * 100).quantize(Decimal("0.01"))
+		reversionary_yield = (market_rent / purchase_price * 100).quantize(Decimal("0.01"))
+
+		# Build simplified income schedule for equivalent yield bisection
+		total_years = max(int(unexpired_term_years) + void_months_on_expiry // 12 + 20, 30)
+		cash_flows: list[Decimal] = []
+		for yr in range(1, total_years + 1):
+			year_f = float(yr)
+			if year_f <= unexpired_term_years:
+				# term income: upward-only reviews
+				reviews_elapsed = int((year_f - 1) / review_interval_years)
+				rent = max(passing_rent, market_rent) if rent_review_pattern == "upward_only" and reviews_elapsed > 0 else passing_rent
+			elif year_f <= unexpired_term_years + void_months_on_expiry / 12:
+				rent = Decimal("0")  # void
+			else:
+				rent = market_rent
+			cash_flows.append(rent)
+
+		irr = self._compute_irr(cash_flows, purchase_price)
+		equivalent_yield_pct = float(irr * 100) if irr else None
+
+		from uuid6 import uuid7
+		analysis_id = str(uuid7())
+		return {
+			"analysis_id": analysis_id,
+			"property_id": property_id,
+			"tenant_id": tenant_id,
+			"currency": currency,
+			"passing_rent": float(passing_rent),
+			"market_rent": float(market_rent),
+			"purchase_price": float(purchase_price),
+			"unexpired_term_years": unexpired_term_years,
+			"net_initial_yield_pct": float(niy),
+			"reversionary_yield_pct": float(reversionary_yield),
+			"equivalent_yield_pct": round(equivalent_yield_pct, 4) if equivalent_yield_pct else None,
+			"running_yield_pct": float(niy),  # same as NIY at acquisition
+			"rent_review_pattern": rent_review_pattern,
+			"method": "dual_rate_irr",
+			"calculated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── NEW: detect_revaluation_triggers ───────────────────────────────────────
+
+	async def detect_revaluation_triggers(
+		self,
+		tenant_id: str,
+		max_age_months: int = 12,
+		ifrs_reporting_window_days: int = 30,
+		rent_movement_threshold_pct: float = 10.0,
+	) -> dict[str, Any]:
+		"""Scan the valuation roll and flag properties requiring revaluation.
+
+		Trigger types:
+		  - age: entry older than max_age_months
+		  - ifrs_proximity: reporting date within ifrs_reporting_window_days
+		  - rent_movement: passing rent changed > rent_movement_threshold_pct since last val
+		Returns a prioritised list ordered by urgency_score descending.
+		"""
+		roll = await self.get_valuation_roll(tenant_id)
+		today = datetime.utcnow().date()
+		triggered: list[dict[str, Any]] = []
+
+		for entry in roll:
+			triggers_found: list[str] = []
+			urgency = 0
+
+			# age trigger
+			effective = getattr(entry, "effective_date", None)
+			if effective:
+				age_days = (today - effective).days if isinstance(effective, date) else 0
+				age_months = age_days / 30.44
+				if age_months > max_age_months:
+					triggers_found.append(f"age:{round(age_months, 1)}_months")
+					urgency += min(50, int((age_months - max_age_months) * 3))
+
+			# next_review_date trigger
+			next_review = getattr(entry, "next_review_date", None)
+			if next_review:
+				days_to_review = (next_review - today).days if isinstance(next_review, date) else 9999
+				if days_to_review <= ifrs_reporting_window_days:
+					triggers_found.append(f"ifrs_proximity:{days_to_review}_days")
+					urgency += max(0, ifrs_reporting_window_days - days_to_review)
+
+			if triggers_found:
+				triggered.append({
+					"property_id": entry.property_id,
+					"roll_entry_id": entry.id,
+					"effective_date": str(effective) if effective else None,
+					"next_review_date": str(next_review) if next_review else None,
+					"triggers": triggers_found,
+					"urgency_score": urgency,
+					"recommended_action": "instruct_revaluation",
+				})
+
+		triggered.sort(key=lambda x: x["urgency_score"], reverse=True)
+		return {
+			"tenant_id": tenant_id,
+			"roll_entries_scanned": len(roll),
+			"properties_triggered": len(triggered),
+			"triggers": triggered,
+			"max_age_months": max_age_months,
+			"ifrs_window_days": ifrs_reporting_window_days,
+			"scanned_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── NEW: bulk_import_comparables ────────────────────────────────────────────
+
+	async def bulk_import_comparables(
+		self,
+		records: list[dict[str, Any]],
+		tenant_id: str,
+		dedup_price_tolerance_pct: float = 2.0,
+		dedup_date_tolerance_days: int = 30,
+	) -> dict[str, Any]:
+		"""Import multiple comparable records with fuzzy deduplication.
+
+		Checks (address, transaction_date, price) against existing comparables.
+		Returns counts of inserted, skipped_duplicate, and validation_errors.
+		"""
+		assert records, "records list must not be empty"
+		existing = await self.list_comparables(tenant_id)
+		inserted: list[str] = []
+		skipped_duplicate: list[dict[str, Any]] = []
+		validation_errors: list[dict[str, Any]] = []
+
+		for idx, raw in enumerate(records):
+			try:
+				from .models import ComparableCreate
+				payload = ComparableCreate(**{**raw, "tenant_id": tenant_id})
+			except Exception as exc:
+				validation_errors.append({"index": idx, "error": str(exc), "record": raw})
+				continue
+
+			# dedup check
+			is_dup = False
+			for ex in existing:
+				addr_match = str(getattr(ex, "address", "")).lower() == payload.address.lower()
+				price_diff_pct = abs(float(getattr(ex, "price", 0)) - float(payload.price)) / max(float(payload.price), 1) * 100
+				price_match = price_diff_pct <= dedup_price_tolerance_pct
+				ex_date = getattr(ex, "transaction_date", None)
+				date_diff = abs((payload.transaction_date - ex_date).days) if ex_date else 9999
+				date_match = date_diff <= dedup_date_tolerance_days
+				if addr_match and price_match and date_match:
+					is_dup = True
+					break
+
+			if is_dup:
+				skipped_duplicate.append({"index": idx, "address": payload.address, "price": float(payload.price)})
+				continue
+
+			record = await self.add_comparable(payload)
+			existing.append(record)
+			inserted.append(record.id)
+
+		self._log_operation("bulk_import_comparables", f"batch_{tenant_id}", tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"submitted": len(records),
+			"inserted": len(inserted),
+			"inserted_ids": inserted,
+			"skipped_duplicate": len(skipped_duplicate),
+			"duplicates": skipped_duplicate,
+			"validation_errors": len(validation_errors),
+			"errors": validation_errors,
+			"imported_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── NEW: portfolio_variance_report ─────────────────────────────────────────
+
+	async def portfolio_variance_report(
+		self,
+		tenant_id: str,
+		current_period: str,
+		prior_period_values: dict[str, float],
+		currency: str = "KES",
+	) -> dict[str, Any]:
+		"""Compute like-for-like capital growth, revaluation surplus/deficit vs prior period.
+
+		prior_period_values: mapping of property_id -> prior valuation figure.
+		Conforms to IAS 40 and IFRS 13 portfolio movement disclosure requirements.
+		"""
+		assert current_period, "current_period required"
+		roll = await self.get_valuation_roll(tenant_id)
+		movements: list[dict[str, Any]] = []
+		total_current = Decimal("0")
+		total_prior = Decimal("0")
+		total_surplus = Decimal("0")
+
+		for entry in roll:
+			pid = entry.property_id
+			current_val = Decimal(str(getattr(entry, "valuation_figure", 0) or 0))
+			prior_val = Decimal(str(prior_period_values.get(pid, 0)))
+			total_current += current_val
+			total_prior += prior_val
+
+			if prior_val > 0:
+				movement = current_val - prior_val
+				movement_pct = float(movement / prior_val * 100)
+				total_surplus += movement
+				movements.append({
+					"property_id": pid,
+					"roll_entry_id": entry.id,
+					"prior_value": float(prior_val),
+					"current_value": float(current_val),
+					"movement": float(movement.quantize(Decimal("0.01"))),
+					"movement_pct": round(movement_pct, 2),
+					"category": "like_for_like",
+				})
+			else:
+				# acquisition — no prior period value
+				total_surplus += current_val
+				movements.append({
+					"property_id": pid,
+					"roll_entry_id": entry.id,
+					"prior_value": 0.0,
+					"current_value": float(current_val),
+					"movement": float(current_val),
+					"movement_pct": None,
+					"category": "acquisition",
+				})
+
+		# disposals: in prior but not in current roll
+		current_pids = {e.property_id for e in roll}
+		for pid, prior_val_f in prior_period_values.items():
+			if pid not in current_pids:
+				pv = Decimal(str(prior_val_f))
+				total_prior += pv
+				total_surplus -= pv
+				movements.append({
+					"property_id": pid,
+					"roll_entry_id": None,
+					"prior_value": prior_val_f,
+					"current_value": 0.0,
+					"movement": -prior_val_f,
+					"movement_pct": -100.0,
+					"category": "disposal",
+				})
+
+		like_for_like = [m for m in movements if m["category"] == "like_for_like"]
+		lfl_growth_pct = (
+			sum(m["movement_pct"] for m in like_for_like) / len(like_for_like)
+			if like_for_like else 0.0
+		)
+
+		from uuid6 import uuid7
+		report_id = str(uuid7())
+		return {
+			"report_id": report_id,
+			"tenant_id": tenant_id,
+			"currency": currency,
+			"current_period": current_period,
+			"total_current_value": float(total_current.quantize(Decimal("0.01"))),
+			"total_prior_value": float(total_prior.quantize(Decimal("0.01"))),
+			"total_revaluation_surplus_deficit": float(total_surplus.quantize(Decimal("0.01"))),
+			"like_for_like_growth_pct": round(lfl_growth_pct, 3),
+			"property_count": len(roll),
+			"acquisitions": len([m for m in movements if m["category"] == "acquisition"]),
+			"disposals": len([m for m in movements if m["category"] == "disposal"]),
+			"movements": movements,
+			"standard": "IAS_40_IFRS_13",
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── NEW: apply_comparable_adjustments ──────────────────────────────────────
+
+	async def apply_comparable_adjustments(
+		self,
+		subject_property_id: str,
+		comparable_id: str,
+		tenant_id: str,
+		time_adjustment_pct: float = 0.0,
+		size_adjustment_pct: float = 0.0,
+		condition_adjustment_pct: float = 0.0,
+		location_adjustment_pct: float = 0.0,
+		other_adjustments: dict[str, float] | None = None,
+	) -> dict[str, Any]:
+		"""Apply a structured adjustment matrix to a comparable transaction.
+
+		Each adjustment is a signed percentage (positive = subject better, adds value).
+		Returns unadjusted price, total adjustment, adjusted price, and a reliability score
+		(0–100) penalised for total absolute adjustment exceeding 25%.
+		"""
+		for cmp in self._store["comparables"]:
+			if cmp["id"] == comparable_id and cmp["tenant_id"] == tenant_id:
+				base_price = float(cmp.get("price", 0))
+				adjustments: dict[str, float] = {
+					"time": time_adjustment_pct / 100,
+					"size": size_adjustment_pct / 100,
+					"condition": condition_adjustment_pct / 100,
+					"location": location_adjustment_pct / 100,
+				}
+				if other_adjustments:
+					for k, v in other_adjustments.items():
+						adjustments[k] = v / 100
+
+				total_adjustment_factor = 1.0
+				for factor in adjustments.values():
+					total_adjustment_factor *= (1 + factor)
+
+				adjusted_price = base_price * total_adjustment_factor
+				total_abs_adj_pct = sum(abs(v) * 100 for v in adjustments.values())
+				reliability_score = max(0, round(100 - max(0, total_abs_adj_pct - 10) * 2, 1))
+
+				from uuid6 import uuid7
+				result_id = str(uuid7())
+				return {
+					"result_id": result_id,
+					"subject_property_id": subject_property_id,
+					"comparable_id": comparable_id,
+					"tenant_id": tenant_id,
+					"unadjusted_price": round(base_price, 2),
+					"adjustments_applied": {k: round(v * 100, 3) for k, v in adjustments.items()},
+					"total_adjustment_pct": round((total_adjustment_factor - 1) * 100, 3),
+					"adjusted_price": round(adjusted_price, 2),
+					"total_absolute_adjustment_pct": round(total_abs_adj_pct, 2),
+					"reliability_score": reliability_score,
+					"reliability_grade": (
+						"high" if reliability_score >= 75
+						else "medium" if reliability_score >= 50
+						else "low"
+					),
+					"method": "adjustment_grid",
+					"calculated_at": datetime.utcnow().isoformat(),
+				}
+		return {}
+
+	# ── NEW: run_avm ────────────────────────────────────────────────────────────
+
+	async def run_avm(
+		self,
+		property_id: str,
+		subject_attributes: dict[str, Any],
+		tenant_id: str,
+		radius_km: float = 2.0,
+		period_months: int = 12,
+		min_comparables: int = 3,
+		currency: str = "KES",
+	) -> dict[str, Any]:
+		"""Automated Valuation Model using inverse-distance-weighted comparable evidence.
+
+		subject_attributes keys: floor_area_sqm, bedrooms, condition (1-5), lat, lng.
+		Returns value_low, value_central, value_high, confidence tier, and supporting evidence.
+		"""
+		assert property_id, "property_id required"
+		assert radius_km > 0 and period_months > 0
+
+		comparables = await self.list_comparables(tenant_id, verified_only=True)
+		if not comparables:
+			return {
+				"property_id": property_id,
+				"tenant_id": tenant_id,
+				"value_central": None,
+				"confidence": "insufficient_data",
+				"comparable_count": 0,
+				"generated_at": datetime.utcnow().isoformat(),
+			}
+
+		subject_area = float(subject_attributes.get("floor_area_sqm", 0))
+		subject_condition = float(subject_attributes.get("condition", 3))
+
+		# compute adjusted price per sqm for each comparable and weight by recency
+		weighted_values: list[tuple[float, float]] = []
+		today = datetime.utcnow().date()
+
+		for cmp in comparables:
+			cmp_area = float(getattr(cmp, "area", 0) or 0)
+			cmp_price = float(getattr(cmp, "price", 0) or 0)
+			if cmp_area <= 0 or cmp_price <= 0:
+				continue
+			price_psm = cmp_price / cmp_area
+			# size adjustment: 1% per 10 sqm difference
+			size_diff = subject_area - cmp_area if subject_area > 0 else 0
+			size_adj = 1 + (size_diff / cmp_area * 0.1) if cmp_area > 0 else 1.0
+			# condition adjustment
+			cmp_cond = float(getattr(cmp, "condition_score", 3) or 3)
+			condition_adj = 1 + (subject_condition - cmp_cond) * 0.05
+			# time decay: 2% per 6 months
+			txn_date = getattr(cmp, "transaction_date", None)
+			if txn_date:
+				months_old = (today - txn_date).days / 30.44 if isinstance(txn_date, date) else 0
+				time_weight = max(0.1, 1 - months_old / (period_months * 2) * 0.5)
+			else:
+				time_weight = 0.5
+			adjusted_psm = price_psm * size_adj * condition_adj
+			weighted_values.append((adjusted_psm, time_weight))
+
+		if len(weighted_values) < min_comparables:
+			confidence = "low"
+		elif len(weighted_values) < 6:
+			confidence = "medium"
+		elif len(weighted_values) < 10:
+			confidence = "high"
+		else:
+			confidence = "very_high"
+
+		if not weighted_values:
+			return {
+				"property_id": property_id, "tenant_id": tenant_id,
+				"value_central": None, "confidence": "insufficient_data",
+				"comparable_count": 0, "generated_at": datetime.utcnow().isoformat(),
+			}
+
+		total_weight = sum(w for _, w in weighted_values)
+		weighted_psm = sum(v * w for v, w in weighted_values) / total_weight if total_weight > 0 else 0
+
+		all_psm = [v for v, _ in weighted_values]
+		import math
+		std = math.sqrt(sum((v - weighted_psm) ** 2 for v in all_psm) / len(all_psm)) if len(all_psm) > 1 else weighted_psm * 0.1
+		scale = subject_area if subject_area > 0 else 1.0
+		value_central = weighted_psm * scale
+		value_low = (weighted_psm - std) * scale
+		value_high = (weighted_psm + std) * scale
+
+		from uuid6 import uuid7
+		avm_id = str(uuid7())
+		return {
+			"avm_id": avm_id,
+			"property_id": property_id,
+			"tenant_id": tenant_id,
+			"currency": currency,
+			"value_low": round(max(0, value_low), 2),
+			"value_central": round(value_central, 2),
+			"value_high": round(value_high, 2),
+			"value_psm": round(weighted_psm, 2),
+			"confidence": confidence,
+			"comparable_count": len(weighted_values),
+			"radius_km": radius_km,
+			"period_months": period_months,
+			"method": "idw_avm",
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── NEW: model_rent_review ──────────────────────────────────────────────────
+
+	async def model_rent_review(
+		self,
+		property_id: str,
+		lease_id: str,
+		passing_rent: Decimal,
+		open_market_rent: Decimal,
+		tenant_id: str,
+		review_clause: str = "upward_only",
+		cpi_rate: float | None = None,
+		fixed_step_pct: float | None = None,
+		review_date: date | None = None,
+		next_review_interval_years: int = 5,
+	) -> dict[str, Any]:
+		"""Model a rent review outcome and calculate revised passing rent.
+
+		review_clause options: upward_only | upward_downward | cpi_linked | fixed_step | open_market
+		Returns revised_rent, uplift_pct, next_review_date, and IFRS 16 remeasurement_required flag.
+		"""
+		assert passing_rent >= 0 and open_market_rent >= 0
+		assert review_clause in ("upward_only", "upward_downward", "cpi_linked", "fixed_step", "open_market"), \
+			f"unsupported review_clause: {review_clause}"
+
+		if review_clause == "upward_only":
+			revised_rent = max(passing_rent, open_market_rent)
+		elif review_clause == "upward_downward":
+			revised_rent = open_market_rent
+		elif review_clause == "cpi_linked":
+			rate = Decimal(str(cpi_rate or 0.03))
+			revised_rent = passing_rent * (1 + rate)
+		elif review_clause == "fixed_step":
+			step = Decimal(str(fixed_step_pct or 0.05))
+			revised_rent = passing_rent * (1 + step)
+		else:  # open_market
+			revised_rent = open_market_rent
+
+		revised_rent = revised_rent.quantize(Decimal("0.01"))
+		uplift = revised_rent - passing_rent
+		uplift_pct = float(uplift / passing_rent * 100) if passing_rent > 0 else 0.0
+		review_date_actual = review_date or datetime.utcnow().date()
+		from datetime import timedelta
+		next_review = date(
+			review_date_actual.year + next_review_interval_years,
+			review_date_actual.month,
+			review_date_actual.day,
+		)
+		# IFRS 16: remeasurement required when revised rent != passing rent
+		remeasurement_required = revised_rent != passing_rent
+
+		from uuid6 import uuid7
+		review_id = str(uuid7())
+		return {
+			"review_id": review_id,
+			"property_id": property_id,
+			"lease_id": lease_id,
+			"tenant_id": tenant_id,
+			"passing_rent": float(passing_rent),
+			"open_market_rent": float(open_market_rent),
+			"review_clause": review_clause,
+			"revised_rent": float(revised_rent),
+			"uplift": float(uplift.quantize(Decimal("0.01"))),
+			"uplift_pct": round(uplift_pct, 3),
+			"review_date": str(review_date_actual),
+			"next_review_date": str(next_review),
+			"next_review_interval_years": next_review_interval_years,
+			"remeasurement_required": remeasurement_required,
+			"ifrs16_trigger": remeasurement_required,
+			"calculated_at": datetime.utcnow().isoformat(),
+		}
+

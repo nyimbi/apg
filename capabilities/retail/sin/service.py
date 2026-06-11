@@ -758,3 +758,517 @@ class SinService:
 	async def get_audit_events(self, tenant_id: str) -> dict[str, Any]:
 		"""Get Audit Events"""
 		return {"tenant_id": tenant_id, "events": []}
+
+	# ------------------------------------------------------------------
+	# Sensor Network Health
+	# ------------------------------------------------------------------
+
+	async def sensor_network_health(self, tenant_id: str, store_id: str) -> dict[str, Any]:
+		"""Compute a health score (0–100) for the sensor network in a store.
+
+		Considers: online ratio, mean heartbeat age, zones without coverage.
+		"""
+		assert store_id, "store_id required"
+		sensors = await self.list_sensors(tenant_id, store_id)
+		if not sensors:
+			return {
+				"store_id": store_id,
+				"sensor_count": 0,
+				"online_count": 0,
+				"online_pct": 0.0,
+				"mean_heartbeat_age_seconds": None,
+				"uncovered_zone_ids": [],
+				"health_score": 0,
+				"status": "no_sensors",
+			}
+
+		now = datetime.utcnow()
+		online = [s for s in sensors if s.status == "online"]
+		online_pct = len(online) / len(sensors)
+
+		heartbeat_ages: list[float] = []
+		for s in online:
+			if s.last_heartbeat_at:
+				hb = s.last_heartbeat_at
+				if isinstance(hb, str):
+					hb = datetime.fromisoformat(hb)
+				heartbeat_ages.append((now - hb).total_seconds())
+		mean_age = sum(heartbeat_ages) / len(heartbeat_ages) if heartbeat_ages else None
+
+		# Zones that have zero online sensors
+		zones = await self.list_zones(tenant_id, store_id)
+		covered_zone_ids = {s.zone_id for s in online}
+		uncovered = [z.id for z in zones if z.id not in covered_zone_ids]
+
+		coverage_pct = 1.0 - (len(uncovered) / len(zones)) if zones else 1.0
+		age_score = max(0.0, 1.0 - (mean_age or 0) / 3600) if mean_age is not None else 1.0
+		health_score = round((online_pct * 0.5 + coverage_pct * 0.3 + age_score * 0.2) * 100)
+
+		self._log_op("sensor_network_health", tenant_id, store_id)
+		return {
+			"store_id": store_id,
+			"sensor_count": len(sensors),
+			"online_count": len(online),
+			"online_pct": round(online_pct, 4),
+			"mean_heartbeat_age_seconds": round(mean_age, 1) if mean_age is not None else None,
+			"uncovered_zone_ids": uncovered,
+			"coverage_pct": round(coverage_pct, 4),
+			"health_score": health_score,
+			"status": "healthy" if health_score >= 80 else ("degraded" if health_score >= 50 else "critical"),
+			"checked_at": now.isoformat(),
+		}
+
+	# ------------------------------------------------------------------
+	# Loss Prevention
+	# ------------------------------------------------------------------
+
+	async def report_lp_incident(
+		self,
+		store_id: str,
+		zone_id: str,
+		sku: str,
+		incident_type: str,
+		estimated_value_loss: float,
+		sensor_ids: list[str] | None = None,
+		notes: str | None = None,
+	) -> dict[str, Any]:
+		"""Open a loss-prevention incident record.
+
+		incident_type: shoplifting | staff_theft | admin_error | damage
+		"""
+		assert store_id, "store_id required"
+		assert incident_type in {"shoplifting", "staff_theft", "admin_error", "damage"}, \
+			f"unsupported incident_type: {incident_type}"
+		assert estimated_value_loss >= 0, "estimated_value_loss must be non-negative"
+		tenant_id = self.tenant_id
+
+		incident_id = uuid7str()
+		record: dict[str, Any] = {
+			"id": incident_id,
+			"tenant_id": tenant_id,
+			"store_id": store_id,
+			"zone_id": zone_id,
+			"sku": sku,
+			"incident_type": incident_type,
+			"estimated_value_loss": estimated_value_loss,
+			"sensor_ids_involved": sensor_ids or [],
+			"investigation_status": "open",
+			"resolution": None,
+			"notes": notes,
+			"reported_by": self.actor_id,
+			"reported_at": datetime.utcnow().isoformat(),
+			"updated_at": datetime.utcnow().isoformat(),
+		}
+		if not hasattr(self, "_lp_incidents"):
+			self._lp_incidents: dict[str, dict[str, Any]] = {}
+		self._lp_incidents[incident_id] = record
+		self._log_op("report_lp_incident", tenant_id, incident_id)
+		return record
+
+	async def escalate_lp_incident(self, incident_id: str, reason: str) -> dict[str, Any] | None:
+		"""Escalate a loss-prevention incident to 'escalated' status."""
+		if not hasattr(self, "_lp_incidents"):
+			return None
+		rec = self._lp_incidents.get(incident_id)
+		if rec is None or rec["tenant_id"] != self.tenant_id:
+			return None
+		rec["investigation_status"] = "escalated"
+		rec["escalation_reason"] = reason
+		rec["escalated_at"] = datetime.utcnow().isoformat()
+		rec["updated_at"] = datetime.utcnow().isoformat()
+		self._lp_incidents[incident_id] = rec
+		self._log_op("escalate_lp_incident", self.tenant_id, incident_id)
+		return rec
+
+	async def close_lp_incident(
+		self, incident_id: str, resolution: str, confirmed_loss: float
+	) -> dict[str, Any] | None:
+		"""Close a loss-prevention incident with a confirmed loss amount."""
+		if not hasattr(self, "_lp_incidents"):
+			return None
+		rec = self._lp_incidents.get(incident_id)
+		if rec is None or rec["tenant_id"] != self.tenant_id:
+			return None
+		rec["investigation_status"] = "closed"
+		rec["resolution"] = resolution
+		rec["confirmed_loss"] = confirmed_loss
+		rec["closed_at"] = datetime.utcnow().isoformat()
+		rec["updated_at"] = datetime.utcnow().isoformat()
+		self._lp_incidents[incident_id] = rec
+		self._log_op("close_lp_incident", self.tenant_id, incident_id)
+		return rec
+
+	async def list_lp_incidents(
+		self, store_id: str, investigation_status: str | None = None
+	) -> list[dict[str, Any]]:
+		"""List loss-prevention incidents for a store, optionally filtered by status."""
+		if not hasattr(self, "_lp_incidents"):
+			return []
+		result = [
+			v for v in self._lp_incidents.values()
+			if v["tenant_id"] == self.tenant_id and v["store_id"] == store_id
+		]
+		if investigation_status:
+			result = [v for v in result if v["investigation_status"] == investigation_status]
+		result.sort(key=lambda x: x["reported_at"], reverse=True)
+		return result
+
+	# ------------------------------------------------------------------
+	# Occupancy Capacity Compliance
+	# ------------------------------------------------------------------
+
+	async def check_occupancy_compliance(
+		self, store_id: str, period: str
+	) -> dict[str, Any]:
+		"""Check whether any recorded occupancy peaks exceed fire-code safety limits.
+
+		Uses store.max_capacity if set; falls back to sqm_total * 2 persons/sqm.
+		Flags breaches and near-capacity events (>= 80% of limit).
+		"""
+		assert store_id, "store_id required"
+		tenant_id = self.tenant_id
+		store = self._stores.get(store_id)
+		assert store is not None and store["tenant_id"] == tenant_id, "store not found"
+
+		max_cap = store.get("max_capacity") or int(store.get("sqm_total", 500) * 2)
+		warning_threshold = int(max_cap * 0.80)
+		breach_threshold = int(max_cap * 0.85)
+
+		traffic = [
+			v for v in self._traffic_counts.values()
+			if v["tenant_id"] == tenant_id and v["store_id"] == store_id
+			and str(v.get("period_start", ""))[:7] == period[:7]
+		]
+
+		breaches = [v for v in traffic if v.get("occupancy_peak", 0) >= breach_threshold]
+		warnings = [v for v in traffic if warning_threshold <= v.get("occupancy_peak", 0) < breach_threshold]
+
+		self._log_op("check_occupancy_compliance", tenant_id, store_id)
+		return {
+			"store_id": store_id,
+			"period": period,
+			"max_capacity": max_cap,
+			"breach_threshold_85pct": breach_threshold,
+			"warning_threshold_80pct": warning_threshold,
+			"traffic_record_count": len(traffic),
+			"breach_count": len(breaches),
+			"warning_count": len(warnings),
+			"compliant": len(breaches) == 0,
+			"breach_records": [
+				{"period_start": v["period_start"], "occupancy_peak": v["occupancy_peak"]}
+				for v in breaches
+			],
+			"checked_at": datetime.utcnow().isoformat(),
+		}
+
+	# ------------------------------------------------------------------
+	# Heatmap Temporal Diff
+	# ------------------------------------------------------------------
+
+	async def compute_heatmap_diff(
+		self, heatmap_id_before: str, heatmap_id_after: str
+	) -> dict[str, Any]:
+		"""Compute signed intensity delta between two heatmaps of the same store and floor.
+
+		Normalises each grid by its total intensity so that layout effects are
+		decoupled from overall traffic volume changes. Returns a delta_grid and
+		summary statistics (max_gain, max_loss, changed_cell_count).
+		"""
+		before = self._heatmaps.get(heatmap_id_before)
+		after = self._heatmaps.get(heatmap_id_after)
+		assert before is not None, f"heatmap {heatmap_id_before} not found"
+		assert after is not None, f"heatmap {heatmap_id_after} not found"
+		assert before["store_id"] == after["store_id"], "heatmaps must belong to same store"
+		assert before["floor_level"] == after["floor_level"], "heatmaps must be same floor"
+
+		def _normalise(grid: list[list[float]]) -> list[list[float]]:
+			total = sum(cell for row in grid for cell in row)
+			if total == 0:
+				return grid
+			return [[cell / total for cell in row] for row in grid]
+
+		g_before = _normalise(before["grid_data"])
+		g_after = _normalise(after["grid_data"])
+
+		rows = min(len(g_before), len(g_after))
+		cols = min(len(g_before[0]), len(g_after[0])) if rows else 0
+
+		delta: list[list[float]] = []
+		all_deltas: list[float] = []
+		for r in range(rows):
+			row_delta = []
+			for c in range(cols):
+				d = round(g_after[r][c] - g_before[r][c], 6)
+				row_delta.append(d)
+				all_deltas.append(d)
+			delta.append(row_delta)
+
+		changed = [d for d in all_deltas if abs(d) > 1e-6]
+		self._log_op("compute_heatmap_diff", before["tenant_id"], before["store_id"])
+		return {
+			"store_id": before["store_id"],
+			"floor_level": before["floor_level"],
+			"heatmap_before": heatmap_id_before,
+			"heatmap_after": heatmap_id_after,
+			"period_before": before.get("period_start"),
+			"period_after": after.get("period_start"),
+			"delta_grid": delta,
+			"max_gain": round(max(all_deltas), 6) if all_deltas else 0.0,
+			"max_loss": round(min(all_deltas), 6) if all_deltas else 0.0,
+			"changed_cell_count": len(changed),
+			"total_cells": rows * cols,
+			"computed_at": datetime.utcnow().isoformat(),
+		}
+
+	# ------------------------------------------------------------------
+	# Shopper Journey Attribution
+	# ------------------------------------------------------------------
+
+	async def stitch_shopper_journey(
+		self, store_id: str, session_id: str
+	) -> dict[str, Any]:
+		"""Reconstruct a shopper journey path from conversion events for a session.
+
+		Returns ordered zone transitions, total dwell, and whether the session converted.
+		"""
+		assert store_id, "store_id required"
+		assert session_id, "session_id required"
+		tenant_id = self.tenant_id
+
+		events = sorted(
+			[
+				v for v in self._conversion_events.values()
+				if v["tenant_id"] == tenant_id
+				and v["store_id"] == store_id
+				and v["session_id"] == session_id
+			],
+			key=lambda x: x.get("occurred_at", ""),
+		)
+
+		if not events:
+			return {"session_id": session_id, "store_id": store_id, "path": [], "converted": False}
+
+		path = [{"from_stage": e["from_stage"], "to_stage": e["to_stage"],
+				  "dwell_seconds": e.get("dwell_seconds", 0.0),
+				  "occurred_at": e.get("occurred_at")} for e in events]
+		total_dwell = sum(e.get("dwell_seconds", 0.0) for e in events)
+		converted = any(e["converted"] for e in events)
+		final_stage = events[-1]["to_stage"]
+
+		return {
+			"session_id": session_id,
+			"store_id": store_id,
+			"event_count": len(events),
+			"path": path,
+			"total_dwell_seconds": total_dwell,
+			"final_stage": final_stage,
+			"converted": converted,
+			"entry_stage": events[0]["from_stage"],
+		}
+
+	# ------------------------------------------------------------------
+	# Peer-Group Benchmarking
+	# ------------------------------------------------------------------
+
+	async def benchmark_peer_group(
+		self,
+		store_id: str,
+		period: str,
+		kpi_metric: str,
+		min_peer_stores: int = 5,
+	) -> dict[str, Any]:
+		"""Rank a store against a peer group matched by store_format.
+
+		Returns percentile rank, gap-to-median, and gap-to-top-quartile.
+		Enforces minimum peer group size business rule.
+		"""
+		assert store_id, "store_id required"
+		assert kpi_metric, "kpi_metric required"
+		tenant_id = self.tenant_id
+
+		target = self._stores.get(store_id)
+		assert target is not None and target["tenant_id"] == tenant_id, "store not found"
+
+		peer_format = target.get("store_format", "")
+		all_stores = await self.list_stores(tenant_id, store_format=peer_format or None)
+		peer_stores = [s for s in all_stores if s.id != store_id]
+
+		if len(peer_stores) < min_peer_stores:
+			return {
+				"store_id": store_id,
+				"period": period,
+				"kpi_metric": kpi_metric,
+				"error": f"insufficient_peer_stores: need {min_peer_stores}, found {len(peer_stores)}",
+				"peer_count": len(peer_stores),
+			}
+
+		def _get_kpi(sid: str) -> float:
+			snaps = [
+				v for v in self._kpi_snapshots.values()
+				if v["tenant_id"] == tenant_id and v["store_id"] == sid
+				and str(v.get("period_start", ""))[:7] == period[:7]
+			]
+			return sum(v["kpi_values"].get(kpi_metric, 0.0) for v in snaps)
+
+		target_val = _get_kpi(store_id)
+		peer_vals = sorted([_get_kpi(s.id) for s in peer_stores])
+		n = len(peer_vals)
+		below = sum(1 for v in peer_vals if v < target_val)
+		percentile = round(below / n * 100, 1) if n else 0.0
+		median = peer_vals[n // 2] if n else 0.0
+		q3 = peer_vals[int(n * 0.75)] if n else 0.0
+
+		self._log_op("benchmark_peer_group", tenant_id, store_id)
+		return {
+			"store_id": store_id,
+			"store_format": peer_format,
+			"period": period,
+			"kpi_metric": kpi_metric,
+			"target_value": round(target_val, 4),
+			"peer_count": n,
+			"percentile_rank": percentile,
+			"peer_median": round(median, 4),
+			"gap_to_median": round(target_val - median, 4),
+			"peer_q3": round(q3, 4),
+			"gap_to_q3": round(target_val - q3, 4),
+			"ranking": "top_quartile" if percentile >= 75 else (
+				"above_median" if percentile >= 50 else (
+					"below_median" if percentile >= 25 else "bottom_quartile"
+				)
+			),
+			"computed_at": datetime.utcnow().isoformat(),
+		}
+
+	# ------------------------------------------------------------------
+	# KPI Trend Detection
+	# ------------------------------------------------------------------
+
+	async def detect_kpi_trends(
+		self,
+		store_id: str,
+		kpi_metric: str,
+		n_periods: int = 8,
+	) -> dict[str, Any]:
+		"""Fit a linear trend over the last n_periods KPI snapshots for a metric.
+
+		Returns slope (units/period), R², trend direction, and an estimate of
+		weeks until a configurable threshold is breached (if degrading).
+		"""
+		assert store_id, "store_id required"
+		assert kpi_metric, "kpi_metric required"
+		tenant_id = self.tenant_id
+
+		snaps = await self.list_kpi_snapshots(tenant_id, store_id)
+		snaps_with_metric = [
+			s for s in snaps if kpi_metric in s.kpi_values
+		][:n_periods]
+
+		if len(snaps_with_metric) < 2:
+			return {
+				"store_id": store_id,
+				"kpi_metric": kpi_metric,
+				"trend_direction": "insufficient_data",
+				"data_points": len(snaps_with_metric),
+			}
+
+		vals = [s.kpi_values[kpi_metric] for s in reversed(snaps_with_metric)]
+		n = len(vals)
+		xs = list(range(n))
+		mean_x = sum(xs) / n
+		mean_y = sum(vals) / n
+		ss_xy = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, vals))
+		ss_xx = sum((x - mean_x) ** 2 for x in xs)
+		slope = ss_xy / ss_xx if ss_xx else 0.0
+		y_pred = [mean_y + slope * (x - mean_x) for x in xs]
+		ss_res = sum((y - yp) ** 2 for y, yp in zip(vals, y_pred))
+		ss_tot = sum((y - mean_y) ** 2 for y in vals)
+		r_squared = round(1 - ss_res / ss_tot, 4) if ss_tot else 1.0
+
+		if abs(slope) < 1e-6:
+			direction = "stable"
+		elif slope > 0:
+			direction = "improving"
+		else:
+			direction = "degrading"
+
+		# Estimate weeks to breach zero if degrading
+		weeks_to_breach: float | None = None
+		if direction == "degrading" and slope < 0 and mean_y > 0:
+			weeks_to_breach = round(-mean_y / slope, 1)
+
+		self._log_op("detect_kpi_trends", tenant_id, store_id)
+		return {
+			"store_id": store_id,
+			"kpi_metric": kpi_metric,
+			"data_points": n,
+			"slope_per_period": round(slope, 6),
+			"r_squared": r_squared,
+			"trend_direction": direction,
+			"current_value": round(vals[-1], 4),
+			"weeks_to_breach_zero": weeks_to_breach,
+			"computed_at": datetime.utcnow().isoformat(),
+		}
+
+	# ------------------------------------------------------------------
+	# Staff Demand Forecasting
+	# ------------------------------------------------------------------
+
+	async def forecast_staffing_demand(
+		self,
+		store_id: str,
+		forecast_weeks: int = 2,
+		traffic_to_staff_ratio: float = 50.0,
+	) -> dict[str, Any]:
+		"""Forecast required headcount per day for the next N weeks.
+
+		Uses a 4-week trailing average of daily foot traffic by day-of-week.
+		Returns a recommended_headcount schedule keyed by ISO weekday (1=Mon..7=Sun).
+		"""
+		assert store_id, "store_id required"
+		assert forecast_weeks >= 1, "forecast_weeks must be >= 1"
+		assert traffic_to_staff_ratio > 0, "traffic_to_staff_ratio must be positive"
+		tenant_id = self.tenant_id
+
+		traffic = [
+			v for v in self._traffic_counts.values()
+			if v["tenant_id"] == tenant_id and v["store_id"] == store_id
+		]
+
+		# Group by weekday
+		weekday_totals: dict[int, list[int]] = {d: [] for d in range(1, 8)}
+		for tc in traffic:
+			try:
+				ps = tc.get("period_start")
+				if isinstance(ps, str):
+					dt = datetime.fromisoformat(ps)
+				else:
+					dt = ps
+				wd = dt.isoweekday()  # 1=Mon..7=Sun
+				weekday_totals[wd].append(tc["entries"])
+			except Exception:
+				continue
+
+		weekday_avg: dict[int, float] = {}
+		for wd, counts in weekday_totals.items():
+			weekday_avg[wd] = round(sum(counts) / len(counts), 1) if counts else 0.0
+
+		schedule: dict[str, dict[str, Any]] = {}
+		dow_names = {1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat", 7: "Sun"}
+		for wd in range(1, 8):
+			avg = weekday_avg.get(wd, 0.0)
+			recommended = max(1, round(avg / traffic_to_staff_ratio))
+			schedule[dow_names[wd]] = {
+				"avg_daily_traffic": avg,
+				"recommended_headcount": recommended,
+				"traffic_to_staff_ratio": traffic_to_staff_ratio,
+			}
+
+		self._log_op("forecast_staffing_demand", tenant_id, store_id)
+		return {
+			"store_id": store_id,
+			"forecast_weeks": forecast_weeks,
+			"traffic_to_staff_ratio": traffic_to_staff_ratio,
+			"weekly_schedule": schedule,
+			"data_records_used": len(traffic),
+			"computed_at": datetime.utcnow().isoformat(),
+		}

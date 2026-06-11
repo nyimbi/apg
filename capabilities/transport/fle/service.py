@@ -1219,6 +1219,719 @@ class FleetService:
 		self._log_op("predictive_maintenance_alerts", "", alerts=str(len(alerts)))
 		return alerts
 
+	# ──────────────────────────────────────────────────────────────
+	# New world-class enhancements
+	# ──────────────────────────────────────────────────────────────
+
+	async def audit_fuel_record(self, fuel_record_id: str) -> dict[str, Any]:
+		"""
+		Run statistical anomaly detection on a fuel record.
+
+		Checks:
+		- Fill volume vs tank capacity (requires vehicle GVW proxy; exact tank stored in payload)
+		- Sensor-vs-claimed delta when fuel_level_pct fields are present in telematics
+		- Price deviation > 15% vs fleet average cost per litre
+		- Duplicate receipt reference
+
+		Returns a dict with is_anomalous, risk_score (0.0–1.0), and anomalies list.
+		Events: fuel.audit_passed | fuel.audit_flagged
+		"""
+		raw = self._get("fuel_records", fuel_record_id)
+		assert raw, f"FuelRecord {fuel_record_id} not found"
+		self._tenant_assert(raw)
+
+		litres_claimed = Decimal(str(raw.get("litres", 0)))
+		cost_per_litre = Decimal(str(raw.get("cost_per_litre", 0)))
+		vehicle_id = raw.get("vehicle_id", "")
+		receipt_ref = raw.get("receipt_ref", "")
+
+		anomalies: list[dict[str, Any]] = []
+
+		# 1. Fleet average cost per litre
+		all_fuel = self._list("fuel_records")
+		prices = [Decimal(str(r["cost_per_litre"])) for r in all_fuel if r.get("cost_per_litre")]
+		if prices and cost_per_litre > 0:
+			avg_price = sum(prices) / len(prices)
+			deviation = abs(cost_per_litre - avg_price) / avg_price if avg_price > 0 else Decimal("0")
+			if deviation > Decimal("0.15"):
+				anomalies.append({
+					"type": "price_deviation",
+					"paid": float(cost_per_litre),
+					"fleet_avg": float(avg_price),
+					"deviation_pct": round(float(deviation) * 100, 1),
+				})
+
+		# 2. Duplicate receipt reference
+		if receipt_ref:
+			dupes = [
+				r["id"] for r in all_fuel
+				if r.get("receipt_ref") == receipt_ref and r["id"] != fuel_record_id
+			]
+			if dupes:
+				anomalies.append({"type": "duplicate_receipt", "duplicate_ids": dupes})
+
+		# 3. Volume vs recent telematics expected consumption
+		trip_id = raw.get("trip_id")
+		if trip_id:
+			trip_raw = self._get("trips", trip_id)
+			if trip_raw:
+				dist = Decimal(str(trip_raw.get("distance_km") or 0))
+				if dist > 0:
+					# Assume 35 L/100 km as fleet reference for heavy vehicles
+					expected = (dist / 100) * Decimal("35")
+					if litres_claimed > expected * Decimal("1.40"):
+						anomalies.append({
+							"type": "volume_exceeds_expected",
+							"claimed_l": float(litres_claimed),
+							"expected_l": float(expected),
+						})
+
+		risk_score = min(1.0, len(anomalies) * 0.35)
+		is_anomalous = len(anomalies) > 0
+
+		event_type = "fuel.audit_flagged" if is_anomalous else "fuel.audit_passed"
+		self._emit_event(event_type, fuel_record_id, {"risk_score": risk_score, "anomalies": anomalies})
+		self._log_op("audit_fuel_record", fuel_record_id, risk_score=str(round(risk_score, 3)))
+		return {
+			"fuel_record_id": fuel_record_id,
+			"vehicle_id": vehicle_id,
+			"is_anomalous": is_anomalous,
+			"risk_score": round(risk_score, 3),
+			"anomalies": anomalies,
+		}
+
+	async def assess_driver_fatigue_risk(
+		self, driver_id: str, lookback_days: int = 7
+	) -> dict[str, Any]:
+		"""
+		Score fatigue risk from tachograph scheduling patterns — no hardware required.
+
+		Detects:
+		- Consecutive maximum-driving days (>= 4 in 7 days)
+		- Repeated split rests (< 11h solid rest) in window
+		- Cumulative driving hours vs recommended ceiling
+
+		Returns risk_score 0.0–1.0, risk_level, contributing factors, and recommendation.
+		"""
+		await self.get_driver(driver_id)
+
+		cutoff_iso = (datetime.utcnow().replace(
+			hour=0, minute=0, second=0, microsecond=0
+		) - __import__("datetime").timedelta(days=lookback_days)).isoformat()
+
+		records = [
+			r for r in self._list("tachograph")
+			if r.get("driver_id") == driver_id
+			and r.get("period_start", "") >= cutoff_iso
+		]
+
+		risk_factors: list[dict[str, Any]] = []
+
+		# Factor 1: consecutive max-driving days (>= 9h = 540 min)
+		max_days = sum(1 for r in records if r.get("driving_minutes", 0) >= 540)
+		if max_days >= 4:
+			risk_factors.append({"factor": "consecutive_max_days", "count": max_days, "weight": 0.30})
+
+		# Factor 2: repeated split rests (< 660 min = 11h solid)
+		split_rest_count = sum(1 for r in records if r.get("rest_minutes", 0) < 660)
+		if split_rest_count >= 3:
+			risk_factors.append({"factor": "repeated_split_rests", "count": split_rest_count, "weight": 0.25})
+
+		# Factor 3: weekly driving hours approaching ceiling (56h = 3360 min)
+		weekly_min = sum(r.get("driving_minutes", 0) for r in records)
+		if weekly_min >= 2800:  # 83% of 56h limit
+			risk_factors.append({
+				"factor": "weekly_hours_near_ceiling",
+				"driving_minutes": weekly_min,
+				"ceiling_minutes": 3360,
+				"weight": 0.20,
+			})
+
+		# Factor 4: any recorded infringement codes
+		infringements = [r["infringement_code"] for r in records if r.get("infringement_code")]
+		if infringements:
+			risk_factors.append({"factor": "recorded_infringements", "codes": infringements, "weight": 0.25})
+
+		risk_score = min(1.0, sum(f["weight"] for f in risk_factors))
+		risk_level = "critical" if risk_score >= 0.7 else "high" if risk_score >= 0.4 else "low"
+		recommendation = (
+			"Mandate 48h off-duty immediately" if risk_score >= 0.7
+			else "Limit next assignment to <= 6h driving" if risk_score >= 0.4
+			else "No action required"
+		)
+
+		self._emit_event("driver.fatigue_risk_assessed", driver_id, {
+			"risk_score": risk_score, "risk_level": risk_level, "lookback_days": lookback_days,
+		})
+		self._log_op("assess_driver_fatigue_risk", driver_id, risk_level=risk_level)
+		return {
+			"driver_id": driver_id,
+			"tenant_id": self._tenant_id,
+			"lookback_days": lookback_days,
+			"records_analysed": len(records),
+			"risk_score": round(risk_score, 3),
+			"risk_level": risk_level,
+			"contributing_factors": risk_factors,
+			"recommendation": recommendation,
+		}
+
+	async def disposal_recommendation(
+		self, vehicle_id: str, current_market_value: Decimal
+	) -> dict[str, Any]:
+		"""
+		Data-driven vehicle disposal / replacement recommendation.
+
+		Compares vehicle TCO per km against fleet average.
+		Estimates payback period on replacement investment.
+		Recommends 'replace', 'monitor', or 'retain'.
+		"""
+		vehicle = await self.get_vehicle(vehicle_id)
+		tco = await self.calculate_tco(vehicle_id)
+
+		# Fleet average cost per km (exclude this vehicle)
+		all_vehicles = self._list("vehicles")
+		fleet_cpkm_values: list[Decimal] = []
+		for v in all_vehicles:
+			if v["id"] == vehicle_id:
+				continue
+			v_trips = [t for t in self._list("trips") if t.get("vehicle_id") == v["id"]]
+			v_dist = sum(Decimal(str(t.get("distance_km") or 0)) for t in v_trips)
+			v_fuel = sum(Decimal(str(r.get("total_cost", 0))) for r in self._list("fuel_records") if r.get("vehicle_id") == v["id"])
+			v_maint = sum(Decimal(str(r.get("actual_cost") or r.get("estimated_cost", 0))) for r in self._list("maintenance") if r.get("vehicle_id") == v["id"])
+			if v_dist > 0:
+				fleet_cpkm_values.append((v_fuel + v_maint) / v_dist)
+
+		fleet_avg_cpkm = sum(fleet_cpkm_values) / len(fleet_cpkm_values) if fleet_cpkm_values else Decimal("0")
+		vehicle_cpkm = tco.cost_per_km
+
+		tco_premium_pct = (
+			float((vehicle_cpkm - fleet_avg_cpkm) / fleet_avg_cpkm * 100)
+			if fleet_avg_cpkm > 0 else 0.0
+		)
+
+		# Maintenance cost trend: last 3 jobs vs prior 3 jobs
+		maint_rows = sorted(
+			[m for m in self._list("maintenance") if m.get("vehicle_id") == vehicle_id and m.get("actual_cost")],
+			key=lambda m: m.get("completed_date", ""),
+		)
+		trend_pct = 0.0
+		if len(maint_rows) >= 6:
+			recent_avg = sum(Decimal(str(m["actual_cost"])) for m in maint_rows[-3:]) / 3
+			prior_avg = sum(Decimal(str(m["actual_cost"])) for m in maint_rows[-6:-3]) / 3
+			trend_pct = float((recent_avg - prior_avg) / prior_avg * 100) if prior_avg > 0 else 0.0
+
+		# Payback: annual premium cost / (replacement_cost - current_market_value)
+		annual_premium = tco.total_cost * Decimal(str(max(0, tco_premium_pct) / 100)) if tco_premium_pct > 0 else Decimal("0")
+		net_replacement_cost = max(Decimal("1"), Decimal("3500000") - current_market_value)  # KES 3.5M default
+		payback_months = float(net_replacement_cost / (annual_premium / 12)) if annual_premium > 0 else 9999.0
+
+		if (tco_premium_pct > 20 and payback_months < 18) or trend_pct > 25:
+			rec = "replace"
+		elif tco_premium_pct > 10 or trend_pct > 15:
+			rec = "monitor"
+		else:
+			rec = "retain"
+
+		result = {
+			"vehicle_id": vehicle_id,
+			"registration": vehicle.registration,
+			"odometer_km": float(vehicle.odometer_km),
+			"recommendation": rec,
+			"tco_premium_vs_fleet_pct": round(tco_premium_pct, 1),
+			"maintenance_cost_trend_pct": round(trend_pct, 1),
+			"payback_months": round(payback_months, 1) if payback_months < 9999 else None,
+			"current_market_value": float(current_market_value),
+			"vehicle_cost_per_km": float(vehicle_cpkm),
+			"fleet_avg_cost_per_km": float(fleet_avg_cpkm),
+		}
+		self._emit_event("vehicle.disposal_assessed", vehicle_id, {"recommendation": rec})
+		self._log_op("disposal_recommendation", vehicle_id, recommendation=rec)
+		return result
+
+	async def optimise_shift_assignments(
+		self, planned_date: datetime
+	) -> list[dict[str, Any]]:
+		"""
+		Greedy HOS-constrained driver–trip assignment for a given date.
+
+		Filters trips planned for planned_date, available drivers, and solves
+		feasibility greedily (least-loaded driver first).
+		Returns [{trip_id, driver_id, feasibility_score, violations}].
+		Production upgrade: replace with Google OR-Tools CP-SAT for global optimality.
+		"""
+		date_str = planned_date.date().isoformat()
+		trips_today = [
+			t for t in self._list("trips")
+			if t.get("planned_departure", "")[:10] == date_str
+			and t.get("status") == "planned"
+		]
+		active_drivers = [d for d in self._list("drivers") if d.get("status") == "active"]
+
+		# Existing driving load today per driver from tachograph
+		driver_load: dict[str, float] = {}
+		for drv in active_drivers:
+			did = drv["id"]
+			today_tacho = [
+				r for r in self._list("tachograph")
+				if r.get("driver_id") == did and r.get("period_start", "")[:10] == date_str
+			]
+			driver_load[did] = sum(r.get("driving_minutes", 0) for r in today_tacho) / 60.0
+
+		MAX_DAILY_H = 9.0  # EU EC 561/2006 standard
+		assignments: list[dict[str, Any]] = []
+
+		for trip in sorted(trips_today, key=lambda t: t.get("planned_departure", "")):
+			# Estimate trip duration from planned window; default 3h
+			dep = trip.get("planned_departure", "")
+			arr = trip.get("planned_arrival", "")
+			est_h = 3.0
+			if dep and arr:
+				try:
+					est_h = max(0.5, (
+						datetime.fromisoformat(arr) - datetime.fromisoformat(dep)
+					).total_seconds() / 3600)
+				except ValueError as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+			best_driver: dict[str, Any] | None = None
+			best_score = -1.0
+			for drv in active_drivers:
+				did = drv["id"]
+				projected = driver_load[did] + est_h
+				if projected > MAX_DAILY_H:
+					continue
+				score = 1.0 - (driver_load[did] / MAX_DAILY_H)
+				if score > best_score:
+					best_score = score
+					best_driver = drv
+
+			if best_driver:
+				driver_load[best_driver["id"]] += est_h
+				assignments.append({
+					"trip_id": trip["id"],
+					"driver_id": best_driver["id"],
+					"driver_name": best_driver.get("name", ""),
+					"estimated_duration_h": round(est_h, 2),
+					"feasibility_score": round(best_score, 3),
+					"violations": [],
+				})
+			else:
+				assignments.append({
+					"trip_id": trip["id"],
+					"driver_id": None,
+					"driver_name": None,
+					"estimated_duration_h": round(est_h, 2),
+					"feasibility_score": 0.0,
+					"violations": ["no_driver_within_hos_limit"],
+				})
+
+		self._emit_event("shifts.optimised", "", {
+			"date": date_str,
+			"trips": len(trips_today),
+			"assigned": sum(1 for a in assignments if a["driver_id"]),
+		})
+		self._log_op("optimise_shift_assignments", "", date=date_str, trips=str(len(trips_today)))
+		return assignments
+
+	async def fleet_budget_variance(
+		self,
+		fuel_budget_month: Decimal,
+		maintenance_budget_month: Decimal,
+	) -> dict[str, Any]:
+		"""
+		Compute month-to-date actual vs budget for fuel and maintenance.
+		Projects month-end spend from current day's burn rate.
+		Emits alert event if projected overspend > 10% (warning) or > 20% (critical).
+		"""
+		now = datetime.utcnow()
+		month_start = datetime(now.year, now.month, 1).isoformat()
+		days_elapsed = max(1, now.day)
+		days_in_month = 30  # safe approximation
+
+		fuel_actual = sum(
+			Decimal(str(r.get("total_cost", 0)))
+			for r in self._list("fuel_records")
+			if r.get("fuelled_at", "") >= month_start
+		)
+		maint_actual = sum(
+			Decimal(str(r.get("actual_cost") or r.get("estimated_cost", 0)))
+			for r in self._list("maintenance")
+			if r.get("completed_date", "") >= month_start
+		)
+
+		fuel_daily_rate = fuel_actual / days_elapsed
+		maint_daily_rate = maint_actual / days_elapsed
+		fuel_projected = fuel_daily_rate * days_in_month
+		maint_projected = maint_daily_rate * days_in_month
+		total_projected = fuel_projected + maint_projected
+		total_budget = fuel_budget_month + maintenance_budget_month
+
+		def _var_pct(actual: Decimal, budget: Decimal) -> float:
+			return float((actual - budget) / budget * 100) if budget > 0 else 0.0
+
+		fuel_var_pct = _var_pct(fuel_projected, fuel_budget_month)
+		maint_var_pct = _var_pct(maint_projected, maintenance_budget_month)
+		total_var_pct = _var_pct(total_projected, total_budget)
+
+		alert_level = (
+			"critical" if total_var_pct > 20
+			else "warning" if total_var_pct > 10
+			else "ok"
+		)
+
+		if alert_level != "ok":
+			self._emit_event("budget.overspend_alert", "", {
+				"alert_level": alert_level,
+				"total_variance_pct": round(total_var_pct, 1),
+				"projected_month_end": str(total_projected),
+			})
+			self._log_compliance_alert("fleet", "budget_overspend", int(total_var_pct))
+
+		self._log_op("fleet_budget_variance", "", alert_level=alert_level)
+		return {
+			"tenant_id": self._tenant_id,
+			"as_of": now.isoformat(),
+			"period_label": now.strftime("%Y-%m"),
+			"fuel_budget": float(fuel_budget_month),
+			"fuel_actual_mtd": float(fuel_actual),
+			"fuel_projected_month_end": float(fuel_projected),
+			"fuel_variance_pct": round(fuel_var_pct, 1),
+			"maintenance_budget": float(maintenance_budget_month),
+			"maintenance_actual_mtd": float(maint_actual),
+			"maintenance_projected_month_end": float(maint_projected),
+			"maintenance_variance_pct": round(maint_var_pct, 1),
+			"total_budget": float(total_budget),
+			"total_actual_mtd": float(fuel_actual + maint_actual),
+			"total_projected_month_end": float(total_projected),
+			"total_variance_pct": round(total_var_pct, 1),
+			"burn_rate_per_day": float(fuel_daily_rate + maint_daily_rate),
+			"alert_level": alert_level,
+		}
+
+	async def generate_incident_claim_pack(self, incident_id: str) -> dict[str, Any]:
+		"""
+		Compile all evidence for an insurance claim into a structured package.
+
+		Aggregates: incident record, ±30-min telematics replay, driver behaviour score,
+		vehicle TCO, COF status, active insurance policy, recent maintenance history.
+
+		Returns a dict ready for export to insurer claims portal.
+		Events: claim_pack.generated
+		"""
+		raw = self._get("incidents", incident_id)
+		assert raw, f"Incident {incident_id} not found"
+		self._tenant_assert(raw)
+
+		vehicle_id = raw["vehicle_id"]
+		driver_id = raw.get("driver_id")
+		occurred_iso = raw.get("occurred_at", "")
+
+		telematics_all = [e for e in self._list("telematics") if e.get("vehicle_id") == vehicle_id]
+		# Sort chronologically and take closest 20 events around incident time
+		telematics_all.sort(key=lambda e: e.get("occurred_at", ""))
+		nearby_events = [
+			e for e in telematics_all
+			if abs((datetime.fromisoformat(e["occurred_at"]) - datetime.fromisoformat(occurred_iso)).total_seconds()) <= 1800
+		] if occurred_iso else telematics_all[-20:]
+
+		driver_score = None
+		if driver_id:
+			try:
+				driver_score = (await self.driver_behaviour_scoring(driver_id)).model_dump(mode="json")
+			except AssertionError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		tco = (await self.calculate_tco(vehicle_id)).model_dump(mode="json")
+		cof_records = await self.list_cof_inspections(vehicle_id=vehicle_id)
+		insurance_policies = await self.list_insurance_policies(vehicle_id=vehicle_id)
+		maintenance_history = await self.list_maintenance(vehicle_id=vehicle_id)
+
+		current_cof = next((c.model_dump(mode="json") for c in cof_records if c.is_current), None)
+		active_insurance = next((p.model_dump(mode="json") for p in insurance_policies if p.is_active), None)
+		recent_completed_maint = [
+			m.model_dump(mode="json") for m in maintenance_history
+			if m.status.value == "completed"
+		][-5:]
+
+		pack = {
+			"claim_reference": f"APG-{incident_id[:8].upper()}",
+			"generated_at": datetime.utcnow().isoformat(),
+			"tenant_id": self._tenant_id,
+			"incident": raw,
+			"telematics_replay": nearby_events,
+			"driver_behaviour_score": driver_score,
+			"vehicle_tco": tco,
+			"current_cof": current_cof,
+			"active_insurance_policy": active_insurance,
+			"recent_maintenance": recent_completed_maint,
+		}
+		self._emit_event("claim_pack.generated", incident_id, {"reference": pack["claim_reference"]})
+		self._log_op("generate_incident_claim_pack", incident_id, ref=pack["claim_reference"])
+		return pack
+
+	async def process_geofence_event(
+		self,
+		vehicle_id: str,
+		geofence_id: str,
+		event_type: str,
+		trip_id: str | None = None,
+		geofence_label: str = "",
+	) -> dict[str, Any]:
+		"""
+		Process a geofence entry/exit trigger and execute registered workflow steps.
+
+		Each geofence key (e.g. 'customer_site_entry') maps to a list of action steps
+		that are emitted as domain events for downstream APG ntfy/wflo consumers.
+
+		Returns steps_executed list and context payload.
+		"""
+		await self.get_vehicle(vehicle_id)
+
+		GEOFENCE_WORKFLOWS: dict[str, list[dict[str, Any]]] = {
+			"customer_site_entry": [
+				{"action": "notify", "recipient": "warehouse_team", "template": "truck_arriving"},
+				{"action": "notify", "recipient": "driver", "template": "proceed_to_bay"},
+				{"action": "workflow", "definition_id": "pod_collection_workflow"},
+			],
+			"depot_entry": [
+				{"action": "notify", "recipient": "yard_manager", "template": "truck_returned"},
+				{"action": "workflow", "definition_id": "post_trip_inspection_workflow"},
+				{"action": "schedule_maintenance", "condition": "odometer_interval_reached"},
+			],
+			"restricted_zone_entry": [
+				{"action": "notify", "recipient": "compliance_officer", "template": "restricted_zone_breach"},
+				{"action": "workflow", "definition_id": "geofence_violation_workflow"},
+			],
+		}
+
+		workflow_key = f"{geofence_id}_{event_type}"
+		steps = GEOFENCE_WORKFLOWS.get(workflow_key, [])
+		executed: list[str] = []
+
+		for step in steps:
+			self._emit_event(f"geofence.{step['action']}", vehicle_id, {
+				"geofence_id": geofence_id,
+				"geofence_label": geofence_label,
+				"event_type": event_type,
+				"step": step,
+				"trip_id": trip_id,
+			})
+			executed.append(step["action"])
+
+		self._log_op(
+			"process_geofence_event", vehicle_id,
+			geofence=geofence_id, event=event_type, steps=str(len(executed))
+		)
+		return {
+			"vehicle_id": vehicle_id,
+			"geofence_id": geofence_id,
+			"geofence_label": geofence_label,
+			"event_type": event_type,
+			"trip_id": trip_id,
+			"steps_executed": executed,
+			"workflow_key": workflow_key,
+			"matched": len(steps) > 0,
+		}
+
+	async def generate_driver_coaching_event(
+		self, telematics_event_id: str
+	) -> dict[str, Any] | None:
+		"""
+		Generate a contextual in-cab micro-coaching message for a telematics event.
+
+		Context-aware scripts are keyed to event_type. Returns None if the event type
+		has no coaching script registered.
+		Events: coaching.delivered
+		"""
+		raw = self._get("telematics", telematics_event_id)
+		if not raw:
+			return None
+		self._tenant_assert(raw)
+
+		COACHING_SCRIPTS: dict[str, dict[str, Any]] = {
+			"speeding": {
+				"message": "Speed noted. Fuel consumption rises 15% above 90 km/h — ease off.",
+				"tone": "informational",
+				"priority": "high",
+			},
+			"harsh_braking": {
+				"message": "Smooth braking saves 4% fuel and extends brake life by 30%.",
+				"tone": "coaching",
+				"priority": "medium",
+			},
+			"harsh_acceleration": {
+				"message": "Gentle acceleration improves fuel efficiency by up to 10%.",
+				"tone": "coaching",
+				"priority": "medium",
+			},
+			"idle": {
+				"message": "Engine idle detected. Switch off to save fuel and reduce emissions.",
+				"tone": "reminder",
+				"priority": "low",
+			},
+			"seatbelt_violation": {
+				"message": "Seatbelt required by law. Please fasten before moving.",
+				"tone": "mandatory",
+				"priority": "critical",
+			},
+			"distraction": {
+				"message": "Eyes on the road. Distracted driving is the leading crash cause.",
+				"tone": "mandatory",
+				"priority": "critical",
+			},
+		}
+
+		script = COACHING_SCRIPTS.get(raw.get("event_type", ""))
+		if not script:
+			return None
+
+		coaching: dict[str, Any] = {
+			"driver_id": raw.get("driver_id"),
+			"vehicle_id": raw.get("vehicle_id"),
+			"event_type": raw["event_type"],
+			"message": script["message"],
+			"tone": script["tone"],
+			"priority": script["priority"],
+			"delivered_at": raw.get("occurred_at"),
+			"lat": raw.get("lat"),
+			"lon": raw.get("lon"),
+		}
+		self._emit_event("coaching.delivered", raw.get("driver_id") or "", coaching)
+		self._log_op("generate_driver_coaching_event", telematics_event_id, event=raw["event_type"])
+		return coaching
+
+	async def vehicle_health_snapshot(self, vehicle_id: str) -> dict[str, Any]:
+		"""
+		Return a comprehensive 360-degree health snapshot for a vehicle.
+
+		Aggregates: current status, latest telematics position, overdue maintenance,
+		expiring compliance documents, recent incidents, TCO summary, and predictive alerts.
+		Designed as a single API call for the vehicle detail page.
+		"""
+		vehicle = await self.get_vehicle(vehicle_id)
+		last_pos = await self.get_vehicle_last_position(vehicle_id)
+		tco = await self.calculate_tco(vehicle_id)
+		compliance = await self.compliance_calendar()
+		predictive = await self.predictive_maintenance_alerts()
+		maintenance = await self.list_maintenance(vehicle_id=vehicle_id)
+		incidents = await self.list_incidents(vehicle_id=vehicle_id)
+
+		# Filter to this vehicle's compliance events
+		vehicle_compliance = [e for e in compliance if e.entity_id == vehicle_id]
+		overdue_compliance = [e for e in vehicle_compliance if e.is_overdue]
+		critical_compliance = [e for e in vehicle_compliance if e.severity == "critical"]
+
+		# Overdue maintenance for this vehicle
+		overdue_maint = [m for m in maintenance if m.status.value == "overdue"]
+		upcoming_maint = [
+			m for m in maintenance
+			if m.status.value == "scheduled"
+		]
+
+		# Predictive alerts for this vehicle
+		vehicle_alerts = [a for a in predictive if a.vehicle_id == vehicle_id]
+
+		# Open incidents
+		open_incidents = [i for i in incidents if i.status.value not in ("resolved", "closed")]
+
+		health_score = 100.0
+		if overdue_compliance:
+			health_score -= len(overdue_compliance) * 10
+		if overdue_maint:
+			health_score -= len(overdue_maint) * 8
+		if open_incidents:
+			health_score -= len(open_incidents) * 5
+		if vehicle_alerts:
+			health_score -= sum(
+				12 if a.urgency == "critical" else 6 if a.urgency == "high" else 2
+				for a in vehicle_alerts
+			)
+		health_score = max(0.0, health_score)
+
+		self._log_op("vehicle_health_snapshot", vehicle_id, health_score=str(round(health_score, 1)))
+		return {
+			"vehicle_id": vehicle_id,
+			"registration": vehicle.registration,
+			"status": vehicle.status.value,
+			"odometer_km": float(vehicle.odometer_km),
+			"health_score": round(health_score, 1),
+			"last_position": last_pos.model_dump(mode="json") if last_pos else None,
+			"tco_summary": {
+				"total_cost": float(tco.total_cost),
+				"cost_per_km": float(tco.cost_per_km),
+				"distance_km": float(tco.distance_km),
+			},
+			"overdue_compliance_count": len(overdue_compliance),
+			"critical_compliance_events": [e.model_dump(mode="json") for e in critical_compliance],
+			"overdue_maintenance_count": len(overdue_maint),
+			"upcoming_maintenance_count": len(upcoming_maint),
+			"predictive_alerts": [a.model_dump(mode="json") for a in vehicle_alerts],
+			"open_incidents": len(open_incidents),
+		}
+
+	async def driver_leaderboard(self, top_n: int = 10) -> list[dict[str, Any]]:
+		"""
+		Compute a ranked driver behaviour leaderboard for the tenant.
+
+		Scores all active drivers and returns the top_n by overall_score descending.
+		Emits: driver.leaderboard_computed
+		Useful for gamification, performance reviews, and insurance negotiations.
+		"""
+		drivers = [d for d in self._list("drivers") if d.get("status") == "active"]
+		scores: list[dict[str, Any]] = []
+
+		for drv in drivers:
+			try:
+				bs = await self.driver_behaviour_scoring(drv["id"])
+				scores.append({
+					"rank": 0,  # assigned after sort
+					"driver_id": drv["id"],
+					"driver_name": drv.get("name", ""),
+					"employee_number": drv.get("employee_number", ""),
+					"overall_score": bs.overall_score,
+					"grade": bs.grade,
+					"trips_count": bs.trips_count,
+					"distance_km": float(bs.distance_km),
+					"incidents_count": bs.incidents_count,
+				})
+			except AssertionError:
+				continue
+
+		scores.sort(key=lambda s: s["overall_score"], reverse=True)
+		for i, s in enumerate(scores[:top_n], start=1):
+			s["rank"] = i
+
+		self._emit_event("driver.leaderboard_computed", "", {"driver_count": len(scores), "top_n": top_n})
+		self._log_op("driver_leaderboard", "", drivers=str(len(scores)))
+		return scores[:top_n]
+
+	async def deferred_maintenance(self, maintenance_id: str, new_date: datetime, reason: str = "") -> MaintenanceResponse:
+		"""
+		Defer a scheduled maintenance job to a later date with audit trail.
+
+		Only SCHEDULED or OVERDUE jobs can be deferred.
+		Emits: maintenance.deferred
+		"""
+		raw = self._get("maintenance", maintenance_id)
+		assert raw, f"Maintenance {maintenance_id} not found"
+		self._tenant_assert(raw)
+		assert raw.get("status") in (
+			MaintenanceStatus.SCHEDULED.value, MaintenanceStatus.OVERDUE.value
+		), "Only SCHEDULED or OVERDUE maintenance can be deferred"
+
+		old_date = raw.get("scheduled_date")
+		raw["status"] = MaintenanceStatus.DEFERRED.value
+		raw["scheduled_date"] = new_date.isoformat()
+		if reason:
+			raw["notes"] = f"[DEFERRED by {self._actor_id}: {reason}] " + raw.get("notes", "")
+		raw["updated_at"] = datetime.utcnow().isoformat()
+		self._put("maintenance", maintenance_id, raw)
+		self._emit_event("maintenance.deferred", maintenance_id, {
+			"old_date": old_date, "new_date": new_date.isoformat(), "reason": reason,
+		})
+		self._log_op("deferred_maintenance", maintenance_id, new_date=new_date.isoformat())
+		return MaintenanceResponse.model_validate(raw)
+
 	async def dashboard_kpis(self) -> DashboardKPIs:
 		"""Compute fleet dashboard KPIs."""
 		vehicles = self._list("vehicles")

@@ -994,17 +994,708 @@ class SafService:
 		)
 
 
-	# ── Auto-generated expansion methods ────────────────────────────────────────
+	# ── Utility / System methods ────────────────────────────────────────────────
+
 	async def export_records(self, format: str = "json") -> dict[str, Any]:
-		"""Export Records"""
-		assert format in {"json","csv"}
+		"""Export all tenant records as a structured bundle (json or csv stub)."""
+		assert format in {"json", "csv"}, "format must be 'json' or 'csv'"
 		return {"format": format, "tenant_id": self.tenant_id}
 
-	async def health_check(self, ) -> dict[str, Any]:
-		"""Health Check"""
-		return {"service": self.__class__.__name__, "tenant_id": self.tenant_id, "status": "healthy"}
+	async def health_check(self) -> dict[str, Any]:
+		"""Return service health status and store sizes."""
+		return {
+			"service": self.__class__.__name__,
+			"tenant_id": self.tenant_id,
+			"status": "healthy",
+			"store_sizes": {
+				"incidents": len(self._incidents),
+				"hazards": len(self._hazards),
+				"risk_register": len(self._risk_register),
+				"permits": len(self._permits),
+				"corrective_actions": len(self._corrective_actions),
+				"risk_assessments": len(self._risk_assessments),
+				"safety_inspections": len(self._safety_inspections),
+				"emergency_drills": len(self._emergency_drills),
+				"critical_controls": len(self._critical_controls),
+				"regulatory_reports": len(self._regulatory_reports),
+				"culture_surveys": len(self._culture_surveys),
+			},
+		}
 
-	async def compliance_report(self, standard: str = "ISO_14001") -> dict[str, Any]:
-		"""Compliance Report"""
+	async def compliance_report(self, standard: str = "ISO_45001") -> dict[str, Any]:
+		"""
+		Generate a compliance gap assessment against a named safety standard.
+
+		Computes observable clause-level indicators from live data:
+		- Incident investigation completion rate
+		- Corrective action on-time closure rate
+		- Critical control verification pass rate
+		- Emergency drill completion in last 12 months
+		- Safety inspection completion count
+
+		standard: ISO_45001 | ISO_14001 | ICMM | AS4804
+		Returns per-clause compliance scores and an overall compliance index (0-100).
+		"""
+		assert standard, "standard required"
 		self._log_op("compliance_report", "report", standard)
-		return {"standard": standard, "tenant_id": self.tenant_id, "status": "compliant", "generated_at": datetime.utcnow().isoformat()}
+		incidents = [r for r in self._incidents.values() if r["tenant_id"] == self.tenant_id]
+		investigated = sum(1 for i in incidents if i.get("investigation_id"))
+		high_sev = [
+			i for i in incidents
+			if i.get("incident_type") in {"fatality", "LTI", "dangerous_occurrence",
+			                               "lost_time_injury", "fatality"}
+		]
+		investigation_rate = (
+			round(investigated / len(high_sev) * 100, 1) if high_sev else 100.0
+		)
+		all_cas = [r for r in self._corrective_actions.values() if r["tenant_id"] == self.tenant_id]
+		closed_cas = [r for r in all_cas if r.get("status") == "closed"]
+		ca_closure_rate = round(len(closed_cas) / len(all_cas) * 100, 1) if all_cas else 100.0
+		cc_all = [r for r in self._critical_controls.values() if r["tenant_id"] == self.tenant_id]
+		cc_effective = [r for r in cc_all if r.get("verification_result") == "effective"]
+		cc_pass_rate = round(len(cc_effective) / len(cc_all) * 100, 1) if cc_all else 100.0
+		drill_count = sum(1 for r in self._emergency_drills.values() if r["tenant_id"] == self.tenant_id)
+		inspection_count = sum(1 for r in self._safety_inspections.values() if r["tenant_id"] == self.tenant_id)
+		drill_score = min(drill_count * 10, 100)  # 10 drills = 100%
+		inspection_score = min(inspection_count * 5, 100)  # 20 inspections = 100%
+		overall = round(
+			(investigation_rate + ca_closure_rate + cc_pass_rate + drill_score + inspection_score) / 5, 1
+		)
+		return {
+			"standard": standard,
+			"tenant_id": self.tenant_id,
+			"overall_compliance_index": overall,
+			"clause_scores": {
+				"incident_investigation_completion_pct": investigation_rate,
+				"corrective_action_closure_pct": ca_closure_rate,
+				"critical_control_pass_pct": cc_pass_rate,
+				"emergency_drill_score": drill_score,
+				"inspection_score": inspection_score,
+			},
+			"data_basis": {
+				"high_severity_incidents": len(high_sev),
+				"total_corrective_actions": len(all_cas),
+				"critical_control_verifications": len(cc_all),
+				"emergency_drills": drill_count,
+				"safety_inspections": inspection_count,
+			},
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── Stop-Work Authority ────────────────────────────────────────────────────
+
+	async def invoke_stop_work_authority(
+		self,
+		location: str,
+		mine_area: str,
+		invoked_by: str,
+		reason: str,
+		related_hazard_id: str | None = None,
+		related_incident_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Formally invoke Stop-Work Authority (SWA) for a location.
+
+		Creates a stop-work record that must be resolved (investigation + authorised
+		resumption) before work may resume. All active permits in the affected area
+		are flagged as suspended.
+
+		Logs a CRITICAL escalation entry at invocation time.
+		"""
+		assert location, "location required"
+		assert mine_area, "mine_area required"
+		assert invoked_by, "invoked_by required"
+		assert reason, "reason required"
+		rec_id = uuid7str()
+		now = datetime.utcnow()
+		# Suspend active permits in area
+		suspended_permit_ids: list[str] = []
+		for permit in self._permits.values():
+			if (
+				permit.get("tenant_id") == self.tenant_id
+				and permit.get("mine_area") == mine_area
+				and permit.get("status") not in ("closed",)
+			):
+				permit["status"] = "suspended_swa"
+				permit["updated_at"] = now.isoformat()
+				suspended_permit_ids.append(permit["id"])
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"location": location,
+			"mine_area": mine_area,
+			"invoked_by": invoked_by,
+			"reason": reason,
+			"related_hazard_id": related_hazard_id,
+			"related_incident_id": related_incident_id,
+			"suspended_permit_ids": suspended_permit_ids,
+			"status": "active",
+			"investigation_id": None,
+			"resumed_by": None,
+			"resumed_at": None,
+			"resumption_conditions": None,
+			"hold_duration_minutes": None,
+			"invoked_at": now.isoformat(),
+			"created_at": now.isoformat(),
+		}
+		if not hasattr(self, "_stop_work_records"):
+			self._stop_work_records: dict[str, dict[str, Any]] = {}
+		self._stop_work_records[rec_id] = rec
+		self._log_escalation(rec_id, f"SWA invoked at {mine_area} by {invoked_by}: {reason}")
+		self._log_op("invoke_swa", "stop_work", rec_id)
+		return rec
+
+	async def authorise_work_resumption(
+		self,
+		swa_id: str,
+		authorised_by: str,
+		investigation_id: str,
+		resumption_conditions: list[str],
+	) -> dict[str, Any]:
+		"""
+		Authorise resumption of work after a Stop-Work Authority hold.
+
+		Requires investigation_id to be present. Computes hold duration.
+		Reinstates permits that were suspended by this SWA.
+		"""
+		if not hasattr(self, "_stop_work_records"):
+			self._stop_work_records = {}
+		rec = self._stop_work_records.get(swa_id)
+		if rec is None:
+			raise KeyError(f"Stop-work record {swa_id} not found")
+		assert rec["tenant_id"] == self.tenant_id, "Cross-tenant access denied"
+		if rec["status"] != "active":
+			raise ValueError(f"SWA {swa_id} is not active (status={rec['status']})")
+		if not investigation_id:
+			raise PermissionError("investigation_id required before authorising resumption")
+		now = datetime.utcnow()
+		import datetime as _dt
+		invoked_dt = datetime.fromisoformat(rec["invoked_at"])
+		hold_minutes = round((now - invoked_dt).total_seconds() / 60, 1)
+		rec["status"] = "resolved"
+		rec["investigation_id"] = investigation_id
+		rec["resumed_by"] = authorised_by
+		rec["resumed_at"] = now.isoformat()
+		rec["resumption_conditions"] = resumption_conditions
+		rec["hold_duration_minutes"] = hold_minutes
+		rec["updated_at"] = now.isoformat()
+		# Reinstate suspended permits
+		for pid in rec.get("suspended_permit_ids", []):
+			permit = self._permits.get(pid)
+			if permit and permit.get("status") == "suspended_swa":
+				permit["status"] = "active"
+				permit["updated_at"] = now.isoformat()
+		self._log_op("authorise_resumption", "stop_work", swa_id)
+		return rec
+
+	async def list_stop_work_records(
+		self, mine_area: str | None = None, active_only: bool = True
+	) -> list[dict[str, Any]]:
+		"""List stop-work authority records, optionally by area or active-only."""
+		if not hasattr(self, "_stop_work_records"):
+			self._stop_work_records = {}
+		results = [r for r in self._stop_work_records.values() if r["tenant_id"] == self.tenant_id]
+		if mine_area:
+			results = [r for r in results if r["mine_area"] == mine_area]
+		if active_only:
+			results = [r for r in results if r["status"] == "active"]
+		return sorted(results, key=lambda x: x["invoked_at"], reverse=True)
+
+	# ── Bowtie Risk Analysis ───────────────────────────────────────────────────
+
+	async def create_bowtie_analysis(
+		self,
+		material_unwanted_event: str,
+		mine_area: str,
+		threat_sources: list[dict[str, Any]],
+		prevention_controls: list[dict[str, Any]],
+		mitigation_controls: list[dict[str, Any]],
+		consequences: list[dict[str, Any]],
+		created_by: str,
+		risk_register_id: str | None = None,
+		escalation_factors: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Create a bowtie risk analysis linking threats, controls, and consequences.
+
+		threat_sources: [{"threat": str, "category": str, "likelihood": str}]
+		prevention_controls: [{"control": str, "type": str, "is_critical": bool, "owner_id": str}]
+		mitigation_controls: [{"control": str, "type": str, "is_critical": bool, "owner_id": str}]
+		consequences: [{"consequence": str, "severity": str, "receptor": str}]
+		escalation_factors: factors that could degrade control effectiveness
+		"""
+		assert material_unwanted_event, "material_unwanted_event required"
+		assert mine_area, "mine_area required"
+		assert threat_sources, "at least one threat_source required"
+		assert prevention_controls or mitigation_controls, "at least one control required"
+		assert consequences, "at least one consequence required"
+		critical_controls = [
+			c for c in (prevention_controls + mitigation_controls)
+			if c.get("is_critical", False)
+		]
+		hierarchy_weights = {"elimination": 1.0, "substitution": 0.85, "engineering": 0.7,
+		                     "administrative": 0.4, "ppe": 0.2}
+		all_controls = prevention_controls + mitigation_controls
+		hci = round(
+			sum(hierarchy_weights.get(c.get("type", "administrative"), 0.4) for c in all_controls)
+			/ max(len(all_controls), 1), 3
+		) if all_controls else 0.0
+		rec_id = uuid7str()
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"material_unwanted_event": material_unwanted_event,
+			"mine_area": mine_area,
+			"risk_register_id": risk_register_id,
+			"threat_sources": threat_sources,
+			"threat_count": len(threat_sources),
+			"prevention_controls": prevention_controls,
+			"mitigation_controls": mitigation_controls,
+			"total_control_count": len(all_controls),
+			"critical_control_count": len(critical_controls),
+			"hierarchy_control_index": hci,
+			"consequences": consequences,
+			"escalation_factors": escalation_factors or [],
+			"created_by": created_by,
+			"status": "active",
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		if not hasattr(self, "_bowtie_analyses"):
+			self._bowtie_analyses: dict[str, dict[str, Any]] = {}
+		self._bowtie_analyses[rec_id] = rec
+		self._log_op("create_bowtie", "bowtie_analysis", rec_id)
+		return rec
+
+	async def get_bowtie_analysis(self, id: str) -> dict[str, Any] | None:
+		"""Retrieve a bowtie analysis by id."""
+		if not hasattr(self, "_bowtie_analyses"):
+			self._bowtie_analyses = {}
+		rec = self._bowtie_analyses.get(id)
+		if rec is None:
+			return None
+		assert rec["tenant_id"] == self.tenant_id, "Cross-tenant access denied"
+		return rec
+
+	# ── Area Risk Heat Map ─────────────────────────────────────────────────────
+
+	async def get_area_risk_heatmap(self) -> list[dict[str, Any]]:
+		"""
+		Compute a risk heat-map ranked by composite risk score per mine_area.
+
+		Aggregates:
+		- Open extreme/high hazards
+		- Incidents in the past 30 days
+		- Overdue corrective actions
+		- Active permits with no valid risk assessment
+
+		Returns areas sorted highest-to-lowest composite score.
+		"""
+		import datetime as _dt
+		now = datetime.utcnow()
+		cutoff_30d = (now - _dt.timedelta(days=30)).isoformat()
+		area_data: dict[str, dict[str, Any]] = {}
+
+		def _area(a: str) -> dict[str, Any]:
+			if a not in area_data:
+				area_data[a] = {
+					"mine_area": a,
+					"open_extreme_hazards": 0,
+					"open_high_hazards": 0,
+					"incidents_30d": 0,
+					"overdue_corrective_actions": 0,
+					"active_permits": 0,
+				}
+			return area_data[a]
+
+		for h in self._hazards.values():
+			if h["tenant_id"] != self.tenant_id or h.get("status") == "closed":
+				continue
+			a = h.get("mine_area", "unknown")
+			if h.get("inherent_risk_rating") == "extreme":
+				_area(a)["open_extreme_hazards"] += 1
+			elif h.get("inherent_risk_rating") == "high":
+				_area(a)["open_high_hazards"] += 1
+
+		for i in self._incidents.values():
+			if i["tenant_id"] != self.tenant_id:
+				continue
+			if i.get("occurred_at", "") >= cutoff_30d:
+				a = i.get("mine_area", i.get("location", "unknown"))
+				_area(a)["incidents_30d"] += 1
+
+		for ca in self._corrective_actions.values():
+			if ca["tenant_id"] != self.tenant_id:
+				continue
+			if ca.get("status") in ("overdue", "OVERDUE"):
+				a = "unknown"  # CAs don't carry area; inherit via source linkage
+				_area(a)["overdue_corrective_actions"] += 1
+
+		for p in self._permits.values():
+			if p["tenant_id"] != self.tenant_id:
+				continue
+			if p.get("status") not in ("closed",) and p.get("valid_to", "") >= now.isoformat():
+				a = p.get("mine_area", p.get("location", "unknown"))
+				_area(a)["active_permits"] += 1
+
+		results = []
+		for data in area_data.values():
+			score = (
+				data["open_extreme_hazards"] * 10
+				+ data["open_high_hazards"] * 5
+				+ data["incidents_30d"] * 8
+				+ data["overdue_corrective_actions"] * 3
+				+ data["active_permits"] * 1
+			)
+			results.append({**data, "composite_risk_score": score})
+
+		return sorted(results, key=lambda x: x["composite_risk_score"], reverse=True)
+
+	# ── Leading Indicators ─────────────────────────────────────────────────────
+
+	async def get_leading_indicators(self, period: str) -> dict[str, Any]:
+		"""
+		Compute leading safety indicator snapshot for a given period (YYYY-MM).
+
+		Indicators:
+		- near_miss_reporting_rate: near misses / total incidents (%)
+		- hazard_identification_count: new hazards identified in period
+		- corrective_action_on_time_closure_pct: CAs closed before due date (%)
+		- safety_inspection_count: inspections completed in period
+		- emergency_drill_count: drills completed in period
+		- critical_control_pass_rate_pct: effective / total CC verifications (%)
+		- overdue_ca_ratio: overdue CAs / all open CAs (%)
+		"""
+		assert period, "period required"
+		period_incidents = [
+			r for r in self._incidents.values()
+			if r["tenant_id"] == self.tenant_id
+			and r.get("occurred_at", r.get("reported_at", ""))[:len(period)] == period
+		]
+		total_incidents = len(period_incidents)
+		near_misses = sum(
+			1 for i in period_incidents
+			if i.get("incident_type") in ("near_miss", IncidentType.NEAR_MISS, "NEAR_MISS")
+		)
+		near_miss_rate = round(near_misses / total_incidents * 100, 1) if total_incidents else 0.0
+		period_hazards = [
+			r for r in self._hazards.values()
+			if r["tenant_id"] == self.tenant_id
+			and r.get("identified_at", r.get("created_at", ""))[:len(period)] == period
+		]
+		all_cas = [r for r in self._corrective_actions.values() if r["tenant_id"] == self.tenant_id]
+		period_closed = [
+			ca for ca in all_cas
+			if ca.get("status") in ("closed",)
+			and ca.get("closed_at", "")[:len(period)] == period
+		]
+		on_time_closed = sum(
+			1 for ca in period_closed
+			if ca.get("closed_at", "") <= ca.get("deadline", ca.get("due_date", "9999"))
+		)
+		on_time_pct = round(on_time_closed / len(period_closed) * 100, 1) if period_closed else 100.0
+		period_inspections = [
+			r for r in self._safety_inspections.values()
+			if r["tenant_id"] == self.tenant_id
+			and r.get("date", "")[:len(period)] == period
+		]
+		period_drills = [
+			r for r in self._emergency_drills.values()
+			if r["tenant_id"] == self.tenant_id
+			and r.get("date", "")[:len(period)] == period
+		]
+		cc_period = [
+			r for r in self._critical_controls.values()
+			if r["tenant_id"] == self.tenant_id
+			and r.get("verified_at", "")[:len(period)] == period
+		]
+		cc_pass_rate = (
+			round(sum(1 for c in cc_period if c["verification_result"] == "effective") / len(cc_period) * 100, 1)
+			if cc_period else 100.0
+		)
+		open_cas = [ca for ca in all_cas if ca.get("status") not in ("closed",)]
+		overdue_cas = [ca for ca in open_cas if ca.get("status") in ("overdue", "OVERDUE")]
+		overdue_ratio = round(len(overdue_cas) / len(open_cas) * 100, 1) if open_cas else 0.0
+		return {
+			"tenant_id": self.tenant_id,
+			"period": period,
+			"near_miss_reporting_rate_pct": near_miss_rate,
+			"hazard_identification_count": len(period_hazards),
+			"corrective_action_on_time_closure_pct": on_time_pct,
+			"safety_inspection_count": len(period_inspections),
+			"emergency_drill_count": len(period_drills),
+			"critical_control_pass_rate_pct": cc_pass_rate,
+			"overdue_ca_ratio_pct": overdue_ratio,
+			"as_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── Permit Conflict Detection ──────────────────────────────────────────────
+
+	async def check_permit_conflicts(
+		self, mine_area: str, proposed_work_type: str
+	) -> dict[str, Any]:
+		"""
+		Check whether a proposed work type conflicts with active permits in a mine area.
+
+		Conflict matrix (hard blocks):
+		  hot_work × confined_space_entry → BLOCK
+		  hot_work × electrical_isolation → WARN
+		  electrical_isolation × excavation → WARN
+		  radiation_work × any → WARN
+
+		Returns conflict_level: none | warning | blocked, with conflicting permit IDs.
+		"""
+		BLOCK_PAIRS = {
+			frozenset({"hot_work", "confined_space_entry"}),
+			frozenset({"hot_work", "confined_space"}),
+		}
+		WARN_PAIRS = {
+			frozenset({"hot_work", "electrical_isolation"}),
+			frozenset({"hot_work", "isolation_lockout"}),
+			frozenset({"electrical_isolation", "excavation"}),
+			frozenset({"isolation_lockout", "excavation"}),
+			frozenset({"radiation_work", "hot_work"}),
+			frozenset({"radiation_work", "confined_space_entry"}),
+		}
+		now = datetime.utcnow().isoformat()
+		active_in_area = [
+			p for p in self._permits.values()
+			if p.get("tenant_id") == self.tenant_id
+			and p.get("mine_area") == mine_area
+			and p.get("status") not in ("closed", "suspended_swa")
+			and p.get("valid_to", "") >= now
+		]
+		conflicts: list[dict[str, Any]] = []
+		conflict_level = "none"
+		for existing in active_in_area:
+			existing_type = existing.get("ptw_type", existing.get("work_type", ""))
+			pair = frozenset({proposed_work_type, existing_type})
+			if pair in BLOCK_PAIRS:
+				conflicts.append({"permit_id": existing["id"], "work_type": existing_type, "severity": "blocked"})
+				conflict_level = "blocked"
+			elif pair in WARN_PAIRS and conflict_level != "blocked":
+				conflicts.append({"permit_id": existing["id"], "work_type": existing_type, "severity": "warning"})
+				if conflict_level == "none":
+					conflict_level = "warning"
+		return {
+			"mine_area": mine_area,
+			"proposed_work_type": proposed_work_type,
+			"active_permit_count": len(active_in_area),
+			"conflict_level": conflict_level,
+			"conflicts": conflicts,
+			"checked_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── Incident Pattern Analysis ──────────────────────────────────────────────
+
+	async def analyse_incident_patterns(
+		self,
+		mine_area: str | None = None,
+		lookback_days: int = 90,
+		min_occurrences: int = 2,
+	) -> dict[str, Any]:
+		"""
+		Detect recurring incident patterns over a lookback window.
+
+		Groups incidents by (incident_type, mine_area) and identifies combinations
+		that recur more than min_occurrences times. Flags whether any recurring
+		pattern lacks a closed corrective action.
+
+		Returns ranked pattern list with recurrence count and open CA flag.
+		"""
+		import datetime as _dt
+		now = datetime.utcnow()
+		cutoff = (now - _dt.timedelta(days=lookback_days)).isoformat()
+		incidents = [
+			r for r in self._incidents.values()
+			if r["tenant_id"] == self.tenant_id
+			and r.get("occurred_at", r.get("reported_at", ""))[:19] >= cutoff[:19]
+		]
+		if mine_area:
+			incidents = [
+				i for i in incidents
+				if i.get("mine_area", i.get("location", "")) == mine_area
+			]
+		pattern_counts: dict[tuple[str, str], list[str]] = {}
+		for inc in incidents:
+			key = (
+				inc.get("incident_type", "unknown"),
+				inc.get("mine_area", inc.get("location", "unknown")),
+			)
+			pattern_counts.setdefault(key, []).append(inc["id"])
+		recurring = {k: v for k, v in pattern_counts.items() if len(v) >= min_occurrences}
+		# For each pattern, check whether any linked CA is still open
+		ca_index: dict[str, list[dict[str, Any]]] = {}
+		for ca in self._corrective_actions.values():
+			if ca["tenant_id"] != self.tenant_id:
+				continue
+			src = ca.get("source_id", ca.get("finding_id", ""))
+			ca_index.setdefault(src, []).append(ca)
+		patterns = []
+		for (inc_type, area), inc_ids in recurring.items():
+			linked_cas = [ca for iid in inc_ids for ca in ca_index.get(iid, [])]
+			open_cas = [ca for ca in linked_cas if ca.get("status") not in ("closed",)]
+			patterns.append({
+				"incident_type": inc_type,
+				"mine_area": area,
+				"occurrence_count": len(inc_ids),
+				"incident_ids": inc_ids,
+				"linked_corrective_actions": len(linked_cas),
+				"open_corrective_actions": len(open_cas),
+				"unresolved_pattern": len(open_cas) > 0 or len(linked_cas) == 0,
+			})
+		return {
+			"tenant_id": self.tenant_id,
+			"lookback_days": lookback_days,
+			"mine_area_filter": mine_area,
+			"total_incidents_analysed": len(incidents),
+			"recurring_patterns": sorted(patterns, key=lambda x: x["occurrence_count"], reverse=True),
+			"as_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── Regulatory Submission Tracking ────────────────────────────────────────
+
+	async def submit_regulatory_report(
+		self, report_id: str, submitted_by: str, submission_reference: str
+	) -> dict[str, Any]:
+		"""
+		Mark a regulatory report as submitted and record the submission reference.
+
+		Updates status from 'draft' → 'submitted'. Validates report exists and
+		belongs to the tenant. Returns updated report record.
+		"""
+		rec = self._regulatory_reports.get(report_id)
+		if rec is None:
+			raise KeyError(f"Regulatory report {report_id} not found")
+		assert rec["tenant_id"] == self.tenant_id, "Cross-tenant access denied"
+		if rec.get("status") != "draft":
+			raise ValueError(f"Report is already in status '{rec['status']}'; only draft reports can be submitted")
+		assert submitted_by, "submitted_by required"
+		assert submission_reference, "submission_reference required"
+		rec["status"] = "submitted"
+		rec["submitted_by"] = submitted_by
+		rec["submission_reference"] = submission_reference
+		rec["submitted_at"] = datetime.utcnow().isoformat()
+		self._log_op("submit_regulatory_report", "regulatory_report", report_id)
+		return rec
+
+	async def list_regulatory_reports(
+		self,
+		period: str | None = None,
+		status: str | None = None,
+		jurisdiction: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""
+		List regulatory reports with optional filters by period, status, or jurisdiction.
+
+		status: draft | submitted | acknowledged | accepted | rejected
+		"""
+		results = [r for r in self._regulatory_reports.values() if r["tenant_id"] == self.tenant_id]
+		if period:
+			results = [r for r in results if r.get("period") == period]
+		if status:
+			results = [r for r in results if r.get("status") == status]
+		if jurisdiction:
+			results = [r for r in results if r.get("jurisdiction") == jurisdiction]
+		return sorted(results, key=lambda x: x.get("generated_at", ""), reverse=True)
+
+	# ── LOTO Isolation Register ────────────────────────────────────────────────
+
+	async def register_isolation_point(
+		self,
+		permit_id: str,
+		isolation_type: str,
+		device_id: str,
+		location_description: str,
+		isolated_by: str,
+		verified_by: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Register a Lockout/Tagout isolation point against a permit to work.
+
+		isolation_type: electrical | mechanical | hydraulic | pneumatic | gravitational | thermal
+		Sets initial state to 'isolated'. Verification changes state to 'verified'.
+		"""
+		assert permit_id, "permit_id required"
+		assert isolation_type, "isolation_type required"
+		assert device_id, "device_id required"
+		assert location_description, "location_description required"
+		assert isolated_by, "isolated_by required"
+		valid_types = {"electrical", "mechanical", "hydraulic", "pneumatic", "gravitational", "thermal", "chemical"}
+		if isolation_type not in valid_types:
+			self._log_warn(f"Non-standard isolation_type '{isolation_type}'")
+		permit = self._permits.get(permit_id)
+		if permit is None:
+			# Also check extended permit store
+			pass
+		now = datetime.utcnow()
+		rec_id = uuid7str()
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"permit_id": permit_id,
+			"isolation_type": isolation_type,
+			"device_id": device_id,
+			"location_description": location_description,
+			"isolated_by": isolated_by,
+			"isolated_at": now.isoformat(),
+			"verified_by": verified_by,
+			"verified_at": now.isoformat() if verified_by else None,
+			"state": "verified" if verified_by else "isolated",
+			"reinstated_by": None,
+			"reinstated_at": None,
+			"created_at": now.isoformat(),
+		}
+		if not hasattr(self, "_isolation_points"):
+			self._isolation_points: dict[str, dict[str, Any]] = {}
+		self._isolation_points[rec_id] = rec
+		self._log_op("register_isolation", "isolation_point", rec_id)
+		return rec
+
+	async def verify_isolation_point(
+		self, isolation_id: str, verified_by: str
+	) -> dict[str, Any]:
+		"""Mark an isolation point as verified by a second person."""
+		if not hasattr(self, "_isolation_points"):
+			self._isolation_points = {}
+		rec = self._isolation_points.get(isolation_id)
+		if rec is None:
+			raise KeyError(f"Isolation point {isolation_id} not found")
+		assert rec["tenant_id"] == self.tenant_id, "Cross-tenant access denied"
+		if rec["state"] == "reinstated":
+			raise ValueError("Isolation point has already been reinstated")
+		rec["verified_by"] = verified_by
+		rec["verified_at"] = datetime.utcnow().isoformat()
+		rec["state"] = "verified"
+		self._log_op("verify_isolation", "isolation_point", isolation_id)
+		return rec
+
+	async def reinstate_isolation_point(
+		self, isolation_id: str, reinstated_by: str
+	) -> dict[str, Any]:
+		"""Record reinstatement (removal) of an isolation point after permit close."""
+		if not hasattr(self, "_isolation_points"):
+			self._isolation_points = {}
+		rec = self._isolation_points.get(isolation_id)
+		if rec is None:
+			raise KeyError(f"Isolation point {isolation_id} not found")
+		assert rec["tenant_id"] == self.tenant_id, "Cross-tenant access denied"
+		if rec["state"] != "verified":
+			raise ValueError(f"Isolation must be in 'verified' state before reinstatement (current: {rec['state']})")
+		rec["reinstated_by"] = reinstated_by
+		rec["reinstated_at"] = datetime.utcnow().isoformat()
+		rec["state"] = "reinstated"
+		self._log_op("reinstate_isolation", "isolation_point", isolation_id)
+		return rec
+
+	async def list_isolation_points(
+		self, permit_id: str | None = None, state: str | None = None
+	) -> list[dict[str, Any]]:
+		"""List LOTO isolation points, optionally filtered by permit or state."""
+		if not hasattr(self, "_isolation_points"):
+			self._isolation_points = {}
+		results = [r for r in self._isolation_points.values() if r["tenant_id"] == self.tenant_id]
+		if permit_id:
+			results = [r for r in results if r["permit_id"] == permit_id]
+		if state:
+			results = [r for r in results if r["state"] == state]
+		return sorted(results, key=lambda x: x["created_at"], reverse=True)

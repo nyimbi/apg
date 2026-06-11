@@ -56,9 +56,19 @@ Transaction currency must match account currency. High-impact transactions requi
 | accounts | /fintech-neobanking/accounts | GET/POST | fintech_neobanking:manage_accounts | Accounts |
 | rails | /fintech-neobanking/rails | GET/POST | fintech_neobanking:manage_rails | Payments |
 | transactions | /fintech-neobanking/transactions | GET/POST | fintech_neobanking:post_transactions | Payments |
+| fx_transfer | /fintech-neobanking/fx-transfer | POST | fintech_neobanking:post_transactions | Payments |
 | savings | /fintech-neobanking/savings | GET/POST | fintech_neobanking:savings | Accounts |
+| autosweep | /fintech-neobanking/savings/autosweep | GET/POST | fintech_neobanking:savings | Accounts |
+| budgets | /fintech-neobanking/budgets | GET/POST | fintech_neobanking:manage_accounts | Analytics |
 | statements | /fintech-neobanking/statements | GET/POST | fintech_neobanking:statements | Servicing |
+| statements_bulk | /fintech-neobanking/statements/bulk | POST | fintech_neobanking:statements | Servicing |
 | cases | /fintech-neobanking/cases | GET/POST | fintech_neobanking:cases | Servicing |
+| chargebacks | /fintech-neobanking/chargebacks | GET/POST | fintech_neobanking:cases | Servicing |
+| consent | /fintech-neobanking/consent | GET/POST | fintech_neobanking:manage_customers | Customers |
+| risk_scores | /fintech-neobanking/risk-scores | GET | fintech_neobanking:view | Analytics |
+| attestations | /fintech-neobanking/attestations | POST | fintech_neobanking:manage_accounts | Accounts |
+| webhooks | /fintech-neobanking/webhooks | GET/POST | fintech_neobanking:admin | Integration |
+| overdraft | /fintech-neobanking/overdraft | GET/POST | fintech_neobanking:manage_accounts | Accounts |
 | agents | /fintech-neobanking/agents | GET/POST | fintech_neobanking:admin | Automation |
 | settings | /fintech-neobanking/settings | GET/POST | fintech_neobanking:admin | Administration |
 
@@ -76,6 +86,13 @@ Transaction currency must match account currency. High-impact transactions requi
 | case_reviewer_required | Service case without reviewer | deny |
 | neobanking_batch_requires_bytewax | Batch without Bytewax | deny |
 | privileged_neobanking_agent_action_requires_human_approval | AI agent privileged scope without approval | deny |
+| fx_transfer_requires_different_currencies | FX transfer with identical from/to currency | deny |
+| fx_rate_must_be_positive | FX transfer with zero or negative rate | deny |
+| chargeback_transaction_must_belong_to_account | Disputed transaction on wrong account | deny |
+| consent_type_must_be_supported | Consent record with unknown type | deny |
+| autosweep_trigger_must_be_supported | Auto-sweep rule with unknown trigger | deny |
+| overdraft_interest_requires_active_overdraft | Accrual on account with no overdraft limit | skip |
+| budget_category_must_be_unique_per_account | Duplicate category budget on same account | replace |
 
 ## Data Models
 | Model | Key Fields |
@@ -86,8 +103,14 @@ Transaction currency must match account currency. High-impact transactions requi
 | PaymentRail | id, account_id, rail_type, provider_reference, wallet_or_card_reference, status |
 | AccountTransaction | id, account_id, transaction_type, amount, currency, risk_reference, status |
 | SavingsPot | id, account_id, name, target_amount, current_amount, status |
+| AutosweepRule | id, account_id, pot_id, trigger, value, execution_count, last_executed_at |
 | AccountStatement | id, account_id, period_start, period_end, transaction_count |
 | ServiceCase | id, customer_id, account_id, reason, reviewer_id, evidence_references, status |
+| Chargeback | id, customer_id, account_id, disputed_transaction_id, disputed_amount, status, ruling |
+| SpendingBudget | id, account_id, category, monthly_limit, status |
+| ConsentRecord | id, customer_id, consent_type, channel, evidence_hash, status, recorded_at |
+| BalanceAttestation | id, account_id, balance, currency, purpose, signature, issued_at, expires_at |
+| AccountWebhook | id, account_id, url, event_filter, delivery_count, last_delivery_at |
 
 ## Streaming Events
 Events emitted to the fintech event stream via Bytewax.
@@ -98,20 +121,36 @@ Events emitted to the fintech event stream via Bytewax.
 | deposit_account_opened | Account opened |
 | payment_rail_linked | Rail linked to account |
 | account_transaction_posted | Transaction posted |
+| fx_transfer_completed | Cross-currency transfer settled |
 | savings_pot_created | Savings pot created |
+| savings_autosweep_executed | Auto-sweep rule fired |
+| savings_goal_reached | Pot balance meets target |
+| budget_75pct_warning | Spending reaches 75 % of budget |
+| budget_exceeded | Spending exceeds 100 % of budget |
 | statement_issued | Statement generated |
 | service_case_opened | Service case opened |
+| chargeback_opened | Dispute opened with provisional credit |
+| chargeback_resolved | Dispute ruled upheld or rejected |
+| consent_recorded | Consent event captured |
+| consent_revoked | Consent withdrawn |
+| overdraft_interest_accrued | Daily overdraft fee posted |
 | neobanking_agent_registered | AI agent registered |
 
 ## Edge Cases Handled
-- Transaction currency must match account currency exactly — a KES transaction against a USD account is denied; currency conversion is the responsibility of the payment rail, not the account ledger
-- Initial account balance of zero is valid (most accounts open at zero); negative initial balance is denied; this allows opening a funded account but not an overdrafted one
-- All transactions require a risk reference — this forces every transaction to be linked to a fraud or AML risk assessment, preventing unscreened money movement
+- Transaction currency must match account currency exactly — a KES transaction against a USD account is denied; currency conversion goes through `fx_convert_and_transfer` which posts a separate FX fee transaction
+- Initial account balance of zero is valid; negative initial balance is denied
+- All transactions require a risk reference — this forces every transaction to be linked to a fraud or AML risk assessment
 - Savings pots are sub-accounts within a deposit account; the pot target must be positive but the current amount can be zero (newly created pot)
-- Service case reasons are validated against a fixed list; free-text reason entry is not supported — cases must be categorized for routing
+- Service case reasons are validated against a fixed list; free-text reason entry is not supported
+- Chargeback provisional credit is issued immediately on dispute opening; reversed atomically if the ruling is rejected
+- Auto-sweep rules skip silently when account balance is insufficient — no error, no partial sweep
+- Budget alerts fire at most once per month per threshold per category — the `_budget_alerts` guard prevents duplicate notifications
+- Balance attestations are valid only until end-of-day of issuance; counterparties must re-request for the next day
+- Consent records are append-only; revocation sets status to 'revoked' with timestamp rather than deleting the record
+- Customer risk scores are advisory only — they do not gate transactions; callers may use scores to tighten limits independently
 
 ## Composability
-- **Upstream**: `fintech_kyc`, `fintech_aml`, and `fintech_fraud` provide the evidence chain required for customer onboarding; `fintech_payments` and `fintech_wallets` provide the payment rail execution
+- **Upstream**: `fintech_kyc`, `fintech_aml`, and `fintech_fraud` provide the evidence chain required for customer onboarding; `fintech_payments` and `fintech_wallets` provide the payment rail execution; `fintech_fx` provides exchange rates for cross-currency transfers
 - **Downstream**: `fintech_mobile` uses neobank accounts as the primary account backing for mobile payments; `fintech_cards` issues debit cards against neobank accounts; `fintech_lending` links loan accounts to neobank current accounts
 - **Peer**: Deployed alongside `fintech_mobile` (channel layer) and `fintech_cards` (debit card issuance) in a full neobank stack
 
@@ -120,3 +159,5 @@ Events emitted to the fintech event stream via Bytewax.
 - `merchant` account type supports business accounts for merchants using the neobank as their primary business account; distinct from the merchant accounts used in `fintech_gateway`
 - Statement period is caller-specified — the rule engine only checks that a period is present; the service layer handles period validation (start < end, reasonable range)
 - `high_impact` is a caller-computed flag; the service layer evaluates the transaction against the `high_value_threshold` and sets the flag before invoking the rule engine
+- Autosweep rules, webhooks, budgets, chargebacks, and consent records are stored in lazily-initialised `dict` attributes on the service instance; they persist in-memory and must be wired to the `store` adapter for durability
+- The `generate_balance_attestation` HMAC key is the `tenant_id`; in production, wire `keym` to use a tenant-specific signing key

@@ -672,3 +672,389 @@ class PrmService:
 		"""Bulk Delete Records"""
 		assert record_ids, "record_ids required"
 		return {"deleted_count": len(record_ids), "tenant_id": tenant_id}
+
+	# ── Property Marketing: Lead Management ──────────────────────────────────────
+
+	async def capture_lead(
+		self,
+		tenant_id: str,
+		property_id: str,
+		contact_name: str,
+		contact_email: str,
+		source: str,
+		*,
+		contact_phone: str | None = None,
+		unit_id: str | None = None,
+		budget_min: float | None = None,
+		budget_max: float | None = None,
+		message: str = "",
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""Capture a prospect lead for a property listing.
+
+		Records the lead with source attribution, scores urgency from budget/message
+		signals, and stores it for agent routing and SLA tracking.
+		"""
+		assert contact_name and contact_email, "contact_name and contact_email required"
+		assert source in (
+			"portal", "referral", "direct", "virtual_tour", "social", "email", "walk_in", "other"
+		), f"unsupported source: {source}"
+		from uuid6 import uuid7
+		lead_id = str(uuid7())
+
+		# Simple urgency score: higher budget, message keywords, virtual-tour source
+		urgency = 0
+		if budget_min and budget_min > 0:
+			urgency += 1
+		if budget_max and budget_max > 0:
+			urgency += 1
+		if source == "virtual_tour":
+			urgency += 2
+		if any(kw in message.lower() for kw in ("urgent", "asap", "immediately", "ready to move")):
+			urgency += 3
+
+		lead: dict[str, Any] = {
+			"id": lead_id,
+			"tenant_id": tenant_id,
+			"property_id": property_id,
+			"unit_id": unit_id,
+			"contact_name": contact_name,
+			"contact_email": contact_email,
+			"contact_phone": contact_phone,
+			"source": source,
+			"budget_min": budget_min,
+			"budget_max": budget_max,
+			"message": message,
+			"urgency_score": urgency,
+			"status": "new",
+			"assigned_agent_id": None,
+			"follow_up_count": 0,
+			"created_by": actor_id,
+			"created_at": datetime.utcnow().isoformat(),
+			"updated_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("leads", []).append(lead)
+		self._log_operation("capture_lead", lead_id, tenant_id)
+		return lead
+
+	async def list_leads(
+		self,
+		tenant_id: str,
+		property_id: str | None = None,
+		status: str | None = None,
+		source: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List leads with optional filters by property, status, or source."""
+		results = [l for l in self._store.get("leads", []) if l["tenant_id"] == tenant_id]
+		if property_id:
+			results = [l for l in results if l["property_id"] == property_id]
+		if status:
+			results = [l for l in results if l["status"] == status]
+		if source:
+			results = [l for l in results if l["source"] == source]
+		return sorted(results, key=lambda l: l["urgency_score"], reverse=True)
+
+	async def assign_lead(
+		self,
+		lead_id: str,
+		tenant_id: str,
+		agent_id: str,
+		actor_id: str = "system",
+	) -> dict[str, Any] | None:
+		"""Assign a lead to an agent and move status to 'assigned'."""
+		assert agent_id, "agent_id required"
+		for i, l in enumerate(self._store.get("leads", [])):
+			if l["id"] == lead_id and l["tenant_id"] == tenant_id:
+				l["assigned_agent_id"] = agent_id
+				l["status"] = "assigned"
+				l["updated_at"] = datetime.utcnow().isoformat()
+				self._store["leads"][i] = l
+				self._log_operation("assign_lead", lead_id, tenant_id)
+				return l
+		return None
+
+	async def update_lead_status(
+		self,
+		lead_id: str,
+		tenant_id: str,
+		new_status: str,
+		notes: str = "",
+		actor_id: str = "system",
+	) -> dict[str, Any] | None:
+		"""Advance a lead through the pipeline (new → assigned → viewing → offer → converted / lost)."""
+		valid_statuses = {"new", "assigned", "viewing", "offer", "converted", "lost", "on_hold"}
+		assert new_status in valid_statuses, f"invalid status: {new_status}"
+		for i, l in enumerate(self._store.get("leads", [])):
+			if l["id"] == lead_id and l["tenant_id"] == tenant_id:
+				old_status = l["status"]
+				l["status"] = new_status
+				l["notes"] = notes
+				l["updated_at"] = datetime.utcnow().isoformat()
+				self._store["leads"][i] = l
+				self._log_status_change(lead_id, old_status, new_status)
+				return l
+		return None
+
+	# ── Property Marketing: Listings ─────────────────────────────────────────────
+
+	async def publish_listing(
+		self,
+		tenant_id: str,
+		property_id: str,
+		unit_id: str | None = None,
+		*,
+		headline: str,
+		description: str,
+		asking_price: float | None = None,
+		asking_rent: float | None = None,
+		rent_frequency: str = "monthly",
+		available_from: date | None = None,
+		media_urls: list[str] | None = None,
+		virtual_tour_url: str | None = None,
+		channels: list[str] | None = None,
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""Compose and publish a property or unit listing to one or more channels.
+
+		A listing is an immutable snapshot — re-publishing creates a new listing version.
+		Supersedes any previous active listing for the same (property_id, unit_id) pair.
+		"""
+		assert headline and description, "headline and description required"
+		assert asking_price or asking_rent, "at least one of asking_price or asking_rent required"
+		from uuid6 import uuid7
+		listing_id = str(uuid7())
+		channels = channels or ["website"]
+
+		# Deactivate previous active listing for same property/unit
+		for l in self._store.setdefault("listings", []):
+			if (
+				l["tenant_id"] == tenant_id
+				and l["property_id"] == property_id
+				and l.get("unit_id") == unit_id
+				and l["status"] == "active"
+			):
+				l["status"] = "superseded"
+				l["updated_at"] = datetime.utcnow().isoformat()
+
+		listing: dict[str, Any] = {
+			"id": listing_id,
+			"tenant_id": tenant_id,
+			"property_id": property_id,
+			"unit_id": unit_id,
+			"headline": headline,
+			"description": description,
+			"asking_price": asking_price,
+			"asking_rent": asking_rent,
+			"rent_frequency": rent_frequency,
+			"available_from": str(available_from) if available_from else None,
+			"media_urls": media_urls or [],
+			"virtual_tour_url": virtual_tour_url,
+			"channels": channels,
+			"status": "active",
+			"view_count": 0,
+			"enquiry_count": 0,
+			"published_by": actor_id,
+			"published_at": datetime.utcnow().isoformat(),
+			"updated_at": datetime.utcnow().isoformat(),
+		}
+		self._store["listings"].append(listing)
+		self._log_operation("publish_listing", listing_id, tenant_id)
+		return listing
+
+	async def unpublish_listing(
+		self,
+		listing_id: str,
+		tenant_id: str,
+		reason: str = "manually_unpublished",
+	) -> dict[str, Any] | None:
+		"""Deactivate a listing, removing it from all channels."""
+		for i, l in enumerate(self._store.get("listings", [])):
+			if l["id"] == listing_id and l["tenant_id"] == tenant_id:
+				l["status"] = "inactive"
+				l["unpublish_reason"] = reason
+				l["updated_at"] = datetime.utcnow().isoformat()
+				self._store["listings"][i] = l
+				self._log_operation("unpublish_listing", listing_id, tenant_id)
+				return l
+		return None
+
+	async def list_listings(
+		self,
+		tenant_id: str,
+		property_id: str | None = None,
+		status: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List property listings, optionally filtered by property or status."""
+		results = [l for l in self._store.get("listings", []) if l["tenant_id"] == tenant_id]
+		if property_id:
+			results = [l for l in results if l["property_id"] == property_id]
+		if status:
+			results = [l for l in results if l["status"] == status]
+		return results
+
+	# ── Property Marketing: Virtual Tours ────────────────────────────────────────
+
+	async def create_virtual_tour(
+		self,
+		tenant_id: str,
+		property_id: str,
+		unit_id: str | None = None,
+		*,
+		tour_name: str,
+		media_type: str = "360_images",
+		scene_urls: list[str] | None = None,
+		floor_plan_url: str | None = None,
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""Register a virtual tour asset for a property or unit.
+
+		Stores scene metadata, generates a shareable tour URL, and links the tour
+		to the corresponding listing if one is active.  Dwell-time analytics events
+		should be posted via `record_tour_view`.
+		"""
+		assert tour_name, "tour_name required"
+		assert media_type in ("360_images", "video_walkthrough", "3d_model", "floor_plan_only"), \
+			f"unsupported media_type: {media_type}"
+		from uuid6 import uuid7
+		tour_id = str(uuid7())
+		shareable_url = f"/realestate/prm/tours/{tour_id}/view"
+
+		tour: dict[str, Any] = {
+			"id": tour_id,
+			"tenant_id": tenant_id,
+			"property_id": property_id,
+			"unit_id": unit_id,
+			"tour_name": tour_name,
+			"media_type": media_type,
+			"scene_urls": scene_urls or [],
+			"scene_count": len(scene_urls or []),
+			"floor_plan_url": floor_plan_url,
+			"shareable_url": shareable_url,
+			"view_count": 0,
+			"avg_dwell_seconds": 0,
+			"status": "active",
+			"created_by": actor_id,
+			"created_at": datetime.utcnow().isoformat(),
+			"updated_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("virtual_tours", []).append(tour)
+
+		# Auto-link to active listing if present
+		for l in self._store.get("listings", []):
+			if (
+				l["tenant_id"] == tenant_id
+				and l["property_id"] == property_id
+				and l.get("unit_id") == unit_id
+				and l["status"] == "active"
+			):
+				l["virtual_tour_url"] = shareable_url
+				break
+
+		self._log_operation("create_virtual_tour", tour_id, tenant_id)
+		return tour
+
+	async def record_tour_view(
+		self,
+		tour_id: str,
+		tenant_id: str,
+		viewer_session_id: str,
+		dwell_seconds: int,
+		lead_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Record a virtual tour view event, updating aggregate dwell-time stats.
+
+		If a lead_id is supplied the lead's urgency score is incremented to reflect
+		active engagement.
+		"""
+		assert viewer_session_id, "viewer_session_id required"
+		assert dwell_seconds >= 0, "dwell_seconds must be non-negative"
+		from uuid6 import uuid7
+		event_id = str(uuid7())
+
+		# Update tour aggregate stats
+		for i, t in enumerate(self._store.get("virtual_tours", [])):
+			if t["id"] == tour_id and t["tenant_id"] == tenant_id:
+				prev_count = t["view_count"]
+				prev_avg = t["avg_dwell_seconds"]
+				new_count = prev_count + 1
+				new_avg = round(((prev_avg * prev_count) + dwell_seconds) / new_count, 1)
+				t["view_count"] = new_count
+				t["avg_dwell_seconds"] = new_avg
+				t["updated_at"] = datetime.utcnow().isoformat()
+				self._store["virtual_tours"][i] = t
+				break
+
+		# Boost lead urgency on tour engagement
+		if lead_id:
+			for i, l in enumerate(self._store.get("leads", [])):
+				if l["id"] == lead_id and l["tenant_id"] == tenant_id:
+					l["urgency_score"] = l.get("urgency_score", 0) + 2
+					l["follow_up_count"] = l.get("follow_up_count", 0) + 1
+					l["updated_at"] = datetime.utcnow().isoformat()
+					self._store["leads"][i] = l
+					break
+
+		event: dict[str, Any] = {
+			"id": event_id,
+			"tour_id": tour_id,
+			"tenant_id": tenant_id,
+			"viewer_session_id": viewer_session_id,
+			"dwell_seconds": dwell_seconds,
+			"lead_id": lead_id,
+			"recorded_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("tour_view_events", []).append(event)
+		self._log_operation("record_tour_view", event_id, tenant_id)
+		return event
+
+	# ── Property Marketing: Analytics ────────────────────────────────────────────
+
+	async def marketing_funnel_report(
+		self,
+		tenant_id: str,
+		property_id: str | None = None,
+		period: str | None = None,
+	) -> dict[str, Any]:
+		"""Generate a marketing funnel report: listings → views → leads → viewings → conversions.
+
+		Provides conversion rates at each funnel stage so agents can identify drop-off
+		points and optimise listing quality, pricing, or follow-up cadence.
+		"""
+		listings = [
+			l for l in self._store.get("listings", [])
+			if l["tenant_id"] == tenant_id
+			and (property_id is None or l["property_id"] == property_id)
+		]
+		leads = [
+			l for l in self._store.get("leads", [])
+			if l["tenant_id"] == tenant_id
+			and (property_id is None or l["property_id"] == property_id)
+		]
+		total_views = sum(l.get("view_count", 0) for l in listings)
+		total_listings = len([l for l in listings if l["status"] == "active"])
+		total_leads = len(leads)
+		viewings = len([l for l in leads if l["status"] in ("viewing", "offer", "converted")])
+		offers = len([l for l in leads if l["status"] in ("offer", "converted")])
+		conversions = len([l for l in leads if l["status"] == "converted"])
+
+		def _rate(num: int, denom: int) -> float:
+			return round(num / denom * 100, 2) if denom else 0.0
+
+		return {
+			"tenant_id": tenant_id,
+			"property_id": property_id,
+			"period": period,
+			"active_listings": total_listings,
+			"total_views": total_views,
+			"total_leads": total_leads,
+			"viewings": viewings,
+			"offers": offers,
+			"conversions": conversions,
+			"views_per_listing": round(total_views / max(total_listings, 1), 1),
+			"lead_to_view_rate_pct": _rate(total_leads, total_views),
+			"view_to_viewing_rate_pct": _rate(viewings, total_leads),
+			"viewing_to_offer_rate_pct": _rate(offers, viewings),
+			"offer_to_conversion_rate_pct": _rate(conversions, offers),
+			"overall_conversion_rate_pct": _rate(conversions, total_leads),
+			"generated_at": datetime.utcnow().isoformat(),
+		}

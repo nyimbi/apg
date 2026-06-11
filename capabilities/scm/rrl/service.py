@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import defaultdict
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -18,6 +19,25 @@ REASON_CODES = {"defective", "wrong_item", "not_as_described", "changed_mind", "
 DISPOSAL_METHODS = {"recycle", "destroy", "donate", "auction", "landfill"}
 RESOLUTIONS = {"refund", "replacement", "credit", "repair"}
 CONDITIONS = {"like_new", "good", "fair", "poor", "scrap"}
+SHIPMENT_STATUSES = {"booked", "in_transit", "out_for_delivery", "delivered", "exception", "cancelled"}
+FRAUD_SIGNALS = {"high_frequency", "no_evidence", "repeat_sku", "out_of_window", "high_value"}
+
+# Condition value multipliers used by the disposition engine
+_CONDITION_VALUE_MULT: dict[str, float] = {
+	"like_new": 0.85,
+	"good": 0.65,
+	"fair": 0.40,
+	"poor": 0.15,
+	"scrap": 0.02,
+}
+
+# Refurbishment ROI multipliers (expected resale uplift after refurb per condition)
+_REFURB_UPLIFT: dict[str, float] = {
+	"good": 0.15,
+	"fair": 0.35,
+	"poor": 0.55,
+	"scrap": 0.0,
+}
 
 
 class ReturnsService:

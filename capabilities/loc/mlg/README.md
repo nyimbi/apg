@@ -125,6 +125,22 @@ Multi-Language & Localisation (MLG) manages translation workflows, locale config
 - Translation lookup is namespace-scoped: `default` namespace is used if not specified, allowing multi-namespace coexistence for the same key
 - Formatting rules reference `locale_id` — the locale must exist in the tenant registry before formatting can be configured
 
+## Advanced Service Methods
+
+| Method | Description |
+|--------|-------------|
+| `coverage_matrix(tenant_id)` | Language × namespace completion heatmap (0–100 %) |
+| `validate_against_glossary(tenant_id, text, lang, domain)` | Detect forbidden terms and suggest replacements |
+| `batch_approve_translations(tenant_id, ids, reviewer_id)` | Bulk approve translations; partial commit with per-ID report |
+| `batch_publish_translations(tenant_id, ids, actor_id)` | Bulk publish approved translations |
+| `rollback_translation(tenant_id, translation_id, version)` | Restore an earlier approved version; archives current as deprecated |
+| `get_translation_history(tenant_id, key, lang, ns)` | All versions of a key, newest first |
+| `translator_workload(tenant_id, translator_id?)` | Per-translator queue depth by status |
+| `sla_violations_report(tenant_id, max_days)` | Translations exceeding review SLA threshold |
+| `format_number(tenant_id, locale_id, value)` | Apply stored locale formatting rules to a number |
+| `score_translation_quality(tenant_id, translation_id)` | AI quality scoring across 5 dimensions |
+| `sync_locale_baseline(source_tenant_id, target_ids)` | Idempotent cross-tenant locale config sync (super-admin) |
+
 ## Composability Notes
 
 - `mco` entity country assignments drive default locale selection per entity
@@ -132,3 +148,6 @@ Multi-Language & Localisation (MLG) manages translation workflows, locale config
 - Rendered UIs consume MLG translation lookups by key/language/namespace at render time
 - `nlpc` can be fed MLG terminology glossaries for domain-aware NLP pipeline grounding
 - MLG emits all lifecycle events to `apg.loc.mlg.lifecycle` for downstream bytewax consumers
+- Coverage matrix feeds directly into `moni` dashboards — no client aggregation required
+- `sla_violations_report` integrates with `ntfy` to alert managers when review SLA is breached
+- `sync_locale_baseline` is the mechanism for platform-wide locale governance across tenants

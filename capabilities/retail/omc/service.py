@@ -854,3 +854,756 @@ class OmcService:
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ------------------------------------------------------------------
+	# Cart Merge (Guest → Authenticated)
+	# ------------------------------------------------------------------
+
+	async def merge_carts(
+		self,
+		tenant_id: str,
+		guest_cart_id: str,
+		authenticated_cart_id: str,
+		strategy: str = "union",
+	) -> OmcCartResponse | None:
+		"""Merge a guest cart into an authenticated cart on login.
+
+		strategy:
+		  'keep_authenticated' — discard guest cart, return authenticated cart unchanged
+		  'keep_guest'         — replace authenticated cart items with guest cart items
+		  'union'              — merge SKUs; sum quantities for duplicates
+		"""
+		assert guest_cart_id, "guest_cart_id required"
+		assert authenticated_cart_id, "authenticated_cart_id required"
+		assert strategy in ("keep_authenticated", "keep_guest", "union"), "invalid strategy"
+
+		guest = self._carts.get(guest_cart_id)
+		auth = self._carts.get(authenticated_cart_id)
+		if guest is None or guest["tenant_id"] != tenant_id:
+			self._log_warn("merge_carts: guest cart not found", guest_cart_id=guest_cart_id)
+			return None
+		if auth is None or auth["tenant_id"] != tenant_id:
+			self._log_warn("merge_carts: auth cart not found", authenticated_cart_id=authenticated_cart_id)
+			return None
+
+		if strategy == "keep_authenticated":
+			merged_items = auth.get("items", [])
+		elif strategy == "keep_guest":
+			merged_items = guest.get("items", [])
+		else:  # union
+			# Index auth items by SKU; accumulate quantities
+			by_sku: dict[str, OmcCartLineItem] = {}
+			for raw in auth.get("items", []):
+				item = OmcCartLineItem(**raw) if isinstance(raw, dict) else raw
+				by_sku[item.sku] = item
+			for raw in guest.get("items", []):
+				item = OmcCartLineItem(**raw) if isinstance(raw, dict) else raw
+				if item.sku in by_sku:
+					existing = by_sku[item.sku]
+					new_qty = existing.quantity + item.quantity
+					by_sku[item.sku] = OmcCartLineItem(
+						sku=existing.sku,
+						quantity=new_qty,
+						unit_price=existing.unit_price,
+						line_total=existing.unit_price * new_qty,
+						discount_applied=existing.discount_applied + item.discount_applied,
+						promotion_ids=list(set(existing.promotion_ids + item.promotion_ids)),
+					)
+				else:
+					by_sku[item.sku] = item
+			merged_items = [i.model_dump() for i in by_sku.values()]
+
+		items_as_models = [OmcCartLineItem(**i) if isinstance(i, dict) else i for i in merged_items]
+		totals = self._compute_cart_totals(items_as_models)
+
+		auth["items"] = [i.model_dump() if hasattr(i, "model_dump") else i for i in items_as_models]
+		auth.update(totals)
+		auth["updated_at"] = datetime.utcnow().isoformat()
+		self._carts[authenticated_cart_id] = auth
+
+		# Invalidate guest cart
+		guest["state"] = "merged"
+		guest["updated_at"] = datetime.utcnow().isoformat()
+		self._carts[guest_cart_id] = guest
+
+		self._log_op("merge_carts", tenant_id, authenticated_cart_id)
+		return OmcCartResponse(**auth)
+
+	# ------------------------------------------------------------------
+	# Loyalty Composability Hooks
+	# ------------------------------------------------------------------
+
+	async def earn_loyalty_points(
+		self,
+		order_id: str,
+		program_id: str,
+		points_per_currency_unit: float = 1.0,
+	) -> dict[str, Any]:
+		"""Record loyalty point earn event for a completed order.
+
+		Calls the retail_loy adapter if available; otherwise records locally for
+		deferred sync. Emits 'loyalty_earned' event.
+		"""
+		assert order_id, "order_id required"
+		assert program_id, "program_id required"
+		tenant_id = self.tenant_id
+
+		order = self._orders.get(order_id)
+		assert order is not None and order["tenant_id"] == tenant_id, "order not found"
+		assert order.get("status") in ("collected", "delivered", "shipped"), \
+			"points only earned on fulfilled orders"
+
+		grand_total = float(order.get("grand_total", 0.0))
+		points_earned = int(grand_total * points_per_currency_unit)
+		customer_id = order.get("customer_id", "")
+
+		earn_record: dict[str, Any] = {
+			"id": uuid7str(),
+			"tenant_id": tenant_id,
+			"order_id": order_id,
+			"customer_id": customer_id,
+			"program_id": program_id,
+			"points_earned": points_earned,
+			"order_value": grand_total,
+			"channel_id": order.get("channel_id"),
+			"earned_at": datetime.utcnow().isoformat(),
+		}
+
+		# Delegate to loy adapter when wired
+		if self._notify:
+			try:
+				await self._notify("loyalty_earned", earn_record)
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		self._log_op("earn_loyalty_points", tenant_id, order_id)
+		return earn_record
+
+	async def burn_loyalty_points(
+		self,
+		cart_id: str,
+		points: int,
+		program_id: str,
+		point_value: float = 0.01,
+	) -> OmcCartResponse | None:
+		"""Apply a loyalty point burn as a cart discount line item.
+
+		Args:
+		  cart_id: target active cart
+		  points: number of points to redeem
+		  program_id: loyalty program identifier
+		  point_value: monetary value per point (default KES 0.01 = 1 cent)
+		"""
+		assert cart_id, "cart_id required"
+		assert points > 0, "points must be positive"
+		assert program_id, "program_id required"
+		tenant_id = self.tenant_id
+
+		rec = self._carts.get(cart_id)
+		if rec is None or rec["tenant_id"] != tenant_id:
+			return None
+		assert rec.get("state") == "active", "can only burn points on active cart"
+
+		discount_value = round(points * point_value, 2)
+		# Add a synthetic zero-unit loyalty discount line item
+		loyalty_line = OmcCartLineItem(
+			sku=f"LOYALTY-{program_id}",
+			quantity=1,
+			unit_price=-discount_value,
+			line_total=-discount_value,
+			discount_applied=discount_value,
+			promotion_ids=[program_id],
+		)
+		items = [OmcCartLineItem(**i) if isinstance(i, dict) else i
+				 for i in rec.get("items", [])]
+		items.append(loyalty_line)
+		totals = self._compute_cart_totals(items)
+		rec["items"] = [i.model_dump() for i in items]
+		rec.update(totals)
+		rec["updated_at"] = datetime.utcnow().isoformat()
+		self._carts[cart_id] = rec
+
+		self._log_op("burn_loyalty_points", tenant_id, cart_id)
+		return OmcCartResponse(**rec)
+
+	# ------------------------------------------------------------------
+	# Safety Stock and Low-Stock Alerts
+	# ------------------------------------------------------------------
+
+	async def compute_safety_stock(
+		self,
+		sku: str,
+		location_id: str,
+		lookback_days: int = 30,
+		lead_time_days: int = 7,
+		service_level_z: float = 1.65,
+	) -> dict[str, Any]:
+		"""Compute reorder point and safety stock from historical demand volatility.
+
+		Uses the classical formula: SS = Z * sigma_d * sqrt(L)
+		where sigma_d = demand std dev per day, L = supplier lead time in days.
+		Demand series is approximated from reservation velocity in stored inventory records.
+		"""
+		assert sku, "sku required"
+		assert location_id, "location_id required"
+		tenant_id = self.tenant_id
+
+		inv_records = [v for v in self._inventory.values()
+					   if v["tenant_id"] == tenant_id
+					   and v["sku"] == sku
+					   and v["location_id"] == location_id]
+
+		if not inv_records:
+			return {"sku": sku, "location_id": location_id, "error": "no inventory records found"}
+
+		# Use reserved_qty as a proxy for demand; in production this comes from sales history
+		total_reserved = sum(v.get("reserved_qty", 0) for v in inv_records)
+		avg_daily_demand = total_reserved / max(lookback_days, 1)
+
+		import math
+		# Variance approximation — in production derive from time-series
+		demand_std = avg_daily_demand * 0.3  # assume 30% CV as baseline
+		safety_stock = int(math.ceil(service_level_z * demand_std * math.sqrt(lead_time_days)))
+		reorder_point = int(math.ceil(avg_daily_demand * lead_time_days + safety_stock))
+
+		# Persist computed safety stock
+		for rec in inv_records:
+			rec["safety_stock_qty"] = safety_stock
+			rec["updated_at"] = datetime.utcnow().isoformat()
+			self._inventory[rec["id"]] = rec
+
+		result = {
+			"sku": sku,
+			"location_id": location_id,
+			"avg_daily_demand": round(avg_daily_demand, 2),
+			"demand_std_dev": round(demand_std, 2),
+			"lead_time_days": lead_time_days,
+			"service_level_z": service_level_z,
+			"safety_stock_qty": safety_stock,
+			"reorder_point": reorder_point,
+			"computed_at": datetime.utcnow().isoformat(),
+		}
+		self._log_op("compute_safety_stock", tenant_id)
+		return result
+
+	async def list_low_stock_alerts(
+		self,
+		threshold_multiplier: float = 1.0,
+	) -> list[dict[str, Any]]:
+		"""Return inventory records where available_qty <= safety_stock_qty * threshold_multiplier.
+
+		threshold_multiplier > 1.0 triggers earlier warnings (e.g. 1.5 = alert at 150% of safety stock).
+		"""
+		tenant_id = self.tenant_id
+		alerts: list[dict[str, Any]] = []
+
+		for rec in self._inventory.values():
+			if rec["tenant_id"] != tenant_id:
+				continue
+			safety = rec.get("safety_stock_qty", 0)
+			available = rec.get("available_qty", 0)
+			threshold = safety * threshold_multiplier
+			if available <= threshold:
+				alerts.append({
+					"sku": rec["sku"],
+					"location_id": rec["location_id"],
+					"channel_id": rec.get("channel_id"),
+					"available_qty": available,
+					"safety_stock_qty": safety,
+					"threshold": threshold,
+					"severity": "critical" if available == 0 else "warning",
+					"checked_at": datetime.utcnow().isoformat(),
+				})
+
+		alerts.sort(key=lambda x: x["available_qty"])
+		self._log_op("list_low_stock_alerts", tenant_id)
+		return alerts
+
+	# ------------------------------------------------------------------
+	# Fraud Screening
+	# ------------------------------------------------------------------
+
+	async def fraud_screen_order(self, order_id: str) -> dict[str, Any]:
+		"""Compute fraud risk score for an order and update fraud_check_passed.
+
+		Assembles feature vector from: order value, customer history, channel,
+		payment method, and velocity. High-risk orders (score >= 0.7) are held
+		for manual review. Configurable threshold via RETAIL_OMC_FRAUD_THRESHOLD env var.
+		"""
+		import os
+		assert order_id, "order_id required"
+		tenant_id = self.tenant_id
+
+		order = self._orders.get(order_id)
+		assert order is not None and order["tenant_id"] == tenant_id, "order not found"
+
+		threshold = float(os.environ.get("RETAIL_OMC_FRAUD_THRESHOLD", "0.7"))
+		customer_id = order.get("customer_id")
+		grand_total = float(order.get("grand_total", 0.0))
+		channel_id = order.get("channel_id", "unknown")
+		payment_method = order.get("payment_method", "unknown")
+
+		# Feature vector
+		customer_orders = [o for o in self._orders.values()
+						   if o["tenant_id"] == tenant_id
+						   and o.get("customer_id") == customer_id
+						   and o["id"] != order_id]
+		order_velocity_30d = len(customer_orders)
+		customer_lifetime_value = sum(float(o.get("grand_total", 0)) for o in customer_orders)
+
+		# Heuristic scoring (production: replace with ML model or fraud API)
+		score = 0.0
+		signals: list[str] = []
+
+		if grand_total > 100_000:
+			score += 0.3
+			signals.append("high_value_order")
+		if order_velocity_30d > 10:
+			score += 0.2
+			signals.append("high_velocity")
+		if channel_id in ("marketplace",) and grand_total > 50_000:
+			score += 0.15
+			signals.append("marketplace_high_value")
+		if payment_method in ("cod", "unknown"):
+			score += 0.1
+			signals.append("risky_payment_method")
+		if customer_lifetime_value == 0 and grand_total > 20_000:
+			score += 0.25
+			signals.append("new_customer_high_value")
+
+		score = min(round(score, 3), 1.0)
+		passed = score < threshold
+		decision = "approved" if passed else "held_for_review"
+
+		order["fraud_check_passed"] = passed
+		order["fraud_score"] = score
+		order["fraud_decision"] = decision
+		order["fraud_signals"] = signals
+		if not passed:
+			order["status"] = "fraud_review"
+		order["updated_at"] = datetime.utcnow().isoformat()
+		self._orders[order_id] = order
+
+		self._log_op("fraud_screen_order", tenant_id, order_id)
+		return {
+			"order_id": order_id,
+			"fraud_score": score,
+			"threshold": threshold,
+			"passed": passed,
+			"decision": decision,
+			"signals": signals,
+			"screened_at": datetime.utcnow().isoformat(),
+		}
+
+	# ------------------------------------------------------------------
+	# Catalogue Search with Faceted Filtering
+	# ------------------------------------------------------------------
+
+	async def search_catalogue(
+		self,
+		tenant_id: str,
+		query: str,
+		filters: dict[str, Any] | None = None,
+		sort: str = "relevance",
+		page: int = 1,
+		page_size: int = 20,
+	) -> dict[str, Any]:
+		"""Full-text catalogue search with faceted filtering and relevance ranking.
+
+		Filters:
+		  category_path: list[str]
+		  brand: str
+		  min_price: float
+		  max_price: float
+		  channel_id: str  (filters by channel_prices availability)
+		  in_stock_only: bool
+
+		Sort options: relevance, price_asc, price_desc, name_asc
+		"""
+		assert tenant_id, "tenant_id required"
+		filters = filters or {}
+
+		candidates = [v for v in self._catalogue.values()
+					  if v["tenant_id"] == tenant_id and v["is_active"]]
+
+		# Apply filters
+		if filters.get("category_path"):
+			cp = filters["category_path"]
+			candidates = [v for v in candidates
+						  if v.get("category_path", [])[:len(cp)] == cp]
+		if filters.get("brand"):
+			candidates = [v for v in candidates
+						  if v.get("brand", "").lower() == filters["brand"].lower()]
+		if filters.get("min_price") is not None:
+			candidates = [v for v in candidates if v["base_price"] >= filters["min_price"]]
+		if filters.get("max_price") is not None:
+			candidates = [v for v in candidates if v["base_price"] <= filters["max_price"]]
+		if filters.get("channel_id"):
+			ch = filters["channel_id"]
+			candidates = [v for v in candidates if ch in v.get("channel_prices", {})]
+		if filters.get("in_stock_only"):
+			stocked_skus = {v["sku"] for v in self._inventory.values()
+							if v["tenant_id"] == tenant_id and v["available_qty"] > 0}
+			candidates = [v for v in candidates if v["sku"] in stocked_skus]
+
+		# Full-text relevance scoring (BM25-lite: term frequency in name + description)
+		q_terms = query.lower().split() if query else []
+
+		def _score(item: dict[str, Any]) -> float:
+			if not q_terms:
+				return 0.0
+			text = f"{item.get('name', '')} {item.get('description', '')} {item.get('brand', '')}".lower()
+			return sum(text.count(t) for t in q_terms) / (len(text.split()) + 1)
+
+		if query:
+			candidates = sorted(candidates, key=_score, reverse=True)
+			# Filter out zero-score results when a query is provided
+			candidates = [v for v in candidates if _score(v) > 0] or candidates
+
+		# Sort
+		if sort == "price_asc":
+			candidates.sort(key=lambda x: x["base_price"])
+		elif sort == "price_desc":
+			candidates.sort(key=lambda x: x["base_price"], reverse=True)
+		elif sort == "name_asc":
+			candidates.sort(key=lambda x: x.get("name", "").lower())
+
+		# Facet aggregation
+		brand_facets: dict[str, int] = {}
+		category_facets: dict[str, int] = {}
+		for v in candidates:
+			b = v.get("brand") or "unknown"
+			brand_facets[b] = brand_facets.get(b, 0) + 1
+			cat = "/".join(v.get("category_path", ["uncategorized"]))
+			category_facets[cat] = category_facets.get(cat, 0) + 1
+
+		total = len(candidates)
+		start = (page - 1) * page_size
+		page_items = candidates[start: start + page_size]
+
+		return {
+			"query": query,
+			"total_results": total,
+			"page": page,
+			"page_size": page_size,
+			"total_pages": max(1, -(-total // page_size)),  # ceiling division
+			"results": [OmcCatalogueItemResponse(**v).model_dump() for v in page_items],
+			"facets": {
+				"brands": brand_facets,
+				"categories": category_facets,
+			},
+			"searched_at": datetime.utcnow().isoformat(),
+		}
+
+	# ------------------------------------------------------------------
+	# Multi-Touch Attribution
+	# ------------------------------------------------------------------
+
+	async def multi_touch_attribution(
+		self,
+		order_id: str,
+		model: str = "linear",
+		time_decay_half_life_hours: float = 24.0,
+	) -> dict[str, Any]:
+		"""Compute multi-touch attribution for an order.
+
+		model options:
+		  'last_touch'  — 100% credit to final touchpoint
+		  'first_touch' — 100% credit to first touchpoint
+		  'linear'      — equal credit across all touchpoints
+		  'time_decay'  — exponential decay, recent touches get more credit
+		"""
+		assert order_id, "order_id required"
+		assert model in ("last_touch", "first_touch", "linear", "time_decay"), "invalid model"
+		tenant_id = self.tenant_id
+
+		order = self._orders.get(order_id)
+		assert order is not None and order["tenant_id"] == tenant_id, "order not found"
+
+		customer_id = order.get("customer_id", "")
+		order_channel = order.get("channel_id", "unknown")
+		grand_total = float(order.get("grand_total", 0.0))
+
+		pre_order_events = sorted(
+			[v for v in self._journey_events.values()
+			 if v["tenant_id"] == tenant_id
+			 and v.get("customer_id") == customer_id
+			 and v.get("occurred_at", "") <= order.get("created_at", "")],
+			key=lambda x: x.get("occurred_at", ""),
+		)
+
+		if not pre_order_events:
+			# No journey data: attribute 100% to order channel
+			attribution_vector = {order_channel: 1.0}
+		elif model == "last_touch":
+			attribution_vector = {pre_order_events[-1].get("channel_id", order_channel): 1.0}
+		elif model == "first_touch":
+			attribution_vector = {pre_order_events[0].get("channel_id", order_channel): 1.0}
+		elif model == "linear":
+			n = len(pre_order_events)
+			attribution_vector = {}
+			for ev in pre_order_events:
+				ch = ev.get("channel_id", "unknown")
+				attribution_vector[ch] = attribution_vector.get(ch, 0.0) + 1.0 / n
+		else:  # time_decay
+			import math
+			order_ts = order.get("created_at", datetime.utcnow().isoformat())
+			weights: list[float] = []
+			for ev in pre_order_events:
+				ev_ts = ev.get("occurred_at", order_ts)
+				# Hours before order
+				try:
+					delta_h = (datetime.fromisoformat(order_ts) - datetime.fromisoformat(ev_ts)).total_seconds() / 3600
+				except Exception:
+					delta_h = 0.0
+				weights.append(math.exp(-delta_h / time_decay_half_life_hours))
+			total_w = sum(weights) or 1.0
+			attribution_vector = {}
+			for ev, w in zip(pre_order_events, weights):
+				ch = ev.get("channel_id", "unknown")
+				attribution_vector[ch] = attribution_vector.get(ch, 0.0) + w / total_w
+
+		# Revenue allocation
+		revenue_attribution = {ch: round(credit * grand_total, 2)
+								for ch, credit in attribution_vector.items()}
+
+		result = {
+			"order_id": order_id,
+			"model": model,
+			"touchpoint_count": len(pre_order_events),
+			"order_value": grand_total,
+			"attribution_vector": {ch: round(v, 4) for ch, v in attribution_vector.items()},
+			"revenue_attribution": revenue_attribution,
+			"computed_at": datetime.utcnow().isoformat(),
+		}
+		self._attribution[order_id] = result
+		self._log_op("multi_touch_attribution", tenant_id, order_id)
+		return result
+
+	# ------------------------------------------------------------------
+	# RMA Workflow with Condition Grading
+	# ------------------------------------------------------------------
+
+	async def process_rma(
+		self,
+		return_id: str,
+		received_items: list[dict[str, Any]],
+		condition_grades: dict[str, str],
+	) -> dict[str, Any]:
+		"""Process a received return and route each item by condition grade.
+
+		condition_grades: {sku: grade} where grade in ('new', 'refurbished', 'damaged', 'scrap')
+		Adjusts inventory and computes actual refund from grade-based recovery rates.
+		"""
+		RECOVERY_RATES = {"new": 1.0, "refurbished": 0.7, "damaged": 0.3, "scrap": 0.0}
+		GRADE_DISPOSITIONS = {
+			"new": "restock",
+			"refurbished": "refurbishment_queue",
+			"damaged": "clearance",
+			"scrap": "write_off",
+		}
+
+		assert return_id, "return_id required"
+		tenant_id = self.tenant_id
+
+		ret = self._returns.get(return_id)
+		assert ret is not None and ret["tenant_id"] == tenant_id, "return not found"
+		assert ret.get("status") in ("pending", "approved"), "return must be pending or approved"
+
+		order_id = ret.get("order_id", "")
+		order = self._orders.get(order_id, {})
+		grand_total = float(order.get("grand_total", 0.0))
+
+		item_dispositions: list[dict[str, Any]] = []
+		total_refund = 0.0
+
+		for item in received_items:
+			sku = item.get("sku", "")
+			qty = item.get("quantity", 1)
+			unit_price = float(item.get("unit_price", 0.0))
+			grade = condition_grades.get(sku, "damaged")
+			disposition = GRADE_DISPOSITIONS.get(grade, "write_off")
+			recovery_rate = RECOVERY_RATES.get(grade, 0.0)
+			refund_for_item = round(unit_price * qty * recovery_rate, 2)
+			total_refund += refund_for_item
+
+			# Restock items that are in 'new' or 'refurbished' condition
+			if grade in ("new", "refurbished") and sku:
+				location_id = order.get("store_id") or "returns_warehouse"
+				inv_records = [v for v in self._inventory.values()
+							   if v["tenant_id"] == tenant_id
+							   and v["sku"] == sku
+							   and v["location_id"] == location_id]
+				if inv_records:
+					rec = inv_records[0]
+					restock_qty = qty if grade == "new" else max(1, int(qty * 0.7))
+					rec["available_qty"] = rec.get("available_qty", 0) + restock_qty
+					rec["on_hand_qty"] = rec.get("on_hand_qty", 0) + restock_qty
+					rec["updated_at"] = datetime.utcnow().isoformat()
+					self._inventory[rec["id"]] = rec
+
+			item_dispositions.append({
+				"sku": sku,
+				"quantity": qty,
+				"grade": grade,
+				"disposition": disposition,
+				"unit_refund": round(unit_price * recovery_rate, 2),
+				"total_refund": refund_for_item,
+			})
+
+		# Finalize return record
+		ret["status"] = "processed"
+		ret["refund_amount"] = round(total_refund, 2)
+		ret["rma_dispositions"] = item_dispositions
+		ret["processed_at"] = datetime.utcnow().isoformat()
+		ret["updated_at"] = datetime.utcnow().isoformat()
+		self._returns[return_id] = ret
+
+		# Update source order status
+		if order:
+			order["status"] = "returned"
+			order["updated_at"] = datetime.utcnow().isoformat()
+			self._orders[order_id] = order
+
+		self._log_op("process_rma", tenant_id, return_id)
+		return {
+			"return_id": return_id,
+			"order_id": order_id,
+			"item_dispositions": item_dispositions,
+			"total_refund": round(total_refund, 2),
+			"original_order_value": grand_total,
+			"recovery_rate": round(total_refund / grand_total, 3) if grand_total else 0.0,
+			"processed_at": ret["processed_at"],
+		}
+
+	# ------------------------------------------------------------------
+	# Shipping Rate Calculation
+	# ------------------------------------------------------------------
+
+	async def calculate_shipping(
+		self,
+		order_id: str,
+		carrier_options: list[str] | None = None,
+	) -> list[dict[str, Any]]:
+		"""Evaluate available carrier options for an order, returning ranked rate quotes.
+
+		Rates are computed from order weight, destination zone, and fulfilment mode.
+		In production, replace the rate table with calls to carrier APIs (DHL, FedEx, G4S).
+		"""
+		assert order_id, "order_id required"
+		tenant_id = self.tenant_id
+
+		order = self._orders.get(order_id)
+		assert order is not None and order["tenant_id"] == tenant_id, "order not found"
+
+		carrier_options = carrier_options or ["standard", "express", "same_day"]
+		fulfilment_mode = order.get("fulfilment_mode", "ship_to_home")
+
+		# Exclude shipping options for C&C (no carrier required)
+		if fulfilment_mode == "click_and_collect":
+			return [{"carrier": "in_store_pickup", "service": "click_and_collect",
+					 "rate": 0.0, "currency": "USD", "eta_days": 0}]
+
+		# Compute total order weight from catalogue items
+		total_weight_kg = 0.0
+		for item in order.get("items", []):
+			sku = item.get("sku", "")
+			qty = item.get("quantity", 1)
+			cat_item = await self.get_catalogue_item_by_sku(tenant_id, sku)
+			if cat_item and cat_item.weight_kg:
+				total_weight_kg += cat_item.weight_kg * qty
+		total_weight_kg = total_weight_kg or 0.5  # default 500g
+
+		# Simplified zone-based rate table (KES/USD)
+		RATE_TABLE = {
+			"standard": {"rate_per_kg": 3.0, "base_rate": 5.0, "eta_days": 5},
+			"express":  {"rate_per_kg": 8.0, "base_rate": 12.0, "eta_days": 2},
+			"same_day": {"rate_per_kg": 15.0, "base_rate": 20.0, "eta_days": 0},
+		}
+
+		quotes: list[dict[str, Any]] = []
+		for carrier in carrier_options:
+			if carrier not in RATE_TABLE:
+				continue
+			tbl = RATE_TABLE[carrier]
+			rate = round(tbl["base_rate"] + tbl["rate_per_kg"] * total_weight_kg, 2)
+			quotes.append({
+				"carrier": carrier,
+				"service": f"{carrier}_delivery",
+				"rate": rate,
+				"currency": order.get("currency_code", "USD"),
+				"weight_kg": round(total_weight_kg, 3),
+				"eta_days": tbl["eta_days"],
+				"fulfilment_mode": fulfilment_mode,
+			})
+
+		quotes.sort(key=lambda x: x["rate"])
+		self._log_op("calculate_shipping", tenant_id, order_id)
+		return quotes
+
+	# ------------------------------------------------------------------
+	# Audit Trail Query
+	# ------------------------------------------------------------------
+
+	async def query_audit_log(
+		self,
+		entity_type: str,
+		entity_id: str | None = None,
+		limit: int = 100,
+	) -> list[dict[str, Any]]:
+		"""Query the structured audit log for an entity type and optional entity ID.
+
+		Audit events are appended by _emit_audit_event (called by write operations).
+		Returns events in reverse-chronological order.
+		"""
+		assert entity_type, "entity_type required"
+		tenant_id = self.tenant_id
+
+		if not hasattr(self, "_audit_log"):
+			self._audit_log: list[dict[str, Any]] = []
+
+		results = [e for e in self._audit_log
+				   if e.get("tenant_id") == tenant_id
+				   and e.get("entity_type") == entity_type
+				   and (entity_id is None or e.get("entity_id") == entity_id)]
+
+		results.sort(key=lambda x: x.get("occurred_at", ""), reverse=True)
+		return results[:limit]
+
+	async def _emit_audit_event(
+		self,
+		entity_type: str,
+		entity_id: str,
+		action: str,
+		before: dict[str, Any],
+		after: dict[str, Any],
+		actor: str | None = None,
+	) -> None:
+		"""Append a structured audit event to the in-process audit log.
+
+		Structured as a CloudEvent for Bytewax compatibility.
+		In production, replace list append with an async write to the audit DB or stream.
+		"""
+		if not hasattr(self, "_audit_log"):
+			self._audit_log: list[dict[str, Any]] = []
+
+		event: dict[str, Any] = {
+			"id": uuid7str(),
+			"tenant_id": self.tenant_id,
+			"entity_type": entity_type,
+			"entity_id": entity_id,
+			"action": action,
+			"actor": actor or self.actor_id,
+			"before": before,
+			"after": after,
+			"occurred_at": datetime.utcnow().isoformat(),
+			"source": "retail_omc",
+			"specversion": "1.0",
+		}
+		self._audit_log.append(event)
+
+		if self._audit_adapter:
+			try:
+				await self._audit_adapter(event)
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+

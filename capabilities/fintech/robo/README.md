@@ -123,3 +123,67 @@ Events emitted to the fintech event stream via Bytewax.
 - `market_data` is declared as an adapter in `DEFAULT_CONFIGURATION` but not in `REQUIRES` — it is a runtime soft dependency; the capability can function without live market data (using cached or manual valuations)
 - The drift threshold (500 bps) is a configuration default; individual profiles can have different thresholds if the service layer implements per-profile overrides
 - Tax-loss harvesting records are advisory — the capability records candidates for tax-loss harvesting; the actual trade execution happens in `fintech_trading`; there is no direct link between a tax-loss record and a trade order in the rule engine
+
+## New Features (v2.0.0)
+
+### Monte Carlo Simulation
+`monte_carlo_retirement_simulation(profile_id, n_paths=10000)` runs 10,000 Gaussian return paths per asset class and returns a P10/P25/P50/P75/P90 percentile fan plus a probability-of-success metric. Replaces the single deterministic compound-growth projection.
+
+### Lifecycle Glide Path
+`compute_glide_path_allocation(profile_id, goal_id, current_age)` computes a target-date allocation using `equity_pct = max(20, 110 - current_age)` scaled by years-to-goal. Returns delta vs current allocation and a rebalance flag.
+
+### Portfolio Stress Testing
+`portfolio_stress_test(profile_id, scenarios)` applies three built-in historical scenarios (GFC 2008, COVID 2020, Rate Shock 2022) plus any custom shocks. Returns drawdown percentage and estimated recovery months per scenario.
+
+### Goal Sensitivity Analysis
+`goal_sensitivity_analysis(goal_id)` runs a 3×3×3 grid over return ± 2 pp, monthly contribution ± 25%, and horizon ± 2 years. Returns a 27-scenario matrix with goal-achievement flags and identifies the highest-leverage intervention lever.
+
+### Drawdown Circuit Breaker
+`drawdown_circuit_breaker_check(portfolio_id, peak_value_usd, drawdown_threshold_pct=15)` suspends automation plans when portfolio drawdown from peak exceeds the threshold. Prevents automated buying during crash conditions without client awareness.
+
+### Robo-to-Human Escalation
+`evaluate_escalation_triggers(profile_id)` evaluates AUM threshold ($500k), distressed goals (< 30% funded, < 2yr horizon), and risk-profile mismatch. Returns escalation decision and freezes automation plans pending human review.
+
+### Tax-Lot Harvesting Engine
+`tax_lot_harvesting_engine(profile_id, jurisdiction, min_lot_age_days=31)` identifies wash-sale-safe harvest candidates per tax lot with multi-jurisdiction CGT rates (KE 15%, US 20%, GB 20%, EU 25%). Returns replacement instrument recommendations.
+
+### Income Reinvestment
+`reinvest_income(portfolio_id, income_events)` credits dividend and coupon income (from explicit events or yield estimates) and reinvests per target allocation. Separates income from capital for tax reporting.
+
+### Client Lifetime Value
+`client_lifetime_value(customer_id)` uses a Gordon-growth CLV formula: `AUM × fee × (1-(1+g)^-T) / (r-g)`. Returns annual fee revenue and lifetime value estimate.
+
+### Churn Prediction
+`churn_probability(customer_id)` computes a logistic churn score from four behavioural signals (goal progress, portfolio health, tenure, AUM tier) and routes to the appropriate retention intervention (adviser call, goal progress email, fee discount).
+
+## Key Service Methods
+
+### Core Advisory
+- `describe()` / `evaluate()` — capability contract and policy enforcement
+- `risk_questionnaire(customer_id, responses)` — 5-dimension questionnaire scoring
+- `determine_risk_profile(questionnaire_id)` — finalise risk profile with allocation and return estimate
+- `recommended_portfolio(risk_profile, amount)` — model portfolio with projected value and fees
+- `onboard_client(customer_id, plan)` — full onboarding: profile + goal + automation setup
+
+### Automation & Rebalancing
+- `auto_invest(customer_id, amount, frequency)` — recurring investment per model portfolio
+- `auto_rebalance(portfolio_id, ...)` — drift-threshold-guarded rebalance with dry-run mode
+- `drawdown_circuit_breaker_check(portfolio_id, peak_value_usd)` — suspend automation on excessive drawdown
+
+### Quantitative Analysis
+- `monte_carlo_retirement_simulation(profile_id, n_paths)` — probabilistic retirement projection
+- `compute_glide_path_allocation(profile_id, goal_id, current_age)` — lifecycle allocation glide
+- `portfolio_stress_test(profile_id, scenarios)` — historical scenario stress testing
+- `goal_sensitivity_analysis(goal_id)` — 3D sensitivity grid
+
+### Tax & Income
+- `tax_optimisation(portfolio_id, jurisdiction)` — TLH candidates with tax saving estimates
+- `tax_lot_harvesting_engine(profile_id, jurisdiction)` — wash-sale-safe lot-level harvesting
+- `reinvest_income(portfolio_id, income_events)` — dividend/coupon reinvestment
+
+### Client Analytics
+- `client_lifetime_value(customer_id)` — Gordon-growth CLV
+- `churn_probability(customer_id)` — logistic churn score with intervention routing
+- `evaluate_escalation_triggers(profile_id)` — robo-to-human escalation decision
+
+_(See `service.py` for all signatures and `docs/user_guide.md` for usage examples.)_

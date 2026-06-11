@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime, timezone
 from itertools import count
 from typing import Any
 
@@ -51,9 +53,10 @@ class HelpService:
 		self._agent_runtimes = {_normalize_token(item) for item in SUPPORTED_HELP_AGENT_RUNTIMES}
 		self._agent_roles = {_normalize_token(item) for item in SUPPORTED_HELP_AGENT_ROLES}
 		self._privileged_agent_roles = {_normalize_token(item) for item in PRIVILEGED_HELP_AGENT_ROLES}
+		_streaming = get_capability_contract()["streaming"]
 		self._lifecycle_operations = {
 			_normalize_token(item)
-			for item in get_capability_contract()["streaming"]["required_operations"]
+			for item in _streaming.get("required_operations", _streaming.get("events", []))
 		}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -961,6 +964,381 @@ class HelpService:
 			"high_rated_pct": round(len(high_rated) / max(len(feedbacks), 1) * 100, 1),
 			"curation_items": len(self._list(self._curation, tenant_id)),
 			"localizations": len(self._list(self._localizations, tenant_id)),
+		}
+
+	# ── Async-native methods (v1.1) ────────────────────────────────────────────
+
+	async def async_search_articles(
+		self,
+		tenant_id: str,
+		query: str,
+		locale: str | None = None,
+		include_restricted: bool = False,
+		limit: int = 10,
+	) -> list[dict[str, Any]]:
+		"""Non-blocking article search — awaitable wrapper for search_articles."""
+		await asyncio.sleep(0)
+		result = self.search_articles(
+			tenant_id=tenant_id,
+			query=query,
+			locale=locale,
+			include_restricted=include_restricted,
+			limit=limit,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_generate_answer(
+		self,
+		answer_id: str,
+		tenant_id: str,
+		query: str,
+		locale: str | None = None,
+		minimum_confidence: float | None = None,
+	) -> dict[str, Any]:
+		"""Non-blocking cited answer generation — awaitable wrapper for generate_answer."""
+		await asyncio.sleep(0)
+		result = self.generate_answer(
+			answer_id=answer_id,
+			tenant_id=tenant_id,
+			query=query,
+			locale=locale,
+			minimum_confidence=minimum_confidence,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_draft_article(
+		self,
+		tenant_id: str,
+		title: str,
+		context_hints: list[str],
+		owner_id: str,
+		locale: str = "en",
+		topics: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""AI-assisted draft composition.
+
+		Produces a structured markdown body from title and bullet hints.
+		Saved with status=draft and tagged ai_assisted.
+		Policy requires human review before publication.
+		"""
+		await asyncio.sleep(0)
+		hints_text = "\n".join(f"- {h}" for h in context_hints)
+		body = (
+			f"## {title}\n\n"
+			f"_AI-assisted draft. Human review required before publication._\n\n"
+			f"{hints_text}\n\n"
+			f"<!-- TODO: expand each point into full paragraphs -->"
+		)
+		article_id = f"ai-draft-{next(self._counter)}"
+		result = self.create_article(
+			article_id=article_id,
+			tenant_id=tenant_id,
+			title=title,
+			body=body,
+			owner_id=owner_id,
+			topics=list(topics or []) + ["ai_assisted"],
+			locale=locale,
+		)
+		self._record_event(
+			tenant_id, "ai_draft_created", article_id,
+			f"AI-assisted draft: {title}", owner_id,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_get_contextual_help(
+		self,
+		tenant_id: str,
+		context_key: str,
+		locale: str = "en",
+		max_snippet_len: int = 280,
+	) -> dict[str, Any]:
+		"""Return a tooltip-sized help snippet for a UI context key.
+
+		Articles are matched when context_key appears in their topics list.
+		Returns max_snippet_len chars from the matched published article body.
+		"""
+		await asyncio.sleep(0)
+		key_norm = context_key.lower().strip()
+		matched: HelpArticle | None = None
+		for article in self._articles.values():
+			if article.tenant_id != tenant_id:
+				continue
+			if article.status != ArticleStatus.PUBLISHED:
+				continue
+			topics_norm = [t.lower().strip() for t in article.topics]
+			if key_norm not in topics_norm:
+				continue
+			if matched is None:
+				matched = article
+			if article.locale == locale:
+				matched = article
+				break
+		if matched is None:
+			return {
+				"context_key": context_key,
+				"found": False,
+				"article_id": None,
+				"title": None,
+				"snippet": None,
+				"locale": locale,
+			}
+		snippet = (matched.body or "")[:max_snippet_len].rstrip()
+		await asyncio.sleep(0)
+		return {
+			"context_key": context_key,
+			"found": True,
+			"article_id": matched.id,
+			"title": matched.title,
+			"snippet": snippet,
+			"locale": matched.locale,
+		}
+
+	async def async_bulk_import_articles(
+		self,
+		tenant_id: str,
+		articles: list[dict[str, Any]],
+		owner_id: str,
+		default_locale: str = "en",
+	) -> dict[str, Any]:
+		"""Bulk article import with per-item validation pipeline.
+
+		Validation stages: schema presence, duplicate title in batch,
+		create_article policy enforcement.
+		"""
+		await asyncio.sleep(0)
+		self._require_tenant(tenant_id)
+		created: list[str] = []
+		failures: list[dict[str, Any]] = []
+		seen_titles: set[str] = set()
+		for idx, item in enumerate(articles):
+			await asyncio.sleep(0)
+			title = str(item.get("title", "")).strip()
+			body = str(item.get("body", "")).strip()
+			if not title or not body:
+				failures.append({"index": idx, "error": "missing_title_or_body"})
+				continue
+			if title.lower() in seen_titles:
+				failures.append({"index": idx, "error": "duplicate_title_in_batch", "title": title})
+				continue
+			seen_titles.add(title.lower())
+			article_id = f"import-{tenant_id}-{idx}-{next(self._counter)}"
+			try:
+				result = self.create_article(
+					article_id=article_id,
+					tenant_id=tenant_id,
+					title=title,
+					body=body,
+					owner_id=owner_id,
+					topics=list(item.get("topics") or []),
+					locale=str(item.get("locale") or default_locale),
+					visibility=str(item.get("visibility") or ContentVisibility.INTERNAL.value),
+					source_ids=list(item.get("source_ids") or []),
+				)
+				created.append(result["id"])
+			except Exception as exc:
+				failures.append({"index": idx, "title": title, "error": str(exc)})
+		self._record_event(
+			tenant_id, "bulk_import_completed", tenant_id,
+			f"Bulk import: {len(created)} created, {len(failures)} failed", owner_id,
+		)
+		await asyncio.sleep(0)
+		return {
+			"tenant_id": tenant_id,
+			"created_count": len(created),
+			"failed_count": len(failures),
+			"created_ids": created,
+			"failures": failures,
+			"imported_at": utc_now_iso(),
+		}
+
+	async def async_score_article_freshness(
+		self,
+		tenant_id: str,
+		article_id: str,
+	) -> dict[str, Any]:
+		"""Compute a composite freshness score (0–1) for an article.
+
+		Components: age_score (days since review), edit_recency_score (days since update),
+		feedback_score (ratio of high-rated feedback). Staleness labels: fresh/aging/stale.
+		"""
+		await asyncio.sleep(0)
+		article = self._require_article(article_id, tenant_id)
+		threshold = 90
+		now = datetime.now(timezone.utc)
+
+		def _days_since(iso: str | None) -> float:
+			if not iso:
+				return float(threshold)
+			try:
+				dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+				return max((now - dt).days, 0)
+			except ValueError:
+				return float(threshold)
+
+		review_days = _days_since(article.last_reviewed_at or article.updated_at)
+		age_score = max(0.0, 1.0 - review_days / max(threshold, 1))
+		update_days = _days_since(article.updated_at)
+		edit_recency_score = max(0.0, 1.0 - update_days / 30.0)
+		feedbacks = [
+			fb for fb in self._feedback.values()
+			if fb.tenant_id == tenant_id and fb.article_id == article_id
+		]
+		feedback_score = (
+			sum(1 for fb in feedbacks if fb.rating >= 4) / len(feedbacks)
+			if feedbacks
+			else 0.5
+		)
+		composite = round((age_score + edit_recency_score + feedback_score) / 3.0, 3)
+		staleness = "fresh" if composite >= 0.7 else ("aging" if composite >= 0.4 else "stale")
+		await asyncio.sleep(0)
+		return {
+			"article_id": article_id,
+			"tenant_id": tenant_id,
+			"age_score": round(age_score, 3),
+			"edit_recency_score": round(edit_recency_score, 3),
+			"feedback_score": round(feedback_score, 3),
+			"composite_score": composite,
+			"staleness": staleness,
+			"days_since_review": round(review_days, 1),
+			"scored_at": utc_now_iso(),
+		}
+
+	async def async_get_slo_report(
+		self,
+		tenant_id: str,
+		period: str = "7d",
+	) -> dict[str, Any]:
+		"""Emit SLO metrics: answer confidence percentiles, CSAT, stale article pct, breaches."""
+		await asyncio.sleep(0)
+		answers = self.list_answers(tenant_id)
+		feedbacks = [fb for fb in self._feedback.values() if fb.tenant_id == tenant_id]
+		articles = self.list_articles(tenant_id)
+		curation = self.list_curation_items(tenant_id)
+		confidences = sorted(a["confidence"] for a in answers)
+
+		def _pct(data: list[float], p: float) -> float:
+			if not data:
+				return 0.0
+			idx = int(len(data) * p / 100)
+			return round(data[min(idx, len(data) - 1)], 3)
+
+		p50 = _pct(confidences, 50)
+		p95 = _pct(confidences, 95)
+		high_rated = sum(1 for fb in feedbacks if fb.rating >= 4)
+		csat = round(high_rated / max(len(feedbacks), 1), 3)
+		published_ids = {a["id"] for a in articles if a.get("status") == "published"}
+		stale_ids = {
+			c["article_id"] for c in curation
+			if c["status"] == "open" and c["reason"] == "freshness_review"
+			and c["article_id"] in published_ids
+		}
+		stale_pct = round(len(stale_ids) / max(len(published_ids), 1) * 100, 1)
+		open_curation = sum(1 for c in curation if c["status"] == "open")
+		breaches: list[str] = []
+		if p50 < 0.5:
+			breaches.append("answer_confidence_p50_below_threshold")
+		if csat < 0.7:
+			breaches.append("feedback_csat_below_70pct")
+		if stale_pct > 20.0:
+			breaches.append("stale_article_pct_above_20pct")
+		await asyncio.sleep(0)
+		return {
+			"tenant_id": tenant_id,
+			"period": period,
+			"answer_confidence_p50": p50,
+			"answer_confidence_p95": p95,
+			"feedback_csat": csat,
+			"stale_article_pct": stale_pct,
+			"open_curation_count": open_curation,
+			"slo_breaches": breaches,
+			"slo_healthy": len(breaches) == 0,
+			"generated_at": utc_now_iso(),
+		}
+
+	async def async_register_webhook(
+		self,
+		tenant_id: str,
+		event_type: str,
+		url: str,
+		secret: str,
+		owner_id: str = "admin",
+	) -> dict[str, Any]:
+		"""Register a tenant webhook for lifecycle events.
+
+		Supported event_type: article.published, article.unpublished,
+		feedback.low_rating, curation.opened.
+		"""
+		await asyncio.sleep(0)
+		self._require_tenant(tenant_id)
+		valid_events = {
+			"article.published", "article.unpublished",
+			"feedback.low_rating", "curation.opened",
+		}
+		if event_type not in valid_events:
+			raise ValueError(f"unsupported_event_type:{event_type}. Valid: {sorted(valid_events)}")
+		if not str(url or "").strip().startswith(("http://", "https://")):
+			raise ValueError("webhook_url_must_be_http_or_https")
+		if not hasattr(self, "_webhooks"):
+			self._webhooks: dict[str, dict[str, Any]] = {}
+		wh_id = f"webhook-{tenant_id}-{_normalize_token(event_type)}-{next(self._counter)}"
+		masked = secret[:4] + "****" if len(secret) >= 4 else "****"
+		record: dict[str, Any] = {
+			"id": wh_id,
+			"tenant_id": tenant_id,
+			"event_type": event_type,
+			"url": url,
+			"masked_secret": masked,
+			"owner_id": owner_id,
+			"status": "active",
+			"registered_at": utc_now_iso(),
+		}
+		self._webhooks[wh_id] = record
+		self._record_event(tenant_id, "webhook_registered", wh_id, f"Webhook {event_type}→{url}", owner_id)
+		await asyncio.sleep(0)
+		return record
+
+	async def async_detect_duplicates(
+		self,
+		tenant_id: str,
+		title: str,
+		body: str,
+		top_k: int = 3,
+	) -> dict[str, Any]:
+		"""Detect potential duplicate articles using Jaccard token overlap.
+
+		Returns top_k similar articles and a proceed/review recommendation.
+		Similarity threshold for duplicate flag: 0.5.
+		"""
+		await asyncio.sleep(0)
+		self._require_tenant(tenant_id)
+		candidate = set((title + " " + body).lower().split())
+		scored: list[tuple[float, dict[str, Any]]] = []
+		for article in self._articles.values():
+			if article.tenant_id != tenant_id:
+				continue
+			tokens = set((article.title + " " + article.body).lower().split())
+			union = len(candidate | tokens)
+			if union == 0:
+				continue
+			j = len(candidate & tokens) / union
+			if j > 0.0:
+				scored.append((j, article.to_dict()))
+		scored.sort(key=lambda x: x[0], reverse=True)
+		top = [
+			{"article_id": d["id"], "title": d["title"], "similarity": round(s, 3)}
+			for s, d in scored[:top_k]
+		]
+		high = any(m["similarity"] >= 0.5 for m in top)
+		await asyncio.sleep(0)
+		return {
+			"tenant_id": tenant_id,
+			"duplicates_found": high,
+			"top_matches": top,
+			"recommendation": "review_existing_articles" if high else "proceed_with_creation",
+			"checked_at": utc_now_iso(),
 		}
 
 	def _list(self, store: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:

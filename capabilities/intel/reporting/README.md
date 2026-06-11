@@ -8,6 +8,7 @@ lifecycle checks, UI models, and provider-neutral AI-agent support.
 
 ## What It Provides
 
+### Core Workflows
 - `reporting_authority_workflow`
 - `reporting_workspace_workflow`
 - `reporting_template_workflow`
@@ -20,59 +21,133 @@ lifecycle checks, UI models, and provider-neutral AI-agent support.
 - `reporting_review_workflow`
 - `reporting_agent_workflow`
 
-## Using The Service
+### Async Lifecycle Methods
+- `create_report` / `add_section` / `add_intelligence_item`
+- `peer_review` / `approve_report` / `disseminate_report`
+- `archive_report` / `report_archive_batch`
+- `report_feedback` / `analytic_judgment` / `key_judgment`
+- `caveat_add`
+- `report_search` / `report_search_advanced`
+- `reporting_analytics` / `report_analytics_extended`
+- `get_report_state` / `report_index` / `pending_approvals`
+- `citation_integrity_check` / `intelligence_score`
+- `dissemination_track` / `template_usage_report`
+- `report_workflow` (end-to-end orchestration)
+
+### Advanced Methods (v1.2)
+- `version_report` — immutable snapshot of product + sections + citations
+- `diff_versions` — structured diff between two version snapshots
+- `register_kiq` / `answer_kiq` / `kiq_coverage_report` — Key Intelligence Question tracking
+- `redact_report` — produce a sanitised lower-classification copy
+- `subscription_register` / `subscription_events` — push/poll lifecycle change notifications
+- `report_classification_audit` — scan for classification mismatches
+- `review_sla_check` — identify peer-review items exceeding SLA threshold
+
+## Quick Start
 
 ```python
 from capabilities.intel.reporting import IntelligenceReportingService
 
-service = IntelligenceReportingService()
+service = IntelligenceReportingService(tenant_id="tenant-a", actor_id="analyst-1")
+
 authority = service.record_authority(
-    "auth-1",
-    "tenant-a",
-    "mission_order",
-    "scope-ref",
-    "confidential",
-    "approver-1",
-    "2026-12-31",
-    "authority-evidence",
+    "auth-1", "tenant-a", "mission_order",
+    "scope-ref", "confidential",
+    "approver-1", "2026-12-31", "authority-evidence",
 )
 workspace = service.record_workspace(
-    "workspace-1",
-    "tenant-a",
-    "threat_reporting",
-    "Threat Reporting",
-    "confidential",
-    authority["id"],
-    "workspace-evidence",
+    "ws-1", "tenant-a", "threat_reporting",
+    "Threat Reporting", "confidential",
+    authority["id"], "ws-evidence",
 )
+template = service.record_template(
+    "tmpl-1", "tenant-a", "ws-1",
+    "threat_report", "templates/threat.json",
+    "confidential", "tmpl-evidence",
+)
+
+import asyncio
+
+async def run():
+    # End-to-end workflow
+    result = await service.report_workflow(
+        "threat_report", "confidential",
+        "Q3 Threat Assessment", "analyst-1",
+        ["consumer-a", "consumer-b"],
+    )
+    print(result)
+
+asyncio.run(run())
 ```
 
-All write operations evaluate deterministic rules before mutation. Invalid
-authority, missing evidence, missing citations, missing approvals, unsupported
-taxonomies, non-Bytewax lifecycle routing, and unsafe AI-agent scopes raise
-`PermissionError`.
+## Classification Hierarchy
 
-## Generated Application Surfaces
+```
+unclassified < restricted < confidential < secret < top_secret
+```
 
-- `app.semantic_model()` returns an APG semantic model for compiler output.
-- `app.component_manifest()` returns a publishable component manifest.
-- `app.self_test()` verifies the package entrypoint and key invariants.
-- `api.py` exposes process-local helpers for generated applications.
-- `views.py` exposes dashboard, console, and agent-workbench view models.
+Child records (sections, redacted copies) may not exceed their parent product's
+classification without a recorded authority of type `classification_upgrade`.
+`redact_report` enforces downgrade via a recorded `classification_downgrade` authority.
+
+## Key Intelligence Questions (KIQ)
+
+Register formal requirements, tag reports against them, and track coverage:
+
+```python
+async def kiq_demo(svc):
+    await svc.register_kiq("kiq-1", "What is the threat actor's TTPs?", priority=1)
+    await svc.answer_kiq("kiq-1", "rpt_analyst-1_threat_report_20260601T120000")
+    coverage = await svc.kiq_coverage_report()
+    print(coverage["coverage_ratio"])
+```
+
+## Report Versioning
+
+```python
+snap = await service.version_report("rpt-abc")
+# ... make edits ...
+snap2 = await service.version_report("rpt-abc")
+diff = await service.diff_versions("rpt-abc", snap["version"], snap2["version"])
+```
+
+## Subscription Notifications
+
+```python
+sub = await service.subscription_register(
+    "consumer-a",
+    filters={"classification": "confidential", "product_type": "threat_report"},
+)
+# ... later ...
+events = await service.subscription_events("consumer-a")
+```
 
 ## Guardrails
 
-The capability denies uncited claims, classification downgrades, source
-fabrication, privacy bypasses, autonomous publication, unapproved
-distribution, and privileged agent actions without human approval. AI agents
-are first-class but bounded: supported runtimes are `codex`, `claude_code`,
-`opencode`, and `pi`.
+The capability denies:
+- Uncited claims
+- Classification downgrades without a recorded authority
+- Source fabrication
+- Privacy bypasses
+- Autonomous publication without human approval
+- Unapproved distribution
+- Privileged agent actions without human approval
+
+AI agents are first-class but bounded. Supported runtimes: `codex`,
+`claude_code`, `opencode`, `pi`.
+
+## Generated Application Surfaces
+
+- `app.semantic_model()` — APG semantic model for compiler output
+- `app.component_manifest()` — publishable component manifest
+- `app.self_test()` — verifies package entrypoint and key invariants
+- `api.py` — process-local helpers for generated applications
+- `views.py` — dashboard, console, and agent-workbench view models
 
 ## Verification
 
-Focused verification for this package covers Python compilation, app self-test,
-manifest JSON validation, package tests, APG inspect, APG publish-plan, package
+Focused verification covers Python compilation, app self-test, manifest JSON
+validation, package tests, APG inspect, APG publish-plan, package
 implementation audit, lifecycle audit, global implementation audit, strict
 package-artifact audit, stale-marker scan, disallowed messaging scan, and
 `git diff --check`.
-

@@ -1364,11 +1364,892 @@ class LoanManagementService:
 		return {
 			"service": "fin_lms",
 			"status": "healthy",
-			"version": "1.0.0",
+			"version": "1.1.0",
 			"adapters": {
 				"auth": type(self._auth).__name__,
 				"audit": type(self._audit).__name__,
 				"notify": type(self._notify).__name__,
 				"gl": type(self._gl).__name__,
 			},
+		}
+
+	# ── Improvement I1: Partial prepayment with configurable strategy ─────────
+
+	async def prepay_with_options(
+		self,
+		tenant_id: str,
+		loan_id: str,
+		amount: Decimal,
+		prepay_date: date,
+		payment_ref: str,
+		strategy: str = "reduce_tenor",
+	) -> dict[str, Any]:
+		"""Partial or full prepayment with explicit strategy for schedule rebuilding.
+
+		strategy:
+		  "reduce_tenor"      — advance future principal, shorten remaining term
+		  "reduce_instalment" — keep tenor, recalculate lower PMT
+		  "advance_next"      — apply surplus to next installment(s) only
+		"""
+		guard_tenant_id(tenant_id)
+		assert amount > ZERO, "prepayment amount must be positive"
+		assert strategy in ("reduce_tenor", "reduce_instalment", "advance_next"), \
+			f"unknown strategy {strategy!r}"
+
+		loan = await self._load_loan(tenant_id, loan_id)
+		if loan.status in (LoanStatus.CLOSED, LoanStatus.WRITTEN_OFF):
+			raise ValueError(f"Loan {loan_id} is {loan.status.value} — cannot prepay")
+
+		# Apply waterfall first (handles penalties/fees/interest portion)
+		waterfall_result = await self.record_repayment(
+			tenant_id=tenant_id,
+			loan_id=loan_id,
+			amount=amount,
+			payment_date=prepay_date,
+			payment_ref=payment_ref,
+			payment_method=PaymentMethod.BANK_TRANSFER,
+		)
+		# Re-load after waterfall
+		loan = await self._load_loan(tenant_id, loan_id)
+
+		if loan.status == LoanStatus.CLOSED:
+			log.info(_log_pretty_path("prepay_full_closure", tenant_id, loan_id))
+			return {**waterfall_result, "strategy": strategy, "new_schedule": [], "closed": True}
+
+		installments = [
+			i for i in await self._schedules.get_installments(loan_id)
+			if i.get("status") != "paid"
+		]
+		remaining_tenor = len(installments)
+
+		if strategy == "reduce_tenor" or strategy == "advance_next":
+			# Re-amortise remaining balance over current remaining tenor
+			new_schedule = await self.generate_amortisation_schedule(
+				loan_id=loan_id,
+				principal=loan.outstanding_balance,
+				rate=loan.rate,
+				tenor_months=max(1, remaining_tenor),
+				method=loan.method,
+				first_payment_date=_add_months(prepay_date, 1),
+			)
+		else:  # reduce_instalment — same tenor but lower PMT
+			new_schedule = await self.generate_amortisation_schedule(
+				loan_id=loan_id,
+				principal=loan.outstanding_balance,
+				rate=loan.rate,
+				tenor_months=max(1, remaining_tenor),
+				method=AmortisationMethod.FRENCH_ANNUITY,
+				first_payment_date=_add_months(prepay_date, 1),
+			)
+
+		await self._audit.log_event(
+			"prepayment_with_strategy", "system", tenant_id, loan_id,
+			{"amount": str(amount), "strategy": strategy, "ref": payment_ref},
+		)
+		log.info(_log_pretty_path(f"prepay strategy={strategy}", tenant_id, loan_id))
+
+		return {
+			"loan_id": loan_id,
+			"prepaid_amount": str(amount),
+			"strategy": strategy,
+			"remaining_balance": str(loan.outstanding_balance),
+			"new_schedule": new_schedule,
+			"waterfall": waterfall_result["allocated"],
+		}
+
+	# ── Improvement I2: Daily interest accrual engine ────────────────────────
+
+	async def accrue_daily_interest(
+		self,
+		tenant_id: str,
+		as_of_date: date,
+	) -> dict[str, Any]:
+		"""IFRS 9 daily interest accrual batch.
+
+		For every active loan, computes `balance × EIR / 365` for each day since
+		the loan's `last_accrual_date` and posts:
+		  DR Accrued Interest Receivable (1210)
+		  CR Interest Income              (4100)
+
+		Idempotent: skips loans where `last_accrual_date >= as_of_date`.
+		"""
+		guard_tenant_id(tenant_id)
+		loans_raw = await self._loans.list_by_tenant(tenant_id)
+
+		accrued_count = 0
+		total_accrued = ZERO
+		errors = 0
+
+		for lr in loans_raw:
+			if lr.get("status") in ("closed", "written_off", "recovered"):
+				continue
+			try:
+				loan = await self._load_loan(tenant_id, lr["id"])
+				last_accrual_raw = lr.get("last_accrual_date")
+				if last_accrual_raw:
+					last_accrual = date.fromisoformat(str(last_accrual_raw))
+				else:
+					last_accrual = loan.disbursement_date or as_of_date
+				if last_accrual >= as_of_date:
+					continue  # already accrued up to date
+
+				days = (as_of_date - last_accrual).days
+				if days <= 0:
+					continue
+
+				daily_rate = _r4(loan.rate / Decimal("365"))
+				accrual_amount = _r2(loan.outstanding_balance * daily_rate * Decimal(str(days)))
+				if accrual_amount <= ZERO:
+					continue
+
+				gl_id = await self._post_gl(
+					tenant_id=tenant_id,
+					loan_id=loan.id,
+					entry_type="interest_accrual",
+					description=f"Daily interest accrual {last_accrual.isoformat()} to {as_of_date.isoformat()}",
+					dr_account="1210",  # Accrued Interest Receivable
+					cr_account="4100",  # Interest Income
+					amount=accrual_amount,
+					posting_date=as_of_date,
+				)
+
+				# Persist last_accrual_date on the loan record
+				loan_dict = loan.model_dump()
+				loan_dict["last_accrual_date"] = as_of_date.isoformat()
+				loan_dict["accrued_interest"] = str(
+					_d(loan_dict.get("accrued_interest") or 0) + accrual_amount
+				)
+				await self._loans.save(loan_dict)
+
+				total_accrued += accrual_amount
+				accrued_count += 1
+				log.info(_log_pretty_path(
+					f"accrual days={days} amount={accrual_amount}", tenant_id, loan.id
+				))
+			except Exception as exc:
+				log.warning(_log_pretty_path("accrual_error", tenant_id, lr["id"]), exc_info=exc)
+				errors += 1
+
+		log.info(_log_pretty_path(
+			f"accrue_daily_interest processed={accrued_count} errors={errors} total={total_accrued}",
+			tenant_id, as_of_date.isoformat(),
+		))
+		return {
+			"tenant_id": tenant_id,
+			"as_of_date": as_of_date.isoformat(),
+			"accrued_count": accrued_count,
+			"total_accrued": str(_r2(total_accrued)),
+			"errors": errors,
+		}
+
+	# ── Improvement I3: EIR / XIRR calculation ───────────────────────────────
+
+	async def calculate_eir(
+		self,
+		tenant_id: str,
+		loan_id: str,
+		origination_fees: Decimal = ZERO,
+		transaction_costs: Decimal = ZERO,
+	) -> dict[str, Any]:
+		"""Calculate Effective Interest Rate (EIR) per IFRS 9 amortised cost.
+
+		Solves for the rate r that satisfies:
+		  net_proceeds = sum(CF_t / (1+r)^t)
+		where net_proceeds = principal - origination_fees - transaction_costs
+		and CF_t are the scheduled installment cashflows.
+
+		Uses Newton-Raphson iteration (max 200 iterations, tol=1e-8).
+		"""
+		guard_tenant_id(tenant_id)
+		loan = await self._load_loan(tenant_id, loan_id)
+		installments = await self._schedules.get_installments(loan_id)
+
+		net_proceeds = loan.principal - origination_fees - transaction_costs
+		assert net_proceeds > ZERO, "net_proceeds must be positive after fees"
+
+		cashflows: list[Decimal] = [_d(i["total"]) for i in installments]
+		n = len(cashflows)
+		if n == 0:
+			raise ValueError(f"No schedule found for loan {loan_id}")
+
+		# Newton-Raphson solver on monthly rate r_m
+		r_m = loan.rate / Decimal("12")  # initial guess = contractual monthly rate
+		tol = Decimal("1e-8")
+		for _iteration in range(200):
+			pv = ZERO
+			dpv = ZERO
+			for t, cf in enumerate(cashflows, start=1):
+				discount = (ONE + r_m) ** t
+				pv  += cf / discount
+				dpv -= Decimal(str(t)) * cf / ((ONE + r_m) ** (t + 1))
+			f  = pv - net_proceeds
+			if dpv == ZERO:
+				break
+			r_m_new = r_m - f / dpv
+			if abs(r_m_new - r_m) < tol:
+				r_m = r_m_new
+				break
+			r_m = r_m_new
+
+		eir_annual = _r4((ONE + r_m) ** 12 - ONE)
+		total_interest = sum(cashflows) - loan.principal
+		total_cost_of_credit = total_interest + origination_fees + transaction_costs
+
+		ev = {
+			"_type": "eir_calculation",
+			"loan_id": loan_id,
+			"tenant_id": tenant_id,
+			"eir": str(eir_annual),
+			"origination_fees": str(origination_fees),
+			"transaction_costs": str(transaction_costs),
+			"total_cost_of_credit": str(_r2(total_cost_of_credit)),
+			"calculated_at": _now_iso(),
+		}
+		await self._events.save(ev)
+		log.info(_log_pretty_path(f"EIR={eir_annual:.4%}", tenant_id, loan_id))
+
+		return {
+			"loan_id": loan_id,
+			"contractual_rate": str(loan.rate),
+			"eir_annual": str(eir_annual),
+			"net_proceeds": str(_r2(net_proceeds)),
+			"total_interest": str(_r2(total_interest)),
+			"origination_fees": str(origination_fees),
+			"transaction_costs": str(transaction_costs),
+			"total_cost_of_credit": str(_r2(total_cost_of_credit)),
+		}
+
+	# ── Improvement I4: IFRS 9 ECL stage bucketing ──────────────────────────
+
+	async def compute_ecl_provision(
+		self,
+		tenant_id: str,
+		loan_id: str,
+		pd: Decimal,
+		lgd: Decimal,
+		ead: Decimal | None = None,
+		stage: int = 1,
+	) -> dict[str, Any]:
+		"""Compute IFRS 9 Expected Credit Loss (ECL) provision.
+
+		Stage 1 → 12-month ECL = PD_12m × LGD × EAD
+		Stage 2/3 → Lifetime ECL: sum PD_t × LGD × EAD discounted at EIR over
+		            remaining cashflows (simplified: use remaining installments).
+
+		pd  — Probability of Default (annual, decimal e.g. 0.05 = 5%)
+		lgd — Loss Given Default (decimal e.g. 0.40 = 40%)
+		ead — Exposure at Default; defaults to outstanding_balance
+		stage — IFRS 9 stage (1, 2, or 3)
+		"""
+		guard_tenant_id(tenant_id)
+		assert stage in (1, 2, 3), "stage must be 1, 2, or 3"
+		assert ZERO <= pd <= ONE, "pd must be between 0 and 1"
+		assert ZERO <= lgd <= ONE, "lgd must be between 0 and 1"
+
+		loan = await self._load_loan(tenant_id, loan_id)
+		if ead is None:
+			ead = loan.outstanding_balance
+
+		installments = [
+			i for i in await self._schedules.get_installments(loan_id)
+			if i.get("status") != "paid"
+		]
+
+		if stage == 1:
+			# 12-month PD only
+			pd_12m = ONE - (ONE - pd) ** (Decimal("1") / Decimal("12"))  # monthly PD
+			ecl = _r2(pd_12m * Decimal("12") * lgd * ead)
+		else:
+			# Lifetime ECL — sum over remaining period with monthly PD
+			pd_monthly = ONE - (ONE - pd) ** (Decimal("1") / Decimal("12"))
+			eir_monthly = loan.rate / Decimal("12")
+			ecl = ZERO
+			survival = ONE  # probability of not having defaulted yet
+			for t, inst in enumerate(installments, start=1):
+				cf_ead = _d(inst.get("balance", ead))
+				default_prob_t = survival * pd_monthly
+				discount = (ONE + eir_monthly) ** t
+				ecl += _r4(default_prob_t * lgd * cf_ead / discount)
+				survival *= (ONE - pd_monthly)
+			ecl = _r2(ecl)
+
+		stage_label = {1: "12-month ECL", 2: "Lifetime ECL (Stage 2)", 3: "Lifetime ECL (Stage 3)"}[stage]
+
+		ev = {
+			"_type": "ecl_provision",
+			"loan_id": loan_id,
+			"tenant_id": tenant_id,
+			"stage": stage,
+			"pd": str(pd),
+			"lgd": str(lgd),
+			"ead": str(ead),
+			"ecl": str(ecl),
+			"calculated_at": _now_iso(),
+		}
+		await self._events.save(ev)
+		log.info(_log_pretty_path(f"ECL stage={stage} ecl={ecl}", tenant_id, loan_id))
+
+		return {
+			"loan_id": loan_id,
+			"stage": stage,
+			"stage_label": stage_label,
+			"pd": str(pd),
+			"lgd": str(lgd),
+			"ead": str(ead),
+			"ecl": str(ecl),
+			"outstanding_balance": str(loan.outstanding_balance),
+		}
+
+	# ── Improvement I7: Loan top-up / additional drawdown ────────────────────
+
+	async def topup_loan(
+		self,
+		tenant_id: str,
+		loan_id: str,
+		additional_amount: Decimal,
+		topup_date: date,
+		approved_by: str,
+		approved_limit: Decimal | None = None,
+		disbursement_ref: str | None = None,
+	) -> dict[str, Any]:
+		"""Additional drawdown on an existing facility (top-up / revolving credit).
+
+		Validates additional_amount against approved_limit if supplied,
+		adds to outstanding_balance, regenerates schedule, posts GL.
+		"""
+		guard_tenant_id(tenant_id)
+		_guard_str(approved_by, "approved_by")
+		assert additional_amount > ZERO, "top-up amount must be positive"
+
+		loan = await self._load_loan(tenant_id, loan_id)
+		if loan.status in (LoanStatus.CLOSED, LoanStatus.WRITTEN_OFF):
+			raise ValueError(f"Loan {loan_id} is {loan.status.value} — cannot top-up")
+
+		if approved_limit is not None:
+			available = approved_limit - loan.outstanding_balance
+			if additional_amount > available:
+				raise ValueError(
+					f"Top-up {additional_amount} exceeds available facility headroom {available}"
+				)
+
+		topup_ref = disbursement_ref or f"TOPUP-{uuid7str()[:8].upper()}"
+		old_balance = loan.outstanding_balance
+		loan.outstanding_balance = _r2(old_balance + additional_amount)
+		loan.principal            = _r2(loan.principal + additional_amount)
+
+		installments = [
+			i for i in await self._schedules.get_installments(loan_id)
+			if i.get("status") != "paid"
+		]
+		remaining_tenor = max(1, len(installments))
+
+		new_schedule = await self.generate_amortisation_schedule(
+			loan_id=loan_id,
+			principal=loan.outstanding_balance,
+			rate=loan.rate,
+			tenor_months=remaining_tenor,
+			method=loan.method,
+			first_payment_date=_add_months(topup_date, 1),
+		)
+
+		gl_id = await self._post_gl(
+			tenant_id=tenant_id,
+			loan_id=loan_id,
+			entry_type="topup_disbursement",
+			description=f"Loan top-up {topup_ref} approved by {approved_by}",
+			dr_account="1200",  # Loans Receivable
+			cr_account="2100",  # Customer Account
+			amount=additional_amount,
+			posting_date=topup_date,
+			ref=topup_ref,
+		)
+
+		ev = {
+			"_type": "topup",
+			"loan_id": loan_id,
+			"tenant_id": tenant_id,
+			"additional_amount": str(additional_amount),
+			"old_balance": str(old_balance),
+			"new_balance": str(loan.outstanding_balance),
+			"topup_date": topup_date.isoformat(),
+			"approved_by": approved_by,
+			"gl_entry_id": gl_id,
+		}
+		await self._events.save(ev)
+		await self._save_loan(loan)
+		await self._audit.log_event(
+			"loan_topup", approved_by, tenant_id, loan_id,
+			{"additional_amount": str(additional_amount), "ref": topup_ref},
+		)
+		log.info(_log_pretty_path(
+			f"topup +{additional_amount} new_balance={loan.outstanding_balance}", tenant_id, loan_id
+		))
+
+		return {
+			"loan_id": loan_id,
+			"topup_ref": topup_ref,
+			"additional_amount": str(additional_amount),
+			"new_outstanding_balance": str(loan.outstanding_balance),
+			"gl_entry_id": gl_id,
+			"new_schedule": new_schedule,
+		}
+
+	# ── Improvement I8: Collateral registration and coverage ─────────────────
+
+	async def register_collateral(
+		self,
+		tenant_id: str,
+		loan_id: str,
+		collateral_type: str,
+		market_value: Decimal,
+		fsv: Decimal,
+		haircut_rate: Decimal,
+		valuation_date: date,
+		description: str = "",
+	) -> dict[str, Any]:
+		"""Register collateral securing a loan.
+
+		collateral_type — e.g. "land_title", "motor_vehicle", "shares", "cash_deposit"
+		market_value    — current open-market value
+		fsv             — Forced Sale Value (typically 70–80% of market)
+		haircut_rate    — additional regulatory haircut (e.g. 0.20 for shares)
+		valuation_date  — date of last formal valuation
+
+		Net collateral value = fsv × (1 - haircut_rate)
+		"""
+		guard_tenant_id(tenant_id)
+		_guard_str(collateral_type, "collateral_type")
+		assert market_value > ZERO, "market_value must be positive"
+		assert ZERO <= fsv <= market_value, "fsv must be <= market_value"
+		assert ZERO <= haircut_rate < ONE, "haircut_rate must be in [0, 1)"
+
+		# Verify loan exists
+		await self._load_loan(tenant_id, loan_id)
+
+		net_collateral_value = _r2(fsv * (ONE - haircut_rate))
+		collateral_id = uuid7str()
+
+		rec = {
+			"_type": "collateral",
+			"id": collateral_id,
+			"loan_id": loan_id,
+			"tenant_id": tenant_id,
+			"collateral_type": collateral_type,
+			"description": description,
+			"market_value": str(market_value),
+			"fsv": str(fsv),
+			"haircut_rate": str(haircut_rate),
+			"net_collateral_value": str(net_collateral_value),
+			"valuation_date": valuation_date.isoformat(),
+			"created_at": _now_iso(),
+		}
+		await self._events.save(rec)
+		await self._audit.log_event(
+			"collateral_registered", "system", tenant_id, loan_id,
+			{"collateral_type": collateral_type, "net_value": str(net_collateral_value)},
+		)
+		log.info(_log_pretty_path(
+			f"collateral {collateral_type} net={net_collateral_value}", tenant_id, loan_id
+		))
+
+		return {
+			"collateral_id": collateral_id,
+			"loan_id": loan_id,
+			"collateral_type": collateral_type,
+			"market_value": str(market_value),
+			"fsv": str(fsv),
+			"net_collateral_value": str(net_collateral_value),
+		}
+
+	async def get_collateral_coverage(
+		self,
+		tenant_id: str,
+		loan_id: str,
+	) -> dict[str, Any]:
+		"""Compute collateral coverage ratio and net-of-collateral exposure.
+
+		Net exposure = max(0, outstanding_balance - total_net_collateral_value)
+		Coverage ratio = total_net_collateral_value / outstanding_balance
+		"""
+		guard_tenant_id(tenant_id)
+		loan = await self._load_loan(tenant_id, loan_id)
+		events = await self._events.list_by_tenant(tenant_id)
+
+		collaterals = [
+			e for e in events
+			if e.get("_type") == "collateral" and e.get("loan_id") == loan_id
+		]
+		total_ncv = _r2(sum(_d(c.get("net_collateral_value", 0)) for c in collaterals))
+		outstanding = loan.outstanding_balance
+
+		def _ratio(n: Decimal, d: Decimal) -> Decimal:
+			return _r4(n / d) if d > ZERO else ZERO
+
+		net_exposure = _r2(max(ZERO, outstanding - total_ncv))
+		coverage_ratio = _ratio(total_ncv, outstanding)
+
+		return {
+			"loan_id": loan_id,
+			"outstanding_balance": str(outstanding),
+			"total_net_collateral_value": str(total_ncv),
+			"coverage_ratio": str(coverage_ratio),
+			"net_exposure": str(net_exposure),
+			"collateral_count": len(collaterals),
+			"collaterals": [
+				{
+					"id": c["id"],
+					"type": c["collateral_type"],
+					"market_value": c["market_value"],
+					"net_collateral_value": c["net_collateral_value"],
+					"valuation_date": c["valuation_date"],
+				}
+				for c in collaterals
+			],
+		}
+
+	# ── Improvement I9: Collections escalation ladder ────────────────────────
+
+	async def run_collections_escalation(
+		self,
+		tenant_id: str,
+		as_of_date: date,
+		policy: dict[int, str] | None = None,
+	) -> dict[str, Any]:
+		"""Automated collections escalation ladder for all in-arrears loans.
+
+		Default DPD → action mapping (override via `policy`):
+		  DPD  5 → REMINDER
+		  DPD 15 → FORMAL_DEMAND
+		  DPD 30 → LEGAL (formal legal notice)
+		  DPD 60 → refer_to_collections
+		  DPD 90 → NPA (no additional notice, already classified)
+
+		Idempotent: compares loan's `last_notice_type` against required stage
+		and only escalates if the new stage is strictly higher.
+		"""
+		guard_tenant_id(tenant_id)
+
+		_default_policy: dict[int, str] = {
+			5:  "REMINDER",
+			15: "FORMAL_DEMAND",
+			30: "LEGAL",
+			60: "COLLECTIONS_REFERRAL",
+			90: "NPA",
+		}
+		active_policy = policy or _default_policy
+		escalation_order = ["REMINDER", "FORMAL_DEMAND", "LEGAL", "COLLECTIONS_REFERRAL", "NPA"]
+
+		loans_raw = await self._loans.list_by_tenant(tenant_id)
+		escalated = 0
+		skipped   = 0
+		errors    = 0
+
+		for lr in loans_raw:
+			if lr.get("status") in ("closed", "written_off", "recovered"):
+				continue
+			dpd = int(lr.get("days_past_due") or 0)
+			if dpd == 0:
+				continue
+
+			# Determine required action for this DPD
+			required_action: str | None = None
+			for threshold in sorted(active_policy.keys(), reverse=True):
+				if dpd >= threshold:
+					required_action = active_policy[threshold]
+					break
+			if required_action is None:
+				skipped += 1
+				continue
+
+			# Check current escalation level
+			current_notice = lr.get("last_notice_type")
+			current_level = escalation_order.index(current_notice) if current_notice in escalation_order else -1
+			required_level = escalation_order.index(required_action) if required_action in escalation_order else -1
+
+			if required_level <= current_level:
+				skipped += 1
+				continue
+
+			try:
+				loan_id = lr["id"]
+				if required_action == "COLLECTIONS_REFERRAL":
+					await self.refer_to_collections(
+						tenant_id=tenant_id,
+						loan_id=loan_id,
+						referred_by="collections_escalation_bot",
+						notes=f"Auto-escalated at DPD {dpd} on {as_of_date.isoformat()}",
+					)
+				elif required_action != "NPA":
+					nt_map = {
+						"REMINDER": DemandNoticeType.REMINDER,
+						"FORMAL_DEMAND": DemandNoticeType.FORMAL_DEMAND,
+						"LEGAL": DemandNoticeType.LEGAL,
+					}
+					await self.send_demand_notice(
+						tenant_id=tenant_id,
+						loan_id=loan_id,
+						notice_type=nt_map[required_action],
+					)
+				escalated += 1
+				log.info(_log_pretty_path(
+					f"escalated dpd={dpd} action={required_action}", tenant_id, loan_id
+				))
+			except Exception as exc:
+				log.warning(_log_pretty_path("escalation_error", tenant_id, lr["id"]), exc_info=exc)
+				errors += 1
+
+		log.info(_log_pretty_path(
+			f"collections_escalation escalated={escalated} skipped={skipped} errors={errors}",
+			tenant_id, as_of_date.isoformat(),
+		))
+		return {
+			"tenant_id": tenant_id,
+			"as_of_date": as_of_date.isoformat(),
+			"escalated": escalated,
+			"skipped": skipped,
+			"errors": errors,
+		}
+
+	# ── Improvement I10: Fee schedule engine ─────────────────────────────────
+
+	async def apply_fee(
+		self,
+		tenant_id: str,
+		loan_id: str,
+		fee_type: str,
+		amount: Decimal,
+		due_date: date,
+		description: str = "",
+		defer_to_eir: bool = False,
+	) -> dict[str, Any]:
+		"""Apply a structured fee to a loan.
+
+		fee_type values: ORIGINATION, PROCESSING, ANNUAL_FACILITY, EXIT, INSURANCE
+		defer_to_eir — if True, the fee is deferred (IFRS 9 integral) and amortised
+		               over the loan life; if False, it is expensed immediately.
+
+		GL for immediate fee:
+		  DR Customer Account (2100) / CR Fee Income (4300)
+		GL for deferred fee:
+		  DR Deferred Fee Asset (1250) / CR Fee Income (4300)  [amortised over tenor]
+		"""
+		guard_tenant_id(tenant_id)
+		_guard_str(fee_type, "fee_type")
+		assert amount > ZERO, "fee amount must be positive"
+
+		loan = await self._load_loan(tenant_id, loan_id)
+		fee_id = uuid7str()
+
+		dr_account = "1250" if defer_to_eir else "2100"
+		cr_account = "4300"  # Fee Income
+
+		gl_id = await self._post_gl(
+			tenant_id=tenant_id,
+			loan_id=loan_id,
+			entry_type="fee",
+			description=description or f"{fee_type} fee",
+			dr_account=dr_account,
+			cr_account=cr_account,
+			amount=amount,
+			posting_date=due_date,
+		)
+
+		fee_rec = {
+			"_type": "fee",
+			"id": fee_id,
+			"loan_id": loan_id,
+			"tenant_id": tenant_id,
+			"fee_type": fee_type,
+			"amount": str(amount),
+			"due_date": due_date.isoformat(),
+			"deferred": defer_to_eir,
+			"amortised_amount": "0",
+			"description": description,
+			"gl_entry_id": gl_id,
+			"created_at": _now_iso(),
+		}
+		await self._events.save(fee_rec)
+
+		# Add to loan's total_fees for waterfall clearing
+		if not defer_to_eir:
+			loan.total_fees += amount
+		await self._save_loan(loan)
+
+		await self._audit.log_event(
+			"fee_applied", "system", tenant_id, loan_id,
+			{"fee_type": fee_type, "amount": str(amount), "deferred": defer_to_eir},
+		)
+		log.info(_log_pretty_path(f"fee {fee_type}={amount} deferred={defer_to_eir}", tenant_id, loan_id))
+
+		return {
+			"fee_id": fee_id,
+			"loan_id": loan_id,
+			"fee_type": fee_type,
+			"amount": str(amount),
+			"deferred": defer_to_eir,
+			"gl_entry_id": gl_id,
+		}
+
+	# ── Improvement I13: Regulatory reporting pack ───────────────────────────
+
+	async def generate_cbk_loan_register(
+		self,
+		tenant_id: str,
+		reporting_date: date,
+	) -> dict[str, Any]:
+		"""Generate CBK Form CBK-LR1 loan register for statutory submission.
+
+		Each row contains the mandatory CBK fields:
+		  loan_id, customer_id, product_code, outstanding_balance,
+		  classification, days_past_due, provision_rate, required_provision,
+		  currency, disbursement_date, maturity_date, status
+		"""
+		guard_tenant_id(tenant_id)
+		loans_raw = await self._loans.list_by_tenant(tenant_id)
+		events = await self._events.list_by_tenant(tenant_id)
+
+		rows: list[dict[str, Any]] = []
+		total_portfolio = ZERO
+		total_provisions_required = ZERO
+
+		for lr in loans_raw:
+			outstanding = _d(lr.get("outstanding_balance", 0))
+			dpd         = int(lr.get("days_past_due") or 0)
+			classification = _classify_by_dpd(dpd)
+			prov_rate   = CBK_PROVISION_RATES[classification]
+			required    = _r2(outstanding * prov_rate)
+
+			# Posted provision for this loan
+			loan_provisions = [
+				e for e in events
+				if e.get("_type") == "provision" and e.get("loan_id") == lr["id"]
+			]
+			posted = _r2(sum(_d(p.get("posted_provision", 0)) for p in loan_provisions))
+
+			row = {
+				"loan_id":             lr["id"],
+				"customer_id":         lr.get("customer_id"),
+				"product_code":        lr.get("product_code"),
+				"currency":            lr.get("currency", "KES"),
+				"outstanding_balance": str(outstanding),
+				"days_past_due":       dpd,
+				"classification":      classification.value,
+				"provision_rate":      str(prov_rate),
+				"required_provision":  str(required),
+				"posted_provision":    str(posted),
+				"provision_shortfall": str(max(ZERO, required - posted)),
+				"status":              lr.get("status"),
+				"disbursement_date":   str(lr.get("disbursement_date") or ""),
+				"maturity_date":       str(lr.get("maturity_date") or ""),
+				"npa_flag":            1 if dpd >= 90 else 0,
+			}
+			rows.append(row)
+			total_portfolio          += outstanding
+			total_provisions_required += required
+
+		# Data quality checks
+		dq_issues: list[str] = []
+		for r in rows:
+			if not r["customer_id"]:
+				dq_issues.append(f"loan {r['loan_id']}: missing customer_id")
+			if not r["disbursement_date"]:
+				dq_issues.append(f"loan {r['loan_id']}: missing disbursement_date")
+
+		log.info(_log_pretty_path(
+			f"CBK_LR1 loans={len(rows)} total={_r2(total_portfolio)}",
+			tenant_id, reporting_date.isoformat(),
+		))
+
+		return {
+			"form":              "CBK-LR1",
+			"tenant_id":         tenant_id,
+			"reporting_date":    reporting_date.isoformat(),
+			"total_loans":       len(rows),
+			"total_portfolio":   str(_r2(total_portfolio)),
+			"total_provisions_required": str(_r2(total_provisions_required)),
+			"data_quality_issues": dq_issues,
+			"rows":              rows,
+		}
+
+	# ── Improvement I14: Multi-currency FX revaluation ───────────────────────
+
+	async def revalue_fx_loan(
+		self,
+		tenant_id: str,
+		loan_id: str,
+		spot_rate: Decimal,
+		revaluation_date: date,
+		base_currency: str = "KES",
+	) -> dict[str, Any]:
+		"""Revalue a foreign-currency loan to the base currency at spot rate.
+
+		DR/CR Loans Receivable Translated (1200)  by delta
+		CR/DR FX Translation Reserve (3100)        by delta
+
+		If kes_equivalent increases (currency appreciated): DR 1200 / CR 3100 (FX gain)
+		If kes_equivalent decreases (currency depreciated): DR 3100 / CR 1200 (FX loss)
+		"""
+		guard_tenant_id(tenant_id)
+		assert spot_rate > ZERO, "spot_rate must be positive"
+
+		loan = await self._load_loan(tenant_id, loan_id)
+		if loan.currency == base_currency:
+			return {
+				"loan_id": loan_id,
+				"message": f"Loan is already denominated in {base_currency} — no revaluation required",
+				"fx_gain_loss": "0",
+			}
+
+		loan_dict = loan.model_dump()
+		prior_rate = _d(loan_dict.get("last_revaluation_rate") or spot_rate)
+		prior_kes  = _r2(loan.outstanding_balance * prior_rate)
+		new_kes    = _r2(loan.outstanding_balance * spot_rate)
+		delta      = _r2(new_kes - prior_kes)
+
+		if delta != ZERO:
+			gain = delta > ZERO
+			gl_id = await self._post_gl(
+				tenant_id=tenant_id,
+				loan_id=loan_id,
+				entry_type="fx_revaluation",
+				description=(
+					f"FX revaluation {loan.currency}/{base_currency} "
+					f"@ {spot_rate} on {revaluation_date.isoformat()}"
+				),
+				dr_account="1200" if gain else "3100",   # Loans Receivable or FX Reserve
+				cr_account="3100" if gain else "1200",   # FX Reserve or Loans Receivable
+				amount=abs(delta),
+				posting_date=revaluation_date,
+				currency=loan.currency,
+			)
+		else:
+			gl_id = None
+
+		# Persist revaluation state on the loan record
+		loan_dict["last_revaluation_rate"] = str(spot_rate)
+		loan_dict["last_revaluation_date"] = revaluation_date.isoformat()
+		loan_dict["kes_equivalent"]        = str(new_kes)
+		await self._loans.save(loan_dict)
+
+		await self._audit.log_event(
+			"fx_revaluation", "system", tenant_id, loan_id,
+			{"spot_rate": str(spot_rate), "delta_kes": str(delta)},
+		)
+		log.info(_log_pretty_path(
+			f"FX revalue {loan.currency}→{base_currency} rate={spot_rate} delta={delta}",
+			tenant_id, loan_id,
+		))
+
+		return {
+			"loan_id":          loan_id,
+			"loan_currency":    loan.currency,
+			"base_currency":    base_currency,
+			"spot_rate":        str(spot_rate),
+			"prior_rate":       str(prior_rate),
+			"outstanding_ccy":  str(loan.outstanding_balance),
+			"prior_kes":        str(prior_kes),
+			"new_kes":          str(new_kes),
+			"fx_gain_loss":     str(delta),
+			"gain_or_loss":     "gain" if delta > ZERO else ("loss" if delta < ZERO else "nil"),
+			"gl_entry_id":      gl_id,
 		}

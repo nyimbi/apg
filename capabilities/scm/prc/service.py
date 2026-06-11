@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -16,6 +18,13 @@ CAPABILITY_ID = "scm_prc"
 PO_STATUSES = {"draft", "sent", "acknowledged", "partially_received", "received", "invoiced", "closed", "cancelled"}
 RFQ_STATUSES = {"draft", "issued", "responses_received", "awarded", "cancelled"}
 MATCH_RESULTS = {"matched", "partial", "disputed"}
+CONTRACT_ALERT_THRESHOLDS = (0.80, 0.95)  # fractions of contract value
+DEFAULT_SLA_HOURS: dict[str, int] = {
+	"po_acknowledgement": 48,
+	"disputed_invoice_resolution": 120,
+	"rfq_response": 168,
+	"goods_receipt": 72,
+}
 
 
 class ProcurementService:
@@ -32,9 +41,12 @@ class ProcurementService:
 		self.vendor_evaluations: dict[str, dict[str, Any]] = {}
 		self.contracts: dict[str, dict[str, Any]] = {}
 		self.spend_records: dict[str, dict[str, Any]] = {}
+		self.exchange_rates: dict[str, float] = {}  # "USD/KES": 130.5
+		self.sla_config: dict[str, int] = dict(DEFAULT_SLA_HOURS)  # overridable per tenant
 		self._rfq_seq: int = 5000
 		self._po_seq: int = 8000
 		self._audit_events: list[dict[str, Any]] = []
+		self._audit_chain_hash: str = ""  # tamper-evident chain
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -57,7 +69,7 @@ class ProcurementService:
 		return f"PO-{tenant[:4].upper()}-{self._po_seq:06d}"
 
 	def _emit(self, tenant_id: str, event_type: str, record_id: str, record_type: str, status: str) -> None:
-		self._audit_events.append({
+		event: dict[str, Any] = {
 			"tenant_id": tenant_id,
 			"event_type": event_type,
 			"record_id": record_id,
@@ -65,7 +77,12 @@ class ProcurementService:
 			"status": status,
 			"capability_id": CAPABILITY_ID,
 			"emitted_at": self._now(),
-		})
+			"prev_hash": self._audit_chain_hash,
+		}
+		event_bytes = json.dumps(event, sort_keys=True).encode()
+		self._audit_chain_hash = hashlib.sha256(event_bytes).hexdigest()
+		event["hash"] = self._audit_chain_hash
+		self._audit_events.append(event)
 
 	# ── Health & describe ─────────────────────────────────────────────────────
 
@@ -649,3 +666,513 @@ class ProcurementService:
 			else:
 				results.append(item)
 		return {"created": len(results), "failed": len(errors), "purchase_orders": results, "errors": errors}
+
+	# ── Contract spend-down tracking ──────────────────────────────────────────
+
+	async def get_contract_spend_status(
+		self,
+		contract_id: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Return consumed vs ceiling value for a contract and emit alerts at 80%/95%.
+
+		Aggregates all non-cancelled POs raised against vendors covered by the contract
+		that were created after the contract start date and before the contract end date.
+		"""
+		tenant = self._tenant(tenant_id)
+		contract = self.contracts.get(contract_id)
+		if not contract or contract["tenant_id"] != tenant:
+			raise KeyError(f"contract '{contract_id}' not found")
+
+		consumed = sum(
+			p["total_value"]
+			for p in self.purchase_orders.values()
+			if p["tenant_id"] == tenant
+			and p["vendor_id"] == contract["vendor_id"]
+			and p["status"] not in {"cancelled"}
+			and p["created_at"] >= contract["start_date"]
+			and p["created_at"] <= contract["end_date"]
+		)
+		ceiling = contract["value"]
+		utilisation = round(consumed / ceiling, 4) if ceiling else 0.0
+		alert_level: str | None = None
+		for threshold in sorted(CONTRACT_ALERT_THRESHOLDS, reverse=True):
+			if utilisation >= threshold:
+				alert_level = f"{int(threshold * 100)}pct"
+				self._emit(
+					tenant,
+					f"contract_nearing_limit_{alert_level}",
+					contract_id,
+					"scm_prc_contract",
+					"active",
+				)
+				break
+
+		return {
+			"contract_id": contract_id,
+			"vendor_id": contract["vendor_id"],
+			"ceiling": ceiling,
+			"currency": contract["currency"],
+			"consumed": round(consumed, 4),
+			"remaining": round(ceiling - consumed, 4),
+			"utilisation_pct": round(utilisation * 100, 2),
+			"alert_level": alert_level,
+			"checked_at": self._now(),
+		}
+
+	# ── RFQ comparative scoring ───────────────────────────────────────────────
+
+	async def score_rfq_responses(
+		self,
+		rfq_id: str,
+		weights: dict[str, float] | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Produce a weighted scorecard across all vendor responses to an RFQ.
+
+		Default weights: price=0.50, lead_time=0.25, quality=0.15, sustainability=0.10.
+		Each response must carry the corresponding keys in its ``quoted_lines`` or at
+		the top-level response dict (callers can set ``lead_time_days``, ``quality_score``,
+		``sustainability_score`` when recording responses).
+		Returns ranked recommendations with scores and an auditable rationale.
+		"""
+		tenant = self._tenant(tenant_id)
+		rfq = self.rfqs.get(rfq_id)
+		if not rfq or rfq["tenant_id"] != tenant:
+			raise KeyError(f"rfq '{rfq_id}' not found")
+
+		w = {"price": 0.50, "lead_time": 0.25, "quality": 0.15, "sustainability": 0.10}
+		if weights:
+			w.update(weights)
+		total_w = sum(w.values())
+		if abs(total_w - 1.0) > 1e-6:
+			raise ValueError(f"weights must sum to 1.0 (got {total_w})")
+
+		responses = [
+			deepcopy(r)
+			for r in self.rfq_responses.values()
+			if r["tenant_id"] == tenant and r["rfq_id"] == rfq_id
+		]
+		if not responses:
+			return {"rfq_id": rfq_id, "ranked": [], "weights": w, "scored_at": self._now()}
+
+		# normalise price (lower is better → invert)
+		prices = [r["total_quoted_amount"] for r in responses]
+		min_price, max_price = min(prices), max(prices)
+		price_range = (max_price - min_price) or 1.0
+
+		scored = []
+		for r in responses:
+			price_norm = 1.0 - (r["total_quoted_amount"] - min_price) / price_range  # 1 = best price
+			lead_time_days = float(r.get("lead_time_days", 14))
+			lead_norm = max(0.0, 1.0 - lead_time_days / 60.0)  # cap at 60 days
+			quality_norm = float(r.get("quality_score", 5.0)) / 10.0
+			sustainability_norm = float(r.get("sustainability_score", 5.0)) / 10.0
+
+			composite = round(
+				w["price"] * price_norm
+				+ w["lead_time"] * lead_norm
+				+ w["quality"] * quality_norm
+				+ w["sustainability"] * sustainability_norm,
+				4,
+			)
+			scored.append({
+				"response_id": r["id"],
+				"vendor_id": r["vendor_id"],
+				"total_quoted_amount": r["total_quoted_amount"],
+				"currency": r["currency"],
+				"lead_time_days": lead_time_days,
+				"quality_score": quality_norm * 10,
+				"sustainability_score": sustainability_norm * 10,
+				"composite_score": composite,
+			})
+
+		ranked = sorted(scored, key=lambda x: x["composite_score"], reverse=True)
+		for i, entry in enumerate(ranked):
+			entry["rank"] = i + 1
+
+		return {
+			"rfq_id": rfq_id,
+			"weights": w,
+			"ranked": ranked,
+			"recommended_vendor": ranked[0]["vendor_id"] if ranked else None,
+			"scored_at": self._now(),
+		}
+
+	# ── Multi-currency normalisation ──────────────────────────────────────────
+
+	async def set_exchange_rate(
+		self,
+		from_currency: str,
+		to_currency: str,
+		rate: float,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Store a dated exchange rate for multi-currency spend normalisation.
+
+		Rates are stored as ``FROM/TO`` keys (e.g. ``"EUR/USD": 1.08``).
+		A reverse rate is derived automatically.
+		"""
+		tenant = self._tenant(tenant_id)
+		if rate <= 0:
+			raise ValueError("exchange rate must be positive")
+		key = f"{from_currency.upper()}/{to_currency.upper()}"
+		rev_key = f"{to_currency.upper()}/{from_currency.upper()}"
+		self.exchange_rates[key] = round(rate, 6)
+		self.exchange_rates[rev_key] = round(1.0 / rate, 6)
+		self._emit(tenant, "exchange_rate_updated", key, "scm_prc_exchange_rate", "active")
+		return {"key": key, "rate": self.exchange_rates[key], "reverse_key": rev_key, "reverse_rate": self.exchange_rates[rev_key], "updated_at": self._now()}
+
+	async def normalised_spend_analytics(
+		self,
+		reporting_currency: str = "USD",
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Aggregate spend normalised to a single reporting currency.
+
+		For each PO, converts ``total_value`` from its transaction currency to
+		``reporting_currency`` using stored exchange rates.  POs whose currency
+		has no stored rate are included in a ``unconverted`` bucket with the
+		original amount and currency noted.
+		"""
+		tenant = self._tenant(tenant_id)
+		reporting_currency = reporting_currency.upper()
+		by_vendor: dict[str, float] = {}
+		unconverted: list[dict[str, Any]] = []
+		total_normalised = 0.0
+
+		for p in self.purchase_orders.values():
+			if p["tenant_id"] != tenant or p["status"] == "cancelled":
+				continue
+			tx_currency = p.get("currency", "USD").upper()
+			value = p["total_value"]
+			if tx_currency == reporting_currency:
+				normalised = value
+			else:
+				rate_key = f"{tx_currency}/{reporting_currency}"
+				rate = self.exchange_rates.get(rate_key)
+				if rate is None:
+					unconverted.append({"po_id": p["id"], "currency": tx_currency, "amount": value})
+					continue
+				normalised = round(value * rate, 4)
+			total_normalised += normalised
+			by_vendor[p["vendor_id"]] = round(by_vendor.get(p["vendor_id"], 0.0) + normalised, 4)
+
+		top_vendors = sorted(by_vendor.items(), key=lambda x: x[1], reverse=True)[:5]
+		return {
+			"tenant_id": tenant,
+			"reporting_currency": reporting_currency,
+			"total_normalised_spend": round(total_normalised, 2),
+			"by_vendor": by_vendor,
+			"top_vendors": [{"vendor_id": v, "spend": s} for v, s in top_vendors],
+			"unconverted_pos": unconverted,
+			"generated_at": self._now(),
+		}
+
+	# ── SLA monitoring ────────────────────────────────────────────────────────
+
+	async def configure_sla(
+		self,
+		sla_config: dict[str, int],
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Override default SLA hours for this service instance.
+
+		Valid keys: ``po_acknowledgement``, ``disputed_invoice_resolution``,
+		``rfq_response``, ``goods_receipt``.  Values are hours (int > 0).
+		"""
+		tenant = self._tenant(tenant_id)
+		valid_keys = set(DEFAULT_SLA_HOURS.keys())
+		for k, v in sla_config.items():
+			if k not in valid_keys:
+				raise ValueError(f"unknown SLA key '{k}'; valid: {sorted(valid_keys)}")
+			if not isinstance(v, int) or v <= 0:
+				raise ValueError(f"SLA value for '{k}' must be a positive integer (hours)")
+			self.sla_config[k] = v
+		self._emit(tenant, "sla_config_updated", "sla", "scm_prc_sla", "active")
+		return {"sla_config": dict(self.sla_config), "updated_at": self._now()}
+
+	async def check_sla_breaches(self, tenant_id: str | None = None) -> dict[str, Any]:
+		"""Scan all open documents for SLA breaches and near-misses.
+
+		Returns per-document status: ``ok``, ``warning`` (>75% of SLA elapsed),
+		or ``breached`` (elapsed > SLA).  Only evaluates documents in transitional
+		states where a response is still awaited.
+		"""
+		tenant = self._tenant(tenant_id)
+		now_dt = datetime.now(timezone.utc)
+
+		def _elapsed_hours(ts: str | None) -> float:
+			if not ts:
+				return 0.0
+			try:
+				dt = datetime.fromisoformat(ts.rstrip("Z")).replace(tzinfo=timezone.utc)
+				return (now_dt - dt).total_seconds() / 3600
+			except Exception:
+				return 0.0
+
+		def _classify(elapsed: float, sla_hours: int) -> str:
+			ratio = elapsed / sla_hours if sla_hours else 0.0
+			if ratio > 1.0:
+				return "breached"
+			if ratio > 0.75:
+				return "warning"
+			return "ok"
+
+		breaches: list[dict[str, Any]] = []
+
+		# POs waiting for acknowledgement
+		for po in self.purchase_orders.values():
+			if po["tenant_id"] != tenant or po["status"] != "sent":
+				continue
+			elapsed = _elapsed_hours(po.get("sent_at"))
+			sla = self.sla_config["po_acknowledgement"]
+			status = _classify(elapsed, sla)
+			if status != "ok":
+				breaches.append({
+					"type": "po_acknowledgement",
+					"record_id": po["id"],
+					"po_number": po.get("po_number"),
+					"vendor_id": po["vendor_id"],
+					"elapsed_hours": round(elapsed, 1),
+					"sla_hours": sla,
+					"status": status,
+				})
+
+		# Disputed three-way matches waiting for resolution
+		for m in self.three_way_matches.values():
+			if m["tenant_id"] != tenant or m["status"] not in {"pending"}:
+				continue
+			elapsed = _elapsed_hours(m.get("created_at"))
+			sla = self.sla_config["disputed_invoice_resolution"]
+			status = _classify(elapsed, sla)
+			if status != "ok":
+				breaches.append({
+					"type": "disputed_invoice_resolution",
+					"record_id": m["id"],
+					"invoice_number": m.get("invoice_number"),
+					"match_result": m.get("match_result"),
+					"elapsed_hours": round(elapsed, 1),
+					"sla_hours": sla,
+					"status": status,
+				})
+
+		# Issued RFQs with no responses yet
+		for rfq in self.rfqs.values():
+			if rfq["tenant_id"] != tenant or rfq["status"] != "issued":
+				continue
+			elapsed = _elapsed_hours(rfq.get("issued_at"))
+			sla = self.sla_config["rfq_response"]
+			status = _classify(elapsed, sla)
+			if status != "ok":
+				breaches.append({
+					"type": "rfq_response",
+					"record_id": rfq["id"],
+					"rfq_number": rfq.get("rfq_number"),
+					"elapsed_hours": round(elapsed, 1),
+					"sla_hours": sla,
+					"status": status,
+				})
+
+		return {
+			"tenant_id": tenant,
+			"total_issues": len(breaches),
+			"breached": [b for b in breaches if b["status"] == "breached"],
+			"warnings": [b for b in breaches if b["status"] == "warning"],
+			"checked_at": self._now(),
+		}
+
+	# ── Tamper-evident audit verification ─────────────────────────────────────
+
+	async def verify_audit_chain(self, tenant_id: str | None = None) -> dict[str, Any]:
+		"""Verify the SHA-256 chain integrity of all audit events for a tenant.
+
+		Recomputes each event's hash from its content and the previous event's hash.
+		Returns ``valid=True`` only if every link in the chain is intact, making
+		unauthorised event deletion or modification detectable.
+		"""
+		tenant = self._tenant(tenant_id)
+		events = [e for e in self._audit_events if e["tenant_id"] == tenant]
+		if not events:
+			return {"valid": True, "event_count": 0, "checked_at": self._now()}
+
+		prev_hash = ""
+		broken_at: int | None = None
+		for i, event in enumerate(events):
+			check_event = {k: v for k, v in event.items() if k != "hash"}
+			check_event["prev_hash"] = prev_hash
+			computed = hashlib.sha256(json.dumps(check_event, sort_keys=True).encode()).hexdigest()
+			if computed != event.get("hash"):
+				broken_at = i
+				break
+			prev_hash = computed
+
+		return {
+			"valid": broken_at is None,
+			"event_count": len(events),
+			"broken_at_index": broken_at,
+			"checked_at": self._now(),
+		}
+
+	# ── Delivery schedule tracking ────────────────────────────────────────────
+
+	async def set_po_delivery_schedule(
+		self,
+		po_id: str,
+		schedule: list[dict[str, Any]],
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Attach a delivery schedule to a PO.
+
+		``schedule`` is a list of milestone dicts, each with keys:
+		  - ``sku``: str
+		  - ``expected_date``: ISO date string
+		  - ``expected_quantity``: float
+		  - ``actual_date``: str | None (populated on receipt)
+		  - ``actual_quantity``: float | None
+		"""
+		tenant = self._tenant(tenant_id)
+		po = self.purchase_orders.get(po_id)
+		if not po or po["tenant_id"] != tenant:
+			raise KeyError(f"po '{po_id}' not found")
+		for milestone in schedule:
+			if "sku" not in milestone or "expected_date" not in milestone:
+				raise ValueError("each schedule milestone requires 'sku' and 'expected_date'")
+		po["delivery_schedule"] = deepcopy(schedule)
+		po["updated_at"] = self._now()
+		self._emit(tenant, "po_delivery_schedule_set", po_id, "scm_prc_purchase_order", po["status"])
+		return deepcopy(po)
+
+	async def get_delivery_performance(
+		self,
+		tenant_id: str | None = None,
+		vendor_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Compute on-time delivery rate per vendor from PO delivery schedules.
+
+		A milestone is 'on time' when ``actual_date <= expected_date`` and
+		``actual_quantity >= expected_quantity``.  Milestones without an
+		``actual_date`` are counted as pending (not included in rate calculation).
+		"""
+		tenant = self._tenant(tenant_id)
+		vendor_stats: dict[str, dict[str, int]] = {}
+
+		for po in self.purchase_orders.values():
+			if po["tenant_id"] != tenant:
+				continue
+			if vendor_id and po["vendor_id"] != vendor_id:
+				continue
+			vnd = po["vendor_id"]
+			if vnd not in vendor_stats:
+				vendor_stats[vnd] = {"on_time": 0, "late": 0, "pending": 0}
+
+			for milestone in po.get("delivery_schedule", []):
+				actual_date = milestone.get("actual_date")
+				expected_date = milestone.get("expected_date", "")
+				actual_qty = float(milestone.get("actual_quantity") or 0.0)
+				expected_qty = float(milestone.get("expected_quantity", 0.0))
+				if not actual_date:
+					vendor_stats[vnd]["pending"] += 1
+					continue
+				if actual_date <= expected_date and actual_qty >= expected_qty:
+					vendor_stats[vnd]["on_time"] += 1
+				else:
+					vendor_stats[vnd]["late"] += 1
+
+		result_vendors = []
+		for vnd, stats in vendor_stats.items():
+			completed = stats["on_time"] + stats["late"]
+			otr = round(stats["on_time"] / completed * 100, 1) if completed else None
+			result_vendors.append({
+				"vendor_id": vnd,
+				"on_time": stats["on_time"],
+				"late": stats["late"],
+				"pending": stats["pending"],
+				"on_time_rate_pct": otr,
+			})
+
+		result_vendors.sort(key=lambda x: (x["on_time_rate_pct"] or -1), reverse=True)
+		return {
+			"tenant_id": tenant,
+			"vendors": result_vendors,
+			"generated_at": self._now(),
+		}
+
+	# ── Process cycle time analytics ──────────────────────────────────────────
+
+	async def procurement_cycle_times(self, tenant_id: str | None = None) -> dict[str, Any]:
+		"""Compute mean cycle times across key procurement process steps.
+
+		Measures:
+		  - ``rfq_to_award_hours``: RFQ created_at → awarded_at
+		  - ``po_draft_to_sent_hours``: PO created_at → sent_at
+		  - ``po_sent_to_acknowledged_hours``: sent_at → acknowledged_at
+		  - ``po_sent_to_received_hours``: sent_at → latest receipt created_at
+
+		Returns mean, min, max per step to surface bottlenecks.
+		"""
+		tenant = self._tenant(tenant_id)
+
+		def _hours_between(start: str | None, end: str | None) -> float | None:
+			if not start or not end:
+				return None
+			try:
+				s = datetime.fromisoformat(start.rstrip("Z")).replace(tzinfo=timezone.utc)
+				e = datetime.fromisoformat(end.rstrip("Z")).replace(tzinfo=timezone.utc)
+				return round((e - s).total_seconds() / 3600, 2)
+			except Exception:
+				return None
+
+		def _stats(values: list[float]) -> dict[str, float | None]:
+			if not values:
+				return {"mean": None, "min": None, "max": None, "count": 0}
+			return {
+				"mean": round(sum(values) / len(values), 2),
+				"min": round(min(values), 2),
+				"max": round(max(values), 2),
+				"count": len(values),
+			}
+
+		rfq_to_award: list[float] = []
+		for r in self.rfqs.values():
+			if r["tenant_id"] != tenant:
+				continue
+			h = _hours_between(r.get("created_at"), r.get("awarded_at"))
+			if h is not None:
+				rfq_to_award.append(h)
+
+		po_draft_to_sent: list[float] = []
+		po_sent_to_ack: list[float] = []
+		po_sent_to_received: list[float] = []
+
+		# build receipt lookup: po_id → earliest receipt timestamp
+		receipt_by_po: dict[str, str] = {}
+		for rcpt in self.receipts.values():
+			if rcpt["tenant_id"] != tenant:
+				continue
+			pid = rcpt["po_id"]
+			existing = receipt_by_po.get(pid)
+			if existing is None or rcpt["received_at"] < existing:
+				receipt_by_po[pid] = rcpt["received_at"]
+
+		for po in self.purchase_orders.values():
+			if po["tenant_id"] != tenant:
+				continue
+			h1 = _hours_between(po.get("created_at"), po.get("sent_at"))
+			if h1 is not None:
+				po_draft_to_sent.append(h1)
+			h2 = _hours_between(po.get("sent_at"), po.get("acknowledged_at"))
+			if h2 is not None:
+				po_sent_to_ack.append(h2)
+			h3 = _hours_between(po.get("sent_at"), receipt_by_po.get(po["id"]))
+			if h3 is not None:
+				po_sent_to_received.append(h3)
+
+		return {
+			"tenant_id": tenant,
+			"rfq_to_award_hours": _stats(rfq_to_award),
+			"po_draft_to_sent_hours": _stats(po_draft_to_sent),
+			"po_sent_to_acknowledged_hours": _stats(po_sent_to_ack),
+			"po_sent_to_received_hours": _stats(po_sent_to_received),
+			"generated_at": self._now(),
+		}

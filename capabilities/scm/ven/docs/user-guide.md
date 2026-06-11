@@ -733,6 +733,124 @@ Access Levels:
 - Support ticket management
 - System maintenance and updates
 
+## New in v2.2.0 — World-Class Async Capabilities
+
+The following capabilities were introduced as async methods on
+`VendorManagementService`. Each method can be awaited directly or called via the
+REST API endpoints listed below.
+
+### Contract Expiry Alerts
+
+`await svc.contract_expiry_alerts(days_ahead=30, tenant_id=...)`
+
+Returns all contracts expiring within `days_ahead` days. For contracts with
+`auto_renew=True`, a 12-month renewal record is created automatically and a
+`vendor_contract_auto_renew_triggered` event is emitted. Procurement teams receive
+a structured response with `expiring_count`, `auto_renewed_count`, and full
+contract detail — no manual calendar tracking required.
+
+**REST**: `GET /scm/vendors/api/v1/contracts/expiry-alerts?days_ahead=30`
+
+### Spend Concentration Risk
+
+`await svc.spend_concentration_risk(period, category_threshold_pct=40.0, total_threshold_pct=20.0, tenant_id=...)`
+
+Flags any vendor whose share of category spend exceeds the category threshold or
+whose share of total spend exceeds the total threshold. Returns a
+`concentration_risks` list with per-vendor share percentages and breach flags.
+Emits `vendor_spend_concentration_risk_detected` for downstream risk management.
+
+**REST**: `GET /scm/vendors/api/v1/spend/concentration-risk?period=2026-06`
+
+### Bulk Onboarding
+
+`await svc.bulk_onboard_vendors(vendors=[...], tenant_id=...)`
+
+Fans out concurrent onboarding calls for a list of vendor payloads. Returns a
+batch result with `success_count`, `failure_count`, and per-row diagnostics.
+Use this for ERP migrations or mass data imports — orders of magnitude faster
+than sequential calls.
+
+**REST**: `POST /scm/vendors/api/v1/vendors/bulk-onboard`
+
+### Compliance Expiry Scan
+
+`await svc.compliance_expiry_scan(as_of_date=..., expiry_warning_days=30, tenant_id=...)`
+
+Scans all compliance records and partitions results into `expired_records` and
+`expiring_soon_records`. Emits `vendor_compliance_expiry_detected` for each
+flagged record. Run daily via a scheduled job to drive certification renewal
+workflows automatically.
+
+**REST**: `GET /scm/vendors/api/v1/compliance/expiry-scan`
+
+### SLA Breach Scan
+
+`await svc.sla_breach_scan(vendor_id, tenant_id=...)`
+
+Cross-references SLA terms stored on active contracts against the vendor's most
+recent performance scores. For each breach, a high-tier risk record is
+auto-created and `vendor_sla_breach_detected` is emitted. Returns `breaches`
+list with `dimension`, `sla_threshold`, `actual_score`, and `gap`.
+
+**REST**: `GET /scm/vendors/api/v1/vendors/{vendor_id}/sla-breach-scan`
+
+### Vendor Reinstatement
+
+`await svc.vendor_reinstatement(vendor_id, rationale, approved_by, tenant_id=...)`
+
+Reinstates a suspended vendor to active status. Validates that an active
+suspension record exists, resolves it with a timestamp and rationale, advances
+`stage` back to `active`, and emits `vendor_reinstated`. Requires non-empty
+`rationale` and `approved_by` — the two-person rule prevents self-reinstatement.
+
+**REST**: `POST /scm/vendors/api/v1/vendors/{vendor_id}/reinstate`
+
+### Multi-Vendor Comparison
+
+`await svc.compare_vendors(vendor_ids=[...], tenant_id=...)`
+
+Returns a head-to-head comparison matrix for two or more vendors. Each profile
+includes performance scores per dimension, risk tier, compliance status, and
+total contract spend. The `recommendations` dict identifies the best vendor per
+dimension (`performance`, `risk`, `spend_relationship`). Use during sourcing
+events or contract renewals to support data-driven selection decisions.
+
+**REST**: `POST /scm/vendors/api/v1/vendors/compare`
+
+### AI Early Warning Digest
+
+`await svc.ai_early_warning_digest(tenant_id=...)`
+
+Runs ML risk classification concurrently across all active vendors (via
+`ml_vendor_risk_assess`). Returns a ranked list of at-risk vendors enriched with
+nearest contract expiry and non-compliant compliance record counts. Falls back to
+rule-based tiers when Ollama is unavailable. Run once daily to generate the
+procurement team's morning digest without manual portfolio scanning.
+
+**REST**: `GET /scm/vendors/api/v1/intelligence/early-warning-digest`
+
+### Vendor Health Score
+
+`await svc.vendor_health_score(vendor_id, tenant_id=...)`
+
+Computes a composite 0–100 health score weighted as:
+
+| Component | Weight | Input |
+|-----------|--------|-------|
+| Performance | 40 % | Latest average performance score |
+| Compliance | 25 % | Non-compliant / expired records (penalty per record) |
+| Risk-adjusted | 25 % | Inverted risk score (lower risk → higher health) |
+| Engagement | 10 % | Portal events + communication log entries |
+
+Results are persisted back onto the vendor record (`health_score`,
+`health_tier`) for fast dashboard queries. Tiers: `excellent` ≥ 85,
+`good` ≥ 70, `fair` ≥ 55, `poor` < 55.
+
+**REST**: `GET /scm/vendors/api/v1/vendors/{vendor_id}/health-score`
+
+---
+
 ## 🚀 Advanced Features
 
 ### Workflow Automation

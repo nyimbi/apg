@@ -1,6 +1,6 @@
 # APG Crawler Capability - User Guide
 
-**Version:** 2.0.0  
+**Version:** 3.0.0  
 **Author:** Datacraft  
 **Copyright:** © 2025 Datacraft  
 **Email:** nyimbi@gmail.com  
@@ -10,32 +10,47 @@
 1. [Overview](#overview)
 2. [Getting Started](#getting-started)
 3. [Crawl Target Management](#crawl-target-management)
-4. [RAG Integration](#rag-integration)
-5. [GraphRAG Knowledge Graphs](#graphrag-knowledge-graphs)
-6. [Collaborative Validation](#collaborative-validation)
-7. [Analytics and Monitoring](#analytics-and-monitoring)
-8. [Best Practices](#best-practices)
-9. [Troubleshooting](#troubleshooting)
+4. [robots.txt Compliance](#robotstxt-compliance)
+5. [Content Change Detection](#content-change-detection)
+6. [Social Media Ingest](#social-media-ingest)
+7. [PII Scrubbing](#pii-scrubbing)
+8. [Language Detection](#language-detection)
+9. [Structured Data Extraction](#structured-data-extraction)
+10. [Source Reputation Index](#source-reputation-index)
+11. [Resumable Crawl Checkpointing](#resumable-crawl-checkpointing)
+12. [Cross-Source Deduplication](#cross-source-deduplication)
+13. [Webhook Notifications](#webhook-notifications)
+14. [RAG Integration](#rag-integration)
+15. [GraphRAG Knowledge Graphs](#graphrag-knowledge-graphs)
+16. [Collaborative Validation](#collaborative-validation)
+17. [Analytics and Monitoring](#analytics-and-monitoring)
+18. [Best Practices](#best-practices)
+19. [Troubleshooting](#troubleshooting)
 
 ## Overview
 
-The APG Crawler Capability is a revolutionary enterprise web intelligence platform that combines advanced web crawling with RAG (Retrieval-Augmented Generation) and GraphRAG capabilities. It provides:
+The APG Crawler Capability is an enterprise web intelligence platform combining governed source collection, content pipeline automation, and multi-modal intelligence extraction. It provides:
 
-- **10x Performance**: Faster than industry-standard crawling solutions
-- **AI-Powered Intelligence**: Automatic content understanding and entity extraction
-- **RAG Integration**: Semantic search with vector embeddings
-- **GraphRAG**: Knowledge graph construction for entity relationships
-- **Collaborative Validation**: Team-based data quality assurance
-- **Multi-tenant Architecture**: Enterprise-grade security and isolation
+- **Governed Collection**: Policy-enforced source registration, crawl-job approval flows, and audit trails.
+- **robots.txt Compliance**: Strict, advisory, and bypass modes with per-domain enforcement.
+- **Change Detection**: Skip unchanged pages to eliminate redundant extraction work.
+- **Social Media Ingest**: First-class adapters for Twitter, Reddit, Mastodon, Telegram, and RSS.
+- **PII Protection**: Automated scrubbing before any content reaches storage or downstream consumers.
+- **Source Reputation**: Composite quality score derived from extraction quality and validation confidence.
+- **Resumable Crawls**: Checkpoint-based frontier persistence for fault-tolerant deep crawls.
+- **Cross-Source Dedup**: Fingerprint blocking deduplication across all sources in a tenant.
+- **Push Notifications**: HMAC-signed outbound webhook bus for real-time downstream integration.
+- **RAG and GraphRAG**: Chunk planning, embedding model selection, and entity graph projection.
+- **Multi-tenant Architecture**: Tenant-scoped data isolation throughout all operations.
 
-### Key Features
+### Key Capabilities
 
-✅ **Multi-Source Orchestration** - Unified data extraction across 20+ sources  
-✅ **Content Cleaning & Fingerprinting** - Automatic content processing and duplicate detection  
-✅ **RAG Processing** - Semantic chunking with vector embeddings  
-✅ **GraphRAG Integration** - Entity extraction and knowledge graph construction  
-✅ **Collaborative Validation** - Team-based quality assurance workflows  
-✅ **Real-time Analytics** - Live dashboards and business intelligence  
+- Multi-source orchestration across web, news, social media, and dark web (Tor) sources.
+- SHA-256 content fingerprinting plus semantic near-duplicate detection.
+- JSON-LD, OpenGraph, and Microdata structured-data extraction.
+- Multilingual content handling with Unicode-block language detection.
+- Collaborative validation sessions with reviewer confidence and decision audit.
+- Bytewax event streaming for all lifecycle transitions.
 
 ## Getting Started
 
@@ -367,6 +382,144 @@ Configure alerts for important events:
 - **Processing Failures**: When operations fail repeatedly
 - **Capacity Limits**: When approaching resource limits
 - **Validation Conflicts**: When validators disagree significantly
+
+## robots.txt Compliance
+
+Every domain is subject to robots.txt enforcement before the first fetch. Three modes are available per source:
+
+| Mode | Behaviour |
+|---|---|
+| `strict` | Disallowed paths are blocked; crawl fails if URL is excluded |
+| `advisory` | Disallowed paths are recorded in the audit trail but crawl proceeds |
+| `disabled` | Rules bypassed; requires `high_risk=True` and `approved_by` on the crawl job |
+
+```python
+result = await svc.check_robots_compliance("https://example.com/admin", compliance_mode="strict")
+# {"allowed": False, "decision": "blocked_by_robots", "crawl_delay_seconds": 1}
+```
+
+The default mode is `strict`. Set `compliance_mode` on the source record at registration time.
+
+## Content Change Detection
+
+For recurring schedules, call `detect_content_changes` before re-processing a page to skip pages that have not changed meaningfully:
+
+```python
+result = await svc.detect_content_changes("https://example.com/article/42", new_content=fetched_html)
+if result["recommendation"] == "skip":
+    pass  # no downstream work needed
+```
+
+Similarity is a fraction in [0, 1]. Pages with similarity >= 0.90 are recommended for skip, eliminating redundant extraction and embedding work.
+
+## Social Media Ingest
+
+Register the social media feed as a source with `source_type="social"`, then ingest normalised items:
+
+```python
+source = svc.register_source(
+    "twitter-feed", "tenant-a", "Twitter Intel", "intel-team", "social",
+    ["https://twitter.com/search?q=threat"], ["twitter.com"],
+    policy_reviewed_by="policy-1",
+)
+items = [{"id": "1234", "text": "Threat actor X...", "author": "@intel", "published_at": "2026-06-11T10:00:00Z"}]
+result = await svc.ingest_social_media(platform="twitter", items=items, source_record_id=source["id"])
+# {"stored": 1, "skipped": 0, ...}
+```
+
+Supported platforms: `twitter`, `reddit`, `mastodon`, `telegram`, `rss`. Duplicate items are silently skipped.
+
+## PII Scrubbing
+
+PII scrubbing must run before extraction records are used downstream. Call it explicitly to get the scrubbed text:
+
+```python
+scrub = await svc.scrub_pii(extraction["id"], "Contact john@example.com or +254712345678")
+print(scrub["scrubbed_text"])   # "Contact [EMAIL] or [PHONE]"
+print(scrub["detections"])      # [{"pii_type": "email", "count": 1}, ...]
+```
+
+Detection patterns: email, `phone_ke` (Kenyan E.164), `phone_intl`, IPv4, Kenyan national ID (8-digit), credit card number.
+
+## Language Detection
+
+Detect the primary language of an extraction and tag the record for language-aware chunking and embedding routing:
+
+```python
+lang = await svc.detect_language(extraction["id"], content[:1000])
+# {"language_code": "sw", "confidence": 0.74, "detected_at": "..."}
+```
+
+Detection uses Unicode block frequencies: CJK, Arabic, Cyrillic, Devanagari, and Latin. Non-Latin scripts are distinguished with high recall; Latin defaults to `en`.
+
+## Structured Data Extraction
+
+Before running general NER, extract structured data embedded in HTML:
+
+```python
+struct = await svc.extract_structured_data(extraction["id"], page_html)
+for rec in struct["records"]:
+    print(rec["source"], rec["schema_type"], rec["data"])
+```
+
+JSON-LD items receive quality baseline 0.95; OpenGraph items receive 0.90. The extraction record is tagged with `structured_data_present` and `structured_record_count`.
+
+## Source Reputation Index
+
+Compute a composite reputation score (0.0–1.0) for any source. Weights: extraction quality 0.5, validation confidence 0.3, HTTPS ratio 0.2:
+
+```python
+rep = await svc.compute_source_reputation(source["id"])
+# {"final_reputation_score": 0.87, "quality_score_component": 0.92, ...}
+```
+
+The score is stored on the source record and visible in `list_sources` output.
+
+## Resumable Crawl Checkpointing
+
+Create periodic checkpoints during deep crawls so failures do not require a full restart:
+
+```python
+# During crawl loop, after every N pages:
+await svc.create_crawl_checkpoint(job["id"], visited_urls=visited, queued_urls=queue)
+
+# On restart after failure:
+state = await svc.resume_from_checkpoint(job_record_id=job["id"])
+queue = state["queued_urls"]
+visited = set(state["visited_urls"])
+```
+
+`coverage_pct` is available in the health report when a checkpoint exists.
+
+## Cross-Source Deduplication
+
+Identify near-duplicate extraction records across all sources in a tenant:
+
+```python
+report = await svc.cross_source_dedup()
+# {"duplicate_groups": 3, "total_candidates": 12, "estimated_savings_pct": 8.5, ...}
+```
+
+For semantic near-duplicate detection (syndicated content with different markup):
+
+```python
+sem = await svc.semantic_dedup_report(similarity_threshold=0.95)
+```
+
+## Webhook Notifications
+
+Register an HTTPS endpoint to receive push notifications on crawl events:
+
+```python
+hook = await svc.register_webhook(
+    webhook_id="hook-1",
+    endpoint_url="https://hooks.example.com/intel",
+    events=["crawl_job_completed", "source_banned", "pii_scrubbed"],
+    secret="shared-hmac-secret",
+)
+```
+
+Deliveries are signed with `X-APG-Signature: sha256=<hmac>`. Delivery count and failure count are tracked on the webhook record.
 
 ## Best Practices
 

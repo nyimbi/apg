@@ -178,6 +178,118 @@ def _csv_escape(v: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Module-level helpers for new methods
+# ---------------------------------------------------------------------------
+
+def _playbook_artifacts(technique_id: str, platform: str) -> list[str]:
+	"""Return expected forensic artifact types for a given ATT&CK technique and platform."""
+	_map: dict[str, list[str]] = {
+		"T1566": ["email_headers", "attachment_hash", "sender_ip"],
+		"T1566.001": ["attachment_hash", "email_metadata"],
+		"T1566.002": ["url_in_email", "redirect_chain"],
+		"T1059": ["process_creation_event", "command_line_args"],
+		"T1059.001": ["powershell_scriptblock", "event_id_4104"],
+		"T1078": ["logon_event_4624", "account_name"],
+		"T1055": ["process_injection_event", "remote_thread_creation"],
+		"T1083": ["file_access_event", "directory_listing_log"],
+		"T1021": ["network_connection_event", "rdp_bitmap_cache"],
+		"T1021.001": ["rdp_connection_event", "windows_security_log"],
+		"T1041": ["network_flow_large_upload", "c2_beacon_traffic"],
+		"T1486": ["file_rename_event", "ransom_note_dropped", "vss_deletion"],
+		"T1027": ["obfuscated_script_file", "base64_encoded_payload"],
+		"T1105": ["network_download_event", "dropped_binary_hash"],
+		"T1071": ["http_user_agent", "dns_query_log"],
+		"T1071.001": ["http_request_log", "tls_sni"],
+		"T1098": ["account_modification_event_4738"],
+		"T1053": ["scheduled_task_creation_event_4698"],
+		"T1070": ["event_log_clear_event_1102", "file_deletion_event"],
+		"T1003": ["lsass_memory_access_event", "credential_dump_file"],
+	}
+	return _map.get(technique_id, ["generic_telemetry"])
+
+
+def _playbook_detection(technique_id: str) -> str:
+	"""Return a one-line detection opportunity note for a technique."""
+	_notes: dict[str, str] = {
+		"T1566": "Monitor inbound email attachments via gateway DLP; alert on .lnk/.js/.vbs attachments",
+		"T1566.001": "Sandbox all email attachments; alert on PE files delivered via email",
+		"T1566.002": "URL rewriting and click-time scanning; alert on newly registered domains in email links",
+		"T1059": "Enable process creation auditing (Sysmon Event ID 1); baseline parent-child process trees",
+		"T1059.001": "Enable PS ScriptBlock logging (Event ID 4104); alert on encoded commands and download cradles",
+		"T1078": "Alert on logons from unusual geolocations or outside business hours for privileged accounts",
+		"T1055": "Monitor CreateRemoteThread and VirtualAllocEx API calls via EDR telemetry",
+		"T1083": "Baseline normal file enumeration patterns; alert on recursive directory scans by non-admin processes",
+		"T1021": "Restrict lateral movement protocols; alert on first-time service-account remote logons",
+		"T1041": "Threshold alert on large outbound data transfers; correlate with C2 beacon timing",
+		"T1486": "Alert on mass file rename events and VSS deletion commands",
+		"T1027": "Alert on high-entropy PowerShell commands; flag base64 decode + IEX patterns",
+		"T1105": "Monitor outbound downloads of PE files from non-allowlisted domains",
+		"T1071": "Inspect HTTP User-Agent strings; alert on beaconing patterns (regular interval connections)",
+		"T1003": "Alert on LSASS process access from non-system processes; restrict debug privilege",
+	}
+	return _notes.get(technique_id, "Enable telemetry for relevant data source and baseline normal behaviour")
+
+
+def _sigma_sketch(technique_id: str, platform: str) -> dict[str, Any]:
+	"""Return a minimal Sigma-compatible detection sketch for a technique."""
+	base: dict[str, Any] = {
+		"title": f"Detect {MITRE_TECHNIQUES.get(technique_id, {}).get('name', technique_id)}",
+		"status": "experimental",
+		"logsource": {"category": "process_creation", "product": platform},
+		"detection": {
+			"selection": {"Technique": technique_id},
+			"condition": "selection",
+		},
+		"tags": [f"attack.{MITRE_TECHNIQUES.get(technique_id, {}).get('tactic', 'unknown')}",
+				 f"attack.{technique_id.lower()}"],
+		"falsepositives": ["legitimate admin activity"],
+		"level": "high",
+	}
+	# Override logsource for specific technique families
+	if technique_id in ("T1566", "T1566.001", "T1566.002"):
+		base["logsource"] = {"category": "email", "product": "exchange"}
+	elif technique_id in ("T1059.001",):
+		base["logsource"] = {"category": "powershell", "product": "windows"}
+		base["detection"]["selection"] = {
+			"EventID": 4104, "ScriptBlockText|contains": ["-EncodedCommand", "IEX", "Invoke-Expression"]
+		}
+	elif technique_id in ("T1486",):
+		base["logsource"] = {"category": "file_change", "product": platform}
+		base["detection"]["selection"] = {
+			"EventID": [4663], "TargetFilename|endswith": [".locked", ".encrypted", ".enc"]
+		}
+	return base
+
+
+def _observable_fields(technique_id: str, platform: str) -> list[str]:
+	"""Return key log fields to collect for hunting a given technique."""
+	_fields: dict[str, list[str]] = {
+		"T1059.001": ["EventID", "ScriptBlockText", "CommandLine", "ParentImage", "User"],
+		"T1566.001": ["SenderAddress", "AttachmentHash", "AttachmentName", "RecipientAddress"],
+		"T1078": ["EventID", "AccountName", "LogonType", "IpAddress", "WorkstationName"],
+		"T1055": ["SourceImage", "TargetImage", "StartAddress", "GrantedAccess"],
+		"T1041": ["DestinationIp", "DestinationPort", "BytesSent", "ProcessName"],
+		"T1486": ["TargetFilename", "Image", "CommandLine", "EventID"],
+		"T1003": ["SourceImage", "GrantedAccess", "TargetImage", "CallTrace"],
+	}
+	return _fields.get(technique_id, ["EventID", "CommandLine", "Image", "User", "Hostname"])
+
+
+def _fp_notes(technique_id: str) -> str:
+	"""Return common false-positive scenarios for a given technique."""
+	_fp: dict[str, str] = {
+		"T1059.001": "Legitimate admin scripts, CI/CD pipelines, software deployment tools",
+		"T1078": "Helpdesk account resets, after-hours on-call access, VPN split tunnelling",
+		"T1055": "Security products (AV, EDR), JIT compilers, legitimate injection frameworks",
+		"T1083": "Backup software, security scanners, software asset management agents",
+		"T1041": "Backup replication, large file transfers to known cloud storage",
+		"T1003": "Memory dump tools used by support staff, EDR live response sessions",
+		"T1027": "Legitimate software packaging, installer scripts, enterprise deployment",
+	}
+	return _fp.get(technique_id, "Evaluate against baseline of normal activity for this process/user")
+
+
+# ---------------------------------------------------------------------------
 # Main service
 # ---------------------------------------------------------------------------
 
@@ -2393,7 +2505,696 @@ class ThreatIntelligenceService:
 		}
 
 	# =========================================================================
-	# Private helpers
+	# Vulnerability Intelligence (2 methods)
+	# =========================================================================
+
+	async def vulnerability_triage(
+		self,
+		cve_ids: list[str],
+	) -> list[dict[str, Any]]:
+		"""Score and rank CVEs by exploitation probability for patch prioritisation.
+
+		Combines CVSS base score, EPSS probability estimate, CISA KEV membership,
+		public PoC availability, and in-the-wild exploitation status into a composite
+		priority score. Returns the list sorted by priority_score descending.
+
+		In production this queries NVD, FIRST EPSS API, and CISA KEV feed.
+		Here we compute a deterministic mock score from the CVE-ID string.
+		"""
+		assert cve_ids, "at least one CVE ID required"
+
+		results: list[dict[str, Any]] = []
+		ioc_store = self._ioc_store()
+
+		for cve_id in cve_ids:
+			assert cve_id.upper().startswith("CVE-"), f"invalid CVE ID format: '{cve_id}'"
+
+			# Pull enrichment if available; otherwise synthesise realistic fields
+			enrichment = self._enrichments.get(cve_id, {})
+			cvss = enrichment.get("cvss_v3", {})
+
+			# Deterministic mock EPSS from CVE year + sequence hash
+			parts = cve_id.upper().split("-")
+			seq_hash = int(hashlib.md5(cve_id.encode()).hexdigest()[:4], 16)
+			epss_probability = round(min(1.0, (seq_hash % 1000) / 1000.0), 4)
+			cvss_base = cvss.get("base_score", round(5.0 + (seq_hash % 50) / 10.0, 1))
+			cvss_severity = cvss.get("severity", "HIGH" if cvss_base >= 7.0 else "MEDIUM")
+
+			exploit_public = enrichment.get("exploit_public", epss_probability > 0.3)
+			exploit_wild = enrichment.get("exploit_in_wild", epss_probability > 0.6)
+			cisa_kev = enrichment.get("cisa_kev", epss_probability > 0.7)
+			patch_available = enrichment.get("patch_available", True)
+
+			# Weighted composite: CVSS(30%) + EPSS(35%) + KEV(20%) + wild(10%) + no_patch(5%)
+			priority_score = round(
+				(cvss_base / 10.0) * 0.30
+				+ epss_probability * 0.35
+				+ (0.20 if cisa_kev else 0.0)
+				+ (0.10 if exploit_wild else 0.0)
+				+ (0.05 if not patch_available else 0.0),
+				4,
+			)
+
+			priority_label = (
+				"CRITICAL" if priority_score >= 0.75
+				else "HIGH" if priority_score >= 0.55
+				else "MEDIUM" if priority_score >= 0.35
+				else "LOW"
+			)
+
+			results.append({
+				"cve_id": cve_id.upper(),
+				"cvss_base_score": cvss_base,
+				"cvss_severity": cvss_severity,
+				"epss_probability": epss_probability,
+				"exploit_public": exploit_public,
+				"exploit_in_wild": exploit_wild,
+				"cisa_kev": cisa_kev,
+				"patch_available": patch_available,
+				"priority_score": priority_score,
+				"priority_label": priority_label,
+				"recommendation": (
+					"Patch immediately — active exploitation and KEV-listed."
+					if cisa_kev and exploit_wild
+					else "Patch within 7 days — public exploit available."
+					if exploit_public
+					else "Schedule patch in next maintenance window."
+					if cvss_base >= 7.0
+					else "Monitor; patch at next regular cycle."
+				),
+				"nvd_url": f"https://nvd.nist.gov/vuln/detail/{cve_id.upper()}",
+				"assessed_at": _now_iso(),
+			})
+
+		results.sort(key=lambda r: r["priority_score"], reverse=True)
+		self._audit("system", "vulnerability_triage_run", f"count={len(results)}")
+		return results
+
+	async def ingest_sandbox_report(
+		self,
+		sandbox_report: dict[str, Any],
+		campaign_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Parse a behavioral sandbox report and extract indicators and technique links.
+
+		Accepts Cuckoo / Any.run / Triage JSON report format (normalized subset).
+		Extracts: dropped file hashes, network IOCs (IPs, domains, URLs),
+		registry mutations, process trees, and MITRE ATT&CK annotations.
+		Stores all extracted IOCs and links them to the given campaign if provided.
+
+		Returns a summary with extracted counts and new indicator IDs.
+		"""
+		assert isinstance(sandbox_report, dict), "sandbox_report must be a dict"
+		report_type = sandbox_report.get("type", "generic")
+
+		extracted_iocs: list[dict[str, Any]] = []
+		techniques_linked: list[str] = []
+		errors: list[str] = []
+
+		ioc_store = self._ioc_store()
+
+		# --- Network indicators ---
+		network = sandbox_report.get("network", {})
+		for host in network.get("hosts", []):
+			ip = host if isinstance(host, str) else host.get("ip", "")
+			if ip:
+				fp = hashlib.sha256(f"ip_address:{ip.lower()}".encode()).hexdigest()
+				if not any(r.get("_fingerprint") == fp for r in ioc_store.values()):
+					iid = _uid()
+					ioc_store[iid] = {
+						"id": iid, "ioc_type": "ip_address", "value": ip,
+						"confidence": 0.75, "tlp": "amber", "source": "sandbox",
+						"context": {"report_type": report_type},
+						"status": "active", "created_at": _now_iso(), "updated_at": _now_iso(),
+						"stix_type": "ipv4-addr", "stix_id": f"ipv4-addr--{iid}",
+						"_fingerprint": fp,
+					}
+					extracted_iocs.append({"ioc_type": "ip_address", "value": ip, "id": iid})
+
+		for domain_entry in network.get("domains", []):
+			domain = domain_entry if isinstance(domain_entry, str) else domain_entry.get("domain", "")
+			if domain:
+				fp = hashlib.sha256(f"domain:{domain.lower()}".encode()).hexdigest()
+				if not any(r.get("_fingerprint") == fp for r in ioc_store.values()):
+					iid = _uid()
+					ioc_store[iid] = {
+						"id": iid, "ioc_type": "domain", "value": domain,
+						"confidence": 0.70, "tlp": "amber", "source": "sandbox",
+						"context": {"report_type": report_type},
+						"status": "active", "created_at": _now_iso(), "updated_at": _now_iso(),
+						"stix_type": "domain-name", "stix_id": f"domain-name--{iid}",
+						"_fingerprint": fp,
+					}
+					extracted_iocs.append({"ioc_type": "domain", "value": domain, "id": iid})
+
+		# --- Dropped files (hashes) ---
+		for dropped in sandbox_report.get("dropped", []):
+			for algo, ioc_type in [("sha256", "file_hash_sha256"), ("sha1", "file_hash_sha1"), ("md5", "file_hash_md5")]:
+				h = dropped.get(algo, dropped.get(algo.upper(), ""))
+				if h:
+					fp = hashlib.sha256(f"{ioc_type}:{h.lower()}".encode()).hexdigest()
+					if not any(r.get("_fingerprint") == fp for r in ioc_store.values()):
+						iid = _uid()
+						ioc_store[iid] = {
+							"id": iid, "ioc_type": ioc_type, "value": h,
+							"confidence": 0.85, "tlp": "amber", "source": "sandbox",
+							"context": {"report_type": report_type, "file_name": dropped.get("name", "")},
+							"status": "active", "created_at": _now_iso(), "updated_at": _now_iso(),
+							"stix_type": "file", "stix_id": f"file--{iid}",
+							"_fingerprint": fp,
+						}
+						extracted_iocs.append({"ioc_type": ioc_type, "value": h, "id": iid})
+					break  # one hash per file is enough
+
+		# --- MITRE ATT&CK technique annotations ---
+		for sig in sandbox_report.get("signatures", []):
+			for tid in sig.get("ttp", sig.get("ttps", [])):
+				if tid in MITRE_TECHNIQUES:
+					techniques_linked.append(tid)
+
+		# --- Link to campaign if requested ---
+		campaign_links: list[dict[str, Any]] = []
+		if campaign_id:
+			cstore = self._campaign_store()
+			if campaign_id not in cstore:
+				errors.append(f"campaign '{campaign_id}' not found; IOCs stored but not linked")
+			else:
+				now = _now_iso()
+				for ioc_rec in extracted_iocs:
+					# Skip already-linked
+					if any(ci["campaign_id"] == campaign_id and ci["indicator_id"] == ioc_rec["id"]
+						   for ci in self._campaign_indicators):
+						continue
+					link: dict[str, Any] = {
+						"id": _uid(), "campaign_id": campaign_id, "indicator_id": ioc_rec["id"],
+						"first_seen": now, "last_seen": now, "added_at": now,
+					}
+					self._campaign_indicators.append(link)
+					campaign_links.append(link)
+
+				for tid in set(techniques_linked):
+					if any(ct["campaign_id"] == campaign_id and ct["technique_id"] == tid
+						   for ct in self._campaign_techniques):
+						continue
+					meta = MITRE_TECHNIQUES[tid]
+					ct_link: dict[str, Any] = {
+						"id": _uid(), "campaign_id": campaign_id, "technique_id": tid,
+						"technique_name": meta["name"], "tactic": meta["tactic"],
+						"notes": f"Auto-extracted from sandbox report ({report_type})",
+						"added_at": _now_iso(), "is_verified_technique": True,
+					}
+					self._campaign_techniques.append(ct_link)
+
+		self._audit("system", "sandbox_report_ingested", f"iocs={len(extracted_iocs)}")
+		return {
+			"report_type": report_type,
+			"extracted_ioc_count": len(extracted_iocs),
+			"extracted_iocs": extracted_iocs,
+			"techniques_linked_count": len(set(techniques_linked)),
+			"techniques_linked": list(set(techniques_linked)),
+			"campaign_id": campaign_id,
+			"campaign_links_created": len(campaign_links),
+			"errors": errors,
+			"ingested_at": _now_iso(),
+		}
+
+	# =========================================================================
+	# Attribution Intelligence (2 methods)
+	# =========================================================================
+
+	async def reverse_attribution(self, indicator_id: str) -> list[dict[str, Any]]:
+		"""Rank candidate threat actors for an unknown indicator.
+
+		Walks indicator -> campaign -> actor link graph, scores each candidate
+		actor by sum-of-weighted-link-confidences and TTP profile overlap.
+		Returns ranked list of candidate actors with confidence intervals and
+		supporting evidence chains.
+		"""
+		ioc_store = self._ioc_store()
+		assert indicator_id in ioc_store, f"indicator '{indicator_id}' not found"
+
+		# Step 1: find campaigns that reference this indicator
+		campaign_ids: list[str] = [
+			ci["campaign_id"] for ci in self._campaign_indicators
+			if ci["indicator_id"] == indicator_id
+		]
+
+		# Step 2: collect actor IDs linked to those campaigns
+		actor_scores: dict[str, dict[str, Any]] = {}
+		for cid in campaign_ids:
+			for link in self._actor_campaign_links:
+				if link["campaign_id"] != cid:
+					continue
+				aid = link["actor_id"]
+				if aid not in actor_scores:
+					actor_scores[aid] = {
+						"actor_id": aid, "score": 0.0,
+						"evidence_chain": [], "campaign_links": [],
+					}
+				actor_scores[aid]["score"] += 0.5
+				actor_scores[aid]["campaign_links"].append(cid)
+				actor_scores[aid]["evidence_chain"].append(
+					f"campaign '{cid}' shares this indicator"
+				)
+
+		# Step 3: boost via direct actor-indicator links
+		for link in self._actor_indicator_links:
+			if link["indicator_id"] != indicator_id:
+				continue
+			aid = link["actor_id"]
+			if aid not in actor_scores:
+				actor_scores[aid] = {
+					"actor_id": aid, "score": 0.0,
+					"evidence_chain": [], "campaign_links": [],
+				}
+			actor_scores[aid]["score"] += link["confidence"]
+			actor_scores[aid]["evidence_chain"].append(
+				f"direct actor-indicator link (type={link['relationship_type']}, conf={link['confidence']})"
+			)
+
+		# Step 4: attach profile data and normalise
+		results: list[dict[str, Any]] = []
+		max_score = max((v["score"] for v in actor_scores.values()), default=1.0) or 1.0
+		for aid, data in actor_scores.items():
+			profile = self._actor_profiles.get(aid, {})
+			normalised = round(data["score"] / max_score, 4)
+			results.append({
+				"actor_id": aid,
+				"actor_name": profile.get("name", "unknown"),
+				"origin_country": profile.get("origin_country", "??"),
+				"motivation": profile.get("motivation", "unknown"),
+				"sophistication": profile.get("sophistication", "unknown"),
+				"attribution_confidence": normalised,
+				"confidence_interval": {
+					"lower": round(max(0.0, normalised - 0.15), 4),
+					"upper": round(min(1.0, normalised + 0.15), 4),
+				},
+				"evidence_chain": data["evidence_chain"],
+				"campaign_count": len(set(data["campaign_links"])),
+			})
+
+		results.sort(key=lambda r: r["attribution_confidence"], reverse=True)
+		self._audit("system", "reverse_attribution_run", indicator_id)
+		return results
+
+	async def generate_simulation_playbook(
+		self,
+		actor_id: str,
+		target_platform: str,
+	) -> dict[str, Any]:
+		"""Generate an adversary simulation playbook from an actor profile.
+
+		Maps the actor's verified TTPs to ordered attack steps compatible with
+		CALDERA / Atomic Red Team. Each step includes technique metadata,
+		expected artifact types, and detection opportunity notes.
+
+		target_platform: windows | linux | macos | cloud
+		"""
+		valid_platforms = {"windows", "linux", "macos", "cloud"}
+		assert actor_id in self._actor_profiles, f"actor '{actor_id}' not found"
+		assert target_platform.lower() in valid_platforms, \
+			f"invalid target_platform '{target_platform}'; choose from {valid_platforms}"
+
+		profile = self._actor_profiles[actor_id]
+		ttps = profile.get("ttps_verified", profile.get("ttps", []))
+
+		# Group by kill-chain phase for ordered playbook steps
+		phase_buckets: dict[str, list[dict[str, Any]]] = {p: [] for p in KILL_CHAIN_PHASES}
+
+		for tid in ttps:
+			if tid not in MITRE_TECHNIQUES:
+				continue
+			meta = MITRE_TECHNIQUES[tid]
+			phase = TACTIC_TO_KILL_CHAIN.get(meta["tactic"], "actions-on-objectives")
+			phase_buckets[phase].append({
+				"step_type": "attack",
+				"technique_id": tid,
+				"technique_name": meta["name"],
+				"tactic": meta["tactic"],
+				"kill_chain_phase": phase,
+				"atomic_test_ref": f"https://github.com/redcanaryco/atomic-red-team/blob/master/atomics/{tid}/{tid}.md",
+				"caldera_ability_hint": tid.replace(".", "_").lower(),
+				"expected_artifacts": _playbook_artifacts(tid, target_platform.lower()),
+				"detection_opportunity": _playbook_detection(tid),
+			})
+
+		# Flatten into ordered steps
+		ordered_steps: list[dict[str, Any]] = []
+		step_num = 1
+		for phase in KILL_CHAIN_PHASES:
+			for step in phase_buckets[phase]:
+				step["step_number"] = step_num
+				ordered_steps.append(step)
+				step_num += 1
+
+		playbook_id = _uid()
+		playbook: dict[str, Any] = {
+			"id": playbook_id,
+			"actor_id": actor_id,
+			"actor_name": profile.get("name"),
+			"target_platform": target_platform.lower(),
+			"step_count": len(ordered_steps),
+			"steps": ordered_steps,
+			"tactic_coverage": sorted({s["tactic"] for s in ordered_steps}),
+			"kill_chain_phases_covered": sorted({s["kill_chain_phase"] for s in ordered_steps}),
+			"estimated_duration_minutes": len(ordered_steps) * 15,
+			"framework_compatibility": ["CALDERA", "Atomic Red Team", "VECTR"],
+			"created_at": _now_iso(),
+		}
+		self._audit("system", "simulation_playbook_generated", actor_id)
+		return playbook
+
+	# =========================================================================
+	# Temporal Intelligence (2 methods)
+	# =========================================================================
+
+	async def apply_confidence_decay(self, indicator_id: str) -> dict[str, Any]:
+		"""Apply time-based confidence decay to a stored indicator.
+
+		Different IOC types age at different rates (half-lives in days):
+		  ip_address: 14d | domain: 30d | url: 21d | file_hash_*: 180d
+		  email: 60d | cve_id: 365d | yara_rule: 120d | sigma_rule: 120d
+
+		Updates the indicator's confidence score in place and returns the
+		decay record with original/new confidence and decay factor.
+		"""
+		ioc_store = self._ioc_store()
+		assert indicator_id in ioc_store, f"indicator '{indicator_id}' not found"
+
+		record = ioc_store[indicator_id]
+		if record.get("status") == "retired":
+			return {
+				"indicator_id": indicator_id,
+				"status": "retired",
+				"decay_applied": False,
+				"note": "retired indicators are not decayed",
+			}
+
+		half_lives: dict[str, int] = {
+			"ip_address": 14, "domain": 30, "url": 21,
+			"file_hash_md5": 180, "file_hash_sha1": 180, "file_hash_sha256": 180,
+			"email": 60, "cve_id": 365, "yara_rule": 120, "sigma_rule": 120,
+		}
+		ioc_type = record["ioc_type"]
+		half_life = half_lives.get(ioc_type, 60)
+
+		created_at = record.get("created_at", _now_iso())
+		try:
+			created_dt = datetime.fromisoformat(created_at.rstrip("Z"))
+			if created_dt.tzinfo is None:
+				created_dt = created_dt.replace(tzinfo=timezone.utc)
+		except ValueError:
+			created_dt = datetime.now(timezone.utc)
+
+		age_days = (datetime.now(timezone.utc) - created_dt).total_seconds() / 86400.0
+		# Exponential decay: C(t) = C0 * 0.5^(t / half_life)
+		decay_factor = math.pow(0.5, age_days / half_life)
+		original_confidence = record["confidence"]
+		new_confidence = round(original_confidence * decay_factor, 4)
+
+		record["confidence"] = new_confidence
+		record["updated_at"] = _now_iso()
+		record["decay_applied_at"] = _now_iso()
+
+		self._audit("system", "confidence_decay_applied", indicator_id)
+		return {
+			"indicator_id": indicator_id,
+			"ioc_type": ioc_type,
+			"age_days": round(age_days, 2),
+			"half_life_days": half_life,
+			"original_confidence": original_confidence,
+			"decay_factor": round(decay_factor, 6),
+			"new_confidence": new_confidence,
+			"decay_applied": True,
+			"retired_by_decay": new_confidence < 0.1,
+			"applied_at": _now_iso(),
+		}
+
+	async def longitudinal_trend_analysis(
+		self,
+		period_days: int = 90,
+		bucket: str = "weekly",
+	) -> dict[str, Any]:
+		"""Bucket indicator and campaign activity into time-series for trend analysis.
+
+		bucket: daily | weekly | monthly
+		Returns time-series dicts per bucket with counts of new indicators,
+		new campaigns, and actor sightings. Includes simple moving-average
+		smoothing and a narrative trend summary.
+		"""
+		valid_buckets = {"daily", "weekly", "monthly"}
+		assert period_days > 0, "period_days must be positive"
+		assert bucket in valid_buckets, f"bucket must be one of {valid_buckets}"
+
+		bucket_days = {"daily": 1, "weekly": 7, "monthly": 30}[bucket]
+		num_buckets = max(1, period_days // bucket_days)
+		now = datetime.now(timezone.utc)
+
+		def _bucket_index(iso_ts: str) -> int | None:
+			try:
+				dt = datetime.fromisoformat(iso_ts.rstrip("Z")).replace(tzinfo=timezone.utc)
+			except ValueError:
+				return None
+			age = (now - dt).total_seconds() / 86400.0
+			if age < 0 or age > period_days:
+				return None
+			return num_buckets - 1 - int(age // bucket_days)
+
+		# Initialise buckets
+		ioc_counts = [0] * num_buckets
+		campaign_counts = [0] * num_buckets
+		actor_counts = [0] * num_buckets
+
+		for rec in self._ioc_store().values():
+			idx = _bucket_index(rec.get("created_at", ""))
+			if idx is not None:
+				ioc_counts[idx] += 1
+
+		for rec in self._campaign_store().values():
+			idx = _bucket_index(rec.get("created_at", ""))
+			if idx is not None:
+				campaign_counts[idx] += 1
+
+		for rec in self._actor_profiles.values():
+			idx = _bucket_index(rec.get("created_at", ""))
+			if idx is not None:
+				actor_counts[idx] += 1
+
+		# Simple 3-period moving average
+		def _sma(series: list[int], window: int = 3) -> list[float]:
+			result: list[float] = []
+			for i in range(len(series)):
+				start = max(0, i - window + 1)
+				result.append(round(sum(series[start:i + 1]) / (i - start + 1), 2))
+			return result
+
+		# Trend direction: compare last 25% average vs previous 25%
+		def _trend_label(series: list[int]) -> str:
+			n = len(series)
+			if n < 4:
+				return "insufficient_data"
+			q = max(1, n // 4)
+			recent_avg = sum(series[-q:]) / q
+			prior_avg = sum(series[-2 * q:-q]) / q
+			if prior_avg == 0:
+				return "emerging" if recent_avg > 0 else "flat"
+			ratio = recent_avg / prior_avg
+			if ratio >= 1.25:
+				return "accelerating"
+			if ratio <= 0.75:
+				return "decelerating"
+			return "stable"
+
+		# Build bucket labels (ISO week start dates, approximate)
+		labels: list[str] = []
+		for i in range(num_buckets):
+			bucket_start = now - timedelta(days=(num_buckets - 1 - i) * bucket_days)
+			labels.append(bucket_start.strftime("%Y-%m-%d"))
+
+		ioc_sma = _sma(ioc_counts)
+		campaign_sma = _sma(campaign_counts)
+
+		ioc_trend = _trend_label(ioc_counts)
+		campaign_trend = _trend_label(campaign_counts)
+
+		narrative = (
+			f"Over the past {period_days} days, indicator volume is {ioc_trend} "
+			f"and campaign activity is {campaign_trend}. "
+			f"Total: {sum(ioc_counts)} new indicators, {sum(campaign_counts)} new campaigns "
+			f"across {num_buckets} {bucket} buckets."
+		)
+
+		self._audit("system", "longitudinal_trend_analysis_run", f"period={period_days}d bucket={bucket}")
+		return {
+			"period_days": period_days,
+			"bucket": bucket,
+			"bucket_count": num_buckets,
+			"labels": labels,
+			"indicators": {
+				"counts": ioc_counts,
+				"sma": ioc_sma,
+				"total": sum(ioc_counts),
+				"trend": ioc_trend,
+			},
+			"campaigns": {
+				"counts": campaign_counts,
+				"sma": campaign_sma,
+				"total": sum(campaign_counts),
+				"trend": campaign_trend,
+			},
+			"actors": {
+				"counts": actor_counts,
+				"total": sum(actor_counts),
+			},
+			"narrative": narrative,
+			"generated_at": _now_iso(),
+		}
+
+	# =========================================================================
+	# PIR & Hunting (2 methods)
+	# =========================================================================
+
+	async def score_pir_satisfaction(self, requirement_id: str) -> dict[str, Any]:
+		"""Score how well collected intelligence satisfies a Priority Intelligence Requirement.
+
+		Matches the PIR's requirement_text against indicator values, campaign names,
+		actor names, and report titles using keyword overlap. Returns a satisfaction
+		score (0–1) and a list of contributing artifact IDs ranked by relevance.
+		"""
+		assert requirement_id in self._requirements, \
+			f"requirement '{requirement_id}' not found"
+
+		req = self._requirements[requirement_id]
+		req_text = req["requirement_text"].lower()
+		keywords: list[str] = [
+			w for w in re.split(r"\W+", req_text) if len(w) > 3
+		]
+		if not keywords:
+			return {
+				"requirement_id": requirement_id,
+				"satisfaction_score": 0.0,
+				"contributing_artifacts": [],
+				"note": "no meaningful keywords extracted from requirement text",
+			}
+
+		hits: list[dict[str, Any]] = []
+
+		def _kw_score(text: str) -> float:
+			t = text.lower()
+			matched = sum(1 for kw in keywords if kw in t)
+			return matched / len(keywords)
+
+		for iid, rec in self._ioc_store().items():
+			score = _kw_score(rec["value"] + " " + str(rec.get("context", "")))
+			if score > 0:
+				hits.append({"artifact_type": "indicator", "artifact_id": iid,
+							 "relevance": round(score, 4)})
+
+		for cid, camp in self._campaign_store().items():
+			score = _kw_score(camp.get("name", "") + " " + camp.get("objective", ""))
+			if score > 0:
+				hits.append({"artifact_type": "campaign", "artifact_id": cid,
+							 "relevance": round(score, 4)})
+
+		for aid, actor in self._actor_profiles.items():
+			score = _kw_score(actor.get("name", "") + " " + " ".join(actor.get("aliases", [])))
+			if score > 0:
+				hits.append({"artifact_type": "actor", "artifact_id": aid,
+							 "relevance": round(score, 4)})
+
+		for rid, report in self._threat_reports.items():
+			score = _kw_score(report.get("title", "") + " " + report.get("summary", ""))
+			if score > 0:
+				hits.append({"artifact_type": "report", "artifact_id": rid,
+							 "relevance": round(score, 4)})
+
+		hits.sort(key=lambda h: h["relevance"], reverse=True)
+		top_hits = hits[:20]
+
+		# Satisfaction score: diminishing returns on additional hits
+		if not hits:
+			satisfaction = 0.0
+		else:
+			max_relevance = max(h["relevance"] for h in hits)
+			satisfaction = round(min(1.0, max_relevance + math.log1p(len(hits)) * 0.05), 4)
+
+		# Update PIR record
+		req["satisfaction_score"] = satisfaction
+		req["last_scored_at"] = _now_iso()
+		req["responses"] = [h["artifact_id"] for h in top_hits[:5]]
+
+		self._audit("system", "pir_satisfaction_scored", requirement_id)
+		return {
+			"requirement_id": requirement_id,
+			"requirement_text": req["requirement_text"],
+			"priority": req["priority"],
+			"satisfaction_score": satisfaction,
+			"satisfaction_label": (
+				"satisfied" if satisfaction >= 0.7
+				else "partial" if satisfaction >= 0.35
+				else "unsatisfied"
+			),
+			"contributing_artifact_count": len(hits),
+			"contributing_artifacts": top_hits,
+			"scored_at": _now_iso(),
+		}
+
+	async def generate_hunting_hypotheses(
+		self,
+		actor_id: str,
+		target_platform: str,
+	) -> list[dict[str, Any]]:
+		"""Generate concrete threat-hunting hypotheses from an actor's TTP profile.
+
+		Each hypothesis includes a Sigma-compatible detection logic sketch,
+		key observable fields, and a hunt priority based on technique frequency
+		and actor sophistication. target_platform: windows | linux | macos | cloud.
+		"""
+		valid_platforms = {"windows", "linux", "macos", "cloud"}
+		assert actor_id in self._actor_profiles, f"actor '{actor_id}' not found"
+		assert target_platform.lower() in valid_platforms, \
+			f"invalid target_platform '{target_platform}'"
+
+		profile = self._actor_profiles[actor_id]
+		platform = target_platform.lower()
+		ttps = profile.get("ttps_verified", profile.get("ttps", []))
+		sophistication = profile.get("sophistication", "intermediate")
+
+		# Sophistication -> hunt priority multiplier
+		soph_multiplier = {
+			"minimal": 0.6, "intermediate": 0.8,
+			"advanced": 1.0, "nation-state": 1.2,
+		}.get(sophistication, 0.8)
+
+		hypotheses: list[dict[str, Any]] = []
+		for tid in ttps:
+			if tid not in MITRE_TECHNIQUES:
+				continue
+			meta = MITRE_TECHNIQUES[tid]
+			base_priority = 0.7  # most known-actor techniques warrant high attention
+
+			hypothesis: dict[str, Any] = {
+				"hypothesis_id": _uid(),
+				"actor_id": actor_id,
+				"technique_id": tid,
+				"technique_name": meta["name"],
+				"tactic": meta["tactic"],
+				"hunt_priority": round(min(1.0, base_priority * soph_multiplier), 3),
+				"platform": platform,
+				"sigma_sketch": _sigma_sketch(tid, platform),
+				"observable_fields": _observable_fields(tid, platform),
+				"false_positive_notes": _fp_notes(tid),
+				"mitre_url": f"https://attack.mitre.org/techniques/{tid.replace('.', '/')}/",
+				"generated_at": _now_iso(),
+			}
+			hypotheses.append(hypothesis)
+
+		hypotheses.sort(key=lambda h: h["hunt_priority"], reverse=True)
+		self._audit("system", "hunting_hypotheses_generated", actor_id)
+		return hypotheses
+
+	# =========================================================================
+	# Private helpers (extended)
 	# =========================================================================
 
 	def _tenant_authority_or_none(self, item_id: str, tenant_id: str) -> ThreatAuthority | None:
@@ -2458,20 +3259,19 @@ class ThreatIntelligenceService:
 				return campaign
 		return None
 
-
-# Alias for backward compatibility
-
 	async def ml_threat_score(self, *args, **kwargs):
-		"""AI-powered AI threat intelligence scoring and priority classification. Requires OLLAMA_BASE_URL."""
+		"""AI-powered threat intelligence scoring and priority classification. Requires OLLAMA_BASE_URL."""
 		import os
 		if not os.environ.get("OLLAMA_BASE_URL"):
 			return {"ml_enhanced": False}
 		try:
-			from capabilities.common.mlx import MLCapability
+			from capabilities.common.mlx import MLCapability  # type: ignore
 			ml = MLCapability()
 			result = await ml.score(kwargs, task="threat_intelligence_priority")
-			return {"threat_priority": round(result.score,3), "threat_factors": result.factors, "ml_enhanced": True}
+			return {"threat_priority": round(result.score, 3), "threat_factors": result.factors, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
 
+
+# Alias for backward compatibility
 IntelThreatsService = ThreatIntelligenceService

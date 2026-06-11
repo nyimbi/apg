@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import time
 from datetime import datetime
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any
 
 from uuid6 import uuid7
@@ -942,4 +945,463 @@ class DashboardService:
 			return {"insights": result.summary, "key_points": result.key_points, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	# ── Dashboard Versioning ──────────────────────────────────────────────────
+
+	async def snapshot_dashboard_version(
+		self,
+		tenant_id: str,
+		dashboard_id: str,
+		change_summary: str | None = None,
+	) -> dict[str, Any]:
+		"""Capture a point-in-time version snapshot of a dashboard and its widgets."""
+		guard_tenant_id(tenant_id)
+		d = self._require(self._dashboards.get(self._tk(tenant_id, dashboard_id)), "Dashboard", dashboard_id)
+		if not hasattr(self, "_dashboard_versions"):
+			self._dashboard_versions: dict[tuple[str, str], list[dict[str, Any]]] = {}
+		key = self._tk(tenant_id, dashboard_id)
+		history = self._dashboard_versions.setdefault(key, [])
+		widgets = await self.list_widgets(tenant_id, dashboard_id)
+		config_blob = json.dumps(d, sort_keys=True, default=str)
+		config_hash = hashlib.sha256(config_blob.encode()).hexdigest()[:16]
+		version: dict[str, Any] = {
+			"version_id": _uuid7(),
+			"tenant_id": tenant_id,
+			"dashboard_id": dashboard_id,
+			"version_number": len(history) + 1,
+			"config_hash": config_hash,
+			"dashboard_snapshot": dict(d),
+			"widgets_snapshot": [dict(w) for w in widgets],
+			"widget_count": len(widgets),
+			"change_summary": change_summary or "auto-snapshot",
+			"actor_id": self.actor_id,
+			"created_at": _now(),
+		}
+		history.append(version)
+		if len(history) > 50:
+			history.pop(0)
+		self._log_audit(tenant_id, "dashboard_version_snapshotted", dashboard_id, {
+			"version_id": version["version_id"],
+			"version_number": version["version_number"],
+			"config_hash": config_hash,
+		})
+		return version
+
+	async def list_dashboard_versions(
+		self,
+		tenant_id: str,
+		dashboard_id: str,
+	) -> list[dict[str, Any]]:
+		"""Return version history for a dashboard, newest first."""
+		guard_tenant_id(tenant_id)
+		self._require(self._dashboards.get(self._tk(tenant_id, dashboard_id)), "Dashboard", dashboard_id)
+		if not hasattr(self, "_dashboard_versions"):
+			return []
+		history = self._dashboard_versions.get(self._tk(tenant_id, dashboard_id), [])
+		return list(reversed(history))
+
+	async def rollback_dashboard(
+		self,
+		tenant_id: str,
+		dashboard_id: str,
+		version_id: str,
+	) -> dict[str, Any]:
+		"""Atomically restore a dashboard to a previous version."""
+		guard_tenant_id(tenant_id)
+		assert version_id, "version_id required"
+		if not hasattr(self, "_dashboard_versions"):
+			raise ValueError(f"No version history for dashboard {dashboard_id}")
+		key = self._tk(tenant_id, dashboard_id)
+		history = self._dashboard_versions.get(key, [])
+		target = next((v for v in history if v["version_id"] == version_id), None)
+		if target is None:
+			raise ValueError(f"Version {version_id} not found")
+		await self.snapshot_dashboard_version(tenant_id, dashboard_id, change_summary="pre-rollback auto-snapshot")
+		self._dashboards[self._tk(tenant_id, dashboard_id)].update({
+			k: v for k, v in target["dashboard_snapshot"].items()
+			if k not in {"id", "tenant_id", "created_at", "created_by"}
+		})
+		self._dashboards[self._tk(tenant_id, dashboard_id)]["updated_at"] = _now()
+		current_keys = [k2 for k2 in self._widgets if k2[0] == tenant_id and self._widgets[k2]["dashboard_id"] == dashboard_id]
+		for k2 in current_keys:
+			del self._widgets[k2]
+		for w in target["widgets_snapshot"]:
+			self._widgets[self._tk(tenant_id, w["id"])] = dict(w)
+		d2 = self._dashboards[self._tk(tenant_id, dashboard_id)]
+		d2["widget_count"] = len(target["widgets_snapshot"])
+		self._log_audit(tenant_id, "dashboard_rolled_back", dashboard_id, {
+			"restored_version_id": version_id,
+			"restored_version_number": target["version_number"],
+		})
+		return {
+			"dashboard_id": dashboard_id,
+			"restored_version_id": version_id,
+			"restored_version_number": target["version_number"],
+			"widget_count_restored": len(target["widgets_snapshot"]),
+			"rolled_back_at": _now(),
+			"actor_id": self.actor_id,
+		}
+
+	# ── KPI Financial Precision ───────────────────────────────────────────────
+
+	async def compute_kpi_financials(
+		self,
+		tenant_id: str,
+		widget_id: str,
+		raw_values: list[str],
+		currency: str = "KES",
+	) -> dict[str, Any]:
+		"""Aggregate monetary KPI values using Decimal arithmetic (ROUND_HALF_EVEN)."""
+		guard_tenant_id(tenant_id)
+		assert raw_values, "raw_values must be non-empty"
+		w = self._require(self._widgets.get(self._tk(tenant_id, widget_id)), "Widget", widget_id)
+		_cent = Decimal("0.01")
+		values: list[Decimal] = [Decimal(str(v)).quantize(_cent, rounding=ROUND_HALF_EVEN) for v in raw_values]
+		n = len(values)
+		total = sum(values, Decimal("0"))
+		mean = (total / n).quantize(_cent, rounding=ROUND_HALF_EVEN)
+		minimum = min(values)
+		maximum = max(values)
+		variance = sum((v - mean) ** 2 for v in values) / n
+		stddev = Decimal(str(float(variance) ** 0.5)).quantize(_cent, rounding=ROUND_HALF_EVEN)
+
+		def _fmt(dec: Decimal) -> str:
+			return f"{currency} {dec:,.2f}"
+
+		financials: dict[str, Any] = {
+			"currency": currency, "n": n,
+			"sum": str(total), "mean": str(mean),
+			"min": str(minimum), "max": str(maximum), "stddev": str(stddev),
+			"sum_formatted": _fmt(total), "mean_formatted": _fmt(mean),
+			"min_formatted": _fmt(minimum), "max_formatted": _fmt(maximum),
+		}
+		w.setdefault("config", {})["financials"] = financials
+		w["updated_at"] = _now()
+		self._log_audit(tenant_id, "kpi_financials_computed", widget_id, {
+			"currency": currency, "n": n, "sum": str(total),
+		})
+		return {"widget_id": widget_id, "widget_name": w["name"], "tenant_id": tenant_id, **financials, "computed_at": _now()}
+
+	# ── Widget Annotations ────────────────────────────────────────────────────
+
+	async def add_widget_annotation(
+		self,
+		tenant_id: str,
+		widget_id: str,
+		label: str,
+		description: str | None = None,
+		timestamp_iso: str | None = None,
+		color: str = "#7C3AED",
+		icon: str = "pin",
+		author_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Attach a timestamped annotation to a widget."""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(label, "label")
+		w = self._require(self._widgets.get(self._tk(tenant_id, widget_id)), "Widget", widget_id)
+		if not hasattr(self, "_annotations"):
+			self._annotations: dict[tuple[str, str], list[dict[str, Any]]] = {}
+		annotation: dict[str, Any] = {
+			"id": _uuid7(), "tenant_id": tenant_id, "widget_id": widget_id,
+			"dashboard_id": w["dashboard_id"], "label": label, "description": description,
+			"timestamp_iso": timestamp_iso or _now(), "color": color, "icon": icon,
+			"author_id": author_id or self.actor_id, "created_at": _now(),
+		}
+		self._annotations.setdefault(self._tk(tenant_id, widget_id), []).append(annotation)
+		self._log_audit(tenant_id, "widget_annotation_added", widget_id, {"annotation_id": annotation["id"], "label": label})
+		return annotation
+
+	async def list_widget_annotations(
+		self,
+		tenant_id: str,
+		widget_id: str,
+		start_ts: str | None = None,
+		end_ts: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Return annotations for a widget, optionally filtered to a time range."""
+		guard_tenant_id(tenant_id)
+		self._require(self._widgets.get(self._tk(tenant_id, widget_id)), "Widget", widget_id)
+		if not hasattr(self, "_annotations"):
+			return []
+		items = list(self._annotations.get(self._tk(tenant_id, widget_id), []))
+		if start_ts:
+			items = [a for a in items if a["timestamp_iso"] >= start_ts]
+		if end_ts:
+			items = [a for a in items if a["timestamp_iso"] <= end_ts]
+		return items
+
+	async def delete_widget_annotation(self, tenant_id: str, widget_id: str, annotation_id: str) -> bool:
+		"""Delete an annotation by ID. Returns True if found and deleted."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_annotations"):
+			return False
+		key = self._tk(tenant_id, widget_id)
+		before = len(self._annotations.get(key, []))
+		self._annotations[key] = [a for a in self._annotations.get(key, []) if a["id"] != annotation_id]
+		removed = len(self._annotations[key]) < before
+		if removed:
+			self._log_audit(tenant_id, "widget_annotation_deleted", widget_id, {"annotation_id": annotation_id})
+		return removed
+
+	# ── Dashboard Template Library ────────────────────────────────────────────
+
+	async def register_dashboard_template(
+		self,
+		tenant_id: str,
+		template_name: str,
+		category: str,
+		dashboard_config: dict[str, Any],
+		widget_specs: list[dict[str, Any]],
+		filter_specs: list[dict[str, Any]] | None = None,
+		owner_id: str | None = None,
+		tags: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Register a reusable dashboard template for rapid provisioning."""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(template_name, "template_name")
+		assert widget_specs, "widget_specs must not be empty"
+		if not hasattr(self, "_templates"):
+			self._templates: dict[tuple[str, str], dict[str, Any]] = {}
+		template: dict[str, Any] = {
+			"id": _uuid7(), "tenant_id": tenant_id, "name": template_name, "category": category,
+			"dashboard_config": dashboard_config, "widget_specs": widget_specs,
+			"filter_specs": filter_specs or [], "tags": tags or [],
+			"owner_id": owner_id or self.actor_id, "use_count": 0,
+			"created_at": _now(), "created_by": owner_id or self.actor_id,
+		}
+		self._templates[self._tk(tenant_id, template["id"])] = template
+		self._log_audit(tenant_id, "dashboard_template_registered", template["id"], {"name": template_name, "category": category})
+		return template
+
+	async def list_dashboard_templates(
+		self,
+		tenant_id: str,
+		category: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List available dashboard templates, optionally filtered by category."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_templates"):
+			return []
+		items = [v for (t, _), v in self._templates.items() if t == tenant_id]
+		if category:
+			items = [tmpl for tmpl in items if tmpl["category"] == category]
+		return items
+
+	async def instantiate_from_template(
+		self,
+		tenant_id: str,
+		template_id: str,
+		name: str,
+		owner_id: str,
+		datasource_overrides: dict[str, str] | None = None,
+	) -> dict[str, Any]:
+		"""Create a new dashboard by cloning a template and rebinding datasources."""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(name, "name")
+		assert owner_id, "owner_id required"
+		if not hasattr(self, "_templates"):
+			raise ValueError(f"Template {template_id} not found")
+		tmpl = self._templates.get(self._tk(tenant_id, template_id))
+		if tmpl is None:
+			raise ValueError(f"Template {template_id} not found")
+		cfg = tmpl["dashboard_config"]
+		dashboard = await self.create_dashboard(
+			tenant_id=tenant_id, name=name, owner_id=owner_id,
+			layout_type=cfg.get("layout_type", "responsive_grid"),
+			access_level=cfg.get("access_level", "private"),
+			description=cfg.get("description"), tags=cfg.get("tags", []),
+			theme=cfg.get("theme", "light"),
+		)
+		overrides = datasource_overrides or {}
+		widget_specs = [
+			{**ws, "datasource_id": overrides.get(ws.get("datasource_id", ""), ws.get("datasource_id", "default"))}
+			for ws in tmpl["widget_specs"]
+		]
+		bulk_result = await self.bulk_create_widgets(
+			tenant_id=tenant_id, dashboard_id=dashboard["id"],
+			widget_specs=widget_specs, owner_id=owner_id,
+		)
+		tmpl["use_count"] += 1
+		self._log_audit(tenant_id, "dashboard_instantiated_from_template", dashboard["id"], {
+			"template_id": template_id, "template_name": tmpl["name"],
+		})
+		return {
+			"dashboard": dashboard, "template_id": template_id,
+			"template_name": tmpl["name"], "widgets_created": bulk_result["created_count"],
+			"datasource_overrides_applied": len(overrides), "instantiated_at": _now(),
+		}
+
+	# ── Async Export Jobs ─────────────────────────────────────────────────────
+
+	async def submit_export_job(
+		self,
+		tenant_id: str,
+		dashboard_id: str,
+		format: str,
+		options: dict[str, Any] | None = None,
+		requested_by: str | None = None,
+	) -> dict[str, Any]:
+		"""Submit an async export job for a large dashboard. Returns job_id immediately."""
+		guard_tenant_id(tenant_id)
+		supported = {"png", "pdf", "html", "json", "csv"}
+		if format not in supported:
+			raise ValueError(f"format must be one of {supported}")
+		d = self._require(self._dashboards.get(self._tk(tenant_id, dashboard_id)), "Dashboard", dashboard_id)
+		if not hasattr(self, "_export_jobs"):
+			self._export_jobs: dict[tuple[str, str], dict[str, Any]] = {}
+		widgets = await self.list_widgets(tenant_id, dashboard_id)
+		job: dict[str, Any] = {
+			"job_id": _uuid7(), "tenant_id": tenant_id, "dashboard_id": dashboard_id,
+			"dashboard_name": d["name"], "format": format, "options": options or {},
+			"status": "queued", "progress_pct": 0, "download_url": None, "error": None,
+			"estimated_seconds": max(5, len(widgets) * 3),
+			"requested_by": requested_by or self.actor_id,
+			"created_at": _now(), "completed_at": None, "_poll_count": 0,
+		}
+		self._export_jobs[self._tk(tenant_id, job["job_id"])] = job
+		self._log_audit(tenant_id, "export_job_submitted", job["job_id"], {"dashboard_id": dashboard_id, "format": format})
+		return {k: v for k, v in job.items() if not k.startswith("_")}
+
+	async def get_export_job_status(self, tenant_id: str, job_id: str) -> dict[str, Any]:
+		"""Poll an export job for status. Simulates completion on the second poll."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_export_jobs"):
+			raise ValueError(f"Export job {job_id} not found")
+		job = self._export_jobs.get(self._tk(tenant_id, job_id))
+		if job is None:
+			raise ValueError(f"Export job {job_id} not found")
+		job["_poll_count"] += 1
+		if job["status"] == "queued" and job["_poll_count"] >= 2:
+			job["status"] = "complete"
+			job["progress_pct"] = 100
+			job["completed_at"] = _now()
+			job["download_url"] = f"https://bi.datacraft.co.ke/exports/{tenant_id}/{job['dashboard_id']}/{job['job_id']}.{job['format']}"
+			self._log_audit(tenant_id, "export_job_completed", job_id, {"format": job["format"]})
+		elif job["status"] == "queued":
+			job["progress_pct"] = 50
+		return {k: v for k, v in job.items() if not k.startswith("_")}
+
+	async def cancel_export_job(self, tenant_id: str, job_id: str) -> bool:
+		"""Cancel a queued export job. Returns False if already completed."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_export_jobs"):
+			return False
+		job = self._export_jobs.get(self._tk(tenant_id, job_id))
+		if job is None or job["status"] != "queued":
+			return False
+		job["status"] = "cancelled"
+		job["completed_at"] = _now()
+		self._log_audit(tenant_id, "export_job_cancelled", job_id)
+		return True
+
+	# ── Row-Level Security ────────────────────────────────────────────────────
+
+	async def set_rls_policy(
+		self,
+		tenant_id: str,
+		dashboard_id: str,
+		policy: dict[str, Any],
+		owner_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Attach a row-level security policy to a dashboard."""
+		guard_tenant_id(tenant_id)
+		assert policy, "policy must be non-empty"
+		self._require(self._dashboards.get(self._tk(tenant_id, dashboard_id)), "Dashboard", dashboard_id)
+		if not hasattr(self, "_rls_policies"):
+			self._rls_policies: dict[tuple[str, str], dict[str, Any]] = {}
+		record: dict[str, Any] = {
+			"id": _uuid7(), "tenant_id": tenant_id, "dashboard_id": dashboard_id,
+			"policy": policy, "owner_id": owner_id or self.actor_id,
+			"active": True, "created_at": _now(), "updated_at": _now(),
+		}
+		self._rls_policies[self._tk(tenant_id, dashboard_id)] = record
+		self._log_audit(tenant_id, "rls_policy_set", dashboard_id, {"role_count": len(policy)})
+		return record
+
+	async def resolve_rls_filters(
+		self,
+		tenant_id: str,
+		dashboard_id: str,
+		actor_id: str,
+		actor_roles: list[str],
+	) -> dict[str, Any]:
+		"""Compute the effective RLS filter set for an actor given their roles."""
+		guard_tenant_id(tenant_id)
+		assert actor_roles, "actor_roles must not be empty"
+		empty = {"tenant_id": tenant_id, "dashboard_id": dashboard_id, "actor_id": actor_id, "filters": {}, "roles_matched": []}
+		if not hasattr(self, "_rls_policies"):
+			return empty
+		record = self._rls_policies.get(self._tk(tenant_id, dashboard_id))
+		if record is None:
+			return empty
+		pol = record["policy"]
+		merged: dict[str, Any] = {}
+		matched_roles: list[str] = []
+		for role in actor_roles:
+			if role in pol:
+				matched_roles.append(role)
+				for field, constraint in pol[role].items():
+					if field not in merged:
+						merged[field] = constraint
+					else:
+						existing = merged[field] if isinstance(merged[field], list) else [merged[field]]
+						new_vals = constraint if isinstance(constraint, list) else [constraint]
+						merged[field] = list(set(existing) | set(new_vals))
+		self._log_audit(tenant_id, "rls_policy_applied", dashboard_id, {"actor_id": actor_id, "roles_matched": matched_roles})
+		return {
+			"tenant_id": tenant_id, "dashboard_id": dashboard_id, "actor_id": actor_id,
+			"filters": merged, "roles_matched": matched_roles, "resolved_at": _now(),
+		}
+
+	# ── Collaboration: Session Presence ──────────────────────────────────────
+
+	async def enter_dashboard_session(
+		self,
+		tenant_id: str,
+		dashboard_id: str,
+		actor_id: str,
+		cursor_position: dict[str, float] | None = None,
+		widget_focus: str | None = None,
+	) -> dict[str, Any]:
+		"""Register an actor as actively editing/viewing a dashboard (presence awareness)."""
+		guard_tenant_id(tenant_id)
+		assert actor_id, "actor_id required"
+		self._require(self._dashboards.get(self._tk(tenant_id, dashboard_id)), "Dashboard", dashboard_id)
+		if not hasattr(self, "_sessions"):
+			self._sessions: dict[tuple[str, str], list[dict[str, Any]]] = {}
+		key = self._tk(tenant_id, dashboard_id)
+		participants = [p for p in self._sessions.setdefault(key, []) if p["actor_id"] != actor_id]
+		entry: dict[str, Any] = {
+			"actor_id": actor_id, "tenant_id": tenant_id, "dashboard_id": dashboard_id,
+			"cursor_position": cursor_position or {"x": 0.0, "y": 0.0},
+			"widget_focus": widget_focus, "joined_at": _now(), "last_seen_at": _now(),
+		}
+		participants.append(entry)
+		self._sessions[key] = participants
+		self._log_audit(tenant_id, "session_entered", dashboard_id, {"actor_id": actor_id})
+		return {
+			"dashboard_id": dashboard_id, "actor_id": actor_id,
+			"participant_count": len(participants), "participants": participants, "joined_at": entry["joined_at"],
+		}
+
+	async def leave_dashboard_session(self, tenant_id: str, dashboard_id: str, actor_id: str) -> dict[str, Any]:
+		"""Remove an actor from the active session for a dashboard."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_sessions"):
+			return {"dashboard_id": dashboard_id, "actor_id": actor_id, "removed": False}
+		key = self._tk(tenant_id, dashboard_id)
+		before = len(self._sessions.get(key, []))
+		self._sessions[key] = [p for p in self._sessions.get(key, []) if p["actor_id"] != actor_id]
+		removed = len(self._sessions[key]) < before
+		if removed:
+			self._log_audit(tenant_id, "session_left", dashboard_id, {"actor_id": actor_id})
+		return {"dashboard_id": dashboard_id, "actor_id": actor_id, "removed": removed,
+			"remaining_participants": len(self._sessions.get(key, []))}
+
+	async def get_session_participants(self, tenant_id: str, dashboard_id: str) -> list[dict[str, Any]]:
+		"""Return the current list of active participants for a dashboard session."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_sessions"):
+			return []
+		return list(self._sessions.get(self._tk(tenant_id, dashboard_id), []))
 

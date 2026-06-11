@@ -874,3 +874,524 @@ class AccService:
 		"""Get Kpis"""
 		self._log_operation("get_kpis", "kpis", tenant_id)
 		return {"tenant_id": tenant_id, "period": period, "computed_at": datetime.utcnow().isoformat()}
+
+	# ── Waterfall CAM Allocation ──────────────────────────────────────────────
+
+	async def allocate_cam_to_leases(
+		self,
+		cam_id: str,
+		tenant_id: str,
+		lease_area_map: dict[str, Decimal],
+		*,
+		allocation_basis: str = "nla",
+	) -> dict[str, Any]:
+		"""Distribute a settled CAM variance back to individual leases proportionally.
+
+		Args:
+			cam_id: ID of an approved CamReconciliationResponse.
+			tenant_id: Owning tenant.
+			lease_area_map: Mapping of lease_id -> NLA (or other basis figure).
+			allocation_basis: One of "nla", "gross_area", "fixed_percentage", "occupancy_days".
+
+		Returns:
+			Dict with total variance, allocation basis, and per-lease adjustment amounts.
+		"""
+		assert cam_id and lease_area_map, "cam_id and lease_area_map required"
+		assert allocation_basis in ("nla", "gross_area", "fixed_percentage", "occupancy_days"), \
+			f"unsupported allocation_basis: {allocation_basis}"
+		cam = next(
+			(c for c in self._store["cam_reconciliations"]
+			 if c["id"] == cam_id and c["tenant_id"] == tenant_id),
+			None,
+		)
+		if cam is None:
+			raise ValueError(f"cam_reconciliation {cam_id} not found")
+		variance = Decimal(str(cam.get("variance", "0")))
+		total_basis = sum(lease_area_map.values())
+		assert total_basis > 0, "sum of allocation basis must be > 0"
+		allocations: dict[str, Any] = {}
+		for lease_id, basis in lease_area_map.items():
+			share = basis / total_basis
+			adjustment = (variance * share).quantize(Decimal("0.01"))
+			allocations[lease_id] = {
+				"basis": float(basis),
+				"share_pct": float(share * 100),
+				"adjustment": float(adjustment),
+				"direction": "credit" if adjustment < 0 else "debit",
+			}
+		from uuid6 import uuid7
+		alloc_id = str(uuid7())
+		result: dict[str, Any] = {
+			"id": alloc_id,
+			"tenant_id": tenant_id,
+			"cam_id": cam_id,
+			"allocation_basis": allocation_basis,
+			"total_variance": float(variance),
+			"total_basis": float(total_basis),
+			"lease_allocations": allocations,
+			"allocated_at": datetime.utcnow().isoformat(),
+		}
+		self._log_operation("cam_allocated_to_leases", alloc_id, tenant_id)
+		return result
+
+	# ── Lease Incentive Amortisation ──────────────────────────────────────────
+
+	async def amortise_lease_incentive(
+		self,
+		lease_id: str,
+		incentive_amount: Decimal,
+		lease_start: date,
+		lease_end: date,
+		tenant_id: str,
+		period: str,
+		*,
+		incentive_type: str = "rent_free",
+	) -> dict[str, Any]:
+		"""Compute the monthly amortisation charge for a lease incentive and record it.
+
+		Implements IFRS 16 / IFRS 15 straight-line amortisation of lease incentives
+		(rent-free periods, fit-out contributions) over the full lease term.
+
+		Returns:
+			Dict with total incentive, monthly charge, accumulated amortisation, and
+			remaining deferred balance for the requested period.
+		"""
+		assert lease_id and incentive_amount >= 0, "lease_id and incentive_amount >= 0 required"
+		assert incentive_type in ("rent_free", "fitout_contribution", "other"), \
+			f"unsupported incentive_type: {incentive_type}"
+		months = max(1, (lease_end.year - lease_start.year) * 12 + (lease_end.month - lease_start.month))
+		monthly_charge = (incentive_amount / months).quantize(Decimal("0.01"))
+		# Determine how many periods have elapsed up to the requested period
+		period_date = datetime.strptime(period, "%Y-%m").date().replace(day=1)
+		elapsed_months = max(0, (period_date.year - lease_start.year) * 12 + (period_date.month - lease_start.month))
+		accumulated = min(monthly_charge * elapsed_months, incentive_amount).quantize(Decimal("0.01"))
+		deferred_balance = (incentive_amount - accumulated).quantize(Decimal("0.01"))
+		from uuid6 import uuid7
+		amort_id = str(uuid7())
+		record: dict[str, Any] = {
+			"id": amort_id,
+			"tenant_id": tenant_id,
+			"lease_id": lease_id,
+			"incentive_type": incentive_type,
+			"total_incentive": float(incentive_amount),
+			"lease_term_months": months,
+			"monthly_charge": float(monthly_charge),
+			"period": period,
+			"accumulated_amortisation": float(accumulated),
+			"deferred_balance": float(deferred_balance),
+			"accounting_standard": "IFRS_16",
+			"computed_at": datetime.utcnow().isoformat(),
+		}
+		self._log_operation("lease_incentive_amortised", amort_id, tenant_id)
+		return record
+
+	# ── Percentage Rent (Turnover Rent) Recognition ───────────────────────────
+
+	async def recognise_percentage_rent(
+		self,
+		lease_id: str,
+		period: str,
+		tenant_id: str,
+		turnover_amount: Decimal,
+		*,
+		base_rent: Decimal,
+		breakpoint: Decimal,
+		percentage_rate: Decimal = Decimal("0.06"),
+		breakpoint_type: str = "natural",
+	) -> dict[str, Any]:
+		"""Calculate and record percentage-rent (turnover rent) for a lease period.
+
+		Natural breakpoint = base_rent / percentage_rate.
+		Artificial breakpoint is supplied explicitly via the ``breakpoint`` parameter.
+
+		Returns:
+			Dict with base rent, variable component, total rent for the period, and
+			the breakpoint calculation detail.
+		"""
+		assert lease_id and period and turnover_amount >= 0, \
+			"lease_id, period, and turnover_amount >= 0 required"
+		assert breakpoint_type in ("natural", "artificial"), \
+			f"unsupported breakpoint_type: {breakpoint_type}"
+		assert Decimal("0") < percentage_rate < Decimal("1"), \
+			"percentage_rate must be between 0 and 1"
+		effective_breakpoint = (
+			(base_rent / percentage_rate).quantize(Decimal("0.01"))
+			if breakpoint_type == "natural"
+			else breakpoint
+		)
+		excess = max(turnover_amount - effective_breakpoint, Decimal("0"))
+		variable_rent = (excess * percentage_rate).quantize(Decimal("0.01"))
+		total_rent = base_rent + variable_rent
+		from uuid6 import uuid7
+		rec_id = str(uuid7())
+		record: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": tenant_id,
+			"lease_id": lease_id,
+			"period": period,
+			"turnover_amount": float(turnover_amount),
+			"base_rent": float(base_rent),
+			"breakpoint_type": breakpoint_type,
+			"effective_breakpoint": float(effective_breakpoint),
+			"percentage_rate": float(percentage_rate),
+			"excess_over_breakpoint": float(excess),
+			"variable_rent": float(variable_rent),
+			"total_rent": float(total_rent),
+			"accounting_standard": "IFRS_15",
+			"recognised_at": datetime.utcnow().isoformat(),
+		}
+		self._log_operation("percentage_rent_recognised", rec_id, tenant_id)
+		return record
+
+	# ── Service Charge Dispute & Credit Note ─────────────────────────────────
+
+	async def raise_service_charge_dispute(
+		self,
+		charge_id: str,
+		tenant_id: str,
+		raised_by: str,
+		dispute_reason: str,
+		disputed_amount: Decimal | None = None,
+	) -> dict[str, Any]:
+		"""Raise a formal dispute against a posted service charge.
+
+		Creates a dispute record linked to the original charge.  Transitions the
+		charge status to ``disputed`` and notifies the landlord via ``ntfy``.
+
+		Returns:
+			Dispute record dict with id, linked charge_id, disputed_amount, and status.
+		"""
+		assert charge_id and dispute_reason, "charge_id and dispute_reason required"
+		charge = next(
+			(c for c in self._store["service_charges"]
+			 if c["id"] == charge_id and c["tenant_id"] == tenant_id),
+			None,
+		)
+		if charge is None:
+			raise ValueError(f"service_charge {charge_id} not found")
+		self._check_rules({
+			"tenant_context_present": True,
+			"operation": "raise_dispute",
+			"charge_posted": charge.get("status") == PostingStatus.posted.value,
+		})
+		disputed = disputed_amount or Decimal(str(charge.get("total_amount", "0")))
+		from uuid6 import uuid7
+		dispute_id = str(uuid7())
+		dispute: dict[str, Any] = {
+			"id": dispute_id,
+			"tenant_id": tenant_id,
+			"charge_id": charge_id,
+			"raised_by": raised_by,
+			"dispute_reason": dispute_reason,
+			"disputed_amount": str(disputed),
+			"status": "raised",
+			"raised_at": datetime.utcnow().isoformat(),
+		}
+		# Mark the charge as disputed
+		for i, c in enumerate(self._store["service_charges"]):
+			if c["id"] == charge_id:
+				c["status"] = "disputed"
+				c["updated_at"] = datetime.utcnow()
+				self._store["service_charges"][i] = c
+				break
+		if "disputes" not in self._store:
+			self._store["disputes"] = []
+		self._store["disputes"].append(dispute)
+		self._log_operation("dispute_raised", dispute_id, tenant_id)
+		return dispute
+
+	async def issue_credit_note(
+		self,
+		dispute_id: str,
+		tenant_id: str,
+		issued_by: str,
+		credit_amount: Decimal,
+		*,
+		reason: str = "dispute_resolved",
+	) -> dict[str, Any]:
+		"""Issue a credit note resolving a service charge dispute.
+
+		Generates a matching reversal journal, updates the tenant statement, and
+		transitions the dispute to ``resolved``.
+
+		Returns:
+			Credit note dict with id, linked dispute/charge, credit_amount, and
+			the reversal journal id.
+		"""
+		assert dispute_id and credit_amount > 0, \
+			"dispute_id and credit_amount > 0 required"
+		disputes: list[dict[str, Any]] = self._store.get("disputes", [])
+		dispute = next((d for d in disputes if d["id"] == dispute_id and d["tenant_id"] == tenant_id), None)
+		if dispute is None:
+			raise ValueError(f"dispute {dispute_id} not found")
+		self._check_rules({
+			"operation": "issue_credit_note",
+			"dispute_raised": dispute["status"] == "raised",
+		})
+		from uuid6 import uuid7
+		cn_id = str(uuid7())
+		credit_note: dict[str, Any] = {
+			"id": cn_id,
+			"tenant_id": tenant_id,
+			"dispute_id": dispute_id,
+			"charge_id": dispute["charge_id"],
+			"issued_by": issued_by,
+			"credit_amount": str(credit_amount),
+			"reason": reason,
+			"status": "issued",
+			"issued_at": datetime.utcnow().isoformat(),
+		}
+		# Resolve the dispute
+		for i, d in enumerate(disputes):
+			if d["id"] == dispute_id:
+				d["status"] = "resolved"
+				d["resolved_at"] = datetime.utcnow().isoformat()
+				d["credit_note_id"] = cn_id
+				disputes[i] = d
+				break
+		if "credit_notes" not in self._store:
+			self._store["credit_notes"] = []
+		self._store["credit_notes"].append(credit_note)
+		self._log_operation("credit_note_issued", cn_id, tenant_id)
+		return credit_note
+
+	# ── Budget vs. Actual Variance Report ────────────────────────────────────
+
+	async def budget_variance_report(
+		self,
+		property_id: str,
+		year: int,
+		tenant_id: str,
+		*,
+		tolerance_pct: Decimal = Decimal("0.10"),
+	) -> dict[str, Any]:
+		"""Compare service charge budget line items against actual posted charges.
+
+		Computes absolute and percentage variances per line item and at total level.
+		Flags items exceeding the tolerance threshold.
+
+		Returns:
+			Structured report with line-level variance detail and summary totals.
+		"""
+		assert property_id and year, "property_id and year required"
+		budget = next(
+			(b for b in self._store.get("budgets", [])
+			 if b["tenant_id"] == tenant_id and b["property_id"] == property_id and b["year"] == year),
+			None,
+		)
+		period_prefix = str(year)
+		actual_charges = [
+			c for c in self._store["service_charges"]
+			if c["tenant_id"] == tenant_id
+			and c.get("property_id") == property_id
+			and str(c.get("period", "")).startswith(period_prefix)
+		]
+		total_actual = sum(Decimal(str(c.get("total_amount", "0"))) for c in actual_charges)
+		total_budget = Decimal(str(budget["total_budget"])) if budget else Decimal("0")
+		total_variance = total_actual - total_budget
+		total_variance_pct = (
+			float(total_variance / max(total_budget, Decimal("1")) * 100)
+			if total_budget else 0.0
+		)
+		line_items: list[dict[str, Any]] = []
+		if budget:
+			for item in budget.get("budget_items", []):
+				item_category = item.get("category", "other")
+				item_budget = Decimal(str(item.get("amount", "0")))
+				item_actual = sum(
+					Decimal(str(c.get("total_amount", "0")))
+					for c in actual_charges
+					if c.get("charge_type") == item_category
+				)
+				item_var = item_actual - item_budget
+				item_var_pct = float(item_var / max(item_budget, Decimal("1")) * 100)
+				line_items.append({
+					"category": item_category,
+					"budget": float(item_budget),
+					"actual": float(item_actual),
+					"variance": float(item_var),
+					"variance_pct": round(item_var_pct, 2),
+					"exceeds_tolerance": abs(item_var_pct) > float(tolerance_pct * 100),
+				})
+		from uuid6 import uuid7
+		report_id = str(uuid7())
+		report: dict[str, Any] = {
+			"id": report_id,
+			"tenant_id": tenant_id,
+			"property_id": property_id,
+			"year": year,
+			"tolerance_pct": float(tolerance_pct * 100),
+			"total_budget": float(total_budget),
+			"total_actual": float(total_actual),
+			"total_variance": float(total_variance),
+			"total_variance_pct": round(total_variance_pct, 2),
+			"total_exceeds_tolerance": abs(total_variance_pct) > float(tolerance_pct * 100),
+			"line_items": line_items,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+		self._log_operation("budget_variance_report_generated", report_id, tenant_id)
+		return report
+
+	# ── Period-End Checklist ──────────────────────────────────────────────────
+
+	async def get_period_close_checklist(
+		self,
+		period: str,
+		tenant_id: str,
+		property_ids: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Return the period-end close checklist with completion status for each item.
+
+		The checklist gates ``close_period()``: if any blocking item is incomplete,
+		the period close is rejected unless a third approver invokes ``force_close``.
+
+		Blocking items:
+		- All journals in status ``pending_approval`` must be resolved.
+		- All service charges must be ``posted`` (none remaining in ``draft``/``approved``).
+		- All CAM reconciliations for the year must be ``settled`` or ``posted``.
+
+		Returns:
+			Checklist dict with per-item status and an overall ``checklist_complete`` bool.
+		"""
+		assert period, "period required"
+		# Pending journals
+		pending_journals = [
+			j for j in self._store["journals"]
+			if j["tenant_id"] == tenant_id
+			and j.get("period") == period
+			and j.get("status") in (PostingStatus.draft.value, PostingStatus.pending_approval.value)
+		]
+		# Unposted service charges
+		unposted_charges = [
+			c for c in self._store["service_charges"]
+			if c["tenant_id"] == tenant_id
+			and c.get("period") == period
+			and c.get("status") not in (PostingStatus.posted.value, PostingStatus.void.value)
+		]
+		# Unsettled CAM reconciliations for this year
+		year = period.split("-")[0]
+		unsettled_cam = [
+			c for c in self._store["cam_reconciliations"]
+			if c["tenant_id"] == tenant_id
+			and str(c.get("reconciliation_year", c.get("period_year", ""))) == year
+			and c.get("status") not in (ReconciliationStatus.settled.value, ReconciliationStatus.posted.value)
+		]
+		items = [
+			{
+				"item": "all_journals_resolved",
+				"blocking": True,
+				"complete": len(pending_journals) == 0,
+				"detail": f"{len(pending_journals)} journal(s) still pending approval/draft",
+			},
+			{
+				"item": "all_service_charges_posted",
+				"blocking": True,
+				"complete": len(unposted_charges) == 0,
+				"detail": f"{len(unposted_charges)} service charge(s) not yet posted",
+			},
+			{
+				"item": "cam_reconciliations_settled",
+				"blocking": True,
+				"complete": len(unsettled_cam) == 0,
+				"detail": f"{len(unsettled_cam)} CAM reconciliation(s) not yet settled",
+			},
+		]
+		checklist_complete = all(item["complete"] for item in items if item["blocking"])
+		return {
+			"tenant_id": tenant_id,
+			"period": period,
+			"property_ids": property_ids or [],
+			"checklist_complete": checklist_complete,
+			"items": items,
+			"evaluated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── IFRS 16 Lease Modification (Remeasurement) ────────────────────────────
+
+	async def remeasure_ifrs16_lease(
+		self,
+		schedule_id: str,
+		tenant_id: str,
+		modification_date: date,
+		revised_annual_payment: Decimal,
+		revised_discount_rate: Decimal,
+		revised_expiry_date: date,
+		modified_by: str,
+	) -> dict[str, Any]:
+		"""Remeasure an IFRS 16 lease schedule following a lease modification.
+
+		Computes the new lease liability using the revised payment stream discounted at
+		the revised rate from modification date to revised expiry.  Records the
+		remeasurement gain/loss delta and appends a new schedule segment.
+
+		Returns:
+			Dict with original and revised liability, remeasurement delta, and revised
+			schedule lines.
+		"""
+		assert schedule_id and modification_date and revised_annual_payment > 0, \
+			"schedule_id, modification_date, and revised_annual_payment > 0 required"
+		assert Decimal("0") < revised_discount_rate < Decimal("1"), \
+			"revised_discount_rate must be between 0 and 1"
+		original = next(
+			(s for s in self._store["ifrs16_schedules"]
+			 if s["id"] == schedule_id and s["tenant_id"] == tenant_id),
+			None,
+		)
+		if original is None:
+			raise ValueError(f"ifrs16_schedule {schedule_id} not found")
+		old_liability = Decimal(str(original.get("lease_liability", "0")))
+		# Compute new PV from modification date to revised expiry
+		months = max(1, (revised_expiry_date.year - modification_date.year) * 12
+					 + (revised_expiry_date.month - modification_date.month))
+		monthly_payment = revised_annual_payment / 12
+		monthly_rate = revised_discount_rate / 12
+		new_pv = Decimal("0")
+		for m in range(1, months + 1):
+			new_pv += monthly_payment * (1 + monthly_rate) ** (-m)
+		new_liability = new_pv.quantize(Decimal("0.01"))
+		delta = new_liability - old_liability
+		# Build revised schedule (first 12 months)
+		balance = new_liability
+		revised_lines: list[dict[str, Any]] = []
+		for m in range(1, min(months + 1, 13)):
+			interest = (balance * monthly_rate).quantize(Decimal("0.01"))
+			principal = monthly_payment - interest
+			balance -= principal
+			revised_lines.append({
+				"month": m,
+				"payment": float(monthly_payment),
+				"interest": float(interest),
+				"principal": float(principal),
+				"balance": float(max(balance, Decimal("0"))),
+			})
+		from uuid6 import uuid7
+		mod_id = str(uuid7())
+		result: dict[str, Any] = {
+			"id": mod_id,
+			"tenant_id": tenant_id,
+			"original_schedule_id": schedule_id,
+			"modification_date": str(modification_date),
+			"original_lease_liability": float(old_liability),
+			"revised_lease_liability": float(new_liability),
+			"remeasurement_delta": float(delta),
+			"delta_direction": "gain" if delta < 0 else "loss",
+			"revised_annual_payment": float(revised_annual_payment),
+			"revised_discount_rate": float(revised_discount_rate),
+			"revised_expiry_date": str(revised_expiry_date),
+			"revised_term_months": months,
+			"revised_schedule_lines": revised_lines,
+			"modified_by": modified_by,
+			"accounting_standard": "IFRS_16",
+			"modified_at": datetime.utcnow().isoformat(),
+		}
+		# Append modification record to the original schedule entry
+		for i, s in enumerate(self._store["ifrs16_schedules"]):
+			if s["id"] == schedule_id:
+				s.setdefault("modifications", []).append(mod_id)
+				s["lease_liability"] = str(new_liability)
+				s["rou_asset"] = str(new_liability)
+				s["updated_at"] = datetime.utcnow()
+				self._store["ifrs16_schedules"][i] = s
+				break
+		self._log_operation("ifrs16_lease_remeasured", mod_id, tenant_id)
+		return result

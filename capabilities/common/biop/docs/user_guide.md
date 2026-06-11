@@ -613,4 +613,345 @@ For technical support:
 
 ---
 
-*This user guide covers the revolutionary APG Biometric Authentication capability. For additional support, refer to the complete documentation set or contact our expert support team.*
+*This user guide covers the APG Biometric Authentication capability. For additional support refer to the complete documentation set or contact nyimbi@gmail.com.*
+
+---
+
+## New Capabilities (service.py methods 43–50)
+
+The sections below cover the eight method groups added in the latest release.
+All examples assume:
+
+```python
+from capabilities.common.biop.service import BiometricService
+svc = BiometricService(actor_id="api-service", tenant_id="acme")
+user = await svc.register_user("ext-001", "Amina Hassan", email="amina@acme.ke")
+```
+
+---
+
+## FIDO2 / WebAuthn
+
+BIOP now manages the full FIDO2 credential lifecycle including hardware attestation
+and sign_count clone detection.
+
+### Register a credential
+
+```python
+cred = await svc.fido2_credential_register(
+    user_id=user["user_id"],
+    credential_id="cred-abc123",
+    aaguid="adce0002-35bc-c60a-648b-0b25f1f05503",  # YubiKey 5 series
+    public_key_cbor="a501020326200121582058...",
+    attestation_type="packed",
+    transports=["usb", "nfc"],
+    backup_eligible=True,
+    uv_flag=True,
+)
+```
+
+### Verify an assertion
+
+```python
+# Pass signature_valid=True after verifying ECDSA with the stored public_key_cbor
+result = await svc.fido2_assertion_verify(
+    credential_id=cred["credential_id"],
+    authenticator_data_hex="49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d9763...",
+    client_data_hash_hex="687474703a2f2f6c6f63616c686f73743a38303030",
+    signature_valid=True,
+    new_sign_count=1,
+)
+assert result["decision"] == "accept"
+# If new_sign_count <= stored count, credential is flagged "compromised"
+```
+
+Supported `attestation_type` values: `packed`, `tpm`, `android-key`,
+`android-safetynet`, `fido-u2f`, `none`.
+
+---
+
+## Step-Up Authentication
+
+Multi-modality step-up flows with session state and TTL.
+
+### Create a session
+
+```python
+session = await svc.step_up_session_create(
+    user_id=user["user_id"],
+    initial_modality="fingerprint",
+    initial_score=0.72,
+    required_confidence=0.90,
+    step_up_modalities=["face", "iris"],
+    ttl_seconds=300,
+)
+# session["status"] == "step_up_required"
+# session["next_modality"] == "face"
+```
+
+### Evaluate a step-up result
+
+```python
+face_v = await svc.verify(user["user_id"], "face", face_probe_bytes)
+session = await svc.step_up_session_evaluate(
+    session_id=session["session_id"],
+    verification_id=face_v["verification_id"],
+    new_score=face_v["match_score"],
+)
+print(session["status"])  # "satisfied" when fused_score >= required_confidence
+```
+
+Session lifecycle: `step_up_required` → `satisfied` | `failed` | `expired`.
+
+---
+
+## Data Retention and Compliance
+
+### Set a retention policy
+
+```python
+policy = await svc.retention_policy_set(
+    modality="fingerprint",
+    retention_days=365,
+    legal_basis="GDPR_Art9_2b",
+    jurisdiction="KE",
+)
+```
+
+### Run a retention sweep
+
+```python
+# Typically called by a nightly cron
+report = await svc.retention_sweep()
+print(f"Revoked {report['expired_templates']} templates for {report['affected_user_count']} users")
+```
+
+Templates past their modality policy (or 730-day default) are soft-deleted with
+`revoke_reason="retention_expired_after_{n}d"` and a full audit event.
+
+---
+
+## Billing and Cost Tracking
+
+All monetary values use `decimal.Decimal` with `ROUND_HALF_EVEN` (banker's rounding).
+Values are stored and returned as `str`-encoded Decimals for JSON safety.
+
+### Record a verification cost
+
+```python
+# Optional: set a cost schedule for a modality
+from decimal import Decimal
+svc._cost_schedules[svc._key(svc.tenant_id, "face")] = {
+    "unit_cost": "0.03",
+    "currency": "USD",
+}
+
+v = await svc.verify(user["user_id"], "face", probe_bytes)
+bill = await svc.verification_cost_record(v["verification_id"], currency="USD")
+# bill["line_total"] == "0.0300"
+```
+
+### Generate a billing summary
+
+```python
+summary = await svc.billing_summary(
+    from_date="2026-01-01",
+    to_date="2026-06-30",
+    currency="USD",
+)
+print(summary["total_cost"])          # e.g. "142.8600"
+print(summary["by_modality"])         # {"face": "87.0000", "fingerprint": "55.8600"}
+```
+
+---
+
+## Uncertainty-Aware Verification
+
+Standard `verify()` returns a scalar `match_score`.
+`match_confidence_with_uncertainty()` bootstraps a 90% confidence interval via
+bit-window sampling across 16 windows of the SHA-256 hash comparison.
+
+```python
+result = await svc.match_confidence_with_uncertainty(
+    user_id=user["user_id"],
+    modality="face",
+    probe_bytes=probe_bytes,
+    threshold=0.85,
+    n_windows=16,
+)
+print(result["match_score"])           # mean over windows
+print(result["confidence_interval"])   # [ci_lo, ci_hi]  (90% CI)
+print(result["high_uncertainty"])      # True when CI width > 0.15
+print(result["decision"])              # "accept" or "reject"
+```
+
+When `high_uncertainty=True` and `decision="accept"`, an additional
+`uncertainty_review_needed` audit event is emitted automatically.
+
+Decision rules:
+
+| CI width | Action |
+|----------|--------|
+| <= 0.15  | Normal accept/reject per threshold |
+| > 0.15   | Accept proceeds but triggers `uncertainty_review_needed` audit event |
+
+---
+
+## PAD Evidence Chains
+
+For forensic and legal admissibility, PAD indicators can be cryptographically
+bound to the parent verification record using SHA-256.
+
+### Create an evidence chain
+
+```python
+challenge = await svc.issue_liveness_challenge(user["user_id"], "face", "blink")
+await svc.complete_liveness_challenge(challenge["challenge_id"], b"response", pad_score=0.95)
+v = await svc.verify(user["user_id"], "face", probe_bytes)
+
+chain = await svc.pad_evidence_chain_create(
+    verification_id=v["verification_id"],
+    challenge_id=challenge["challenge_id"],
+    pad_indicators=[],   # pass spoofing artifact labels if detected
+)
+print(chain["chain_hash"])   # 64-char SHA-256 hex digest
+```
+
+### Verify chain integrity
+
+```python
+check = await svc.pad_evidence_chain_verify(chain["chain_id"])
+assert check["integrity_verified"] is True
+# integrity_verified=False indicates the stored record was tampered with
+```
+
+The hash input is deterministic:
+`verification_id | challenge_nonce | sorted_indicators | chained_at`
+
+---
+
+## Governance Agents
+
+AI agents participating in biometric decisions (PAD classifiers, match reviewers,
+anomaly detectors) must be registered before their invocations are logged.
+
+### Register an agent
+
+```python
+agent = await svc.biometric_agent_register(
+    agent_id="agent-pad-classifier-v2",
+    name="PAD Classifier v2",
+    runtime="claude_code",        # codex | claude_code | opencode | pi
+    role="pad_classifier",        # pad_classifier | match_reviewer | anomaly_detector
+                                  # | compliance_checker | consent_evaluator
+    scope="Classify PAD attack artifacts in face liveness challenges",
+    owner="security-team",
+    purpose="Reduce manual PAD review workload",
+    contribution_disclosed=True,
+    human_approval_required=False,
+)
+```
+
+Agents with `human_approval_required=True` are created with
+`status="pending_review"` and cannot log invocations until approved.
+
+### Log an invocation
+
+```python
+inv = await svc.biometric_agent_invoke_log(
+    agent_id=agent["agent_id"],
+    operation="pad_analysis",
+    linked_record_id=challenge["challenge_id"],
+    input_summary="face_liveness_challenge; modality=face; challenge_type=blink",
+    output_summary="no_attack_detected; confidence=0.97",
+    latency_ms=43,
+    confidence_score=0.97,
+)
+```
+
+Raw biometric bytes must never appear in `input_summary` or `output_summary`.
+
+---
+
+## Analytics and Reporting
+
+### KPI dashboard
+
+```python
+dash = await svc.dashboard()
+# Keys: total_users, active_users, opted_out_users,
+#       template_counts_by_modality, verification_stats,
+#       watchlist_count, consent_records
+```
+
+### Performance metrics (FAR / FRR / EER)
+
+```python
+metrics = await svc.performance_metrics(modality="face")
+print(metrics["eer"])   # Equal Error Rate
+```
+
+### Compliance report
+
+```python
+report = await svc.compliance_report(framework="GDPR")
+# Keys: total_data_subjects, subjects_with_consent, subjects_opted_out,
+#       consent_rate, retention_policy_enforced, audit_trail_complete
+```
+
+### Template quality report
+
+```python
+quality = await svc.template_quality_report()
+print(quality["avg_quality"], quality["low_quality_count"])
+```
+
+### Audit trail export
+
+```python
+events = await svc.audit_trail_export(event_type="fido2_assertion_verified")
+```
+
+---
+
+## Troubleshooting
+
+### Low match scores after template enrolment
+
+1. Run `quality_assess()` on the sample bytes before enrolment. Reject samples
+   with `quality_score < 0.4` (`usable=False`).
+2. Use `biometric_update()` to replace a degraded template without deleting the
+   user record.
+3. Check `template_quality_report()` for tenant-wide quality trends.
+
+### High uncertainty warnings (`high_uncertainty=True`)
+
+- Probe sample quality is low relative to the enrolled template.
+- Environmental factors (lighting, sensor noise) are causing hash-comparison
+  variance across bit windows.
+- Consider lowering `n_windows` (increases per-window length, reduces variance)
+  or enforcing a quality gate via `quality_assess()`.
+
+### Step-up session expired
+
+Sessions have a 300-second default TTL.  Recreate the session with
+`step_up_session_create()` and restart the modality cascade.
+
+### FIDO2 counter rollback detected
+
+The credential is automatically marked `compromised` and all subsequent
+assertions are rejected.  Revoke the credential via `revoke_template()` and
+re-register the authenticator.  This is a strong signal of credential cloning.
+
+### Templates not swept by retention_sweep
+
+Verify a retention policy exists for the modality:
+```python
+policy = svc._retention_policies.get(svc._key(svc.tenant_id, "fingerprint"))
+print(policy)  # None → default 730-day policy applies
+```
+
+### Contact
+
+- Email: nyimbi@gmail.com
+- Include audit_log export (from `audit_trail_export()`) and service version.

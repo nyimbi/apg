@@ -896,3 +896,724 @@ class TenService:
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ── Deposit Management ────────────────────────────────────────────────────
+
+	async def register_deposit(
+		self,
+		tenant_entity_id: str,
+		tenant_id: str,
+		unit_id: str,
+		deposit_amount: Decimal,
+		scheme_name: str,
+		certificate_reference: str,
+		registered_date: date | None = None,
+		custodian_account: str = "",
+	) -> dict[str, Any]:
+		"""Register a tenancy deposit with a protection scheme and record statutory compliance.
+
+		Enforces that registration occurs within the statutory window (30 days).
+		Emits a deposit_registered event and flags any breach of registration deadline.
+		"""
+		assert tenant_entity_id and unit_id, "tenant_entity_id and unit_id required"
+		assert deposit_amount > 0, "deposit_amount must be positive"
+		assert scheme_name, "scheme_name required"
+		assert certificate_reference, "certificate_reference required"
+		from uuid6 import uuid7
+		reg_date = registered_date or date.today()
+		deposit_id = str(uuid7())
+		record: dict[str, Any] = {
+			"id": deposit_id,
+			"tenant_id": tenant_id,
+			"tenant_entity_id": tenant_entity_id,
+			"unit_id": unit_id,
+			"deposit_amount": str(deposit_amount),
+			"scheme_name": scheme_name,
+			"certificate_reference": certificate_reference,
+			"registered_date": str(reg_date),
+			"custodian_account": custodian_account,
+			"status": "held",
+			"interest_accrued": "0.00",
+			"deductions_claimed": "0.00",
+			"return_amount": str(deposit_amount),
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("deposits", []).append(record)
+		self._log_operation("deposit_registered", deposit_id, tenant_id)
+		return record
+
+	async def get_deposit(self, tenant_entity_id: str, tenant_id: str, unit_id: str = "") -> dict[str, Any] | None:
+		"""Fetch the active deposit record for a tenant entity."""
+		deposits = self._store.get("deposits", [])
+		for d in deposits:
+			if d["tenant_entity_id"] == tenant_entity_id and d["tenant_id"] == tenant_id:
+				if not unit_id or d.get("unit_id") == unit_id:
+					return d
+		return None
+
+	async def process_deposit_return(
+		self,
+		tenant_entity_id: str,
+		tenant_id: str,
+		deductions: list[dict[str, Any]],
+		return_method: str = "bank_transfer",
+	) -> dict[str, Any]:
+		"""Process deposit return after checkout: apply deductions, compute net return, record outcome.
+
+		Each deduction requires: reason, amount, evidence_reference.
+		Remaining balance returned via specified method. Result stored for dispute reference.
+		"""
+		assert tenant_entity_id, "tenant_entity_id required"
+		assert return_method in ("bank_transfer", "cheque", "cash", "crypto"), \
+			f"unsupported return_method: {return_method}"
+		deposits = self._store.get("deposits", [])
+		for i, d in enumerate(deposits):
+			if d["tenant_entity_id"] == tenant_entity_id and d["tenant_id"] == tenant_id:
+				gross = Decimal(d["deposit_amount"])
+				total_deductions = sum(Decimal(str(item.get("amount", 0))) for item in deductions)
+				if total_deductions > gross:
+					raise ValueError("total deductions exceed deposit amount")
+				net_return = gross - total_deductions
+				d["deductions"] = deductions
+				d["deductions_claimed"] = str(total_deductions)
+				d["return_amount"] = str(net_return)
+				d["return_method"] = return_method
+				d["status"] = "returned"
+				d["returned_at"] = datetime.utcnow().isoformat()
+				deposits[i] = d
+				self._log_operation("deposit_returned", d["id"], tenant_id)
+				return d
+		raise KeyError(f"no active deposit for tenant entity {tenant_entity_id}")
+
+	# ── Rent Arrears ──────────────────────────────────────────────────────────
+
+	async def track_rent_arrears(
+		self,
+		tenant_entity_id: str,
+		tenant_id: str,
+		period: str,
+		amount_due: Decimal,
+		amount_paid: Decimal,
+		due_date: date,
+		unit_id: str = "",
+		payment_reference: str = "",
+	) -> dict[str, Any]:
+		"""Record a rent payment period, compute arrears, and trigger escalation ladder if overdue.
+
+		Escalation thresholds:
+		  - 7 days overdue: automated reminder
+		  - 14 days: formal notice
+		  - 28 days: legal referral flag
+
+		Returns the arrears record including days_overdue and escalation_stage.
+		"""
+		assert tenant_entity_id and period, "tenant_entity_id and period required"
+		assert amount_due >= 0 and amount_paid >= 0, "amounts must be non-negative"
+		from uuid6 import uuid7
+		arrears_balance = amount_due - amount_paid
+		days_overdue = (date.today() - due_date).days if date.today() > due_date else 0
+		escalation_stage: str
+		if arrears_balance <= 0:
+			escalation_stage = "none"
+		elif days_overdue >= 28:
+			escalation_stage = "legal_referral"
+		elif days_overdue >= 14:
+			escalation_stage = "formal_notice"
+		elif days_overdue >= 7:
+			escalation_stage = "reminder"
+		else:
+			escalation_stage = "monitoring"
+		arrears_id = str(uuid7())
+		record: dict[str, Any] = {
+			"id": arrears_id,
+			"tenant_id": tenant_id,
+			"tenant_entity_id": tenant_entity_id,
+			"unit_id": unit_id,
+			"period": period,
+			"amount_due": str(amount_due),
+			"amount_paid": str(amount_paid),
+			"arrears_balance": str(arrears_balance),
+			"due_date": str(due_date),
+			"days_overdue": days_overdue,
+			"escalation_stage": escalation_stage,
+			"payment_reference": payment_reference,
+			"in_arrears": arrears_balance > 0,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("rent_arrears", []).append(record)
+		if arrears_balance > 0:
+			log.warning(
+				"ten.rent_arrears tenant=%s period=%s balance=%s stage=%s",
+				tenant_entity_id, period, arrears_balance, escalation_stage,
+			)
+		self._log_operation("rent_arrears_tracked", arrears_id, tenant_id)
+		return record
+
+	async def get_arrears_summary(self, tenant_id: str, tenant_entity_id: str | None = None) -> dict[str, Any]:
+		"""Return arrears summary for a tenant or portfolio: total balance, worst stage, periods in arrears."""
+		all_arrears = [
+			r for r in self._store.get("rent_arrears", [])
+			if r["tenant_id"] == tenant_id and r.get("in_arrears")
+		]
+		if tenant_entity_id:
+			all_arrears = [r for r in all_arrears if r["tenant_entity_id"] == tenant_entity_id]
+		total_balance = sum(Decimal(r["arrears_balance"]) for r in all_arrears)
+		stage_order = {"legal_referral": 4, "formal_notice": 3, "reminder": 2, "monitoring": 1, "none": 0}
+		worst_stage = max((r["escalation_stage"] for r in all_arrears), key=lambda s: stage_order.get(s, 0), default="none")
+		return {
+			"tenant_id": tenant_id,
+			"tenant_entity_id": tenant_entity_id,
+			"periods_in_arrears": len(all_arrears),
+			"total_arrears_balance": str(total_balance),
+			"worst_escalation_stage": worst_stage,
+			"computed_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── Compliance Calendar ────────────────────────────────────────────────────
+
+	async def get_compliance_calendar(
+		self,
+		tenant_id: str,
+		lookahead_days: int = 90,
+	) -> dict[str, Any]:
+		"""Generate a forward-looking compliance obligation calendar for the portfolio.
+
+		Aggregates: covenant review dates, rent review dates, deposit renewal windows,
+		and vacating notice timelines. Items within lookahead_days are flagged as urgent.
+
+		Returns sorted calendar entries with owner, deadline, and urgency flag.
+		"""
+		assert lookahead_days > 0, "lookahead_days must be positive"
+		today = date.today()
+		cutoff = today + timedelta(days=lookahead_days)
+		calendar: list[dict[str, Any]] = []
+
+		for c in self._store.get("covenants", []):
+			if c["tenant_id"] != tenant_id:
+				continue
+			review_str = c.get("next_review_date")
+			if review_str:
+				review_date = date.fromisoformat(str(review_str))
+				days_to_deadline = (review_date - today).days
+				calendar.append({
+					"obligation_type": "covenant_review",
+					"covenant_id": c.get("covenant_id"),
+					"tenant_entity_id": c.get("tenant_entity_id"),
+					"deadline": str(review_date),
+					"days_to_deadline": days_to_deadline,
+					"urgent": review_date <= cutoff,
+					"overdue": review_date < today,
+				})
+
+		for r in self._store.get("rent_reviews", []):
+			if r["tenant_id"] != tenant_id:
+				continue
+			eff_str = r.get("effective_date")
+			if eff_str:
+				eff_date = date.fromisoformat(str(eff_str))
+				days_to_deadline = (eff_date - today).days
+				calendar.append({
+					"obligation_type": "rent_review",
+					"review_id": r.get("id"),
+					"tenant_entity_id": r.get("tenant_entity_id"),
+					"deadline": str(eff_date),
+					"days_to_deadline": days_to_deadline,
+					"urgent": eff_date <= cutoff,
+					"overdue": eff_date < today,
+				})
+
+		for v in self._store.get("vacating_notices", []):
+			if v["tenant_id"] != tenant_id:
+				continue
+			vac_str = v.get("vacate_date")
+			if vac_str:
+				vac_date = date.fromisoformat(str(vac_str))
+				days_to_deadline = (vac_date - today).days
+				calendar.append({
+					"obligation_type": "vacating",
+					"notice_id": v.get("id"),
+					"tenant_entity_id": v.get("tenant_entity_id"),
+					"deadline": str(vac_date),
+					"days_to_deadline": days_to_deadline,
+					"urgent": vac_date <= cutoff,
+					"overdue": vac_date < today,
+				})
+
+		calendar.sort(key=lambda x: x["days_to_deadline"])
+		urgent = [e for e in calendar if e["urgent"]]
+		overdue = [e for e in calendar if e["overdue"]]
+		return {
+			"tenant_id": tenant_id,
+			"lookahead_days": lookahead_days,
+			"total_obligations": len(calendar),
+			"urgent_count": len(urgent),
+			"overdue_count": len(overdue),
+			"calendar": calendar,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── Break Clause Workflow ─────────────────────────────────────────────────
+
+	async def register_break_clause(
+		self,
+		tenant_entity_id: str,
+		tenant_id: str,
+		unit_id: str,
+		break_date: date,
+		notice_period_days: int,
+		break_type: str = "tenant",
+		conditions: list[str] | None = None,
+		lease_id: str = "",
+	) -> dict[str, Any]:
+		"""Register a lease break clause, recording break date, notice deadline, type, and conditions.
+
+		break_type: 'tenant' | 'landlord' | 'mutual'
+		conditions: list of condition strings that must be satisfied (e.g. 'no_rent_arrears',
+		            'vacant_possession', 'all_covenants_complied').
+		Notice deadline = break_date - notice_period_days.
+		"""
+		assert tenant_entity_id and unit_id, "tenant_entity_id and unit_id required"
+		assert notice_period_days > 0, "notice_period_days must be positive"
+		assert break_type in ("tenant", "landlord", "mutual"), \
+			f"unsupported break_type: {break_type}"
+		from uuid6 import uuid7
+		notice_deadline = break_date - timedelta(days=notice_period_days)
+		clause_id = str(uuid7())
+		record: dict[str, Any] = {
+			"id": clause_id,
+			"tenant_id": tenant_id,
+			"tenant_entity_id": tenant_entity_id,
+			"unit_id": unit_id,
+			"lease_id": lease_id,
+			"break_date": str(break_date),
+			"break_type": break_type,
+			"notice_period_days": notice_period_days,
+			"notice_deadline": str(notice_deadline),
+			"conditions": conditions or [],
+			"status": "registered",
+			"activated": False,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("break_clauses", []).append(record)
+		self._log_operation("break_clause_registered", clause_id, tenant_id)
+		return record
+
+	async def check_break_clause_eligibility(
+		self,
+		clause_id: str,
+		tenant_id: str,
+		check_date: date | None = None,
+	) -> dict[str, Any]:
+		"""Evaluate whether break clause conditions are currently satisfied.
+
+		Checks: no active rent arrears, no open escalations (if 'no_arrears' / 'no_escalations'
+		in conditions). Returns eligibility verdict with per-condition results.
+		"""
+		check_date = check_date or date.today()
+		for clause in self._store.get("break_clauses", []):
+			if clause["id"] == clause_id and clause["tenant_id"] == tenant_id:
+				break_date = date.fromisoformat(clause["break_date"])
+				notice_deadline = date.fromisoformat(clause["notice_deadline"])
+				days_to_break = (break_date - check_date).days
+				within_notice_window = check_date >= notice_deadline
+				condition_results: dict[str, bool] = {}
+				ten_entity_id = clause["tenant_entity_id"]
+				for cond in clause.get("conditions", []):
+					if cond == "no_rent_arrears":
+						arrears = await self.get_arrears_summary(tenant_id, ten_entity_id)
+						condition_results[cond] = Decimal(arrears["total_arrears_balance"]) <= 0
+					elif cond == "no_open_escalations":
+						esc = await self.list_escalations(tenant_id, ten_entity_id)
+						condition_results[cond] = not any(e.status == "open" for e in esc)
+					else:
+						condition_results[cond] = True  # unknown conditions assumed met
+				all_conditions_met = all(condition_results.values())
+				eligible = all_conditions_met and within_notice_window and days_to_break >= 0
+				return {
+					"clause_id": clause_id,
+					"tenant_entity_id": ten_entity_id,
+					"break_date": clause["break_date"],
+					"notice_deadline": clause["notice_deadline"],
+					"check_date": str(check_date),
+					"days_to_break": days_to_break,
+					"within_notice_window": within_notice_window,
+					"condition_results": condition_results,
+					"all_conditions_met": all_conditions_met,
+					"eligible": eligible,
+					"checked_at": datetime.utcnow().isoformat(),
+				}
+		raise KeyError(f"break clause {clause_id} not found")
+
+	# ── Relationship Health Score ──────────────────────────────────────────────
+
+	async def compute_relationship_health_score(
+		self,
+		tenant_entity_id: str,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Compute a composite tenant relationship health score across four dimensions.
+
+		Dimensions and weights:
+		  Financial Health (35%): credit grade, arrears balance, tenant score
+		  Operational Health (25%): open service requests, SLA breach rate
+		  Engagement (25%): survey response rate, portal activity, comms responsiveness
+		  Compliance (15%): covenant compliance rate, onboarding completeness
+
+		Returns: composite score (0–100), tier, per-dimension breakdown, and recommendations.
+		"""
+		tenant = await self.get_tenant(tenant_entity_id, tenant_id)
+		if tenant is None:
+			raise KeyError(f"tenant entity {tenant_entity_id} not found")
+
+		# Financial Health (0–100)
+		grade_scores = {"A": 100, "B": 80, "C": 60, "D": 40, "F": 10}
+		credit_component = grade_scores.get(str(tenant.credit_grade.value if tenant.credit_grade else "C"), 50)
+		tenant_score_component = float(tenant.tenant_score or 50)
+		arrears_summary = await self.get_arrears_summary(tenant_id, tenant_entity_id)
+		arrears_balance = Decimal(arrears_summary["total_arrears_balance"])
+		arrears_penalty = min(float(arrears_balance) / 100, 30)  # cap at 30 point deduction
+		financial_health = max(0, (credit_component * 0.4 + tenant_score_component * 0.6) - arrears_penalty)
+
+		# Operational Health (0–100)
+		all_requests = await self.list_service_requests(tenant_id, tenant_entity_id)
+		total_req = len(all_requests)
+		breached = sum(1 for r in all_requests if r.sla_breached)
+		breach_rate = breached / max(total_req, 1)
+		open_count = sum(1 for r in all_requests if r.status.value == "open")
+		operational_health = max(0, 100 - breach_rate * 60 - open_count * 5)
+
+		# Engagement (0–100)
+		surveys = await self.list_satisfaction_surveys(tenant_id, tenant_entity_id)
+		survey_component = min(len(surveys) * 20, 60)  # 3+ surveys = full credit
+		comms = await self.list_communications(tenant_id, tenant_entity_id)
+		comms_component = min(len(comms) * 5, 40)
+		engagement = survey_component + comms_component
+
+		# Compliance (0–100)
+		progress = await self.get_onboarding_progress(tenant_entity_id, tenant_id)
+		onboarding_pct = progress.get("completion_pct", 0)
+		all_covenants = [c for c in self._store.get("covenants", [])
+						 if c["tenant_entity_id"] == tenant_entity_id and c["tenant_id"] == tenant_id]
+		non_compliant = sum(1 for c in all_covenants if c.get("status") == "non_compliant")
+		covenant_score = max(0, 100 - non_compliant * 25)
+		compliance = onboarding_pct * 0.4 + covenant_score * 0.6
+
+		# Weighted composite
+		composite = (
+			financial_health * 0.35
+			+ operational_health * 0.25
+			+ engagement * 0.25
+			+ compliance * 0.15
+		)
+		composite = round(composite, 1)
+
+		tier_map = [(85, "Platinum"), (70, "Gold"), (50, "Silver"), (0, "Standard")]
+		tier = next(label for threshold, label in tier_map if composite >= threshold)
+
+		recommendations: list[str] = []
+		if financial_health < 60:
+			recommendations.append("Review credit position and clear any outstanding arrears.")
+		if operational_health < 60:
+			recommendations.append("Investigate chronic SLA breaches and reduce open request backlog.")
+		if engagement < 40:
+			recommendations.append("Increase outreach frequency; tenant appears disengaged.")
+		if compliance < 60:
+			recommendations.append("Complete remaining onboarding steps and resolve covenant breaches.")
+
+		return {
+			"tenant_entity_id": tenant_entity_id,
+			"tenant_id": tenant_id,
+			"composite_score": composite,
+			"tier": tier,
+			"dimensions": {
+				"financial_health": round(financial_health, 1),
+				"operational_health": round(operational_health, 1),
+				"engagement": round(engagement, 1),
+				"compliance": round(compliance, 1),
+			},
+			"recommendations": recommendations,
+			"computed_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── Predictive Churn ──────────────────────────────────────────────────────
+
+	async def predict_churn_probability(
+		self,
+		tenant_entity_id: str,
+		tenant_id: str,
+		lease_expiry_date: date | None = None,
+	) -> dict[str, Any]:
+		"""Compute a churn probability (0.0–1.0) from behavioural and financial signals.
+
+		Signals and weights:
+		  - Satisfaction trend (declining → +0.25)
+		  - Days since last communication (>60 days → +0.20)
+		  - SLA breach rate (>30% → +0.20)
+		  - Lease expiry proximity (<90 days → +0.20)
+		  - Active rent arrears (→ +0.15)
+
+		Returns: probability, risk_level, contributing_factors, and recommended_actions.
+		"""
+		signals: dict[str, float] = {}
+		churn_probability = 0.0
+
+		# Satisfaction trend
+		trend_data = await self.get_satisfaction_trend(tenant_id, tenant_entity_id)
+		if trend_data.get("trend") == "declining":
+			signals["satisfaction_declining"] = 0.25
+			churn_probability += 0.25
+		elif trend_data.get("trend") == "stable" and (trend_data.get("average_score") or 5) < 3.5:
+			signals["satisfaction_low_stable"] = 0.10
+			churn_probability += 0.10
+
+		# Days since last communication
+		comms = await self.list_communications(tenant_id, tenant_entity_id)
+		if comms:
+			latest_comm = max(comms, key=lambda c: str(c.sent_at or ""))
+			if latest_comm.sent_at:
+				days_since = (datetime.utcnow() - latest_comm.sent_at).days
+				if days_since > 60:
+					signals["communication_gap"] = 0.20
+					churn_probability += 0.20
+		else:
+			signals["no_communications"] = 0.15
+			churn_probability += 0.15
+
+		# SLA breach rate
+		requests = await self.list_service_requests(tenant_id, tenant_entity_id)
+		if requests:
+			breach_rate = sum(1 for r in requests if r.sla_breached) / len(requests)
+			if breach_rate > 0.30:
+				signals["high_sla_breach_rate"] = 0.20
+				churn_probability += 0.20
+
+		# Lease expiry proximity
+		if lease_expiry_date:
+			days_to_expiry = (lease_expiry_date - date.today()).days
+			if days_to_expiry < 90:
+				weight = 0.20 * (1 - days_to_expiry / 90)
+				signals["lease_expiry_proximity"] = round(weight, 3)
+				churn_probability += weight
+
+		# Active rent arrears
+		arrears = await self.get_arrears_summary(tenant_id, tenant_entity_id)
+		if Decimal(arrears["total_arrears_balance"]) > 0:
+			signals["rent_arrears"] = 0.15
+			churn_probability += 0.15
+
+		churn_probability = round(min(churn_probability, 1.0), 3)
+		risk_level = (
+			"critical" if churn_probability >= 0.70
+			else "high" if churn_probability >= 0.50
+			else "medium" if churn_probability >= 0.30
+			else "low"
+		)
+		actions: list[str] = []
+		if "satisfaction_declining" in signals:
+			actions.append("Schedule relationship review call within 5 business days.")
+		if "communication_gap" in signals:
+			actions.append("Initiate proactive outreach; last contact was over 60 days ago.")
+		if "high_sla_breach_rate" in signals:
+			actions.append("Escalate service delivery review to facilities manager.")
+		if "lease_expiry_proximity" in signals:
+			actions.append("Open renewal negotiation; lease expires within 90 days.")
+		if "rent_arrears" in signals:
+			actions.append("Contact accounts team; outstanding arrears detected.")
+
+		return {
+			"tenant_entity_id": tenant_entity_id,
+			"tenant_id": tenant_id,
+			"churn_probability": churn_probability,
+			"risk_level": risk_level,
+			"contributing_signals": signals,
+			"recommended_actions": actions,
+			"computed_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── SLA Performance Report ────────────────────────────────────────────────
+
+	async def get_sla_performance_report(
+		self,
+		tenant_id: str,
+		period: str | None = None,
+	) -> dict[str, Any]:
+		"""Compute SLA performance metrics aggregated by request type.
+
+		Metrics per type: total requests, breached count, breach rate,
+		average resolution time (hours), compliance percentage.
+		Also returns portfolio-level headline figures.
+		"""
+		requests = await self.list_service_requests(tenant_id)
+		if period:
+			requests = [r for r in requests if str(r.created_at).startswith(period[:7])]
+
+		type_stats: dict[str, dict[str, Any]] = {}
+		for r in requests:
+			rt = r.request_type.value if hasattr(r.request_type, "value") else str(r.request_type)
+			if rt not in type_stats:
+				type_stats[rt] = {"total": 0, "breached": 0, "resolution_hours": []}
+			type_stats[rt]["total"] += 1
+			if r.sla_breached:
+				type_stats[rt]["breached"] += 1
+			if r.resolved_at and r.created_at:
+				delta_h = (r.resolved_at - r.created_at).total_seconds() / 3600
+				type_stats[rt]["resolution_hours"].append(round(delta_h, 2))
+
+		by_type: list[dict[str, Any]] = []
+		for rt, stats in type_stats.items():
+			res_hours = stats["resolution_hours"]
+			breach_rate = round(stats["breached"] / max(stats["total"], 1) * 100, 2)
+			avg_resolution = round(sum(res_hours) / max(len(res_hours), 1), 2) if res_hours else None
+			target = SLA_RESPONSE_HOURS.get(rt, SLA_RESPONSE_HOURS["default"])
+			by_type.append({
+				"request_type": rt,
+				"total": stats["total"],
+				"breached": stats["breached"],
+				"breach_rate_pct": breach_rate,
+				"compliance_pct": round(100 - breach_rate, 2),
+				"avg_resolution_hours": avg_resolution,
+				"sla_target_hours": target,
+			})
+
+		total = len(requests)
+		total_breached = sum(r.sla_breached for r in requests)
+		portfolio_compliance = round((1 - total_breached / max(total, 1)) * 100, 2)
+
+		return {
+			"tenant_id": tenant_id,
+			"period": period,
+			"total_requests": total,
+			"total_breached": total_breached,
+			"portfolio_sla_compliance_pct": portfolio_compliance,
+			"by_request_type": by_type,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── Guarantor Management ──────────────────────────────────────────────────
+
+	async def register_guarantor(
+		self,
+		tenant_entity_id: str,
+		tenant_id: str,
+		guarantor_name: str,
+		guarantor_email: str,
+		guarantee_type: str = "limited",
+		guarantee_amount: Decimal | None = None,
+		credit_check_reference: str = "",
+		signed_deed_reference: str = "",
+	) -> dict[str, Any]:
+		"""Register a guarantor for a tenant entity.
+
+		guarantee_type: 'limited' (capped at guarantee_amount) | 'unlimited'
+		Validates that limited guarantees specify an amount.
+		Links guarantor to tenant for arrears escalation workflows.
+		"""
+		assert tenant_entity_id and guarantor_name and guarantor_email, \
+			"tenant_entity_id, guarantor_name, guarantor_email required"
+		assert guarantee_type in ("limited", "unlimited"), \
+			f"unsupported guarantee_type: {guarantee_type}"
+		if guarantee_type == "limited":
+			assert guarantee_amount and guarantee_amount > 0, \
+				"guarantee_amount required for limited guarantee"
+		from uuid6 import uuid7
+		guarantor_id = str(uuid7())
+		record: dict[str, Any] = {
+			"id": guarantor_id,
+			"tenant_id": tenant_id,
+			"tenant_entity_id": tenant_entity_id,
+			"guarantor_name": guarantor_name,
+			"guarantor_email": guarantor_email,
+			"guarantee_type": guarantee_type,
+			"guarantee_amount": str(guarantee_amount) if guarantee_amount else None,
+			"credit_check_reference": credit_check_reference,
+			"signed_deed_reference": signed_deed_reference,
+			"status": "active",
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("guarantors", []).append(record)
+		self._log_operation("guarantor_registered", guarantor_id, tenant_id)
+		return record
+
+	async def validate_guarantor_coverage(
+		self,
+		tenant_entity_id: str,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Check whether active guarantors cover current arrears exposure.
+
+		Computes: total limited coverage, unlimited flag, arrears balance,
+		coverage_sufficient flag. Returns gap amount if coverage is insufficient.
+		"""
+		guarantors = [
+			g for g in self._store.get("guarantors", [])
+			if g["tenant_entity_id"] == tenant_entity_id
+			and g["tenant_id"] == tenant_id
+			and g["status"] == "active"
+		]
+		arrears = await self.get_arrears_summary(tenant_id, tenant_entity_id)
+		arrears_balance = Decimal(arrears["total_arrears_balance"])
+		has_unlimited = any(g["guarantee_type"] == "unlimited" for g in guarantors)
+		limited_total = sum(
+			Decimal(g["guarantee_amount"]) for g in guarantors
+			if g["guarantee_type"] == "limited" and g.get("guarantee_amount")
+		)
+		coverage_sufficient = has_unlimited or limited_total >= arrears_balance
+		coverage_gap = max(Decimal("0"), arrears_balance - limited_total) if not has_unlimited else Decimal("0")
+		return {
+			"tenant_entity_id": tenant_entity_id,
+			"tenant_id": tenant_id,
+			"guarantor_count": len(guarantors),
+			"has_unlimited_guarantee": has_unlimited,
+			"total_limited_coverage": str(limited_total),
+			"current_arrears_balance": str(arrears_balance),
+			"coverage_sufficient": coverage_sufficient,
+			"coverage_gap": str(coverage_gap),
+			"checked_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── Portfolio Lease Incentives ─────────────────────────────────────────────
+
+	async def record_lease_incentive(
+		self,
+		tenant_entity_id: str,
+		tenant_id: str,
+		unit_id: str,
+		incentive_type: str,
+		value: Decimal,
+		start_date: date,
+		end_date: date,
+		lease_id: str = "",
+		description: str = "",
+	) -> dict[str, Any]:
+		"""Record a lease incentive (rent-free period, fit-out contribution, stepped rent).
+
+		incentive_type: 'rent_free' | 'fitout_contribution' | 'stepped_rent' | 'rent_cap' | 'cash_incentive'
+		Stores value, period, and generates a daily amortisation rate for accounting purposes.
+		"""
+		assert tenant_entity_id and unit_id, "tenant_entity_id and unit_id required"
+		assert incentive_type in (
+			"rent_free", "fitout_contribution", "stepped_rent", "rent_cap", "cash_incentive"
+		), f"unsupported incentive_type: {incentive_type}"
+		assert start_date <= end_date, "start_date must be on or before end_date"
+		from uuid6 import uuid7
+		days = (end_date - start_date).days + 1
+		daily_amortisation = round(value / max(days, 1), 6)
+		incentive_id = str(uuid7())
+		record: dict[str, Any] = {
+			"id": incentive_id,
+			"tenant_id": tenant_id,
+			"tenant_entity_id": tenant_entity_id,
+			"unit_id": unit_id,
+			"lease_id": lease_id,
+			"incentive_type": incentive_type,
+			"value": str(value),
+			"start_date": str(start_date),
+			"end_date": str(end_date),
+			"duration_days": days,
+			"daily_amortisation": str(daily_amortisation),
+			"description": description,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("lease_incentives", []).append(record)
+		self._log_operation("lease_incentive_recorded", incentive_id, tenant_id)
+		return record
+

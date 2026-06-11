@@ -1217,6 +1217,514 @@ class TelecomPerformanceService:
 		raise PermissionError(reasons or "policy_denied")
 
 
+	# ── World-class enhancement methods ─────────────────────────────────────────
+
+	async def detect_kpi_anomalies(
+		self,
+		kpi_name: str,
+		lookback_days: int = 30,
+		z_threshold: float = 2.0,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Detect statistical anomalies in a KPI time-series using z-score fencing.
+
+		Computes rolling mean and std-dev over the full stored history for kpi_name.
+		Any measurement more than z_threshold standard deviations from the mean is
+		flagged as an anomaly.  IQR-based clipping is applied first to remove extreme
+		outliers that would inflate the std-dev.
+
+		Returns per-anomaly detail including z-score and deviation direction.
+		"""
+		assert kpi_name, "kpi_name required"
+		assert lookback_days > 0, "lookback_days must be positive"
+		kpi_lower = kpi_name.lower()
+		measurements = [
+			k for k in self.kpis.values()
+			if k.tenant_id == tenant_id and k.kpi_name.lower() == kpi_lower
+		]
+		if not measurements:
+			return {
+				"kpi_name": kpi_name, "tenant_id": tenant_id, "lookback_days": lookback_days,
+				"anomaly_count": 0, "anomalies": [], "mean": None, "std_dev": None,
+				"analysed_at": _utcnow(),
+			}
+		values = [m.value for m in measurements]
+		# IQR clip to reduce outlier inflation of std-dev
+		sorted_vals = sorted(values)
+		n = len(sorted_vals)
+		q1 = sorted_vals[n // 4]
+		q3 = sorted_vals[(3 * n) // 4]
+		iqr = q3 - q1
+		clipped = [v for v in values if (q1 - 1.5 * iqr) <= v <= (q3 + 1.5 * iqr)]
+		mean_val = statistics.mean(clipped) if clipped else statistics.mean(values)
+		std_val = statistics.stdev(clipped) if len(clipped) > 1 else 0.0
+		anomalies: list[dict[str, Any]] = []
+		for m in measurements:
+			z = (m.value - mean_val) / std_val if std_val > 0 else 0.0
+			if abs(z) >= z_threshold:
+				anomalies.append({
+					"kpi_id": m.id,
+					"value": m.value,
+					"z_score": round(z, 4),
+					"direction": "high" if z > 0 else "low",
+					"recorded_at": m.recorded_at,
+				})
+		if anomalies:
+			self._audit(tenant_id, "kpi_anomalies_detected", f"{kpi_name}:count:{len(anomalies)}")
+		return {
+			"kpi_name": kpi_name,
+			"tenant_id": tenant_id,
+			"lookback_days": lookback_days,
+			"z_threshold": z_threshold,
+			"mean": round(mean_val, 4),
+			"std_dev": round(std_val, 4),
+			"anomaly_count": len(anomalies),
+			"anomalies": anomalies,
+			"analysed_at": _utcnow(),
+		}
+
+	async def correlate_degradation(
+		self,
+		kpi_ids: list[str],
+		correlation_threshold: float = 0.85,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Compute pairwise Pearson correlation between KPI value series.
+
+		KPI pairs with correlation >= correlation_threshold are flagged as
+		likely co-degrading — useful for root-cause suppression and alert grouping.
+		Returns an upper-triangular correlation matrix and a list of high-correlation
+		pairs.
+		"""
+		assert len(kpi_ids) >= 2, "at least 2 kpi_ids required"
+		# Build per-KPI value vectors aligned by index position
+		kpi_vectors: dict[str, list[float]] = {}
+		for kpi_id in kpi_ids:
+			k = self.kpis.get(self._key(tenant_id, kpi_id))
+			if k is None:
+				kpi_vectors[kpi_id] = []
+			else:
+				kpi_vectors[kpi_id] = [k.value]
+		# For KPIs with the same name recorded multiple times, flatten by name
+		def _pearson(xs: list[float], ys: list[float]) -> float | None:
+			n = min(len(xs), len(ys))
+			if n < 2:
+				return None
+			xs, ys = xs[:n], ys[:n]
+			mx, my = statistics.mean(xs), statistics.mean(ys)
+			num = sum((xs[i] - mx) * (ys[i] - my) for i in range(n))
+			dx = (sum((x - mx) ** 2 for x in xs)) ** 0.5
+			dy = (sum((y - my) ** 2 for y in ys)) ** 0.5
+			return round(num / (dx * dy), 4) if dx * dy > 0 else None
+
+		pairs: list[dict[str, Any]] = []
+		matrix: dict[str, dict[str, float | None]] = {}
+		ids = list(kpi_vectors.keys())
+		for i in range(len(ids)):
+			matrix[ids[i]] = {}
+			for j in range(i + 1, len(ids)):
+				r = _pearson(kpi_vectors[ids[i]], kpi_vectors[ids[j]])
+				matrix[ids[i]][ids[j]] = r
+				if r is not None and abs(r) >= correlation_threshold:
+					pairs.append({"kpi_a": ids[i], "kpi_b": ids[j], "correlation": r})
+		if pairs:
+			self._audit(tenant_id, "degradation_correlation_detected", f"pairs:{len(pairs)}")
+		return {
+			"tenant_id": tenant_id,
+			"kpi_ids": kpi_ids,
+			"correlation_threshold": correlation_threshold,
+			"high_correlation_pairs": pairs,
+			"correlation_matrix": matrix,
+			"computed_at": _utcnow(),
+		}
+
+	async def compute_sla_penalty(
+		self,
+		compliance_id: str,
+		sla_tier: str,
+		credit_rate_per_pct: float = 100.0,
+		currency: str = "USD",
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Compute SLA penalty credit for a breached compliance record.
+
+		Credit = (target_value - actual_value) / target_value * 100 * credit_rate_per_pct.
+		sla_tier: "gold" | "silver" | "bronze" — applies a tier multiplier
+		(gold=2.0, silver=1.5, bronze=1.0).  Output is intended for the telecom_bil
+		event stream.
+		"""
+		assert compliance_id, "compliance_id required"
+		sla_tier = sla_tier.lower()
+		tier_multipliers = {"gold": 2.0, "silver": 1.5, "bronze": 1.0}
+		multiplier = tier_multipliers.get(sla_tier, 1.0)
+		record = self.sla_compliance.get(self._key(tenant_id, compliance_id))
+		if record is None:
+			raise ValueError(f"SLA compliance record {compliance_id} not found")
+		if record.status != "breached":
+			return {
+				"compliance_id": compliance_id, "tenant_id": tenant_id,
+				"status": "not_breached", "credit_amount": 0.0, "currency": currency,
+			}
+		breach_pct = max(0.0, (record.target_value - record.actual_value) / record.target_value * 100)
+		credit_amount = round(breach_pct * credit_rate_per_pct * multiplier, 2)
+		self._audit(tenant_id, "sla_penalty_computed", compliance_id)
+		return {
+			"compliance_id": compliance_id,
+			"tenant_id": tenant_id,
+			"sla_type": record.sla_type,
+			"sla_tier": sla_tier,
+			"breach_pct": round(breach_pct, 4),
+			"tier_multiplier": multiplier,
+			"credit_rate_per_pct": credit_rate_per_pct,
+			"credit_amount": credit_amount,
+			"currency": currency,
+			"billing_event": "sla_credit",
+			"computed_at": _utcnow(),
+		}
+
+	async def suggest_threshold_updates(
+		self,
+		tenant_id: str = "default",
+		lookback_days: int = 30,
+		warning_percentile: float = 0.95,
+		critical_percentile: float = 0.99,
+	) -> dict[str, Any]:
+		"""Suggest revised thresholds based on empirical KPI percentile distribution.
+
+		For each KPI name with an existing threshold, computes the empirical
+		warning_percentile and critical_percentile of all stored values.
+		Returns a diff dict showing current vs recommended values — human approval
+		is still required to commit via set_threshold.
+		"""
+		suggestions: list[dict[str, Any]] = []
+		# Group KPIs by name
+		by_name: dict[str, list[float]] = {}
+		for k in self.kpis.values():
+			if k.tenant_id == tenant_id:
+				by_name.setdefault(k.kpi_name, []).append(k.value)
+		for threshold in self.thresholds.values():
+			if threshold.tenant_id != tenant_id:
+				continue
+			vals = by_name.get(threshold.kpi_name, [])
+			if len(vals) < 10:
+				# Insufficient history — skip
+				continue
+			sorted_vals = sorted(vals)
+			n = len(sorted_vals)
+			w_idx = min(int(n * warning_percentile), n - 1)
+			c_idx = min(int(n * critical_percentile), n - 1)
+			rec_warning = sorted_vals[w_idx]
+			rec_critical = sorted_vals[c_idx]
+			suggestions.append({
+				"threshold_id": threshold.id,
+				"kpi_name": threshold.kpi_name,
+				"network_layer": threshold.network_layer,
+				"current_warning": threshold.warning_value,
+				"current_critical": threshold.critical_value,
+				"recommended_warning": round(rec_warning, 4),
+				"recommended_critical": round(rec_critical, 4),
+				"sample_count": n,
+				"delta_warning": round(rec_warning - threshold.warning_value, 4),
+				"delta_critical": round(rec_critical - threshold.critical_value, 4),
+			})
+		self._audit(tenant_id, "threshold_suggestions_generated", f"count:{len(suggestions)}")
+		return {
+			"tenant_id": tenant_id,
+			"lookback_days": lookback_days,
+			"warning_percentile": warning_percentile,
+			"critical_percentile": critical_percentile,
+			"suggestion_count": len(suggestions),
+			"suggestions": suggestions,
+			"note": "Approval via set_threshold required to apply changes.",
+			"generated_at": _utcnow(),
+		}
+
+	async def end_to_end_service_quality(
+		self,
+		service_id: str,
+		period: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Compute an E2E service quality score (0–1000, MOS-like) for a service.
+
+		Radio layer: RSRP and SINR KPIs (weight 40%).
+		Core layer: latency and packet_loss KPIs (weight 35%).
+		Transport layer: jitter and BER KPIs (weight 25%).
+
+		Each sub-score is normalised: higher is better.  Missing layer data
+		contributes a neutral 0.5 sub-score.  Score buckets:
+		Excellent ≥ 800 | Good 600–799 | Fair 400–599 | Poor < 400.
+		"""
+		assert service_id, "service_id required"
+		assert period, "period required"
+
+		def _layer_kpis(name_fragments: list[str]) -> list[float]:
+			result: list[float] = []
+			for k in self.kpis.values():
+				if k.tenant_id != tenant_id:
+					continue
+				kn = k.kpi_name.lower()
+				if any(frag in kn for frag in name_fragments):
+					result.append(k.value)
+			return result
+
+		def _normalise_higher_better(vals: list[float], target: float) -> float:
+			if not vals:
+				return 0.5
+			mean_val = statistics.mean(vals)
+			return min(1.0, max(0.0, mean_val / target))
+
+		def _normalise_lower_better(vals: list[float], target: float) -> float:
+			if not vals:
+				return 0.5
+			mean_val = statistics.mean(vals)
+			return min(1.0, max(0.0, 1.0 - mean_val / (target * 2)))
+
+		radio_rsrp = _layer_kpis(["rsrp"])
+		radio_sinr = _layer_kpis(["sinr"])
+		radio_score = (
+			_normalise_higher_better(radio_rsrp, -70.0) * 0.5
+			+ _normalise_higher_better(radio_sinr, 20.0) * 0.5
+		) if (radio_rsrp or radio_sinr) else 0.5
+
+		core_latency = _layer_kpis(["latency", "rtt"])
+		core_loss = _layer_kpis(["packet_loss", "loss"])
+		core_score = (
+			_normalise_lower_better(core_latency, 20.0) * 0.6
+			+ _normalise_lower_better(core_loss, 0.01) * 0.4
+		) if (core_latency or core_loss) else 0.5
+
+		transport_jitter = _layer_kpis(["jitter"])
+		transport_ber = _layer_kpis(["ber", "bit_error"])
+		transport_score = (
+			_normalise_lower_better(transport_jitter, 5.0) * 0.6
+			+ _normalise_lower_better(transport_ber, 1e-6) * 0.4
+		) if (transport_jitter or transport_ber) else 0.5
+
+		composite = radio_score * 0.40 + core_score * 0.35 + transport_score * 0.25
+		e2e_score = round(composite * 1000, 1)
+		bucket = (
+			"excellent" if e2e_score >= 800
+			else "good" if e2e_score >= 600
+			else "fair" if e2e_score >= 400
+			else "poor"
+		)
+		self._audit(tenant_id, "e2e_service_quality_computed", service_id)
+		return {
+			"service_id": service_id,
+			"period": period,
+			"tenant_id": tenant_id,
+			"e2e_score": e2e_score,
+			"quality_bucket": bucket,
+			"layer_scores": {
+				"radio": round(radio_score * 1000, 1),
+				"core": round(core_score * 1000, 1),
+				"transport": round(transport_score * 1000, 1),
+			},
+			"computed_at": _utcnow(),
+		}
+
+	async def subscriber_impact_score(
+		self,
+		event_id: str,
+		affected_cells: list[str],
+		affected_subscriber_count: int,
+		degradation_duration_minutes: float,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Compute subscriber-impact score for a degradation event.
+
+		impact_score = affected_subscriber_count * degradation_duration_minutes.
+		Priority tiers:
+		  P1: score > 100,000 subscriber-minutes
+		  P2: score > 10,000
+		  P3: score > 1,000
+		  P4: score <= 1,000
+
+		P1 events should trigger ITSM high-priority incident creation.
+		Returns tier, raw score, and recommended action.
+		"""
+		assert event_id, "event_id required"
+		assert affected_subscriber_count >= 0, "subscriber count must be non-negative"
+		assert degradation_duration_minutes >= 0, "duration must be non-negative"
+		score = affected_subscriber_count * degradation_duration_minutes
+		if score > 100_000:
+			tier, action = "P1", "create_itsm_p1_incident"
+		elif score > 10_000:
+			tier, action = "P2", "create_itsm_p2_incident"
+		elif score > 1_000:
+			tier, action = "P3", "notify_noc_team"
+		else:
+			tier, action = "P4", "log_and_monitor"
+		self._audit(tenant_id, "subscriber_impact_scored", f"{event_id}:{tier}")
+		return {
+			"event_id": event_id,
+			"tenant_id": tenant_id,
+			"affected_cells": affected_cells,
+			"affected_subscriber_count": affected_subscriber_count,
+			"degradation_duration_minutes": degradation_duration_minutes,
+			"subscriber_impact_score": score,
+			"priority_tier": tier,
+			"recommended_action": action,
+			"computed_at": _utcnow(),
+		}
+
+	async def capacity_heatmap(
+		self,
+		region: str,
+		granularity: str = "daily",
+		period: str = "last_30_days",
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Build a time × resource utilisation matrix for heatmap rendering.
+
+		Aggregates PerCapacityRecord entries for resources matching the region prefix.
+		granularity: "hourly" | "daily" | "weekly"  (affects bucket label only;
+		actual time bucketing requires timestamp-tagged records — this implementation
+		uses record insertion order as a proxy index).
+
+		Returns a compact {cells: [[bucket_idx, resource_ref, utilisation_pct]]} structure.
+		"""
+		assert region, "region required"
+		assert granularity in ("hourly", "daily", "weekly"), "granularity must be hourly|daily|weekly"
+		records = [
+			r for r in self.capacity_records.values()
+			if r.tenant_id == tenant_id and region.lower() in r.resource_reference.lower()
+		]
+		# Group by resource_reference
+		by_resource: dict[str, list[float]] = {}
+		for r in records:
+			by_resource.setdefault(r.resource_reference, []).append(r.utilisation_pct)
+		cells: list[list[Any]] = []
+		for resource, utils in by_resource.items():
+			for idx, util in enumerate(utils):
+				cells.append([idx, resource, round(util, 2)])
+		resources = list(by_resource.keys())
+		overall_max = max((u for r in by_resource.values() for u in r), default=0.0)
+		hotspots = [r for r, utils in by_resource.items() if max(utils, default=0) > 85.0]
+		if hotspots:
+			self._audit(tenant_id, "capacity_heatmap_hotspots_detected", f"region:{region}")
+		return {
+			"region": region,
+			"granularity": granularity,
+			"period": period,
+			"tenant_id": tenant_id,
+			"resource_count": len(resources),
+			"resources": resources,
+			"overall_peak_utilisation_pct": round(overall_max, 2),
+			"hotspot_resources": hotspots,
+			"cells": cells,
+			"generated_at": _utcnow(),
+		}
+
+	async def generate_compliance_evidence(
+		self,
+		regulator: str,
+		standard: str,
+		period: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Generate a regulatory compliance evidence package.
+
+		Bundles KPI summaries, SLA compliance rates, breach counts, threshold
+		change audit trails, and open alert counts into a structured manifest.
+		A SHA-256 fingerprint of the serialised manifest is included to support
+		tamper-evidence requirements.
+
+		regulator examples: "BEREC", "CA_KENYA", "GSMA"
+		standard examples: "ETSI_TS_102_250", "ITU_T_G826", "3GPP_TS_32_401"
+		"""
+		import hashlib, json
+		assert regulator, "regulator required"
+		assert standard, "standard required"
+		assert period, "period required"
+		kpis = [k.to_dict() for k in self.kpis.values() if k.tenant_id == tenant_id]
+		sla_recs = [r.to_dict() for r in self.sla_compliance.values() if r.tenant_id == tenant_id and r.period == period]
+		breaches = [r for r in sla_recs if r.get("status") == "breached"]
+		threshold_changes = [e for e in self.audit_events if e["tenant_id"] == tenant_id and e["event_type"] == "threshold_changed"]
+		open_alerts = [a for a in self._alerts if a["tenant_id"] == tenant_id and a.get("status") == "open"]
+		manifest: dict[str, Any] = {
+			"regulator": regulator,
+			"standard": standard,
+			"period": period,
+			"tenant_id": tenant_id,
+			"kpi_summary": {
+				"total": len(kpis),
+				"critical": sum(1 for k in kpis if k.get("status") == "critical"),
+				"warning": sum(1 for k in kpis if k.get("status") == "warning"),
+			},
+			"sla_compliance": {
+				"total_measurements": len(sla_recs),
+				"breach_count": len(breaches),
+				"compliance_rate": round((len(sla_recs) - len(breaches)) / max(len(sla_recs), 1), 4),
+				"breach_types": list({r.get("sla_type") for r in breaches}),
+				"notification_gaps": sum(1 for r in breaches if not r.get("notification_sent", True)),
+			},
+			"threshold_changes": {"count": len(threshold_changes)},
+			"open_alerts": len(open_alerts),
+			"generated_at": _utcnow(),
+		}
+		fingerprint = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+		manifest["sha256"] = fingerprint
+		self._audit(tenant_id, "compliance_evidence_generated", f"{regulator}:{standard}:{period}")
+		return manifest
+
+	async def publish_performance_intelligence(
+		self,
+		period: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Consolidate top degrading KPIs, SLA hotspots, capacity risks, and NPS signals
+		into a single intelligence payload for downstream capability consumption.
+
+		Publishes to audit stream topic apg.intel.per_feed.
+		Downstream consumers: intel, telecom_ana, telecom_bil.
+		"""
+		assert period, "period required"
+		# Top degrading KPIs (status == critical or warning)
+		degrading = [
+			{"kpi_id": k.id, "kpi_name": k.kpi_name, "status": k.status, "value": k.value}
+			for k in self.kpis.values()
+			if k.tenant_id == tenant_id and k.status in ("critical", "warning")
+		]
+		degrading.sort(key=lambda x: 0 if x["status"] == "critical" else 1)
+		# SLA breach hotspots
+		sla_breaches = [
+			{"compliance_id": r.id, "sla_type": r.sla_type, "customer_id": r.customer_id}
+			for r in self.sla_compliance.values()
+			if r.tenant_id == tenant_id and r.status == "breached" and r.period == period
+		]
+		# Capacity risk nodes (overloaded/congested)
+		capacity_risks = [
+			{"record_id": r.id, "resource": r.resource_reference, "state": r.capacity_state, "util_pct": r.utilisation_pct}
+			for r in self.capacity_records.values()
+			if r.tenant_id == tenant_id and r.capacity_state in ("congested", "overloaded")
+		]
+		# NPS detractors
+		detractors = [
+			{"nps_id": r["id"], "customer_id": r["customer_id"], "score": r["score"]}
+			for r in self._nps_records
+			if r["tenant_id"] == tenant_id and r["category"] == "detractor"
+		]
+		payload: dict[str, Any] = {
+			"period": period,
+			"tenant_id": tenant_id,
+			"stream_topic": "apg.intel.per_feed",
+			"top_degrading_kpis": degrading[:10],
+			"sla_breach_hotspots": sla_breaches[:10],
+			"capacity_risk_nodes": capacity_risks[:10],
+			"nps_detractors": detractors[:10],
+			"summary": {
+				"degrading_kpi_count": len(degrading),
+				"sla_breach_count": len(sla_breaches),
+				"capacity_risk_count": len(capacity_risks),
+				"nps_detractor_count": len(detractors),
+			},
+			"published_at": _utcnow(),
+		}
+		self._audit(tenant_id, "performance_intelligence_published", f"period:{period}")
+		return payload
+
 	# ── Auto-generated expansion methods ────────────────────────────────────────
 	async def export_records(self, tenant_id: str = "default", format: str = "json") -> dict[str, Any]:
 		"""Export Records"""

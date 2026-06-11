@@ -291,3 +291,188 @@ For trips crossing borders:
 ## Hired/Rental Vehicles
 
 Vehicles with `ownership_type` of `hired` or `contract_hire` are validated against hire period dates on dispatch. Operations outside the hire window are blocked.
+
+---
+
+## Fuel Fraud Audit
+
+Every fuel record can be audited for anomalies via `POST /api/fle/v1/fuel/<id>/audit`.
+
+The engine checks three independent signals:
+
+| Signal | Trigger | Severity |
+|--------|---------|----------|
+| Price deviation | Cost/litre > 15% above fleet average | Medium |
+| Duplicate receipt | Same receipt_ref on another record | High |
+| Volume vs expected | Claimed litres > 140% of telematics-derived consumption | High |
+
+Each detected anomaly contributes 0.35 to a `risk_score` (0.0–1.0). Records with `risk_score >= 0.35` emit a `fuel.audit_flagged` event for investigation.
+
+---
+
+## Driver Fatigue Risk Scoring
+
+`GET /api/fle/v1/drivers/<id>/fatigue-risk?lookback_days=7`
+
+Analyses tachograph records over the lookback window and returns:
+
+| Factor | Threshold | Weight |
+|--------|-----------|--------|
+| Consecutive max-driving days | >= 4 days at 9h+ | 0.30 |
+| Repeated split rests | >= 3 times < 11h solid | 0.25 |
+| Weekly hours near ceiling | >= 83% of 56h limit | 0.20 |
+| Recorded infringements | Any code present | 0.25 |
+
+Risk levels: **low** (< 0.4), **high** (0.4–0.69), **critical** (>= 0.7).  
+At critical, the system recommends "Mandate 48h off-duty immediately."
+
+No additional hardware required — uses existing tachograph data.
+
+---
+
+## Vehicle Disposal Recommendations
+
+`GET /api/fle/v1/vehicles/<id>/disposal?market_value=<KES>`
+
+Compares the vehicle's TCO per km against the fleet average and evaluates the maintenance cost trend over the last 6 completed jobs.
+
+| Recommendation | Condition |
+|----------------|-----------|
+| **replace** | TCO premium > 20% AND payback < 18 months, OR maintenance cost rising > 25% |
+| **monitor** | TCO premium 10–20% OR maintenance trend 15–25% |
+| **retain** | Within acceptable TCO range |
+
+Payback is calculated as: `(replacement_cost − market_value) ÷ annual_tco_premium`.
+
+---
+
+## Shift Assignment Optimisation
+
+`POST /api/fle/v1/shifts/optimise` with `{"date": "2026-06-15"}`
+
+Assigns available active drivers to planned trips for the given date while respecting EU EC 561/2006 daily driving limits (9h).
+
+The greedy solver:
+1. Sorts trips by planned departure time
+2. Assigns the least-loaded eligible driver to each trip
+3. Returns `feasibility_score` per assignment and flags trips with `no_driver_within_hos_limit`
+
+Production note: replace the greedy solver with Google OR-Tools CP-SAT for global optimality on large fleets.
+
+---
+
+## Budget Burn-Rate Variance
+
+`POST /api/fle/v1/reports/budget-variance` with `{"fuel_budget_month": 500000, "maintenance_budget_month": 200000}`
+
+Returns month-to-date actuals and projects month-end spend from the current burn rate.
+
+| Alert Level | Condition |
+|-------------|-----------|
+| ok | Projected overspend <= 10% |
+| warning | Projected overspend 10–20% |
+| critical | Projected overspend > 20% |
+
+A `budget.overspend_alert` event is emitted at warning or critical — consumed by `ntfy` to notify the finance team.
+
+---
+
+## Insurance Claim Pack
+
+`GET /api/fle/v1/incidents/<id>/claim-pack`
+
+Generates a structured evidence package containing:
+- Full incident record
+- ±30-minute telematics replay (GPS track, speed, events)
+- Driver behaviour score (YTD)
+- Vehicle TCO summary
+- Current COF certificate
+- Active insurance policy details
+- Last 5 completed maintenance records
+
+The `claim_reference` (e.g. `APG-3F9A1B2C`) can be quoted directly on the insurer's claims portal. Reduces claim preparation time from 4–6 hours to under 2 minutes.
+
+---
+
+## Geofence Workflow Triggers
+
+`POST /api/fle/v1/geofence/event`
+
+```json
+{
+  "vehicle_id": "...",
+  "geofence_id": "customer_site",
+  "event_type": "entry",
+  "trip_id": "...",
+  "geofence_label": "Bamburi Cement Mombasa"
+}
+```
+
+Pre-configured geofence/event pairs execute workflow steps automatically:
+
+| Geofence Key | Steps Executed |
+|--------------|----------------|
+| `customer_site_entry` | Notify warehouse + driver, trigger POD workflow |
+| `depot_entry` | Notify yard manager, trigger post-trip inspection, check maintenance interval |
+| `restricted_zone_entry` | Notify compliance officer, trigger violation workflow |
+
+Steps are emitted as domain events for `wflo` and `ntfy` to process.
+
+---
+
+## Driver Coaching Events
+
+`POST /api/fle/v1/telematics/<telematics_event_id>/coaching`
+
+Generates a contextual in-cab coaching message for a telematics event. Supported event types:
+
+| Event | Message Tone | Priority |
+|-------|-------------|----------|
+| speeding | Informational | High |
+| harsh_braking | Coaching | Medium |
+| harsh_acceleration | Coaching | Medium |
+| idle | Reminder | Low |
+| seatbelt_violation | Mandatory | Critical |
+| distraction | Mandatory | Critical |
+
+Returns `null` for events without a registered coaching script.
+
+---
+
+## Vehicle Health Snapshot
+
+`GET /api/fle/v1/vehicles/<id>/health`
+
+Single-call aggregated health view for the vehicle detail page:
+
+| Field | Source |
+|-------|--------|
+| `health_score` (0–100) | Deducted by overdue compliance, maintenance, incidents, and predictive alerts |
+| `last_position` | Latest telematics event |
+| `tco_summary` | Total cost, cost/km, distance |
+| `critical_compliance_events` | Compliance calendar filtered to this vehicle |
+| `predictive_alerts` | ML/rule-based maintenance predictions |
+| `open_incidents` | Count of unresolved incidents |
+
+---
+
+## Driver Leaderboard
+
+`GET /api/fle/v1/reports/driver-leaderboard?top_n=10`
+
+Returns the top N active drivers ranked by overall behaviour score descending. Each entry includes rank, score, grade, trip count, distance, and incident count. Use for:
+- Monthly performance reviews
+- Driver incentive programmes
+- Insurance premium negotiations
+
+---
+
+## Deferring Maintenance
+
+`POST /api/fle/v1/maintenance/<id>/defer`
+
+```json
+{"new_date": "2026-07-01T08:00:00", "reason": "Parts on order — ETA 25 June"}
+```
+
+Moves a `scheduled` or `overdue` maintenance job to a new date with full audit trail (actor, reason, original date preserved in notes). The `maintenance.deferred` event is emitted for downstream notification.

@@ -194,6 +194,26 @@ Events emitted to the `apg.scm.ven.lifecycle` event stream via Bytewax. Delivery
 - UI theme tokens are defined in `THEME` within `capability_contract.py` under the `vendor_control` theme. Tenant overrides are applied at runtime via the `theme.allow_tenant_overrides` config flag.
 - The six AI agent roles (`vendor_onboarding_reviewer`, `risk_reviewer`, `performance_reviewer`, `compliance_reviewer`, `contract_reviewer`, `supplier_query_reviewer`) map to distinct review scopes. Registering an agent to the wrong role will pass the rules engine (role is validated) but will receive incorrect context payloads from the intelligence service.
 
+## New Async Methods (v2.2.0)
+
+Eight async methods added to `VendorManagementService` covering the highest-value
+gaps identified in `WORLD_CLASS_IMPROVEMENTS.md`:
+
+| Method | Description |
+|--------|-------------|
+| `contract_expiry_alerts(days_ahead, tenant_id)` | Surface contracts expiring within a window; auto-renew `auto_renew=True` contracts |
+| `spend_concentration_risk(period, category_threshold_pct, total_threshold_pct, tenant_id)` | Flag single-source spend dependency by category and total share |
+| `bulk_onboard_vendors(vendors, tenant_id)` | Concurrent fan-out onboarding with per-row success/error results |
+| `compliance_expiry_scan(as_of_date, expiry_warning_days, tenant_id)` | Scan compliance records for expired or soon-to-expire certifications |
+| `sla_breach_scan(vendor_id, tenant_id)` | Cross-reference SLA terms against performance scores; auto-create risk records on breach |
+| `vendor_reinstatement(vendor_id, rationale, approved_by, tenant_id)` | Complete the suspension lifecycle — reinstate a suspended vendor |
+| `compare_vendors(vendor_ids, tenant_id)` | Head-to-head multi-vendor comparison matrix for data-driven selection |
+| `ai_early_warning_digest(tenant_id)` | Portfolio-level ML-powered digest of at-risk vendors; falls back to rule-based tiers |
+| `vendor_health_score(vendor_id, tenant_id)` | Composite 0–100 health score (performance 40 %, compliance 25 %, risk 25 %, engagement 10 %) |
+
+All new methods are `async def` and safe to call with `await` from any async
+web framework or APG composition layer.
+
 ## Verification
 
 ```bash

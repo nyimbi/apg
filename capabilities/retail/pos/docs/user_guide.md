@@ -255,3 +255,143 @@ POST /retail-pos/api/v1/overrides
 ```
 
 Self-approval (cashier == supervisor) is blocked by the system.
+
+---
+
+## Basket Suggestions (Co-Purchase Intelligence)
+
+For loyalty customers, the system can suggest items the customer almost always buys alongside what is already in the basket:
+
+```
+GET /retail-pos/api/v1/transactions/<id>/basket-suggestions?customer_id=<id>&top_n=3
+```
+
+Returns up to `top_n` SKUs ranked by co-purchase frequency from the customer's loyalty history. No external ML service required.
+
+---
+
+## Fraud Risk Scoring
+
+Every completed transaction can be scored for fraud risk:
+
+```
+GET /retail-pos/api/v1/transactions/<id>/fraud-score
+```
+
+Response:
+```json
+{
+  "transaction_id": "...",
+  "fraud_risk_score": 45,
+  "risk_level": "medium",
+  "signals": ["high_discount_rate_23pct"],
+  "requires_review": false
+}
+```
+
+Transactions with `risk_level: high` (score ≥ 60) are flagged in the supervisor queue.
+
+---
+
+## Live Store Dashboard
+
+Real-time trading snapshot for store managers:
+
+```
+GET /retail-pos/api/v1/stores/<store_id>/live
+```
+
+Returns active sessions, open baskets, rolling transactions-per-minute (last 5 min), hour revenue, and payment method mix. Designed for SSE push every 15–30 seconds.
+
+---
+
+## Session Performance Metrics
+
+Cashier throughput ranking for all open sessions:
+
+```
+GET /retail-pos/api/v1/stores/<store_id>/session-metrics
+```
+
+Returns per-cashier: transactions/hour, average basket value, void rate %, discount rate %, and an `alert` flag when thresholds are exceeded (void rate > 5% or discount rate > 15%).
+
+---
+
+## Predictive Cash Management
+
+Check how long the current till cash will last at current velocity:
+
+```
+GET /retail-pos/api/v1/sessions/<id>/cash-runway?horizon_minutes=30
+```
+
+Response:
+```json
+{
+  "current_cash": 4800.00,
+  "cash_velocity_per_hour": 1200.00,
+  "predicted_shortage_in_minutes": 22.0,
+  "alert": true,
+  "recommended_action": "request_safe_drop"
+}
+```
+
+An alert fires when projected shortage is within `horizon_minutes` (default 30).
+
+---
+
+## Inventory Soft-Reserve
+
+When `add_item` is called the system can soft-reserve stock to prevent two cashiers from selling the same last unit:
+
+```
+POST /retail-pos/api/v1/inventory/reserve
+{
+  "transaction_id": "<id>",
+  "sku": "MILK-1L",
+  "quantity": 2,
+  "store_id": "store-nbi-01"
+}
+```
+
+The hold expires automatically after 15 minutes. To release manually:
+```
+DELETE /retail-pos/api/v1/inventory/holds/<transaction_id>/<sku>
+```
+
+---
+
+## Shift Handover
+
+Enforce dual cash counts between outgoing and incoming cashiers:
+
+1. Initiate handover (locks the session):
+   ```
+   POST /retail-pos/api/v1/sessions/<outgoing_session_id>/handover
+   { "incoming_cashier_id": "bob" }
+   ```
+
+2. Both cashiers submit their count independently:
+   ```
+   POST /retail-pos/api/v1/handovers/<handover_id>/count
+   { "cashier_id": "alice", "counted_cash": 1350.00 }
+
+   POST /retail-pos/api/v1/handovers/<handover_id>/count
+   { "cashier_id": "bob", "counted_cash": 1345.00 }
+   ```
+
+3. When both counts are received:
+   - Variance ≤ KES 10: status = `completed` → terminal released for new session
+   - Variance > KES 10: status = `disputed` → supervisor review required
+
+---
+
+## Customer Purchase History
+
+View a customer's full purchase history and spending analytics:
+
+```
+GET /retail-pos/api/v1/customers/<customer_id>/history?period=2026-06&limit=50
+```
+
+Response includes: total spend, average basket, loyalty balance, top SKUs by purchase frequency, payment method preferences, and last visit date.

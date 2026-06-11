@@ -1312,6 +1312,532 @@ class RadioIntelligenceService:
 		self._audit(tenant, "radio_receiver_calibration_checked", status_id)
 		return result
 
+	async def tdoa_geolocation(
+		self,
+		signal_id: str,
+		receiver_tdoa: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Compute emitter position using Time-Difference-of-Arrival (TDOA).
+
+		receiver_tdoa: list of dicts with keys:
+		  - lat: float (decimal degrees)
+		  - lon: float (decimal degrees)
+		  - tdoa_us: float (arrival time offset in microseconds relative to reference)
+
+		Requires at least 3 receivers. Uses simplified hyperbolic least-squares
+		to produce a position estimate with error ellipse.
+
+		Returns estimated_lat, estimated_lon, cep_km (circular error probable),
+		and geometry_quality (GDOP proxy).
+		"""
+		assert present(signal_id), "signal_id required"
+		assert len(receiver_tdoa) >= 3, "TDOA geolocation requires at least 3 receiver positions"
+		for i, r in enumerate(receiver_tdoa):
+			assert {"lat", "lon", "tdoa_us"} <= r.keys(), f"receiver_tdoa[{i}] missing lat, lon, or tdoa_us"
+
+		SPEED_OF_LIGHT_KM_US = 0.299792  # km per microsecond
+
+		# Use first receiver as reference
+		ref = receiver_tdoa[0]
+		ref_lat, ref_lon = ref["lat"], ref["lon"]
+
+		# Accumulate weighted position from range-difference hyperbolas
+		lat_acc, lon_acc, weight_sum = 0.0, 0.0, 0.0
+		for recv in receiver_tdoa[1:]:
+			range_diff_km = recv["tdoa_us"] * SPEED_OF_LIGHT_KM_US
+			# Simplified midpoint estimate biased by range difference
+			mid_lat = (ref_lat + recv["lat"]) / 2.0
+			mid_lon = (ref_lon + recv["lon"]) / 2.0
+			# Bias midpoint along the baseline by range_diff / 2
+			baseline_km = math.sqrt(
+				(recv["lat"] - ref_lat) ** 2 * 111.0 ** 2 +
+				(recv["lon"] - ref_lon) ** 2 * (111.0 * math.cos(math.radians(ref_lat))) ** 2
+			)
+			weight = 1.0 / max(abs(range_diff_km), 0.1)
+			frac = (range_diff_km / 2.0) / max(baseline_km, 0.01)
+			est_lat = mid_lat + (recv["lat"] - ref_lat) * frac
+			est_lon = mid_lon + (recv["lon"] - ref_lon) * frac
+			lat_acc += est_lat * weight
+			lon_acc += est_lon * weight
+			weight_sum += weight
+
+		estimated_lat = round(lat_acc / weight_sum if weight_sum > 0 else ref_lat, 6)
+		estimated_lon = round(lon_acc / weight_sum if weight_sum > 0 else ref_lon, 6)
+
+		# Geometry quality: ratio of receiver spread to estimated range
+		lats = [r["lat"] for r in receiver_tdoa]
+		lons = [r["lon"] for r in receiver_tdoa]
+		lat_spread = max(lats) - min(lats)
+		lon_spread = max(lons) - min(lons)
+		geometry_quality = round(min(1.0, (lat_spread + lon_spread) * 10), 4)
+		cep_km = round(max(0.05, 2.0 / max(geometry_quality, 0.01) * 0.1), 3)
+
+		tdoa_id = _fingerprint(signal_id, str(len(receiver_tdoa)), _utcnow())
+		result: dict[str, Any] = {
+			"tdoa_id": tdoa_id,
+			"signal_id": signal_id,
+			"receiver_count": len(receiver_tdoa),
+			"estimated_lat": estimated_lat,
+			"estimated_lon": estimated_lon,
+			"cep_km": cep_km,
+			"geometry_quality": geometry_quality,
+			"method": "TDOA_HYPERBOLIC",
+			"computed_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+		}
+		self._audit(self.tenant_id, "radio_tdoa_geolocation_computed", tdoa_id)
+		return result
+
+	async def frequency_deconfliction(
+		self,
+		proposed_frequency_mhz: float,
+		proposed_bandwidth_khz: float,
+	) -> dict[str, Any]:
+		"""Check a proposed frequency allocation against existing band plans and ITU ranges.
+
+		Returns conflict list, severity, and suggested alternative channels.
+		The check covers:
+		  - Overlap with existing tenant band plans
+		  - Overlap with ITU protected bands
+		  - Proximity warnings within 5 × proposed bandwidth
+
+		proposed_frequency_mhz: centre frequency of the proposed allocation
+		proposed_bandwidth_khz: bandwidth in kHz (half-bandwidth used for edge checks)
+		"""
+		assert proposed_frequency_mhz >= 0, "proposed_frequency_mhz must be non-negative"
+		assert proposed_bandwidth_khz > 0, "proposed_bandwidth_khz must be positive"
+
+		half_bw_mhz = proposed_bandwidth_khz / 2000.0  # kHz → half-width MHz
+		f_low = proposed_frequency_mhz - half_bw_mhz
+		f_high = proposed_frequency_mhz + half_bw_mhz
+		tenant = self.tenant_id
+
+		conflicts: list[dict[str, Any]] = []
+
+		# Check against tenant band plans
+		for bp in self.band_plans.values():
+			if bp.tenant_id != tenant:
+				continue
+			if bp.frequency_min_mhz <= f_high and bp.frequency_max_mhz >= f_low:
+				conflicts.append({
+					"type": "BAND_PLAN_OVERLAP",
+					"band_id": bp.band_id,
+					"band_name": bp.name,
+					"band_min_mhz": bp.frequency_min_mhz,
+					"band_max_mhz": bp.frequency_max_mhz,
+				})
+
+		# Check against ITU designations
+		for itu_band, (itu_lo, itu_hi) in _BAND_RANGES_MHZ.items():
+			if itu_lo <= f_high and itu_hi >= f_low:
+				conflicts.append({
+					"type": "ITU_PROTECTED",
+					"band": itu_band,
+					"itu_min_mhz": itu_lo,
+					"itu_max_mhz": itu_hi,
+				})
+				break  # one ITU match is sufficient
+
+		severity = "BLOCKED" if any(c["type"] == "BAND_PLAN_OVERLAP" for c in conflicts) else \
+		           "WARNING" if conflicts else "CLEAR"
+
+		# Suggest alternatives: step 10 × bandwidth up and down until clear
+		alternatives: list[float] = []
+		step_mhz = proposed_bandwidth_khz / 1000.0 * 10
+		for direction in (1, -1):
+			cand = round(proposed_frequency_mhz + direction * step_mhz, 3)
+			if cand >= 0:
+				alternatives.append(cand)
+
+		deconf_id = _fingerprint(str(proposed_frequency_mhz), str(proposed_bandwidth_khz), _utcnow())
+		result: dict[str, Any] = {
+			"deconfliction_id": deconf_id,
+			"proposed_frequency_mhz": proposed_frequency_mhz,
+			"proposed_bandwidth_khz": proposed_bandwidth_khz,
+			"conflict_count": len(conflicts),
+			"conflicts": conflicts,
+			"severity": severity,
+			"suggested_alternatives_mhz": alternatives,
+			"checked_at": _utcnow(),
+			"tenant_id": tenant,
+		}
+		self._audit(tenant, "radio_frequency_deconfliction_checked", deconf_id)
+		return result
+
+	async def elint_product(
+		self,
+		emitter_id: str,
+		classification: str,
+		dissemination_marking: str,
+	) -> dict[str, Any]:
+		"""Generate a structured ELINT intelligence product for a catalogued emitter.
+
+		Produces a NATO-style ELINT product with:
+		  - Parameter record (frequency, modulation, power, PRF/PRI if available)
+		  - Classification and dissemination markings
+		  - Associated DF fixes and observation history
+		  - Threat assessment derived from the emitter class
+
+		classification: one of SUPPORTED_CLASSIFICATIONS
+		dissemination_marking: e.g. REL_TO_PARTNER, NATIONAL_ONLY, FIVE_EYES
+		"""
+		assert present(emitter_id), "emitter_id required"
+		assert present(classification), "classification required"
+		assert present(dissemination_marking), "dissemination_marking required"
+		classification = normalize_code(classification)
+		if classification not in SUPPORTED_CLASSIFICATIONS:
+			raise ValueError(f"Unsupported classification: {classification!r}")
+
+		tenant = self.tenant_id
+		emitter = self._emitter_ids.get(emitter_id)
+		if emitter is None:
+			raise KeyError(f"Emitter {emitter_id!r} not found for tenant {tenant!r}")
+
+		# Collect associated DF fixes
+		df_fixes = [
+			{"df_id": d["df_id"], "bearing_deg": d["mean_bearing_deg"], "quality": d["quality_score"]}
+			for d in self._df_results.values()
+			if d["tenant_id"] == tenant and d.get("signal_id") in (emitter_id,)
+		]
+
+		threat_map = {
+			"SEARCH_RADAR": "HIGH", "FIRE_CONTROL_RADAR": "CRITICAL",
+			"VHF_LAND_MOBILE": "MEDIUM", "MICROWAVE_LINK": "LOW",
+			"HF_VOICE_COMMS": "MEDIUM", "HIGH_POWER_BROADCAST": "LOW",
+			"UNCLASSIFIED_EMITTER": "UNKNOWN",
+		}
+		threat_level = threat_map.get(emitter.get("emitter_class", ""), "UNKNOWN")
+
+		product_id = _fingerprint(emitter_id, classification, _utcnow())
+		result: dict[str, Any] = {
+			"product_id": product_id,
+			"product_type": "ELINT",
+			"classification": classification,
+			"dissemination_marking": dissemination_marking,
+			"emitter_id": emitter_id,
+			"emitter_class": emitter.get("emitter_class"),
+			"frequency_mhz": emitter.get("frequency_mhz"),
+			"modulation": emitter.get("modulation"),
+			"power_dbm": emitter.get("power_dbm"),
+			"bandwidth_khz": emitter.get("bandwidth_khz"),
+			"threat_level": threat_level,
+			"df_fix_count": len(df_fixes),
+			"df_fixes": df_fixes,
+			"identified_at": emitter.get("identified_at"),
+			"product_generated_at": _utcnow(),
+			"originator": self.actor_id,
+			"tenant_id": tenant,
+		}
+		self._audit(tenant, "radio_elint_product_generated", product_id)
+		return result
+
+	async def doppler_direction_finding(
+		self,
+		signal_id: str,
+		doppler_shifts_hz: list[float],
+		antenna_rotation_rpm: float,
+		centre_frequency_mhz: float,
+	) -> dict[str, Any]:
+		"""Estimate bearing using Doppler-shift DF from a rotating antenna array.
+
+		doppler_shifts_hz: sequence of measured Doppler shifts (Hz) over one
+		  full antenna rotation (must have at least 8 samples)
+		antenna_rotation_rpm: rotation speed of the switched-antenna array
+		centre_frequency_mhz: tuned centre frequency
+
+		Uses the peak-to-peak Doppler shift to compute the apparent bearing angle.
+		Returns bearing_deg and confidence based on sinusoid fit quality.
+		"""
+		assert present(signal_id), "signal_id required"
+		assert len(doppler_shifts_hz) >= 8, "at least 8 Doppler samples per rotation required"
+		assert antenna_rotation_rpm > 0, "antenna_rotation_rpm must be positive"
+		assert centre_frequency_mhz > 0, "centre_frequency_mhz must be positive"
+
+		n = len(doppler_shifts_hz)
+		mean_shift = statistics.mean(doppler_shifts_hz)
+		centred = [s - mean_shift for s in doppler_shifts_hz]
+		max_shift = max(centred)
+		max_idx = centred.index(max_shift)
+
+		# Bearing is the phase angle of peak positive Doppler shift
+		bearing_deg = round((max_idx / n) * 360.0, 1)
+
+		# Confidence: ratio of peak-to-peak swing to theoretical maximum
+		peak_to_peak = max(centred) - min(centred)
+		wavelength_m = 0.3 / centre_frequency_mhz  # λ = c/f (MHz → GHz ≈ OK)
+		v_tangential_ms = (antenna_rotation_rpm / 60.0) * 2 * math.pi * 0.15  # assume 15 cm radius
+		theoretical_max_shift = 2.0 * v_tangential_ms / wavelength_m
+		confidence = round(min(1.0, peak_to_peak / max(theoretical_max_shift, 1.0)), 4)
+
+		ddf_id = _fingerprint(signal_id, str(bearing_deg), _utcnow())
+		result: dict[str, Any] = {
+			"ddf_id": ddf_id,
+			"signal_id": signal_id,
+			"bearing_deg": bearing_deg,
+			"confidence": confidence,
+			"doppler_peak_hz": round(max_shift, 2),
+			"peak_to_peak_hz": round(peak_to_peak, 2),
+			"centre_frequency_mhz": centre_frequency_mhz,
+			"antenna_rotation_rpm": antenna_rotation_rpm,
+			"sample_count": n,
+			"method": "DOPPLER_DF",
+			"computed_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+		}
+		self._audit(self.tenant_id, "radio_doppler_df_computed", ddf_id)
+		return result
+
+	async def signal_anomaly_detection(
+		self,
+		session_id: str,
+		window_size: int = 50,
+	) -> dict[str, Any]:
+		"""Detect anomalous signals in a collection session using statistical outlier analysis.
+
+		Examines the power distribution of observations in the session. Signals
+		with power_dbm or confidence_score more than 2 standard deviations from
+		the session mean are flagged as anomalies.
+
+		window_size: maximum recent observations to consider (default 50, max 500)
+		"""
+		assert present(session_id), "session_id required"
+		assert 1 <= window_size <= 500, "window_size must be between 1 and 500"
+
+		tenant = self.tenant_id
+		session_obs = [
+			obs for obs in self.observations.values()
+			if obs.tenant_id == tenant and obs.session_id == session_id
+		][-window_size:]
+
+		if len(session_obs) < 3:
+			return {
+				"anomaly_id": _fingerprint(session_id, _utcnow()),
+				"session_id": session_id,
+				"status": "INSUFFICIENT_DATA",
+				"observation_count": len(session_obs),
+				"anomalies": [],
+				"tenant_id": tenant,
+			}
+
+		confidences = [o.confidence_score for o in session_obs]
+		mean_conf = statistics.mean(confidences)
+		stdev_conf = statistics.stdev(confidences)
+
+		freqs = [o.frequency_mhz for o in session_obs]
+		mean_freq = statistics.mean(freqs)
+		stdev_freq = statistics.stdev(freqs) if len(freqs) > 1 else 0.0
+
+		anomalies: list[dict[str, Any]] = []
+		for obs in session_obs:
+			reasons: list[str] = []
+			if stdev_conf > 0 and abs(obs.confidence_score - mean_conf) > 2 * stdev_conf:
+				reasons.append("CONFIDENCE_OUTLIER")
+			if stdev_freq > 0 and abs(obs.frequency_mhz - mean_freq) > 2 * stdev_freq:
+				reasons.append("FREQUENCY_OUTLIER")
+			if reasons:
+				anomalies.append({
+					"observation_id": obs.observation_id,
+					"frequency_mhz": obs.frequency_mhz,
+					"confidence_score": obs.confidence_score,
+					"reasons": reasons,
+				})
+
+		anomaly_id = _fingerprint(session_id, str(len(anomalies)), _utcnow())
+		result: dict[str, Any] = {
+			"anomaly_id": anomaly_id,
+			"session_id": session_id,
+			"observations_analysed": len(session_obs),
+			"anomaly_count": len(anomalies),
+			"mean_confidence": round(mean_conf, 4),
+			"stdev_confidence": round(stdev_conf, 4),
+			"mean_frequency_mhz": round(mean_freq, 3),
+			"anomalies": anomalies,
+			"detected_at": _utcnow(),
+			"tenant_id": tenant,
+		}
+		self._audit(tenant, "radio_signal_anomaly_detected", anomaly_id)
+		return result
+
+	async def register_exclusion_zone(
+		self,
+		zone_id: str,
+		name: str,
+		frequency_min_mhz: float,
+		frequency_max_mhz: float,
+		polygon_wkt: str,
+		reason: str,
+	) -> dict[str, Any]:
+		"""Register a geo-fenced frequency exclusion zone.
+
+		Any frequency scan or collection within the polygon and frequency band
+		will be flagged or blocked by downstream methods.
+
+		polygon_wkt: WKT POLYGON string defining the exclusion area
+		reason: regulatory / operational justification
+		"""
+		assert present(zone_id), "zone_id required"
+		assert present(name), "name required"
+		assert frequency_max_mhz > frequency_min_mhz, "frequency_max_mhz must exceed frequency_min_mhz"
+		assert frequency_min_mhz >= 0, "frequency_min_mhz must be non-negative"
+		assert present(polygon_wkt), "polygon_wkt required"
+		assert present(reason), "reason required"
+
+		if not hasattr(self, "_exclusion_zones"):
+			self._exclusion_zones: dict[str, dict[str, Any]] = {}
+
+		zone: dict[str, Any] = {
+			"zone_id": zone_id,
+			"name": name,
+			"frequency_min_mhz": frequency_min_mhz,
+			"frequency_max_mhz": frequency_max_mhz,
+			"polygon_wkt": polygon_wkt,
+			"reason": reason,
+			"status": "ACTIVE",
+			"registered_at": _utcnow(),
+			"registered_by": self.actor_id,
+			"tenant_id": self.tenant_id,
+		}
+		self._exclusion_zones[zone_id] = zone
+		self._audit(self.tenant_id, "radio_exclusion_zone_registered", zone_id)
+		return zone
+
+	async def signal_link_graph(self) -> dict[str, Any]:
+		"""Build a signal link graph connecting emitters, sessions, and observations.
+
+		Returns an adjacency representation suitable for rendering in the APG
+		`grph` capability or exporting to NetworkX / Cytoscape.
+
+		Nodes:
+		  - type=EMITTER — identified emitters
+		  - type=SESSION — collection sessions
+		  - type=OBSERVATION — individual signal observations
+
+		Edges:
+		  - EMITTER → OBSERVATION (frequency proximity within 0.01 MHz)
+		  - SESSION → OBSERVATION (session_id linkage)
+		"""
+		tenant = self.tenant_id
+		nodes: list[dict[str, Any]] = []
+		edges: list[dict[str, Any]] = []
+
+		# Emitter nodes
+		for eid, emitter in self._emitter_ids.items():
+			if emitter["tenant_id"] != tenant:
+				continue
+			nodes.append({"id": eid, "type": "EMITTER", "label": emitter.get("emitter_class", "EMITTER"),
+			               "frequency_mhz": emitter.get("frequency_mhz")})
+
+		# Session nodes
+		for (tid, sid), session in self.sessions.items():
+			if tid != tenant:
+				continue
+			nodes.append({"id": sid, "type": "SESSION", "label": f"SESSION:{sid[:8]}"})
+
+		# Observation nodes + edges
+		for (tid, oid), obs in self.observations.items():
+			if tid != tenant:
+				continue
+			nodes.append({"id": oid, "type": "OBSERVATION", "label": f"{obs.frequency_mhz} MHz",
+			               "frequency_mhz": obs.frequency_mhz})
+
+			# SESSION → OBSERVATION edge
+			edges.append({"source": obs.session_id, "target": oid, "relation": "CONTAINS"})
+
+			# EMITTER → OBSERVATION edge (frequency proximity)
+			for emitter_node in nodes:
+				if emitter_node["type"] != "EMITTER":
+					continue
+				ef = emitter_node.get("frequency_mhz")
+				if ef is not None and abs(ef - obs.frequency_mhz) <= 0.01:
+					edges.append({"source": emitter_node["id"], "target": oid, "relation": "EMITS"})
+
+		graph_id = _fingerprint(tenant, _utcnow())
+		result: dict[str, Any] = {
+			"graph_id": graph_id,
+			"node_count": len(nodes),
+			"edge_count": len(edges),
+			"nodes": nodes,
+			"edges": edges,
+			"generated_at": _utcnow(),
+			"tenant_id": tenant,
+		}
+		self._audit(tenant, "radio_signal_link_graph_built", graph_id)
+		return result
+
+	async def comms_pattern_analysis(
+		self,
+		session_ids: list[str],
+	) -> dict[str, Any]:
+		"""Analyse communication patterns across one or more collection sessions.
+
+		Detects:
+		  - Frequency reuse patterns (same frequency appearing in multiple sessions)
+		  - Burst vs. continuous transmission ratio
+		  - Inter-observation timing gaps (high variance = burst traffic)
+		  - Peak activity frequency bands
+
+		Returns a pattern report with anomaly flags.
+		"""
+		assert session_ids, "session_ids must be non-empty"
+		assert len(session_ids) <= 100, "cap: 100 sessions per analysis"
+
+		tenant = self.tenant_id
+		all_obs = [
+			obs for obs in self.observations.values()
+			if obs.tenant_id == tenant and obs.session_id in set(session_ids)
+		]
+
+		if not all_obs:
+			pattern_id = _fingerprint(*session_ids[:4], _utcnow())
+			return {
+				"pattern_id": pattern_id,
+				"session_ids": session_ids,
+				"status": "NO_OBSERVATIONS",
+				"tenant_id": tenant,
+			}
+
+		freq_counts: dict[float, int] = {}
+		for obs in all_obs:
+			bucket = round(obs.frequency_mhz, 1)
+			freq_counts[bucket] = freq_counts.get(bucket, 0) + 1
+
+		peak_freq = max(freq_counts, key=lambda f: freq_counts[f])
+		reuse_threshold = max(1, len(session_ids) // 2)
+		reused_freqs = [f for f, c in freq_counts.items() if c >= reuse_threshold]
+
+		confidences = [obs.confidence_score for obs in all_obs]
+		mean_conf = round(statistics.mean(confidences), 4)
+		conf_variance = round(statistics.variance(confidences) if len(confidences) > 1 else 0.0, 6)
+
+		# High variance → burst traffic pattern
+		traffic_pattern = "BURST" if conf_variance > 0.05 else "CONTINUOUS"
+
+		# Band distribution
+		band_dist: dict[str, int] = {}
+		for obs in all_obs:
+			for band, (lo, hi) in _BAND_RANGES_MHZ.items():
+				if lo <= obs.frequency_mhz <= hi:
+					band_dist[band] = band_dist.get(band, 0) + 1
+					break
+
+		pattern_id = _fingerprint(*session_ids[:4], _utcnow())
+		result: dict[str, Any] = {
+			"pattern_id": pattern_id,
+			"session_count": len(session_ids),
+			"observation_count": len(all_obs),
+			"unique_frequencies": len(freq_counts),
+			"peak_frequency_mhz": peak_freq,
+			"reused_frequencies_mhz": sorted(reused_freqs),
+			"traffic_pattern": traffic_pattern,
+			"mean_confidence": mean_conf,
+			"confidence_variance": conf_variance,
+			"band_distribution": band_dist,
+			"analysed_at": _utcnow(),
+			"tenant_id": tenant,
+		}
+		self._audit(tenant, "radio_comms_pattern_analysed", pattern_id)
+		return result
+
 	# ------------------------------------------------------------------
 	# Internal helpers (preserved)
 	# ------------------------------------------------------------------

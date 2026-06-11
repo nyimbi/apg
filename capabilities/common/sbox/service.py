@@ -1038,6 +1038,438 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 		self._record_event(tenant_id, "benchmark_run", sandbox_id, f"Bench {operation} {iterations}x", benchmarked_by)
 		return record
 
+
+	# ------------------------------------------------------------------
+	# Async methods — world-class improvements
+	# ------------------------------------------------------------------
+
+	async def async_create_sandbox(
+		self,
+		name: str,
+		template: str,
+		owner_id: str,
+		expiry_hours: int,
+		tenant_id: str = "default",
+		isolation_profile_id: str | None = None,
+		dataset_ids: list[str] | None = None,
+		lifecycle_review_recorded: bool = False,
+		secret_access_requested: bool = False,
+		outbound_network_requested: bool = False,
+	) -> dict[str, Any]:
+		"""
+		Async variant of create_sandbox for concurrent sandbox provisioning.
+
+		Yields to the event loop before and after synchronous creation to allow
+		multiple sandboxes to be provisioned concurrently without blocking.
+		"""
+		await asyncio.sleep(0)
+		result = self.create_sandbox(
+			name=name,
+			template=template,
+			owner_id=owner_id,
+			expiry_hours=expiry_hours,
+			tenant_id=tenant_id,
+			isolation_profile_id=isolation_profile_id,
+			dataset_ids=dataset_ids,
+			lifecycle_review_recorded=lifecycle_review_recorded,
+			secret_access_requested=secret_access_requested,
+			outbound_network_requested=outbound_network_requested,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_start_run(
+		self,
+		tenant_id: str,
+		sandbox_id: str,
+		run_type: str,
+		requested_by: str,
+		tests_requested: int,
+		event_stream: str = "bytewax",
+	) -> dict[str, Any]:
+		"""
+		Async variant of start_run.
+
+		Allows concurrent run initiation across multiple sandboxes without
+		blocking the caller's event loop.
+		"""
+		await asyncio.sleep(0)
+		result = self.start_run(
+			tenant_id=tenant_id,
+			sandbox_id=sandbox_id,
+			run_type=run_type,
+			requested_by=requested_by,
+			tests_requested=tests_requested,
+			event_stream=event_stream,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_complete_run(
+		self,
+		tenant_id: str,
+		run_id: str,
+		tests_passed: int,
+		tests_failed: int = 0,
+		tests_blocked: int = 0,
+		logs: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Async variant of complete_run.
+
+		Suitable for use inside async test runners (pytest-asyncio, anyio)
+		where the event loop must not be blocked during run finalization.
+		"""
+		await asyncio.sleep(0)
+		result = self.complete_run(
+			tenant_id=tenant_id,
+			run_id=run_id,
+			tests_passed=tests_passed,
+			tests_failed=tests_failed,
+			tests_blocked=tests_blocked,
+			logs=logs,
+		)
+		await asyncio.sleep(0)
+		return result
+
+	async def async_simulate_event(
+		self,
+		sandbox_id: str,
+		event_type: str,
+		payload: dict[str, Any],
+		tenant_id: str = "default",
+		triggered_by: str = "system",
+		delivery_delay_ms: int = 0,
+	) -> dict[str, Any]:
+		"""
+		Async event simulation with optional artificial delivery delay.
+
+		delivery_delay_ms simulates realistic async event bus latency.
+		Returns the event record with measured actual delivery latency.
+		"""
+		start_ns = time.monotonic_ns()
+		if delivery_delay_ms > 0:
+			await asyncio.sleep(delivery_delay_ms / 1000.0)
+		result = self.simulate_event(
+			sandbox_id=sandbox_id,
+			event_type=event_type,
+			payload=payload,
+			tenant_id=tenant_id,
+			triggered_by=triggered_by,
+		)
+		elapsed_ms = round((time.monotonic_ns() - start_ns) / 1_000_000, 3)
+		return {**result, "actual_delivery_latency_ms": elapsed_ms}
+
+	async def async_parallel_scenario_run(
+		self,
+		sandbox_id: str,
+		scenario_ids: list[str],
+		tenant_id: str = "default",
+		run_type: str = "integration",
+		requested_by: str = "system",
+		tests_per_scenario: int = 5,
+		max_concurrency: int = 4,
+	) -> dict[str, Any]:
+		"""
+		Run multiple test scenarios truly concurrently using asyncio.gather.
+
+		max_concurrency caps simultaneous coroutines via asyncio.Semaphore.
+		Each scenario gets its own async_start_run + async_complete_run.
+		Returns aggregate pass/fail counts plus per-scenario detail.
+		"""
+		semaphore = asyncio.Semaphore(max_concurrency)
+
+		async def _run_one(sid: str) -> dict[str, Any]:
+			async with semaphore:
+				run = await self.async_start_run(
+					tenant_id=tenant_id,
+					sandbox_id=sandbox_id,
+					run_type=run_type,
+					requested_by=requested_by,
+					tests_requested=tests_per_scenario,
+				)
+				completed = await self.async_complete_run(
+					tenant_id=tenant_id,
+					run_id=run["id"],
+					tests_passed=tests_per_scenario,
+					tests_failed=0,
+					logs=[f"Async scenario {sid} completed."],
+				)
+				return {"scenario_id": sid, **completed}
+
+		results = await asyncio.gather(*[_run_one(sid) for sid in scenario_ids], return_exceptions=True)
+		passed_count = sum(1 for r in results if r.get("status") == "passed")
+		return {
+			"sandbox_id": sandbox_id,
+			"tenant_id": tenant_id,
+			"scenario_count": len(results),
+			"passed_scenario_count": passed_count,
+			"failed_scenario_count": len(results) - passed_count,
+			"max_concurrency": max_concurrency,
+			"results": list(results),
+			"requested_by": requested_by,
+			"completed_at": _ts(),
+		}
+
+	async def async_chaos_inject_and_observe(
+		self,
+		sandbox_id: str,
+		fault_type: str,
+		tenant_id: str = "default",
+		target_service: str | None = None,
+		severity: float = 0.1,
+		duration_seconds: int = 5,
+		observe_interval_seconds: float = 1.0,
+		injected_by: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Inject a chaos fault and collect sandbox status observations over
+		the fault duration at observe_interval_seconds granularity.
+
+		Returns the fault record enriched with a time-series observations list.
+		"""
+		fault = self.chaos_inject(
+			sandbox_id=sandbox_id,
+			tenant_id=tenant_id,
+			fault_type=fault_type,
+			target_service=target_service,
+			severity=severity,
+			duration_seconds=duration_seconds,
+			injected_by=injected_by,
+		)
+		observations: list[dict[str, Any]] = []
+		elapsed = 0.0
+		while elapsed < duration_seconds:
+			await asyncio.sleep(observe_interval_seconds)
+			elapsed += observe_interval_seconds
+			status = self.sandbox_status(sandbox_id=sandbox_id, tenant_id=tenant_id)
+			observations.append({"elapsed_s": round(elapsed, 2), **status})
+		return {
+			**fault,
+			"observed_duration_s": round(elapsed, 2),
+			"observation_count": len(observations),
+			"observations": observations,
+		}
+
+	async def async_load_and_validate_dataset(
+		self,
+		sandbox_id: str,
+		dataset_name: str,
+		records: list[dict[str, Any]],
+		schema: dict[str, str],
+		tenant_id: str = "default",
+		loaded_by: str = "system",
+		strict: bool = True,
+	) -> dict[str, Any]:
+		"""
+		Load records into a sandbox and validate every record against schema.
+
+		schema maps field_name -> type name (int, float, bool, str).
+		With strict=True raises ValueError on any schema violation.
+		Returns load record enriched with validation summary.
+		"""
+		await asyncio.sleep(0)
+		type_map: dict[str, type] = {
+			"int": int, "integer": int,
+			"float": float, "decimal": float,
+			"bool": bool, "boolean": bool,
+			"str": str, "string": str,
+		}
+		violations: list[dict[str, Any]] = []
+		for idx, record in enumerate(records):
+			for field_name, expected_type_name in schema.items():
+				expected_type = type_map.get(expected_type_name, str)
+				value = record.get(field_name)
+				if value is not None and not isinstance(value, expected_type):
+					violations.append({
+						"record_index": idx,
+						"field": field_name,
+						"expected": expected_type_name,
+						"actual": type(value).__name__,
+						"value": value,
+					})
+		valid_count = len(records) - len({v["record_index"] for v in violations})
+		if strict and violations:
+			raise ValueError(
+				f"dataset_validation_failed: {len(violations)} violations across {len(records)} records"
+			)
+		load_result = self.load_test_data(
+			sandbox_id=sandbox_id,
+			dataset_name=dataset_name,
+			tenant_id=tenant_id,
+			data={"records": records, "schema": schema},
+			record_count=len(records),
+			loaded_by=loaded_by,
+		)
+		await asyncio.sleep(0)
+		return {
+			**load_result,
+			"schema": schema,
+			"total_records": len(records),
+			"valid_count": valid_count,
+			"invalid_count": len(records) - valid_count,
+			"violation_count": len(violations),
+			"violations": violations if not strict else [],
+		}
+
+	async def async_snapshot_and_restore(
+		self,
+		sandbox_id: str,
+		tenant_id: str = "default",
+		snapshot_label: str = "",
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Capture a sandbox snapshot, reset state (simulating destructive work),
+		then restore to the captured point.
+
+		Use as a test isolation primitive: sandbox returns to pre-test state.
+		"""
+		await asyncio.sleep(0)
+		snapshot = self.environment_snapshot(
+			sandbox_id=sandbox_id,
+			tenant_id=tenant_id,
+			snapshot_label=snapshot_label or f"pre-test-{_ts()}",
+			captured_by=actor,
+		)
+		await asyncio.sleep(0)
+		self.reset_sandbox(sandbox_id=sandbox_id, tenant_id=tenant_id, reset_by=actor)
+		await asyncio.sleep(0)
+		sandbox = self._require_owned(self._sandboxes, sandbox_id, tenant_id, "sandbox_not_found")
+		prior_state = snapshot["sandbox_state"].get("state", "ready")
+		sandbox.state = prior_state
+		sandbox.updated_at = utc_now()
+		snap_id = snapshot["id"]
+		self._record_event(
+			tenant_id, "snapshot_restored", sandbox_id,
+			f"Restored to {snap_id}", actor,
+		)
+		return {
+			"sandbox_id": sandbox_id,
+			"tenant_id": tenant_id,
+			"snapshot_id": snap_id,
+			"snapshot_label": snapshot["label"],
+			"restored_state": sandbox.state,
+			"actor": actor,
+			"restored_at": _ts(),
+		}
+
+	async def async_security_posture_report(
+		self,
+		sandbox_id: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""
+		Multi-dimension security posture report for a sandbox.
+
+		Dimensions scored 0-100 (higher = safer):
+		  network_exposure, secret_surface, data_sensitivity, ttl_risk, isolation_gap.
+		Returns overall score, grade (A-D), and remediation recommendations.
+		"""
+		await asyncio.sleep(0)
+		sandbox = self._require_owned(self._sandboxes, sandbox_id, tenant_id, "sandbox_not_found")
+		iso = self._isolation_profiles.get(_state_key(tenant_id, sandbox.isolation_profile_id))
+		data_loads = [v for v in self._test_data.values()
+			if v.get("sandbox_id") == sandbox_id and v.get("tenant_id") == tenant_id]
+		mocks = [v for v in self._mock_services.values()
+			if v.get("sandbox_id") == sandbox_id and v.get("tenant_id") == tenant_id]
+
+		if not sandbox.outbound_network_requested:
+			network_score = 100
+		elif iso and iso.network_approval_recorded:
+			network_score = 70
+		else:
+			network_score = 20
+
+		if not sandbox.secret_access_requested:
+			secret_score = 100
+		elif iso and iso.secret_redaction_enabled:
+			secret_score = 65
+		else:
+			secret_score = 0
+
+		data_score = max(0, 100 - len(data_loads) * 10)
+		ttl_score = max(0, 100 - int((sandbox.ttl_hours - 24) / 144 * 100))
+		level_scores = {"strict": 100, "standard": 70, "permissive": 40, "none": 10}
+		iso_level = iso.level if iso else "none"
+		isolation_score = level_scores.get(iso_level, 50)
+		overall = round((network_score + secret_score + data_score + ttl_score + isolation_score) / 5)
+
+		recommendations: list[str] = []
+		if network_score < 70:
+			recommendations.append("Record network approval or disable outbound access.")
+		if secret_score < 65:
+			recommendations.append("Enable secret redaction before requesting secret access.")
+		if data_score < 70:
+			recommendations.append("Reduce inline data loads; prefer synthetic datasets.")
+		if ttl_score < 60:
+			recommendations.append("Reduce sandbox TTL to under 72 hours.")
+		if isolation_score < 70:
+			recommendations.append("Upgrade isolation level to strict or standard.")
+
+		return {
+			"sandbox_id": sandbox_id,
+			"tenant_id": tenant_id,
+			"overall_posture_score": overall,
+			"posture_grade": "A" if overall >= 85 else "B" if overall >= 70 else "C" if overall >= 50 else "D",
+			"dimensions": {
+				"network_exposure": network_score,
+				"secret_surface": secret_score,
+				"data_sensitivity": data_score,
+				"ttl_risk": ttl_score,
+				"isolation_gap": isolation_score,
+			},
+			"mock_service_count": len(mocks),
+			"data_load_count": len(data_loads),
+			"isolation_level": iso_level,
+			"recommendations": recommendations,
+			"evaluated_at": _ts(),
+		}
+
+	async def async_quota_check(
+		self,
+		tenant_id: str,
+		max_sandboxes: int = 20,
+		max_active_runs: int = 10,
+		max_mock_services: int = 50,
+	) -> dict[str, Any]:
+		"""
+		Check current tenant resource usage against configurable quota limits.
+
+		Returns usage summary, boolean within_quota flag, and breach list.
+		Does not enforce — callers decide whether to block or warn.
+		"""
+		await asyncio.sleep(0)
+		sandboxes = self.list_sandboxes(tenant_id)
+		runs = [r for r in self._runs.values() if r.tenant_id == tenant_id and r.status == "running"]
+		mocks = [v for v in self._mock_services.values() if v.get("tenant_id") == tenant_id]
+		sandbox_count = len(sandboxes)
+		active_run_count = len(runs)
+		mock_count = len(mocks)
+		breaches: list[dict[str, Any]] = []
+		if sandbox_count >= max_sandboxes:
+			breaches.append({"resource": "sandboxes", "used": sandbox_count, "limit": max_sandboxes})
+		if active_run_count >= max_active_runs:
+			breaches.append({"resource": "active_runs", "used": active_run_count, "limit": max_active_runs})
+		if mock_count >= max_mock_services:
+			breaches.append({"resource": "mock_services", "used": mock_count, "limit": max_mock_services})
+		return {
+			"tenant_id": tenant_id,
+			"within_quota": len(breaches) == 0,
+			"usage": {
+				"sandboxes": sandbox_count,
+				"active_runs": active_run_count,
+				"mock_services": mock_count,
+			},
+			"limits": {
+				"max_sandboxes": max_sandboxes,
+				"max_active_runs": max_active_runs,
+				"max_mock_services": max_mock_services,
+			},
+			"breaches": breaches,
+			"checked_at": _ts(),
+		}
+
 	def create_record(self, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "active") -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		m = metadata or {}

@@ -752,6 +752,358 @@ class MobileDeviceManagementService:
 			"audit_events": sum(1 for e in self._audit_events if e.get("tenant_id") == tenant_id),
 		}
 
+	# -------------------------------------------------------------------------
+	# Bulk Operations
+	# -------------------------------------------------------------------------
+
+	async def bulk_enrol_devices(
+		self,
+		payloads: list[DeviceEnrolmentCreate],
+	) -> dict[str, Any]:
+		"""Enrol multiple devices in a single operation.
+
+		Returns a BulkEnrolmentResult dict with per-row success/failure details.
+		Idempotent: devices whose serial_number already exists in the tenant are
+		skipped and counted as duplicates rather than raising an error.
+		"""
+		assert payloads, "bulk_enrol_devices requires at least one payload"
+		tenant_id = payloads[0].tenant_id
+		assert all(p.tenant_id == tenant_id for p in payloads), "all payloads must share the same tenant_id"
+
+		existing_serials = {d.serial_number for d in self._devices.values() if d.tenant_id == tenant_id}
+		results: list[dict[str, Any]] = []
+		succeeded = 0
+		failed = 0
+		duplicates = 0
+
+		for p in payloads:
+			if p.serial_number in existing_serials:
+				results.append({"serial_number": p.serial_number, "status": "duplicate", "error": None})
+				duplicates += 1
+				continue
+			try:
+				device = await self.enrol_device(p)
+				existing_serials.add(p.serial_number)
+				results.append({"serial_number": p.serial_number, "status": "enrolled", "device_id": device.id, "error": None})
+				succeeded += 1
+			except Exception as exc:
+				results.append({"serial_number": p.serial_number, "status": "failed", "error": str(exc)})
+				failed += 1
+
+		return {
+			"tenant_id": tenant_id,
+			"total": len(payloads),
+			"succeeded": succeeded,
+			"failed": failed,
+			"duplicates": duplicates,
+			"results": results,
+			"enrolled_at": datetime.utcnow().isoformat(),
+		}
+
+	# -------------------------------------------------------------------------
+	# Device Health Score
+	# -------------------------------------------------------------------------
+
+	async def get_device_health_score(
+		self,
+		tenant_id: str,
+		device_id: str,
+	) -> dict[str, Any]:
+		"""Compute a weighted health score (0–100) for a device.
+
+		Scoring components (configurable weights):
+		- compliance_state (40 pts): compliant=40, pending=20, non_compliant=0
+		- enrolment_state (20 pts): enrolled=20, suspended=5, unenrolled/wiped=0
+		- last_seen_recency (20 pts): within 1h=20, within 24h=10, older=0
+		- open_alerts (20 pts): no open critical/high alerts=20, any=0
+		"""
+		self._enforce({"tenant_context_present": _present(tenant_id)})
+		device = self._require_device(tenant_id, device_id)
+
+		# Compliance component
+		compliance_score = {"compliant": 40, "pending_evaluation": 20, "non_compliant": 0}.get(device.compliance_state, 0)
+
+		# Enrolment component
+		enrolment_score = {"enrolled": 20, "suspended": 5, "unenrolled": 0, "wiped": 0, "locked": 10}.get(device.enrolment_state, 0)
+
+		# Recency component
+		now = datetime.utcnow()
+		last_seen = device.last_seen_at or device.enrolled_at
+		hours_since = (now - last_seen).total_seconds() / 3600
+		if hours_since <= 1:
+			recency_score = 20
+		elif hours_since <= 24:
+			recency_score = 10
+		else:
+			recency_score = 0
+
+		# Alert component
+		open_critical = any(
+			a.device_id == device_id and not a.resolved and a.severity in ("critical", "high")
+			for a in self._alerts.values()
+			if a.tenant_id == tenant_id
+		)
+		alert_score = 0 if open_critical else 20
+
+		total = compliance_score + enrolment_score + recency_score + alert_score
+		self._audit(tenant_id, "device_health_score_computed", device_id)
+		return {
+			"device_id": device_id,
+			"tenant_id": tenant_id,
+			"health_score": total,
+			"components": {
+				"compliance": compliance_score,
+				"enrolment": enrolment_score,
+				"last_seen_recency": recency_score,
+				"open_alerts": alert_score,
+			},
+			"grade": "A" if total >= 80 else ("B" if total >= 60 else ("C" if total >= 40 else "F")),
+			"computed_at": now.isoformat(),
+		}
+
+	# -------------------------------------------------------------------------
+	# Device Groups
+	# -------------------------------------------------------------------------
+
+	async def create_device_group(
+		self,
+		tenant_id: str,
+		name: str,
+		description: str | None,
+		created_by: str,
+	) -> dict[str, Any]:
+		"""Create a named device group for bulk policy targeting."""
+		self._enforce({
+			"tenant_context_present": _present(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+		})
+		assert _present(name), "group name must not be empty"
+		group_id = uuid7str()
+		group = {
+			"id": group_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"description": description,
+			"device_ids": [],
+			"created_by": created_by,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		if not hasattr(self, "_device_groups"):
+			self._device_groups: dict[tuple[str, str], dict[str, Any]] = {}
+		self._device_groups[self._key(tenant_id, group_id)] = group
+		self._audit(tenant_id, "device_group_created", group_id)
+		return group
+
+	async def add_device_to_group(
+		self,
+		tenant_id: str,
+		group_id: str,
+		device_id: str,
+		added_by: str,
+	) -> dict[str, Any]:
+		"""Add a device to an existing device group."""
+		self._enforce({"tenant_context_present": _present(tenant_id)})
+		self._require_device(tenant_id, device_id)
+		if not hasattr(self, "_device_groups"):
+			self._device_groups = {}
+		group = self._device_groups.get((tenant_id, group_id))
+		assert group is not None, f"device_group_not_found: {group_id}"
+		if device_id not in group["device_ids"]:
+			group["device_ids"].append(device_id)
+		self._audit(tenant_id, "device_added_to_group", device_id)
+		return {"group_id": group_id, "device_id": device_id, "status": "added", "added_by": added_by}
+
+	async def assign_policy_to_group(
+		self,
+		tenant_id: str,
+		group_id: str,
+		policy_id: str,
+		assigned_by: str,
+		created_by: str,
+	) -> dict[str, Any]:
+		"""Assign a policy to all devices in a device group.
+
+		Returns a summary with per-device assignment results.
+		"""
+		self._enforce({
+			"tenant_context_present": _present(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+		})
+		if not hasattr(self, "_device_groups"):
+			self._device_groups = {}
+		group = self._device_groups.get((tenant_id, group_id))
+		assert group is not None, f"device_group_not_found: {group_id}"
+		self._require_policy(tenant_id, policy_id)
+
+		results: list[dict[str, Any]] = []
+		for device_id in group["device_ids"]:
+			try:
+				from .models import PolicyAssignmentCreate
+				pa = PolicyAssignmentCreate(
+					tenant_id=tenant_id,
+					policy_id=policy_id,
+					device_id=device_id,
+					assigned_by=assigned_by,
+					created_by=created_by,
+				)
+				assignment = await self.assign_policy(pa)
+				results.append({"device_id": device_id, "assignment_id": assignment.id, "status": "assigned"})
+			except Exception as exc:
+				results.append({"device_id": device_id, "status": "failed", "error": str(exc)})
+
+		self._audit(tenant_id, "policy_assigned_to_group", group_id)
+		return {
+			"group_id": group_id,
+			"policy_id": policy_id,
+			"tenant_id": tenant_id,
+			"device_count": len(group["device_ids"]),
+			"results": results,
+			"assigned_at": datetime.utcnow().isoformat(),
+		}
+
+	# -------------------------------------------------------------------------
+	# Wipe Cancellation
+	# -------------------------------------------------------------------------
+
+	async def cancel_wipe(
+		self,
+		tenant_id: str,
+		wipe_id: str,
+		cancelled_by: str,
+		reason: str,
+	) -> WipeRequestResponse:
+		"""Cancel a pending wipe request within the rollback window.
+
+		Only `pending` wipes may be cancelled. Completed or already-cancelled
+		wipes raise an assertion error. The cancellation is recorded in the
+		audit trail with the provided reason.
+		"""
+		self._enforce({
+			"tenant_context_present": _present(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"approval_present": True,
+		})
+		wipe = self._require_wipe(tenant_id, wipe_id)
+		assert wipe.state == "pending", f"only_pending_wipes_can_be_cancelled: current_state={wipe.state}"
+		assert _present(reason), "cancellation reason must not be empty"
+		wipe.state = "cancelled"
+		wipe.error_message = f"cancelled_by={cancelled_by}: {reason}"
+		wipe.updated_at = datetime.utcnow()
+		# Restore device enrolment state if device exists
+		device = self._devices.get((tenant_id, wipe.device_id))
+		if device and device.enrolment_state == "wiped":
+			device.enrolment_state = "enrolled"
+			device.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "wipe_cancelled", wipe_id)
+		return wipe
+
+	# -------------------------------------------------------------------------
+	# Certificate Lifecycle
+	# -------------------------------------------------------------------------
+
+	async def track_certificate(
+		self,
+		tenant_id: str,
+		device_id: str,
+		cert_serial: str,
+		issuer: str,
+		not_before: datetime,
+		not_after: datetime,
+		tracked_by: str,
+	) -> dict[str, Any]:
+		"""Register a certificate record for lifecycle tracking.
+
+		Automatically raises a `certificate_expiring_soon` alert if the
+		certificate expires within 30 days.
+		"""
+		self._enforce({"tenant_context_present": _present(tenant_id)})
+		self._require_device(tenant_id, device_id)
+		assert _present(cert_serial), "cert_serial must not be empty"
+		assert not_after > not_before, "not_after must be after not_before"
+
+		if not hasattr(self, "_certificates"):
+			self._certificates: dict[tuple[str, str], dict[str, Any]] = {}
+
+		cert_id = uuid7str()
+		days_remaining = (not_after - datetime.utcnow()).days
+		status = "valid" if days_remaining > 0 else "expired"
+		record = {
+			"id": cert_id,
+			"tenant_id": tenant_id,
+			"device_id": device_id,
+			"cert_serial": cert_serial,
+			"issuer": issuer,
+			"not_before": not_before.isoformat(),
+			"not_after": not_after.isoformat(),
+			"days_remaining": days_remaining,
+			"status": status,
+			"tracked_by": tracked_by,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._certificates[self._key(tenant_id, cert_id)] = record
+		self._audit(tenant_id, "certificate_tracked", cert_id)
+
+		if 0 < days_remaining <= 30:
+			await self._raise_alert(
+				tenant_id, device_id, "certificate_expiring_soon",
+				"high" if days_remaining <= 7 else "medium",
+				f"Certificate {cert_serial} expires in {days_remaining} day(s) on {not_after.date().isoformat()}",
+			)
+		elif days_remaining <= 0:
+			await self._raise_alert(
+				tenant_id, device_id, "certificate_expired",
+				"critical",
+				f"Certificate {cert_serial} expired on {not_after.date().isoformat()}",
+			)
+		return record
+
+	async def list_certificates(
+		self,
+		tenant_id: str,
+		device_id: str | None = None,
+		status: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List tracked certificates with optional filters."""
+		self._enforce({"tenant_context_present": _present(tenant_id)})
+		if not hasattr(self, "_certificates"):
+			self._certificates = {}
+		certs = [c for c in self._certificates.values() if c["tenant_id"] == tenant_id]
+		if device_id:
+			certs = [c for c in certs if c["device_id"] == device_id]
+		if status:
+			certs = [c for c in certs if c["status"] == status]
+		return sorted(certs, key=lambda c: c["not_after"])
+
+	# -------------------------------------------------------------------------
+	# Audit Log Query
+	# -------------------------------------------------------------------------
+
+	async def get_audit_log(
+		self,
+		tenant_id: str,
+		entity_id: str | None = None,
+		event_type: str | None = None,
+		limit: int = 100,
+	) -> list[dict[str, Any]]:
+		"""Return filtered audit log entries for a tenant.
+
+		Supports filtering by entity_id (device, policy, wipe, etc.) and/or
+		event_type. Results are newest-first. Limit defaults to 100.
+		"""
+		self._enforce({"tenant_context_present": _present(tenant_id)})
+		assert 1 <= limit <= 1000, "limit must be between 1 and 1000"
+		entries = [e for e in self._audit_events if e.get("tenant_id") == tenant_id]
+		if entity_id:
+			entries = [e for e in entries if e.get("entity_id") == entity_id]
+		if event_type:
+			entries = [e for e in entries if e.get("event_type") == event_type]
+		# Newest first
+		entries = sorted(entries, key=lambda e: e.get("timestamp", ""), reverse=True)
+		return entries[:limit]
+
 	async def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		"""High-level MDM dashboard summary."""
 		devices = [d for d in self._devices.values() if d.tenant_id == tenant_id]

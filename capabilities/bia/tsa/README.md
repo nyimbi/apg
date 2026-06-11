@@ -38,15 +38,39 @@ The Time Series Analytics capability (bia_tsa) provides high-frequency time-seri
 | default_forecast_model | prophet | Default forecasting model |
 | sensitivity_default | 0.95 | Default anomaly sensitivity |
 
+## New Features (v1.1)
+
+| Feature | Method | Description |
+|---------|--------|-------------|
+| Spectral Analysis | `spectral_analysis()` | FFT-based dominant frequency discovery; auto-suggests `period` for `seasonal_decompose` |
+| Data Quality Scoring | `score_data_quality()` | Composite 0-100 score across completeness, uniqueness, consistency, timeliness dimensions |
+| Feature Extraction | `extract_features()` | tsfresh-style: 'minimal' (5), 'basic' (12), 'comprehensive' (25+) statistical features for ML pipelines |
+| ETS Forecast | `forecast_ets()` | Holt-Winters Triple Exponential Smoothing with additive/multiplicative error, trend, seasonality; Decimal-precision parameters |
+| Batch Anomaly Detection | `anomaly_detect_batch()` | Concurrent multi-series anomaly scoring via `asyncio.gather`; aggregate summary across all series |
+| Stream Backfill | `backfill_stream()` | Idempotent late-data backfill with `merge_newer_wins`, `merge_older_wins`, and `replace` strategies; audit-tagged records |
+| Walk-Forward Backtesting | `backtest_forecast()` | n-fold expanding-window backtesting for ARIMA, Holt-Winters, and linear models; MAE/RMSE/MAPE/sMAPE |
+| OHLCV Aggregation | `aggregate_ohlcv()` | Tick-to-bar aggregation using `Decimal` arithmetic; includes VWAP when volume column present |
+| Series Resampling | `resample_series()` | Uniform frequency resampling (mean/sum/last/first/min/max) with forward/backward fill; stores result as new stream |
+| Conformal Calibration | `calibrate_forecast_intervals()` | Distribution-free interval calibration using held-out residual quantiles; updates existing forecast records in-place |
+
 ## API Routes
 | Path | Method | Description | Permission |
 |------|--------|-------------|------------|
 | /api/bia/tsa/streams | GET/POST | List/register streams | bia_tsa:streams |
 | /api/bia/tsa/streams/<id>/ingest | POST | Ingest data points | bia_tsa:streams |
 | /api/bia/tsa/streams/<id>/pause | POST | Pause stream | bia_tsa:streams |
+| /api/bia/tsa/streams/<id>/backfill | POST | Backfill late-arriving data | bia_tsa:streams |
+| /api/bia/tsa/streams/<id>/resample | POST | Resample to uniform frequency | bia_tsa:streams |
+| /api/bia/tsa/streams/<id>/quality | GET | Data quality score | bia_tsa:streams |
+| /api/bia/tsa/streams/<id>/features | GET | Extract ML features | bia_tsa:streams |
+| /api/bia/tsa/streams/<id>/spectral | GET | Spectral / FFT analysis | bia_tsa:streams |
+| /api/bia/tsa/streams/<id>/ohlcv | GET | OHLCV bar aggregation | bia_tsa:streams |
 | /api/bia/tsa/anomaly-configs | GET/POST | Anomaly configs | bia_tsa:anomalies |
 | /api/bia/tsa/anomaly-events | GET | Anomaly events | bia_tsa:anomalies |
+| /api/bia/tsa/anomaly-batch | POST | Multi-series batch detection | bia_tsa:anomalies |
 | /api/bia/tsa/forecasts | GET/POST | Forecasts | bia_tsa:forecast |
+| /api/bia/tsa/forecasts/<id>/calibrate | POST | Conformal interval calibration | bia_tsa:forecast |
+| /api/bia/tsa/forecasts/backtest | POST | Walk-forward backtesting | bia_tsa:forecast |
 | /api/bia/tsa/decompositions | GET/POST | Decompositions | bia_tsa:decompose |
 | /api/bia/tsa/windows | GET/POST | Stream windows | bia_tsa:streams |
 | /api/bia/tsa/streams/<id>/fill-gaps | POST | Fill gaps | bia_tsa:streams |

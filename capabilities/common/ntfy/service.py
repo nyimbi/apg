@@ -1836,6 +1836,524 @@ class NotificationService:
 			"delivery_stats_lifetime": self._delivery_stats,
 		}
 
+	# ========== Idempotent Delivery ==========
+
+	async def send_idempotent(
+		self,
+		recipient: str,
+		template_id: str,
+		variables: Dict[str, Any],
+		idempotency_key: str,
+		priority: str = "normal",
+		scheduled_at: "Optional[datetime]" = None,
+	) -> Dict[str, Any]:
+		"""
+		Send a notification exactly once, keyed by idempotency_key.
+
+		If the same key is used within the current process lifetime the original
+		delivery record is returned without re-sending.  Safe to call multiple
+		times from retry loops or upstream orchestrators.
+
+		Returns the notification record with an extra ``idempotent_hit: bool`` field.
+		"""
+		if not hasattr(self, "_idempotency_cache"):
+			self._idempotency_cache: Dict[str, str] = {}
+
+		cache_key = f"{self.tenant_id}:{idempotency_key}"
+		existing_id = self._idempotency_cache.get(cache_key)
+		if existing_id and existing_id in self._notifications:
+			record = dict(self._notifications[existing_id])
+			record["idempotent_hit"] = True
+			_log.debug(f"Idempotent hit for key={idempotency_key} -> notification {existing_id}")
+			return record
+
+		notif = await self.send_notification(
+			recipient=recipient,
+			template_id=template_id,
+			variables=variables,
+			priority=priority,
+			scheduled_at=scheduled_at,
+		)
+		self._idempotency_cache[cache_key] = notif["id"]
+		notif["idempotent_hit"] = False
+		_log.info(f"Idempotent send registered: key={idempotency_key} -> {notif['id']}")
+		return notif
+
+	# ========== Dead-Letter Queue ==========
+
+	async def requeue_dead_letters(
+		self,
+		max_age_hours: int = 24,
+		limit: int = 100,
+	) -> Dict[str, Any]:
+		"""
+		Re-drive failed notifications from the dead-letter queue.
+
+		Collects up to ``limit`` notifications in ``failed`` or ``bounced`` state
+		created within ``max_age_hours``.  Returns a summary with ``requeued``,
+		``skipped``, ``failed``, ``records`` keys.
+		"""
+		cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
+		candidates = [
+			n for n in self._notifications.values()
+			if n["tenant_id"] == self.tenant_id
+			and n.get("status") in ("failed", "bounced")
+			and datetime.fromisoformat(n["created_at"]) >= cutoff
+		][:limit]
+
+		requeued: List[Dict[str, Any]] = []
+		skipped: List[str] = []
+		errors: List[str] = []
+
+		for notif in candidates:
+			try:
+				result = await self.retry_failed(notif["id"])
+				requeued.append(result)
+			except ValueError as exc:
+				skipped.append(notif["id"])
+				_log.debug(f"DLQ skip {notif['id']}: {exc}")
+			except Exception as exc:
+				errors.append(notif["id"])
+				_log.error(f"DLQ re-drive error {notif['id']}: {exc}")
+
+		summary = {
+			"requeued": len(requeued),
+			"skipped": len(skipped),
+			"failed": len(errors),
+			"records": requeued,
+		}
+		self._audit_log.append({
+			"event": "dlq_requeued",
+			"tenant_id": self.tenant_id,
+			"requeued": len(requeued),
+			"at": datetime.utcnow().isoformat(),
+		})
+		_log.info(f"DLQ re-drive: {summary['requeued']} requeued, {summary['skipped']} skipped, {summary['failed']} errored")
+		return summary
+
+	async def dlq_depth(self) -> Dict[str, int]:
+		"""Return dead-letter queue depth broken down by channel for the current tenant."""
+		channel_counts: Dict[str, int] = {}
+		for n in self._notifications.values():
+			if n["tenant_id"] == self.tenant_id and n.get("status") in ("failed", "bounced"):
+				ch = n.get("channel", "unknown")
+				channel_counts[ch] = channel_counts.get(ch, 0) + 1
+		return channel_counts
+
+	# ========== Consent & Compliance ==========
+
+	async def record_consent(
+		self,
+		recipient_id: str,
+		channel: str,
+		legal_basis: str,
+		evidence_ref: str,
+	) -> Dict[str, Any]:
+		"""
+		Record GDPR/CCPA consent for a recipient on a specific channel.
+
+		Consent records are append-only; revoking adds a separate revocation
+		record rather than mutating the original.
+
+		Returns the immutable consent record with UUID7 ID and ISO timestamp.
+		"""
+		if not hasattr(self, "_consent_records"):
+			self._consent_records: Dict[str, List[Dict[str, Any]]] = {}
+
+		consent_id = uuid7str()
+		now = datetime.utcnow().isoformat()
+		record: Dict[str, Any] = {
+			"id": consent_id,
+			"tenant_id": self.tenant_id,
+			"recipient_id": recipient_id,
+			"channel": channel,
+			"status": "granted",
+			"legal_basis": legal_basis,
+			"evidence_ref": evidence_ref,
+			"recorded_at": now,
+		}
+		key = f"{self.tenant_id}:{recipient_id}:{channel}"
+		if key not in self._consent_records:
+			self._consent_records[key] = []
+		self._consent_records[key].append(record)
+		self._audit_log.append({
+			"event": "consent_recorded",
+			"consent_id": consent_id,
+			"recipient_id": recipient_id,
+			"channel": channel,
+			"legal_basis": legal_basis,
+			"at": now,
+		})
+		_log.info(f"Consent recorded: {consent_id} for {recipient_id} on {channel} ({legal_basis})")
+		return dict(record)
+
+	async def revoke_consent(
+		self,
+		recipient_id: str,
+		channel: str,
+	) -> Dict[str, Any]:
+		"""
+		Revoke consent for a recipient on a channel.
+
+		The original consent record is not mutated.  A suppression is added
+		automatically so no further sends occur on the revoked channel.
+		"""
+		if not hasattr(self, "_consent_records"):
+			self._consent_records = {}
+
+		revocation_id = uuid7str()
+		now = datetime.utcnow().isoformat()
+		revocation: Dict[str, Any] = {
+			"id": revocation_id,
+			"tenant_id": self.tenant_id,
+			"recipient_id": recipient_id,
+			"channel": channel,
+			"status": "revoked",
+			"revoked_at": now,
+		}
+		key = f"{self.tenant_id}:{recipient_id}:{channel}"
+		if key not in self._consent_records:
+			self._consent_records[key] = []
+		self._consent_records[key].append(revocation)
+		await self.add_suppression(recipient_id, "consent_revoked", channel=channel)
+		self._audit_log.append({
+			"event": "consent_revoked",
+			"revocation_id": revocation_id,
+			"recipient_id": recipient_id,
+			"channel": channel,
+			"at": now,
+		})
+		_log.info(f"Consent revoked: {revocation_id} for {recipient_id} on {channel}")
+		return dict(revocation)
+
+	async def get_consent_status(
+		self,
+		recipient_id: str,
+		channel: str,
+	) -> Dict[str, Any]:
+		"""
+		Return the current consent status for a recipient/channel pair.
+
+		Reports effective status (``granted`` or ``revoked``), legal basis,
+		and full append-only history.
+		"""
+		if not hasattr(self, "_consent_records"):
+			self._consent_records = {}
+
+		key = f"{self.tenant_id}:{recipient_id}:{channel}"
+		records = self._consent_records.get(key, [])
+		if not records:
+			return {
+				"recipient_id": recipient_id,
+				"channel": channel,
+				"status": "unknown",
+				"has_consent": False,
+				"history": [],
+			}
+		latest = records[-1]
+		return {
+			"recipient_id": recipient_id,
+			"channel": channel,
+			"status": latest["status"],
+			"has_consent": latest["status"] == "granted",
+			"legal_basis": latest.get("legal_basis"),
+			"latest_at": latest.get("recorded_at") or latest.get("revoked_at"),
+			"history": [dict(r) for r in records],
+		}
+
+	async def bulk_consent_check(
+		self,
+		recipient_ids: List[str],
+		channel: str,
+	) -> Dict[str, bool]:
+		"""
+		Check consent for multiple recipients in a single call.
+
+		Returns a mapping of ``recipient_id -> has_consent (bool)``.
+		Use this to gate campaign send lists before dispatching.
+		"""
+		results: Dict[str, bool] = {}
+		for rid in recipient_ids:
+			status = await self.get_consent_status(rid, channel)
+			results[rid] = bool(status.get("has_consent"))
+		_log.debug(f"bulk_consent_check: {sum(results.values())}/{len(results)} have consent for {channel}")
+		return results
+
+	# ========== Notification Digest / Fatigue Prevention ==========
+
+	async def send_digested(
+		self,
+		recipient_id: str,
+		template_id: str,
+		variables: Dict[str, Any],
+		digest_window_minutes: int = 60,
+	) -> Dict[str, Any]:
+		"""
+		Buffer a notification for digest delivery within a time window.
+
+		Multiple calls within the window accumulate into a single outgoing
+		notification.  The window is flushed lazily on the next call after
+		expiry, or eagerly via ``flush_digest``.
+
+		Returns the digest buffer record with current pending count.
+		"""
+		if not hasattr(self, "_digest_buffer"):
+			self._digest_buffer: Dict[str, Dict[str, Any]] = {}
+
+		key = f"{self.tenant_id}:{recipient_id}"
+		now = datetime.utcnow()
+		existing = self._digest_buffer.get(key)
+		if existing and datetime.fromisoformat(existing["window_expires_at"]) > now:
+			existing["items"].append({
+				"template_id": template_id,
+				"variables": variables,
+				"buffered_at": now.isoformat(),
+			})
+			_log.debug(f"Digest buffer: added item for {recipient_id}, pending={len(existing['items'])}")
+			return dict(existing)
+
+		if existing:
+			await self._flush_digest(key, existing)
+
+		window_expires_at = (now + timedelta(minutes=digest_window_minutes)).isoformat()
+		digest_id = uuid7str()
+		digest_record: Dict[str, Any] = {
+			"id": digest_id,
+			"tenant_id": self.tenant_id,
+			"recipient_id": recipient_id,
+			"status": "buffered",
+			"window_expires_at": window_expires_at,
+			"items": [{"template_id": template_id, "variables": variables, "buffered_at": now.isoformat()}],
+			"created_at": now.isoformat(),
+		}
+		self._digest_buffer[key] = digest_record
+		_log.info(f"Digest window opened: {digest_id} for {recipient_id}, expires {window_expires_at}")
+		return dict(digest_record)
+
+	async def flush_digest(self, recipient_id: str) -> Dict[str, Any]:
+		"""Force-flush the digest buffer for a recipient, sending one combined notification."""
+		if not hasattr(self, "_digest_buffer"):
+			self._digest_buffer = {}
+		key = f"{self.tenant_id}:{recipient_id}"
+		digest = self._digest_buffer.get(key)
+		if not digest:
+			return {"recipient_id": recipient_id, "flushed": 0, "notification_id": None}
+		return await self._flush_digest(key, digest)
+
+	async def _flush_digest(self, key: str, digest: Dict[str, Any]) -> Dict[str, Any]:
+		"""Internal: flush a digest buffer and send a combined notification."""
+		items = digest.get("items", [])
+		recipient_id = digest["recipient_id"]
+		if not items:
+			self._digest_buffer.pop(key, None)
+			return {"recipient_id": recipient_id, "flushed": 0, "notification_id": None}
+
+		first = items[0]
+		combined_vars: Dict[str, Any] = dict(first.get("variables", {}))
+		combined_vars["digest_count"] = len(items)
+		combined_vars["digest_items"] = items
+
+		notification_id = None
+		if first["template_id"] in self._templates:
+			notif = await self.send_notification(
+				recipient=recipient_id,
+				template_id=first["template_id"],
+				variables=combined_vars,
+			)
+			notification_id = notif["id"]
+
+		self._digest_buffer.pop(key, None)
+		self._audit_log.append({
+			"event": "digest_flushed",
+			"recipient_id": recipient_id,
+			"items_count": len(items),
+			"notification_id": notification_id,
+			"at": datetime.utcnow().isoformat(),
+		})
+		_log.info(f"Digest flushed for {recipient_id}: {len(items)} items -> notification {notification_id}")
+		return {
+			"recipient_id": recipient_id,
+			"flushed": len(items),
+			"notification_id": notification_id,
+		}
+
+	# ========== Predictive Send-Time Optimisation ==========
+
+	async def predict_optimal_send_time(
+		self,
+		recipient_id: str,
+		channel: str,
+		fallback_hour: int = 9,
+	) -> Dict[str, Any]:
+		"""
+		Predict the next optimal send hour for a recipient on a given channel.
+
+		Analyses historical ``opened_at`` timestamps (last 90 days) to build
+		an hour-of-day histogram and returns the hour with the highest open count.
+		Requires at least 5 open events; falls back to ``fallback_hour`` otherwise.
+
+		Returns a dict with ``predicted_hour``, ``confidence``, ``data_points``,
+		``next_send_at`` (ISO datetime), and ``basis`` ("historical" or "fallback").
+		"""
+		cutoff = datetime.utcnow() - timedelta(days=90)
+		open_times = [
+			datetime.fromisoformat(n["opened_at"])
+			for n in self._notifications.values()
+			if n["tenant_id"] == self.tenant_id
+			and n["recipient"] == recipient_id
+			and n.get("channel") == channel
+			and n.get("opened_at")
+			and datetime.fromisoformat(n["opened_at"]) >= cutoff
+		]
+
+		now = datetime.utcnow()
+		if len(open_times) < 5:
+			next_occ = now.replace(hour=fallback_hour, minute=0, second=0, microsecond=0)
+			if next_occ <= now:
+				next_occ += timedelta(days=1)
+			return {
+				"recipient_id": recipient_id,
+				"channel": channel,
+				"predicted_hour": fallback_hour,
+				"confidence": 0.0,
+				"data_points": len(open_times),
+				"next_send_at": next_occ.isoformat(),
+				"basis": "fallback",
+			}
+
+		hour_histogram: Dict[int, int] = {}
+		for dt in open_times:
+			hour_histogram[dt.hour] = hour_histogram.get(dt.hour, 0) + 1
+
+		best_hour = max(hour_histogram, key=lambda h: hour_histogram[h])
+		total = sum(hour_histogram.values())
+		confidence = round(hour_histogram[best_hour] / total, 3)
+
+		next_occ = now.replace(hour=best_hour, minute=0, second=0, microsecond=0)
+		if next_occ <= now:
+			next_occ += timedelta(days=1)
+
+		_log.debug(f"predict_optimal_send_time {recipient_id}/{channel}: hour={best_hour}, confidence={confidence}")
+		return {
+			"recipient_id": recipient_id,
+			"channel": channel,
+			"predicted_hour": best_hour,
+			"confidence": confidence,
+			"data_points": len(open_times),
+			"next_send_at": next_occ.isoformat(),
+			"basis": "historical",
+		}
+
+	# ========== Delivery Latency Percentiles ==========
+
+	async def delivery_latency_percentiles(
+		self,
+		period: Dict[str, str],
+		channel: Optional[str] = None,
+	) -> Dict[str, Any]:
+		"""
+		Compute p50, p95, and p99 delivery latency percentiles for a period.
+
+		Latency is ``delivered_at - sent_at`` in milliseconds.  Records missing
+		either timestamp are excluded.
+
+		Args:
+			period: ``{"start": "<ISO>", "end": "<ISO>"}``
+			channel: Optional channel filter.
+
+		Returns:
+			Dict with ``p50_ms``, ``p95_ms``, ``p99_ms``, and ``sample_count``.
+		"""
+		start = datetime.fromisoformat(period["start"])
+		end = datetime.fromisoformat(period["end"])
+		latencies_ms: List[float] = []
+		for n in self._notifications.values():
+			if n["tenant_id"] != self.tenant_id:
+				continue
+			if not (start <= datetime.fromisoformat(n["created_at"]) <= end):
+				continue
+			if channel and n.get("channel") != channel:
+				continue
+			if n.get("sent_at") and n.get("delivered_at"):
+				sent = datetime.fromisoformat(n["sent_at"])
+				delivered = datetime.fromisoformat(n["delivered_at"])
+				delta_ms = (delivered - sent).total_seconds() * 1000
+				if delta_ms >= 0:
+					latencies_ms.append(delta_ms)
+
+		if len(latencies_ms) < 2:
+			return {
+				"period": period,
+				"channel": channel,
+				"p50_ms": None,
+				"p95_ms": None,
+				"p99_ms": None,
+				"sample_count": len(latencies_ms),
+			}
+
+		latencies_ms.sort()
+
+		def _pct(data: List[float], pct: float) -> float:
+			idx = max(0, int(len(data) * pct / 100) - 1)
+			return round(data[idx], 2)
+
+		return {
+			"period": period,
+			"channel": channel,
+			"p50_ms": _pct(latencies_ms, 50),
+			"p95_ms": _pct(latencies_ms, 95),
+			"p99_ms": _pct(latencies_ms, 99),
+			"sample_count": len(latencies_ms),
+		}
+
+	# ========== Template Cloning ==========
+
+	async def clone_template(
+		self,
+		source_template_id: str,
+		new_name: str,
+	) -> Dict[str, Any]:
+		"""
+		Clone an existing template into a new independent record.
+
+		The new template is a deep copy of the source's current version.
+		Version history is not carried over — the clone starts at version 1.
+
+		Args:
+			source_template_id: Template to clone from.
+			new_name: Name for the new template.
+
+		Returns:
+			Newly created template record with ``cloned_from`` metadata.
+		"""
+		source = self._templates.get(source_template_id)
+		if not source:
+			raise KeyError(f"Source template {source_template_id} not found")
+
+		current_version_num = source["current_version"]
+		current_version = next(
+			v for v in source["versions"].values() if v["version"] == current_version_num
+		)
+
+		new_template = await self.create_template(
+			name=new_name,
+			channel=source["channel"],
+			subject=current_version["subject"],
+			body=current_version["body"],
+			variables=list(current_version.get("variables", [])),
+		)
+		new_template["cloned_from"] = source_template_id
+		self._templates[new_template["id"]]["cloned_from"] = source_template_id
+		self._audit_log.append({
+			"event": "template_cloned",
+			"source_template_id": source_template_id,
+			"new_template_id": new_template["id"],
+			"new_name": new_name,
+			"at": datetime.utcnow().isoformat(),
+		})
+		_log.info(f"Cloned template {source_template_id} -> {new_template['id']} ({new_name})")
+		return dict(new_template)
+
 
 # Factory function for service creation
 def create_notification_service(tenant_id: str, **config_overrides) -> NotificationService:

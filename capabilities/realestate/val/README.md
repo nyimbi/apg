@@ -92,8 +92,24 @@ Full-cycle property valuation: comparable sales database, DCF model builder with
 - Mass appraisal runs return a results list even in simulation mode
 - Yield calculation handles zero purchase price via explicit ValueError
 
+## New in This Release
+
+| Method | Description |
+|--------|-------------|
+| `dcf_sensitivity_analysis()` | 2-D capital value grid sweeping discount rate and exit yield ±150 bps |
+| `residual_land_valuation()` | GDV minus development costs giving residual land value (RICS VPS 12) |
+| `calculate_equivalent_yield()` | NIY, equivalent yield, reversionary yield via IRR bisection |
+| `run_avm()` | IDW automated valuation model with confidence bands (low/medium/high/very_high) |
+| `model_rent_review()` | Rent review clause engine with IFRS 16 remeasurement trigger |
+| `bulk_import_comparables()` | Batch comparable ingest with fuzzy deduplication |
+| `apply_comparable_adjustments()` | Structured adjustment matrix with reliability score |
+| `portfolio_variance_report()` | IAS 40/IFRS 13 like-for-like movement with acquisition/disposal split |
+| `detect_revaluation_triggers()` | Scan roll for age, IFRS proximity, and rent movement triggers |
+
 ## Composability Notes
 - Valuation figures feed `realestate_prm` property current_valuation field
-- IFRS 16 commencement valuations triggered by `realestate_lea` lease activation
+- IFRS 16 commencement valuations triggered by `realestate_lea` lease activation; `model_rent_review()` returns `ifrs16_trigger` flag
 - Insurance reinstatement values cross-reference `realestate_ins` asset schedule
 - DCF rental income inputs sourced from `realestate_ren` rent roll
+- `detect_revaluation_triggers()` output can be consumed by `schd` to schedule automatic revaluation instructions
+- `run_avm()` confidence bands gate auto-approval in mortgage origination workflows (`realestate_mrt`)

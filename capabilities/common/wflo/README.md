@@ -1,25 +1,27 @@
-# Workflow Orchestration Capability
+# Workflow Low-Code (wflo)
 
-`wflo` provides APG's common capability for governed workflow and process automation. It composes workflow definition, versioning, publication approval, trigger policy, retry policy, task routing, approval gates, execution state, event streams, compensation, first-class provider-neutral AI workflow agents, UI route metadata, visual theming, and Bytewax lifecycle guardrails.
+`wflo` provides APG's common capability for governed workflow and process automation. It composes workflow definition, versioning, publication approval, trigger policy, retry policy, task routing, approval gates, execution state, event streams, compensation, first-class provider-neutral AI workflow agents, visual designer serialization, UI route metadata, visual theming, and Bytewax lifecycle guardrails.
 
 ## What It Provides
 
 - Tenant-scoped workflow definitions with owner, version, steps, triggers, retry policy, compensation plan, runtime estimate, review state, and publication state.
 - Step modeling for human, automation, approval, AI, and event steps with policy references and compensation metadata.
-- Execution lifecycle with published-definition enforcement, correlation IDs, Bytewax event stream policy, event history, cancellation, failure, completion, and compensation state.
-- Task lifecycle with assignment, claim, completion, escalation reason, due date, and event emission.
+- Execution lifecycle with published-definition enforcement, correlation IDs, idempotent starts, Bytewax event stream policy, event history, cancellation, failure, completion, and compensation state.
+- Task lifecycle with assignment, claim, bulk creation, completion, escalation reason, due date, and event emission.
 - Approval lifecycle with approver, reason, decision evidence, delegation, decision state, and execution status updates.
+- Visual designer serialization via `serialize_designer_state` — emits a `{nodes, edges, metadata}` graph compatible with React Flow and similar canvas renderers.
 - First-class workflow agents with provider-neutral runtime (`codex`, `claude_code`, `opencode`, `pi`), governance role, owner, purpose, scope, disclosure, privileged-role review, and audit events.
 - Bytewax lifecycle batch validation for definition, publication, execution, task, approval, compensation, workflow-agent, and audit mutations.
 - Durable review evidence for review-required workflow definitions, privileged workflow agents, denied lifecycle batches, approval decisions, and audit events.
 - Deterministic rule decisions for workflow authoring, runtime, approvals, tasks, compensation, agents, tenant isolation, and batch mutation policy.
+- Full async interface (`async_*` method variants) for ASGI hosts, background schedulers, and async test suites.
 - Dependency-light API helpers, UI view models, package manifest, semantic model, and release evidence.
 
 ## Runtime Shape
 
-The generated runtime is `service.WfloService`. It is deterministic and in-memory so generated applications can exercise workflow behavior without live event buses, schedulers, distributed executors, notification systems, AI providers, script runners, or durable workflow databases.
+The runtime is `service.WfloService`. It is deterministic and in-memory so generated applications can exercise workflow behavior without live event buses, schedulers, distributed executors, notification systems, AI providers, script runners, or durable workflow databases.
 
-Primary methods:
+### Synchronous Methods
 
 - `create_workflow_definition(...)`
 - `publish_workflow(...)`
@@ -38,8 +40,36 @@ Primary methods:
 - `register_workflow_agent(...)`
 - `validate_batch_mutation(...)`
 - `validate_lifecycle_batch(...)`
+- `bpmn_import(...)`
+- `process_simulate(...)`
+- `bottleneck_detect(...)`
+- `sla_enforce(...)`
+- `compensation_trigger(...)`
+- `parallel_gateway(...)`
+- `inclusive_gateway(...)`
+- `boundary_event(...)`
+- `escalation_handle(...)`
+- `process_analytics(...)`
+- `serialize_designer_state(...)`
 - `list_pending_reviews(...)`
 - `dashboard_summary(...)`
+
+### Async Methods
+
+All sync methods that involve mutations or I/O-bound aggregation have async counterparts:
+
+- `async_create_workflow_definition(...)`
+- `async_start_execution(...)` — adds idempotency on duplicate `correlation_id`
+- `async_complete_task(...)`
+- `async_record_approval(...)`
+- `async_process_analytics(...)`
+- `async_sla_enforce(...)`
+- `async_bpmn_import(...)`
+- `async_bulk_create_tasks(...)` — creates N tasks in one await
+- `async_dashboard_summary(...)`
+- `async_cancel_execution(...)`
+- `async_process_simulate(...)`
+- `async_serialize_designer_state(...)`
 
 ## Configuration And Rules
 

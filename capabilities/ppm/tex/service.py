@@ -995,5 +995,499 @@ class TimeExpenseService:
 		self._audit(t, "record_restored", record_id)
 		return {"record_id": record_id, "status": "active", "tenant_id": t}
 
+	# ── World-class expansion methods ────────────────────────────────────────
+
+	async def lock_timesheet_for_payroll(
+		self, timesheet_id: str, payroll_run_id: str, tenant_id: str | None = None
+	) -> dict[str, Any]:
+		"""Lock an approved timesheet after it has been consumed by a payroll run.
+
+		Locked timesheets reject any further approval or entry-addition attempts,
+		preventing silent double-processing and audit failures.
+		"""
+		assert _present(timesheet_id), "timesheet_id required"
+		assert _present(payroll_run_id), "payroll_run_id required"
+		t = tenant_id or self.tenant_id
+		ts = self.timesheets.get(self._key(t, timesheet_id))
+		assert ts is not None, f"timesheet {timesheet_id!r} not found"
+		assert ts.status == "approved", "only approved timesheets can be locked for payroll"
+		locked_at = str(datetime.utcnow().isoformat())
+		# Store lock metadata in a per-instance registry; avoids model mutation for now
+		if not hasattr(self, "_locked_timesheets"):
+			self._locked_timesheets: dict[tuple[str, str], dict[str, str]] = {}
+		self._locked_timesheets[self._key(t, timesheet_id)] = {
+			"payroll_run_id": payroll_run_id,
+			"locked_at": locked_at,
+		}
+		ts.status = "locked"
+		self._audit(t, "timesheet_locked", timesheet_id)
+		return {
+			"timesheet_id": timesheet_id,
+			"payroll_run_id": payroll_run_id,
+			"locked_at": locked_at,
+			"tenant_id": t,
+		}
+
+	async def check_overtime(
+		self,
+		employee_id: str,
+		period_reference: str,
+		daily_limit_hours: float = 8.0,
+		weekly_limit_hours: float = 40.0,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Detect overtime breaches for an employee within a given period.
+
+		Aggregates time entries by day and week, flagging entries that exceed
+		configurable thresholds. Returns a list of warnings suitable for surfacing
+		at submission time.
+		"""
+		assert _present(employee_id), "employee_id required"
+		assert _present(period_reference), "period_reference required"
+		t = tenant_id or self.tenant_id
+
+		# Collect all timesheets owned by this employee for this period
+		ts_ids = {
+			ts.id for ts in self.timesheets.values()
+			if ts.tenant_id == t
+			and ts.resource_id == employee_id
+			and ts.period_reference.startswith(period_reference[:7])
+		}
+		entries = [
+			e for e in self.time_entries.values()
+			if e.tenant_id == t and e.timesheet_id in ts_ids
+		]
+
+		# Aggregate by day
+		by_day: dict[str, float] = {}
+		for e in entries:
+			by_day[e.entry_date] = by_day.get(e.entry_date, 0.0) + e.hours
+
+		total_hours = sum(by_day.values())
+		warnings: list[dict[str, Any]] = []
+
+		for day, hours in by_day.items():
+			if hours > daily_limit_hours:
+				warnings.append({
+					"type": "daily_overtime",
+					"date": day,
+					"hours": round(hours, 2),
+					"limit": daily_limit_hours,
+					"excess": round(hours - daily_limit_hours, 2),
+				})
+
+		if total_hours > weekly_limit_hours:
+			warnings.append({
+				"type": "weekly_overtime",
+				"period": period_reference,
+				"hours": round(total_hours, 2),
+				"limit": weekly_limit_hours,
+				"excess": round(total_hours - weekly_limit_hours, 2),
+			})
+
+		if warnings:
+			self._audit(t, "overtime_detected", employee_id)
+
+		return {
+			"employee_id": employee_id,
+			"period_reference": period_reference,
+			"total_hours": round(total_hours, 2),
+			"daily_limit": daily_limit_hours,
+			"weekly_limit": weekly_limit_hours,
+			"overtime_warnings": warnings,
+			"has_overtime": bool(warnings),
+			"tenant_id": t,
+		}
+
+	async def bulk_approve_timesheets(
+		self,
+		timesheet_ids: list[str],
+		approver_id: str,
+		comments: str = "bulk_approved",
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Approve multiple timesheets concurrently.
+
+		Runs individual approvals in parallel via asyncio.gather. Returns a
+		summary of approved IDs and any failures with their reasons — safe to
+		call at period-end for high-volume approval runs.
+		"""
+		assert timesheet_ids, "timesheet_ids required"
+		assert _present(approver_id), "approver_id required"
+		t = tenant_id or self.tenant_id
+
+		async def _approve_one(ts_id: str) -> tuple[str, dict[str, Any] | None, str | None]:
+			try:
+				approval_id = f"bulk_tappr_{ts_id}"
+				result = self._approve_timesheet_record(
+					approval_id=approval_id,
+					tenant_id=t,
+					timesheet_id=ts_id,
+					reviewer_id=approver_id,
+					status="approved",
+					comments=comments,
+					evidence_reference=f"bulk_appr_{str(date.today())}",
+				)
+				return ts_id, result, None
+			except Exception as exc:
+				return ts_id, None, str(exc)
+
+		results = await asyncio.gather(*[_approve_one(tid) for tid in timesheet_ids], return_exceptions=True)
+
+		approved = [{"timesheet_id": tid, "result": res} for tid, res, err in results if err is None]
+		failed = {tid: err for tid, _, err in results if err is not None}
+
+		self._audit(t, "bulk_timesheets_approved", f"approver:{approver_id}:count:{len(approved)}")
+		return {
+			"approved_count": len(approved),
+			"failed_count": len(failed),
+			"approved": approved,
+			"failed": failed,
+			"approver_id": approver_id,
+			"tenant_id": t,
+		}
+
+	async def amend_time_entry(
+		self,
+		entry_id: str,
+		new_hours: float,
+		justification: str,
+		new_description: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Create an amendment record against an existing time entry.
+
+		Preserves the original entry as immutable history. The amendment creates
+		a new TimeEntry with a derived ID, linked back to the original via
+		description metadata. Original entry gains status tracking via the
+		amendment registry.
+		"""
+		assert _present(entry_id), "entry_id required"
+		assert _positive(new_hours), "new_hours must be positive"
+		assert new_hours <= 24, "new_hours cannot exceed 24 per day"
+		assert _present(justification), "justification required for amendments"
+		t = tenant_id or self.tenant_id
+
+		original = self.time_entries.get(self._key(t, entry_id))
+		assert original is not None, f"time entry {entry_id!r} not found"
+
+		amendment_id = f"{entry_id}_amend_{str(date.today()).replace('-', '')}"
+		amended_description = new_description or original.description
+		amendment = self.record_time_entry(
+			entry_id=amendment_id,
+			tenant_id=t,
+			timesheet_id=original.timesheet_id,
+			project_id=original.project_id,
+			task_id=original.task_id,
+			entry_type=original.entry_type,
+			billable_status=original.billable_status,
+			hours=new_hours,
+			entry_date=original.entry_date,
+			description=f"AMENDMENT of {entry_id}: {amended_description}",
+			backdated=True,
+			justification=justification,
+		)
+
+		# Track amendment linkage
+		if not hasattr(self, "_amendments"):
+			self._amendments: dict[str, str] = {}  # amendment_id -> original_id
+		self._amendments[amendment_id] = entry_id
+
+		self._audit(t, "time_entry_amended", amendment_id)
+		return {
+			"original_entry_id": entry_id,
+			"amendment_id": amendment_id,
+			"original_hours": original.hours,
+			"new_hours": new_hours,
+			"justification": justification,
+			"amendment": amendment,
+			"tenant_id": t,
+		}
+
+	async def forecast_expense_spend(
+		self,
+		project_id: str,
+		lookahead_days: int = 30,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Forecast upcoming expense spend for a project.
+
+		Aggregates: committed (submitted/pending approval), and extrapolates
+		a trend from the last 3 calendar months. Returns a risk level suitable
+		for budget alert thresholds.
+		"""
+		assert _present(project_id), "project_id required"
+		assert lookahead_days > 0, "lookahead_days must be positive"
+		t = tenant_id or self.tenant_id
+
+		all_claims = [c for c in self.expense_claims.values()
+					  if c.tenant_id == t and c.project_id == project_id]
+
+		committed = sum(c.amount for c in all_claims if c.status in ("submitted", "under_review"))
+		approved_total = sum(c.amount for c in all_claims if c.status in ("approved", "reimbursed"))
+		rejected_total = sum(c.amount for c in all_claims if c.status == "rejected")
+
+		# Trend: group approved claims by month
+		monthly_spend: dict[str, float] = {}
+		for c in all_claims:
+			if c.status in ("approved", "reimbursed"):
+				month_key = c.expense_date[:7]
+				monthly_spend[month_key] = monthly_spend.get(month_key, 0.0) + c.amount
+
+		sorted_months = sorted(monthly_spend.keys())
+		recent_months = sorted_months[-3:] if len(sorted_months) >= 3 else sorted_months
+		avg_monthly = (sum(monthly_spend[m] for m in recent_months) / len(recent_months)) if recent_months else 0.0
+		forecasted = round(avg_monthly * (lookahead_days / 30.0), 2)
+		total_exposure = round(committed + forecasted, 2)
+
+		risk_level = "low"
+		if total_exposure > avg_monthly * 2:
+			risk_level = "high"
+		elif total_exposure > avg_monthly * 1.2:
+			risk_level = "medium"
+
+		self._audit(t, "expense_forecast_generated", project_id)
+		return {
+			"project_id": project_id,
+			"lookahead_days": lookahead_days,
+			"committed_pending": round(committed, 2),
+			"approved_historical": round(approved_total, 2),
+			"rejected_total": round(rejected_total, 2),
+			"avg_monthly_spend": round(avg_monthly, 2),
+			"forecasted_additional": forecasted,
+			"total_exposure": total_exposure,
+			"budget_risk_level": risk_level,
+			"trend_months_used": len(recent_months),
+			"tenant_id": t,
+			"generated_at": str(date.today()),
+		}
+
+	async def resource_utilisation_heatmap(
+		self,
+		resource_id: str,
+		year: int,
+		month: int,
+		capacity_hours_per_day: float = 8.0,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Build a day-indexed utilisation map for a resource across a calendar month.
+
+		Returns `{YYYY-MM-DD: {hours, billable_hours, utilisation_pct}}` suitable
+		for rendering calendar heatmap widgets in the project dashboard.
+		"""
+		assert _present(resource_id), "resource_id required"
+		assert 1 <= month <= 12, "month must be 1-12"
+		assert year >= 2000, "year must be >= 2000"
+		t = tenant_id or self.tenant_id
+
+		period_prefix = f"{year:04d}-{month:02d}"
+		ts_ids = {
+			ts.id for ts in self.timesheets.values()
+			if ts.tenant_id == t and ts.resource_id == resource_id
+		}
+		entries = [
+			e for e in self.time_entries.values()
+			if e.tenant_id == t
+			and e.timesheet_id in ts_ids
+			and e.entry_date.startswith(period_prefix)
+		]
+
+		day_map: dict[str, dict[str, Any]] = {}
+		for e in entries:
+			day = e.entry_date
+			rec = day_map.setdefault(day, {"hours": 0.0, "billable_hours": 0.0})
+			rec["hours"] += e.hours
+			if e.billable_status == "billable":
+				rec["billable_hours"] += e.hours
+
+		# Round and add utilisation_pct
+		heatmap: dict[str, dict[str, Any]] = {}
+		for day, rec in day_map.items():
+			h = round(rec["hours"], 2)
+			bh = round(rec["billable_hours"], 2)
+			heatmap[day] = {
+				"hours": h,
+				"billable_hours": bh,
+				"utilisation_pct": round(min(h / capacity_hours_per_day, 1.0) * 100, 1),
+			}
+
+		total_days_logged = len(heatmap)
+		total_hours = round(sum(v["hours"] for v in heatmap.values()), 2)
+		avg_daily = round(total_hours / total_days_logged, 2) if total_days_logged else 0.0
+
+		return {
+			"resource_id": resource_id,
+			"year": year,
+			"month": month,
+			"period": period_prefix,
+			"capacity_hours_per_day": capacity_hours_per_day,
+			"days_with_entries": total_days_logged,
+			"total_hours": total_hours,
+			"average_daily_hours": avg_daily,
+			"heatmap": heatmap,
+			"tenant_id": t,
+		}
+
+	async def query_audit_log(
+		self,
+		event_type: str | None = None,
+		reference_id: str | None = None,
+		from_date: str | None = None,
+		tenant_id: str | None = None,
+		limit: int = 100,
+	) -> dict[str, Any]:
+		"""Query the audit log with optional filters.
+
+		Supports filtering by event_type and reference_id. Returns events in
+		reverse-chronological order (most recent first) up to `limit`.
+		"""
+		t = tenant_id or self.tenant_id
+		events = [e for e in self.audit_events if e["tenant_id"] == t]
+		if event_type:
+			events = [e for e in events if e["event_type"] == event_type]
+		if reference_id:
+			events = [e for e in events if e.get("reference_id") == reference_id]
+		# Reverse so newest first, then cap
+		events = list(reversed(events))[:limit]
+		return {
+			"tenant_id": t,
+			"filter_event_type": event_type,
+			"filter_reference_id": reference_id,
+			"total_returned": len(events),
+			"limit": limit,
+			"events": events,
+		}
+
+	async def export_to_project_accounting(
+		self,
+		project_id: str,
+		period: str,
+		pac_adapter: Any = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Export approved timesheets and expense claims to project accounting.
+
+		Computes labour cost by applying billing rates to approved timesheet hours.
+		Bundles approved expense claims. Calls `pac_adapter.ingest_cost_batch` when
+		an adapter is provided; otherwise returns the batch payload for inspection.
+		"""
+		assert _present(project_id), "project_id required"
+		assert _present(period), "period required"
+		t = tenant_id or self.tenant_id
+
+		# Approved timesheets for project/period
+		approved_sheets = [
+			ts for ts in self.timesheets.values()
+			if ts.tenant_id == t and ts.project_id == project_id
+			and ts.status in ("approved", "locked")
+			and ts.period_reference.startswith(period[:7])
+		]
+
+		# Collect time entries for those timesheets
+		approved_ts_ids = {ts.id for ts in approved_sheets}
+		entries = [
+			e for e in self.time_entries.values()
+			if e.tenant_id == t and e.timesheet_id in approved_ts_ids
+			and e.billable_status == "billable"
+		]
+
+		# Apply billing rates
+		labour_line_items: list[dict[str, Any]] = []
+		total_labour_cost = 0.0
+		for e in entries:
+			rate = next(
+				(br for br in self.billing_rates.values()
+				 if br.tenant_id == t and br.project_id == project_id),
+				None,
+			)
+			unit_rate = rate.rate_amount if rate else 0.0
+			line_cost = round(e.hours * unit_rate, 2)
+			total_labour_cost += line_cost
+			labour_line_items.append({
+				"entry_id": e.id,
+				"resource_id": (self.timesheets.get(self._key(t, e.timesheet_id)) or
+								type("_", (), {"resource_id": "unknown"})()).resource_id,
+				"hours": e.hours,
+				"rate": unit_rate,
+				"cost": line_cost,
+				"date": e.entry_date,
+			})
+
+		# Approved expense claims
+		expense_items = [
+			c.to_dict() for c in self.expense_claims.values()
+			if c.tenant_id == t and c.project_id == project_id
+			and c.status in ("approved", "reimbursed")
+			and c.expense_date[:7] == period[:7]
+		]
+		total_expense_cost = sum(float(c.get("amount", 0)) for c in expense_items)
+
+		batch = {
+			"project_id": project_id,
+			"period": period,
+			"tenant_id": t,
+			"labour_line_items": labour_line_items,
+			"expense_line_items": expense_items,
+			"total_labour_cost": round(total_labour_cost, 2),
+			"total_expense_cost": round(total_expense_cost, 2),
+			"grand_total": round(total_labour_cost + total_expense_cost, 2),
+			"exported_at": str(date.today()),
+		}
+
+		if pac_adapter is not None:
+			await pac_adapter.ingest_cost_batch(batch)
+
+		self._audit(t, "billable_hours_exported", project_id)
+		self._audit(t, "expense_costs_exported", project_id)
+		return batch
+
+	async def employee_expense_summary(
+		self,
+		employee_id: str,
+		period: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Summarise all expense claims for an employee, optionally filtered by period.
+
+		Returns totals by status and category, suitable for employee self-service
+		dashboards and finance team reconciliation views.
+		"""
+		assert _present(employee_id), "employee_id required"
+		t = tenant_id or self.tenant_id
+
+		claims = [
+			c for c in self.expense_claims.values()
+			if c.tenant_id == t and c.resource_id == employee_id
+		]
+		if period:
+			claims = [c for c in claims if c.expense_date.startswith(period[:7])]
+
+		by_status: dict[str, float] = {}
+		by_category: dict[str, float] = {}
+		for c in claims:
+			by_status[c.status] = round(by_status.get(c.status, 0.0) + c.amount, 2)
+			by_category[c.category] = round(by_category.get(c.category, 0.0) + c.amount, 2)
+
+		reimbursements = [
+			r for r in self.reimbursements.values()
+			if r.tenant_id == t and r.resource_id == employee_id
+		]
+		total_reimbursed = sum(r.amount for r in reimbursements)
+
+		return {
+			"employee_id": employee_id,
+			"period": period,
+			"claim_count": len(claims),
+			"total_claimed": round(sum(c.amount for c in claims), 2),
+			"total_reimbursed": round(total_reimbursed, 2),
+			"pending_reimbursement": round(
+				sum(c.amount for c in claims if c.status == "approved"), 2
+			),
+			"by_status": by_status,
+			"by_category": by_category,
+			"tenant_id": t,
+			"generated_at": str(date.today()),
+		}
+
 
 PpmTexService = TimeExpenseService

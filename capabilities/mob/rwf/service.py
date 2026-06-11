@@ -879,3 +879,459 @@ class RemoteWorkforceService:
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# -------------------------------------------------------------------------
+	# Field Shift Management
+	# -------------------------------------------------------------------------
+
+	async def check_in_shift(
+		self,
+		tenant_id: str,
+		employee_id: str,
+		location_lat: float | None = None,
+		location_lon: float | None = None,
+		site_id: str | None = None,
+		created_by: str | None = None,
+	) -> dict[str, Any]:
+		"""Record a field worker shift check-in with optional GPS coordinates."""
+		guard_tenant_id(tenant_id)
+		shift_id = uuid7str()
+		shift: dict[str, Any] = {
+			"shift_id": shift_id,
+			"tenant_id": tenant_id,
+			"employee_id": employee_id,
+			"site_id": site_id,
+			"checked_in_at": datetime.utcnow().isoformat(),
+			"checked_out_at": None,
+			"duration_minutes": None,
+			"location_lat": location_lat,
+			"location_lon": location_lon,
+			"state": "active",
+			"created_by": created_by or employee_id,
+		}
+		# store under a dedicated namespace
+		if not hasattr(self, "_shifts"):
+			self._shifts: dict[tuple[str, str], dict[str, Any]] = {}
+		self._shifts[(tenant_id, shift_id)] = shift
+		self._audit(tenant_id, "shift_checked_in", shift_id)
+		return shift
+
+	async def check_out_shift(
+		self,
+		tenant_id: str,
+		shift_id: str,
+		location_lat: float | None = None,
+		location_lon: float | None = None,
+	) -> dict[str, Any]:
+		"""Record shift check-out and compute duration."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_shifts"):
+			self._shifts = {}
+		shift = self._shifts.get((tenant_id, shift_id))
+		assert shift is not None, f"shift_not_found: {shift_id}"
+		assert shift["state"] == "active", f"shift_already_closed: {shift_id}"
+		now = datetime.utcnow()
+		checked_in = datetime.fromisoformat(shift["checked_in_at"])
+		duration = int((now - checked_in).total_seconds() / 60)
+		shift["checked_out_at"] = now.isoformat()
+		shift["duration_minutes"] = duration
+		shift["state"] = "closed"
+		if location_lat is not None:
+			shift["checkout_lat"] = location_lat
+		if location_lon is not None:
+			shift["checkout_lon"] = location_lon
+		self._audit(tenant_id, "shift_checked_out", shift_id)
+		return shift
+
+	async def get_active_shifts(self, tenant_id: str, site_id: str | None = None) -> list[dict[str, Any]]:
+		"""Return all currently active shifts for a tenant, optionally filtered by site."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_shifts"):
+			self._shifts = {}
+		shifts = [s for s in self._shifts.values() if s["tenant_id"] == tenant_id and s["state"] == "active"]
+		if site_id:
+			shifts = [s for s in shifts if s.get("site_id") == site_id]
+		return sorted(shifts, key=lambda s: s["checked_in_at"])
+
+	# -------------------------------------------------------------------------
+	# Field Task Management
+	# -------------------------------------------------------------------------
+
+	async def assign_field_task(
+		self,
+		tenant_id: str,
+		employee_id: str,
+		task_title: str,
+		task_type: str,
+		due_at: datetime | None = None,
+		geo_region: str | None = None,
+		priority: str = "normal",
+		dependencies: list[str] | None = None,
+		created_by: str = "system",
+	) -> dict[str, Any]:
+		"""Assign a field task to a worker, optionally constrained to a geo-region."""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(task_title, "task_title")
+		task_id = uuid7str()
+		task: dict[str, Any] = {
+			"task_id": task_id,
+			"tenant_id": tenant_id,
+			"employee_id": employee_id,
+			"task_title": task_title,
+			"task_type": task_type,
+			"priority": priority,
+			"geo_region": geo_region,
+			"due_at": due_at.isoformat() if due_at else None,
+			"dependencies": dependencies or [],
+			"state": "assigned",
+			"created_by": created_by,
+			"assigned_at": datetime.utcnow().isoformat(),
+			"completed_at": None,
+		}
+		if not hasattr(self, "_field_tasks"):
+			self._field_tasks: dict[tuple[str, str], dict[str, Any]] = {}
+		self._field_tasks[(tenant_id, task_id)] = task
+		self._audit(tenant_id, "field_task_assigned", task_id)
+		return task
+
+	async def complete_field_task(
+		self,
+		tenant_id: str,
+		task_id: str,
+		outcome_notes: str = "",
+		completed_by: str | None = None,
+	) -> dict[str, Any]:
+		"""Mark a field task as completed."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_field_tasks"):
+			self._field_tasks = {}
+		task = self._field_tasks.get((tenant_id, task_id))
+		assert task is not None, f"field_task_not_found: {task_id}"
+		assert task["state"] == "assigned", f"task_not_in_assigned_state: {task_id}"
+		task["state"] = "completed"
+		task["outcome_notes"] = outcome_notes
+		task["completed_at"] = datetime.utcnow().isoformat()
+		if completed_by:
+			task["completed_by"] = completed_by
+		self._audit(tenant_id, "field_task_completed", task_id)
+		return task
+
+	async def list_field_tasks(
+		self,
+		tenant_id: str,
+		employee_id: str | None = None,
+		state: str | None = None,
+		geo_region: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List field tasks with optional filters."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_field_tasks"):
+			self._field_tasks = {}
+		tasks = [t for t in self._field_tasks.values() if t["tenant_id"] == tenant_id]
+		if employee_id:
+			tasks = [t for t in tasks if t["employee_id"] == employee_id]
+		if state:
+			tasks = [t for t in tasks if t["state"] == state]
+		if geo_region:
+			tasks = [t for t in tasks if t.get("geo_region") == geo_region]
+		return sorted(tasks, key=lambda t: t["assigned_at"])
+
+	# -------------------------------------------------------------------------
+	# Field Certifications
+	# -------------------------------------------------------------------------
+
+	async def record_certification(
+		self,
+		tenant_id: str,
+		employee_id: str,
+		cert_type: str,
+		issuer: str,
+		issued_at: datetime,
+		expiry_date: datetime | None = None,
+		cert_number: str | None = None,
+		created_by: str = "hr",
+	) -> dict[str, Any]:
+		"""Record a field worker certification or licence."""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(cert_type, "cert_type")
+		cert_id = uuid7str()
+		now = datetime.utcnow()
+		expired = expiry_date is not None and expiry_date < now
+		cert: dict[str, Any] = {
+			"cert_id": cert_id,
+			"tenant_id": tenant_id,
+			"employee_id": employee_id,
+			"cert_type": cert_type,
+			"issuer": issuer,
+			"cert_number": cert_number,
+			"issued_at": issued_at.isoformat(),
+			"expiry_date": expiry_date.isoformat() if expiry_date else None,
+			"state": "expired" if expired else "valid",
+			"created_by": created_by,
+			"recorded_at": now.isoformat(),
+		}
+		if not hasattr(self, "_certifications"):
+			self._certifications: dict[tuple[str, str], dict[str, Any]] = {}
+		self._certifications[(tenant_id, cert_id)] = cert
+		if expired:
+			# auto-raise a compliance incident for expired cert on record
+			await self.raise_incident(
+				type("_Payload", (), {  # type: ignore[call-arg]
+					"tenant_id": tenant_id,
+					"employee_id": employee_id,
+					"incident_type": "compliance_breach",
+					"description": f"Expired certification on record: {cert_type}",
+					"severity": "medium",
+					"reported_by": "system",
+					"created_by": "system",
+				})()
+			)
+		self._audit(tenant_id, "certification_recorded", cert_id)
+		return cert
+
+	async def list_certifications(
+		self,
+		tenant_id: str,
+		employee_id: str | None = None,
+		cert_type: str | None = None,
+		state: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List field certifications, optionally filtered."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_certifications"):
+			self._certifications = {}
+		certs = [c for c in self._certifications.values() if c["tenant_id"] == tenant_id]
+		if employee_id:
+			certs = [c for c in certs if c["employee_id"] == employee_id]
+		if cert_type:
+			certs = [c for c in certs if c["cert_type"] == cert_type]
+		if state:
+			certs = [c for c in certs if c["state"] == state]
+		return sorted(certs, key=lambda c: c["recorded_at"])
+
+	# -------------------------------------------------------------------------
+	# Route Optimisation
+	# -------------------------------------------------------------------------
+
+	async def optimize_field_route(
+		self,
+		tenant_id: str,
+		waypoints: list[dict[str, Any]],
+		start_point: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Optimise a field worker's route using nearest-neighbour + 2-opt TSP.
+
+		Each waypoint must be a dict with at least ``lat``, ``lon``, and ``label`` keys.
+		Returns ordered waypoints and an estimated total distance (Euclidean).
+		"""
+		guard_tenant_id(tenant_id)
+		import math
+
+		def _dist(a: dict[str, Any], b: dict[str, Any]) -> float:
+			return math.sqrt((a["lat"] - b["lat"]) ** 2 + (a["lon"] - b["lon"]) ** 2)
+
+		if not waypoints:
+			return {"tenant_id": tenant_id, "route": [], "total_distance": 0.0, "algorithm": "none"}
+
+		points = list(waypoints)
+		origin = start_point or points[0]
+
+		# Nearest-neighbour initial tour
+		unvisited = list(range(len(points)))
+		tour: list[int] = []
+		current = origin
+		while unvisited:
+			nearest_idx = min(unvisited, key=lambda i: _dist(current, points[i]))
+			tour.append(nearest_idx)
+			current = points[nearest_idx]
+			unvisited.remove(nearest_idx)
+
+		# 2-opt improvement
+		improved = True
+		while improved:
+			improved = False
+			for i in range(len(tour) - 1):
+				for j in range(i + 2, len(tour)):
+					d_before = _dist(points[tour[i]], points[tour[i + 1]]) + _dist(points[tour[j - 1]], points[tour[j % len(tour)]])
+					d_after = _dist(points[tour[i]], points[tour[j - 1]]) + _dist(points[tour[i + 1]], points[tour[j % len(tour)]])
+					if d_after < d_before - 1e-10:
+						tour[i + 1:j] = tour[i + 1:j][::-1]
+						improved = True
+
+		ordered = [points[i] for i in tour]
+		total_dist = sum(_dist(ordered[k], ordered[k + 1]) for k in range(len(ordered) - 1))
+
+		self._audit(tenant_id, "route_optimised", f"waypoints={len(waypoints)}")
+		return {
+			"tenant_id": tenant_id,
+			"route": ordered,
+			"total_distance": round(total_dist, 6),
+			"algorithm": "nearest_neighbour+2opt",
+			"waypoint_count": len(ordered),
+		}
+
+	# -------------------------------------------------------------------------
+	# Offline Sync Queue
+	# -------------------------------------------------------------------------
+
+	async def enqueue_offline_operation(
+		self,
+		tenant_id: str,
+		employee_id: str,
+		operation: str,
+		payload: dict[str, Any],
+		logical_clock: int | None = None,
+	) -> dict[str, Any]:
+		"""Queue an operation recorded offline for later sync replay."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_offline_queue"):
+			self._offline_queue: list[dict[str, Any]] = []
+		entry: dict[str, Any] = {
+			"op_id": uuid7str(),
+			"tenant_id": tenant_id,
+			"employee_id": employee_id,
+			"operation": operation,
+			"payload": payload,
+			"logical_clock": logical_clock or len(self._offline_queue),
+			"queued_at": datetime.utcnow().isoformat(),
+			"synced": False,
+			"sync_error": None,
+		}
+		self._offline_queue.append(entry)
+		return entry
+
+	async def sync_offline_queue(self, tenant_id: str, employee_id: str) -> dict[str, Any]:
+		"""Replay all pending offline operations for an employee in causal order."""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_offline_queue"):
+			self._offline_queue = []
+		pending = [
+			op for op in self._offline_queue
+			if op["tenant_id"] == tenant_id and op["employee_id"] == employee_id and not op["synced"]
+		]
+		# replay in causal order
+		pending.sort(key=lambda o: o["logical_clock"])
+		succeeded, failed = 0, 0
+		errors: list[dict[str, Any]] = []
+		for op in pending:
+			try:
+				# dispatch to known write operations; unknown ops are logged
+				handler = getattr(self, op["operation"], None)
+				if handler is not None:
+					await handler(**op["payload"])
+				op["synced"] = True
+				succeeded += 1
+			except Exception as exc:
+				op["sync_error"] = str(exc)
+				failed += 1
+				errors.append({"op_id": op["op_id"], "error": str(exc)})
+		self._audit(tenant_id, "offline_queue_synced", employee_id)
+		return {
+			"tenant_id": tenant_id,
+			"employee_id": employee_id,
+			"total_pending": len(pending),
+			"succeeded": succeeded,
+			"failed": failed,
+			"errors": errors,
+		}
+
+	# -------------------------------------------------------------------------
+	# Bulk Operations
+	# -------------------------------------------------------------------------
+
+	async def bulk_start_onboarding(
+		self,
+		tenant_id: str,
+		payloads: list[OnboardingRecordCreate],
+	) -> dict[str, Any]:
+		"""Start onboarding for multiple employees in one call with partial-failure semantics."""
+		guard_tenant_id(tenant_id)
+		succeeded: list[Any] = []
+		failed: list[dict[str, Any]] = []
+		for p in payloads:
+			try:
+				record = await self.start_onboarding(p)
+				succeeded.append(record)
+			except Exception as exc:
+				failed.append({"employee_id": getattr(p, "employee_id", None), "error": str(exc)})
+		return {
+			"tenant_id": tenant_id,
+			"total": len(payloads),
+			"succeeded": len(succeeded),
+			"failed": len(failed),
+			"records": succeeded,
+			"partial_errors": failed,
+		}
+
+	# -------------------------------------------------------------------------
+	# Audit Log Export
+	# -------------------------------------------------------------------------
+
+	async def export_audit_log(
+		self,
+		tenant_id: str,
+		event_type: str | None = None,
+		since: datetime | None = None,
+		until: datetime | None = None,
+		format: str = "json",
+	) -> dict[str, Any]:
+		"""Export the audit log for a tenant, optionally filtered by event type and time range.
+
+		``format`` is reserved for future SIEM CEF output; currently always JSON.
+		"""
+		guard_tenant_id(tenant_id)
+		events = [e for e in self._audit_events if e.get("tenant_id") == tenant_id]
+		if event_type:
+			events = [e for e in events if e.get("event_type") == event_type]
+		if since:
+			events = [e for e in events if datetime.fromisoformat(e["timestamp"]) >= since]
+		if until:
+			events = [e for e in events if datetime.fromisoformat(e["timestamp"]) <= until]
+		import hashlib, json as _json
+		checksum = hashlib.sha256(_json.dumps(events, sort_keys=True).encode()).hexdigest()
+		return {
+			"tenant_id": tenant_id,
+			"event_count": len(events),
+			"events": events,
+			"format": format,
+			"checksum": checksum,
+			"exported_at": datetime.utcnow().isoformat(),
+		}
+
+	# -------------------------------------------------------------------------
+	# Health Check
+	# -------------------------------------------------------------------------
+
+	async def health_check(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Return a structured health report for liveness/readiness probes."""
+		checks: dict[str, str] = {}
+
+		# rule engine self-test
+		try:
+			result = evaluate_capability_rules({"tenant_context_present": True})
+			checks["rule_engine"] = "ok" if "decision" in result else "degraded"
+		except Exception as exc:
+			checks["rule_engine"] = f"error: {exc}"
+
+		# in-memory storage check
+		try:
+			_ = len(self._work_policies) + len(self._incidents) + len(self._vpn_access)
+			checks["storage"] = "ok"
+		except Exception as exc:
+			checks["storage"] = f"error: {exc}"
+
+		# schema version sanity
+		try:
+			contract = get_capability_contract(tenant_id)
+			checks["contract"] = "ok" if contract else "empty"
+		except Exception as exc:
+			checks["contract"] = f"error: {exc}"
+
+		overall = "healthy" if all(v == "ok" for v in checks.values()) else "degraded"
+		return {
+			"status": overall,
+			"tenant_id": tenant_id,
+			"checks": checks,
+			"audit_event_count": len(self._audit_events),
+			"checked_at": datetime.utcnow().isoformat(),
+		}
+

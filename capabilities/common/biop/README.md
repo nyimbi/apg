@@ -141,6 +141,80 @@ assert result["decision"] == "deny"
 assert "bytewax_biop_stream_required" in result["matched_rules"]
 ```
 
+## New Methods (service.py 43–50)
+
+| # | Method | Purpose |
+|---|--------|---------|
+| 43 | `fido2_credential_register` | FIDO2/WebAuthn credential with AAGUID, attestation type, CTAP 2.2 backup flags |
+| 44 | `fido2_assertion_verify` | Verify assertion; sign_count rollback → credential flagged `compromised` |
+| 45 | `retention_policy_set` | Per-modality retention policy (days, legal_basis, jurisdiction) |
+| 45b | `retention_sweep` | Revoke templates past expiry; suitable for nightly cron |
+| 46 | `verification_cost_record` | Billing line per verification using `Decimal` + ROUND_HALF_EVEN |
+| 46b | `billing_summary` | Aggregate billing by modality over date range; Decimal-precise totals |
+| 47 | `step_up_session_create` | Step-up session with modality cascade and TTL |
+| 47b | `step_up_session_evaluate` | Fuse new verification; returns satisfied/step_up_required/failed/expired |
+| 48 | `biometric_agent_register` | Register AI agent (codex/claude_code/opencode/pi) with role and disclosure |
+| 48b | `biometric_agent_invoke_log` | Immutable agent invocation record linked to biometric operation |
+| 49 | `pad_evidence_chain_create` | SHA-256 bind PAD indicators + challenge nonce to verification |
+| 49b | `pad_evidence_chain_verify` | Recompute chain hash; `integrity_verified=False` signals tampering |
+| 50 | `match_confidence_with_uncertainty` | Verification with 90% CI; flags high-uncertainty accepts for review |
+
+### Quick examples
+
+```python
+from capabilities.common.biop.service import BiometricService
+
+svc = BiometricService(actor_id="api", tenant_id="acme")
+user = await svc.register_user("emp-007", "Amina Hassan")
+
+# FIDO2
+cred = await svc.fido2_credential_register(
+    user_id=user["user_id"],
+    credential_id="cred-001",
+    aaguid="adce0002-35bc-c60a-648b-0b25f1f05503",
+    public_key_cbor="a501...",
+    attestation_type="packed",
+)
+result = await svc.fido2_assertion_verify(
+    credential_id="cred-001",
+    authenticator_data_hex="...",
+    client_data_hash_hex="...",
+    signature_valid=True,
+    new_sign_count=1,
+)
+assert result["decision"] == "accept"
+
+# Retention sweep
+await svc.retention_policy_set("fingerprint", 365, "GDPR_Art9_2b", "KE")
+report = await svc.retention_sweep()
+
+# Billing (Decimal)
+verif = await svc.verify(user["user_id"], "face", b"probe")
+bill = await svc.verification_cost_record(verif["verification_id"])
+summary = await svc.billing_summary(from_date="2026-01-01")
+
+# Step-up
+session = await svc.step_up_session_create(
+    user["user_id"], "fingerprint", 0.72, required_confidence=0.90,
+    step_up_modalities=["face"]
+)
+session = await svc.step_up_session_evaluate(
+    session["session_id"], verif["verification_id"], 0.91
+)
+
+# Uncertainty-aware verification
+result = await svc.match_confidence_with_uncertainty(user["user_id"], "face", b"probe")
+print(result["confidence_interval"], result["high_uncertainty"])
+
+# PAD evidence chain
+challenge = await svc.issue_liveness_challenge(user["user_id"])
+await svc.complete_liveness_challenge(challenge["challenge_id"], b"resp", 0.96)
+v = await svc.verify(user["user_id"], "face", b"probe")
+chain = await svc.pad_evidence_chain_create(v["verification_id"], challenge["challenge_id"])
+check = await svc.pad_evidence_chain_verify(chain["chain_id"])
+assert check["integrity_verified"]
+```
+
 ## Composition Notes
 
 BIOP depends on `mfau`, `cvsn`, `aicr`, `encr`, `audl`, and `conf`. Optional adapters include `auth`, `frec`, `moni`, `cach`, and Bytewax event streams. Applications should compose BIOP through the capability contract and dependency-light runtime helpers, not by importing production-only web, hardware integration, or external agent internals.

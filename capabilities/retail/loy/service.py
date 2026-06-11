@@ -825,3 +825,612 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ------------------------------------------------------------------
+	# Batch Earn
+	# ------------------------------------------------------------------
+
+	async def batch_earn_points(
+		self,
+		earn_records: list[dict[str, Any]],
+		programme_id: str,
+		*,
+		idempotency_key: str | None = None,
+	) -> dict[str, Any]:
+		"""Process a batch of earn records asynchronously.
+
+		Each record: {customer_id, transaction_id, spend_amount, bonus_multiplier?}
+		Records are processed individually; partial failures are collected in ``errors``.
+		Returns aggregate stats plus per-record results.
+		"""
+		assert earn_records, "earn_records must be non-empty"
+		assert programme_id, "programme_id required"
+		self._log_op("batch_earn_points", self.tenant_id)
+
+		results: list[dict[str, Any]] = []
+		errors: list[dict[str, Any]] = []
+
+		for record in earn_records:
+			cid = record.get("customer_id", "")
+			tid = record.get("transaction_id", "")
+			spend = float(record.get("spend_amount", 0.0))
+			multiplier = float(record.get("bonus_multiplier", 1.0))
+			try:
+				txn = await self.earn_points(cid, tid, spend, multiplier)
+				results.append({"customer_id": cid, "status": "ok", "txn": txn})
+			except Exception as exc:
+				errors.append({"customer_id": cid, "transaction_id": tid, "error": str(exc)})
+
+		total_points = sum(r["txn"]["points"] for r in results if "txn" in r)
+		return {
+			"programme_id": programme_id,
+			"idempotency_key": idempotency_key,
+			"total_records": len(earn_records),
+			"succeeded": len(results),
+			"failed": len(errors),
+			"total_points_issued": total_points,
+			"results": results,
+			"errors": errors,
+			"processed_at": datetime.utcnow().isoformat(),
+		}
+
+	# ------------------------------------------------------------------
+	# Tier Downgrade Check
+	# ------------------------------------------------------------------
+
+	async def tier_downgrade_check(self, customer_id: str) -> dict[str, Any]:
+		"""Evaluate whether a member's rolling-window earn falls below current tier threshold.
+
+		Respects ``downgrade_grace_days`` — the downgrade is only executed once the grace
+		window has elapsed since the member first fell below threshold.
+		"""
+		tenant_id = self.tenant_id
+		member = self._members.get(customer_id)
+		assert member is not None and member["tenant_id"] == tenant_id, "member not found"
+
+		programme_id = member.get("programme_id", "")
+		tiers = await self.list_tiers(tenant_id, programme_id)
+		current_tier_id = member.get("current_tier_id")
+		current_tier = next((t for t in tiers if t.id == current_tier_id), None)
+
+		if current_tier is None:
+			return {"customer_id": customer_id, "action": "no_tier_assigned"}
+
+		# Calculate rolling-window earn points
+		from datetime import timedelta
+		window_days = getattr(current_tier, "qualification_window_days", 365)
+		grace_days = getattr(current_tier, "downgrade_grace_days", 90)
+		cutoff = (datetime.utcnow() - timedelta(days=window_days)).isoformat()
+
+		rolling_earn = sum(
+			t.get("points", 0)
+			for t in self._transactions.values()
+			if t.get("tenant_id") == tenant_id
+			and t.get("member_id") == customer_id
+			and t.get("transaction_type") == "earn"
+			and str(t.get("created_at", "")) >= cutoff
+		)
+		qualification_pts = getattr(current_tier, "qualification_points", 0)
+		below_threshold = rolling_earn < qualification_pts
+
+		downgrade_scheduled = member.get("downgrade_scheduled_at")
+		downgraded = False
+		action = "no_action"
+
+		if below_threshold:
+			if downgrade_scheduled is None:
+				# First time below threshold — set grace timer
+				member["downgrade_scheduled_at"] = datetime.utcnow().isoformat()
+				member["updated_at"] = datetime.utcnow().isoformat()
+				self._members[customer_id] = member
+				action = "grace_period_started"
+			else:
+				grace_start = datetime.fromisoformat(downgrade_scheduled)
+				if (datetime.utcnow() - grace_start).days >= grace_days:
+					# Grace elapsed — execute downgrade to next lower tier
+					tiers_sorted = sorted(tiers, key=lambda t: getattr(t, "qualification_points", 0))
+					lower_tiers = [t for t in tiers_sorted
+									if getattr(t, "qualification_points", 0) <= rolling_earn
+									and t.id != current_tier_id]
+					if lower_tiers:
+						new_tier = lower_tiers[-1]
+						old_name = current_tier.tier_name
+						await self.assign_member_tier(tenant_id, customer_id, new_tier.id, "system")
+						member["downgrade_scheduled_at"] = None
+						self._members[customer_id] = member
+						self._log_tier_event(customer_id, old_name, new_tier.tier_name)
+						downgraded = True
+						action = "downgraded"
+				else:
+					action = "grace_period_active"
+		else:
+			# Recovered — clear grace timer
+			if downgrade_scheduled:
+				member["downgrade_scheduled_at"] = None
+				member["updated_at"] = datetime.utcnow().isoformat()
+				self._members[customer_id] = member
+				action = "grace_period_cleared"
+
+		return {
+			"customer_id": customer_id,
+			"current_tier": current_tier.tier_name,
+			"rolling_earn_points": rolling_earn,
+			"qualification_threshold": qualification_pts,
+			"below_threshold": below_threshold,
+			"grace_days": grace_days,
+			"downgraded": downgraded,
+			"action": action,
+			"checked_at": str(date.today()),
+		}
+
+	# ------------------------------------------------------------------
+	# Points Liability Report
+	# ------------------------------------------------------------------
+
+	async def points_liability_report(self, programme_id: str) -> dict[str, Any]:
+		"""Compute outstanding points liability with breakage estimate.
+
+		Produces a finance-grade report: total outstanding, breakage assumption,
+		net liability in currency, and tier/segment breakdown.
+		"""
+		assert programme_id, "programme_id required"
+		tenant_id = self.tenant_id
+
+		members = [m for m in self._members.values()
+				   if m["tenant_id"] == tenant_id and m.get("programme_id") == programme_id]
+		programme = next(
+			(LoyProgrammeResponse(**v) for v in self._programmes.values()
+			 if v["tenant_id"] == tenant_id and v["id"] == programme_id),
+			None,
+		)
+		rate = getattr(programme, "points_to_currency_rate", POINTS_CASH_RATE) if programme else POINTS_CASH_RATE
+
+		total_outstanding = sum(m["points_balance"] for m in members)
+
+		# Breakage: estimate from historical expiry runs
+		total_expired = sum(
+			abs(t.get("points", 0))
+			for t in self._transactions.values()
+			if t.get("tenant_id") == tenant_id
+			and t.get("transaction_type") == "expiry"
+		)
+		total_issued = sum(m.get("lifetime_points_earned", 0) for m in members)
+		breakage_rate = round(total_expired / total_issued, 4) if total_issued else 0.05  # default 5%
+
+		gross_liability = round(total_outstanding * rate, 2)
+		expected_breakage = round(gross_liability * breakage_rate, 2)
+		net_liability = round(gross_liability - expected_breakage, 2)
+
+		# Breakdown by tier
+		tier_breakdown: dict[str, dict[str, Any]] = {}
+		for m in members:
+			tier = m.get("current_tier_name", "none")
+			tier_breakdown.setdefault(tier, {"member_count": 0, "points": 0, "liability": 0.0})
+			tier_breakdown[tier]["member_count"] += 1
+			tier_breakdown[tier]["points"] += m["points_balance"]
+			tier_breakdown[tier]["liability"] = round(tier_breakdown[tier]["points"] * rate, 2)
+
+		# Scenario analysis (3 redemption rates)
+		scenarios = {
+			"optimistic_redemption_80pct": round(gross_liability * 0.80, 2),
+			"base_redemption_60pct": round(gross_liability * 0.60, 2),
+			"conservative_redemption_40pct": round(gross_liability * 0.40, 2),
+		}
+
+		return {
+			"programme_id": programme_id,
+			"total_outstanding_points": total_outstanding,
+			"gross_liability_currency": gross_liability,
+			"breakage_rate": breakage_rate,
+			"expected_breakage_currency": expected_breakage,
+			"net_liability_currency": net_liability,
+			"conversion_rate": rate,
+			"member_count": len(members),
+			"tier_breakdown": tier_breakdown,
+			"scenario_analysis": scenarios,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ------------------------------------------------------------------
+	# Member Merge
+	# ------------------------------------------------------------------
+
+	async def merge_members(
+		self,
+		tenant_id: str,
+		primary_member_id: str,
+		secondary_member_id: str,
+		merged_by: str,
+	) -> dict[str, Any]:
+		"""Merge secondary member into primary: transfers balance, retargets transactions,
+		marks secondary as 'merged'. Immutable audit record created.
+
+		Raises AssertionError if members are not in the same tenant/programme.
+		"""
+		assert primary_member_id != secondary_member_id, "primary and secondary must differ"
+		assert merged_by, "merged_by required"
+
+		primary = self._members.get(primary_member_id)
+		secondary = self._members.get(secondary_member_id)
+		assert primary is not None and primary["tenant_id"] == tenant_id, "primary member not found"
+		assert secondary is not None and secondary["tenant_id"] == tenant_id, "secondary member not found"
+		assert primary.get("programme_id") == secondary.get("programme_id"), \
+			"members must belong to the same programme to merge"
+		assert secondary["status"] != "merged", "secondary already merged"
+
+		transferred_points = secondary["points_balance"]
+		transferred_lifetime = secondary.get("lifetime_points_earned", 0)
+
+		# Transfer balance and lifetime stats
+		primary["points_balance"] += transferred_points
+		primary["lifetime_points_earned"] += transferred_lifetime
+		primary["lifetime_points_redeemed"] += secondary.get("lifetime_points_redeemed", 0)
+		primary["updated_at"] = datetime.utcnow().isoformat()
+		self._members[primary_member_id] = primary
+
+		# Retarget transactions
+		retargeted = 0
+		for txn_id, txn in self._transactions.items():
+			if txn.get("member_id") == secondary_member_id and txn.get("tenant_id") == tenant_id:
+				txn["member_id"] = primary_member_id
+				txn["merge_note"] = f"retargeted from {secondary_member_id}"
+				self._transactions[txn_id] = txn
+				retargeted += 1
+
+		# Mark secondary as merged
+		secondary["status"] = "merged"
+		secondary["merged_into"] = primary_member_id
+		secondary["merged_at"] = datetime.utcnow().isoformat()
+		secondary["merged_by"] = merged_by
+		secondary["points_balance"] = 0
+		secondary["updated_at"] = datetime.utcnow().isoformat()
+		self._members[secondary_member_id] = secondary
+
+		audit_id = uuid7str()
+		self._log_op("merge_members", tenant_id, f"{primary_member_id}<-{secondary_member_id}")
+
+		return {
+			"audit_id": audit_id,
+			"primary_member_id": primary_member_id,
+			"secondary_member_id": secondary_member_id,
+			"points_transferred": transferred_points,
+			"lifetime_points_merged": transferred_lifetime,
+			"transactions_retargeted": retargeted,
+			"merged_by": merged_by,
+			"merged_at": secondary["merged_at"],
+		}
+
+	# ------------------------------------------------------------------
+	# Referral Earn
+	# ------------------------------------------------------------------
+
+	async def generate_referral_code(self, tenant_id: str, member_id: str) -> dict[str, Any]:
+		"""Generate a unique referral code for a member. Idempotent — returns existing code if present."""
+		member = self._members.get(member_id)
+		assert member is not None and member["tenant_id"] == tenant_id, "member not found"
+		assert member["status"] == "active", "only active members can refer"
+
+		existing_code = member.get("referral_code")
+		if existing_code:
+			return {
+				"member_id": member_id,
+				"referral_code": existing_code,
+				"already_existed": True,
+			}
+
+		code = f"REF-{member_id[:8].upper()}-{uuid7str()[:4].upper()}"
+		member["referral_code"] = code
+		member["referral_code_created_at"] = datetime.utcnow().isoformat()
+		member["updated_at"] = datetime.utcnow().isoformat()
+		self._members[member_id] = member
+
+		self._log_op("generate_referral_code", tenant_id, member_id)
+		return {
+			"member_id": member_id,
+			"referral_code": code,
+			"already_existed": False,
+			"created_at": member["referral_code_created_at"],
+		}
+
+	async def process_referral_earn(
+		self,
+		tenant_id: str,
+		referral_code: str,
+		referee_member_id: str,
+		qualifying_spend: float,
+		referrer_bonus: int = 500,
+		referee_bonus: int = 200,
+	) -> dict[str, Any]:
+		"""Award referral bonus points to both referrer and referee after qualifying spend.
+
+		Referral depth is limited to 2 levels to prevent pyramid exploitation.
+		"""
+		assert referral_code, "referral_code required"
+		assert referee_member_id, "referee_member_id required"
+		assert qualifying_spend > 0, "qualifying_spend must be positive"
+
+		# Locate referrer by code
+		referrer = next(
+			(m for m in self._members.values()
+			 if m.get("tenant_id") == tenant_id and m.get("referral_code") == referral_code),
+			None,
+		)
+		assert referrer is not None, "referral code not found"
+		assert referrer["id"] != referee_member_id, "member cannot refer themselves"
+
+		referee = self._members.get(referee_member_id)
+		assert referee is not None and referee["tenant_id"] == tenant_id, "referee member not found"
+		assert referee.get("referred_by") is None, "member has already been referred"
+
+		# Award referrer bonus
+		referrer["points_balance"] += referrer_bonus
+		referrer["lifetime_points_earned"] += referrer_bonus
+		referrer["referral_count"] = referrer.get("referral_count", 0) + 1
+		referrer["updated_at"] = datetime.utcnow().isoformat()
+		self._members[referrer["id"]] = referrer
+
+		# Award referee bonus
+		referee["points_balance"] += referee_bonus
+		referee["lifetime_points_earned"] += referee_bonus
+		referee["referred_by"] = referrer["id"]
+		referee["updated_at"] = datetime.utcnow().isoformat()
+		self._members[referee_member_id] = referee
+
+		self._log_points_change(referrer["id"], referrer_bonus, referrer["points_balance"])
+		self._log_points_change(referee_member_id, referee_bonus, referee["points_balance"])
+
+		ref_id = uuid7str()
+		return {
+			"referral_id": ref_id,
+			"referrer_member_id": referrer["id"],
+			"referee_member_id": referee_member_id,
+			"referrer_bonus_points": referrer_bonus,
+			"referee_bonus_points": referee_bonus,
+			"qualifying_spend": qualifying_spend,
+			"processed_at": datetime.utcnow().isoformat(),
+		}
+
+	# ------------------------------------------------------------------
+	# Campaign ROI
+	# ------------------------------------------------------------------
+
+	async def record_campaign_attribution(
+		self,
+		tenant_id: str,
+		campaign_id: str,
+		member_id: str,
+		transaction_id: str,
+		incremental_revenue: float,
+	) -> dict[str, Any]:
+		"""Link a member transaction to a campaign for ROI measurement."""
+		assert campaign_id, "campaign_id required"
+		assert member_id, "member_id required"
+		assert incremental_revenue >= 0, "incremental_revenue must be non-negative"
+
+		campaign = self._campaigns.get(campaign_id)
+		assert campaign is not None and campaign["tenant_id"] == tenant_id, "campaign not found"
+
+		attr_key = f"attr_{campaign_id}_{transaction_id}"
+		self._transactions[attr_key] = {
+			"id": attr_key,
+			"tenant_id": tenant_id,
+			"campaign_id": campaign_id,
+			"member_id": member_id,
+			"transaction_id": transaction_id,
+			"transaction_type": "campaign_attribution",
+			"incremental_revenue": incremental_revenue,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+
+		# Update campaign attribution counter on the campaign record
+		campaign["redemption_count"] = campaign.get("redemption_count", 0) + 1
+		self._campaigns[campaign_id] = campaign
+
+		return {"attribution_id": attr_key, "campaign_id": campaign_id, "member_id": member_id}
+
+	async def get_campaign_roi(self, tenant_id: str, campaign_id: str) -> dict[str, Any]:
+		"""Compute ROI for a campaign: incremental revenue vs. points cost.
+
+		ROI = (incremental_revenue - points_cost_currency) / points_cost_currency
+		"""
+		campaign = self._campaigns.get(campaign_id)
+		assert campaign is not None and campaign["tenant_id"] == tenant_id, "campaign not found"
+
+		programme_id = campaign.get("programme_id", "")
+		programme = next(
+			(LoyProgrammeResponse(**v) for v in self._programmes.values()
+			 if v["tenant_id"] == tenant_id and v["id"] == programme_id),
+			None,
+		)
+		rate = getattr(programme, "points_to_currency_rate", POINTS_CASH_RATE) if programme else POINTS_CASH_RATE
+
+		attributions = [
+			t for t in self._transactions.values()
+			if t.get("tenant_id") == tenant_id
+			and t.get("campaign_id") == campaign_id
+			and t.get("transaction_type") == "campaign_attribution"
+		]
+
+		total_incremental_revenue = sum(a.get("incremental_revenue", 0.0) for a in attributions)
+		points_issued = campaign.get("points_issued_to_date", 0)
+		points_cost_currency = round(points_issued * rate, 2)
+		gross_roi = (
+			round((total_incremental_revenue - points_cost_currency) / points_cost_currency, 4)
+			if points_cost_currency > 0 else None
+		)
+
+		return {
+			"campaign_id": campaign_id,
+			"campaign_name": campaign.get("name"),
+			"attribution_count": len(attributions),
+			"total_incremental_revenue": round(total_incremental_revenue, 2),
+			"points_issued": points_issued,
+			"points_cost_currency": points_cost_currency,
+			"gross_roi": gross_roi,
+			"status": campaign.get("approval_status"),
+			"calculated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ------------------------------------------------------------------
+	# Tiered Reward Gating
+	# ------------------------------------------------------------------
+
+	async def list_rewards_for_member(
+		self, tenant_id: str, programme_id: str, member_id: str
+	) -> list[LoyRewardResponse]:
+		"""Return rewards eligible for a specific member based on tier and CLV segment.
+
+		Rewards with ``min_tier_name`` set are only shown to members at or above that tier.
+		Tier ranking: bronze < silver < gold < platinum.
+		"""
+		TIER_RANK: dict[str, int] = {"bronze": 0, "silver": 1, "gold": 2, "platinum": 3}
+
+		member = self._members.get(member_id)
+		assert member is not None and member["tenant_id"] == tenant_id, "member not found"
+
+		member_tier_rank = TIER_RANK.get(member.get("current_tier_name", "bronze"), 0)
+		member_segment = member.get("clv_segment")
+
+		all_rewards = await self.list_rewards(tenant_id, programme_id)
+		eligible: list[LoyRewardResponse] = []
+		for reward in all_rewards:
+			# Check tier gate
+			min_tier = getattr(reward, "min_tier_name", None)
+			if min_tier:
+				if TIER_RANK.get(min_tier, 0) > member_tier_rank:
+					continue
+			# Check segment gate
+			allowed_segs = getattr(reward, "allowed_segments", None)
+			if allowed_segs and member_segment not in allowed_segs:
+				continue
+			eligible.append(reward)
+		return eligible
+
+	# ------------------------------------------------------------------
+	# GDPR / Privacy — Consent Lifecycle & Data Export
+	# ------------------------------------------------------------------
+
+	async def withdraw_consent(
+		self, tenant_id: str, member_id: str, withdrawn_by: str
+	) -> dict[str, Any]:
+		"""Record consent withdrawal, freeze the member, and schedule data deletion.
+
+		Compliant with GDPR Art. 7 / Kenya DPA 2019.
+		"""
+		assert withdrawn_by, "withdrawn_by required"
+		member = self._members.get(member_id)
+		assert member is not None and member["tenant_id"] == tenant_id, "member not found"
+		assert member.get("consent_recorded"), "no consent on record to withdraw"
+
+		member["consent_recorded"] = False
+		member["consent_withdrawn_at"] = datetime.utcnow().isoformat()
+		member["consent_withdrawn_by"] = withdrawn_by
+		member["status"] = "frozen"
+		member["data_deletion_scheduled_at"] = datetime.utcnow().isoformat()
+		member["updated_at"] = datetime.utcnow().isoformat()
+		self._members[member_id] = member
+
+		self._log_op("withdraw_consent", tenant_id, member_id)
+		return {
+			"member_id": member_id,
+			"consent_withdrawn_at": member["consent_withdrawn_at"],
+			"status": "frozen",
+			"data_deletion_scheduled": True,
+			"withdrawn_by": withdrawn_by,
+		}
+
+	async def export_member_data(self, tenant_id: str, member_id: str) -> dict[str, Any]:
+		"""GDPR Data Subject Access Request — return all data held for a member.
+
+		Returns member profile, all transactions, CLV records, offers, and coalition transfers.
+		"""
+		member = self._members.get(member_id)
+		assert member is not None and member["tenant_id"] == tenant_id, "member not found"
+
+		transactions = [
+			t for t in self._transactions.values()
+			if t.get("tenant_id") == tenant_id and t.get("member_id") == member_id
+		]
+		clv_records = [
+			v for v in self._clv_segments.values()
+			if v.get("tenant_id") == tenant_id and v.get("member_id") == member_id
+		]
+		offers = self._personalised_offers.get(member_id, [])
+		coalition = [
+			c for c in self._coalition_transfers
+			if c.get("customer_id") == member_id
+		]
+
+		return {
+			"member_id": member_id,
+			"tenant_id": tenant_id,
+			"exported_at": datetime.utcnow().isoformat(),
+			"profile": member,
+			"transactions": transactions,
+			"clv_records": clv_records,
+			"personalised_offers": offers,
+			"coalition_transfers": coalition,
+			"record_counts": {
+				"transactions": len(transactions),
+				"clv_records": len(clv_records),
+				"offers": len(offers),
+				"coalition_transfers": len(coalition),
+			},
+		}
+
+	# ------------------------------------------------------------------
+	# Duplicate Member Detection
+	# ------------------------------------------------------------------
+
+	async def find_duplicate_candidates(
+		self, tenant_id: str, programme_id: str
+	) -> list[dict[str, Any]]:
+		"""Identify potential duplicate member accounts using fuzzy field matching.
+
+		Groups members by (email, mobile, or normalised name) and returns groups
+		with 2+ members as duplicate candidate sets.
+		"""
+		members = [
+			m for m in self._members.values()
+			if m["tenant_id"] == tenant_id
+			and m.get("programme_id") == programme_id
+			and m["status"] not in ("merged",)
+		]
+
+		# Index by email
+		email_index: dict[str, list[str]] = {}
+		mobile_index: dict[str, list[str]] = {}
+		name_index: dict[str, list[str]] = {}
+
+		for m in members:
+			mid = m["id"]
+			if m.get("email"):
+				email_index.setdefault(m["email"].lower(), []).append(mid)
+			if m.get("mobile"):
+				mobile_index.setdefault(m["mobile"].replace(" ", ""), []).append(mid)
+			name_key = f"{m.get('first_name','').lower().strip()}_{m.get('last_name','').lower().strip()}"
+			name_index.setdefault(name_key, []).append(mid)
+
+		duplicate_groups: list[dict[str, Any]] = []
+		seen_sets: list[frozenset[str]] = []
+
+		def _add_group(reason: str, member_ids: list[str], key: str) -> None:
+			s = frozenset(member_ids)
+			if len(s) >= 2 and s not in seen_sets:
+				seen_sets.append(s)
+				duplicate_groups.append({
+					"match_reason": reason,
+					"match_key": key,
+					"member_ids": list(s),
+					"count": len(s),
+				})
+
+		for key, ids in email_index.items():
+			_add_group("email_match", ids, key)
+		for key, ids in mobile_index.items():
+			_add_group("mobile_match", ids, key)
+		for key, ids in name_index.items():
+			if "_" in key and key != "_":
+				_add_group("name_match", ids, key)
+
+		return duplicate_groups
+

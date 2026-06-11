@@ -657,4 +657,179 @@ response = requests.post(
 
 ---
 
+## New Features (v2.2)
+
+### Recurring Billing Engine
+
+Automate monthly, quarterly, or annual invoice generation without manual intervention.
+
+**Setup a recurring schedule:**
+
+```python
+svc = AccountsReceivableService(tenant_id="acme")
+schedule = await svc.create_recurring_schedule(
+    customer_id="cust-001",
+    template_lines=[{
+        "description": "Monthly SaaS subscription",
+        "quantity": 1,
+        "unit_price": 1200.00,
+        "tax_rate": 0.16,
+        "revenue_account": "4100",
+    }],
+    frequency="monthly",
+    start_date="2026-07-01",
+    end_date="2027-06-30",
+    payment_terms="NET30",
+)
+
+# Run on the first of each month (scheduled job)
+result = await svc.run_recurring_invoicing(as_of_date="2026-07-01")
+# result["invoices_created"] == 1
+```
+
+---
+
+### Dynamic Early-Payment Discounts
+
+Offer customers sliding-scale discounts to accelerate cash collection.
+
+**Generate and accept a discount offer:**
+
+```python
+offer = await svc.calculate_dynamic_discount(
+    invoice_id="inv-001",
+    cost_of_capital_pct=12.0,   # your cost of capital
+)
+# offer["tiers"] — list of {pay_by, discount_pct, amount_payable}
+
+# Customer accepts the 5-day tier (index 1)
+result = await svc.accept_early_payment_discount(offer_id=offer["id"], tier_index=1)
+```
+
+The system computes the break-even discount rate from your cost of capital, so every offer is financially sound.
+
+---
+
+### Instalment Plans
+
+Allow customers to pay large invoices in structured instalments.
+
+```python
+plan_result = await svc.create_instalment_plan(
+    invoice_id="inv-002",
+    num_instalments=3,
+    frequency="monthly",
+    first_due_date="2026-07-15",
+)
+# plan_result["instalments"] — 3 records, each with its own due date and amount
+
+# When a payment arrives for instalment 1:
+await svc.process_instalment_payment(
+    instalment_id=plan_result["instalments"][0]["id"],
+    payment_id="pay-001",
+)
+```
+
+---
+
+### Period-Close Checklist
+
+Replace manual spreadsheet checklists with a structured, auditable close process.
+
+```python
+close_result = await svc.run_period_close_checklist(period="2026-06")
+# close_result["overall_status"] — "pass" or "fail"
+# close_result["steps"] — per-step pass/fail/skipped detail
+```
+
+Steps executed automatically:
+1. Unposted approved invoice check
+2. Foreign-currency revaluation
+3. ECL bad-debt provision calculation
+4. AR sub-ledger to GL reconciliation
+5. Aging report snapshot
+6. Dunning letter archive count
+
+---
+
+### Customer Churn Risk Scoring
+
+Identify at-risk customers before they stop paying, using AR behavioural signals.
+
+```python
+score = await svc.calculate_churn_risk_score(customer_id="cust-001")
+# score["churn_risk_score"]  — 0.0 (low) to 1.0 (high)
+# score["risk_band"]         — "low" | "medium" | "high"
+# score["signals"]           — payment delay slope, dispute freq, etc.
+
+# Score all active customers in one call:
+batch = await svc.run_churn_scoring()
+# batch["elevated_risk_customers"] — IDs of customers with score >= 0.7
+```
+
+---
+
+### IFRS 9 Scenario-Based ECL
+
+Provide auditors and the board with multi-scenario ECL disclosures.
+
+```python
+ecl = await svc.calculate_ecl_scenarios()
+# Returns base / adverse / severe scenario results plus probability-weighted ECL
+print(ecl["probability_weighted_ecl"])
+
+# Supply custom scenarios aligned to central bank stress tests:
+ecl = await svc.calculate_ecl_scenarios(scenarios={
+    "base":    {"current": 0.005, "1_30": 0.01, "31_60": 0.05, "61_90": 0.15, "91_120": 0.40, "120_plus": 0.85},
+    "adverse": {"current": 0.015, "1_30": 0.03, "31_60": 0.10, "61_90": 0.30, "91_120": 0.65, "120_plus": 1.00},
+})
+```
+
+---
+
+### Customer Self-Service Portal
+
+Give customers secure, read-only access to their open invoices without calling AR staff.
+
+```python
+# Generate a 72-hour portal token and send it to the customer
+token_info = await svc.generate_customer_portal_token(customer_id="cust-001", expires_in_hours=72)
+# Send token_info["token"] to the customer via email
+
+# Customer-facing endpoint (validate and return invoices):
+open_invoices = await svc.portal_get_open_invoices(
+    token=token_info["token"],
+    customer_id="cust-001",
+)
+```
+
+Internal fields (tenant_id, workflow IDs) are stripped before data is returned to the customer.
+
+---
+
+### Bank Statement Auto-Reconciliation
+
+Process ISO 20022 / MT940 bank statement lines and auto-match them to open invoices.
+
+```python
+statement_result = await svc.ingest_bank_statement(
+    statement_lines=[
+        {
+            "amount": 5000.00,
+            "currency": "USD",
+            "reference": "Acme Corp payment",
+            "customer_id": "cust-001",   # optional — looked up by name if absent
+            "value_date": "2026-06-10",
+        },
+    ],
+    statement_date="2026-06-10",
+    bank_account="ACC-001-USD",
+)
+print(f"Matched: {statement_result['matched_count']}, Unmatched: {statement_result['unmatched_count']}")
+```
+
+Unmatched lines are flagged for manual review in the `unmatched` array.
+
+---
+
 *For additional support and training resources, visit the APG Platform documentation portal or contact our support team.*

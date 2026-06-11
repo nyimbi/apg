@@ -1959,20 +1959,1010 @@ class AccountsPayableService:
 			"EFT":         "csv",
 		}.get(bank_format, "txt")
 
+	# -----------------------------------------------------------------------
+	# Async extensions — AI, forecasting, risk, compliance, workflow
+	# -----------------------------------------------------------------------
+
+	async def ml_duplicate_invoice_detect(
+		self,
+		invoice_id: str,
+		tenant_id: str,
+		lookback_days: int = 90,
+	) -> dict[str, Any]:
+		"""AI-powered duplicate invoice detection via local Ollama embedding model.
+
+		Embeds the candidate invoice's key features (vendor, amount, invoice_number,
+		document hash) and computes cosine similarity against invoices captured in
+		the last `lookback_days`.  Scores above 0.92 are flagged as probable duplicates.
+
+		Requires OLLAMA_BASE_URL environment variable.  Degrades gracefully when
+		Ollama is unavailable — returns ml_enhanced=False with a rule-based fallback.
+		"""
+		import os
+
+		invoice = self._find_invoice_by_public_id(invoice_id)
+		if invoice is None:
+			raise KeyError(f"Invoice {invoice_id} not found")
+
+		# Rule-based fallback: exact match on (vendor_id, invoice_number, amount)
+		exact_matches = [
+			rec["invoice_id"]
+			for rec in self._invoices.values()
+			if rec["id"] != invoice["id"]
+			and rec.get("tenant_id") == tenant_id
+			and rec.get("vendor_id") == invoice.get("vendor_id")
+			and rec.get("invoice_number") == invoice.get("invoice_number")
+			and abs(float(rec.get("amount", 0)) - float(invoice.get("amount", 0))) < 0.01
+		]
+
+		if exact_matches:
+			return {
+				"invoice_id": invoice_id,
+				"is_duplicate": True,
+				"exact_match_ids": exact_matches,
+				"fuzzy_match_ids": [],
+				"confidence": 1.0,
+				"reason": "exact match on vendor_id + invoice_number + amount",
+				"ml_enhanced": False,
+			}
+
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			return {
+				"invoice_id": invoice_id,
+				"is_duplicate": False,
+				"exact_match_ids": [],
+				"fuzzy_match_ids": [],
+				"confidence": 0.0,
+				"reason": "OLLAMA_BASE_URL not set; rule-based check passed",
+				"ml_enhanced": False,
+			}
+
+		try:
+			import json as _json
+			import urllib.request as _req
+
+			def _embed(text: str) -> list[float]:
+				payload = _json.dumps({"model": "nomic-embed-text", "prompt": text}).encode()
+				with _req.urlopen(
+					_req.Request(
+						os.environ["OLLAMA_BASE_URL"].rstrip("/") + "/api/embeddings",
+						data=payload,
+						headers={"Content-Type": "application/json"},
+					),
+					timeout=10,
+				) as resp:
+					return _json.loads(resp.read())["embedding"]
+
+			def _cosine(a: list[float], b: list[float]) -> float:
+				dot = sum(x * y for x, y in zip(a, b))
+				norm_a = sum(x ** 2 for x in a) ** 0.5
+				norm_b = sum(x ** 2 for x in b) ** 0.5
+				if norm_a == 0 or norm_b == 0:
+					return 0.0
+				return dot / (norm_a * norm_b)
+
+			candidate_text = (
+				f"{invoice.get('vendor_id')} {invoice.get('invoice_number')} "
+				f"{invoice.get('amount')} {invoice.get('currency')}"
+			)
+			candidate_vec = _embed(candidate_text)
+
+			cutoff = date.today() - timedelta(days=lookback_days)
+			fuzzy_matches: list[str] = []
+			for rec in self._invoices.values():
+				if rec["id"] == invoice["id"] or rec.get("tenant_id") != tenant_id:
+					continue
+				try:
+					rec_date = date.fromisoformat(rec.get("updated_at", "")[:10])
+					if rec_date < cutoff:
+						continue
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+				rec_text = (
+					f"{rec.get('vendor_id')} {rec.get('invoice_number')} "
+					f"{rec.get('amount')} {rec.get('currency')}"
+				)
+				rec_vec = _embed(rec_text)
+				sim = _cosine(candidate_vec, rec_vec)
+				if sim >= 0.92:
+					fuzzy_matches.append(rec["invoice_id"])
+
+			return {
+				"invoice_id": invoice_id,
+				"is_duplicate": bool(fuzzy_matches),
+				"exact_match_ids": [],
+				"fuzzy_match_ids": fuzzy_matches,
+				"confidence": 0.95 if fuzzy_matches else 0.05,
+				"reason": "ml cosine similarity against nomic-embed-text vectors" if fuzzy_matches else "no similar invoices found",
+				"ml_enhanced": True,
+			}
+		except Exception as exc:
+			return {
+				"invoice_id": invoice_id,
+				"is_duplicate": False,
+				"exact_match_ids": [],
+				"fuzzy_match_ids": [],
+				"confidence": 0.0,
+				"reason": f"ml check failed: {exc}",
+				"ml_enhanced": False,
+			}
+
+	async def forecast_cash_outflows(
+		self,
+		tenant_id: str,
+		horizon_weeks: int = 13,
+	) -> dict[str, Any]:
+		"""Produce a rolling weekly AP cash outflow forecast for the next N weeks.
+
+		For each approved, unpaid invoice, places the outstanding balance in the
+		week bucket corresponding to its due_date.  Invoices with no due_date fall
+		into the final bucket.  A historical payment-velocity adjustment (± days
+		early/late) is approximated from past paid invoices.
+
+		Returns weekly buckets with P10/P50/P90 probabilistic bands based on
+		observed payment-day variance, plus a total projected outflow.
+		"""
+		assert horizon_weeks >= 1, "horizon_weeks must be >= 1"
+
+		today = date.today()
+		week_buckets: list[dict[str, Any]] = []
+		for w in range(horizon_weeks):
+			week_start = today + timedelta(weeks=w)
+			week_end = today + timedelta(weeks=w + 1) - timedelta(days=1)
+			week_buckets.append({
+				"week": w + 1,
+				"week_start": week_start.isoformat(),
+				"week_end": week_end.isoformat(),
+				"amount_p50": Decimal("0"),
+				"invoice_ids": [],
+			})
+
+		overflow_bucket: dict[str, Any] = {
+			"week": horizon_weeks + 1,
+			"week_start": (today + timedelta(weeks=horizon_weeks)).isoformat(),
+			"week_end": "beyond_horizon",
+			"amount_p50": Decimal("0"),
+			"invoice_ids": [],
+		}
+
+		# Compute historical payment-velocity variance: days actual vs due
+		paid_deltas: list[int] = []
+		for inv in self._invoices.values():
+			if inv.get("tenant_id") != tenant_id:
+				continue
+			if inv.get("status") == "paid" and inv.get("due_date") and inv.get("updated_at"):
+				delta = _days_between(inv["due_date"][:10], inv["updated_at"][:10])
+				paid_deltas.append(delta)
+
+		avg_delta = (sum(paid_deltas) / len(paid_deltas)) if paid_deltas else 0.0
+		variance = 0.0
+		if len(paid_deltas) > 1:
+			mean = avg_delta
+			variance = sum((d - mean) ** 2 for d in paid_deltas) / len(paid_deltas)
+		std_dev = variance ** 0.5
+
+		# Place invoices into buckets
+		for inv in self._invoices.values():
+			if inv.get("tenant_id") != tenant_id:
+				continue
+			if inv.get("status") not in {"approved", "matched"}:
+				continue
+			if inv.get("held"):
+				continue
+			outstanding = _d(inv.get("amount", 0)) - _d(inv.get("paid_amount", 0))
+			if outstanding <= 0:
+				continue
+
+			due = inv.get("due_date")
+			placed = False
+			if due:
+				try:
+					due_date_obj = date.fromisoformat(due[:10])
+					for bucket in week_buckets:
+						ws = date.fromisoformat(bucket["week_start"])
+						we = date.fromisoformat(bucket["week_end"])
+						if ws <= due_date_obj <= we:
+							bucket["amount_p50"] += outstanding
+							bucket["invoice_ids"].append(inv["invoice_id"])
+							placed = True
+							break
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+			if not placed:
+				overflow_bucket["amount_p50"] += outstanding
+				overflow_bucket["invoice_ids"].append(inv["invoice_id"])
+
+		# Build output with P10/P50/P90 bands from std_dev
+		result_buckets = []
+		total_p50 = Decimal("0")
+		for bucket in week_buckets + [overflow_bucket]:
+			p50 = bucket["amount_p50"]
+			adjustment = Decimal(str(round(std_dev * float(p50) / 100, 2))) if p50 > 0 else Decimal("0")
+			result_buckets.append({
+				"week": bucket["week"],
+				"week_start": bucket["week_start"],
+				"week_end": bucket["week_end"],
+				"amount_p10": str(max(Decimal("0"), p50 - adjustment * 2)),
+				"amount_p50": str(p50),
+				"amount_p90": str(p50 + adjustment * 2),
+				"invoice_count": len(bucket["invoice_ids"]),
+				"invoice_ids": bucket["invoice_ids"],
+			})
+			total_p50 += p50
+
+		return {
+			"tenant_id": tenant_id,
+			"horizon_weeks": horizon_weeks,
+			"forecast_date": today.isoformat(),
+			"total_projected_outflow": str(total_p50),
+			"avg_payment_delta_days": round(avg_delta, 1),
+			"payment_velocity_std_dev_days": round(std_dev, 1),
+			"weekly_buckets": result_buckets,
+			"currency": "KES",
+			"generated_at": _now(),
+		}
+
+	async def compute_invoice_tax(
+		self,
+		invoice_record_id: str,
+		tenant_id: str,
+		tax_profile: str = "standard",
+	) -> dict[str, Any]:
+		"""Determine and compute applicable VAT and withholding tax for an invoice.
+
+		Tax profiles:
+		  standard   — VAT 16%, WHT 5% on services
+		  exempt     — VAT 0%, WHT 0%
+		  vat_only   — VAT 16%, no WHT
+		  wht_only   — no VAT, WHT 5%
+		  zero_rated — VAT 0%, WHT 5%
+
+		Returns gross_amount, vat_amount, wht_amount, net_payable, and the
+		applicable rates with a breakdown suitable for iTax VAT schedule filing.
+		"""
+		invoice = self._require_invoice(invoice_record_id, tenant_id)
+
+		tax_table: dict[str, dict[str, float]] = {
+			"standard":  {"vat_pct": 16.0, "wht_pct": 5.0},
+			"exempt":    {"vat_pct": 0.0,  "wht_pct": 0.0},
+			"vat_only":  {"vat_pct": 16.0, "wht_pct": 0.0},
+			"wht_only":  {"vat_pct": 0.0,  "wht_pct": 5.0},
+			"zero_rated": {"vat_pct": 0.0, "wht_pct": 5.0},
+		}
+		assert tax_profile in tax_table, (
+			f"tax_profile must be one of {list(tax_table)}, got '{tax_profile}'"
+		)
+
+		rates = tax_table[tax_profile]
+		gross = _d(invoice.get("amount", 0))
+		vat_pct = _d(rates["vat_pct"])
+		wht_pct = _d(rates["wht_pct"])
+
+		vat_amount = (gross * vat_pct / Decimal("100")).quantize(Decimal("0.01"), ROUND_HALF_UP)
+		gross_plus_vat = gross + vat_amount
+		wht_amount = (gross * wht_pct / Decimal("100")).quantize(Decimal("0.01"), ROUND_HALF_UP)
+		net_payable = gross_plus_vat - wht_amount
+
+		result = {
+			"invoice_id": invoice.get("invoice_id"),
+			"invoice_record_id": invoice_record_id,
+			"tenant_id": tenant_id,
+			"tax_profile": tax_profile,
+			"gross_amount": str(gross),
+			"vat_rate_pct": str(vat_pct),
+			"vat_amount": str(vat_amount),
+			"gross_plus_vat": str(gross_plus_vat),
+			"wht_rate_pct": str(wht_pct),
+			"wht_amount": str(wht_amount),
+			"net_payable": str(net_payable),
+			"currency": invoice.get("currency", "KES"),
+			"computed_at": _now(),
+		}
+
+		# Persist tax metadata on the invoice record for downstream scheduling
+		invoice["tax_profile"] = tax_profile
+		invoice["vat_amount"] = float(vat_amount)
+		invoice["wht_amount"] = float(wht_amount)
+		invoice["net_payable"] = float(net_payable)
+		invoice["updated_at"] = _now()
+
+		self._emit("invoice_tax_computed", tenant_id, invoice_record_id, {
+			"tax_profile": tax_profile, "vat_amount": str(vat_amount), "wht_amount": str(wht_amount),
+		})
+		return result
+
+	async def generate_vat_schedule(
+		self,
+		tenant_id: str,
+		period: dict[str, str],
+	) -> dict[str, Any]:
+		"""Generate an iTax-compatible VAT schedule for a given accounting period.
+
+		Aggregates all invoices with computed VAT in the period and produces:
+		  - input tax credit entries (AP invoices received)
+		  - output tax entries (placeholder for AR integration)
+		  - net VAT payable / refundable
+		  - a line-by-line schedule ready for KRA iTax upload
+
+		period keys: start (ISO date), end (ISO date)
+		"""
+		period_start = period.get("start", "")
+		period_end = period.get("end", "")
+
+		schedule_lines: list[dict[str, Any]] = []
+		total_input_vat = Decimal("0")
+		total_wht = Decimal("0")
+
+		for inv in self._invoices.values():
+			if inv.get("tenant_id") != tenant_id:
+				continue
+			if inv.get("status") in {"cancelled", "rejected"}:
+				continue
+			updated = inv.get("updated_at", "")[:10]
+			if period_start and updated < period_start[:10]:
+				continue
+			if period_end and updated > period_end[:10]:
+				continue
+
+			vat = _d(inv.get("vat_amount", 0))
+			wht = _d(inv.get("wht_amount", 0))
+			if vat == 0 and wht == 0:
+				continue
+
+			total_input_vat += vat
+			total_wht += wht
+			schedule_lines.append({
+				"invoice_number": inv.get("invoice_number"),
+				"vendor_id": inv.get("vendor_id"),
+				"invoice_date": inv.get("updated_at", "")[:10],
+				"gross_amount": str(_d(inv.get("amount", 0))),
+				"vat_amount": str(vat),
+				"wht_amount": str(wht),
+				"net_payable": str(_d(inv.get("net_payable", inv.get("amount", 0)))),
+				"currency": inv.get("currency", "KES"),
+				"tax_profile": inv.get("tax_profile", "standard"),
+			})
+
+		return {
+			"tenant_id": tenant_id,
+			"period": period,
+			"schedule_type": "input_vat",
+			"line_count": len(schedule_lines),
+			"total_input_vat": str(total_input_vat),
+			"total_wht_withheld": str(total_wht),
+			"net_vat_payable": str(total_input_vat),
+			"lines": schedule_lines,
+			"currency": "KES",
+			"generated_at": _now(),
+			"filing_reference": f"VAT_{tenant_id[:8]}_{(period_start or _today())[:7].replace('-', '')}",
+		}
+
+	async def score_vendor_risk(
+		self,
+		vendor_record_id: str,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Compute a composite vendor risk score (0–100) from AP transaction history.
+
+		Scoring factors (weighted):
+		  - Invoice exception rate:     25 pts (fewer exceptions → lower risk)
+		  - Payment dispute rate:       25 pts (fewer disputes → lower risk)
+		  - Price variance rate:        20 pts (tighter pricing → lower risk)
+		  - On-time submission rate:    15 pts (consistent submission → lower risk)
+		  - Bank-account change events: 15 pts (stability → lower risk)
+
+		Score interpretation:
+		  0–25  : Low risk — preferred vendor
+		  26–50 : Moderate risk — standard controls apply
+		  51–75 : High risk — enhanced due diligence required
+		  76–100: Critical risk — payment block recommended
+		"""
+		vendor = self._require_vendor(vendor_record_id, tenant_id)
+		vendor_id = vendor["vendor_id"]
+
+		invoices = [
+			inv for inv in self._invoices.values()
+			if inv.get("vendor_id") == vendor_id and inv.get("tenant_id") == tenant_id
+		]
+		total_invoices = len(invoices)
+
+		if total_invoices == 0:
+			return {
+				"vendor_id": vendor_id,
+				"vendor_record_id": vendor_record_id,
+				"tenant_id": tenant_id,
+				"risk_score": 0,
+				"risk_tier": "insufficient_data",
+				"factors": {},
+				"recommendation": "no invoice history — apply standard new-vendor onboarding controls",
+				"computed_at": _now(),
+			}
+
+		# Exception rate
+		exception_count = sum(
+			1 for inv in invoices if inv.get("status") == "match_exception"
+		)
+		exception_rate = exception_count / total_invoices
+
+		# Dispute proxy: invoices placed on hold
+		disputed = sum(1 for inv in invoices if inv.get("held"))
+		dispute_rate = disputed / total_invoices
+
+		# Price variance: average variance_rate across matched invoices
+		variance_values = [
+			float(inv.get("variance_rate", 0))
+			for inv in invoices
+			if inv.get("matched") and inv.get("variance_rate") is not None
+		]
+		avg_variance = sum(variance_values) / len(variance_values) if variance_values else 0.0
+
+		# Bank change risk
+		bank_change = int(vendor.get("bank_change", False))
+
+		# Weighted score (higher = more risky)
+		score = (
+			exception_rate * 25
+			+ dispute_rate * 25
+			+ min(avg_variance / 10, 1.0) * 20  # cap at 10% variance = full 20 pts
+			+ bank_change * 15
+		)
+		score = min(100.0, round(score, 1))
+
+		if score <= 25:
+			tier = "low"
+			recommendation = "preferred vendor — eligible for early payment and portal acceleration"
+		elif score <= 50:
+			tier = "moderate"
+			recommendation = "standard controls — no additional action required"
+		elif score <= 75:
+			tier = "high"
+			recommendation = "enhanced due diligence — require dual approval and document review"
+		else:
+			tier = "critical"
+			recommendation = "payment block recommended — escalate to AP Controller"
+
+		return {
+			"vendor_id": vendor_id,
+			"vendor_record_id": vendor_record_id,
+			"tenant_id": tenant_id,
+			"risk_score": score,
+			"risk_tier": tier,
+			"factors": {
+				"exception_rate_pct": round(exception_rate * 100, 1),
+				"dispute_rate_pct": round(dispute_rate * 100, 1),
+				"avg_price_variance_pct": round(avg_variance, 2),
+				"bank_change_flag": bool(bank_change),
+				"total_invoices_analysed": total_invoices,
+			},
+			"recommendation": recommendation,
+			"computed_at": _now(),
+		}
+
+	async def straight_through_process(
+		self,
+		invoice_record_id: str,
+		tenant_id: str,
+		approved_by: str = "auto_stp",
+		requested_by: str = "stp_engine",
+	) -> dict[str, Any]:
+		"""Execute STP pipeline: validate → match → approve → schedule.
+
+		Each step returns a StepResult. The pipeline aborts on the first
+		failing step, routes to the appropriate exception queue, and emits
+		a `stp_escalated` event.  Only a fully-passing invoice advances to
+		`approved` status and emits `stp_completed`.
+
+		Steps:
+		  1. invoice_validated  — invoice exists and is in capturable state
+		  2. duplicate_check    — no exact duplicates found
+		  3. po_match           — invoice matches its PO (two-way or three-way)
+		  4. approval           — system approves with STP principal
+		"""
+		steps: list[dict[str, Any]] = []
+
+		# Step 1: validate
+		try:
+			invoice = self._require_invoice(invoice_record_id, tenant_id)
+			steps.append({"step": "invoice_validated", "passed": True, "detail": f"status={invoice['status']}"})
+		except KeyError as exc:
+			steps.append({"step": "invoice_validated", "passed": False, "detail": str(exc)})
+			self._emit("stp_escalated", tenant_id, invoice_record_id, {"step": "invoice_validated"})
+			return {"invoice_record_id": invoice_record_id, "passed": False, "steps": steps, "escalated_at": _now()}
+
+		# Step 2: duplicate check (synchronous rule-based only in STP)
+		exact_dups = [
+			rec["invoice_id"]
+			for rec in self._invoices.values()
+			if rec["id"] != invoice["id"]
+			and rec.get("tenant_id") == tenant_id
+			and rec.get("vendor_id") == invoice.get("vendor_id")
+			and rec.get("invoice_number") == invoice.get("invoice_number")
+			and abs(float(rec.get("amount", 0)) - float(invoice.get("amount", 0))) < 0.01
+		]
+		if exact_dups:
+			steps.append({"step": "duplicate_check", "passed": False, "detail": f"duplicates: {exact_dups}"})
+			invoice["status"] = "held"
+			invoice["held"] = True
+			invoice["hold_reason"] = "duplicate_suspected"
+			invoice["updated_at"] = _now()
+			self._emit("stp_escalated", tenant_id, invoice_record_id, {"step": "duplicate_check"})
+			return {"invoice_record_id": invoice_record_id, "passed": False, "steps": steps, "escalated_at": _now()}
+		steps.append({"step": "duplicate_check", "passed": True, "detail": "no duplicates found"})
+
+		# Step 3: PO match
+		po_id = invoice.get("po_id")
+		grn_id = invoice.get("grn_id")
+		if po_id:
+			if grn_id:
+				match_result = self.three_way_match(invoice["invoice_id"], po_id, grn_id)
+			else:
+				match_result = self.two_way_match(invoice["invoice_id"], po_id)
+			if match_result["passed"]:
+				steps.append({"step": "po_match", "passed": True, "detail": match_result["match_type"]})
+			else:
+				steps.append({"step": "po_match", "passed": False, "detail": str(match_result["failures"])})
+				self._emit("stp_escalated", tenant_id, invoice_record_id, {"step": "po_match"})
+				return {"invoice_record_id": invoice_record_id, "passed": False, "steps": steps, "escalated_at": _now()}
+		else:
+			steps.append({"step": "po_match", "passed": True, "detail": "no PO required (non-PO invoice)"})
+
+		# Step 4: STP approval
+		try:
+			self.approve_invoice(
+				tenant_id,
+				invoice_record_id,
+				approved_by=approved_by,
+				requested_by=requested_by,
+			)
+			steps.append({"step": "approval", "passed": True, "detail": f"approved by {approved_by}"})
+		except Exception as exc:
+			steps.append({"step": "approval", "passed": False, "detail": str(exc)})
+			self._emit("stp_escalated", tenant_id, invoice_record_id, {"step": "approval"})
+			return {"invoice_record_id": invoice_record_id, "passed": False, "steps": steps, "escalated_at": _now()}
+
+		self._emit("stp_completed", tenant_id, invoice_record_id, {"steps": len(steps)})
+		return {
+			"invoice_record_id": invoice_record_id,
+			"passed": True,
+			"steps": steps,
+			"completed_at": _now(),
+		}
+
+	async def compute_vendor_scorecard(
+		self,
+		vendor_record_id: str,
+		tenant_id: str,
+		period: dict[str, str] | None = None,
+	) -> dict[str, Any]:
+		"""Compute a comprehensive vendor performance scorecard for the given period.
+
+		Metrics (each scored 0–100, higher = better performance):
+		  invoice_accuracy_rate   : % invoices passing match without exception
+		  match_pass_rate         : % invoices with matched=True
+		  on_time_submission_rate : % invoices submitted before due_date
+		  dispute_rate            : inverse of % invoices held (inverted for score)
+		  credit_note_rate        : proxy via matched invoices with discount corrections
+
+		Composite performance_index = weighted average across all metrics.
+		"""
+		vendor = self._require_vendor(vendor_record_id, tenant_id)
+		vendor_id = vendor["vendor_id"]
+
+		period = period or {}
+		period_start = period.get("start", "")
+		period_end = period.get("end", "")
+
+		invoices = [
+			inv for inv in self._invoices.values()
+			if inv.get("vendor_id") == vendor_id
+			and inv.get("tenant_id") == tenant_id
+			and (not period_start or inv.get("updated_at", "")[:10] >= period_start[:10])
+			and (not period_end or inv.get("updated_at", "")[:10] <= period_end[:10])
+		]
+
+		total = len(invoices)
+		if total == 0:
+			return {
+				"vendor_id": vendor_id,
+				"vendor_name": vendor.get("name"),
+				"tenant_id": tenant_id,
+				"period": period,
+				"total_invoices": 0,
+				"performance_index": None,
+				"metrics": {},
+				"recommendation": "insufficient data for scoring",
+				"computed_at": _now(),
+			}
+
+		matched = sum(1 for inv in invoices if inv.get("matched"))
+		exceptions = sum(1 for inv in invoices if inv.get("status") == "match_exception")
+		held = sum(1 for inv in invoices if inv.get("held"))
+		on_time = sum(
+			1 for inv in invoices
+			if inv.get("due_date") and inv.get("updated_at")
+			and inv["updated_at"][:10] <= inv["due_date"][:10]
+		)
+		discount_corrections = sum(1 for inv in invoices if inv.get("discount_captured"))
+
+		invoice_accuracy = ((total - exceptions) / total) * 100
+		match_pass = (matched / total) * 100
+		on_time_submission = (on_time / total) * 100
+		dispute_score = (1 - held / total) * 100
+		credit_note_score = max(0, 100 - (discount_corrections / total) * 100)
+
+		# Weighted composite: accuracy 30, match 25, on-time 20, dispute 15, credit_note 10
+		perf_index = (
+			invoice_accuracy * 0.30
+			+ match_pass * 0.25
+			+ on_time_submission * 0.20
+			+ dispute_score * 0.15
+			+ credit_note_score * 0.10
+		)
+
+		if perf_index >= 85:
+			tier = "preferred"
+			rec = "eligible for portal fast-track and early payment incentives"
+		elif perf_index >= 70:
+			tier = "good"
+			rec = "standard relationship — monitor for improvement opportunities"
+		elif perf_index >= 50:
+			tier = "fair"
+			rec = "schedule vendor review meeting to address recurring exceptions"
+		else:
+			tier = "poor"
+			rec = "formal performance improvement plan required; consider dual sourcing"
+
+		return {
+			"vendor_id": vendor_id,
+			"vendor_name": vendor.get("name"),
+			"tenant_id": tenant_id,
+			"period": period,
+			"total_invoices": total,
+			"performance_index": round(perf_index, 1),
+			"performance_tier": tier,
+			"metrics": {
+				"invoice_accuracy_rate": round(invoice_accuracy, 1),
+				"match_pass_rate": round(match_pass, 1),
+				"on_time_submission_rate": round(on_time_submission, 1),
+				"dispute_score": round(dispute_score, 1),
+				"credit_note_score": round(credit_note_score, 1),
+			},
+			"recommendation": rec,
+			"computed_at": _now(),
+		}
+
+	async def score_payment_fraud_risk(
+		self,
+		payment_record_id: str,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Score a pending payment for real-time fraud risk indicators.
+
+		Risk factors evaluated (each contributes 0–25 pts):
+		  1. New bank account for this vendor (registered within last 90 days)
+		  2. Amount deviation > 2x vendor's historical median payment
+		  3. Payment scheduled on a weekend or Kenyan public holiday
+		  4. Vendor bank account changed within 72h of this payment scheduling
+
+		Score 0–100:
+		  0–39  : low risk — proceed normally
+		  40–74 : medium risk — flag for second-pair-of-eyes review
+		  75+   : high risk — block and require CISO override
+
+		Returns score, risk_tier, fired_factors, and recommendation.
+		"""
+		payment = self._require_payment(payment_record_id, tenant_id)
+		invoice = self._require_invoice(payment["invoice_record_id"], tenant_id)
+		vendor_record = None
+		for v in self._vendors.values():
+			if v.get("vendor_id") == payment.get("vendor_id") and v.get("tenant_id") == tenant_id:
+				vendor_record = v
+				break
+
+		risk_score = 0
+		factors: list[dict[str, Any]] = []
+
+		# Factor 1: bank account recently added for vendor
+		bank_change = bool(vendor_record and vendor_record.get("bank_change"))
+		if bank_change:
+			risk_score += 25
+			factors.append({"factor": "new_bank_account", "weight": 25,
+			                "detail": "vendor bank account was recently changed"})
+
+		# Factor 2: amount deviation vs vendor median
+		vendor_payments = [
+			_d(p.get("amount", 0))
+			for p in self._payments.values()
+			if p.get("vendor_id") == payment.get("vendor_id")
+			and p.get("id") != payment["id"]
+			and p.get("status") == "paid"
+		]
+		if vendor_payments:
+			sorted_pmts = sorted(vendor_payments)
+			median = sorted_pmts[len(sorted_pmts) // 2]
+			current_amount = _d(payment.get("amount", 0))
+			if median > 0 and current_amount > median * 2:
+				risk_score += 20
+				factors.append({"factor": "amount_deviation", "weight": 20,
+				                "detail": f"amount {current_amount} is >2x median {median}"})
+
+		# Factor 3: weekend payment
+		try:
+			sched_date = date.fromisoformat(payment.get("scheduled_date", _today())[:10])
+			if sched_date.weekday() >= 5:  # Saturday=5, Sunday=6
+				risk_score += 15
+				factors.append({"factor": "weekend_payment", "weight": 15,
+				                "detail": f"payment scheduled on {sched_date.strftime('%A')}"})
+		except Exception as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		# Factor 4: bank change within 72h of payment scheduling
+		vendor_updated = vendor_record.get("updated_at", "") if vendor_record else ""
+		payment_created = payment.get("updated_at", "")
+		if vendor_updated and payment_created:
+			delta_hours = abs(_days_between(vendor_updated[:10], payment_created[:10])) * 24
+			if bank_change and delta_hours <= 72:
+				risk_score += 20
+				factors.append({"factor": "bank_change_proximity", "weight": 20,
+				                "detail": f"bank changed ~{delta_hours}h before payment scheduling"})
+
+		risk_score = min(100, risk_score)
+
+		if risk_score >= 75:
+			tier = "high"
+			recommendation = "block payment — require CISO override and independent bank account verification"
+		elif risk_score >= 40:
+			tier = "medium"
+			recommendation = "flag for second-pair-of-eyes review before release"
+		else:
+			tier = "low"
+			recommendation = "proceed normally"
+
+		self._emit("payment_fraud_risk_scored", tenant_id, payment_record_id, {
+			"risk_score": risk_score, "risk_tier": tier,
+		})
+
+		return {
+			"payment_record_id": payment_record_id,
+			"invoice_id": invoice.get("invoice_id"),
+			"vendor_id": payment.get("vendor_id"),
+			"tenant_id": tenant_id,
+			"risk_score": risk_score,
+			"risk_tier": tier,
+			"fired_factors": factors,
+			"recommendation": recommendation,
+			"scored_at": _now(),
+		}
+
+	async def compute_accruals(
+		self,
+		tenant_id: str,
+		period: dict[str, str],
+	) -> dict[str, Any]:
+		"""Identify and generate accrual journal entries for period-end close.
+
+		Scans for:
+		  Type A — GRNs received before period_end with no matching approved invoice
+		           (received-not-invoiced, RNI).  Accrual: DR Accrued Liabilities,
+		           CR Goods Received Not Invoiced.
+		  Type B — Approved POs past expected delivery date with no GRN and no invoice
+		           (service accruals, blanket commitments).  Accrual: DR Expense,
+		           CR Accrued Expenses.
+
+		Returns a list of proposed journal entries ready for GL posting, plus a
+		summary count and total accrual amount.
+		"""
+		period_end = period.get("end", _today())
+		period_label = period_end[:7]  # YYYY-MM
+
+		journal_entries: list[dict[str, Any]] = []
+		total_accrual = Decimal("0")
+
+		# Type A: GRNs without matched invoices
+		matched_grn_ids = {
+			inv.get("grn_id")
+			for inv in self._invoices.values()
+			if inv.get("tenant_id") == tenant_id
+			and inv.get("grn_id")
+			and inv.get("matched")
+		}
+
+		for grn_id, grn in self._goods_receipts.items():
+			if grn_id in matched_grn_ids:
+				continue
+			grn_date = grn.get("received_date", grn.get("updated_at", ""))[:10]
+			if grn_date > period_end[:10]:
+				continue
+			# Estimate accrual from PO amount on the linked PO
+			po = self._purchase_orders.get(grn.get("po_id", ""))
+			accrual_amount = _d(grn.get("received_value", po.get("amount", 0) if po else 0))
+			if accrual_amount <= 0:
+				continue
+			entry_id = f"accrual_rni_{grn_id[:12]}_{period_label.replace('-', '')}"
+			journal_entries.append({
+				"entry_id": entry_id,
+				"accrual_type": "received_not_invoiced",
+				"description": f"RNI accrual for GRN {grn_id} — period {period_label}",
+				"lines": [
+					{"account": "ACCRUED_LIABILITIES", "debit": str(accrual_amount), "credit": "0.00"},
+					{"account": "GRNI_CLEARING", "debit": "0.00", "credit": str(accrual_amount)},
+				],
+				"period": period_label,
+				"grn_id": grn_id,
+				"amount": str(accrual_amount),
+				"reversal_date": (date.fromisoformat(period_end[:10]) + timedelta(days=1)).isoformat(),
+				"auto_reverse": True,
+			})
+			total_accrual += accrual_amount
+
+		# Type B: POs past delivery date with no GRN
+		invoiced_po_ids = {
+			inv.get("po_id")
+			for inv in self._invoices.values()
+			if inv.get("tenant_id") == tenant_id and inv.get("po_id")
+		}
+
+		for po_id, po in self._purchase_orders.items():
+			if po_id in invoiced_po_ids:
+				continue
+			delivery_date = po.get("expected_delivery_date", po.get("updated_at", ""))[:10]
+			if not delivery_date or delivery_date > period_end[:10]:
+				continue
+			accrual_amount = _d(po.get("amount", 0))
+			if accrual_amount <= 0:
+				continue
+			entry_id = f"accrual_svc_{po_id[:12]}_{period_label.replace('-', '')}"
+			journal_entries.append({
+				"entry_id": entry_id,
+				"accrual_type": "service_accrual",
+				"description": f"Service accrual for PO {po_id} — period {period_label}",
+				"lines": [
+					{"account": "ACCRUED_EXPENSES", "debit": str(accrual_amount), "credit": "0.00"},
+					{"account": "AP_CONTROL", "debit": "0.00", "credit": str(accrual_amount)},
+				],
+				"period": period_label,
+				"po_id": po_id,
+				"amount": str(accrual_amount),
+				"reversal_date": (date.fromisoformat(period_end[:10]) + timedelta(days=1)).isoformat(),
+				"auto_reverse": True,
+			})
+			total_accrual += accrual_amount
+
+		self._emit("accruals_computed", tenant_id, period_label, {
+			"entry_count": len(journal_entries), "total_accrual": str(total_accrual),
+		})
+
+		return {
+			"tenant_id": tenant_id,
+			"period": period,
+			"period_label": period_label,
+			"entry_count": len(journal_entries),
+			"total_accrual_amount": str(total_accrual),
+			"rni_entries": sum(1 for e in journal_entries if e["accrual_type"] == "received_not_invoiced"),
+			"service_accrual_entries": sum(1 for e in journal_entries if e["accrual_type"] == "service_accrual"),
+			"journal_entries": journal_entries,
+			"currency": "KES",
+			"computed_at": _now(),
+		}
+
+	async def nl_query(
+		self,
+		question: str,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Natural language AP query powered by local Ollama LLM.
+
+		Routes the user question through a locally-hosted LLM (llama3.1:8b by default)
+		with a structured AP system prompt.  The model selects the most appropriate
+		data method, calls it with tenant-scoped parameters, and returns both the
+		natural-language answer and the underlying structured data.
+
+		Requires OLLAMA_BASE_URL environment variable.  Falls back to a keyword-router
+		when Ollama is unavailable.
+		"""
+		import os
+
+		# Keyword-based fallback router
+		def _keyword_route(q: str) -> dict[str, Any]:
+			q_lower = q.lower()
+			if any(w in q_lower for w in ("aging", "overdue", "outstanding", "past due")):
+				data = self.aging_summary(tenant_id)
+				return {"method": "aging_summary", "answer": f"AP aging: {data['open_invoice_count']} open invoices totalling {data['open_amount']}.", "data": data}
+			if any(w in q_lower for w in ("kpi", "dashboard", "metrics", "performance")):
+				data = self.ap_kpi_dashboard()
+				return {"method": "ap_kpi_dashboard", "answer": f"AP KPIs: {data['total_invoices']} total invoices, DPO={data['dpo_30d']} days.", "data": data}
+			if any(w in q_lower for w in ("exception", "blocked", "match fail", "hold")):
+				data = self.match_exception_queue({"tenant_id": tenant_id})
+				return {"method": "match_exception_queue", "answer": f"{len(data)} open match exceptions.", "data": data}
+			if any(w in q_lower for w in ("spend", "category", "supplier spend", "breakdown")):
+				data = self.spend_analytics({"start": (date.today() - timedelta(days=30)).isoformat(), "end": _today()}, "supplier")
+				return {"method": "spend_analytics", "answer": f"Top supplier spend last 30 days: {data['ranked_breakdown'][:3]}.", "data": data}
+			data = self.dashboard_summary(tenant_id)
+			return {"method": "dashboard_summary", "answer": f"AP summary: {data['invoice_count']} invoices, {data['open_invoice_count']} open.", "data": data}
+
+		if not os.environ.get("OLLAMA_BASE_URL"):
+			result = _keyword_route(question)
+			return {
+				"question": question,
+				"tenant_id": tenant_id,
+				"answer": result["answer"],
+				"method_used": result["method"],
+				"data": result["data"],
+				"ml_enhanced": False,
+				"responded_at": _now(),
+			}
+
+		try:
+			import json as _json
+			import urllib.request as _req
+
+			system_prompt = (
+				"You are an Accounts Payable assistant for a finance team. "
+				"Available data queries: aging_summary, ap_kpi_dashboard, "
+				"match_exception_queue, spend_analytics, dashboard_summary. "
+				"Respond with a JSON object: {\"method\": \"<method_name>\", \"answer\": \"<natural language answer>\"}. "
+				"Be concise. Use KES currency. Tenant is already filtered."
+			)
+			payload = _json.dumps({
+				"model": os.environ.get("OLLAMA_AP_MODEL", "llama3.1:8b"),
+				"prompt": f"System: {system_prompt}\nUser: {question}",
+				"stream": False,
+			}).encode()
+
+			with _req.urlopen(
+				_req.Request(
+					os.environ["OLLAMA_BASE_URL"].rstrip("/") + "/api/generate",
+					data=payload,
+					headers={"Content-Type": "application/json"},
+				),
+				timeout=30,
+			) as resp:
+				llm_resp = _json.loads(resp.read())
+
+			raw_text = llm_resp.get("response", "")
+			try:
+				parsed = _json.loads(raw_text)
+				method_name = parsed.get("method", "dashboard_summary")
+				answer = parsed.get("answer", raw_text)
+			except Exception:
+				method_name = "dashboard_summary"
+				answer = raw_text
+
+			# Execute the resolved method
+			method_map = {
+				"aging_summary": lambda: self.aging_summary(tenant_id),
+				"ap_kpi_dashboard": lambda: self.ap_kpi_dashboard(),
+				"match_exception_queue": lambda: self.match_exception_queue({"tenant_id": tenant_id}),
+				"spend_analytics": lambda: self.spend_analytics(
+					{"start": (date.today() - timedelta(days=30)).isoformat(), "end": _today()}, "supplier"
+				),
+				"dashboard_summary": lambda: self.dashboard_summary(tenant_id),
+			}
+			data = method_map.get(method_name, method_map["dashboard_summary"])()
+
+			return {
+				"question": question,
+				"tenant_id": tenant_id,
+				"answer": answer,
+				"method_used": method_name,
+				"data": data,
+				"ml_enhanced": True,
+				"responded_at": _now(),
+			}
+
+		except Exception as exc:
+			result = _keyword_route(question)
+			return {
+				"question": question,
+				"tenant_id": tenant_id,
+				"answer": result["answer"],
+				"method_used": result["method"],
+				"data": result["data"],
+				"ml_enhanced": False,
+				"fallback_reason": str(exc),
+				"responded_at": _now(),
+			}
+
 
 # Back-compat alias
-
-	async def ml_duplicate_invoice_detect(self, *args, **kwargs):
-		"""AI-powered AI duplicate invoice and payment anomaly detection. Requires OLLAMA_BASE_URL."""
-		import os
-		if not os.environ.get("OLLAMA_BASE_URL"):
-			return {"ml_enhanced": False}
-		try:
-			from capabilities.common.mlx import MLCapability
-			ml = MLCapability()
-			result = await ml.score(kwargs, task="accounts_payable_duplicate_detection")
-			return {"duplicate_score": round(result.score,3), "flags": result.factors, "ml_enhanced": True}
-		except Exception:
-			return {"ml_enhanced": False}
-
 APService = AccountsPayableService

@@ -2245,6 +2245,714 @@ class AccountsReceivableService:
 		await self._put("ar_gl_entries", entry)
 		return deepcopy(entry)
 
+	# ─────────────────────────────────────────────────────────────────────────
+	# ██  RECURRING BILLING
+	# ─────────────────────────────────────────────────────────────────────────
+
+	async def create_recurring_schedule(
+		self,
+		customer_id: str,
+		template_lines: list[dict[str, Any]],
+		frequency: str,
+		start_date: str,
+		end_date: str | None = None,
+		payment_terms: str = "NET30",
+	) -> dict[str, Any]:
+		"""Create a recurring invoice schedule.
+
+		frequency: daily | weekly | monthly | quarterly | annually
+		"""
+		_VALID_FREQUENCIES = {"daily", "weekly", "monthly", "quarterly", "annually"}
+		assert frequency in _VALID_FREQUENCIES, f"frequency must be one of {_VALID_FREQUENCIES}"
+		assert template_lines, "template_lines required"
+		assert start_date, "start_date required"
+		await self._require("ar_customers", customer_id, "customer")
+
+		record: dict[str, Any] = {
+			"id": uuid7str(),
+			"type": "ar_recurring_schedule",
+			"customer_id": customer_id,
+			"template_lines": template_lines,
+			"frequency": frequency,
+			"start_date": start_date,
+			"end_date": end_date,
+			"payment_terms": payment_terms,
+			"next_run_date": start_date,
+			"run_count": 0,
+			"status": "active",
+			"created_by": self.actor_id,
+			"created_at": _now(),
+			"updated_at": _now(),
+		}
+		await self._put("ar_recurring_schedules", record)
+		await self._log_audit("recurring_schedule_created", record["id"], {
+			"customer_id": customer_id, "frequency": frequency, "start_date": start_date,
+		})
+		return deepcopy(record)
+
+	async def run_recurring_invoicing(self, as_of_date: str | None = None) -> dict[str, Any]:
+		"""Generate invoices for all due recurring schedules as of the given date."""
+		_FREQ_DAYS: dict[str, int] = {
+			"daily": 1, "weekly": 7, "monthly": 30, "quarterly": 91, "annually": 365,
+		}
+		ref = as_of_date or _today()
+		schedules = await self._query("ar_recurring_schedules", {"status": "active"})
+		due = [s for s in schedules if s.get("next_run_date", "9999") <= ref]
+
+		created_invoices: list[dict[str, Any]] = []
+		for sched in due:
+			terms = sched.get("payment_terms", "NET30")
+			net_days = int("".join(filter(str.isdigit, terms)) or "30")
+			inv_date = sched["next_run_date"]
+			due_date_obj = date.fromisoformat(inv_date) + timedelta(days=net_days)
+			customer = await self._require("ar_customers", sched["customer_id"], "customer")
+			inv = await self.create_invoice(
+				customer_id=sched["customer_id"],
+				invoice_date=inv_date,
+				due_date=due_date_obj.isoformat(),
+				lines=sched["template_lines"],
+				currency=customer.get("currency", "USD"),
+				payment_terms=sched.get("payment_terms", "NET30"),
+				recurring_schedule_id=sched["id"],
+			)
+			await self.submit_invoice(inv["id"])
+			created_invoices.append(inv)
+
+			step_days = _FREQ_DAYS.get(sched["frequency"], 30)
+			next_date = (date.fromisoformat(inv_date) + timedelta(days=step_days)).isoformat()
+			sched["next_run_date"] = next_date
+			sched["run_count"] = sched.get("run_count", 0) + 1
+			if sched.get("end_date") and next_date > sched["end_date"]:
+				sched["status"] = "completed"
+			sched["updated_at"] = _now()
+			await self._put("ar_recurring_schedules", sched)
+
+		await self._log_audit("recurring_invoicing_run", "batch", {
+			"as_of_date": ref, "schedules_processed": len(due), "invoices_created": len(created_invoices),
+		})
+		return {
+			"as_of_date": ref,
+			"schedules_processed": len(due),
+			"invoices_created": len(created_invoices),
+			"invoice_ids": [inv["id"] for inv in created_invoices],
+		}
+
+	# ─────────────────────────────────────────────────────────────────────────
+	# ██  DYNAMIC EARLY-PAYMENT DISCOUNTS
+	# ─────────────────────────────────────────────────────────────────────────
+
+	async def calculate_dynamic_discount(
+		self,
+		invoice_id: str,
+		cost_of_capital_pct: float | Decimal = Decimal("10.0"),
+	) -> dict[str, Any]:
+		"""Sliding-scale early-payment discount tiers for an invoice.
+
+		Break-even daily rate = cost_of_capital / 365.
+		Tiers offered at 2, 5, 10, 15 days before original due date.
+		"""
+		invoice = await self._require("ar_invoices", invoice_id, "invoice")
+		assert invoice["status"] not in ("paid", "cancelled", "void"), \
+			f"invoice is already {invoice['status']}"
+
+		outstanding = _d(invoice["outstanding_amount"])
+		due = date.fromisoformat(invoice["due_date"])
+		today_date = date.today()
+		days_to_due = (due - today_date).days
+		assert days_to_due > 0, "invoice is past due — discount not applicable"
+
+		annual_rate = _d(cost_of_capital_pct) / 100
+		daily_rate = annual_rate / 365
+
+		tiers: list[dict[str, Any]] = []
+		for pay_in_days in (2, 5, 10, 15):
+			if pay_in_days >= days_to_due:
+				continue
+			days_saved = days_to_due - pay_in_days
+			discount_pct = _round2(daily_rate * days_saved * 100)
+			discount_amount = _round2(outstanding * daily_rate * days_saved)
+			discounted_amount = _round2(outstanding - discount_amount)
+			tiers.append({
+				"pay_by": (today_date + timedelta(days=pay_in_days)).isoformat(),
+				"days_accelerated": days_saved,
+				"discount_pct": str(discount_pct),
+				"discount_amount": str(discount_amount),
+				"amount_payable": str(discounted_amount),
+			})
+
+		offer: dict[str, Any] = {
+			"id": uuid7str(),
+			"type": "ar_discount_offer",
+			"invoice_id": invoice_id,
+			"customer_id": invoice["customer_id"],
+			"original_amount": str(outstanding),
+			"original_due_date": invoice["due_date"],
+			"cost_of_capital_pct": str(cost_of_capital_pct),
+			"tiers": tiers,
+			"status": "open",
+			"generated_at": _now(),
+		}
+		await self._put("ar_discount_offers", offer)
+		await self._log_audit("discount_offer_generated", invoice_id, {
+			"tiers": len(tiers), "cost_of_capital_pct": str(cost_of_capital_pct),
+		})
+		return deepcopy(offer)
+
+	async def accept_early_payment_discount(
+		self,
+		offer_id: str,
+		tier_index: int,
+	) -> dict[str, Any]:
+		"""Accept a specific discount tier; adjusts outstanding invoice amount."""
+		offer = await self._require("ar_discount_offers", offer_id, "offer")
+		assert offer["status"] == "open", f"offer is {offer['status']}"
+		tiers = offer.get("tiers", [])
+		assert 0 <= tier_index < len(tiers), f"tier_index {tier_index} out of range"
+
+		tier = tiers[tier_index]
+		invoice = await self._require("ar_invoices", offer["invoice_id"], "invoice")
+		invoice["outstanding_amount"] = tier["amount_payable"]
+		invoice["discount_applied_pct"] = tier["discount_pct"]
+		invoice["discount_applied_amount"] = tier["discount_amount"]
+		invoice["discount_due_by"] = tier["pay_by"]
+		invoice["updated_at"] = _now()
+		await self._put("ar_invoices", invoice)
+
+		offer["status"] = "accepted"
+		offer["accepted_tier"] = tier_index
+		offer["accepted_at"] = _now()
+		offer["updated_at"] = _now()
+		await self._put("ar_discount_offers", offer)
+
+		await self._log_audit("discount_accepted", offer_id, {
+			"invoice_id": offer["invoice_id"], "tier": tier_index, "discount_pct": tier["discount_pct"],
+		})
+		return {"offer": deepcopy(offer), "invoice": deepcopy(invoice)}
+
+	# ─────────────────────────────────────────────────────────────────────────
+	# ██  INSTALMENT PLANS
+	# ─────────────────────────────────────────────────────────────────────────
+
+	async def create_instalment_plan(
+		self,
+		invoice_id: str,
+		num_instalments: int,
+		frequency: str,
+		first_due_date: str,
+	) -> dict[str, Any]:
+		"""Split an outstanding invoice into a structured instalment plan.
+
+		frequency: weekly | monthly | quarterly
+		"""
+		_FREQ_DAYS: dict[str, int] = {"weekly": 7, "monthly": 30, "quarterly": 91}
+		assert frequency in _FREQ_DAYS, f"frequency must be one of {set(_FREQ_DAYS)}"
+		assert num_instalments >= 2, "num_instalments must be >= 2"
+
+		invoice = await self._require("ar_invoices", invoice_id, "invoice")
+		assert invoice["status"] not in ("paid", "cancelled", "void"), \
+			f"invoice is {invoice['status']}"
+
+		outstanding = _d(invoice["outstanding_amount"])
+		instalment_amount = _round2(outstanding / num_instalments)
+		last_amount = _round2(outstanding - instalment_amount * (num_instalments - 1))
+
+		step = _FREQ_DAYS[frequency]
+		plan_id = uuid7str()
+		instalments: list[dict[str, Any]] = []
+		base = date.fromisoformat(first_due_date)
+		for i in range(num_instalments):
+			due = (base + timedelta(days=step * i)).isoformat()
+			amt = last_amount if i == num_instalments - 1 else instalment_amount
+			inst: dict[str, Any] = {
+				"id": uuid7str(),
+				"type": "ar_instalment",
+				"plan_id": plan_id,
+				"invoice_id": invoice_id,
+				"customer_id": invoice["customer_id"],
+				"instalment_no": i + 1,
+				"amount": str(amt),
+				"due_date": due,
+				"status": "pending",
+				"created_at": _now(),
+			}
+			await self._put("ar_instalments", inst)
+			instalments.append(inst)
+
+		plan: dict[str, Any] = {
+			"id": plan_id,
+			"type": "ar_instalment_plan",
+			"invoice_id": invoice_id,
+			"customer_id": invoice["customer_id"],
+			"total_amount": str(outstanding),
+			"num_instalments": num_instalments,
+			"frequency": frequency,
+			"first_due_date": first_due_date,
+			"instalment_ids": [inst["id"] for inst in instalments],
+			"status": "active",
+			"created_by": self.actor_id,
+			"created_at": _now(),
+			"updated_at": _now(),
+		}
+		await self._put("ar_instalment_plans", plan)
+
+		invoice["instalment_plan_id"] = plan_id
+		invoice["status"] = "partially_paid"
+		invoice["updated_at"] = _now()
+		await self._put("ar_invoices", invoice)
+
+		await self._log_audit("instalment_plan_created", plan_id, {
+			"invoice_id": invoice_id, "num_instalments": num_instalments, "frequency": frequency,
+		})
+		return {"plan": deepcopy(plan), "instalments": [deepcopy(i) for i in instalments]}
+
+	async def process_instalment_payment(
+		self,
+		instalment_id: str,
+		payment_id: str,
+	) -> dict[str, Any]:
+		"""Mark a specific instalment as paid from the given payment record."""
+		instalment = await self._require("ar_instalments", instalment_id, "instalment")
+		assert instalment["status"] == "pending", f"instalment is {instalment['status']}"
+
+		result = await self.apply_payment(
+			payment_id,
+			[{"invoice_id": instalment["invoice_id"], "amount": instalment["amount"]}],
+		)
+
+		instalment["status"] = "paid"
+		instalment["payment_id"] = payment_id
+		instalment["paid_at"] = _now()
+		instalment["updated_at"] = _now()
+		await self._put("ar_instalments", instalment)
+
+		plan = await self._store.get("ar_instalment_plans", instalment["plan_id"])
+		if plan and plan.get("tenant_id") == self.tenant_id:
+			all_insts = await self._query("ar_instalments", {"plan_id": plan["id"]})
+			if all(inst.get("status") == "paid" for inst in all_insts):
+				plan["status"] = "completed"
+				plan["completed_at"] = _now()
+				plan["updated_at"] = _now()
+				await self._put("ar_instalment_plans", plan)
+
+		await self._log_audit("instalment_paid", instalment_id, {
+			"payment_id": payment_id, "plan_id": instalment["plan_id"],
+		})
+		return {"instalment": deepcopy(instalment), "payment_result": result}
+
+	# ─────────────────────────────────────────────────────────────────────────
+	# ██  PERIOD-CLOSE CHECKLIST
+	# ─────────────────────────────────────────────────────────────────────────
+
+	async def run_period_close_checklist(self, period: str) -> dict[str, Any]:
+		"""Execute the AR period-close checklist for the given period (YYYY-MM).
+
+		Steps:
+		  1. Validate no unposted approved invoices remain
+		  2. Foreign-currency revaluation (last recorded rates)
+		  3. Bad-debt ECL provision calculation
+		  4. AR sub-ledger to GL reconciliation
+		  5. Aging report snapshot
+		  6. Dunning letter archive count
+		"""
+		assert period and len(period) == 7, "period must be YYYY-MM"
+
+		period_from = f"{period}-01"
+		year, month = int(period[:4]), int(period[5:7])
+		next_month_first = date(year + (month // 12), (month % 12) + 1, 1)
+		period_to = (next_month_first - timedelta(days=1)).isoformat()
+
+		checklist_id = uuid7str()
+		steps: list[dict[str, Any]] = []
+
+		def _step(name: str, status: str, detail: Any) -> dict[str, Any]:
+			return {"step": name, "status": status, "detail": detail, "checked_at": _now()}
+
+		unposted = await self._query("ar_invoices", {"status": "approved"})
+		period_unposted = [inv for inv in unposted if inv.get("invoice_date", "").startswith(period)]
+		steps.append(_step(
+			"no_unposted_invoices",
+			"pass" if not period_unposted else "fail",
+			{"unposted_count": len(period_unposted), "invoice_ids": [i["id"] for i in period_unposted]},
+		))
+
+		fx_rates_raw = await self._query("ar_fx_rates")
+		latest_rates: dict[str, Decimal] = {}
+		for r in sorted(fx_rates_raw, key=lambda x: x.get("rate_date", "")):
+			if r.get("to_currency") == "USD":
+				latest_rates[r["from_currency"]] = _d(r["rate"])
+		if latest_rates:
+			reval = await self.foreign_currency_revaluation(period, latest_rates)
+			steps.append(_step(
+				"fx_revaluation", "pass",
+				{"invoices_revalued": reval["invoices_revalued"], "gain_loss": reval["total_unrealised_gain_loss"]},
+			))
+		else:
+			steps.append(_step("fx_revaluation", "skipped", {"reason": "no_fx_rates_recorded"}))
+
+		provision = await self.calculate_bad_debt_provision()
+		steps.append(_step("bad_debt_provision", "pass", {"total_provision": provision["total_provision"]}))
+
+		all_open_inv = await self._query("ar_invoices")
+		ar_balance = sum(
+			_d(inv.get("outstanding_amount", 0))
+			for inv in all_open_inv
+			if inv.get("status") not in ("cancelled", "void", "paid", "written_off")
+		)
+		gl_entries = await self._query("ar_gl_entries")
+		gl_ar_balance = Decimal(0)
+		for entry in gl_entries:
+			for line in entry.get("lines", []):
+				if line.get("account") == "1200":
+					gl_ar_balance += _d(line.get("debit", 0)) - _d(line.get("credit", 0))
+		reconciled = abs(ar_balance - gl_ar_balance) < Decimal("0.01")
+		steps.append(_step(
+			"ar_gl_reconciliation", "pass" if reconciled else "warn",
+			{
+				"ar_subledger_balance": str(_round2(ar_balance)),
+				"gl_ar_balance": str(_round2(gl_ar_balance)),
+				"difference": str(_round2(abs(ar_balance - gl_ar_balance))),
+			},
+		))
+
+		aging = await self.calculate_aging(period_to)
+		steps.append(_step(
+			"aging_snapshot", "pass",
+			{"grand_total": aging["grand_total"], "as_of_date": aging["as_of_date"]},
+		))
+
+		dunning_letters = await self._query("ar_dunning_letters")
+		period_letters = [dl for dl in dunning_letters if dl.get("generated_at", "").startswith(period)]
+		steps.append(_step("dunning_letter_archive", "pass", {"letters_archived": len(period_letters)}))
+
+		overall_status = "pass" if all(s["status"] in ("pass", "skipped") for s in steps) else "fail"
+		checklist: dict[str, Any] = {
+			"id": checklist_id,
+			"type": "ar_period_close",
+			"period": period,
+			"period_from": period_from,
+			"period_to": period_to,
+			"steps": steps,
+			"overall_status": overall_status,
+			"executed_by": self.actor_id,
+			"executed_at": _now(),
+		}
+		await self._put("ar_period_close_checklists", checklist)
+		await self._log_audit("period_close_checklist_run", checklist_id, {
+			"period": period, "overall_status": overall_status,
+		})
+		return deepcopy(checklist)
+
+	# ─────────────────────────────────────────────────────────────────────────
+	# ██  CUSTOMER CHURN RISK SCORING
+	# ─────────────────────────────────────────────────────────────────────────
+
+	async def calculate_churn_risk_score(self, customer_id: str) -> dict[str, Any]:
+		"""Compute a 0.0–1.0 churn risk score from AR payment behaviour signals.
+
+		Weights: 35% payment delay trend, 25% dispute frequency,
+		         20% credit-hold history, 20% outstanding/credit-limit ratio.
+		"""
+		customer = await self._require("ar_customers", customer_id, "customer")
+		all_invoices = await self._query("ar_invoices", {"customer_id": customer_id})
+		all_disputes = await self._query("ar_disputes", {"customer_id": customer_id})
+
+		paid_invoices = [
+			inv for inv in all_invoices
+			if inv.get("status") == "paid" and inv.get("paid_at") and inv.get("due_date")
+		]
+		paid_invoices.sort(key=lambda x: x.get("paid_at", ""))
+		dtps: list[float] = [
+			_days_between(inv["due_date"], inv["paid_at"][:10])
+			for inv in paid_invoices[-12:]
+		]
+
+		delay_slope = 0.0
+		if len(dtps) >= 2:
+			n = len(dtps)
+			xs = list(range(n))
+			x_mean = sum(xs) / n
+			y_mean = sum(dtps) / n
+			num = sum((xs[i] - x_mean) * (dtps[i] - y_mean) for i in range(n))
+			den = sum((xs[i] - x_mean) ** 2 for i in range(n))
+			delay_slope = num / den if den != 0 else 0.0
+
+		total_invoices = max(len(all_invoices), 1)
+		dispute_freq = len(all_disputes) / total_invoices
+		credit_hold_flag = 1.0 if customer.get("credit_hold") else 0.0
+		credit_limit = float(_d(customer.get("credit_limit", 1) or 1))
+		outstanding = sum(
+			float(_d(inv.get("outstanding_amount", 0)))
+			for inv in all_invoices
+			if inv.get("status") not in ("cancelled", "void", "paid")
+		)
+		outstanding_ratio = min(outstanding / credit_limit, 1.0) if credit_limit > 0 else 1.0
+
+		delay_score = min(max(delay_slope / 30, 0.0), 1.0)
+		raw = (
+			0.35 * delay_score +
+			0.25 * min(dispute_freq, 1.0) +
+			0.20 * credit_hold_flag +
+			0.20 * outstanding_ratio
+		)
+		score = round(min(max(raw, 0.0), 1.0), 4)
+
+		churn_record: dict[str, Any] = {
+			"id": uuid7str(),
+			"type": "ar_churn_score",
+			"customer_id": customer_id,
+			"churn_risk_score": score,
+			"risk_band": "high" if score >= 0.7 else ("medium" if score >= 0.4 else "low"),
+			"signals": {
+				"payment_delay_slope_days": round(delay_slope, 3),
+				"dispute_frequency": round(dispute_freq, 4),
+				"credit_hold": bool(credit_hold_flag),
+				"outstanding_ratio": round(outstanding_ratio, 4),
+			},
+			"scored_at": _now(),
+		}
+		await self._put("ar_churn_scores", churn_record)
+		await self._log_audit("churn_risk_scored", customer_id, {
+			"score": score, "risk_band": churn_record["risk_band"],
+		})
+		return deepcopy(churn_record)
+
+	async def run_churn_scoring(self) -> dict[str, Any]:
+		"""Score all active customers for churn risk; internally alert on score >= 0.7."""
+		customers = await self._query("ar_customers", {"status": "active"})
+		results: list[dict[str, Any]] = []
+		elevated: list[str] = []
+
+		for customer in customers:
+			score_rec = await self.calculate_churn_risk_score(customer["id"])
+			results.append(score_rec)
+			if score_rec["churn_risk_score"] >= 0.7:
+				elevated.append(customer["id"])
+				await self._log_notify(
+					self.actor_id, "internal",
+					f"Churn Risk Elevated — {customer['name']}",
+					f"Customer {customer['name']} churn score {score_rec['churn_risk_score']:.2f}. "
+					f"Signals: {score_rec['signals']}",
+					{"customer_id": customer["id"], "score": score_rec["churn_risk_score"]},
+				)
+
+		await self._log_audit("churn_scoring_batch_run", "batch", {
+			"customers_scored": len(results), "elevated_count": len(elevated),
+		})
+		return {
+			"customers_scored": len(results),
+			"elevated_risk_customers": elevated,
+			"scores": results,
+			"run_at": _now(),
+		}
+
+	# ─────────────────────────────────────────────────────────────────────────
+	# ██  IFRS 9 SCENARIO-BASED ECL
+	# ─────────────────────────────────────────────────────────────────────────
+
+	async def calculate_ecl_scenarios(
+		self,
+		scenarios: dict[str, dict[str, float | Decimal]] | None = None,
+	) -> dict[str, Any]:
+		"""IFRS 9 multi-scenario ECL: base / adverse / severe with probability weighting.
+
+		Default scenarios are conservative. Caller may supply custom per-bucket loss rates.
+		Probability weights: base 60%, adverse 30%, severe 10%.
+		"""
+		_DEFAULT_SCENARIOS: dict[str, dict[str, Decimal]] = {
+			"base": {
+				"current": Decimal("0.005"), "1_30": Decimal("0.010"),
+				"31_60": Decimal("0.050"),  "61_90": Decimal("0.150"),
+				"91_120": Decimal("0.400"), "120_plus": Decimal("0.850"),
+			},
+			"adverse": {
+				"current": Decimal("0.015"), "1_30": Decimal("0.030"),
+				"31_60": Decimal("0.100"),  "61_90": Decimal("0.300"),
+				"91_120": Decimal("0.650"), "120_plus": Decimal("1.000"),
+			},
+			"severe": {
+				"current": Decimal("0.030"), "1_30": Decimal("0.060"),
+				"31_60": Decimal("0.200"),  "61_90": Decimal("0.500"),
+				"91_120": Decimal("0.800"), "120_plus": Decimal("1.000"),
+			},
+		}
+		scenario_rates = scenarios or _DEFAULT_SCENARIOS
+		aging = await self.calculate_aging()
+		totals = aging["totals"]
+
+		scenario_results: dict[str, Any] = {}
+		for scenario_name, rates in scenario_rates.items():
+			provision_total = Decimal(0)
+			bucket_detail: list[dict[str, Any]] = []
+			for bucket in ("current", "1_30", "31_60", "61_90", "91_120", "120_plus"):
+				balance = _d(totals.get(bucket, 0))
+				rate = _d(rates.get(bucket, 0))
+				provision = _round2(balance * rate)
+				provision_total += provision
+				bucket_detail.append({
+					"bucket": bucket, "balance": str(balance),
+					"loss_rate": str(rate), "provision": str(provision),
+				})
+			scenario_results[scenario_name] = {
+				"buckets": bucket_detail,
+				"total_provision": str(_round2(provision_total)),
+			}
+
+		_DEFAULT_WEIGHTS = {"base": Decimal("0.60"), "adverse": Decimal("0.30"), "severe": Decimal("0.10")}
+		pwecl = sum(
+			_d(scenario_results[scen]["total_provision"]) * weight
+			for scen, weight in _DEFAULT_WEIGHTS.items()
+			if scen in scenario_results
+		)
+
+		result: dict[str, Any] = {
+			"as_of_date": aging["as_of_date"],
+			"scenarios": scenario_results,
+			"probability_weighted_ecl": str(_round2(pwecl)),
+			"weights_used": {k: str(v) for k, v in _DEFAULT_WEIGHTS.items()},
+			"calculated_at": _now(),
+		}
+		await self._log_audit("ecl_scenarios_calculated", "batch", {
+			"scenario_count": len(scenario_results), "pwecl": str(_round2(pwecl)),
+		})
+		return result
+
+	# ─────────────────────────────────────────────────────────────────────────
+	# ██  CUSTOMER PORTAL TOKENS
+	# ─────────────────────────────────────────────────────────────────────────
+
+	async def generate_customer_portal_token(
+		self,
+		customer_id: str,
+		expires_in_hours: int = 72,
+	) -> dict[str, Any]:
+		"""Issue a scoped access token for the customer self-service portal.
+
+		Returns the raw token once — the hash is stored. Caller delivers token to customer.
+		"""
+		import hashlib
+		import secrets
+		assert expires_in_hours > 0, "expires_in_hours must be positive"
+		await self._require("ar_customers", customer_id, "customer")
+
+		raw_token = secrets.token_hex(32)
+		token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+		expires_at = (
+			datetime.utcnow() + timedelta(hours=expires_in_hours)
+		).isoformat(timespec="seconds") + "Z"
+
+		record: dict[str, Any] = {
+			"id": uuid7str(),
+			"type": "ar_portal_token",
+			"customer_id": customer_id,
+			"token_hash": token_hash,
+			"expires_at": expires_at,
+			"status": "active",
+			"created_at": _now(),
+		}
+		await self._put("ar_portal_tokens", record)
+		await self._log_audit("portal_token_issued", customer_id, {"expires_at": expires_at})
+		return {
+			"token": raw_token,
+			"token_id": record["id"],
+			"customer_id": customer_id,
+			"expires_at": expires_at,
+		}
+
+	async def portal_get_open_invoices(self, token: str, customer_id: str) -> list[dict[str, Any]]:
+		"""Return open invoices for a customer after validating their portal token."""
+		import hashlib
+		token_hash = hashlib.sha256(token.encode()).hexdigest()
+		tokens = await self._query("ar_portal_tokens", {"customer_id": customer_id, "status": "active"})
+		valid = next((t for t in tokens if t.get("token_hash") == token_hash), None)
+		if not valid:
+			raise PermissionError("invalid or expired portal token")
+		if valid["expires_at"] < _now():
+			raise PermissionError("portal token has expired")
+
+		invoices = await self._query("ar_invoices", {"customer_id": customer_id})
+		open_invoices = [
+			inv for inv in invoices
+			if inv.get("status") not in ("cancelled", "void", "paid", "draft")
+		]
+		_STRIP = {"tenant_id", "gl_entry_id", "workflow_instance_id"}
+		return [{k: v for k, v in deepcopy(inv).items() if k not in _STRIP} for inv in open_invoices]
+
+	# ─────────────────────────────────────────────────────────────────────────
+	# ██  BANK STATEMENT INGESTION
+	# ─────────────────────────────────────────────────────────────────────────
+
+	async def ingest_bank_statement(
+		self,
+		statement_lines: list[dict[str, Any]],
+		statement_date: str,
+		bank_account: str,
+	) -> dict[str, Any]:
+		"""Parse and auto-reconcile a bank statement against open AR.
+
+		Each line: {amount, currency, reference, customer_id (optional), value_date}.
+		Lines with identifiable customers are auto-matched via smart_match_payment.
+		Unmatched lines are included in the result for manual review.
+		"""
+		assert statement_lines, "statement_lines required"
+		assert statement_date, "statement_date required"
+		assert bank_account, "bank_account required"
+
+		matched: list[dict[str, Any]] = []
+		unmatched: list[dict[str, Any]] = []
+
+		for line in statement_lines:
+			amount = _d(line.get("amount", 0))
+			if amount <= 0:
+				unmatched.append({**line, "reason": "non_positive_amount"})
+				continue
+
+			customer_id = line.get("customer_id")
+			if not customer_id:
+				all_customers = await self._query("ar_customers")
+				matched_cust = next(
+					(c for c in all_customers if line.get("reference", "") in c.get("name", "")),
+					None,
+				)
+				customer_id = matched_cust["id"] if matched_cust else None
+
+			if not customer_id:
+				unmatched.append({**line, "reason": "customer_not_identified"})
+				continue
+
+			payment = await self.record_payment(
+				customer_id=customer_id,
+				amount=amount,
+				currency=line.get("currency", "USD"),
+				payment_date=line.get("value_date", statement_date),
+				payment_method="bank_transfer",
+				reference=line.get("reference", "BANK-STMT"),
+			)
+			match_result = await self.smart_match_payment(payment["id"])
+			matched.append({
+				"statement_line": line,
+				"payment_id": payment["id"],
+				"match_result": match_result,
+			})
+
+		statement_record: dict[str, Any] = {
+			"id": uuid7str(),
+			"type": "ar_bank_statement",
+			"bank_account": bank_account,
+			"statement_date": statement_date,
+			"lines_total": len(statement_lines),
+			"matched_count": len(matched),
+			"unmatched_count": len(unmatched),
+			"matched": matched,
+			"unmatched": unmatched,
+			"reconciled_at": _now(),
+		}
+		await self._put("ar_bank_statements", statement_record)
+		await self._log_audit("bank_statement_ingested", statement_record["id"], {
+			"bank_account": bank_account, "matched": len(matched), "unmatched": len(unmatched),
+		})
+		return deepcopy(statement_record)
+
+
 
 # ─────────────────────────────────────────────────────────────
 # Backwards-compat alias

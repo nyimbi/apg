@@ -24,6 +24,14 @@ deployment, and medical/ergonomic engines attach through explicit APG adapters.
 - First-class AI pose agents for runtimes such as Codex, Claude Code, OpenCode,
   and Pi.
 - Bytewax lifecycle stream contract for batch and runtime pose mutations.
+- Joint angle extraction for biomechanical and ergonomic analysis.
+- Confidence-weighted consensus fusion of multi-model or multi-camera estimates.
+- Anatomical anomaly detection against keypoint topology constraints.
+- Laplace-mechanism privacy anonymisation of pose estimates.
+- Tamper-evident quality certification with SHA-256 content hashing.
+- Linear frame interpolation for dropped-frame gap filling.
+- EWMA-based model confidence drift detection.
+- Display-ready skeleton overlay segment generation (COCO-17, Halpe-26, minimal).
 
 ## Minimal Usage
 
@@ -35,27 +43,59 @@ tenant_id = "tenant-pose"
 
 model = service.register_model("rtmpose", tenant_id, "RTMPose", "rtmpose", "vision-team", "pose-policy:default")
 session = service.start_session(
-	"session-001",
-	tenant_id,
-	"Movement Study",
-	"coach",
-	"camera:studio-a",
-	model["id"],
-	subject_consent_recorded=True,
-	secure_stream=True,
-	realtime_stream=True,
+    "session-001",
+    tenant_id,
+    "Movement Study",
+    "coach",
+    "camera:studio-a",
+    model["id"],
+    subject_consent_recorded=True,
+    secure_stream=True,
+    realtime_stream=True,
 )
 frame = service.record_frame("frame-001", tenant_id, session["id"], 1, "2026-05-30T10:00:00Z", "frame://001", 1920, 1080)
 estimate = service.estimate_pose(
-	"estimate-001",
-	tenant_id,
-	session["id"],
-	frame["id"],
-	model["id"],
-	[{"name": "left_shoulder", "x": 100, "y": 120, "confidence": 0.95}],
+    "estimate-001",
+    tenant_id,
+    session["id"],
+    frame["id"],
+    model["id"],
+    [{"name": "left_shoulder", "x": 100, "y": 120, "confidence": 0.95}],
 )
 analysis = service.analyze_pose("analysis-001", tenant_id, estimate["id"], "biomechanical")
 ```
+
+## Async Methods Quick Reference
+
+| Method | Description |
+|--------|-------------|
+| `multi_person_pose()` | Batch estimate all persons in a single frame |
+| `skeletal_track()` | Link estimates across frames into a temporal track |
+| `action_recognise()` | Classify a pose sequence into a recognised action |
+| `gesture_detect()` | Detect hand gesture from a single estimate |
+| `fall_detect()` | Detect falls via hip-centroid vertical drop |
+| `gait_analysis()` | Compute cadence, symmetry, stride variability |
+| `pose_compare()` | Keypoint-by-keypoint similarity between two estimates |
+| `exercise_count()` | Count rep oscillations from hip-y series |
+| `ergonomics_assess()` | RULA-style ergonomics risk scoring |
+| `pose_export()` | Export session estimates to JSON or plain text |
+| `pose_annotate()` | Attach training labels to estimates |
+| `pose_analytics()` | Aggregate statistics across a tenant |
+| `real_time_pose()` | Low-latency path for realtime streams |
+| `pose_normalize()` | Scale keypoints to reference skeleton height |
+| `model_benchmark()` | Pass-rate benchmark for a model |
+| `session_summary()` | Lightweight session statistics |
+| `estimate_search()` | Filter estimates by session and confidence band |
+| `annotation_list()` | List annotations, optionally by estimate |
+| `model_list()` | List models with type and edge_ready filters |
+| `extract_joint_angles()` | Anatomical joint angles + bilateral symmetry deltas |
+| `fuse_estimates()` | Confidence-weighted consensus fusion of estimates |
+| `flag_anatomical_anomalies()` | Topology constraint violation detection |
+| `anonymise_estimate()` | Gaussian-noise privacy anonymisation |
+| `certify_estimate_quality()` | SHA-256 tamper-evident quality certificate |
+| `interpolate_missing_frames()` | Linear fill for dropped-frame gaps |
+| `detect_model_drift()` | EWMA confidence drift detection |
+| `build_skeleton_overlay()` | Display-ready edge segments for rendering |
 
 ## Guardrail Summary
 

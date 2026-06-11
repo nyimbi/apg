@@ -32,6 +32,9 @@ streams remain APG adapter boundaries.
   access, session, review, policy, and agent mutations.
 - Contract-derived semantic model, package manifest, release report, and
   publish-plan support.
+- **Async-native methods** for identity registration, access requests, session
+  management, policy evaluation, and compliance snapshots — enabling safe use
+  in async adapters and concurrent broker fan-out patterns.
 
 ## Main Files
 
@@ -48,15 +51,21 @@ streams remain APG adapter boundaries.
 
 ## Runtime Flow
 
-1. Register or verify an identity.
+1. Register or verify an identity (sync or `async_register_identity`).
 2. Register a device for that identity with posture, trust, compliance, and
-   attestation signals.
+   attestation signals (sync or `async_update_device_posture` for continuous
+   telemetry).
 3. Register a protected resource and attach a resource policy.
-4. Request access.
+4. Request access (sync or `async_request_access`).
 5. The rule engine allows, denies, or routes the request for review.
 6. Approved requests can start sessions.
-7. Sessions can be reevaluated as risk changes.
-8. Sessions can be closed or revoked, with audit events recorded throughout.
+7. Sessions can be reevaluated as risk changes (sync or
+   `async_reevaluate_session` / `async_bulk_reevaluate_sessions`).
+8. Policy decisions can be evaluated independently via `async_evaluate_policy`.
+9. Sessions can be closed or revoked (sync or `async_close_session`), with
+   audit events recorded throughout.
+10. Tenant-level compliance snapshots are available via
+    `async_compliance_snapshot` for SIEM export and dashboard polling.
 
 ## Python Usage
 
@@ -115,6 +124,49 @@ batch = service.validate_ztna_lifecycle_batch(
 	mutation_count=2,
 	operation="ztna_agent_batch",
 )
+```
+
+### Async Usage
+
+All async methods are safe to use in `asyncio`-based adapters, FastAPI
+handlers, or concurrent broker fan-outs. They delegate to the corresponding
+sync methods and hold no additional locks.
+
+```python
+import asyncio
+from capabilities.common.ztna.service import ZtnaService
+
+service = ZtnaService()
+
+async def main():
+	identity = await service.async_register_identity(
+		identity_key="analyst",
+		tenant_id="tenant-a",
+		subject_id="user-1",
+		display_name="Analyst",
+		verified=True,
+		mfa_completed=True,
+	)
+
+	# Evaluate policy without mutating session state
+	decision = await service.async_evaluate_policy(
+		identity_id=identity["id"],
+		resource_id=resource["id"],
+		action="read",
+	)
+	assert decision["allowed"]
+
+	# Re-evaluate all active sessions after a risk signal
+	results = await service.async_bulk_reevaluate_sessions(
+		tenant_id="tenant-a",
+		risk_score=0.6,
+	)
+
+	# Compliance snapshot for SIEM export
+	snapshot = await service.async_compliance_snapshot("tenant-a")
+	print(snapshot["summary"]["active_session_count"])
+
+asyncio.run(main())
 ```
 
 ## Privileged Access

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from .capability_contract import (
@@ -1033,3 +1034,309 @@ class WfloService:
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+	# ---------------------------------------------------------------------------
+	# Async interface
+	# ---------------------------------------------------------------------------
+
+	async def async_create_workflow_definition(
+		self,
+		tenant_id: str,
+		name: str,
+		owner_ref: str,
+		steps: list[dict[str, Any]],
+		trigger_type: str = "manual",
+		trigger_policy_ref: str = "",
+		retry_policy_ref: str = "",
+		compensation_ref: str = "",
+		expected_runtime_minutes: int = 60,
+		runtime_review_recorded: bool = False,
+		version: int = 1,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Async variant of create_workflow_definition."""
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(
+			None,
+			lambda: self.create_workflow_definition(
+				tenant_id=tenant_id,
+				name=name,
+				owner_ref=owner_ref,
+				steps=steps,
+				trigger_type=trigger_type,
+				trigger_policy_ref=trigger_policy_ref,
+				retry_policy_ref=retry_policy_ref,
+				compensation_ref=compensation_ref,
+				expected_runtime_minutes=expected_runtime_minutes,
+				runtime_review_recorded=runtime_review_recorded,
+				version=version,
+				actor=actor,
+			),
+		)
+
+	async def async_start_execution(
+		self,
+		tenant_id: str,
+		definition_id: str,
+		correlation_id: str,
+		started_by: str,
+		payload: dict[str, Any] | None = None,
+		event_stream: str = "bytewax",
+	) -> dict[str, Any]:
+		"""Async variant of start_execution with idempotency enforcement on duplicate correlation_id."""
+		existing = next(
+			(
+				ex.to_dict()
+				for ex in self.executions.values()
+				if ex.tenant_id == tenant_id and ex.correlation_id == correlation_id
+			),
+			None,
+		)
+		if existing is not None:
+			self._record_audit(
+				tenant_id,
+				"duplicate_start_attempted",
+				existing["id"],
+				f"Duplicate start_execution ignored for correlation_id={correlation_id}",
+				started_by,
+			)
+			return existing
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(
+			None,
+			lambda: self.start_execution(
+				tenant_id=tenant_id,
+				definition_id=definition_id,
+				correlation_id=correlation_id,
+				started_by=started_by,
+				payload=payload,
+				event_stream=event_stream,
+			),
+		)
+
+	async def async_complete_task(
+		self,
+		tenant_id: str,
+		task_id: str,
+		completed_by: str,
+	) -> dict[str, Any]:
+		"""Async variant of complete_task."""
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(
+			None,
+			lambda: self.complete_task(tenant_id=tenant_id, task_id=task_id, completed_by=completed_by),
+		)
+
+	async def async_record_approval(
+		self,
+		tenant_id: str,
+		approval_id: str,
+		decision: str,
+		decision_by: str,
+		decision_evidence_ref: str = "",
+		delegated_to: str = "",
+	) -> dict[str, Any]:
+		"""Async variant of record_approval."""
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(
+			None,
+			lambda: self.record_approval(
+				tenant_id=tenant_id,
+				approval_id=approval_id,
+				decision=decision,
+				decision_by=decision_by,
+				decision_evidence_ref=decision_evidence_ref,
+				delegated_to=delegated_to,
+			),
+		)
+
+	async def async_process_analytics(
+		self,
+		tenant_id: str,
+		period: str = "all",
+	) -> dict[str, Any]:
+		"""Async variant of process_analytics."""
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(None, lambda: self.process_analytics(tenant_id, period))
+
+	async def async_sla_enforce(
+		self,
+		tenant_id: str,
+		execution_id: str,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Async variant of sla_enforce, suitable for background scheduler invocation."""
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(
+			None,
+			lambda: self.sla_enforce(tenant_id=tenant_id, execution_id=execution_id, actor=actor),
+		)
+
+	async def async_bpmn_import(
+		self,
+		tenant_id: str,
+		bpmn_xml: str,
+		owner_ref: str,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Async variant of bpmn_import, suitable for async file-upload handlers."""
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(
+			None,
+			lambda: self.bpmn_import(
+				tenant_id=tenant_id,
+				bpmn_xml=bpmn_xml,
+				owner_ref=owner_ref,
+				actor=actor,
+			),
+		)
+
+	async def async_bulk_create_tasks(
+		self,
+		tenant_id: str,
+		execution_id: str,
+		task_specs: list[dict[str, Any]],
+	) -> list[dict[str, Any]]:
+		"""Create multiple tasks for an execution in a single async call.
+
+		Each entry in task_specs must have: step_id, title, assignee_ref.
+		Optional: due_at.
+		"""
+		self._require_tenant(tenant_id)
+		assert task_specs, "task_specs must not be empty"
+		results: list[dict[str, Any]] = []
+		loop = asyncio.get_event_loop()
+		for spec in task_specs:
+			step_id = str(spec.get("step_id") or "")
+			title = str(spec.get("title") or "")
+			assignee_ref = str(spec.get("assignee_ref") or "")
+			due_at: str | None = spec.get("due_at")
+			result = await loop.run_in_executor(
+				None,
+				lambda s=step_id, t=title, a=assignee_ref, d=due_at: self.create_task(
+					tenant_id=tenant_id,
+					execution_id=execution_id,
+					step_id=s,
+					title=t,
+					assignee_ref=a,
+					due_at=d,
+				),
+			)
+			results.append(result)
+		return results
+
+	async def async_dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Async variant of dashboard_summary."""
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(None, lambda: self.dashboard_summary(tenant_id))
+
+	async def async_cancel_execution(
+		self,
+		tenant_id: str,
+		execution_id: str,
+		actor: str,
+		reason: str,
+	) -> dict[str, Any]:
+		"""Async variant of cancel_execution."""
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(
+			None,
+			lambda: self.cancel_execution(
+				tenant_id=tenant_id,
+				execution_id=execution_id,
+				actor=actor,
+				reason=reason,
+			),
+		)
+
+	async def async_process_simulate(
+		self,
+		tenant_id: str,
+		definition_id: str,
+		simulation_runs: int = 100,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Async variant of process_simulate."""
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(
+			None,
+			lambda: self.process_simulate(
+				tenant_id=tenant_id,
+				definition_id=definition_id,
+				simulation_runs=simulation_runs,
+				actor=actor,
+			),
+		)
+
+	def serialize_designer_state(
+		self,
+		tenant_id: str,
+		definition_id: str,
+	) -> dict[str, Any]:
+		"""Serialize a workflow definition as a canvas-compatible node/edge graph.
+
+		Returns ``{nodes, edges, metadata}`` compatible with React Flow and similar
+		visual designer renderers.  Each step maps to a node; sequential order maps
+		to edges.  Parallel groups produce gateway nodes with branch edges.
+		"""
+		self._require_tenant(tenant_id)
+		defn = self._get_definition(tenant_id, definition_id)
+		nodes: list[dict[str, Any]] = []
+		edges: list[dict[str, Any]] = []
+		nodes.append({"id": "__start__", "type": "start", "data": {"label": "Start"}, "position": {"x": 0, "y": 0}})
+		prev_id = "__start__"
+		parallel_groups: dict[str, list[str]] = {}
+		for idx, step in enumerate(defn.steps):
+			node_id = step["id"]
+			parallel_group = step.get("parallel_group")
+			nodes.append({
+				"id": node_id,
+				"type": step["step_type"],
+				"data": {
+					"label": step["name"],
+					"step_type": step["step_type"],
+					"sla_minutes": step.get("sla_minutes", 1440),
+					"requires_approval": step.get("requires_approval", False),
+					"assignee_ref": step.get("assignee_ref", ""),
+				},
+				"position": {"x": 200 * (idx + 1), "y": 0},
+			})
+			if parallel_group:
+				parallel_groups.setdefault(parallel_group, []).append(node_id)
+			else:
+				edges.append({"id": f"e_{prev_id}__{node_id}", "source": prev_id, "target": node_id})
+				prev_id = node_id
+		for group_name, node_ids in parallel_groups.items():
+			gateway_id = f"gw_{group_name}"
+			nodes.append({"id": gateway_id, "type": "parallel_gateway", "data": {"label": group_name}, "position": {"x": 0, "y": 100}})
+			for branch_id in node_ids:
+				edges.append({"id": f"e_{gateway_id}__{branch_id}", "source": gateway_id, "target": branch_id})
+		nodes.append({"id": "__end__", "type": "end", "data": {"label": "End"}, "position": {"x": 200 * (len(defn.steps) + 1), "y": 0}})
+		if prev_id != "__start__":
+			edges.append({"id": f"e_{prev_id}____end__", "source": prev_id, "target": "__end__"})
+		return {
+			"definition_id": definition_id,
+			"tenant_id": tenant_id,
+			"name": defn.name,
+			"version": defn.version,
+			"nodes": nodes,
+			"edges": edges,
+			"metadata": {
+				"step_count": len(defn.steps),
+				"trigger_type": defn.trigger_type,
+				"status": defn.status,
+				"serialized_at": utc_now(),
+			},
+		}
+
+	async def async_serialize_designer_state(
+		self,
+		tenant_id: str,
+		definition_id: str,
+	) -> dict[str, Any]:
+		"""Async variant of serialize_designer_state."""
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(
+			None,
+			lambda: self.serialize_designer_state(tenant_id=tenant_id, definition_id=definition_id),
+		)

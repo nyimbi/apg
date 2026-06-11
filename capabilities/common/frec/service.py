@@ -906,5 +906,511 @@ class FacialRecognitionService:
 				"consent_records": consent_count, "audit_events": len(self._audit),
 				"status": "ok", "ts": _now()}
 
+	# ── WATCHLIST ─────────────────────────────────────────────────────────────
+
+	async def create_watchlist(
+		self,
+		watchlist_id: str,
+		name: str,
+		policy_id: str,
+		owner: str,
+		reason: str,
+		match_threshold: float = 0.90,
+	) -> dict[str, Any]:
+		"""Create a named watchlist with policy binding."""
+		assert watchlist_id and name and policy_id and owner
+		if not hasattr(self, "_watchlists"):
+			self._watchlists: dict[str, dict[str, Any]] = {}
+		if watchlist_id in self._watchlists:
+			return {"success": False, "error": "watchlist_exists"}
+		self._watchlists[watchlist_id] = {
+			"id": watchlist_id, "name": name, "policy_id": policy_id,
+			"owner": owner, "reason": reason, "match_threshold": match_threshold,
+			"subject_ids": [], "created_at": _now(), "tenant_id": self.tenant_id, "status": "active",
+		}
+		await self._create_audit_log(action_type="WATCHLIST_CREATED", resource_id=watchlist_id,
+									 actor_id=owner, policy_id=policy_id)
+		return {"success": True, "watchlist_id": watchlist_id, "name": name, "policy_id": policy_id}
+
+	async def add_watchlist_subject(
+		self,
+		watchlist_id: str,
+		subject_id: str,
+		added_by: str,
+		reason: str,
+		expiry: str | None = None,
+	) -> dict[str, Any]:
+		"""Add a subject to a watchlist."""
+		if not hasattr(self, "_watchlists"):
+			self._watchlists: dict[str, dict[str, Any]] = {}
+		wl = self._watchlists.get(watchlist_id)
+		if wl is None:
+			return {"success": False, "error": "watchlist_not_found"}
+		if wl["status"] != "active":
+			return {"success": False, "error": f"watchlist_{wl['status']}"}
+		existing_ids = [s["subject_id"] for s in wl["subject_ids"]]
+		if subject_id in existing_ids:
+			return {"success": False, "error": "subject_already_on_watchlist"}
+		entry = {"subject_id": subject_id, "added_by": added_by, "reason": reason,
+				 "added_at": _now(), "expiry": expiry, "active": True}
+		wl["subject_ids"].append(entry)
+		await self._create_audit_log(action_type="WATCHLIST_SUBJECT_ADDED", resource_id=watchlist_id,
+									 user_id=subject_id, actor_id=added_by)
+		return {"success": True, "watchlist_id": watchlist_id, "subject_id": subject_id}
+
+	async def watchlist_match(
+		self,
+		probe_image: np.ndarray,
+		watchlist_id: str,
+	) -> dict[str, Any]:
+		"""1:N match of probe against a watchlist. Returns hits above the watchlist threshold."""
+		assert probe_image is not None and probe_image.size > 0
+		if not hasattr(self, "_watchlists"):
+			self._watchlists: dict[str, dict[str, Any]] = {}
+		wl = self._watchlists.get(watchlist_id)
+		if wl is None:
+			return {"success": False, "error": "watchlist_not_found"}
+		start = datetime.now()
+		feats, quality = await self._extract_probe_features(probe_image, f"watchlist_{watchlist_id}")
+		if feats is None:
+			return {"success": False, "error": quality.get("error", "extraction_failed"),
+					"quality_score": quality.get("overall_score", 0)}
+		threshold = float(wl.get("match_threshold", self.verification_threshold))
+		hits: list[dict[str, Any]] = []
+		for entry in wl.get("subject_ids", []):
+			if not entry.get("active", True):
+				continue
+			sid = entry["subject_id"]
+			templates = await self.database_service.get_user_templates(sid, active_only=True)
+			for tmpl in templates:
+				raw = await self.database_service.decrypt_template_data(tmpl)
+				if raw is None:
+					continue
+				stored = np.frombuffer(raw, dtype=np.float32)
+				sim = self._cosine_similarity(feats, stored)
+				if sim >= threshold:
+					hits.append({"subject_id": sid, "score": float(sim), "watchlist_id": watchlist_id,
+								 "reason": entry.get("reason"), "added_by": entry.get("added_by")})
+		hits.sort(key=lambda x: -x["score"])
+		ms = (datetime.now() - start).total_seconds() * 1000
+		if hits:
+			await self._create_audit_log(action_type="WATCHLIST_HIT", resource_id=watchlist_id,
+										 hit_count=len(hits), processing_time_ms=ms)
+		return {"success": True, "watchlist_id": watchlist_id, "hits": hits,
+				"hit_count": len(hits), "quality_score": quality.get("overall_score", 0),
+				"processing_time_ms": ms, "ts": _now()}
+
+	# ── DEEPFAKE & MORPHING ATTACK DETECTION ─────────────────────────────────
+
+	async def deepfake_detect(self, image: np.ndarray) -> dict[str, Any]:
+		"""Detect GAN/diffusion deepfake faces via FFT spectral anomaly and DCT artifact analysis.
+
+		Wire an AICR adapter backed by a FaceForensics++-trained classifier for production.
+		"""
+		assert image is not None and image.size > 0
+		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+		f_transform = np.fft.fft2(gray.astype(np.float32))
+		f_shift = np.fft.fftshift(f_transform)
+		magnitude = np.log(np.abs(f_shift) + 1)
+		h, w = magnitude.shape
+		h_mid, w_mid = h // 2, w // 2
+		cardinal_energy = float(magnitude[h_mid, :].mean() + magnitude[:, w_mid].mean())
+		total_energy = float(magnitude.mean())
+		spectral_ratio = cardinal_energy / (total_energy + 1e-8)
+		spectral_anomaly = spectral_ratio > 2.5
+		dct_scores = []
+		block_size = 8
+		for y in range(0, gray.shape[0] - block_size, block_size):
+			for x in range(0, gray.shape[1] - block_size, block_size):
+				block = gray[y:y + block_size, x:x + block_size].astype(np.float32)
+				dct_block = cv2.dct(block)
+				hf_energy = float(np.abs(dct_block[4:, 4:]).mean())
+				dct_scores.append(hf_energy)
+		avg_hf_dct = float(np.mean(dct_scores)) if dct_scores else 0.0
+		dct_anomaly = avg_hf_dct < 2.0
+		indicators = {"spectral_anomaly": spectral_anomaly, "dct_artifact": dct_anomaly,
+					  "spectral_ratio": float(spectral_ratio), "avg_hf_dct": avg_hf_dct}
+		risk_score = float(spectral_anomaly) * 0.55 + float(dct_anomaly) * 0.45
+		is_deepfake = risk_score > 0.5
+		await self._create_audit_log(action_type="DEEPFAKE_SCAN",
+									 result="suspect" if is_deepfake else "clear", risk_score=risk_score)
+		return {"is_deepfake": is_deepfake, "risk_score": risk_score, "indicators": indicators,
+				"note": "heuristic — wire AICR adapter for production classifier", "ts": _now()}
+
+	async def morphing_attack_detect(self, image: np.ndarray) -> dict[str, Any]:
+		"""Detect face morphing attacks via landmark asymmetry and Laplacian seam artifact scoring."""
+		assert image is not None and image.size > 0
+		faces = await self.face_detector.detect_faces(image, "morph_detect")
+		if not faces:
+			return {"is_morph": False, "confidence": 0.0, "error": "no_face_detected"}
+		fd = faces[0]
+		landmarks = fd.get("landmarks", {})
+		left_eye = landmarks.get("left_eye", {})
+		right_eye = landmarks.get("right_eye", {})
+		left_mouth = landmarks.get("left_mouth_corner", {})
+		right_mouth = landmarks.get("right_mouth_corner", {})
+
+		def _y_diff(a: dict[str, Any], b: dict[str, Any]) -> float:
+			return abs(float(a.get("y", 0)) - float(b.get("y", 0)))
+
+		eye_asymmetry = _y_diff(left_eye, right_eye)
+		mouth_asymmetry = _y_diff(left_mouth, right_mouth)
+		bb = fd.get("bounding_box", {})
+		face_height = max(float(bb.get("height", 1)), 1.0)
+		norm_asymmetry = (eye_asymmetry + mouth_asymmetry) / face_height
+		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+		lap = cv2.Laplacian(gray, cv2.CV_64F)
+		edge_std = float(np.std(lap))
+		seam_anomaly = edge_std > 35.0
+		morph_score = min(1.0, norm_asymmetry * 3.0) * 0.5 + float(seam_anomaly) * 0.5
+		is_morph = morph_score > 0.55
+		await self._create_audit_log(action_type="MORPH_ATTACK_SCAN",
+									 result="suspect" if is_morph else "clear", morph_score=morph_score)
+		return {"is_morph": is_morph, "morph_score": morph_score,
+				"indicators": {"landmark_asymmetry": norm_asymmetry,
+							   "seam_anomaly": seam_anomaly, "edge_std": edge_std}, "ts": _now()}
+
+	# ── BIAS & EXPLAINABILITY ─────────────────────────────────────────────────
+
+	async def bias_audit_report(
+		self,
+		cohort_field: str = "demographic_group",
+		min_samples: int = 30,
+	) -> dict[str, Any]:
+		"""Per-cohort FAR/FRR bias audit per ISO/IEC 19795-10.
+
+		Reads verification audit events tagged with cohort metadata. Flag cohorts
+		whose FAR or FRR diverges from the overall mean by more than 5pp.
+		"""
+		verif_events = [e for e in self._audit if e.get("action_type") == "FACE_VERIFIED"]
+		cohorts: dict[str, list[dict[str, Any]]] = defaultdict(list)
+		for ev in verif_events:
+			cohort = ev.get(cohort_field, "unknown")
+			cohorts[cohort].append(ev)
+		results: dict[str, Any] = {}
+		for cohort, events in cohorts.items():
+			if len(events) < min_samples:
+				results[cohort] = {"status": "insufficient_samples", "count": len(events)}
+				continue
+			genuine_accept = sum(1 for e in events if e.get("action_result") == "success" and e.get("is_genuine"))
+			genuine_reject = sum(1 for e in events if e.get("action_result") == "failure" and e.get("is_genuine"))
+			impostor_accept = sum(1 for e in events if e.get("action_result") == "success" and not e.get("is_genuine"))
+			impostor_reject = sum(1 for e in events if e.get("action_result") == "failure" and not e.get("is_genuine"))
+			total_genuine = genuine_accept + genuine_reject or 1
+			total_impostor = impostor_accept + impostor_reject or 1
+			results[cohort] = {
+				"count": len(events),
+				"FAR": impostor_accept / total_impostor,
+				"FRR": genuine_reject / total_genuine,
+				"EER": (impostor_accept / total_impostor + genuine_reject / total_genuine) / 2,
+				"genuine_accept": genuine_accept, "impostor_accept": impostor_accept,
+			}
+		all_far = [v["FAR"] for v in results.values() if isinstance(v.get("FAR"), float)]
+		all_frr = [v["FRR"] for v in results.values() if isinstance(v.get("FRR"), float)]
+		overall_far = sum(all_far) / len(all_far) if all_far else 0.0
+		overall_frr = sum(all_frr) / len(all_frr) if all_frr else 0.0
+		bias_flags = [
+			cohort for cohort, stats in results.items()
+			if isinstance(stats.get("FAR"), float)
+			and (abs(stats["FAR"] - overall_far) > 0.05 or abs(stats["FRR"] - overall_frr) > 0.05)
+		]
+		return {"cohorts": results, "overall_FAR": overall_far, "overall_FRR": overall_frr,
+				"bias_flags": bias_flags, "standard": "ISO/IEC 19795-10",
+				"cohort_field": cohort_field, "ts": _now()}
+
+	async def explain_verification(self, verification_id: str) -> dict[str, Any]:
+		"""Human-readable explanation of a verification decision (GDPR Art. 22).
+
+		Returns binding constraint, counterfactual threshold, and plain-language summary
+		structured for both subject disclosure and machine-readable audit ingestion.
+		"""
+		events = [e for e in self._audit
+				  if e.get("resource_id") == verification_id and e.get("action_type") == "FACE_VERIFIED"]
+		if not events:
+			return {"error": "verification_not_found", "verification_id": verification_id}
+		ev = events[0]
+		outcome = ev.get("action_result", "unknown")
+		failure_reason = ev.get("failure_reason", "")
+		confidence = float(ev.get("confidence_score", 0.0))
+		similarity = float(ev.get("similarity_score", 0.0))
+		quality = float(ev.get("input_quality_score", 0.0))
+		if quality < self.quality_threshold:
+			binding_constraint = "input_image_quality"
+			counterfactual = (f"Quality score {quality:.2f} below threshold {self.quality_threshold:.2f}. "
+							  f"Outcome changes if quality >= {self.quality_threshold:.2f}.")
+		elif similarity < self.verification_threshold:
+			binding_constraint = "biometric_similarity"
+			counterfactual = (f"Similarity {similarity:.2f} below threshold {self.verification_threshold:.2f}. "
+							  f"Outcome changes if similarity >= {self.verification_threshold:.2f}.")
+		elif failure_reason and "liveness" in failure_reason:
+			binding_constraint = "liveness_check"
+			counterfactual = "Liveness check did not confirm a live subject."
+		else:
+			binding_constraint = "composite_score"
+			counterfactual = f"Composite confidence {confidence:.2f} marginally below threshold."
+		plain_language = (
+			f"Verification {'succeeded' if outcome == 'success' else 'failed'} "
+			f"with confidence {confidence:.2f}. "
+			f"Determining factor: {binding_constraint.replace('_', ' ')}. {counterfactual}"
+		)
+		return {"verification_id": verification_id, "outcome": outcome,
+				"binding_constraint": binding_constraint, "confidence": confidence,
+				"similarity": similarity, "quality": quality, "counterfactual": counterfactual,
+				"plain_language_summary": plain_language, "regulation": "GDPR Art. 22", "ts": _now()}
+
+	# ── TEMPLATE AGING & RE-ENROLLMENT ───────────────────────────────────────
+
+	async def template_aging_report(
+		self,
+		gallery_id: str,
+		drift_threshold: float = 0.05,
+	) -> dict[str, Any]:
+		"""Flag subjects whose rolling average match confidence has drifted below enrollment quality.
+
+		Compares enrollment-time quality score against the last 20 verification audit events
+		per subject. Subjects exceeding `drift_threshold` degradation are flagged for re-enrollment.
+		"""
+		gallery = self._galleries.get(gallery_id)
+		if gallery is None:
+			return {"success": False, "error": "gallery_not_found"}
+		subjects = gallery.get("subject_ids", [])
+		flagged: list[dict[str, Any]] = []
+		healthy: list[str] = []
+		for sid in subjects:
+			templates = await self.database_service.get_user_templates(sid, active_only=True)
+			if not templates:
+				continue
+			enroll_quality = float(getattr(templates[0], "quality_score", 0) or 0)
+			recent_events = [e for e in self._audit
+							 if e.get("action_type") == "FACE_VERIFIED" and e.get("user_id") == sid][-20:]
+			if len(recent_events) < 5:
+				healthy.append(sid)
+				continue
+			avg_confidence = sum(float(e.get("confidence_score", 0)) for e in recent_events) / len(recent_events)
+			drift = enroll_quality - avg_confidence
+			if drift >= drift_threshold:
+				flagged.append({"subject_id": sid, "enroll_quality": enroll_quality,
+								"recent_avg_confidence": avg_confidence, "drift": drift,
+								"recommendation": "re_enroll"})
+			else:
+				healthy.append(sid)
+		return {"gallery_id": gallery_id, "flagged_count": len(flagged), "healthy_count": len(healthy),
+				"drift_threshold": drift_threshold, "flagged_subjects": flagged, "ts": _now()}
+
+	async def reenroll_subject(
+		self,
+		subject_id: str,
+		new_image: np.ndarray,
+		quality_threshold: float = 0.85,
+		reason: str = "scheduled_re_enrollment",
+	) -> dict[str, Any]:
+		"""Hard-delete existing templates and re-enroll with a fresh image. Requires active consent."""
+		assert subject_id and new_image is not None and new_image.size > 0
+		consent_check = await self.check_consent(subject_id, "biometric_identification")
+		if not consent_check.get("has_consent"):
+			consent_check = await self.check_consent(subject_id, "workforce_authentication")
+		if not consent_check.get("has_consent"):
+			return {"success": False, "error": "consent_required_for_reenrollment"}
+		existing_templates = await self.database_service.get_user_templates(subject_id, active_only=False)
+		for tmpl in existing_templates:
+			await self.database_service.delete_template(tmpl.id)
+		result = await self.enroll_face(subject_id, new_image, quality_threshold)
+		if result["success"]:
+			await self._create_audit_log(action_type="SUBJECT_REENROLLED", user_id=subject_id,
+										 reason=reason, previous_template_count=len(existing_templates))
+		return {**result, "reason": reason, "previous_templates_deleted": len(existing_templates)}
+
+	# ── CONTINUOUS AUTHENTICATION ─────────────────────────────────────────────
+
+	async def continuous_auth_stream(
+		self,
+		subject_id: str,
+		frame_source: list[np.ndarray],
+		interval_frames: int = 30,
+		revoke_on_fail_count: int = 3,
+	) -> AsyncGenerator[dict[str, Any], None]:
+		"""Async generator yielding ambient re-authentication events from camera frames.
+
+		Emits a REVOKE event and stops after `revoke_on_fail_count` consecutive failures.
+		Replace `frame_source` with a real async camera stream in production.
+		"""
+		consecutive_failures = 0
+		frame_index = 0
+		for frame in frame_source:
+			frame_index += 1
+			if frame_index % interval_frames != 0:
+				continue
+			result = await self.verify_face(subject_id, frame, {"require_liveness": False})
+			verified = result.get("verified", False)
+			event: dict[str, Any] = {
+				"event_type": "re_auth", "subject_id": subject_id, "frame_index": frame_index,
+				"verified": verified, "confidence": result.get("confidence", 0.0), "ts": _now(),
+			}
+			if verified:
+				consecutive_failures = 0
+				event["status"] = "active"
+			else:
+				consecutive_failures += 1
+				event["status"] = "warning"
+				event["consecutive_failures"] = consecutive_failures
+				if consecutive_failures >= revoke_on_fail_count:
+					event["status"] = "revoked"
+					event["event_type"] = "auth_revoked"
+					await self._create_audit_log(action_type="CONTINUOUS_AUTH_REVOKED",
+												 user_id=subject_id, frame_index=frame_index)
+					yield event
+					return
+			yield event
+
+	# ── FEDERATED IDENTIFICATION ──────────────────────────────────────────────
+
+	async def federated_identify(
+		self,
+		probe_image: np.ndarray,
+		tenants: list[dict[str, str]],
+		top_k: int = 5,
+	) -> dict[str, Any]:
+		"""Cross-tenant 1:N identification. Each tenant entry requires a consent_proof token.
+
+		Fans out identification in parallel across supplied galleries and merges re-ranked results.
+		Production deployments replace the local gallery lookup with gRPC calls to remote FREC instances.
+		"""
+		assert probe_image is not None and probe_image.size > 0
+		start = datetime.now()
+		feats, quality = await self._extract_probe_features(probe_image, "federated_identify")
+		if feats is None:
+			return {"success": False, "error": quality.get("error", "extraction_failed")}
+
+		async def _identify_tenant(spec: dict[str, str]) -> list[dict[str, Any]]:
+			if not spec.get("consent_proof"):
+				return []
+			gallery = self._galleries.get(spec.get("gallery_id", ""))
+			if not gallery:
+				return []
+			candidates = []
+			for sid in gallery.get("subject_ids", []):
+				for tmpl in await self.database_service.get_user_templates(sid, active_only=True):
+					raw = await self.database_service.decrypt_template_data(tmpl)
+					if raw is None:
+						continue
+					sim = self._cosine_similarity(feats, np.frombuffer(raw, dtype=np.float32))
+					candidates.append({"subject_id": sid, "score": float(sim),
+									   "tenant_id": spec.get("tenant_id"), "gallery_id": spec.get("gallery_id")})
+			return candidates
+
+		all_results = await asyncio.gather(*[_identify_tenant(t) for t in tenants], return_exceptions=True)
+		merged: list[dict[str, Any]] = [c for sublist in all_results for c in sublist]
+		merged.sort(key=lambda x: -x["score"])
+		for i, c in enumerate(merged[:top_k]):
+			c["rank"] = i + 1
+		ms = (datetime.now() - start).total_seconds() * 1000
+		await self._create_audit_log(action_type="FEDERATED_IDENTIFY",
+									 tenant_count=len(tenants), hit_count=len(merged[:top_k]))
+		return {"success": True, "candidates": merged[:top_k], "quality_score": quality.get("overall_score", 0),
+				"tenant_count": len(tenants), "processing_time_ms": ms, "ts": _now()}
+
+	# ── CONSENT PORTABILITY (GDPR ART. 20) ───────────────────────────────────
+
+	async def export_consent_portable(self, subject_id: str) -> dict[str, Any]:
+		"""Export active consents as a W3C Verifiable Credential JSON-LD document (GDPR Art. 20).
+
+		Sign the credential with the tenant private key via the `encr` adapter in production.
+		"""
+		consents = [c for c in self._consents.values()
+					if c["subject_id"] == subject_id and c["status"] == "active"]
+		credential = {
+			"@context": ["https://www.w3.org/2018/credentials/v1",
+						 "https://datacraft.co.ke/frec/consent/v1"],
+			"type": ["VerifiableCredential", "BiometricConsentCredential"],
+			"issuer": f"did:datacraft:{self.tenant_id}",
+			"issuanceDate": _now(),
+			"credentialSubject": {
+				"id": f"did:datacraft:subject:{subject_id}",
+				"biometricConsents": [
+					{"purpose": c["purpose"], "obtainedBy": c["obtained_by"],
+					 "expiry": c["expiry"], "recordedAt": c["recorded_at"]}
+					for c in consents
+				],
+			},
+			"proof": {"type": "placeholder — sign with encr adapter in production",
+					  "created": _now(), "proofPurpose": "assertionMethod"},
+		}
+		await self._create_audit_log(action_type="CONSENT_EXPORTED", user_id=subject_id,
+									 consent_count=len(consents))
+		return {"success": True, "subject_id": subject_id, "credential": credential,
+				"consent_count": len(consents), "exported_at": _now()}
+
+	async def import_consent_portable(
+		self,
+		subject_id: str,
+		credential: dict[str, Any],
+		obtained_by: str = "import",
+	) -> dict[str, Any]:
+		"""Ingest a portable W3C VC-structured consent record and activate it locally (GDPR Art. 20).
+
+		Validate the credential's cryptographic proof via the `encr` adapter before activation
+		in production. The current implementation skips proof verification (stub).
+		"""
+		assert subject_id and credential
+		if "VerifiableCredential" not in credential.get("type", []):
+			return {"success": False, "error": "invalid_credential_type"}
+		if "BiometricConsentCredential" not in credential.get("type", []):
+			return {"success": False, "error": "not_biometric_consent_credential"}
+		consents_data = credential.get("credentialSubject", {}).get("biometricConsents", [])
+		if not consents_data:
+			return {"success": False, "error": "no_consent_data_in_credential"}
+		imported = []
+		for entry in consents_data:
+			purpose = entry.get("purpose", "")
+			if not purpose:
+				continue
+			result = await self.record_consent(subject_id, purpose, obtained_by, entry.get("expiry", ""))
+			if result.get("success"):
+				imported.append(purpose)
+		await self._create_audit_log(action_type="CONSENT_IMPORTED", user_id=subject_id,
+									 imported_count=len(imported), issuer=credential.get("issuer"))
+		return {"success": True, "subject_id": subject_id, "imported_purposes": imported,
+				"imported_count": len(imported), "imported_at": _now(),
+				"note": "proof signature not verified — wire encr adapter in production"}
+
+	# ── ISO/IEC 30107-3 LIVENESS COMPLIANCE ──────────────────────────────────
+
+	async def liveness_compliance_report(
+		self,
+		test_results: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Evaluate liveness system against ISO/IEC 30107-3 APCER/BPCER/ACER metrics.
+
+		`test_results` items: {"is_live_predicted": bool, "is_bona_fide": bool,
+		"attack_type": str | None, "confidence": float}.
+
+		Level 4 compliance requires APCER <= 0.5% and BPCER <= 0.5%.
+		"""
+		if not test_results:
+			return {"error": "no_test_results_provided"}
+		bona_fide = [r for r in test_results if r.get("is_bona_fide", True)]
+		attacks = [r for r in test_results if not r.get("is_bona_fide", True)]
+		bona_fide_rejected = sum(1 for r in bona_fide if not r.get("is_live_predicted", True))
+		bpcer = bona_fide_rejected / len(bona_fide) if bona_fide else 0.0
+		attack_types: dict[str, list[dict[str, Any]]] = defaultdict(list)
+		for r in attacks:
+			attack_types[r.get("attack_type", "unknown")].append(r)
+		apcer_per_type: dict[str, float] = {
+			atype: sum(1 for s in samples if s.get("is_live_predicted", False)) / len(samples)
+			for atype, samples in attack_types.items()
+		}
+		apcer = max(apcer_per_type.values()) if apcer_per_type else 0.0
+		acer = (apcer + bpcer) / 2
+		level_4_apcer = 0.005
+		level_4_bpcer = 0.005
+		return {
+			"standard": "ISO/IEC 30107-3", "claimed_level": 4,
+			"compliant": apcer <= level_4_apcer and bpcer <= level_4_bpcer,
+			"APCER": apcer, "BPCER": bpcer, "ACER": acer,
+			"APCER_per_attack_type": apcer_per_type,
+			"level_4_thresholds": {"APCER": level_4_apcer, "BPCER": level_4_bpcer},
+			"bona_fide_count": len(bona_fide), "attack_count": len(attacks), "ts": _now(),
+		}
+
 
 __all__ = ['FacialRecognitionService']

@@ -846,6 +846,543 @@ class VendorManagementService:
 		return deepcopy(contract)
 
 
+	# ------------------------------------------------------------------
+	# World-Class async enhancements (Improvements 5, 6, 7, 8, 11, 12, 13, 15)
+	# ------------------------------------------------------------------
+
+	async def contract_expiry_alerts(
+		self,
+		days_ahead: int = 30,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Return contracts expiring within *days_ahead* days and emit pre-expiry events.
+
+		For auto_renew=True contracts a renewal record is created automatically.
+		Returns counts and per-contract detail so callers can build alert digests.
+		"""
+		import asyncio
+		from datetime import timedelta
+
+		tenant = self._tenant(tenant_id)
+		cutoff = (datetime.utcnow() + timedelta(days=days_ahead)).date().isoformat()
+		today = datetime.utcnow().date().isoformat()
+
+		expiring: list[dict[str, Any]] = []
+		auto_renewed: list[dict[str, Any]] = []
+
+		for contract in list(self.contracts.values()):
+			if contract["tenant_id"] != tenant:
+				continue
+			end_date = contract.get("end_date", "")
+			if today <= end_date <= cutoff:
+				expiring.append(deepcopy(contract))
+				self._emit(tenant, "vendor_contract_expiry_approaching", {
+					"id": contract["id"],
+					"type": "vendor_contract",
+					"status": "expiry_approaching",
+				})
+				if contract.get("auto_renew"):
+					renewed = self.contract_renew(
+						vendor_id=contract["vendor_id"],
+						contract_id=contract["id"],
+						extension_months=12,
+						reason="auto_renew_triggered",
+						tenant_id=tenant,
+					)
+					self._emit(tenant, "vendor_contract_auto_renew_triggered", {
+						"id": contract["id"],
+						"type": "vendor_contract",
+						"status": "auto_renewed",
+					})
+					auto_renewed.append(renewed)
+
+		return {
+			"tenant_id": tenant,
+			"days_ahead": days_ahead,
+			"expiring_count": len(expiring),
+			"auto_renewed_count": len(auto_renewed),
+			"expiring_contracts": expiring,
+			"auto_renewed_contracts": auto_renewed,
+			"generated_at": _now(),
+		}
+
+	async def spend_concentration_risk(
+		self,
+		period: str,
+		category_threshold_pct: float = 40.0,
+		total_threshold_pct: float = 20.0,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Detect spend concentration risks for a period.
+
+		Flags any vendor whose share of category spend exceeds *category_threshold_pct*
+		or whose share of total spend exceeds *total_threshold_pct*.
+		Emits vendor_spend_concentration_risk_detected for each flagged vendor.
+		"""
+		tenant = self._tenant(tenant_id)
+		analysis = self.spend_analysis(period, tenant_id=tenant)
+		total = analysis["total_spend"] or 1.0  # prevent divide-by-zero
+		per_vendor = analysis["per_vendor_spend"]
+		concentration_risks: list[dict[str, Any]] = []
+
+		for vname, spend in per_vendor.items():
+			total_share = round(spend / total * 100, 2)
+			# Resolve vendor record for category share
+			vendor_obj = next(
+				(v for v in self.vendors.values() if v["tenant_id"] == tenant and v["name"] == vname),
+				None,
+			)
+			cat = vendor_obj.get("category", "unknown") if vendor_obj else "unknown"
+			cat_total = analysis["per_category_spend"].get(cat, 1.0) or 1.0
+			cat_share = round(spend / cat_total * 100, 2)
+
+			if total_share > total_threshold_pct or cat_share > category_threshold_pct:
+				flag = {
+					"vendor_name": vname,
+					"vendor_id": vendor_obj["id"] if vendor_obj else None,
+					"category": cat,
+					"spend": spend,
+					"total_share_pct": total_share,
+					"category_share_pct": cat_share,
+					"total_threshold_breached": total_share > total_threshold_pct,
+					"category_threshold_breached": cat_share > category_threshold_pct,
+				}
+				concentration_risks.append(flag)
+				if vendor_obj:
+					self._emit(tenant, "vendor_spend_concentration_risk_detected", {
+						"id": vendor_obj["id"],
+						"type": "vendor_profile",
+						"status": "concentration_risk",
+					})
+
+		return {
+			"tenant_id": tenant,
+			"period": period,
+			"total_spend": analysis["total_spend"],
+			"category_threshold_pct": category_threshold_pct,
+			"total_threshold_pct": total_threshold_pct,
+			"concentration_risk_count": len(concentration_risks),
+			"concentration_risks": concentration_risks,
+			"generated_at": _now(),
+		}
+
+	async def bulk_onboard_vendors(
+		self,
+		vendors: list[dict[str, Any]],
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Fan-out onboarding for multiple vendors concurrently.
+
+		Each element of *vendors* must supply the same kwargs accepted by
+		onboard_vendor. Returns a batch result with per-row success/error detail.
+		"""
+		import asyncio
+
+		tenant = self._tenant(tenant_id)
+		successes: list[dict[str, Any]] = []
+		failures: list[dict[str, Any]] = []
+
+		async def _onboard_one(payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
+			try:
+				result = self.onboard_vendor(tenant_id=tenant, **payload)
+				return True, result
+			except Exception as exc:
+				return False, {"error": str(exc), "payload": payload}
+
+		results = await asyncio.gather(*[_onboard_one(v) for v in vendors], return_exceptions=False)
+		for ok, data in results:
+			(successes if ok else failures).append(data)
+
+		return {
+			"tenant_id": tenant,
+			"total": len(vendors),
+			"success_count": len(successes),
+			"failure_count": len(failures),
+			"successes": successes,
+			"failures": failures,
+			"processed_at": _now(),
+		}
+
+	async def compliance_expiry_scan(
+		self,
+		as_of_date: str | None = None,
+		expiry_warning_days: int = 30,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Scan all compliance records for expired or soon-to-expire certifications.
+
+		Emits vendor_compliance_expiry_detected for each flagged record.
+		Returns a structured report partitioned by expired vs expiring_soon.
+		"""
+		from datetime import timedelta
+
+		tenant = self._tenant(tenant_id)
+		today_str = as_of_date or datetime.utcnow().date().isoformat()
+		warn_cutoff = (datetime.fromisoformat(today_str) + timedelta(days=expiry_warning_days)).date().isoformat()
+
+		expired: list[dict[str, Any]] = []
+		expiring_soon: list[dict[str, Any]] = []
+
+		for rec in self.compliance.values():
+			if rec["tenant_id"] != tenant:
+				continue
+			review_date = rec.get("next_review_date") or rec.get("valid_until") or ""
+			if not review_date:
+				continue
+			if review_date <= today_str:
+				expired.append(deepcopy(rec))
+				self._emit(tenant, "vendor_compliance_expiry_detected", {
+					"id": rec["id"],
+					"type": "vendor_compliance",
+					"status": "expired",
+				})
+			elif review_date <= warn_cutoff:
+				expiring_soon.append(deepcopy(rec))
+				self._emit(tenant, "vendor_compliance_expiry_detected", {
+					"id": rec["id"],
+					"type": "vendor_compliance",
+					"status": "expiring_soon",
+				})
+
+		return {
+			"tenant_id": tenant,
+			"as_of_date": today_str,
+			"expiry_warning_days": expiry_warning_days,
+			"expired_count": len(expired),
+			"expiring_soon_count": len(expiring_soon),
+			"expired_records": expired,
+			"expiring_soon_records": expiring_soon,
+			"generated_at": _now(),
+		}
+
+	async def sla_breach_scan(
+		self,
+		vendor_id: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Cross-reference SLA terms in active contracts against recorded performance.
+
+		Flags any dimension where the SLA threshold is breached, emits
+		vendor_sla_breach_detected, and auto-creates a high-tier risk record for
+		each breach.
+		"""
+		tenant = self._tenant(tenant_id)
+		vendor = self._get_vendor(vendor_id, tenant)
+		active_contracts = [
+			c for c in self.contracts.values()
+			if c["tenant_id"] == tenant and c["vendor_id"] == vendor_id and c["status"] == "active"
+		]
+		vendor_perfs = [
+			p for p in self.performance.values()
+			if p["tenant_id"] == tenant and p["vendor_id"] == vendor_id
+		]
+		latest_perf = max(vendor_perfs, key=lambda p: p["created_at"], default=None)
+		perf_scores = latest_perf["scores"] if latest_perf else {}
+
+		breaches: list[dict[str, Any]] = []
+		for contract in active_contracts:
+			sla_terms = contract.get("sla_terms") or {}
+			for dimension, threshold in sla_terms.items():
+				actual = perf_scores.get(dimension)
+				if actual is not None and isinstance(threshold, (int, float)) and actual < threshold:
+					breach = {
+						"contract_id": contract["id"],
+						"dimension": dimension,
+						"sla_threshold": threshold,
+						"actual_score": actual,
+						"gap": round(threshold - actual, 2),
+					}
+					breaches.append(breach)
+					self._emit(tenant, "vendor_sla_breach_detected", {
+						"id": vendor_id,
+						"type": "vendor_profile",
+						"status": "sla_breach",
+					})
+					# Auto-create a high-tier risk record for each breach
+					risk_id = self._record_id("risk")
+					self.record_risk(
+						risk_id, tenant, vendor_id,
+						risk_type="sla_breach",
+						tier="high",
+						description=f"SLA breach on {dimension}: actual {actual} < threshold {threshold}",
+						owner_id="risk_team",
+					)
+
+		return {
+			"vendor_id": vendor_id,
+			"vendor_name": vendor["name"],
+			"tenant_id": tenant,
+			"active_contract_count": len(active_contracts),
+			"breach_count": len(breaches),
+			"breaches": breaches,
+			"assessed_at": _now(),
+		}
+
+	async def vendor_reinstatement(
+		self,
+		vendor_id: str,
+		rationale: str,
+		approved_by: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Reinstate a suspended vendor back to active status.
+
+		Validates an active suspension record exists, resolves it with a timestamp,
+		sets vendor stage to active, and emits vendor_reinstated.
+		"""
+		tenant = self._tenant(tenant_id)
+		vendor = self._get_vendor(vendor_id, tenant)
+		if vendor.get("stage") != "suspended":
+			raise PermissionError("vendor_not_suspended")
+		if not approved_by:
+			raise PermissionError("reinstatement_approval_required")
+		if not rationale:
+			raise ValueError("reinstatement_rationale_required")
+
+		susp_id = vendor.get("suspension_id")
+		susp_record = self._suspensions.get(susp_id) if susp_id else None
+		if susp_record:
+			susp_record["status"] = "resolved"
+			susp_record["resolved_at"] = _now()
+			susp_record["resolved_by"] = approved_by
+			susp_record["resolution_rationale"] = rationale
+
+		vendor["stage"] = "active"
+		vendor.pop("suspension_id", None)
+		reinstate_record = {
+			"id": self._record_id("reinstate"),
+			"type": "vendor_reinstatement",
+			"kind": "reinstatement",
+			"tenant_id": tenant,
+			"vendor_id": vendor_id,
+			"vendor_name": vendor["name"],
+			"rationale": rationale,
+			"approved_by": approved_by,
+			"suspension_id": susp_id,
+			"status": "active",
+			"reinstated_at": _now(),
+		}
+		self._emit(tenant, "vendor_reinstated", {**reinstate_record, "type": "vendor_reinstatement"})
+		return reinstate_record
+
+	async def compare_vendors(
+		self,
+		vendor_ids: list[str],
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Head-to-head multi-vendor comparison on performance, risk, spend, and compliance.
+
+		Returns a structured comparison matrix with per-dimension best/worst
+		identification. Useful for data-driven vendor selection during sourcing events.
+		"""
+		import asyncio
+
+		tenant = self._tenant(tenant_id)
+		if len(vendor_ids) < 2:
+			raise ValueError("compare_vendors_requires_at_least_two_vendors")
+
+		async def _profile(vid: str) -> dict[str, Any]:
+			vendor = self._get_vendor(vid, tenant)
+			latest_perf = max(
+				(p for p in self.performance.values() if p["tenant_id"] == tenant and p["vendor_id"] == vid),
+				key=lambda p: p["created_at"],
+				default=None,
+			)
+			risk_summary = self.vendor_risk_assessment(vid, tenant_id=tenant)
+			compliance_records = [c for c in self.compliance.values() if c["tenant_id"] == tenant and c["vendor_id"] == vid]
+			non_compliant = sum(1 for c in compliance_records if c.get("status_value") in {"non_compliant", "expired"})
+			spend = sum(
+				c["value"] for c in self.contracts.values()
+				if c["tenant_id"] == tenant and c["vendor_id"] == vid
+			)
+			return {
+				"vendor_id": vid,
+				"vendor_name": vendor["name"],
+				"category": vendor.get("category"),
+				"stage": vendor.get("stage"),
+				"is_preferred": bool(self._preferred_vendors.get(f"{tenant}:{vid}")),
+				"is_suspended": vendor.get("stage") == "suspended",
+				"performance_scores": latest_perf["scores"] if latest_perf else {},
+				"average_performance": latest_perf["average_score"] if latest_perf else None,
+				"performance_tier": latest_perf["performance_tier"] if latest_perf else "unscored",
+				"risk_score": risk_summary["risk_score"],
+				"risk_tier": risk_summary["risk_tier"],
+				"compliance_total": len(compliance_records),
+				"non_compliant_count": non_compliant,
+				"total_contract_spend": round(spend, 2),
+			}
+
+		profiles = await asyncio.gather(*[_profile(vid) for vid in vendor_ids], return_exceptions=True)
+		profiles_list = list(profiles)
+
+		# Identify best per dimension
+		recommendations: dict[str, str] = {}
+		scored = [p for p in profiles_list if p["average_performance"] is not None]
+		if scored:
+			best_perf = max(scored, key=lambda p: p["average_performance"])
+			recommendations["performance"] = best_perf["vendor_name"]
+		lowest_risk = min(profiles_list, key=lambda p: p["risk_score"])
+		recommendations["risk"] = lowest_risk["vendor_name"]
+		most_spend = max(profiles_list, key=lambda p: p["total_contract_spend"])
+		recommendations["spend_relationship"] = most_spend["vendor_name"]
+
+		return {
+			"tenant_id": tenant,
+			"vendor_count": len(vendor_ids),
+			"profiles": profiles_list,
+			"recommendations": recommendations,
+			"generated_at": _now(),
+		}
+
+	async def ai_early_warning_digest(
+		self,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Portfolio-level early warning digest powered by ML risk classification.
+
+		Runs ml_vendor_risk_assess concurrently across all active vendors. Returns
+		a ranked list of at-risk vendors enriched with contract expiry and compliance
+		expiry data. Falls back to rule-based risk tiers when Ollama is unavailable.
+		"""
+		import asyncio
+		import os
+
+		tenant = self._tenant(tenant_id)
+		active_vendors = [
+			v for v in self.vendors.values()
+			if v["tenant_id"] == tenant and v.get("stage") not in {"deactivated", "terminated"}
+		]
+
+		async def _assess(vendor: dict[str, Any]) -> dict[str, Any]:
+			vid = vendor["id"]
+			try:
+				risk = await self.ml_vendor_risk_assess(vid, tenant_id=tenant)
+			except Exception:
+				risk = self.vendor_risk_assessment(vid, tenant_id=tenant)
+				risk["ml_enhanced"] = False
+
+			# Enrich with nearest contract expiry
+			vendor_contracts = sorted(
+				(c for c in self.contracts.values() if c["tenant_id"] == tenant and c["vendor_id"] == vid),
+				key=lambda c: c.get("end_date", "9999"),
+			)
+			nearest_expiry = vendor_contracts[0]["end_date"] if vendor_contracts else None
+
+			# Compliance non-compliant count
+			non_compliant = sum(
+				1 for c in self.compliance.values()
+				if c["tenant_id"] == tenant and c["vendor_id"] == vid
+				and c.get("status_value") in {"non_compliant", "expired"}
+			)
+
+			return {
+				"vendor_id": vid,
+				"vendor_name": vendor["name"],
+				"risk_tier": risk.get("ml_risk_tier") or risk.get("risk_tier"),
+				"risk_score": risk.get("risk_score", 0),
+				"ml_enhanced": risk.get("ml_enhanced", False),
+				"nearest_contract_expiry": nearest_expiry,
+				"non_compliant_records": non_compliant,
+			}
+
+		all_assessments = await asyncio.gather(*[_assess(v) for v in active_vendors], return_exceptions=False)
+
+		at_risk = [
+			a for a in all_assessments
+			if a["risk_tier"] in {"critical_risk", "high_risk", "critical", "high"}
+		]
+		at_risk_sorted = sorted(at_risk, key=lambda a: a["risk_score"], reverse=True)
+
+		return {
+			"tenant_id": tenant,
+			"total_vendors_assessed": len(active_vendors),
+			"at_risk_count": len(at_risk_sorted),
+			"at_risk_vendors": at_risk_sorted,
+			"ml_enhanced": os.environ.get("OLLAMA_BASE_URL") is not None,
+			"generated_at": _now(),
+		}
+
+	async def vendor_health_score(
+		self,
+		vendor_id: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Compute a composite 0–100 vendor health score.
+
+		Weights: performance average (40 %), compliance score (25 %),
+		risk-adjusted factor (25 %), relationship engagement (10 %).
+		Persists the result back onto the vendor record for fast dashboard queries.
+		"""
+		tenant = self._tenant(tenant_id)
+		vendor = self._get_vendor(vendor_id, tenant)
+
+		# Performance component (40 %)
+		vendor_perfs = [p for p in self.performance.values() if p["tenant_id"] == tenant and p["vendor_id"] == vendor_id]
+		latest_perf = max(vendor_perfs, key=lambda p: p["created_at"], default=None)
+		perf_score = latest_perf["average_score"] if latest_perf else 70.0
+		perf_component = perf_score * 0.40
+
+		# Compliance component (25 %) — starts at 100 and loses points per non-compliant record
+		compliance_records = [c for c in self.compliance.values() if c["tenant_id"] == tenant and c["vendor_id"] == vendor_id]
+		non_compliant = sum(1 for c in compliance_records if c.get("status_value") in {"non_compliant", "expired"})
+		compliance_raw = max(0, 100 - non_compliant * 25)
+		compliance_component = compliance_raw * 0.25
+
+		# Risk component (25 %) — inverted risk score (lower risk = higher health)
+		risk_summary = self.vendor_risk_assessment(vendor_id, tenant_id=tenant)
+		risk_raw = max(0, 100 - risk_summary["risk_score"])
+		risk_component = risk_raw * 0.25
+
+		# Relationship engagement (10 %) — proxy: portal events + communications
+		portal_events = sum(1 for e in self._portal_events if e["tenant_id"] == tenant and e["vendor_id"] == vendor_id)
+		comms = sum(1 for c in self.communications.values() if c["tenant_id"] == tenant and c["vendor_id"] == vendor_id)
+		engagement_raw = min(100, (portal_events + comms) * 10)
+		engagement_component = engagement_raw * 0.10
+
+		health_score = round(perf_component + compliance_component + risk_component + engagement_component, 2)
+		health_tier = (
+			"excellent" if health_score >= 85
+			else "good" if health_score >= 70
+			else "fair" if health_score >= 55
+			else "poor"
+		)
+
+		# Persist back to vendor record for fast queries
+		vendor["health_score"] = health_score
+		vendor["health_tier"] = health_tier
+		vendor["health_score_updated_at"] = _now()
+
+		return {
+			"vendor_id": vendor_id,
+			"vendor_name": vendor["name"],
+			"tenant_id": tenant,
+			"health_score": health_score,
+			"health_tier": health_tier,
+			"components": {
+				"performance": round(perf_component, 2),
+				"compliance": round(compliance_component, 2),
+				"risk_adjusted": round(risk_component, 2),
+				"engagement": round(engagement_component, 2),
+			},
+			"inputs": {
+				"performance_average": perf_score,
+				"non_compliant_records": non_compliant,
+				"risk_score": risk_summary["risk_score"],
+				"engagement_events": portal_events + comms,
+			},
+			"assessed_at": _now(),
+		}
+
+
 VendorManagementLifecycleService = VendorManagementService
 VendorLifecycleService = VendorManagementService
 VendorRiskService = VendorManagementService

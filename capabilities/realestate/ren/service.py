@@ -948,3 +948,688 @@ class RenService:
 		"""Analytics Summary"""
 		self._log_operation("analytics_summary", "analytics", tenant_id)
 		return {"tenant_id": tenant_id, "period": period, "computed_at": datetime.utcnow().isoformat()}
+
+	# ── NEW: get_tenancy_statement ─────────────────────────────────────────────
+
+	async def get_tenancy_statement(
+		self,
+		tenancy_id: str,
+		tenant_id: str,
+		from_date: date | None = None,
+		to_date: date | None = None,
+	) -> dict[str, Any]:
+		"""
+		Produce a chronological ledger statement for a tenancy.
+
+		Returns opening balance, line items (charges, payments, credits), closing
+		balance, and total days-in-arrears for the requested window.  Defaults to
+		the full tenancy life if dates are omitted.
+		"""
+		assert tenancy_id and tenant_id, "tenancy_id and tenant_id required"
+		tenancy = await self.get_tenancy(tenancy_id, tenant_id)
+		if not tenancy:
+			raise KeyError(f"tenancy {tenancy_id} not found")
+
+		# Collect payments in window
+		payments = [
+			p for p in self._store["payments"]
+			if p.get("tenancy_id") == tenancy_id and p.get("tenant_id") == tenant_id
+		]
+		if from_date:
+			payments = [p for p in payments if p.get("received_at", p.get("created_at", "")) >= str(from_date)]
+		if to_date:
+			payments = [p for p in payments if p.get("received_at", p.get("created_at", "")) <= str(to_date)]
+
+		# Collect arrears records in window
+		arrears = [
+			a for a in self._store["arrears"]
+			if a.get("tenancy_id") == tenancy_id and a.get("tenant_id") == tenant_id
+		]
+
+		# Build ledger lines
+		ledger: list[dict[str, Any]] = []
+		running_balance = Decimal("0")
+
+		for p in sorted(payments, key=lambda x: x.get("received_at", x.get("created_at", ""))):
+			amt = Decimal(str(p.get("amount", 0)))
+			running_balance -= amt  # credit reduces balance
+			ledger.append({
+				"date": p.get("received_at", p.get("created_at")),
+				"type": "payment",
+				"description": f"Rent payment – period {p.get('period', 'N/A')}",
+				"debit": None,
+				"credit": float(amt),
+				"balance": float(running_balance),
+				"reference": p.get("id"),
+			})
+			# charge row for expected rent
+			expected = Decimal(str(p.get("expected_rent", 0)))
+			if expected > 0:
+				running_balance += expected
+				ledger.insert(-1, {
+					"date": p.get("received_at", p.get("created_at")),
+					"type": "charge",
+					"description": f"Rent charge – period {p.get('period', 'N/A')}",
+					"debit": float(expected),
+					"credit": None,
+					"balance": float(running_balance - amt),
+					"reference": None,
+				})
+
+		total_arrears = sum(
+			Decimal(str(a.get("amount_overdue", 0)))
+			for a in arrears
+			if a.get("status") not in (ArrearsStatus.current.value,)
+		)
+		days_in_arrears = max((a.get("days_overdue", 0) for a in arrears), default=0)
+
+		self._log_operation("tenancy_statement", tenancy_id, tenant_id)
+		return {
+			"tenancy_id": tenancy_id,
+			"tenant_id": tenant_id,
+			"from_date": str(from_date or tenancy.start_date),
+			"to_date": str(to_date or date.today()),
+			"opening_balance": 0.0,
+			"closing_balance": float(running_balance),
+			"total_charged": float(sum(l["debit"] for l in ledger if l["debit"])),
+			"total_paid": float(sum(l["credit"] for l in ledger if l["credit"])),
+			"total_arrears": float(total_arrears),
+			"days_in_arrears": days_in_arrears,
+			"ledger": ledger,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── NEW: record_inspection ─────────────────────────────────────────────────
+
+	async def record_inspection(
+		self,
+		tenancy_id: str,
+		tenant_id: str,
+		inspection_type: str,
+		condition_items: list[dict[str, Any]],
+		inspector_id: str,
+		inspection_date: date | None = None,
+		photos: list[str] | None = None,
+		notes: str = "",
+	) -> dict[str, Any]:
+		"""
+		Record a property inspection (move-in, mid-term, or move-out).
+
+		Each condition_item: {"room": str, "item": str, "condition": str,
+		"grade": 1-5, "notes": str}.  Photos are document IDs from the
+		document store.  Move-out inspections are automatically linked to the
+		deposit deduction workflow.
+		"""
+		assert tenancy_id and tenant_id and inspector_id, \
+			"tenancy_id, tenant_id, inspector_id required"
+		assert inspection_type in ("move_in", "mid_term", "move_out"), \
+			f"unsupported inspection_type: {inspection_type}"
+		assert condition_items, "condition_items must not be empty"
+
+		from uuid6 import uuid7
+		inspection_id = str(uuid7())
+		insp_date = inspection_date or date.today()
+
+		# Validate each condition item has minimum fields
+		for item in condition_items:
+			assert "room" in item and "item" in item, \
+				"each condition_item requires 'room' and 'item' keys"
+			grade = item.get("grade", 3)
+			assert 1 <= int(grade) <= 5, "grade must be 1-5"
+
+		# Count items requiring remediation (grade < 3 = below acceptable)
+		remediation_required = [i for i in condition_items if int(i.get("grade", 3)) < 3]
+
+		if "inspections" not in self._store:
+			self._store["inspections"] = []
+
+		inspection: dict[str, Any] = {
+			"id": inspection_id,
+			"tenant_id": tenant_id,
+			"tenancy_id": tenancy_id,
+			"inspection_type": inspection_type,
+			"inspection_date": str(insp_date),
+			"inspector_id": inspector_id,
+			"condition_items": condition_items,
+			"photos": photos or [],
+			"notes": notes,
+			"items_requiring_remediation": len(remediation_required),
+			"remediation_items": remediation_required,
+			"deposit_deduction_eligible": inspection_type == "move_out" and len(remediation_required) > 0,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store["inspections"].append(inspection)
+		self._log_operation(f"inspection_{inspection_type}", inspection_id, tenant_id)
+		return inspection
+
+	# ── NEW: propose_rent_increase ─────────────────────────────────────────────
+
+	async def propose_rent_increase(
+		self,
+		tenancy_id: str,
+		tenant_id: str,
+		new_rent: Decimal,
+		effective_date: date,
+		proposed_by: str,
+		notice_days: int | None = None,
+		reason: str = "",
+	) -> dict[str, Any]:
+		"""
+		Propose a rent increase for a tenancy.
+
+		Enforces minimum statutory notice period (defaults to one full rental period
+		for the tenancy's rent_frequency).  The increase is NOT applied until
+		`effective_date` passes; use `apply_rent_increase()` to commit.
+
+		Returns a rent-increase proposal record with status "proposed".
+		"""
+		assert tenancy_id and tenant_id and proposed_by, \
+			"tenancy_id, tenant_id, proposed_by required"
+		assert new_rent > 0, "new_rent must be positive"
+		assert effective_date > date.today(), "effective_date must be in the future"
+
+		tenancy = await self.get_tenancy(tenancy_id, tenant_id)
+		if not tenancy:
+			raise KeyError(f"tenancy {tenancy_id} not found")
+		if tenancy.status not in (TenancyStatus.active, TenancyStatus.holding_over):
+			raise ValueError(f"rent increase only allowed on active/holding-over tenancy, got {tenancy.status}")
+
+		# Derive minimum notice days from rent frequency
+		_freq_notice_days = {
+			"weekly": 7, "fortnightly": 14, "monthly": 28,
+			"quarterly": 84, "semi_annual": 168, "annual": 365, "in_advance": 28,
+		}
+		min_notice = notice_days or _freq_notice_days.get(tenancy.rent_frequency.value, 28)
+		days_until_effective = (effective_date - date.today()).days
+		if days_until_effective < min_notice:
+			raise ValueError(
+				f"notice too short: {days_until_effective} days given, "
+				f"minimum {min_notice} days required for {tenancy.rent_frequency.value} tenancy"
+			)
+
+		if "rent_increases" not in self._store:
+			self._store["rent_increases"] = []
+
+		from uuid6 import uuid7
+		proposal_id = str(uuid7())
+		proposal: dict[str, Any] = {
+			"id": proposal_id,
+			"tenant_id": tenant_id,
+			"tenancy_id": tenancy_id,
+			"current_rent": str(tenancy.rent_amount),
+			"new_rent": str(new_rent),
+			"increase_pct": round(
+				float((new_rent - tenancy.rent_amount) / tenancy.rent_amount * 100), 2
+			),
+			"effective_date": str(effective_date),
+			"notice_days": days_until_effective,
+			"proposed_by": proposed_by,
+			"reason": reason,
+			"status": "proposed",
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store["rent_increases"].append(proposal)
+		self._log_operation("rent_increase_proposed", proposal_id, tenant_id)
+		return proposal
+
+	async def apply_rent_increase(
+		self,
+		proposal_id: str,
+		tenant_id: str,
+		applied_by: str,
+	) -> dict[str, Any]:
+		"""
+		Apply an approved rent increase once the effective date has passed.
+
+		Updates the tenancy rent_amount.  Raises ValueError if effective_date
+		has not yet been reached.
+		"""
+		assert proposal_id and tenant_id and applied_by, \
+			"proposal_id, tenant_id, applied_by required"
+		proposals = self._store.get("rent_increases", [])
+		for i, p in enumerate(proposals):
+			if p["id"] == proposal_id and p["tenant_id"] == tenant_id:
+				if p["status"] not in ("proposed", "approved"):
+					raise ValueError(f"proposal status is {p['status']}, cannot apply")
+				effective = date.fromisoformat(p["effective_date"])
+				if effective > date.today():
+					raise ValueError(
+						f"effective_date {effective} has not passed; cannot apply increase yet"
+					)
+				p["status"] = "applied"
+				p["applied_by"] = applied_by
+				p["applied_at"] = datetime.utcnow().isoformat()
+				self._store["rent_increases"][i] = p
+				# Update tenancy rent_amount
+				for j, t in enumerate(self._store["tenancies"]):
+					if t["id"] == p["tenancy_id"] and t["tenant_id"] == tenant_id:
+						t["rent_amount"] = p["new_rent"]
+						t["updated_at"] = datetime.utcnow()
+						self._store["tenancies"][j] = t
+						break
+				self._log_operation("rent_increase_applied", proposal_id, tenant_id)
+				return p
+		raise KeyError(f"rent increase proposal {proposal_id} not found")
+
+	# ── NEW: record_void_period ────────────────────────────────────────────────
+
+	async def record_void_period(
+		self,
+		unit_id: str,
+		tenant_id: str,
+		start_date: date,
+		end_date: date | None = None,
+		reason: str = "between_tenancies",
+		notes: str = "",
+	) -> dict[str, Any]:
+		"""
+		Record a void period for a unit (gap between tenancies).
+
+		If end_date is None the void is open (unit still vacant).  Void periods
+		feed into `get_void_report()` and `rental_analytics()` void_rate_pct.
+		"""
+		assert unit_id and tenant_id, "unit_id and tenant_id required"
+		assert reason in (
+			"between_tenancies", "refurbishment", "owner_occupied",
+			"legal_dispute", "unlet", "other"
+		), f"unsupported reason: {reason}"
+		assert end_date is None or end_date >= start_date, \
+			"end_date must be >= start_date"
+
+		if "voids" not in self._store:
+			self._store["voids"] = []
+
+		from uuid6 import uuid7
+		void_id = str(uuid7())
+		void_days = (end_date - start_date).days if end_date else None
+		void: dict[str, Any] = {
+			"id": void_id,
+			"tenant_id": tenant_id,
+			"unit_id": unit_id,
+			"start_date": str(start_date),
+			"end_date": str(end_date) if end_date else None,
+			"void_days": void_days,
+			"reason": reason,
+			"status": "closed" if end_date else "open",
+			"notes": notes,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store["voids"].append(void)
+		self._log_operation("void_recorded", void_id, tenant_id)
+		return void
+
+	async def get_void_report(
+		self,
+		tenant_id: str,
+		period_start: date | None = None,
+		period_end: date | None = None,
+		unit_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Summarise void periods for a portfolio or single unit.
+
+		Returns total void days, void rate (vs total days in period), and
+		a breakdown by reason.
+		"""
+		assert tenant_id, "tenant_id required"
+		voids = [v for v in self._store.get("voids", []) if v["tenant_id"] == tenant_id]
+		if unit_id:
+			voids = [v for v in voids if v["unit_id"] == unit_id]
+		if period_start:
+			voids = [v for v in voids if (v["end_date"] or str(date.today())) >= str(period_start)]
+		if period_end:
+			voids = [v for v in voids if v["start_date"] <= str(period_end)]
+
+		total_void_days = sum(v.get("void_days") or 0 for v in voids)
+		period_days = (
+			(period_end - period_start).days
+			if period_start and period_end
+			else 365
+		)
+		void_rate_pct = round(total_void_days / max(period_days, 1) * 100, 2)
+
+		by_reason: dict[str, int] = {}
+		for v in voids:
+			by_reason[v["reason"]] = by_reason.get(v["reason"], 0) + (v.get("void_days") or 0)
+
+		return {
+			"tenant_id": tenant_id,
+			"unit_id": unit_id,
+			"period_start": str(period_start) if period_start else None,
+			"period_end": str(period_end) if period_end else None,
+			"void_count": len(voids),
+			"total_void_days": total_void_days,
+			"void_rate_pct": void_rate_pct,
+			"by_reason": by_reason,
+			"open_voids": len([v for v in voids if v["status"] == "open"]),
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── NEW: snapshot_rent_roll / compare_rent_rolls ───────────────────────────
+
+	async def snapshot_rent_roll(
+		self,
+		tenant_id: str,
+		snapshot_date: date | None = None,
+		property_id: str | None = None,
+		label: str = "",
+	) -> dict[str, Any]:
+		"""
+		Capture a named point-in-time snapshot of the rent roll.
+
+		Stores the snapshot in `_store["rent_roll_snapshots"]`.  Use
+		`compare_rent_rolls()` to diff two snapshots for month-end
+		reconciliation or auditor evidence packs.
+		"""
+		assert tenant_id, "tenant_id required"
+		roll = await self.generate_rent_roll(tenant_id, property_id=property_id)
+		snap_date = snapshot_date or date.today()
+
+		if "rent_roll_snapshots" not in self._store:
+			self._store["rent_roll_snapshots"] = []
+
+		from uuid6 import uuid7
+		snapshot_id = str(uuid7())
+		snapshot: dict[str, Any] = {
+			"id": snapshot_id,
+			"tenant_id": tenant_id,
+			"snapshot_date": str(snap_date),
+			"property_id": property_id,
+			"label": label or f"snapshot-{snap_date}",
+			"tenancy_count": len(roll),
+			"gross_rent": sum(r["rent_amount"] for r in roll),
+			"total_arrears": sum(r["total_arrears"] for r in roll),
+			"roll": roll,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store["rent_roll_snapshots"].append(snapshot)
+		self._log_operation("rent_roll_snapshot", snapshot_id, tenant_id)
+		return snapshot
+
+	async def compare_rent_rolls(
+		self,
+		snapshot_id_a: str,
+		snapshot_id_b: str,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""
+		Diff two rent roll snapshots.
+
+		Returns sets of added/removed/changed tenancies with delta amounts.
+		Useful for month-end reconciliation: compare start-of-month vs end-of-month.
+		"""
+		assert snapshot_id_a and snapshot_id_b and tenant_id, \
+			"snapshot_id_a, snapshot_id_b, tenant_id required"
+		snapshots = {
+			s["id"]: s
+			for s in self._store.get("rent_roll_snapshots", [])
+			if s["tenant_id"] == tenant_id
+		}
+		snap_a = snapshots.get(snapshot_id_a)
+		snap_b = snapshots.get(snapshot_id_b)
+		if not snap_a:
+			raise KeyError(f"snapshot {snapshot_id_a} not found")
+		if not snap_b:
+			raise KeyError(f"snapshot {snapshot_id_b} not found")
+
+		roll_a = {r["tenancy_id"]: r for r in snap_a["roll"]}
+		roll_b = {r["tenancy_id"]: r for r in snap_b["roll"]}
+
+		added = [roll_b[tid] for tid in roll_b if tid not in roll_a]
+		removed = [roll_a[tid] for tid in roll_a if tid not in roll_b]
+		changed = []
+		for tid in roll_a:
+			if tid in roll_b:
+				a, b = roll_a[tid], roll_b[tid]
+				if a["rent_amount"] != b["rent_amount"] or a["total_arrears"] != b["total_arrears"]:
+					changed.append({
+						"tenancy_id": tid,
+						"rent_delta": b["rent_amount"] - a["rent_amount"],
+						"arrears_delta": b["total_arrears"] - a["total_arrears"],
+						"before": a,
+						"after": b,
+					})
+
+		return {
+			"snapshot_a": {"id": snapshot_id_a, "date": snap_a["snapshot_date"], "label": snap_a["label"]},
+			"snapshot_b": {"id": snapshot_id_b, "date": snap_b["snapshot_date"], "label": snap_b["label"]},
+			"added_count": len(added),
+			"removed_count": len(removed),
+			"changed_count": len(changed),
+			"gross_rent_delta": snap_b["gross_rent"] - snap_a["gross_rent"],
+			"arrears_delta": snap_b["total_arrears"] - snap_a["total_arrears"],
+			"added": added,
+			"removed": removed,
+			"changed": changed,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── NEW: schedule_arrears_chase ────────────────────────────────────────────
+
+	async def schedule_arrears_chase(
+		self,
+		arrears_id: str,
+		tenant_id: str,
+		chase_sequence: list[dict[str, Any]] | None = None,
+		override_contact: str = "",
+	) -> dict[str, Any]:
+		"""
+		Schedule an automated arrears-chasing sequence for an arrears record.
+
+		Each step in `chase_sequence`: {"days_after": int, "method": str,
+		"template": str}.  Supported methods: email, sms, letter, phone, portal.
+		Returns a chase schedule record.  Integrates with `schd` capability when
+		available.
+		"""
+		assert arrears_id and tenant_id, "arrears_id and tenant_id required"
+		arrears_rec = next(
+			(a for a in self._store["arrears"]
+			if a["id"] == arrears_id and a["tenant_id"] == tenant_id),
+			None,
+		)
+		if not arrears_rec:
+			raise KeyError(f"arrears record {arrears_id} not found")
+
+		_default_sequence: list[dict[str, Any]] = [
+			{"days_after": 3, "method": "email", "template": "arrears_reminder_1"},
+			{"days_after": 7, "method": "sms", "template": "arrears_reminder_2"},
+			{"days_after": 14, "method": "letter", "template": "formal_demand"},
+			{"days_after": 30, "method": "email", "template": "pre_legal_warning"},
+		]
+		sequence = chase_sequence or _default_sequence
+		supported_methods = {"email", "sms", "letter", "phone", "portal"}
+		for step in sequence:
+			assert step.get("method") in supported_methods, \
+				f"unsupported chase method: {step.get('method')}"
+			assert isinstance(step.get("days_after"), int) and step["days_after"] > 0, \
+				"days_after must be a positive int"
+
+		if "chase_schedules" not in self._store:
+			self._store["chase_schedules"] = []
+
+		from uuid6 import uuid7
+		schedule_id = str(uuid7())
+		today = date.today()
+		scheduled_steps = [
+			{
+				**step,
+				"scheduled_date": str(today + timedelta(days=step["days_after"])),
+				"status": "pending",
+			}
+			for step in sequence
+		]
+		schedule: dict[str, Any] = {
+			"id": schedule_id,
+			"tenant_id": tenant_id,
+			"arrears_id": arrears_id,
+			"tenancy_id": arrears_rec.get("tenancy_id"),
+			"override_contact": override_contact,
+			"steps": scheduled_steps,
+			"status": "active",
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store["chase_schedules"].append(schedule)
+		self._log_operation("arrears_chase_scheduled", schedule_id, tenant_id)
+		return schedule
+
+	# ── NEW: generate_rent_receipt ─────────────────────────────────────────────
+
+	async def generate_rent_receipt(
+		self,
+		payment_id: str,
+		tenant_id: str,
+		issued_by: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Generate a formal rent receipt for a payment.
+
+		Populates `receipt_number` as a sequential `REC-{YYYY}-{NNN}` string.
+		Returns the receipt dict.  Marks the payment record as receipted.
+		"""
+		assert payment_id and tenant_id, "payment_id and tenant_id required"
+		payment = next(
+			(p for p in self._store["payments"]
+			if p["id"] == payment_id and p["tenant_id"] == tenant_id),
+			None,
+		)
+		if not payment:
+			raise KeyError(f"payment {payment_id} not found")
+
+		# Derive next sequential receipt number for this tenant / year
+		year = datetime.utcnow().year
+		existing = [
+			p for p in self._store["payments"]
+			if p.get("receipt_number") and p["tenant_id"] == tenant_id
+			and p["receipt_number"].startswith(f"REC-{year}-")
+		]
+		seq = len(existing) + 1
+		receipt_number = f"REC-{year}-{seq:04d}"
+
+		# Update payment record with receipt number
+		for i, p in enumerate(self._store["payments"]):
+			if p["id"] == payment_id and p["tenant_id"] == tenant_id:
+				p["receipt_number"] = receipt_number
+				p["receipted_at"] = datetime.utcnow().isoformat()
+				self._store["payments"][i] = p
+				break
+
+		# Fetch tenancy info for receipt
+		tenancy = None
+		if payment.get("tenancy_id"):
+			tenancy = await self.get_tenancy(payment["tenancy_id"], tenant_id)
+
+		if "receipts" not in self._store:
+			self._store["receipts"] = []
+
+		from uuid6 import uuid7
+		receipt_id = str(uuid7())
+		receipt: dict[str, Any] = {
+			"id": receipt_id,
+			"receipt_number": receipt_number,
+			"tenant_id": tenant_id,
+			"payment_id": payment_id,
+			"tenancy_id": payment.get("tenancy_id"),
+			"unit_id": tenancy.unit_id if tenancy else payment.get("unit_id"),
+			"property_id": tenancy.property_id if tenancy else None,
+			"amount": payment.get("amount"),
+			"currency": payment.get("currency", "KES"),
+			"payment_method": payment.get("payment_method"),
+			"period": payment.get("period"),
+			"payment_date": payment.get("received_at", payment.get("created_at")),
+			"issued_by": issued_by,
+			"issued_at": datetime.utcnow().isoformat(),
+		}
+		self._store["receipts"].append(receipt)
+		self._log_operation("receipt_generated", receipt_id, tenant_id)
+		return receipt
+
+	# ── NEW: run_compliance_check ──────────────────────────────────────────────
+
+	async def run_compliance_check(
+		self,
+		tenancy_id: str,
+		tenant_id: str,
+		jurisdiction: str = "KE",
+	) -> dict[str, Any]:
+		"""
+		Run a structured compliance checklist for a tenancy.
+
+		Items are driven by jurisdiction and tenancy type.  Each item returns
+		status (pass / fail / not_applicable / unknown) with expiry date where
+		relevant.  Raises no errors — returns per-item verdicts for the caller
+		to act on.
+		"""
+		assert tenancy_id and tenant_id, "tenancy_id and tenant_id required"
+		assert jurisdiction in ("KE", "GB", "ZA", "NG", "GH"), \
+			f"unsupported jurisdiction: {jurisdiction}"
+		tenancy = await self.get_tenancy(tenancy_id, tenant_id)
+		if not tenancy:
+			raise KeyError(f"tenancy {tenancy_id} not found")
+
+		# Base compliance items (jurisdiction-agnostic)
+		items: list[dict[str, Any]] = [
+			{
+				"item": "deposit_registered",
+				"description": "Tenancy deposit registered with approved scheme",
+				"status": "pass" if tenancy.deposit_registered else "fail",
+				"remediation": "Register deposit within 30 days of receipt" if not tenancy.deposit_registered else None,
+			},
+			{
+				"item": "referencing_complete",
+				"description": "Tenant referencing checks completed",
+				"status": "pass" if tenancy.referencing_complete else "fail",
+				"remediation": "Complete referencing before activation" if not tenancy.referencing_complete else None,
+			},
+			{
+				"item": "right_to_rent_checked",
+				"description": "Right to rent (occupancy eligibility) verified",
+				"status": "pass" if tenancy.right_to_rent_checked else "fail",
+				"remediation": "Verify ID and occupancy eligibility documents" if not tenancy.right_to_rent_checked else None,
+			},
+		]
+
+		# GB-specific items
+		if jurisdiction == "GB":
+			items += [
+				{
+					"item": "epc_valid",
+					"description": "Energy Performance Certificate (EPC) rating E or above",
+					"status": "unknown",
+					"remediation": "Obtain EPC from accredited assessor",
+				},
+				{
+					"item": "gas_safety_cert",
+					"description": "Annual Gas Safety Certificate (CP12) valid",
+					"status": "unknown",
+					"remediation": "Book annual gas safety check",
+				},
+				{
+					"item": "eicr_valid",
+					"description": "Electrical Installation Condition Report (EICR) within 5 years",
+					"status": "unknown",
+					"remediation": "Commission EICR from qualified electrician",
+				},
+			]
+
+		overall = "pass" if all(i["status"] == "pass" for i in items) else "fail"
+		fail_count = len([i for i in items if i["status"] == "fail"])
+
+		if "compliance_checks" not in self._store:
+			self._store["compliance_checks"] = []
+
+		from uuid6 import uuid7
+		check_id = str(uuid7())
+		result: dict[str, Any] = {
+			"id": check_id,
+			"tenant_id": tenant_id,
+			"tenancy_id": tenancy_id,
+			"jurisdiction": jurisdiction,
+			"tenancy_type": tenancy.tenancy_type.value,
+			"overall_status": overall,
+			"fail_count": fail_count,
+			"items": items,
+			"checked_at": datetime.utcnow().isoformat(),
+		}
+		self._store["compliance_checks"].append(result)
+		self._log_operation("compliance_checked", check_id, tenant_id)
+		return result

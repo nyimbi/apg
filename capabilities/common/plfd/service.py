@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
@@ -1227,6 +1228,418 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 			"max_rate_limit_rpm":        max_rl,
 			"platform_health_at":        _ts(),
 		}
+
+	# ------------------------------------------------------------------
+	# Async federation and governance methods
+	# ------------------------------------------------------------------
+
+	async def async_health_check_all_services(
+		self,
+		tenant_id: str = "default",
+		include_dependencies: bool = True,
+	) -> dict[str, Any]:
+		"""Async concurrent health check across all registered services.
+
+		Runs per-service evaluation via asyncio.gather — suitable for large
+		service catalogs where sequential checks would block.
+		"""
+		import asyncio as _asyncio
+		services = self.list_services(tenant_id)
+		dependencies = self.list_dependencies(tenant_id)
+
+		async def _check(svc: dict[str, Any]) -> dict[str, Any]:
+			svc_id = svc["id"]
+			svc_deps = [d for d in dependencies if d["source_service_id"] == svc_id]
+			unhealthy_deps = [d for d in svc_deps if d.get("required") and d["health_status"] != "healthy"]
+			health = "degraded" if (unhealthy_deps and include_dependencies) else svc["health_status"]
+			return {
+				"service_id": svc_id,
+				"service_name": svc["name"],
+				"tier": svc["tier"],
+				"health_status": health,
+				"dependency_count": len(svc_deps),
+				"unhealthy_dependency_count": len(unhealthy_deps),
+				"monitoring_enabled": svc.get("monitoring_enabled", False),
+			}
+
+		service_results: list[dict[str, Any]] = list(
+			await _asyncio.gather(*(_check(s) for s in services), return_exceptions=True)
+		)
+		healthy  = sum(1 for s in service_results if s["health_status"] == "healthy")
+		degraded = sum(1 for s in service_results if s["health_status"] == "degraded")
+		unhealthy = len(service_results) - healthy - degraded
+		overall = "healthy" if unhealthy == 0 and degraded == 0 else ("degraded" if unhealthy == 0 else "unhealthy")
+		self._record_audit(tenant_id, "health_check_all", "platform", "platform_health_checked_async", "allow")
+		return {
+			"tenant_id": tenant_id,
+			"overall": overall,
+			"service_count": len(service_results),
+			"healthy_count": healthy,
+			"degraded_count": degraded,
+			"unhealthy_count": unhealthy,
+			"services": service_results,
+			"checked_at": _ts(),
+			"async": True,
+		}
+
+	async def async_probe_dependency_health(
+		self,
+		tenant_id: str,
+		dependency_id: str,
+		probe_fn: Any | None = None,
+	) -> dict[str, Any]:
+		"""Active health probe for a single dependency.
+
+		probe_fn: optional async callable ``(dep: dict) -> str`` returning
+		          'healthy' | 'degraded' | 'unhealthy'. None = dry-run.
+		Updates the stored health_status and audits the result.
+		"""
+		dep = self._dependencies.get(_state_key(tenant_id, dependency_id))
+		if dep is None:
+			raise KeyError("foundation_dependency_not_found")
+		if probe_fn is not None:
+			new_status: str = await probe_fn(dep.to_dict())
+			dep.health_status = normalize_health(new_status)
+		self._record_audit(tenant_id, dependency_id, "dependency_health_probed", "plfd", "allow",
+			metadata={"health_status": dep.health_status})
+		return {
+			"dependency_id":    dependency_id,
+			"tenant_id":        tenant_id,
+			"source_service_id": dep.source_service_id,
+			"target_service_id": dep.target_service_id,
+			"health_status":    dep.health_status,
+			"probed_at":        _ts(),
+			"probe_active":     probe_fn is not None,
+		}
+
+	async def async_probe_all_dependencies(
+		self,
+		tenant_id: str,
+		probe_fn: Any | None = None,
+	) -> dict[str, Any]:
+		"""Fan-out async probe across all tenant dependencies concurrently."""
+		import asyncio as _asyncio
+		dep_ids = [dep.id for dep in self._dependencies.values() if dep.tenant_id == tenant_id]
+		results: list[dict[str, Any]] = list(
+			await _asyncio.gather(*(
+				self.async_probe_dependency_health(tenant_id, dep_id, probe_fn)
+				for dep_id in dep_ids
+			), return_exceptions=True)
+		)
+		healthy  = sum(1 for r in results if r["health_status"] == "healthy")
+		degraded = sum(1 for r in results if r["health_status"] == "degraded")
+		unhealthy = sum(1 for r in results if r["health_status"] == "unhealthy")
+		return {
+			"tenant_id":    tenant_id,
+			"total_probed": len(results),
+			"healthy":      healthy,
+			"degraded":     degraded,
+			"unhealthy":    unhealthy,
+			"results":      results,
+			"probed_at":    _ts(),
+		}
+
+	async def async_score_change_risk(
+		self,
+		change_id: str,
+		tenant_id: str,
+	) -> dict[str, Any]:
+		"""Composite risk score (0–100) for a platform change.
+
+		Components: blast radius (40 pts), dependency health (30 pts),
+		review completeness (20 pts), rollback readiness (10 pts).
+		Returns score, band (low/medium/high/critical), and recommended actions.
+		"""
+		change = self._require_change(change_id, tenant_id)
+		deps = self._service_dependency_dicts(tenant_id, change.service_id)
+		required_deps  = [d for d in deps if d.get("required")]
+		unhealthy_req  = [d for d in required_deps if d["health_status"] != "healthy"]
+		blast          = min(change.affected_capability_count / 50.0, 1.0) * 40.0
+		dep_score      = (len(unhealthy_req) / max(len(required_deps), 1)) * 30.0
+		review_missing = (0 if change.broad_review_recorded else 10) + (0 if change.security_review_recorded else 10)
+		rollback_score = 0.0 if change.rollback_plan_ref else 10.0
+		total          = round(blast + dep_score + review_missing + rollback_score, 1)
+		band = "low" if total < 25 else "medium" if total < 50 else "high" if total < 75 else "critical"
+		recommended: list[str] = []
+		if not change.broad_review_recorded:     recommended.append("complete_broad_review")
+		if not change.security_review_recorded:  recommended.append("complete_security_review")
+		if not change.rollback_plan_ref:         recommended.append("attach_rollback_plan")
+		if unhealthy_req:                        recommended.append("restore_dependency_health")
+		self._record_audit(tenant_id, change_id, "change_risk_scored", "plfd", "allow",
+			metadata={"risk_score": total, "risk_band": band})
+		return {
+			"change_id":  change_id,
+			"tenant_id":  tenant_id,
+			"risk_score": total,
+			"risk_band":  band,
+			"components": {"blast_radius": round(blast, 1), "dependency_health": round(dep_score, 1),
+			               "review_completeness": review_missing, "rollback_readiness": rollback_score},
+			"recommended_actions": recommended,
+			"scored_at":  _ts(),
+		}
+
+	async def async_detect_baseline_drift(
+		self,
+		tenant_id: str,
+		service_id: str,
+		live_config_snapshot: dict[str, Any],
+		drift_threshold: float = 0.0,
+	) -> dict[str, Any]:
+		"""Diff an approved configuration baseline against a live config snapshot.
+
+		Returns changed, added, removed keys and a drift_ratio.
+		Emits an audit event when drift_ratio exceeds drift_threshold.
+		"""
+		baselines = self._service_baseline_dicts(tenant_id, service_id)
+		cfg_baselines = [b for b in baselines if b["baseline_type"] == "configuration" and b["status"] == "approved"]
+		if not cfg_baselines:
+			return {
+				"tenant_id": tenant_id, "service_id": service_id,
+				"drift_detected": False, "reason": "no_approved_configuration_baseline",
+				"checked_at": _ts(),
+			}
+		baseline_ref = cfg_baselines[-1]["evidence_ref"]
+		prefix = f"{tenant_id}:"
+		stored = {v["key"]: v["value"] for k, v in self._platform_configs.items() if k.startswith(prefix)}
+		changed = [k for k in live_config_snapshot if k in stored and live_config_snapshot[k] != stored[k]]
+		added   = [k for k in live_config_snapshot if k not in stored]
+		removed = [k for k in stored if k not in live_config_snapshot]
+		drift_ratio    = (len(changed) + len(added) + len(removed)) / max(len(stored), 1)
+		drift_detected = drift_ratio > drift_threshold
+		if drift_detected:
+			self._record_audit(tenant_id, service_id, "baseline_drift_detected", "plfd", "allow",
+				metadata={"drift_ratio": round(drift_ratio, 4), "baseline_ref": baseline_ref})
+		return {
+			"tenant_id": tenant_id, "service_id": service_id,
+			"baseline_ref": baseline_ref,
+			"drift_detected": drift_detected,
+			"drift_ratio": round(drift_ratio, 4),
+			"changed_keys": changed, "added_keys": added, "removed_keys": removed,
+			"checked_at": _ts(),
+		}
+
+	async def async_sla_contract_register(
+		self,
+		tenant_id: str,
+		service_name: str,
+		availability_pct: float,
+		latency_p99_ms: float,
+		error_rate_pct: float,
+		rpo_minutes: int,
+		rto_minutes: int,
+		registered_by: str = "system",
+	) -> dict[str, Any]:
+		"""Register an SLA contract (availability, latency, error-rate, RPO, RTO) for a service."""
+		if not service_name:
+			raise ValueError("service_name_required")
+		if not (0.0 <= availability_pct <= 100.0):
+			raise ValueError("availability_pct_must_be_0_to_100")
+		if not hasattr(self, "_sla_contracts"):
+			self._sla_contracts: dict[str, dict[str, Any]] = {}
+		contract = {
+			"tenant_id": tenant_id, "service_name": service_name,
+			"availability_pct": availability_pct, "latency_p99_ms": latency_p99_ms,
+			"error_rate_pct": error_rate_pct, "rpo_minutes": rpo_minutes,
+			"rto_minutes": rto_minutes, "registered_by": registered_by,
+			"registered_at": _ts(),
+		}
+		self._sla_contracts[f"{tenant_id}:{service_name}"] = contract
+		self._record_audit(tenant_id, service_name, "sla_contract_registered", registered_by, "allow",
+			metadata={"availability_pct": availability_pct})
+		return contract
+
+	async def async_sla_evaluate(
+		self,
+		tenant_id: str,
+		service_name: str,
+		metrics_window: dict[str, Any],
+	) -> dict[str, Any]:
+		"""Evaluate SLA compliance from an observed metrics window.
+
+		metrics_window keys: observed_availability_pct, observed_latency_p99_ms,
+		observed_error_rate_pct. Returns compliant flag, breach list.
+		"""
+		if not hasattr(self, "_sla_contracts"):
+			self._sla_contracts = {}
+		contract = self._sla_contracts.get(f"{tenant_id}:{service_name}")
+		if contract is None:
+			return {"tenant_id": tenant_id, "service_name": service_name,
+			        "compliant": None, "reason": "no_sla_contract_registered", "evaluated_at": _ts()}
+		breaches: list[dict[str, Any]] = []
+
+		def _chk(dim: str, obs_key: str, target: float, gte: bool) -> None:
+			obs = metrics_window.get(obs_key)
+			if obs is None:
+				return
+			if not ((obs >= target) if gte else (obs <= target)):
+				breaches.append({"dimension": dim, "target": target, "observed": obs, "breach": True})
+
+		_chk("availability", "observed_availability_pct", contract["availability_pct"], gte=True)
+		_chk("latency_p99",  "observed_latency_p99_ms",  contract["latency_p99_ms"],  gte=False)
+		_chk("error_rate",   "observed_error_rate_pct",  contract["error_rate_pct"],  gte=False)
+		if breaches:
+			self._record_audit(tenant_id, service_name, "sla_breach_detected", "plfd", "allow",
+				metadata={"breach_count": len(breaches)})
+		return {
+			"tenant_id": tenant_id, "service_name": service_name,
+			"compliant": len(breaches) == 0, "breach_count": len(breaches),
+			"breaches": breaches, "evaluated_at": _ts(),
+		}
+
+	async def async_canary_release_start(
+		self,
+		tenant_id: str,
+		service_name: str,
+		canary_version: str,
+		baseline_version: str,
+		initial_traffic_pct: float = 5.0,
+		started_by: str = "system",
+		success_criteria: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Start a canary release with configurable initial traffic split."""
+		if not service_name:
+			raise ValueError("service_name_required")
+		if not (0.0 <= initial_traffic_pct <= 100.0):
+			raise ValueError("initial_traffic_pct_must_be_0_to_100")
+		if not hasattr(self, "_canary_releases"):
+			self._canary_releases: dict[str, dict[str, Any]] = {}
+		canary_id = stable_id("canary", tenant_id, service_name, canary_version)
+		record: dict[str, Any] = {
+			"canary_id": canary_id, "tenant_id": tenant_id,
+			"service_name": service_name, "canary_version": canary_version,
+			"baseline_version": baseline_version, "traffic_pct": initial_traffic_pct,
+			"status": "running", "success_criteria": dict(success_criteria or {}),
+			"started_by": started_by, "started_at": _ts(),
+			"completed_at": None, "abort_reason": None,
+		}
+		self._canary_releases[canary_id] = record
+		self._record_audit(tenant_id, service_name, "canary_release_started", started_by, "allow",
+			metadata={"canary_version": canary_version, "traffic_pct": initial_traffic_pct})
+		return record
+
+	async def async_canary_release_advance(
+		self,
+		tenant_id: str,
+		canary_id: str,
+		new_traffic_pct: float,
+		advanced_by: str = "system",
+	) -> dict[str, Any]:
+		"""Advance canary traffic; promotes to full at 100%."""
+		if not hasattr(self, "_canary_releases"):
+			self._canary_releases = {}
+		record = self._canary_releases.get(canary_id)
+		if record is None or record["tenant_id"] != tenant_id:
+			raise KeyError("canary_release_not_found")
+		if record["status"] != "running":
+			raise ValueError(f"canary_not_running:{record['status']}")
+		if not (0.0 <= new_traffic_pct <= 100.0):
+			raise ValueError("new_traffic_pct_must_be_0_to_100")
+		record["traffic_pct"] = new_traffic_pct
+		if new_traffic_pct >= 100.0:
+			record["status"] = "promoted"
+			record["completed_at"] = _ts()
+		self._record_audit(tenant_id, record["service_name"], "canary_release_advanced", advanced_by, "allow",
+			metadata={"new_traffic_pct": new_traffic_pct, "status": record["status"]})
+		return dict(record)
+
+	async def async_canary_release_abort(
+		self,
+		tenant_id: str,
+		canary_id: str,
+		reason: str,
+		aborted_by: str = "system",
+	) -> dict[str, Any]:
+		"""Abort a canary release and roll back to zero canary traffic."""
+		if not hasattr(self, "_canary_releases"):
+			self._canary_releases = {}
+		record = self._canary_releases.get(canary_id)
+		if record is None or record["tenant_id"] != tenant_id:
+			raise KeyError("canary_release_not_found")
+		if record["status"] != "running":
+			raise ValueError(f"canary_not_running:{record['status']}")
+		record["status"]       = "aborted"
+		record["traffic_pct"]  = 0.0
+		record["abort_reason"] = reason
+		record["completed_at"] = _ts()
+		self._record_audit(tenant_id, record["service_name"], "canary_release_aborted", aborted_by, "allow",
+			metadata={"reason": reason})
+		return dict(record)
+
+	async def async_federated_token_exchange(
+		self,
+		source_tenant: str,
+		target_tenant: str,
+		scopes: list[str],
+		issuer_token: str,
+		requested_by: str = "system",
+	) -> dict[str, Any]:
+		"""OAuth2 RFC 8693 token exchange between tenants.
+
+		Issues a capability-scoped assertion allowing source_tenant to act on
+		target_tenant. The issuer_token is SHA-256 hashed; the hash is stored
+		but not returned to the caller.
+		"""
+		import hashlib
+		if not source_tenant or not target_tenant:
+			raise ValueError("both_source_and_target_tenant_required")
+		if not scopes:
+			raise ValueError("federation_scopes_required")
+		if not issuer_token:
+			raise ValueError("issuer_token_required")
+		if not hasattr(self, "_federation_tokens"):
+			self._federation_tokens: list[dict[str, Any]] = []
+		token_hash    = hashlib.sha256(issuer_token.encode()).hexdigest()[:32]
+		assertion_id  = stable_id("fedtok", source_tenant, target_tenant, token_hash[:8])
+		record: dict[str, Any] = {
+			"assertion_id":  assertion_id,
+			"source_tenant": source_tenant,
+			"target_tenant": target_tenant,
+			"scopes":        list(scopes),
+			"token_hash":    token_hash,
+			"requested_by":  requested_by,
+			"status":        "issued",
+			"issued_at":     _ts(),
+			"expires_at":    None,
+		}
+		self._federation_tokens.append(record)
+		self._record_audit(source_tenant, assertion_id, "federated_token_issued", requested_by, "allow",
+			metadata={"target_tenant": target_tenant, "scopes": scopes})
+		return {k: v for k, v in record.items() if k != "token_hash"}
+
+	async def async_negotiate_capability_share(
+		self,
+		requester_tenant: str,
+		capability_id: str,
+		offered_capabilities: list[str],
+		contract_version: str = "1.0.0",
+		negotiated_by: str = "system",
+	) -> dict[str, Any]:
+		"""Negotiate a runtime capability-sharing agreement between tenants.
+
+		requester_tenant declares offered_capabilities in exchange for
+		capability_id. Returns a negotiation record with acceptance status.
+		Raises if offered_capabilities is empty (no reciprocal offer).
+		"""
+		if not offered_capabilities:
+			raise ValueError("offered_capabilities_required_for_federation_negotiation")
+		if not hasattr(self, "_capability_shares"):
+			self._capability_shares: list[dict[str, Any]] = []
+		share_id = stable_id("capshare", requester_tenant, capability_id, contract_version)
+		record: dict[str, Any] = {
+			"share_id":             share_id,
+			"requester_tenant":     requester_tenant,
+			"capability_id":        capability_id,
+			"offered_capabilities": list(offered_capabilities),
+			"contract_version":     contract_version,
+			"status":               "accepted",
+			"negotiated_by":        negotiated_by,
+			"negotiated_at":        _ts(),
+		}
+		self._capability_shares.append(record)
+		self._record_audit(requester_tenant, capability_id, "capability_share_negotiated",
+			negotiated_by, "accepted",
+			metadata={"offered": offered_capabilities, "version": contract_version})
+		return record
 
 
 # Alias

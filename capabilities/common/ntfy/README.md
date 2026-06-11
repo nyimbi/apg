@@ -204,6 +204,110 @@ The contract exposes these route names:
 - `audit`
 - `settings`
 
+## New Service Features (service.py)
+
+The `NotificationService` class in `service.py` now provides the following additional
+async methods beyond the core runtime and package-API surfaces:
+
+### Idempotent Delivery
+
+```python
+# Re-callable from retry loops — returns the original record on duplicate key.
+notif = await svc.send_idempotent(
+    recipient="user@example.com",
+    template_id=tid,
+    variables={"name": "Alice"},
+    idempotency_key="welcome:user-42",
+)
+print(notif["idempotent_hit"])  # False on first call, True on replay
+```
+
+### Dead-Letter Queue Re-Drive
+
+```python
+# Retry all failed/bounced notifications created in the last 6 hours.
+summary = await svc.requeue_dead_letters(max_age_hours=6, limit=200)
+print(summary["requeued"])
+
+# Check per-channel DLQ depth before deciding to re-drive.
+depths = await svc.dlq_depth()
+# {"email": 12, "sms": 3}
+```
+
+### Consent & Regulatory Compliance
+
+```python
+# GDPR opt-in — immutable append-only record.
+consent = await svc.record_consent(
+    recipient_id="user-42",
+    channel="email",
+    legal_basis="opt_in",
+    evidence_ref="form-event-uuid7",
+)
+
+# Hard opt-out — adds a suppression automatically.
+revocation = await svc.revoke_consent("user-42", "email")
+
+# Inspect current status + full history.
+status = await svc.get_consent_status("user-42", "email")
+print(status["has_consent"])  # False after revocation
+
+# Gate a campaign send list in one call.
+consent_map = await svc.bulk_consent_check(["user-1", "user-2", "user-3"], "email")
+eligible = [uid for uid, ok in consent_map.items() if ok]
+```
+
+### Notification Digest / Fatigue Prevention
+
+```python
+# Accumulate multiple notifications into a single digest within a 30-minute window.
+await svc.send_digested("user-42", tid, {"msg": "Event A"}, digest_window_minutes=30)
+await svc.send_digested("user-42", tid, {"msg": "Event B"}, digest_window_minutes=30)
+
+# Force-flush the window early (e.g. on logout or end of session).
+result = await svc.flush_digest("user-42")
+print(result["flushed"])  # 2
+```
+
+### Predictive Send-Time Optimisation
+
+```python
+# Recommend the hour with historically highest open rate for this recipient.
+prediction = await svc.predict_optimal_send_time("user-42", "email")
+print(prediction["predicted_hour"])  # e.g. 9
+print(prediction["next_send_at"])    # ISO datetime of next occurrence
+print(prediction["confidence"])      # fraction of opens at that hour
+print(prediction["basis"])           # "historical" or "fallback"
+```
+
+### Delivery Latency Percentiles
+
+```python
+# p50/p95/p99 latency across a time window, optionally per channel.
+percentiles = await svc.delivery_latency_percentiles(
+    {"start": "2025-01-01T00:00:00", "end": "2025-01-31T23:59:59"},
+    channel="email",
+)
+print(percentiles["p99_ms"])  # e.g. 142.5
+```
+
+### Template Cloning
+
+```python
+# Create an independent copy of a template under a new name.
+clone = await svc.clone_template(source_template_id=tid, new_name="Welcome (B variant)")
+print(clone["cloned_from"])   # original template ID
+print(clone["id"])            # new independent template ID
+```
+
+## Improvement Roadmap
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for 15 detailed proposals covering idempotency,
+dead-letter queues, adaptive rate limiting, webhook HMAC signing, priority queues,
+A/B testing, quiet-hour enforcement, consent compliance, latency percentiles,
+digest batching, immutable audit sinks, circuit breakers, tenant isolation,
+streaming delivery events, and predictive send-time optimisation.
+
 ## Focused Verification
 
 ```bash

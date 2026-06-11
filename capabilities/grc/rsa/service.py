@@ -1115,3 +1115,715 @@ class RiskAssessmentService:
 			"risk_coverage_rate_pct": round((total - open_risks) / max(total, 1) * 100, 1),
 			"generated_at": _now(),
 		}
+
+	# ─────────────────────────────────────────────────────────
+	# CVSS v3.1 scoring engine
+	# ─────────────────────────────────────────────────────────
+
+	async def cvss_score(
+		self,
+		vector_string: str,
+		*,
+		vulnerability_id: str | None = None,
+		risk_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Compute a CVSS v3.1 Base Score from a standard vector string.
+
+		Accepts the full AV:_/AC:_/PR:_/UI:_/S:_/C:_/I:_/A:_ vector and returns
+		the numeric base score (0.0–10.0), severity label, and exploitability/
+		impact sub-scores. Optionally links the result to a vulnerability or risk.
+
+		Example: ``CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H`` → 9.8 critical
+		"""
+		import math
+		assert vector_string, "vector_string required"
+
+		_AV = {"N": 0.85, "A": 0.62, "L": 0.55, "P": 0.2}
+		_AC = {"L": 0.77, "H": 0.44}
+		_PR_U = {"N": 0.85, "L": 0.62, "H": 0.27}
+		_PR_C = {"N": 0.85, "L": 0.68, "H": 0.5}
+		_UI = {"N": 0.85, "R": 0.62}
+		_CIA = {"N": 0.0, "L": 0.22, "H": 0.56}
+
+		parts: dict[str, str] = {}
+		clean = vector_string.upper().replace("CVSS:3.1/", "").replace("CVSS:3.0/", "")
+		for segment in clean.split("/"):
+			if ":" in segment:
+				k, v = segment.split(":", 1)
+				parts[k] = v
+
+		try:
+			av = _AV[parts["AV"]]
+			ac = _AC[parts["AC"]]
+			scope_changed = parts.get("S", "U") == "C"
+			pr = (_PR_C if scope_changed else _PR_U)[parts["PR"]]
+			ui = _UI[parts["UI"]]
+			c = _CIA[parts["C"]]
+			i_ = _CIA[parts["I"]]
+			a = _CIA[parts["A"]]
+		except KeyError as exc:
+			raise ValueError(f"Invalid or incomplete CVSS vector — missing metric: {exc}") from exc
+
+		isc_base = 1 - (1 - c) * (1 - i_) * (1 - a)
+		if scope_changed:
+			isc = 7.52 * (isc_base - 0.029) - 3.25 * ((isc_base - 0.02) ** 15)
+		else:
+			isc = 6.42 * isc_base
+
+		exploitability = 8.22 * av * ac * pr * ui
+
+		if isc <= 0:
+			base_score = 0.0
+		elif scope_changed:
+			base_score = min(1.08 * (isc + exploitability), 10.0)
+		else:
+			base_score = min(isc + exploitability, 10.0)
+
+		base_score = math.ceil(base_score * 10) / 10
+
+		severity_map = [(9.0, "critical"), (7.0, "high"), (4.0, "medium"), (0.1, "low"), (0.0, "none")]
+		severity = next(label for threshold, label in severity_map if base_score >= threshold)
+
+		result: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"vector_string": vector_string,
+			"cvss_version": "3.1",
+			"base_score": base_score,
+			"severity": severity,
+			"exploitability_score": round(exploitability, 1),
+			"impact_score": round(isc, 1),
+			"scope_changed": scope_changed,
+			"vulnerability_id": vulnerability_id,
+			"risk_id": risk_id,
+			"scored_at": _now(),
+		}
+		await self._store.put("cvss_scores", result)
+		if risk_id:
+			try:
+				risk = await self._get_risk(risk_id)
+				risk["cvss_base_score"] = base_score
+				risk["cvss_severity"] = severity
+				risk["cvss_vector"] = vector_string
+				risk["updated_at"] = _now()
+				await self._store.put("risks", risk)
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+		await self._audit_event(
+			"cvss_scored", "system", result["id"],
+			{"base_score": base_score, "severity": severity, "risk_id": risk_id},
+		)
+		return result
+
+	# ─────────────────────────────────────────────────────────
+	# Penetration testing lifecycle
+	# ─────────────────────────────────────────────────────────
+
+	async def pentest_engagement_create(
+		self,
+		entity_id: str,
+		name: str,
+		scope: list[str],
+		methodology: str,
+		tester_team: str,
+		start_date: str,
+		end_date: str,
+		*,
+		engagement_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Create a penetration testing engagement record.
+
+		Methodologies: black_box | grey_box | white_box | red_team | purple_team.
+		Scope items are hostnames, CIDR ranges, or application URLs.
+		"""
+		valid_methods = {"black_box", "grey_box", "white_box", "red_team", "purple_team"}
+		assert methodology in valid_methods, f"methodology: {' | '.join(sorted(valid_methods))}"
+		assert entity_id, "entity_id required"
+		assert name, "name required"
+		assert scope, "scope required — list of targets"
+		assert tester_team, "tester_team required"
+		assert start_date <= end_date, "start_date must be <= end_date"
+
+		engagement: dict[str, Any] = {
+			"id": engagement_id or _uid(),
+			"tenant_id": self._tenant_id,
+			"entity_id": entity_id,
+			"name": name,
+			"scope": scope,
+			"methodology": methodology,
+			"tester_team": tester_team,
+			"start_date": start_date,
+			"end_date": end_date,
+			"status": "planned",
+			"finding_count": 0,
+			"finding_count_by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0},
+			"executive_summary": None,
+			"created_at": _now(),
+			"updated_at": _now(),
+		}
+		await self._store.put("pentest_engagements", engagement)
+		await self._audit_event(
+			"pentest_engagement_created", tester_team, engagement["id"],
+			{"entity_id": entity_id, "methodology": methodology, "scope_count": len(scope)},
+		)
+		return engagement
+
+	async def pentest_finding_record(
+		self,
+		engagement_id: str,
+		title: str,
+		description: str,
+		cvss_vector: str,
+		affected_asset: str,
+		tester_id: str,
+		*,
+		cve_id: str | None = None,
+		proof_of_concept: str = "",
+		remediation_advice: str = "",
+	) -> dict[str, Any]:
+		"""Record a penetration testing finding with CVSS scoring.
+
+		Automatically computes the CVSS base score and links the finding to the
+		engagement. Fires a high/critical notification to the entity owner.
+		"""
+		assert engagement_id, "engagement_id required"
+		assert title, "title required"
+		assert cvss_vector, "cvss_vector required"
+		assert affected_asset, "affected_asset required"
+		assert tester_id, "tester_id required"
+
+		engagement = await self._store.get("pentest_engagements", engagement_id)
+		if engagement is None:
+			raise ValueError(f"Engagement not found: {engagement_id}")
+
+		cvss_result = await self.cvss_score(cvss_vector)
+		severity = cvss_result["severity"]
+
+		finding: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"engagement_id": engagement_id,
+			"title": title,
+			"description": description,
+			"cvss_vector": cvss_vector,
+			"cvss_base_score": cvss_result["base_score"],
+			"severity": severity,
+			"affected_asset": affected_asset,
+			"cve_id": cve_id,
+			"proof_of_concept": proof_of_concept,
+			"remediation_advice": remediation_advice,
+			"tester_id": tester_id,
+			"status": "open",
+			"retest_status": None,
+			"recorded_at": _now(),
+		}
+		await self._store.put("pentest_findings", finding)
+
+		engagement["finding_count"] = engagement.get("finding_count", 0) + 1
+		by_sev = engagement.setdefault("finding_count_by_severity", {})
+		by_sev[severity] = by_sev.get(severity, 0) + 1
+		engagement["status"] = "in_progress"
+		engagement["updated_at"] = _now()
+		await self._store.put("pentest_engagements", engagement)
+
+		await self._audit_event(
+			"pentest_finding_recorded", tester_id, finding["id"],
+			{"severity": severity, "cvss_base_score": cvss_result["base_score"], "cve_id": cve_id},
+		)
+		if severity in {"critical", "high"}:
+			await self._notify.send(
+				engagement.get("entity_id", "security@datacraft.co.ke"), "email",
+				f"Pen-test {severity.upper()} finding: {title}",
+				f"Finding '{title}' (CVSS {cvss_result['base_score']}) recorded in engagement {engagement_id}.",
+			)
+		return finding
+
+	async def pentest_retest_schedule(
+		self,
+		finding_id: str,
+		retest_date: str,
+		assigned_tester: str,
+	) -> dict[str, Any]:
+		"""Schedule a retest for a remediated pen-test finding."""
+		assert retest_date, "retest_date required"
+		assert assigned_tester, "assigned_tester required"
+
+		finding = await self._store.get("pentest_findings", finding_id)
+		if finding is None:
+			raise ValueError(f"Pen-test finding not found: {finding_id}")
+
+		finding["retest_status"] = "scheduled"
+		finding["retest_date"] = retest_date
+		finding["retest_assigned_to"] = assigned_tester
+		finding["updated_at"] = _now()
+		await self._store.put("pentest_findings", finding)
+
+		retest: dict[str, Any] = {
+			"id": _uid(),
+			"finding_id": finding_id,
+			"retest_date": retest_date,
+			"assigned_tester": assigned_tester,
+			"status": "scheduled",
+			"scheduled_at": _now(),
+		}
+		await self._store.put("pentest_retests", retest)
+		await self._audit_event("pentest_retest_scheduled", assigned_tester, finding_id, {"retest_date": retest_date})
+		return retest
+
+	async def pentest_report_generate(
+		self,
+		engagement_id: str,
+		executive_summary: str,
+		generated_by: str,
+	) -> dict[str, Any]:
+		"""Generate a pen-test report summary for an engagement.
+
+		Aggregates finding counts by severity and lists top-10 highest-CVSS findings.
+		"""
+		assert executive_summary, "executive_summary required"
+		assert generated_by, "generated_by required"
+
+		engagement = await self._store.get("pentest_engagements", engagement_id)
+		if engagement is None:
+			raise ValueError(f"Engagement not found: {engagement_id}")
+
+		all_findings = await self._store.query("pentest_findings", {"engagement_id": engagement_id}, limit=10_000)
+		top_findings = sorted(all_findings, key=lambda f: f.get("cvss_base_score", 0.0), reverse=True)[:10]
+
+		report: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"engagement_id": engagement_id,
+			"engagement_name": engagement.get("name"),
+			"entity_id": engagement.get("entity_id"),
+			"methodology": engagement.get("methodology"),
+			"scope": engagement.get("scope"),
+			"start_date": engagement.get("start_date"),
+			"end_date": engagement.get("end_date"),
+			"executive_summary": executive_summary,
+			"total_findings": len(all_findings),
+			"finding_count_by_severity": engagement.get("finding_count_by_severity", {}),
+			"top_10_findings": [
+				{
+					"title": f["title"],
+					"severity": f["severity"],
+					"cvss_base_score": f.get("cvss_base_score"),
+					"affected_asset": f.get("affected_asset"),
+					"cve_id": f.get("cve_id"),
+				}
+				for f in top_findings
+			],
+			"generated_by": generated_by,
+			"generated_at": _now(),
+		}
+		await self._store.put("pentest_reports", report)
+		engagement["executive_summary"] = executive_summary
+		engagement["status"] = "completed"
+		engagement["report_id"] = report["id"]
+		engagement["updated_at"] = _now()
+		await self._store.put("pentest_engagements", engagement)
+		await self._audit_event(
+			"pentest_report_generated", generated_by, engagement_id,
+			{"total_findings": len(all_findings), "report_id": report["id"]},
+		)
+		return report
+
+	# ─────────────────────────────────────────────────────────
+	# Vulnerability lifecycle
+	# ─────────────────────────────────────────────────────────
+
+	async def vulnerability_register(
+		self,
+		entity_id: str,
+		title: str,
+		cvss_vector: str,
+		affected_asset: str,
+		discovered_by: str,
+		*,
+		cve_id: str | None = None,
+		source: str = "manual",
+		vuln_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Register a vulnerability with CVSS scoring and SLA deadline computation.
+
+		SLA deadlines (CISA KEV-aligned):
+		  critical → 1 day | high → 7 days | medium → 30 days | low → 90 days
+
+		Sources: manual | scanner | cve_feed | pentest | bug_bounty.
+		"""
+		assert entity_id, "entity_id required"
+		assert title, "title required"
+		assert affected_asset, "affected_asset required"
+		assert discovered_by, "discovered_by required"
+
+		cvss_result = await self.cvss_score(cvss_vector)
+		severity = cvss_result["severity"]
+		sla_days = {"critical": 1, "high": 7, "medium": 30, "low": 90, "none": 180}
+		deadline = (date.today() + timedelta(days=sla_days.get(severity, 90))).isoformat()
+
+		vuln: dict[str, Any] = {
+			"id": vuln_id or _uid(),
+			"tenant_id": self._tenant_id,
+			"entity_id": entity_id,
+			"title": title,
+			"cvss_vector": cvss_vector,
+			"cvss_base_score": cvss_result["base_score"],
+			"severity": severity,
+			"affected_asset": affected_asset,
+			"cve_id": cve_id,
+			"source": source,
+			"discovered_by": discovered_by,
+			"status": "open",
+			"patch_status": "unpatched",
+			"remediation_deadline": deadline,
+			"sla_breached": False,
+			"discovered_at": _now(),
+			"updated_at": _now(),
+		}
+		await self._store.put("vulnerabilities", vuln)
+		await self._audit_event(
+			"vulnerability_registered", discovered_by, vuln["id"],
+			{"severity": severity, "cvss_base_score": cvss_result["base_score"], "cve_id": cve_id},
+		)
+		if severity in {"critical", "high"}:
+			await self._notify.send(
+				"security@datacraft.co.ke", "email",
+				f"New {severity.upper()} vulnerability: {title}",
+				f"Vulnerability '{title}' (CVSS {cvss_result['base_score']}) registered. Deadline: {deadline}.",
+			)
+		return vuln
+
+	async def vulnerability_sla_check(
+		self,
+		entity_id: str,
+	) -> dict[str, Any]:
+		"""Check open vulnerabilities against their remediation SLA deadlines.
+
+		Updates breach flags and fires notifications for newly-breached items.
+		Returns breached and at-risk (within 3 days) lists.
+		"""
+		today = date.today().isoformat()
+		vulns = await self._store.query(
+			"vulnerabilities",
+			{"entity_id": entity_id, "tenant_id": self._tenant_id},
+			limit=10_000,
+		)
+		open_vulns = [v for v in vulns if v.get("status") == "open"]
+
+		breached: list[dict[str, Any]] = []
+		at_risk: list[dict[str, Any]] = []
+		for v in open_vulns:
+			deadline = v.get("remediation_deadline", "9999-12-31")
+			if today > deadline:
+				if not v.get("sla_breached"):
+					v["sla_breached"] = True
+					v["sla_breached_at"] = _now()
+					v["updated_at"] = _now()
+					await self._store.put("vulnerabilities", v)
+					await self._notify.send(
+						"security@datacraft.co.ke", "email",
+						f"SLA BREACH — {v.get('severity', '').upper()}: {v.get('title')}",
+						f"Vulnerability '{v.get('title')}' breached its SLA (deadline: {deadline}).",
+					)
+				breached.append({"id": v["id"], "title": v.get("title"), "severity": v.get("severity"), "deadline": deadline})
+			elif (date.today() + timedelta(days=3)).isoformat() >= deadline:
+				at_risk.append({"id": v["id"], "title": v.get("title"), "severity": v.get("severity"), "deadline": deadline})
+
+		return {
+			"entity_id": entity_id,
+			"checked_at": _now(),
+			"open_vulnerabilities": len(open_vulns),
+			"sla_breached": len(breached),
+			"sla_at_risk_3d": len(at_risk),
+			"breached_items": breached,
+			"at_risk_items": at_risk,
+		}
+
+	async def vulnerability_patch_update(
+		self,
+		vulnerability_id: str,
+		patch_status: str,
+		notes: str,
+		updated_by: str,
+	) -> dict[str, Any]:
+		"""Update the patch status for a vulnerability.
+
+		Patch statuses: unpatched | patch_available | patching_in_progress |
+		                patched | mitigated | risk_accepted | will_not_fix.
+		Marks the vulnerability closed when status is patched or mitigated.
+		"""
+		valid_statuses = {
+			"unpatched", "patch_available", "patching_in_progress",
+			"patched", "mitigated", "risk_accepted", "will_not_fix",
+		}
+		assert patch_status in valid_statuses, f"patch_status: {' | '.join(sorted(valid_statuses))}"
+		assert updated_by, "updated_by required"
+
+		vuln = await self._store.get("vulnerabilities", vulnerability_id)
+		if vuln is None:
+			raise ValueError(f"Vulnerability not found: {vulnerability_id}")
+
+		vuln["patch_status"] = patch_status
+		vuln["patch_notes"] = notes
+		vuln["last_updated_by"] = updated_by
+		vuln["updated_at"] = _now()
+		if patch_status in {"patched", "mitigated"}:
+			vuln["status"] = "closed"
+			vuln["closed_at"] = _now()
+		await self._store.put("vulnerabilities", vuln)
+		await self._audit_event("vulnerability_patch_updated", updated_by, vulnerability_id, {"patch_status": patch_status})
+		return vuln
+
+	# ─────────────────────────────────────────────────────────
+	# Risk acceptance governance
+	# ─────────────────────────────────────────────────────────
+
+	async def risk_acceptance_request(
+		self,
+		risk_id: str,
+		requestor_id: str,
+		justification: str,
+		expiry_date: str,
+	) -> dict[str, Any]:
+		"""Submit a formal risk acceptance request for governance approval.
+
+		Creates a pending acceptance record. Requires approval via
+		`risk_acceptance_approve` before risk status changes to accepted.
+		"""
+		assert requestor_id, "requestor_id required"
+		assert justification, "justification required"
+		assert expiry_date > date.today().isoformat(), "expiry_date must be in the future"
+
+		risk = await self._get_risk(risk_id)
+		acceptance: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"risk_id": risk_id,
+			"risk_name": risk.get("risk_name"),
+			"requestor_id": requestor_id,
+			"justification": justification,
+			"expiry_date": expiry_date,
+			"status": "pending_approval",
+			"approved_by": None,
+			"approved_at": None,
+			"created_at": _now(),
+		}
+		await self._store.put("risk_acceptances", acceptance)
+		await self._audit_event("risk_acceptance_requested", requestor_id, risk_id, {"expiry_date": expiry_date})
+		return acceptance
+
+	async def risk_acceptance_approve(
+		self,
+		acceptance_id: str,
+		approver_id: str,
+		comments: str = "",
+	) -> dict[str, Any]:
+		"""Approve a risk acceptance request and mark the risk as accepted.
+
+		Sets risk status to 'accepted' with the recorded expiry date. Expired
+		acceptances must be renewed via `risk_acceptance_expiry_check`.
+		"""
+		assert approver_id, "approver_id required"
+
+		acceptance = await self._store.get("risk_acceptances", acceptance_id)
+		if acceptance is None:
+			raise ValueError(f"Risk acceptance not found: {acceptance_id}")
+		if acceptance["status"] != "pending_approval":
+			raise ValueError(f"Acceptance not pending: current status={acceptance['status']}")
+
+		acceptance["status"] = "approved"
+		acceptance["approved_by"] = approver_id
+		acceptance["approval_comments"] = comments
+		acceptance["approved_at"] = _now()
+		await self._store.put("risk_acceptances", acceptance)
+
+		risk = await self._get_risk(acceptance["risk_id"])
+		risk["status"] = "accepted"
+		risk["acceptance_expiry"] = acceptance["expiry_date"]
+		risk["acceptance_id"] = acceptance_id
+		risk["updated_at"] = _now()
+		await self._store.put("risks", risk)
+
+		await self._audit_event(
+			"risk_acceptance_approved", approver_id, acceptance["risk_id"],
+			{"acceptance_id": acceptance_id, "expiry_date": acceptance["expiry_date"]},
+		)
+		return acceptance
+
+	async def risk_acceptance_expiry_check(
+		self,
+		entity_id: str,
+	) -> dict[str, Any]:
+		"""Check all approved risk acceptances for expiry and revert expired ones.
+
+		Risks whose acceptance has expired are reverted to 'requires_review' and
+		the risk owner is notified.
+		"""
+		today = date.today().isoformat()
+		acceptances = await self._store.query("risk_acceptances", {"tenant_id": self._tenant_id}, limit=10_000)
+		approved = [a for a in acceptances if a.get("status") == "approved"]
+		reverted: list[str] = []
+
+		for acc in approved:
+			if acc.get("expiry_date", "9999-12-31") <= today:
+				acc["status"] = "expired"
+				acc["expired_at"] = _now()
+				await self._store.put("risk_acceptances", acc)
+				try:
+					risk = await self._get_risk(acc["risk_id"])
+					risk["status"] = "requires_review"
+					risk["acceptance_expiry"] = None
+					risk["updated_at"] = _now()
+					await self._store.put("risks", risk)
+					await self._notify.send(
+						risk.get("owner_id", "risk@datacraft.co.ke"), "email",
+						f"Risk acceptance expired: {risk.get('risk_name')}",
+						f"Acceptance for '{risk.get('risk_name')}' expired on {acc['expiry_date']}. Please re-assess.",
+					)
+					reverted.append(acc["risk_id"])
+				except ValueError as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		return {
+			"entity_id": entity_id,
+			"checked_at": _now(),
+			"approved_acceptances": len(approved),
+			"expired_and_reverted": len(reverted),
+			"reverted_risk_ids": reverted,
+		}
+
+	# ─────────────────────────────────────────────────────────
+	# Portfolio / cross-entity aggregation
+	# ─────────────────────────────────────────────────────────
+
+	async def portfolio_risk_aggregate(
+		self,
+		entity_ids: list[str],
+		period: str,
+	) -> dict[str, Any]:
+		"""Aggregate risk posture across multiple entities (portfolio view).
+
+		Returns consolidated counts by rating, concentration by category,
+		and top-10 highest-scoring risks across the portfolio.
+		Intended for Group CRO / board-level oversight.
+		"""
+		assert entity_ids, "entity_ids required"
+
+		start, end = _period_bounds(period)
+		all_risks: list[dict[str, Any]] = []
+		for eid in entity_ids:
+			risks = await self._store.query(
+				"risks", {"entity_id": eid, "tenant_id": self._tenant_id}, limit=10_000
+			)
+			all_risks.extend(risks)
+
+		by_rating: dict[str, int] = {}
+		by_category: dict[str, int] = {}
+		for r in all_risks:
+			rat = r.get("inherent_rating", "unassessed")
+			cat = r.get("category", "unknown")
+			by_rating[rat] = by_rating.get(rat, 0) + 1
+			by_category[cat] = by_category.get(cat, 0) + 1
+
+		total = max(len(all_risks), 1)
+		concentration = {
+			cat: round(count / total, 3)
+			for cat, count in sorted(by_category.items(), key=lambda x: -x[1])
+		}
+		top_10 = sorted(
+			[r for r in all_risks if r.get("inherent_score") is not None],
+			key=lambda r: r.get("inherent_score", 0),
+			reverse=True,
+		)[:10]
+
+		return {
+			"id": _uid(),
+			"entity_ids": entity_ids,
+			"period": period,
+			"period_start": start,
+			"period_end": end,
+			"total_risks": len(all_risks),
+			"by_rating": by_rating,
+			"concentration_by_category": concentration,
+			"top_10_portfolio_risks": [
+				{
+					"risk_name": r.get("risk_name"),
+					"entity_id": r.get("entity_id"),
+					"inherent_score": r.get("inherent_score"),
+					"inherent_rating": r.get("inherent_rating"),
+				}
+				for r in top_10
+			],
+			"generated_at": _now(),
+		}
+
+	# ─────────────────────────────────────────────────────────
+	# Vendor / third-party risk assessment
+	# ─────────────────────────────────────────────────────────
+
+	async def vendor_risk_assess(
+		self,
+		vendor_id: str,
+		vendor_name: str,
+		data_sensitivity: str,
+		access_level: str,
+		questionnaire_scores: dict[str, float],
+		assessed_by: str,
+	) -> dict[str, Any]:
+		"""Perform a vendor risk assessment and compute a composite risk tier.
+
+		Data sensitivity: public | internal | confidential | restricted.
+		Access level: none | read | read_write | privileged | critical_infrastructure.
+
+		``questionnaire_scores`` maps domain names to scores in the 0–100 range.
+
+		Tier classification:
+		  Tier 1 (critical) — restricted data OR critical_infrastructure access
+		  Tier 2 (high)     — confidential data OR privileged access
+		  Tier 3 (medium)   — internal data OR read_write access
+		  Tier 4 (low)      — public data AND read/none access
+
+		Review cadence: Tier 1/2 → 6 months; Tier 3/4 → 12 months.
+		"""
+		valid_sensitivity = {"public", "internal", "confidential", "restricted"}
+		valid_access = {"none", "read", "read_write", "privileged", "critical_infrastructure"}
+		assert data_sensitivity in valid_sensitivity, f"data_sensitivity: {' | '.join(sorted(valid_sensitivity))}"
+		assert access_level in valid_access, f"access_level: {' | '.join(sorted(valid_access))}"
+		assert questionnaire_scores, "questionnaire_scores required"
+		assert assessed_by, "assessed_by required"
+
+		if data_sensitivity == "restricted" or access_level == "critical_infrastructure":
+			tier = 1
+		elif data_sensitivity == "confidential" or access_level == "privileged":
+			tier = 2
+		elif data_sensitivity == "internal" or access_level == "read_write":
+			tier = 3
+		else:
+			tier = 4
+
+		avg_score = round(sum(questionnaire_scores.values()) / len(questionnaire_scores), 1)
+		risk_score = round(100.0 - avg_score, 1)
+		risk_rating = _score_to_rating(risk_score / 25.0)
+
+		assessment: dict[str, Any] = {
+			"id": _uid(),
+			"tenant_id": self._tenant_id,
+			"vendor_id": vendor_id,
+			"vendor_name": vendor_name,
+			"data_sensitivity": data_sensitivity,
+			"access_level": access_level,
+			"tier": tier,
+			"questionnaire_scores": questionnaire_scores,
+			"avg_questionnaire_score": avg_score,
+			"risk_score": risk_score,
+			"risk_rating": risk_rating,
+			"assessed_by": assessed_by,
+			"assessed_at": _now(),
+			"review_due": (date.today() + timedelta(days=365 if tier >= 3 else 180)).isoformat(),
+		}
+		await self._store.put("vendor_risk_assessments", assessment)
+		await self._audit_event(
+			"vendor_risk_assessed", assessed_by, vendor_id,
+			{"tier": tier, "risk_score": risk_score, "risk_rating": risk_rating},
+		)
+		return assessment

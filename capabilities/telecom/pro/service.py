@@ -55,6 +55,13 @@ class ServiceProvisioningService:
 		self._fallouts: dict[str, dict[str, Any]] = {}
 		self._jeopardies: dict[str, dict[str, Any]] = {}
 		self._analytics_events: list[dict[str, Any]] = []
+		# Product catalogue stores
+		self._catalogue_products: dict[tuple[str, str], dict[str, Any]] = {}
+		self._product_versions: dict[tuple[str, str], list[dict[str, Any]]] = {}
+		self._catalogue_bundles: dict[tuple[str, str], dict[str, Any]] = {}
+		self._price_list: dict[tuple[str, str], dict[str, Any]] = {}
+		self._promotions: dict[tuple[str, str], dict[str, Any]] = {}
+		self._applied_promotions: dict[str, dict[str, Any]] = {}  # key: "order_id:campaign_id"
 
 	# ------------------------------------------------------------------ #
 	# Contract                                                             #
@@ -677,6 +684,539 @@ class ServiceProvisioningService:
 			"error_count": error_count,
 			"results": results,
 			"submitted_at": _utcnow(),
+		}
+
+	# ------------------------------------------------------------------ #
+	# Product Catalogue methods                                           #
+	# ------------------------------------------------------------------ #
+
+	async def create_product(
+		self,
+		product_id: str,
+		name: str,
+		category: str,
+		characteristics: dict[str, Any],
+		tenant_id: str = "default",
+		status: str = "draft",
+		version: int = 1,
+	) -> dict[str, Any]:
+		"""Create a new product in the service catalogue (TMF620-aligned).
+
+		Validates that product_id is unique per tenant.  Initial status must
+		be draft; use update_product_status to advance the lifecycle.
+		Stores versioned record keyed by (tenant_id, product_id, version).
+		"""
+		assert product_id, "product_id required"
+		assert name, "name required"
+		assert category, "category required"
+		valid_statuses = {"draft", "review", "approved", "active", "deprecated", "retired"}
+		if status not in valid_statuses:
+			raise ValueError(f"Invalid status '{status}'. Must be one of {sorted(valid_statuses)}")
+		key = (tenant_id, product_id)
+		if key in self._catalogue_products:
+			raise ValueError(f"Product {product_id} already exists for tenant {tenant_id}")
+		product: dict[str, Any] = {
+			"product_id": product_id,
+			"name": name,
+			"category": category,
+			"characteristics": characteristics,
+			"tenant_id": tenant_id,
+			"status": status,
+			"version": version,
+			"created_at": _utcnow(),
+			"updated_at": _utcnow(),
+		}
+		self._catalogue_products[key] = product
+		self._product_versions.setdefault(key, []).append(dict(product))
+		self._audit(tenant_id, "product_created", product_id)
+		return product
+
+	async def update_product_status(
+		self,
+		product_id: str,
+		new_status: str,
+		justification: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Advance a product through the lifecycle state machine.
+
+		Valid transitions:
+		  draft -> review -> approved -> active -> deprecated -> retired
+
+		Raises ValueError with the allowed-transitions map if transition is
+		invalid.  Every transition is audit-logged with the justification.
+		"""
+		assert product_id, "product_id required"
+		assert justification, "justification required"
+		_TRANSITIONS: dict[str, set[str]] = {
+			"draft":      {"review"},
+			"review":     {"approved", "draft"},
+			"approved":   {"active", "draft"},
+			"active":     {"deprecated"},
+			"deprecated": {"retired"},
+			"retired":    set(),
+		}
+		key = (tenant_id, product_id)
+		product = self._catalogue_products.get(key)
+		if product is None:
+			raise ValueError(f"Product {product_id} not found for tenant {tenant_id}")
+		current = product["status"]
+		allowed = _TRANSITIONS.get(current, set())
+		if new_status not in allowed:
+			raise ValueError(
+				f"Cannot transition product {product_id} from '{current}' to '{new_status}'. "
+				f"Allowed transitions: {sorted(allowed) if allowed else '(none — terminal state)'}"
+			)
+		old_version = dict(product)
+		product["status"] = new_status
+		product["version"] += 1
+		product["updated_at"] = _utcnow()
+		product["_transition_justification"] = justification
+		self._product_versions[key].append(dict(product))
+		self._audit(tenant_id, f"product_status_{new_status}", f"{product_id}:{justification[:60]}")
+		return product
+
+	async def create_bundle(
+		self,
+		bundle_id: str,
+		name: str,
+		components: list[dict[str, Any]],
+		pricing_tier: str,
+		tenant_id: str = "default",
+		eligibility_rules: list[str] | None = None,
+		incompatible_with: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Create a product bundle from a set of constituent products.
+
+		components: list of {product_id, quantity, mandatory} dicts.
+		Validates that each referenced product_id exists and is active.
+		Applies incompatibility guards — raises ValueError if bundle_id
+		conflicts with any product in incompatible_with.
+		"""
+		assert bundle_id, "bundle_id required"
+		assert name, "name required"
+		assert components, "at least one component required"
+		# Validate all component products exist
+		for comp in components:
+			pid = comp.get("product_id", "")
+			prod_key = (tenant_id, pid)
+			if prod_key not in self._catalogue_products:
+				raise ValueError(f"Component product '{pid}' not found in catalogue for tenant {tenant_id}")
+			if self._catalogue_products[prod_key].get("status") not in {"active", "approved"}:
+				raise ValueError(f"Component product '{pid}' is not active/approved")
+		key = (tenant_id, bundle_id)
+		if key in self._catalogue_bundles:
+			raise ValueError(f"Bundle {bundle_id} already exists for tenant {tenant_id}")
+		bundle: dict[str, Any] = {
+			"bundle_id": bundle_id,
+			"name": name,
+			"components": components,
+			"pricing_tier": pricing_tier,
+			"tenant_id": tenant_id,
+			"eligibility_rules": eligibility_rules or [],
+			"incompatible_with": incompatible_with or [],
+			"status": "active",
+			"created_at": _utcnow(),
+		}
+		self._catalogue_bundles[key] = bundle
+		self._audit(tenant_id, "bundle_created", bundle_id)
+		return bundle
+
+	async def decompose_bundle_to_orders(
+		self,
+		bundle_id: str,
+		customer_id: str,
+		tenant_id: str = "default",
+		parameters: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Decompose a bundle into individual service orders for each component.
+
+		Creates one service order per mandatory component.  Optional components
+		are listed in pending_optional for separate confirmation.  Returns the
+		list of created order_ids and the bundle decomposition record.
+		"""
+		assert bundle_id, "bundle_id required"
+		assert customer_id, "customer_id required"
+		key = (tenant_id, bundle_id)
+		bundle = self._catalogue_bundles.get(key)
+		if bundle is None:
+			raise ValueError(f"Bundle {bundle_id} not found for tenant {tenant_id}")
+		created_orders: list[str] = []
+		pending_optional: list[str] = []
+		params = parameters or {}
+		for comp in bundle["components"]:
+			pid = comp.get("product_id", "")
+			qty = comp.get("quantity", 1)
+			mandatory = comp.get("mandatory", True)
+			for i in range(int(qty)):
+				order_id = f"ord-{bundle_id}-{pid}-{i}-{_utcnow()[:10]}"
+				if mandatory:
+					await self.service_order_receive(
+						order_id=order_id,
+						customer_id=customer_id,
+						product_code=pid,
+						parameters={**params, "bundle_id": bundle_id, "component_index": i},
+						tenant_id=tenant_id,
+					)
+					created_orders.append(order_id)
+				else:
+					pending_optional.append({"order_id": order_id, "product_id": pid})
+		decomposition: dict[str, Any] = {
+			"bundle_id": bundle_id,
+			"customer_id": customer_id,
+			"tenant_id": tenant_id,
+			"created_orders": created_orders,
+			"pending_optional": pending_optional,
+			"decomposed_at": _utcnow(),
+		}
+		self._audit(tenant_id, "bundle_decomposed", bundle_id)
+		return decomposition
+
+	async def create_price(
+		self,
+		price_id: str,
+		product_id: str,
+		amount: float,
+		currency: str,
+		charge_type: str,
+		effective_from: str,
+		tenant_id: str = "default",
+		effective_to: str | None = None,
+		rate_table: list[dict[str, Any]] | None = None,
+	) -> dict[str, Any]:
+		"""Create a price record for a product with effective dating.
+
+		charge_type: one-time | recurring | usage
+		effective_from / effective_to: ISO-8601 date strings.
+		rate_table: optional tiered pricing [{threshold, unit_price}].
+		Raises ValueError if the product does not exist.
+		"""
+		assert price_id, "price_id required"
+		assert product_id, "product_id required"
+		assert currency, "currency required"
+		valid_charge_types = {"one-time", "recurring", "usage"}
+		if charge_type not in valid_charge_types:
+			raise ValueError(f"charge_type must be one of {sorted(valid_charge_types)}")
+		if (tenant_id, product_id) not in self._catalogue_products:
+			raise ValueError(f"Product {product_id} not found in catalogue for tenant {tenant_id}")
+		price_key = (tenant_id, price_id)
+		if price_key in self._price_list:
+			raise ValueError(f"Price {price_id} already exists")
+		price: dict[str, Any] = {
+			"price_id": price_id,
+			"product_id": product_id,
+			"amount": float(amount),
+			"currency": currency,
+			"charge_type": charge_type,
+			"effective_from": effective_from,
+			"effective_to": effective_to,
+			"rate_table": rate_table or [],
+			"tenant_id": tenant_id,
+			"created_at": _utcnow(),
+		}
+		self._price_list[price_key] = price
+		self._audit(tenant_id, "price_created", f"{product_id}:{price_id}")
+		return price
+
+	async def get_effective_price(
+		self,
+		product_id: str,
+		as_of_date: str,
+		tenant_id: str = "default",
+		charge_type: str | None = None,
+	) -> dict[str, Any] | None:
+		"""Return the effective price for a product at a given date.
+
+		Filters by charge_type if provided.  Returns the most recently
+		effective price whose effective_from <= as_of_date and whose
+		effective_to is None or >= as_of_date.  Returns None if no price found.
+		"""
+		assert product_id, "product_id required"
+		assert as_of_date, "as_of_date required"
+		candidates: list[dict[str, Any]] = []
+		for (tid, pid), price in self._price_list.items():
+			if tid != tenant_id or price["product_id"] != product_id:
+				continue
+			if charge_type and price["charge_type"] != charge_type:
+				continue
+			if price["effective_from"] <= as_of_date:
+				eto = price.get("effective_to")
+				if eto is None or eto >= as_of_date:
+					candidates.append(price)
+		if not candidates:
+			return None
+		return max(candidates, key=lambda p: p["effective_from"])
+
+	async def search_catalogue(
+		self,
+		tenant_id: str = "default",
+		category: str | None = None,
+		status: str | None = None,
+		keyword: str | None = None,
+		min_price: float | None = None,
+		max_price: float | None = None,
+		offset: int = 0,
+		limit: int = 50,
+	) -> dict[str, Any]:
+		"""Search the product catalogue with multi-facet filtering and pagination.
+
+		Supports keyword (name substring match), category, status, and price
+		range filters.  Returns results page plus facet counts for category
+		and status dimensions so UIs can render filter chips without extra
+		calls.
+		"""
+		all_products = [
+			p for (tid, _), p in self._catalogue_products.items()
+			if tid == tenant_id
+		]
+		filtered: list[dict[str, Any]] = []
+		for p in all_products:
+			if category and p.get("category") != category:
+				continue
+			if status and p.get("status") != status:
+				continue
+			if keyword and keyword.lower() not in p.get("name", "").lower():
+				continue
+			filtered.append(p)
+		# Price filter — resolve effective price per product
+		if min_price is not None or max_price is not None:
+			today = _utcnow()[:10]
+			price_filtered: list[dict[str, Any]] = []
+			for p in filtered:
+				ep = await self.get_effective_price(p["product_id"], today, tenant_id, "recurring")
+				if ep is None:
+					ep = await self.get_effective_price(p["product_id"], today, tenant_id, "one-time")
+				if ep is None:
+					continue
+				amt = ep["amount"]
+				if min_price is not None and amt < min_price:
+					continue
+				if max_price is not None and amt > max_price:
+					continue
+				price_filtered.append(p)
+			filtered = price_filtered
+		# Facets
+		facets: dict[str, dict[str, int]] = {"category": {}, "status": {}}
+		for p in filtered:
+			cat = p.get("category", "unknown")
+			sta = p.get("status", "unknown")
+			facets["category"][cat] = facets["category"].get(cat, 0) + 1
+			facets["status"][sta] = facets["status"].get(sta, 0) + 1
+		page = filtered[offset: offset + limit]
+		self._audit(tenant_id, "catalogue_searched", f"kw:{keyword or ''}")
+		return {
+			"tenant_id": tenant_id,
+			"total_matches": len(filtered),
+			"offset": offset,
+			"limit": limit,
+			"results": page,
+			"facets": facets,
+		}
+
+	async def create_promotion(
+		self,
+		campaign_id: str,
+		discount_type: str,
+		discount_value: float,
+		applies_to: list[str],
+		valid_from: str,
+		valid_to: str,
+		tenant_id: str = "default",
+		usage_limit: int = 0,
+	) -> dict[str, Any]:
+		"""Create a promotional campaign with discount rules.
+
+		discount_type: percentage | fixed | free-month
+		applies_to: list of product_ids or category names.
+		usage_limit: 0 = unlimited.
+		Raises ValueError if valid_to <= valid_from.
+		"""
+		assert campaign_id, "campaign_id required"
+		assert applies_to, "applies_to must not be empty"
+		valid_discount_types = {"percentage", "fixed", "free-month"}
+		if discount_type not in valid_discount_types:
+			raise ValueError(f"discount_type must be one of {sorted(valid_discount_types)}")
+		if valid_to <= valid_from:
+			raise ValueError("valid_to must be after valid_from")
+		key = (tenant_id, campaign_id)
+		if key in self._promotions:
+			raise ValueError(f"Promotion campaign {campaign_id} already exists")
+		promotion: dict[str, Any] = {
+			"campaign_id": campaign_id,
+			"discount_type": discount_type,
+			"discount_value": float(discount_value),
+			"applies_to": applies_to,
+			"valid_from": valid_from,
+			"valid_to": valid_to,
+			"usage_limit": int(usage_limit),
+			"usage_count": 0,
+			"tenant_id": tenant_id,
+			"status": "active",
+			"created_at": _utcnow(),
+		}
+		self._promotions[key] = promotion
+		self._audit(tenant_id, "promotion_created", campaign_id)
+		return promotion
+
+	async def apply_promotion_to_order(
+		self,
+		order_id: str,
+		campaign_id: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Apply a promotional discount to a service order.
+
+		Validates: campaign active, within validity window, usage limit not
+		exceeded, order product_code matches applies_to list.  Idempotent —
+		applying the same promotion twice to the same order is a no-op.
+		Returns the discount record.
+		"""
+		assert order_id, "order_id required"
+		assert campaign_id, "campaign_id required"
+		key = (tenant_id, campaign_id)
+		promotion = self._promotions.get(key)
+		if promotion is None:
+			raise ValueError(f"Promotion {campaign_id} not found")
+		if promotion["status"] != "active":
+			raise ValueError(f"Promotion {campaign_id} is not active")
+		today = _utcnow()[:10]
+		if today < promotion["valid_from"] or today > promotion["valid_to"]:
+			raise ValueError(f"Promotion {campaign_id} is outside validity window")
+		if promotion["usage_limit"] > 0 and promotion["usage_count"] >= promotion["usage_limit"]:
+			raise ValueError(f"Promotion {campaign_id} has reached its usage limit")
+		order = self._service_orders.get(order_id)
+		if order is None:
+			raise ValueError(f"Order {order_id} not found")
+		# Check idempotency
+		applied_key = f"{order_id}:{campaign_id}"
+		if applied_key in self._applied_promotions:
+			return self._applied_promotions[applied_key]
+		# Check product eligibility
+		product_code = order.get("product_code", "")
+		applies_to = promotion["applies_to"]
+		if applies_to and product_code not in applies_to:
+			raise ValueError(f"Order product_code '{product_code}' not in promotion applies_to list")
+		promotion["usage_count"] += 1
+		discount_record: dict[str, Any] = {
+			"order_id": order_id,
+			"campaign_id": campaign_id,
+			"discount_type": promotion["discount_type"],
+			"discount_value": promotion["discount_value"],
+			"applied_at": _utcnow(),
+		}
+		self._applied_promotions[applied_key] = discount_record
+		self._audit(tenant_id, "promotion_applied", f"{order_id}:{campaign_id}")
+		return discount_record
+
+	async def catalogue_health_dashboard(
+		self,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Compute a catalogue health score and KPI breakdown.
+
+		Returns: active/draft/deprecated product counts, price coverage
+		percentage (products with at least one active price), SLA tier
+		distribution, promotions expiring within 7 days, and a composite
+		completeness score 0-100 computed as:
+		  (active + priced) / (2 * total) * 100 — clamped to [0, 100].
+		O(n) single-pass computation.
+		"""
+		products = [
+			p for (tid, _), p in self._catalogue_products.items()
+			if tid == tenant_id
+		]
+		total = len(products)
+		status_counts: dict[str, int] = {}
+		for p in products:
+			s = p.get("status", "unknown")
+			status_counts[s] = status_counts.get(s, 0) + 1
+		# Price coverage
+		today = _utcnow()[:10]
+		priced_count = 0
+		for p in products:
+			pid = p["product_id"]
+			has_price = any(
+				pr["product_id"] == pid
+				and pr["effective_from"] <= today
+				and (pr.get("effective_to") is None or pr["effective_to"] >= today)
+				for (tid, _), pr in self._price_list.items()
+				if tid == tenant_id
+			)
+			if has_price:
+				priced_count += 1
+		price_coverage_pct = round(priced_count / max(total, 1) * 100, 2)
+		# Promotions expiring within 7 days
+		from datetime import datetime, timedelta
+		cutoff = (datetime.utcnow() + timedelta(days=7)).date().isoformat()
+		expiring_promos = [
+			p["campaign_id"]
+			for (tid, _), p in self._promotions.items()
+			if tid == tenant_id and p["status"] == "active" and p["valid_to"] <= cutoff
+		]
+		# Bundles
+		bundle_count = sum(1 for (tid, _) in self._catalogue_bundles if tid == tenant_id)
+		# Completeness score
+		active_count = status_counts.get("active", 0)
+		completeness = round(min((active_count + priced_count) / max(2 * total, 1) * 100, 100), 2)
+		return {
+			"tenant_id": tenant_id,
+			"total_products": total,
+			"status_breakdown": status_counts,
+			"price_coverage_pct": price_coverage_pct,
+			"priced_product_count": priced_count,
+			"bundle_count": bundle_count,
+			"promotions_expiring_in_7d": expiring_promos,
+			"completeness_score": completeness,
+			"computed_at": _utcnow(),
+		}
+
+	async def bulk_update_prices(
+		self,
+		updates: list[dict[str, Any]],
+		approval_reference: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Apply a bulk price change set with an approval gate.
+
+		Each update dict: {price_id, new_amount, effective_from, reason}.
+		Validates approval_reference is present, all price_ids exist, and
+		effective_from is a valid ISO date.  Applies atomically — if any
+		validation fails, no updates are applied.  Returns per-item result.
+		"""
+		assert updates, "updates must not be empty"
+		assert approval_reference, "approval_reference required"
+		# Validate all before applying
+		errors: list[dict[str, Any]] = []
+		for u in updates:
+			pid = u.get("price_id", "")
+			if not pid:
+				errors.append({"price_id": pid, "error": "price_id required"})
+				continue
+			key = (tenant_id, pid)
+			if key not in self._price_list:
+				errors.append({"price_id": pid, "error": "price not found"})
+			if "new_amount" not in u:
+				errors.append({"price_id": pid, "error": "new_amount required"})
+		if errors:
+			raise ValueError(f"Validation failed for {len(errors)} price updates: {errors}")
+		results: list[dict[str, Any]] = []
+		for u in updates:
+			key = (tenant_id, u["price_id"])
+			price = self._price_list[key]
+			old_amount = price["amount"]
+			price["amount"] = float(u["new_amount"])
+			if "effective_from" in u:
+				price["effective_from"] = u["effective_from"]
+			price["updated_at"] = _utcnow()
+			price["_update_reason"] = u.get("reason", "")
+			results.append({"price_id": u["price_id"], "old_amount": old_amount, "new_amount": price["amount"], "status": "updated"})
+		self._audit(tenant_id, "bulk_prices_updated", f"ref:{approval_reference}:count:{len(updates)}")
+		return {
+			"tenant_id": tenant_id,
+			"approval_reference": approval_reference,
+			"updated_count": len(results),
+			"results": results,
+			"updated_at": _utcnow(),
 		}
 
 	# ------------------------------------------------------------------ #

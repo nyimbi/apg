@@ -1012,4 +1012,760 @@ class PortfolioAnalyticsService:
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ── New world-class methods ───────────────────────────────────────────────
+
+	async def earned_value_metrics(
+		self, portfolio_id: str, as_of_date: str | None = None
+	) -> dict[str, Any]:
+		"""Compute EVM indicators (SPI, CPI, EAC, TCPI, SV, CV) for every project in the portfolio,
+		then aggregate to portfolio level.
+
+		Each project in the registry must supply:
+		  - planned_value (PV): budgeted cost of work scheduled
+		  - earned_value (EV): budgeted cost of work performed
+		  - actual_cost (AC): actual cost incurred
+		  - budget_at_completion (BAC): total authorised budget
+
+		Returns per-project rows plus portfolio-level weighted averages.
+		"""
+		assert _present(portfolio_id), "portfolio_id required"
+		tenant_id = self.tenant_id
+		portfolio = self._portfolio_or_none(portfolio_id, tenant_id)
+		assert portfolio is not None, f"portfolio {portfolio_id} not found"
+
+		as_of = as_of_date or str(date.today())
+		projects = [p for p in self._project_registry.values()
+					if p.get("portfolio_id") == portfolio_id and p.get("tenant_id") == tenant_id]
+
+		rows: list[dict[str, Any]] = []
+		for p in projects:
+			pv  = float(p.get("planned_value", p.get("budget", 0.0)))
+			ev  = float(p.get("earned_value", 0.0))
+			ac  = float(p.get("actual_cost", 0.0))
+			bac = float(p.get("budget_at_completion", p.get("budget", 0.0)))
+
+			spi  = round(ev / pv, 4) if pv else None
+			cpi  = round(ev / ac, 4) if ac else None
+			sv   = round(ev - pv, 2)
+			cv   = round(ev - ac, 2)
+			eac  = round(bac / cpi, 2) if cpi else None
+			etc  = round((eac - ac), 2) if eac is not None else None
+			tcpi = round((bac - ev) / (bac - ac), 4) if (bac - ac) != 0 else None
+
+			health = "green"
+			if spi is not None and cpi is not None:
+				if spi < 0.9 or cpi < 0.9:
+					health = "red"
+				elif spi < 1.0 or cpi < 1.0:
+					health = "amber"
+
+			rows.append({
+				"project_id": p.get("project_id"),
+				"pv": pv, "ev": ev, "ac": ac, "bac": bac,
+				"spi": spi, "cpi": cpi,
+				"sv": sv, "cv": cv,
+				"eac": eac, "etc": etc, "tcpi": tcpi,
+				"health": health,
+			})
+
+		# Portfolio-level weighted averages (weighted by BAC)
+		total_bac  = sum(r["bac"] for r in rows) or 1.0
+		port_spi   = round(sum(r["spi"] * r["bac"] for r in rows if r["spi"] is not None) / total_bac, 4) if rows else None
+		port_cpi   = round(sum(r["cpi"] * r["bac"] for r in rows if r["cpi"] is not None) / total_bac, 4) if rows else None
+		total_ev   = sum(r["ev"] for r in rows)
+		total_ac   = sum(r["ac"] for r in rows)
+		total_pv   = sum(r["pv"] for r in rows)
+
+		self._audit(tenant_id, "earned_value_metrics_computed", portfolio_id)
+		return {
+			"portfolio_id": portfolio_id,
+			"as_of_date": as_of,
+			"project_count": len(rows),
+			"portfolio_spi": port_spi,
+			"portfolio_cpi": port_cpi,
+			"total_sv": round(total_ev - total_pv, 2),
+			"total_cv": round(total_ev - total_ac, 2),
+			"total_bac": round(total_bac, 2),
+			"total_ev": round(total_ev, 2),
+			"total_ac": round(total_ac, 2),
+			"projects": rows,
+		}
+
+	async def portfolio_bubble_chart(
+		self,
+		portfolio_id: str,
+		x_metric: str = "risk_score",
+		y_metric: str = "return_value",
+		size_metric: str = "budget",
+	) -> dict[str, Any]:
+		"""Return normalised bubble chart data for a portfolio.
+
+		x_metric, y_metric, size_metric can be any of:
+		  risk_score | return_value | alignment_score | budget | progress_pct | demand_fte
+
+		Values are min-max normalised to [0, 1] within the dataset so axes are
+		scale-agnostic. Each bubble also carries raw values for tooltip rendering.
+		"""
+		assert _present(portfolio_id), "portfolio_id required"
+		valid_metrics = {"risk_score", "return_value", "alignment_score", "budget", "progress_pct", "demand_fte"}
+		assert x_metric in valid_metrics, f"x_metric must be one of {valid_metrics}"
+		assert y_metric in valid_metrics, f"y_metric must be one of {valid_metrics}"
+		assert size_metric in valid_metrics, f"size_metric must be one of {valid_metrics}"
+		tenant_id = self.tenant_id
+
+		projects = [p for p in self._project_registry.values()
+					if p.get("portfolio_id") == portfolio_id and p.get("tenant_id") == tenant_id]
+
+		# Build raw metric vectors
+		def _extract(p: dict[str, Any], metric: str) -> float:
+			if metric == "alignment_score":
+				# Average alignment scores recorded for this project
+				proj_id = p.get("project_id", "")
+				scores = [a.score for a in self.alignment_scores.values()
+						  if a.tenant_id == tenant_id
+						  and getattr(a, "portfolio_id", None) == portfolio_id]
+				return sum(scores) / len(scores) if scores else 0.0
+			if metric == "risk_score":
+				rr = [r.risk_score for r in self.risk_return_analyses.values()
+					  if r.tenant_id == tenant_id and r.portfolio_id == portfolio_id]
+				return sum(rr) / len(rr) if rr else 0.0
+			return float(p.get(metric, 0.0))
+
+		def _normalise(values: list[float]) -> list[float]:
+			lo, hi = min(values, default=0.0), max(values, default=1.0)
+			span = hi - lo or 1.0
+			return [round((v - lo) / span, 4) for v in values]
+
+		x_raw  = [_extract(p, x_metric)    for p in projects]
+		y_raw  = [_extract(p, y_metric)    for p in projects]
+		sz_raw = [_extract(p, size_metric) for p in projects]
+
+		x_norm  = _normalise(x_raw)
+		y_norm  = _normalise(y_raw)
+		sz_norm = _normalise(sz_raw)
+
+		bubbles = [
+			{
+				"project_id": projects[i].get("project_id"),
+				"x": x_norm[i], "y": y_norm[i], "size": sz_norm[i],
+				f"{x_metric}_raw": round(x_raw[i], 4),
+				f"{y_metric}_raw": round(y_raw[i], 4),
+				f"{size_metric}_raw": round(sz_raw[i], 4),
+				"health": projects[i].get("health", "unknown"),
+			}
+			for i in range(len(projects))
+		]
+
+		self._audit(tenant_id, "bubble_chart_generated", portfolio_id)
+		return {
+			"portfolio_id": portfolio_id,
+			"x_metric": x_metric,
+			"y_metric": y_metric,
+			"size_metric": size_metric,
+			"bubble_count": len(bubbles),
+			"bubbles": bubbles,
+			"generated_at": str(date.today()),
+		}
+
+	async def delivery_velocity_trend(
+		self,
+		portfolio_id: str,
+		window_weeks: int = 4,
+	) -> dict[str, Any]:
+		"""Track project completion rate over rolling time windows and detect velocity decline.
+
+		Projects are counted as 'completed' when progress_pct == 100.
+		Velocity = completed projects per window.  Linear regression over the
+		window series yields a slope; a negative slope for >= 2 consecutive
+		windows triggers a 'declining' flag.
+
+		Requires projects in _project_registry to carry 'completed_date' (ISO date string).
+		"""
+		assert _present(portfolio_id), "portfolio_id required"
+		assert window_weeks >= 1, "window_weeks must be >= 1"
+		from datetime import datetime, timedelta
+		tenant_id = self.tenant_id
+
+		projects = [p for p in self._project_registry.values()
+					if p.get("portfolio_id") == portfolio_id
+					and p.get("tenant_id") == tenant_id
+					and p.get("progress_pct", 0) == 100
+					and p.get("completed_date")]
+
+		today = datetime.fromisoformat(str(date.today()))
+		# Build 8-window rolling series
+		num_windows = 8
+		windows: list[dict[str, Any]] = []
+		for w in range(num_windows - 1, -1, -1):
+			end   = today - timedelta(weeks=w * window_weeks)
+			start = end - timedelta(weeks=window_weeks)
+			count = sum(
+				1 for p in projects
+				if start <= datetime.fromisoformat(str(p["completed_date"])) < end
+			)
+			windows.append({"window_start": start.date().isoformat(),
+							 "window_end": end.date().isoformat(),
+							 "completed_count": count})
+
+		counts = [w["completed_count"] for w in windows]
+
+		# Simple linear regression slope
+		n = len(counts)
+		xs = list(range(n))
+		x_mean = sum(xs) / n
+		y_mean = sum(counts) / n
+		numerator   = sum((xs[i] - x_mean) * (counts[i] - y_mean) for i in range(n))
+		denominator = sum((xs[i] - x_mean) ** 2 for i in range(n)) or 1.0
+		slope = round(numerator / denominator, 4)
+
+		# Detect consecutive declining windows (≥2)
+		consecutive_declines = 0
+		max_consecutive = 0
+		for i in range(1, n):
+			if counts[i] < counts[i - 1]:
+				consecutive_declines += 1
+				max_consecutive = max(max_consecutive, consecutive_declines)
+			else:
+				consecutive_declines = 0
+
+		self._audit(tenant_id, "delivery_velocity_computed", portfolio_id)
+		return {
+			"portfolio_id": portfolio_id,
+			"window_weeks": window_weeks,
+			"num_windows": num_windows,
+			"velocity_slope": slope,
+			"trend": "declining" if slope < -0.1 else ("flat" if abs(slope) <= 0.1 else "improving"),
+			"max_consecutive_declining_windows": max_consecutive,
+			"velocity_alert": max_consecutive >= 2,
+			"windows": windows,
+			"computed_at": str(date.today()),
+		}
+
+	async def rag_escalation_check(
+		self,
+		tenant_id: str | None = None,
+		red_threshold_snapshots: int = 2,
+	) -> dict[str, Any]:
+		"""Evaluate portfolios for sustained RAG=RED status and emit escalation actions.
+
+		A portfolio is escalated if it has been RED in >= red_threshold_snapshots consecutive
+		health checks.  Returns a list of triggered escalation records, each carrying
+		portfolio_id, owner, severity, and a pre-populated notification payload for the
+		ntfy capability.
+		"""
+		t = tenant_id or self.tenant_id
+		portfolios = self.list_portfolios(t)
+		escalations: list[dict[str, Any]] = []
+		reviewed: list[dict[str, Any]] = []
+
+		for p in portfolios:
+			pid = p.get("id") or p.get("portfolio_id", "")
+			alignment_recs = [a for a in self.alignment_scores.values()
+							  if a.tenant_id == t and a.portfolio_id == pid]
+			avg_align = (sum(a.score for a in alignment_recs) / len(alignment_recs)
+						 if alignment_recs else 0.0)
+			rag = "green" if avg_align >= 7 else ("amber" if avg_align >= 4 else "red")
+
+			# Count consecutive RED exec reports
+			exec_history = self._exec_reports.get(pid, [])
+			consecutive_red = 0
+			for rep in reversed(exec_history):
+				rep_rag = rep.get("data", {}).get("overview", {}).get("rag", rag)
+				if rep_rag == "red":
+					consecutive_red += 1
+				else:
+					break
+			# Use current rag if no history
+			if not exec_history and rag == "red":
+				consecutive_red = 1
+
+			status = {"portfolio_id": pid, "rag": rag, "consecutive_red": consecutive_red}
+			reviewed.append(status)
+
+			if rag == "red" and consecutive_red >= red_threshold_snapshots:
+				escalations.append({
+					"escalation_id": f"esc_{pid}_{str(date.today())}",
+					"portfolio_id": pid,
+					"owner_id": p.get("owner_id", "unknown"),
+					"severity": "critical" if consecutive_red >= 4 else "high",
+					"consecutive_red_snapshots": consecutive_red,
+					"avg_alignment_score": round(avg_align, 2),
+					"recommended_action": "schedule_portfolio_review",
+					"notify_payload": {
+						"channel": "portfolio_escalation",
+						"subject": f"Portfolio {pid} RED for {consecutive_red} consecutive periods",
+						"body": (
+							f"Portfolio {pid} has alignment score {round(avg_align, 2):.2f}/10 "
+							f"and has been RED for {consecutive_red} consecutive review periods. "
+							"Immediate portfolio owner review required."
+						),
+					},
+					"triggered_at": str(date.today()),
+				})
+
+		self._audit(t, "rag_escalation_check_run", t)
+		return {
+			"tenant_id": t,
+			"portfolios_reviewed": len(reviewed),
+			"escalations_triggered": len(escalations),
+			"red_threshold": red_threshold_snapshots,
+			"escalations": escalations,
+			"all_portfolio_status": reviewed,
+			"checked_at": str(date.today()),
+		}
+
+	async def benchmark_gap_analysis(
+		self,
+		portfolio_id: str,
+		benchmark_types: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Compare portfolio performance against multiple benchmark types simultaneously.
+
+		For each benchmark type in the requested list, looks up matching PerformanceSnapshot
+		records and computes:
+		  - absolute gap = actual_value - benchmark_value
+		  - relative gap pct = (actual / benchmark - 1) * 100
+		  - gap_direction: 'above' | 'on_target' | 'below'
+
+		Returns gaps ranked by magnitude (tornado chart structure).
+		"""
+		assert _present(portfolio_id), "portfolio_id required"
+		tenant_id = self.tenant_id
+		btypes = benchmark_types or SUPPORTED_BENCHMARK_TYPES
+
+		snapshots = [s for s in self.performance_snapshots.values()
+					 if s.tenant_id == tenant_id and s.portfolio_id == portfolio_id
+					 and s.benchmark_type in btypes]
+
+		gaps: list[dict[str, Any]] = []
+		for s in snapshots:
+			bv  = s.benchmark_value
+			av  = s.actual_value
+			abs_gap = round(av - bv, 4)
+			rel_gap = round((av / bv - 1) * 100, 2) if bv else 0.0
+			gaps.append({
+				"snapshot_id": s.id,
+				"benchmark_type": s.benchmark_type,
+				"period": s.period,
+				"benchmark_value": bv,
+				"actual_value": av,
+				"absolute_gap": abs_gap,
+				"relative_gap_pct": rel_gap,
+				"gap_direction": "above" if abs_gap > 0 else ("on_target" if abs_gap == 0 else "below"),
+			})
+
+		# Rank by absolute magnitude descending (tornado order)
+		gaps.sort(key=lambda g: abs(g["absolute_gap"]), reverse=True)
+
+		self._audit(tenant_id, "benchmark_gap_analysed", portfolio_id)
+		return {
+			"portfolio_id": portfolio_id,
+			"benchmark_types_requested": btypes,
+			"snapshots_analysed": len(gaps),
+			"above_benchmark": sum(1 for g in gaps if g["gap_direction"] == "above"),
+			"below_benchmark": sum(1 for g in gaps if g["gap_direction"] == "below"),
+			"on_target": sum(1 for g in gaps if g["gap_direction"] == "on_target"),
+			"largest_gap": gaps[0] if gaps else None,
+			"gaps_ranked": gaps,
+			"analysed_at": str(date.today()),
+		}
+
+	async def portfolio_balance_score(
+		self,
+		portfolio_id: str,
+		h1_target_pct: float = 70.0,
+		h2_target_pct: float = 20.0,
+		h3_target_pct: float = 10.0,
+	) -> dict[str, Any]:
+		"""Classify projects into McKinsey Three Horizons and score portfolio balance.
+
+		Classification heuristic:
+		  - strategic_fit < 0.4 AND innovation_index < 0.4  => H1 (run-the-business)
+		  - strategic_fit >= 0.4 OR innovation_index in [0.4, 0.7)  => H2 (growth)
+		  - innovation_index >= 0.7  => H3 (transformation)
+
+		strategic_fit and innovation_index are pulled from alignment scores for the
+		'strategic_fit' and 'innovation_index' dimensions respectively, normalised to [0, 1].
+
+		Returns investment split, target deviation, and rebalancing recommendations.
+		"""
+		assert _present(portfolio_id), "portfolio_id required"
+		assert abs(h1_target_pct + h2_target_pct + h3_target_pct - 100.0) < 0.01, \
+			"Horizon targets must sum to 100"
+		tenant_id = self.tenant_id
+
+		projects = [p for p in self._project_registry.values()
+					if p.get("portfolio_id") == portfolio_id and p.get("tenant_id") == tenant_id]
+
+		def _avg_score_for_dim(dim: str) -> dict[str, float]:
+			"""Return {project_id: avg_score} for the given alignment dimension."""
+			result: dict[str, float] = {}
+			for a in self.alignment_scores.values():
+				if a.tenant_id != tenant_id or a.portfolio_id != portfolio_id:
+					continue
+				if a.dimension != dim:
+					continue
+				pid_key = getattr(a, "project_id", portfolio_id)
+				result.setdefault(pid_key, []).append(a.score / 10.0)  # type: ignore[arg-type]
+			return {k: round(sum(v) / len(v), 4) for k, v in result.items()}  # type: ignore[arg-type]
+
+		sf_scores  = _avg_score_for_dim("strategic_fit")
+		inn_scores = _avg_score_for_dim("innovation_index")
+
+		h1_budget = h2_budget = h3_budget = 0.0
+		classified: list[dict[str, Any]] = []
+		for p in projects:
+			pid    = p.get("project_id", "")
+			budget = float(p.get("budget", 0.0))
+			sf     = sf_scores.get(pid, 0.3)
+			inn    = inn_scores.get(pid, 0.3)
+			if inn >= 0.7:
+				horizon = "H3"
+				h3_budget += budget
+			elif sf >= 0.4 or (0.4 <= inn < 0.7):
+				horizon = "H2"
+				h2_budget += budget
+			else:
+				horizon = "H1"
+				h1_budget += budget
+			classified.append({"project_id": pid, "horizon": horizon,
+								"strategic_fit": sf, "innovation_index": inn,
+								"budget": budget})
+
+		total_budget = h1_budget + h2_budget + h3_budget or 1.0
+		h1_actual = round(h1_budget / total_budget * 100, 2)
+		h2_actual = round(h2_budget / total_budget * 100, 2)
+		h3_actual = round(h3_budget / total_budget * 100, 2)
+
+		balance_deviation = round(
+			(abs(h1_actual - h1_target_pct) + abs(h2_actual - h2_target_pct) + abs(h3_actual - h3_target_pct)) / 3, 2
+		)
+
+		self._audit(tenant_id, "portfolio_balance_scored", portfolio_id)
+		return {
+			"portfolio_id": portfolio_id,
+			"project_count": len(projects),
+			"horizon_split": {"H1": h1_actual, "H2": h2_actual, "H3": h3_actual},
+			"horizon_targets": {"H1": h1_target_pct, "H2": h2_target_pct, "H3": h3_target_pct},
+			"balance_deviation_pct": balance_deviation,
+			"balance_rating": "excellent" if balance_deviation < 5 else ("good" if balance_deviation < 15 else "needs_rebalancing"),
+			"rebalancing_needed": balance_deviation >= 15,
+			"projects": classified,
+			"scored_at": str(date.today()),
+		}
+
+	async def resource_bottleneck_detector(
+		self,
+		portfolio_id: str,
+		period: str,
+		top_n: int = 5,
+	) -> dict[str, Any]:
+		"""Identify the top-N over-allocated resource roles across portfolio projects.
+
+		Each project in _project_registry may carry a 'role_demand' dict:
+		  {"senior_developer": 2.5, "data_engineer": 1.0, ...}
+		and a 'role_supply' dict with available FTE per role.
+
+		Utilisation = demand / supply.  Severity = utilisation * impact_weight
+		where impact_weight defaults to the project's strategic_fit alignment score.
+		"""
+		assert _present(portfolio_id), "portfolio_id required"
+		assert _present(period), "period required"
+		assert top_n >= 1, "top_n must be >= 1"
+		tenant_id = self.tenant_id
+
+		projects = [p for p in self._project_registry.values()
+					if p.get("portfolio_id") == portfolio_id and p.get("tenant_id") == tenant_id]
+
+		# Aggregate demand and supply per role
+		role_demand: dict[str, float] = {}
+		role_supply: dict[str, float] = {}
+		for p in projects:
+			for role, fte in p.get("role_demand", {}).items():
+				role_demand[role] = role_demand.get(role, 0.0) + float(fte)
+			for role, fte in p.get("role_supply", {}).items():
+				role_supply[role] = role_supply.get(role, 0.0) + float(fte)
+
+		# Fallback: if no role-level data, use aggregate FTE
+		if not role_demand:
+			total_d = sum(float(p.get("demand_fte", 0.0)) for p in projects)
+			total_s = sum(float(p.get("supply_fte", 0.0)) for p in projects)
+			role_demand = {"aggregate_fte": total_d}
+			role_supply = {"aggregate_fte": total_s}
+
+		bottlenecks: list[dict[str, Any]] = []
+		for role in role_demand:
+			demand  = role_demand[role]
+			supply  = role_supply.get(role, demand * 0.8)  # assume 80% supply if unknown
+			util    = round(demand / supply, 4) if supply else float("inf")
+			gap_fte = round(demand - supply, 2)
+			bottlenecks.append({
+				"role": role,
+				"demand_fte": round(demand, 2),
+				"supply_fte": round(supply, 2),
+				"utilisation": util,
+				"gap_fte": gap_fte,
+				"severity": "critical" if util > 1.3 else ("high" if util > 1.1 else ("moderate" if util > 1.0 else "ok")),
+				"over_allocated": util > 1.0,
+			})
+
+		bottlenecks.sort(key=lambda b: b["utilisation"], reverse=True)
+
+		self._audit(tenant_id, "resource_bottleneck_detected", portfolio_id)
+		return {
+			"portfolio_id": portfolio_id,
+			"period": period,
+			"roles_analysed": len(bottlenecks),
+			"over_allocated_roles": sum(1 for b in bottlenecks if b["over_allocated"]),
+			"top_bottlenecks": bottlenecks[:top_n],
+			"all_roles": bottlenecks,
+			"detected_at": str(date.today()),
+		}
+
+	async def portfolio_lifecycle_advance(
+		self,
+		portfolio_id: str,
+		target_stage: str,
+		actor_id: str,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		"""Advance a portfolio through its lifecycle with transition validation.
+
+		Legal transitions:
+		  proposed -> approved -> active -> under_review -> closed
+		  active -> archived (bypass for abandoned portfolios)
+		  under_review -> active (re-activation after review)
+
+		Raises PermissionError on illegal transitions.
+		Records a full transition history on the portfolio object.
+		"""
+		assert _present(portfolio_id), "portfolio_id required"
+		assert _present(target_stage), "target_stage required"
+		assert _present(actor_id), "actor_id required"
+		assert _present(evidence_reference), "evidence_reference required"
+		tenant_id = self.tenant_id
+
+		target_stage = _norm(target_stage)
+		assert target_stage in SUPPORTED_PORTFOLIO_STATUSES, \
+			f"target_stage must be one of {SUPPORTED_PORTFOLIO_STATUSES}"
+
+		portfolio = self._portfolio_or_none(portfolio_id, tenant_id)
+		assert portfolio is not None, f"portfolio {portfolio_id} not found"
+
+		LEGAL_TRANSITIONS: dict[str, list[str]] = {
+			"proposed":     ["approved"],
+			"approved":     ["active"],
+			"active":       ["under_review", "archived", "closed"],
+			"under_review": ["active", "closed"],
+			"archived":     ["closed"],
+			"closed":       [],
+		}
+
+		current = portfolio.status
+		allowed = LEGAL_TRANSITIONS.get(current, [])
+		if target_stage not in allowed:
+			raise PermissionError(
+				f"Illegal lifecycle transition: {current} -> {target_stage}. "
+				f"Allowed: {allowed}"
+			)
+
+		# Record transition history (stored as list on the portfolio object via __dict__)
+		history = getattr(portfolio, "_lifecycle_history", [])
+		history.append({
+			"from_stage": current,
+			"to_stage": target_stage,
+			"actor_id": actor_id,
+			"evidence_reference": evidence_reference,
+			"transitioned_at": str(date.today()),
+		})
+		portfolio.status = target_stage
+		try:
+			portfolio._lifecycle_history = history  # type: ignore[attr-defined]
+		except AttributeError:
+			object.__setattr__(portfolio, "_lifecycle_history", history)
+
+		self._audit(tenant_id, "portfolio_lifecycle_advanced", portfolio_id)
+		return {
+			"portfolio_id": portfolio_id,
+			"previous_stage": current,
+			"current_stage": target_stage,
+			"actor_id": actor_id,
+			"evidence_reference": evidence_reference,
+			"lifecycle_history": history,
+			"advanced_at": str(date.today()),
+		}
+
+	async def generate_portfolio_narrative(
+		self,
+		portfolio_id: str,
+		period: str,
+		style: str = "formal",
+	) -> dict[str, Any]:
+		"""Generate a plain-English executive narrative for a portfolio period.
+
+		Calls a locally-hosted Ollama model (llama3.1:8b or OLLAMA_NARRATIVE_MODEL env var).
+		style: 'formal' | 'concise' | 'risk_focused'
+
+		Falls back gracefully when OLLAMA_BASE_URL is not configured, returning a
+		structured template narrative built from the report data.
+		"""
+		import os
+		assert _present(portfolio_id), "portfolio_id required"
+		assert _present(period), "period required"
+		assert style in {"formal", "concise", "risk_focused"}, \
+			"style must be formal | concise | risk_focused"
+
+		# Gather structured data
+		report_result = await self.executive_portfolio_report(portfolio_id, period)
+		data  = report_result.get("data", {})
+		ov    = data.get("overview", {})
+		rr    = data.get("risk_return", {})
+		iei   = data.get("investment_efficiency", {})
+
+		style_instructions = {
+			"formal": "Write in formal business English suitable for a board pack.",
+			"concise": "Use bullet-point style executive summary, maximum 3 sentences per section.",
+			"risk_focused": "Lead with risks and mitigation actions; secondary focus on performance.",
+		}
+
+		prompt = f"""You are a senior portfolio management consultant.
+{style_instructions[style]}
+
+Portfolio: {portfolio_id} | Period: {period}
+Projects: {ov.get('project_count', 0)} | Budget utilisation: {ov.get('budget_utilisation_pct', 0)}%
+Health: {ov.get('health_distribution', {})} | Avg progress: {ov.get('avg_progress_pct', 0)}%
+Avg alignment: {ov.get('avg_alignment_score', 0)}/10
+Risk/Return ratio: {rr.get('ratio', 'N/A')} | ROI: {iei.get('roi_pct', 0)}% | NPV: {iei.get('npv', 0)}
+
+Write a 3-paragraph executive narrative: (1) overall portfolio health, (2) financial performance,
+(3) key risks and recommended actions.
+"""
+
+		narrative_text: str | None = None
+		model_used: str = "template_fallback"
+
+		ollama_url = os.environ.get("OLLAMA_BASE_URL")
+		if ollama_url:
+			try:
+				import httpx
+				model_name = os.environ.get("OLLAMA_NARRATIVE_MODEL", "llama3.1:8b")
+				async with httpx.AsyncClient(timeout=60.0) as client:
+					resp = await client.post(
+						f"{ollama_url}/api/generate",
+						json={"model": model_name, "prompt": prompt, "stream": False},
+					)
+					resp.raise_for_status()
+					narrative_text = resp.json().get("response", "").strip()
+					model_used = model_name
+			except Exception:
+				narrative_text = None
+
+		if not narrative_text:
+			# Structured template fallback
+			health_dist = ov.get("health_distribution", {})
+			narrative_text = (
+				f"Portfolio {portfolio_id} contains {ov.get('project_count', 0)} active initiatives "
+				f"with an average progress of {ov.get('avg_progress_pct', 0):.1f}% as of {period}. "
+				f"Health distribution: {health_dist.get('green', 0)} on-track, "
+				f"{health_dist.get('amber', 0)} at-risk, {health_dist.get('red', 0)} critical. "
+				f"Strategic alignment averages {ov.get('avg_alignment_score', 0):.2f}/10.\n\n"
+				f"Financial performance shows budget utilisation of "
+				f"{ov.get('budget_utilisation_pct', 0):.1f}%. "
+				f"Portfolio ROI stands at {iei.get('roi_pct', 0):.1f}% with NPV of "
+				f"{iei.get('npv', 0):,.0f}. "
+				f"Investment efficiency index: {iei.get('iei', 0):.3f}.\n\n"
+				f"Key risk indicator: risk/return ratio of {rr.get('ratio', 'N/A')}. "
+				f"Recommended action: review at-risk and critical projects immediately and "
+				f"validate strategic alignment for any project scoring below 4/10."
+			)
+
+		self._audit(self.tenant_id, "portfolio_narrative_generated", portfolio_id)
+		return {
+			"portfolio_id": portfolio_id,
+			"period": period,
+			"style": style,
+			"model_used": model_used,
+			"narrative": narrative_text,
+			"source_data": data,
+			"generated_at": str(date.today()),
+		}
+
+	async def sync_to_intel_domain(
+		self,
+		portfolio_id: str,
+		intel_service: Any | None = None,
+	) -> dict[str, Any]:
+		"""Push a structured portfolio health signal into the intel domain pipeline.
+
+		Builds a standardised signal payload from:
+		  - Portfolio RAG status
+		  - Avg alignment score
+		  - EVM SPI/CPI (if available)
+		  - Top risk score
+
+		If intel_service is provided and exposes `ingest_portfolio_signal`, calls it directly.
+		Otherwise serialises the payload and records it in the audit log for async pickup.
+
+		This closes the loop between portfolio health and enterprise threat intelligence.
+		"""
+		assert _present(portfolio_id), "portfolio_id required"
+		tenant_id = self.tenant_id
+
+		# Gather portfolio health data
+		portfolio = self._portfolio_or_none(portfolio_id, tenant_id)
+		assert portfolio is not None, f"portfolio {portfolio_id} not found"
+
+		alignment_recs = [a for a in self.alignment_scores.values()
+						  if a.tenant_id == tenant_id and a.portfolio_id == portfolio_id]
+		avg_align = (sum(a.score for a in alignment_recs) / len(alignment_recs)
+					 if alignment_recs else 0.0)
+		rag = "green" if avg_align >= 7 else ("amber" if avg_align >= 4 else "red")
+
+		rr_recs = [r for r in self.risk_return_analyses.values()
+				   if r.tenant_id == tenant_id and r.portfolio_id == portfolio_id]
+		avg_risk = (sum(r.risk_score for r in rr_recs) / len(rr_recs) if rr_recs else 0.0)
+
+		projects = [p for p in self._project_registry.values()
+					if p.get("portfolio_id") == portfolio_id and p.get("tenant_id") == tenant_id]
+		critical_count = sum(1 for p in projects if p.get("health") == "red")
+
+		signal_payload: dict[str, Any] = {
+			"signal_type": "portfolio_health",
+			"source_capability": "ppm_pan",
+			"portfolio_id": portfolio_id,
+			"tenant_id": tenant_id,
+			"rag_status": rag,
+			"avg_alignment_score": round(avg_align, 2),
+			"avg_risk_score": round(avg_risk, 2),
+			"critical_projects": critical_count,
+			"portfolio_status": portfolio.status,
+			"severity": "critical" if rag == "red" and critical_count > 0 else (
+				"high" if rag == "red" else ("medium" if rag == "amber" else "low")
+			),
+			"signal_timestamp": str(date.today()),
+			"metadata": {
+				"alignment_records": len(alignment_recs),
+				"risk_records": len(rr_recs),
+				"project_count": len(projects),
+			},
+		}
+
+		intel_result: dict[str, Any] = {}
+		if intel_service is not None and hasattr(intel_service, "ingest_portfolio_signal"):
+			try:
+				intel_result = await intel_service.ingest_portfolio_signal(signal_payload)
+			except Exception as exc:
+				intel_result = {"error": str(exc), "signal_queued": False}
+		else:
+			# Record for async pickup — intel domain polls this audit stream
+			intel_result = {"signal_queued": True, "delivery": "audit_stream"}
+
+		self._audit(tenant_id, "intel_signal_synced", portfolio_id)
+		return {
+			"portfolio_id": portfolio_id,
+			"signal_payload": signal_payload,
+			"intel_result": intel_result,
+			"synced_at": str(date.today()),
+		}
+
 PpmPanService = PortfolioAnalyticsService

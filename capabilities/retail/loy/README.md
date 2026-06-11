@@ -1,7 +1,7 @@
 # Loyalty & Rewards
 
 ## Overview
-Provides end-to-end loyalty programme management for retail tenants: member enrolment with consent and identity verification, points earn/redeem/adjust transactions, tier qualification and downgrade management, coalition partner integration, targeted campaign authoring with approval workflows, a reward catalogue, customer lifetime value (CLV) segmentation, and configurable points-expiry policies. All operations are tenant-isolated, streamed to Bytewax, and governed by 28 deterministic rules.
+Provides end-to-end loyalty programme management for retail tenants: member enrolment with consent and identity verification, points earn/redeem/adjust/batch transactions, tier qualification and downgrade management, coalition partner integration, referral earn, targeted campaign authoring with approval workflows and ROI measurement, a tiered reward catalogue, customer lifetime value (CLV) segmentation, points liability reporting, member merge/deduplication, and configurable points-expiry policies. All operations are tenant-isolated, streamed to Bytewax, and governed by 28+ deterministic rules with full GDPR/DPA consent lifecycle support.
 
 ## Capability ID
 `retail_loy`
@@ -11,14 +11,19 @@ Provides end-to-end loyalty programme management for retail tenants: member enro
 |---|---|
 | loyalty_member_enrolment | Consent-gated member onboarding with identity verification |
 | loyalty_points_earn | POS and partner earn transactions with receipt validation |
+| loyalty_points_earn_batch | High-volume batch earn with partial-failure model |
 | loyalty_points_redeem | Balance-validated redemption across mechanisms |
-| loyalty_tier_management | Tier assignment with skip protection and downgrade grace |
-| loyalty_campaign_management | Campaign authoring, approval, and activation lifecycle |
+| loyalty_tier_management | Tier upgrade, downgrade with grace period, and skip protection |
+| loyalty_campaign_management | Campaign authoring, approval, activation, and ROI measurement |
 | loyalty_partner_coalition | Multi-partner earn/redeem with SLA and settlement |
+| loyalty_referral_earn | Referral code generation and referee/referrer bonus processing |
 | loyalty_clv_analytics | RFM-based CLV scoring and segment assignment |
 | loyalty_expiry_management | Rolling-activity and calendar-year expiry with dry-run |
-| loyalty_reward_catalogue | Reward stock and validity management |
-| loyalty_transaction_ledger | Immutable earn/redeem/adjust audit ledger |
+| loyalty_reward_catalogue | Tier-gated and segment-gated reward stock and validity management |
+| loyalty_transaction_ledger | Immutable earn/redeem/adjust/coalition/referral audit ledger |
+| loyalty_liability_report | Points float, breakage estimate, and net liability in currency |
+| loyalty_member_merge | Duplicate detection and member merge with transaction retargeting |
+| loyalty_privacy | GDPR/DPA consent withdrawal, data export, and deletion scheduling |
 
 ## Requires
 | Capability | Reason |
@@ -52,17 +57,30 @@ Provides end-to-end loyalty programme management for retail tenants: member enro
 | /retail-loy/api/v1/members | GET/POST | List members / enrol | retail_loy:view/write |
 | /retail-loy/api/v1/members/<id> | GET/PUT/DELETE | Member detail/update/deactivate | retail_loy:view/write |
 | /retail-loy/api/v1/members/<id>/transactions | GET | Transaction ledger | retail_loy:view |
+| /retail-loy/api/v1/members/<id>/summary | GET | Full member summary | retail_loy:view |
+| /retail-loy/api/v1/members/<id>/export | GET | GDPR data export | retail_loy:admin |
+| /retail-loy/api/v1/members/<id>/consent/withdraw | POST | Withdraw consent | retail_loy:admin |
+| /retail-loy/api/v1/members/<id>/referral-code | GET/POST | Get/generate referral code | retail_loy:write |
+| /retail-loy/api/v1/members/merge | POST | Merge duplicate members | retail_loy:admin |
+| /retail-loy/api/v1/members/duplicates | GET | List duplicate candidates | retail_loy:admin |
 | /retail-loy/api/v1/transactions/earn | POST | Post earn transaction | retail_loy:write |
+| /retail-loy/api/v1/transactions/earn/batch | POST | Batch earn (high volume) | retail_loy:write |
 | /retail-loy/api/v1/transactions/redeem | POST | Post redeem transaction | retail_loy:write |
 | /retail-loy/api/v1/transactions/adjust | POST | Administrative adjustment | retail_loy:write |
+| /retail-loy/api/v1/transactions/referral | POST | Process referral earn | retail_loy:write |
 | /retail-loy/api/v1/tiers | GET/POST | List/create tiers | retail_loy:view/admin |
+| /retail-loy/api/v1/tiers/<id>/downgrade-check | POST | Run downgrade check | retail_loy:admin |
 | /retail-loy/api/v1/campaigns | GET/POST | List/create campaigns | retail_loy:view/write |
 | /retail-loy/api/v1/campaigns/<id>/approve | POST | Approve campaign | retail_loy:admin |
 | /retail-loy/api/v1/campaigns/<id>/activate | POST | Activate campaign | retail_loy:admin |
+| /retail-loy/api/v1/campaigns/<id>/roi | GET | Campaign ROI report | retail_loy:admin |
+| /retail-loy/api/v1/campaigns/<id>/attribution | POST | Record campaign attribution | retail_loy:write |
 | /retail-loy/api/v1/partners | GET/POST | List/register partners | retail_loy:admin |
 | /retail-loy/api/v1/rewards | GET/POST | List/create rewards | retail_loy:view/write |
+| /retail-loy/api/v1/rewards/for-member/<id> | GET | Tier-gated rewards for member | retail_loy:view |
 | /retail-loy/api/v1/clv/<member_id> | GET | Get CLV segment | retail_loy:view |
 | /retail-loy/api/v1/expiry/run | POST | Run expiry (dry_run default) | retail_loy:admin |
+| /retail-loy/api/v1/reports/liability | GET | Points liability report | retail_loy:admin |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -111,8 +129,25 @@ Provides end-to-end loyalty programme management for retail tenants: member enro
 - Batch earn without Bytewax stream: guardrail enforced
 
 ## Composability Notes
-- **retail_pos** triggers earn/redeem via the transaction ledger at checkout
-- **retail_omc** triggers earn on online orders via the same earn API
+- **retail_pos** triggers earn/redeem via the transaction ledger at checkout; batch earn at EOD
+- **retail_omc** triggers earn on online orders via the same earn API; referral codes tracked per channel
 - **retail_prm** can issue loyalty_multiplier campaigns that interact with earn rates
-- **retail_sin** CLV segments can be used as audience targeting in campaigns
-- CLV recalculation is scheduled via **schd** and can trigger tier reassignments
+- **retail_sin** CLV segments can be used as audience targeting in campaigns and tiered reward gating
+- CLV recalculation is scheduled via **schd** and can trigger tier reassignments and churn interventions
+- **retail_loy** publishes `member_merged`, `consent_withdrawn`, `referral_completed`, and `downgrade_scheduled` events to the Bytewax stream for downstream consumers
+
+## New Service Methods (v1.1)
+| Method | Description |
+|---|---|
+| `batch_earn_points()` | Process list of earn records with partial-failure model |
+| `tier_downgrade_check()` | Evaluate and execute tier downgrade with grace period |
+| `points_liability_report()` | Finance-grade outstanding liability with breakage estimate |
+| `merge_members()` | Merge duplicate member accounts, retarget transactions |
+| `find_duplicate_candidates()` | Fuzzy-match duplicate detection by email/mobile/name |
+| `generate_referral_code()` | Idempotent referral code generation per member |
+| `process_referral_earn()` | Award referrer and referee bonuses on qualifying spend |
+| `record_campaign_attribution()` | Link transactions to campaigns for ROI tracking |
+| `get_campaign_roi()` | Compute incremental revenue ROI vs. points cost |
+| `list_rewards_for_member()` | Tier-gated and segment-gated reward catalogue |
+| `withdraw_consent()` | GDPR consent withdrawal with freeze and deletion scheduling |
+| `export_member_data()` | GDPR DSAR — full member data export |

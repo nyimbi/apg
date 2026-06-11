@@ -83,5 +83,27 @@ Provides comprehensive telecom security management covering fraud detection (WAN
 - Intercept expiry tracked — expired intercepts must be renewed via new warrant
 - Regulatory authority field separate from warrant to support dual-sign jurisdictions
 
+## New Methods (v1.1)
+| Method | Description |
+|--------|-------------|
+| `evaluate_fraud_risk_score()` | Multi-signal 0–1 risk score for an MSISDN (velocity, geo, IOC, SIM swap) |
+| `correlate_signaling_attacks()` | Cluster SS7/Diameter attacks to detect coordinated campaigns |
+| `generate_security_posture_score()` | Unified 0–100 posture score with grade across 4 security dimensions |
+| `enrich_threat_intel_ioc()` | Cross-reference an IOC against all internal signal stores |
+| `run_red_team_scenario()` | Replay GSMA attack scenarios against live detection logic |
+| `manage_intercept_expiry()` | Audit LI expiry: mark expired, warn pre-expiry, idempotent |
+| `multi_jurisdiction_compliance_matrix()` | Per-jurisdiction compliance matrix (KE/TZ/UG/ZA/EU/US) |
+| `subscriber_anomaly_detection()` | Z-score behavioral anomaly detection across 5 subscriber metrics |
+
+## World-Class Improvement Roadmap
+See `WORLD_CLASS_IMPROVEMENTS.md` for 15 prioritised enhancements including:
+- ML-driven fraud scoring via local Ollama models
+- Real-time Bytewax streaming fraud pipeline
+- GSMA FS.11 compliant SS7 firewall
+- STIX/TAXII threat intelligence federation
+- CALEA/ETSI LI delivery functions (DF2/DF3)
+- Cryptographic evidence chains for fraud cases
+- Automated red team regression framework
+
 ## Composability Notes
 Feeds fraud signals to telecom_ana (fraud analytics). Consumes network events from telecom_net for SS7/Diameter correlation. Lawful intercept integrates with comp for regulatory reporting chains. Threat intel composes with grph for adversary network mapping.

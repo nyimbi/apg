@@ -1,9 +1,15 @@
-# PLFD Platform Foundation Capability
+# PLFD Platform Federation Capability
 
-PLFD provides APG applications with a tenant-scoped foundation governance
-runtime: platform service registry, dependency posture, required baselines,
-readiness gates, platform change approval, foundation agents, UI metadata,
-theme tokens, audit evidence, and Bytewax-backed lifecycle events.
+PLFD provides APG applications with a tenant-scoped foundation governance and
+**multi-platform federation** runtime: platform service registry, dependency
+posture, required baselines, readiness gates, platform change approval,
+foundation agents, UI metadata, theme tokens, audit evidence, and
+Bytewax-backed lifecycle events.
+
+New in this release: async-first federation APIs covering federated identity
+token exchange, capability sharing negotiation, active dependency probing,
+change risk scoring, baseline drift detection, SLA contract enforcement, and
+canary release orchestration.
 
 The package stays dependency-light. Production configuration stores, tenant
 registries, identity providers, audit sinks, monitoring systems, health checks,
@@ -25,6 +31,23 @@ APG adapters in the executable contract and are bound by the host application.
   and contribution-disclosure guardrails.
 - UI route, API, view-model, theme, semantic-model, package-manifest, and
   release-report evidence.
+
+### Federation Features (async)
+
+| Method | Purpose |
+|--------|---------|
+| `async_federated_token_exchange` | OAuth2 RFC 8693 token exchange between tenants |
+| `async_negotiate_capability_share` | Runtime capability-sharing negotiation with reciprocal offers |
+| `async_health_check_all_services` | Concurrent fan-out health probing via `asyncio.gather` |
+| `async_probe_dependency_health` | Active single-dependency liveness probe with pluggable probe_fn |
+| `async_probe_all_dependencies` | Parallel fan-out across all tenant dependencies |
+| `async_score_change_risk` | Composite risk scoring (blast radius, dep health, review, rollback) |
+| `async_detect_baseline_drift` | Diff approved baseline against live config snapshot |
+| `async_sla_contract_register` | Register SLA targets (availability, latency, error-rate, RPO, RTO) |
+| `async_sla_evaluate` | Evaluate SLA compliance from a metrics window |
+| `async_canary_release_start` | Start a canary release with configurable traffic split |
+| `async_canary_release_advance` | Advance canary traffic; promotes at 100% |
+| `async_canary_release_abort` | Abort canary and roll back to baseline |
 
 ## Main Files
 

@@ -102,6 +102,18 @@ class RealTimeMonitoringService:
 		self._triage_state: dict[str, dict[str, Any]] = {}
 		# False-positive registry: monitor_id -> list of flagged event fingerprints
 		self._false_positives: dict[str, list[str]] = defaultdict(list)
+		# Suppression registry: monitor_id -> suppression record with expiry
+		self._suppressions: dict[str, dict[str, Any]] = {}
+		# Per-watch adaptive baselines: watch_id -> baseline stats dict
+		self._watch_baselines: dict[str, dict[str, Any]] = {}
+		# Watch expression version history: watch_id -> list of version records
+		self._watch_history: dict[str, list[dict[str, Any]]] = defaultdict(list)
+		# Watchlist entities: entity_id -> watchlist record
+		self._watchlist: dict[str, dict[str, Any]] = {}
+		# Incident playbooks: incident_id -> playbook record
+		self._playbooks: dict[str, dict[str, Any]] = {}
+		# Sealed audit ledgers: ledger_root -> sealed record
+		self._sealed_ledgers: dict[str, dict[str, Any]] = {}
 
 	# ------------------------------------------------------------------
 	# Capability introspection
@@ -1220,19 +1232,408 @@ class RealTimeMonitoringService:
 		)
 		raise PermissionError(reasons or "monitoring_policy_denied")
 
+	# ------------------------------------------------------------------
+	# World-class improvements – new async methods (8+)
+	# ------------------------------------------------------------------
 
-
-	async def ml_alert_triage(self, *args, **kwargs):
-		"""AI-powered AI-powered security alert triage and false positive reduction. Requires OLLAMA_BASE_URL."""
+	async def ml_alert_triage(self, *args, **kwargs) -> dict[str, Any]:
+		"""AI-powered security alert triage and false positive reduction. Requires OLLAMA_BASE_URL."""
 		import os
 		if not os.environ.get("OLLAMA_BASE_URL"):
 			return {"ml_enhanced": False}
 		try:
 			from capabilities.common.mlx import MLCapability
 			ml = MLCapability()
-			result = await ml.classify(str(kwargs), labels=["false_positive","informational","low_priority","high_priority","critical"])
+			result = await ml.classify(str(kwargs), labels=["false_positive", "informational", "low_priority", "high_priority", "critical"])
 			return {"triage_class": result.label, "confidence": result.confidence, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def update_watch_baseline(self, watch_id: str, window: str = "7d") -> dict[str, Any]:
+		"""Recompute adaptive confidence baseline for *watch_id* over *window*.
+
+		Computes mean, stddev, p95, p99 from confidence scores of all recorded
+		events on this watch. Stored in ``self._watch_baselines``.
+
+		Returns baseline dict with adaptive_threshold = mean + 1.5 * stddev.
+		"""
+		assert present(watch_id), "watch_id required"
+		assert present(window), "window required"
+		tenant_id = self.tenant_id
+		scores: list[float] = [
+			getattr(e, "confidence_score", 0.0)
+			for (tid, _), e in self.events.items()
+			if tid == tenant_id and getattr(e, "watch_id", "") == watch_id
+		]
+		if not scores:
+			baseline: dict[str, Any] = {
+				"watch_id": watch_id, "window": window, "sample_count": 0,
+				"mean": 0.0, "stddev": 0.0, "p95": 0.0, "p99": 0.0,
+				"adaptive_threshold": 0.0, "computed_at": _utcnow(),
+			}
+			self._watch_baselines[watch_id] = baseline
+			return baseline
+		mean = statistics.mean(scores)
+		stddev = statistics.stdev(scores) if len(scores) > 1 else 0.0
+		sorted_scores = sorted(scores)
+		n = len(sorted_scores)
+		p95 = sorted_scores[min(int(n * 0.95), n - 1)]
+		p99 = sorted_scores[min(int(n * 0.99), n - 1)]
+		baseline = {
+			"watch_id": watch_id, "window": window, "sample_count": n,
+			"mean": round(mean, 4), "stddev": round(stddev, 4),
+			"p95": round(p95, 4), "p99": round(p99, 4),
+			"adaptive_threshold": round(mean + 1.5 * stddev, 4),
+			"computed_at": _utcnow(),
+		}
+		self._watch_baselines[watch_id] = baseline
+		self._audit(tenant_id, "watch_baseline_updated", watch_id)
+		return baseline
+
+	async def update_watch_expression(
+		self,
+		watch_id: str,
+		new_expression: str,
+		change_reason: str,
+		analyst_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Update keyword expression for *watch_id* with full version history.
+
+		Appends a version record to ``self._watch_history[watch_id]`` before
+		applying the change, enabling rollback and audit-grade change tracking.
+		"""
+		assert present(watch_id), "watch_id required"
+		assert present(new_expression), "new_expression required"
+		assert present(change_reason), "change_reason required"
+		tenant_id = self.tenant_id
+		key = self._tenant_key(tenant_id, watch_id)
+		watch = self.watches.get(key)
+		if watch is None:
+			raise KeyError(f"Watch not found: {watch_id}")
+		previous_expression = watch.watch_expression
+		version = len(self._watch_history[watch_id]) + 1
+		self._watch_history[watch_id].append({
+			"version": version,
+			"previous_expression": previous_expression,
+			"new_expression": new_expression,
+			"change_reason": change_reason,
+			"analyst_id": analyst_id or self.actor_id,
+			"changed_at": _utcnow(),
+		})
+		watch.watch_expression = new_expression
+		self._audit(tenant_id, "watch_expression_updated", watch_id)
+		return {**watch.to_dict(), "version": version + 1, "previous_expression": previous_expression}
+
+	async def unsuppress_monitor(self, monitor_id: str) -> dict[str, Any]:
+		"""Reinstate alerting for *monitor_id* before its suppression window expires.
+
+		Returns confirmation record. No-op if monitor is not currently suppressed.
+		"""
+		assert present(monitor_id), "monitor_id required"
+		suppression = self._suppressions.pop(monitor_id, None)
+		if suppression is None:
+			return {"monitor_id": monitor_id, "status": "not_suppressed", "reinstated_at": _utcnow()}
+		self._audit(self.tenant_id, "monitor_unsuppressed", monitor_id)
+		return {
+			"monitor_id": monitor_id, "status": "reinstated",
+			"original_suppression": suppression, "reinstated_at": _utcnow(),
+		}
+
+	async def add_to_watchlist(
+		self,
+		entity_type: str,
+		entity_id: str,
+		keywords: list[str],
+		risk_tier: str = "medium",
+	) -> dict[str, Any]:
+		"""Register an entity (person, org, IP, domain) on the watchlist.
+
+		Maps entity to underlying ``MonitoringWatch`` records created via
+		``start_monitor``. Degrades gracefully if no policy/source is registered.
+
+		Args:
+			risk_tier: One of ``"low"``, ``"medium"``, ``"high"``.
+		"""
+		assert present(entity_type), "entity_type required"
+		assert present(entity_id), "entity_id required"
+		assert isinstance(keywords, list) and keywords, "keywords must be a non-empty list"
+		assert risk_tier in {"low", "medium", "high"}, "risk_tier must be low|medium|high"
+		watch_id: str | None = None
+		try:
+			result = await self.start_monitor(
+				target_type=entity_type,
+				target_id=entity_id,
+				keywords=keywords,
+				channels=["watchlist"],
+			)
+			watch_id = result["monitor_id"]
+		except RuntimeError:
+			pass  # No policy/source yet; entry created without underlying watch
+		entry: dict[str, Any] = {
+			"entity_type": entity_type, "entity_id": entity_id,
+			"keywords": keywords, "risk_tier": risk_tier,
+			"watch_id": watch_id, "hit_count": 0, "last_seen": None,
+			"added_at": _utcnow(), "tenant_id": self.tenant_id,
+		}
+		self._watchlist[entity_id] = entry
+		self._audit(self.tenant_id, "watchlist_entity_added", entity_id)
+		return entry
+
+	async def remove_from_watchlist(self, entity_id: str) -> dict[str, Any]:
+		"""Remove an entity from the watchlist and deactivate its underlying watch.
+
+		Raises KeyError if entity is not on the watchlist.
+		"""
+		assert present(entity_id), "entity_id required"
+		entry = self._watchlist.pop(entity_id, None)
+		if entry is None:
+			raise KeyError(f"Entity not on watchlist: {entity_id}")
+		watch_id = entry.get("watch_id")
+		if watch_id:
+			try:
+				await self.stop_monitor(watch_id)
+			except KeyError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+		self._audit(self.tenant_id, "watchlist_entity_removed", entity_id)
+		return {"entity_id": entity_id, "removed": True, "watch_id": watch_id, "removed_at": _utcnow()}
+
+	async def watchlist_report(self) -> list[dict[str, Any]]:
+		"""Aggregate hit counts and last-seen timestamps per watchlist entity.
+
+		Iterates events to count hits per entity's watch ID and identify the
+		most recent observation. Returns entries sorted by hit_count descending.
+		"""
+		tenant_id = self.tenant_id
+		watch_to_entity: dict[str, str] = {
+			entry["watch_id"]: eid
+			for eid, entry in self._watchlist.items()
+			if entry.get("watch_id")
+		}
+		hit_counts: dict[str, int] = defaultdict(int)
+		last_seen: dict[str, str] = {}
+		for (tid, _), event in self.events.items():
+			if tid != tenant_id:
+				continue
+			wid = getattr(event, "watch_id", "")
+			eid = watch_to_entity.get(wid)
+			if eid:
+				hit_counts[eid] += 1
+				observed = getattr(event, "observed_at", "")
+				if observed and (eid not in last_seen or observed > last_seen[eid]):
+					last_seen[eid] = observed
+		report: list[dict[str, Any]] = [
+			{**entry, "hit_count": hit_counts.get(eid, 0), "last_seen": last_seen.get(eid)}
+			for eid, entry in self._watchlist.items()
+		]
+		report.sort(key=lambda x: x["hit_count"], reverse=True)
+		self._audit(tenant_id, "watchlist_report_generated", f"entities={len(report)}")
+		return report
+
+	async def severity_heatmap(self, granularity: str = "1h", periods: int = 24) -> dict[str, Any]:
+		"""Build a time-bucketed severity matrix for dashboard consumption.
+
+		Bins events into UTC hour buckets cross-tabulated by severity over the
+		most recent *periods* buckets. Only ``"1h"`` granularity is supported.
+
+		Returns dict with ``matrix`` (list of ``{bucket, severities}``),
+		``total_events``, ``peak_bucket``, and metadata.
+		"""
+		import hashlib as _hashlib  # noqa: F401 (ensure stdlib available)
+		from datetime import timedelta
+		assert granularity == "1h", "Only '1h' granularity is currently supported"
+		assert 1 <= periods <= 168, "periods must be between 1 and 168"
+		tenant_id = self.tenant_id
+		now_utc = datetime.now(timezone.utc)
+		bucket_start = now_utc - timedelta(hours=periods)
+		heatmap: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+		# Build event_id -> signal severity index
+		event_severity: dict[str, str] = {
+			eid: getattr(s, "severity", "info")
+			for (tid, _), s in self.signals.items()
+			if tid == tenant_id
+			for eid in [getattr(s, "event_id", "")]
+			if eid
+		}
+		for (tid, eid), event in self.events.items():
+			if tid != tenant_id:
+				continue
+			obs = getattr(event, "observed_at", "")
+			if not obs:
+				continue
+			try:
+				dt = datetime.fromisoformat(obs.replace("Z", "+00:00"))
+				if dt < bucket_start:
+					continue
+				bucket = dt.strftime("%Y-%m-%dT%H:00Z")
+				severity = event_severity.get(eid, "info")
+				heatmap[bucket][severity] += 1
+			except ValueError:
+				continue
+		matrix = [
+			{"bucket": bkt, "severities": dict(sevs)}
+			for bkt, sevs in sorted(heatmap.items())
+		]
+		total_events = sum(sum(s.values()) for s in heatmap.values())
+		peak_bucket = max(heatmap, key=lambda b: sum(heatmap[b].values())) if heatmap else None
+		self._audit(tenant_id, "severity_heatmap_generated", f"periods={periods}")
+		return {
+			"tenant_id": tenant_id, "granularity": granularity, "periods": periods,
+			"matrix": matrix, "total_events": total_events, "peak_bucket": peak_bucket,
+			"generated_at": _utcnow(),
+		}
+
+	async def seal_audit_ledger(self, period_end: str) -> dict[str, Any]:
+		"""Hash-chain the audit log through *period_end* for tamper evidence.
+
+		Each entry is serialised as canonical JSON and chained via SHA-256 so
+		that modification of any historical entry invalidates subsequent hashes.
+		The ``ledger_root`` is stored in ``self._sealed_ledgers``.
+		"""
+		import hashlib
+		import json as _json
+		assert present(period_end), "period_end required"
+		tenant_id = self.tenant_id
+		entries = sorted(
+			[e for e in self.audit_events if e["tenant_id"] == tenant_id and e.get("recorded_at", "") <= period_end],
+			key=lambda e: e.get("recorded_at", ""),
+		)
+		chain_hash = "0" * 64
+		for entry in entries:
+			canonical = _json.dumps({**entry, "prev_hash": chain_hash}, sort_keys=True, separators=(",", ":"))
+			chain_hash = hashlib.sha256(canonical.encode()).hexdigest()
+		seal_record: dict[str, Any] = {
+			"ledger_root": chain_hash, "tenant_id": tenant_id,
+			"period_end": period_end, "entry_count": len(entries),
+			"sealed_at": _utcnow(),
+		}
+		self._sealed_ledgers[chain_hash] = seal_record
+		self._audit(tenant_id, "audit_ledger_sealed", chain_hash[:16])
+		return seal_record
+
+	async def verify_audit_ledger(self, ledger_root: str) -> dict[str, Any]:
+		"""Verify a previously sealed audit ledger by re-deriving the hash chain.
+
+		Args:
+			ledger_root: The ``ledger_root`` returned by ``seal_audit_ledger``.
+
+		Returns:
+			``{valid, entry_count, ledger_root, verified_at}``.
+		"""
+		import hashlib
+		import json as _json
+		assert present(ledger_root), "ledger_root required"
+		sealed = self._sealed_ledgers.get(ledger_root)
+		if sealed is None:
+			return {"valid": False, "entry_count": 0, "ledger_root": ledger_root, "reason": "unknown_ledger", "verified_at": _utcnow()}
+		tenant_id = sealed["tenant_id"]
+		period_end = sealed["period_end"]
+		entries = sorted(
+			[e for e in self.audit_events if e["tenant_id"] == tenant_id and e.get("recorded_at", "") <= period_end],
+			key=lambda e: e.get("recorded_at", ""),
+		)
+		chain_hash = "0" * 64
+		for entry in entries:
+			canonical = _json.dumps({**entry, "prev_hash": chain_hash}, sort_keys=True, separators=(",", ":"))
+			chain_hash = hashlib.sha256(canonical.encode()).hexdigest()
+		valid = chain_hash == ledger_root
+		self._audit(tenant_id, "audit_ledger_verified", ledger_root[:16])
+		return {"valid": valid, "entry_count": len(entries), "ledger_root": chain_hash, "verified_at": _utcnow()}
+
+	async def enforce_retention(self, dry_run: bool = True) -> dict[str, Any]:
+		"""Identify (and optionally purge) records exceeding their retention TTL.
+
+		Retention TTLs by class: ``ephemeral``=7d, ``standard``=90d,
+		``long_term``=365d, ``permanent``=never purged.
+
+		Args:
+			dry_run: If True (default), report only. Set False to purge.
+
+		Returns:
+			Summary with eligible/purged counts and eligible event IDs.
+		"""
+		from datetime import timedelta
+		tenant_id = self.tenant_id
+		ttl_days: dict[str, int] = {"ephemeral": 7, "standard": 90, "long_term": 365}
+		now_utc = datetime.now(timezone.utc)
+		watch_retention: dict[str, str] = {
+			wid: getattr(w, "retention_class", "standard")
+			for (tid, wid), w in self.watches.items()
+			if tid == tenant_id
+		}
+		eligible_events: list[str] = []
+		keys_to_purge: list[tuple[str, str]] = []
+		for (tid, eid), event in self.events.items():
+			if tid != tenant_id:
+				continue
+			wid = getattr(event, "watch_id", "")
+			retention = watch_retention.get(wid, "standard")
+			max_days = ttl_days.get(retention)
+			if max_days is None:
+				continue  # permanent — skip
+			obs = getattr(event, "observed_at", "")
+			if not obs:
+				continue
+			try:
+				dt = datetime.fromisoformat(obs.replace("Z", "+00:00"))
+				if (now_utc - dt).days >= max_days:
+					eligible_events.append(eid)
+					if not dry_run:
+						keys_to_purge.append((tid, eid))
+			except ValueError:
+				continue
+		for key in keys_to_purge:
+			self.events.pop(key, None)
+		self._audit(tenant_id, "retention_enforcement_run", f"dry_run={dry_run},eligible={len(eligible_events)}")
+		return {
+			"tenant_id": tenant_id, "dry_run": dry_run,
+			"eligible_event_count": len(eligible_events),
+			"purged_event_count": len(keys_to_purge),
+			"eligible_event_ids": eligible_events[:100],
+			"checked_at": _utcnow(),
+		}
+
+	async def composite_health_score(self) -> dict[str, Any]:
+		"""Compute a 0–100 composite health score from all monitoring health signals.
+
+		Four equally-weighted components (25 pts each):
+		1. Stale watch penalty.
+		2. Signal/event ratio in target band [0.05, 0.30].
+		3. SLA breach rate against open incidents.
+		4. Average false-positive rate across watches.
+
+		health_status: ``"healthy"`` ≥ 80, ``"degraded"`` ≥ 50, ``"critical"`` < 50.
+		"""
+		health = await self.monitor_health_check()
+		sla = await self.sla_breach_alert()
+		tenant_id = self.tenant_id
+		stale_score = max(0.0, 25.0 - health["stale_watch_count"] * 2.5)
+		ser = health["signal_to_event_ratio"]
+		ser_score = 25.0 if 0.05 <= ser <= 0.30 else max(0.0, 25.0 - abs(ser - 0.175) * 50)
+		incident_total = health["incident_count"]
+		breached = sla["breached_count"]
+		sla_score = 25.0 if incident_total == 0 else max(0.0, 25.0 * (1.0 - breached / incident_total))
+		fp_rates: list[float] = []
+		for (tid, mid) in list(self.watches.keys())[:50]:
+			if tid == tenant_id:
+				fp_data = await self.false_positive_rate(mid)
+				fp_rates.append(fp_data["false_positive_rate"])
+		avg_fp = statistics.mean(fp_rates) if fp_rates else 0.0
+		fp_score = max(0.0, 25.0 * (1.0 - min(avg_fp * 5, 1.0)))
+		total_score = round(stale_score + ser_score + sla_score + fp_score, 1)
+		status = "healthy" if total_score >= 80 else "degraded" if total_score >= 50 else "critical"
+		self._audit(tenant_id, "composite_health_score_computed", f"score={total_score}")
+		return {
+			"tenant_id": tenant_id,
+			"health_score": total_score,
+			"health_status": status,
+			"components": {
+				"stale_watch_score": round(stale_score, 1),
+				"signal_event_ratio_score": round(ser_score, 1),
+				"sla_score": round(sla_score, 1),
+				"false_positive_score": round(fp_score, 1),
+			},
+			"evaluated_at": _utcnow(),
+		}
+
 
 IntelMonitoringService = RealTimeMonitoringService

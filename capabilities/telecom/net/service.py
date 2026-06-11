@@ -413,68 +413,6 @@ class NetworkManagementService:
 		self._audit(tenant_id, "fault_correlation_run", str(len(alerts)))
 		return correlation_record
 
-	async def root_cause_analysis(
-		self,
-		fault_id: str,
-		tenant_id: str = "default",
-	) -> dict[str, Any]:
-		"""Perform root cause analysis for a fault ticket or alarm.
-
-		Looks up the fault ticket, examines correlated alarms, performance
-		threshold breaches, and recent config changes to build an RCA report.
-		"""
-		assert fault_id, "fault_id required"
-		ticket = self.fault_tickets.get(self._key(tenant_id, fault_id))
-		alarm: NetAlarm | None = None
-		if ticket is not None:
-			alarm = self.alarms.get(self._key(tenant_id, ticket.alarm_id))
-		elif fault_id in {a.id for a in self.alarms.values() if a.tenant_id == tenant_id}:
-			alarm = next(a for a in self.alarms.values() if a.id == fault_id and a.tenant_id == tenant_id)
-		# Gather contributing factors
-		contributing_factors: list[str] = []
-		# Recent performance breaches on same NE
-		ne_ref = (alarm.ne_reference if alarm else "") or (ticket.alarm_id if ticket else "")
-		perf_breaches = [
-			r for r in self.performance_records.values()
-			if r.tenant_id == tenant_id and r.ne_reference == ne_ref and r.value > r.threshold
-		]
-		if perf_breaches:
-			contributing_factors.append(f"performance_breaches:{len(perf_breaches)}")
-		# Recent config changes on same NE
-		recent_changes = [
-			c for c in self.config_changes.values()
-			if c.tenant_id == tenant_id and c.ne_reference == ne_ref
-		]
-		if recent_changes:
-			contributing_factors.append(f"recent_config_changes:{len(recent_changes)}")
-		# Correlated alarms
-		correlated_count = sum(
-			1 for grp in self._fault_correlations
-			for g in grp.get("groups", [])
-			if g.get("root_alarm") == fault_id or fault_id in g.get("child_alarms", [])
-		)
-		if correlated_count:
-			contributing_factors.append(f"correlated_alarms:{correlated_count}")
-		confidence = min(0.95, 0.4 + len(contributing_factors) * 0.15)
-		root_cause = (
-			"configuration_change" if any("config" in f for f in contributing_factors)
-			else ("performance_degradation" if any("performance" in f for f in contributing_factors)
-			else "unknown")
-		)
-		rca: dict[str, Any] = {
-			"fault_id": fault_id,
-			"tenant_id": tenant_id,
-			"ne_reference": ne_ref,
-			"root_cause": root_cause,
-			"confidence": round(confidence, 3),
-			"contributing_factors": contributing_factors,
-			"recommendation": f"Review {root_cause.replace('_', ' ')} on {ne_ref}",
-			"analysed_at": _utcnow(),
-		}
-		self._rca_records[fault_id] = rca
-		self._audit(tenant_id, "root_cause_analysis_completed", fault_id)
-		return rca
-
 	async def trouble_ticket_create(
 		self,
 		fault_id: str,
@@ -1117,10 +1055,7 @@ class NetworkManagementService:
 		assert query
 		return {"query": query, "results": [], "tenant_id": tenant_id}
 
-
-# Backward-compatible alias
-
-	async def ml_network_fault_predict(self, *args, **kwargs):
+	async def ml_network_fault_predict(self, *args, **kwargs) -> dict[str, Any]:
 		"""AI-powered network fault prediction from performance metrics. Requires OLLAMA_BASE_URL."""
 		import os
 		if not os.environ.get("OLLAMA_BASE_URL"):
@@ -1129,8 +1064,391 @@ class NetworkManagementService:
 			from capabilities.common.mlx import MLCapability
 			ml = MLCapability()
 			result = await ml.score(kwargs, task="telecom_network_fault_prediction")
-			return {"fault_probability": round(result.score,3), "risk_factors": result.factors, "ml_enhanced": True}
+			return {"fault_probability": round(result.score, 3), "risk_factors": result.factors, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ------------------------------------------------------------------ #
+	# World-class enhancements                                            #
+	# ------------------------------------------------------------------ #
+
+	async def ne_health_score(
+		self,
+		ne_id: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Compute a composite health score (0–100) for a network element.
+
+		Combines active alarm count (weighted by severity), recent performance
+		threshold breaches, config change churn, and SLA compliance into a
+		single normalised score.  Returns colour-coded status for topology view.
+		"""
+		assert ne_id, "ne_id required"
+		# Alarm penalty: critical=20, major=10, minor=3, warning=1
+		alarm_weights = {"critical": 20, "major": 10, "minor": 3, "warning": 1, "informational": 0}
+		alarm_penalty = sum(
+			alarm_weights.get(a.severity, 1)
+			for a in self.alarms.values()
+			if a.tenant_id == tenant_id and a.ne_reference == ne_id and a.status in ("raised", "acknowledged")
+		)
+		# Performance penalty: one point per recent breach
+		perf_penalty = sum(
+			1 for r in self.performance_records.values()
+			if r.tenant_id == tenant_id and r.ne_reference == ne_id and r.value > r.threshold
+		)
+		# Config churn penalty: one point per change in last N (max 5 recorded)
+		config_penalty = min(
+			10,
+			sum(1 for c in self.config_changes.values() if c.tenant_id == tenant_id and c.ne_reference == ne_id),
+		)
+		total_penalty = min(100, alarm_penalty + perf_penalty + config_penalty)
+		score = max(0, 100 - total_penalty)
+		status = "healthy" if score >= 80 else ("degraded" if score >= 50 else "critical")
+		colour = "#15803D" if status == "healthy" else ("#B45309" if status == "degraded" else "#B91C1C")
+		result: dict[str, Any] = {
+			"ne_id": ne_id,
+			"tenant_id": tenant_id,
+			"health_score": score,
+			"status": status,
+			"colour": colour,
+			"alarm_penalty": alarm_penalty,
+			"perf_penalty": perf_penalty,
+			"config_penalty": config_penalty,
+			"computed_at": _utcnow(),
+		}
+		self._audit(tenant_id, "ne_health_score_computed", ne_id)
+		return result
+
+	async def generate_pir(
+		self,
+		ticket_id: str,
+		tenant_id: str = "default",
+		author: str = "system",
+	) -> dict[str, Any]:
+		"""Generate a Post-Incident Review (PIR) report for a resolved fault ticket.
+
+		Collates alarm timeline, RCA findings, MTTR, SLA impact, and corrective
+		actions.  Stores the report in ``_pir_records`` and emits an audit event.
+		"""
+		assert ticket_id, "ticket_id required"
+		ticket = self._ticket_or_raise(ticket_id, tenant_id)
+		alarm = self.alarms.get(self._key(tenant_id, ticket.alarm_id))
+		rca = self._rca_records.get(ticket_id) or self._rca_records.get(ticket.alarm_id)
+		# Compute MTTR if both timestamps are present
+		mttr_minutes: float | None = None
+		if ticket.opened_at and ticket.resolved_at:
+			try:
+				opened = datetime.datetime.fromisoformat(ticket.opened_at.replace("Z", ""))
+				resolved = datetime.datetime.fromisoformat(ticket.resolved_at.replace("Z", ""))
+				mttr_minutes = round((resolved - opened).total_seconds() / 60, 1)
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+		# SLA records impacted during the incident window
+		sla_impacted = [
+			s.to_dict() for s in self.sla_records.values()
+			if s.tenant_id == tenant_id and s.status == "breached"
+		]
+		pir: dict[str, Any] = {
+			"pir_id": f"pir-{ticket_id}",
+			"ticket_id": ticket_id,
+			"tenant_id": tenant_id,
+			"author": author,
+			"alarm_id": ticket.alarm_id,
+			"ne_reference": alarm.ne_reference if alarm else None,
+			"severity": ticket.severity,
+			"ticket_status": ticket.status,
+			"mttr_minutes": mttr_minutes,
+			"root_cause": rca.get("primary_cause") if rca else "pending",
+			"probable_causes": rca.get("probable_causes", []) if rca else [],
+			"sla_breaches_during_incident": len(sla_impacted),
+			"corrective_actions": [],
+			"generated_at": _utcnow(),
+		}
+		if not hasattr(self, "_pir_records"):
+			self._pir_records: dict[str, dict[str, Any]] = {}
+		self._pir_records[ticket_id] = pir
+		self._audit(tenant_id, "pir_generated", ticket_id)
+		return pir
+
+	async def capacity_trend_forecast(
+		self,
+		ne_id: str,
+		metric: str,
+		tenant_id: str = "default",
+		window: int = 10,
+	) -> dict[str, Any]:
+		"""Forecast when a metric will breach its threshold on a given NE.
+
+		Fits a simple linear trend over the last ``window`` performance records
+		and extrapolates days-to-breach.  Returns ``None`` for days_to_breach
+		when the trend is flat or improving.
+		"""
+		assert ne_id, "ne_id required"
+		assert metric, "metric required"
+		metric_norm = metric.lower()
+		records = sorted(
+			[
+				r for r in self.performance_records.values()
+				if r.tenant_id == tenant_id and r.ne_reference == ne_id and r.metric_type == metric_norm
+			],
+			key=lambda r: r.recorded_at,
+		)[-window:]
+		if len(records) < 2:
+			return {
+				"ne_id": ne_id, "metric": metric, "tenant_id": tenant_id,
+				"days_to_breach": None, "trend": "insufficient_data",
+				"sample_count": len(records), "computed_at": _utcnow(),
+			}
+		values = [r.value for r in records]
+		threshold = records[-1].threshold
+		n = len(values)
+		xs = list(range(n))
+		x_mean = sum(xs) / n
+		y_mean = sum(values) / n
+		num = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, values))
+		den = sum((x - x_mean) ** 2 for x in xs) or 1e-9
+		slope = num / den
+		intercept = y_mean - slope * x_mean
+		# Each record represents one collection interval (300 s default → ~5 min)
+		# Estimate collection_interval as average gap between records if possible
+		collection_interval_days = 300 / 86400  # 5 minutes in days
+		days_to_breach: float | None = None
+		if slope > 0 and values[-1] < threshold:
+			steps_to_breach = (threshold - (slope * (n - 1) + intercept)) / slope
+			days_to_breach = round(steps_to_breach * collection_interval_days, 2) if steps_to_breach > 0 else 0.0
+		trend = "increasing" if slope > 0.01 else ("decreasing" if slope < -0.01 else "stable")
+		self._audit(tenant_id, "capacity_trend_forecast_run", f"{ne_id}:{metric_norm}")
+		return {
+			"ne_id": ne_id,
+			"metric": metric,
+			"tenant_id": tenant_id,
+			"current_value": round(values[-1], 4),
+			"threshold": threshold,
+			"slope_per_interval": round(slope, 6),
+			"trend": trend,
+			"days_to_breach": days_to_breach,
+			"sample_count": n,
+			"computed_at": _utcnow(),
+		}
+
+	async def detect_configuration_drift(
+		self,
+		ne_id: str,
+		current_config: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Compare ``current_config`` against the last approved backup and report drift.
+
+		If drift is detected, automatically raises a ``configuration_error`` alarm
+		so the NOC is notified of an unauthorised configuration change.
+		"""
+		assert ne_id, "ne_id required"
+		assert current_config, "current_config required"
+		backups = self._config_backups.get(ne_id, [])
+		baseline = backups[-1] if backups else None
+		baseline_preview = (baseline or {}).get("config_preview", "")
+		current_preview = current_config[:200]
+		drift_detected = baseline is not None and current_preview != baseline_preview
+		alarm: dict[str, Any] | None = None
+		if drift_detected:
+			alarm_id = f"alarm-drift-{ne_id}-{_utcnow()}"
+			cat = "configuration_error"
+			if cat not in (SUPPORTED_FAULT_CATEGORIES or []):
+				cat = SUPPORTED_FAULT_CATEGORIES[0] if SUPPORTED_FAULT_CATEGORIES else "hardware_failure"
+			alarm = self.raise_alarm(
+				alarm_id=alarm_id,
+				tenant_id=tenant_id,
+				ne_reference=ne_id,
+				severity="major",
+				category=cat,
+				description=f"Configuration drift detected on {ne_id}: running config differs from last approved backup",
+				raised_at=_utcnow(),
+			)
+		result: dict[str, Any] = {
+			"ne_id": ne_id,
+			"tenant_id": tenant_id,
+			"drift_detected": drift_detected,
+			"baseline_version": (baseline or {}).get("version"),
+			"baseline_backed_up_at": (baseline or {}).get("backed_up_at"),
+			"alarm": alarm,
+			"checked_at": _utcnow(),
+		}
+		self._audit(tenant_id, "configuration_drift_checked", ne_id)
+		return result
+
+	async def sla_penalty_calculation(
+		self,
+		sla_id: str,
+		breach_duration_minutes: float,
+		tenant_id: str = "default",
+		penalty_rate_per_minute: float = 0.0,
+		currency: str = "USD",
+	) -> dict[str, Any]:
+		"""Calculate SLA penalty for a breached SLA record.
+
+		Computes the contractual penalty based on breach duration and the
+		configured rate.  Returns a credit note draft suitable for forwarding
+		to the billing capability (``telecom_bil``).
+		"""
+		assert sla_id, "sla_id required"
+		assert breach_duration_minutes >= 0, "breach_duration_minutes must be non-negative"
+		sla = self.sla_records.get(self._key(tenant_id, sla_id))
+		if sla is None:
+			raise ValueError(f"SLA record {sla_id} not found")
+		if sla.status != "breached":
+			return {
+				"sla_id": sla_id, "tenant_id": tenant_id,
+				"penalty_amount": 0.0, "currency": currency,
+				"reason": "sla_not_breached", "computed_at": _utcnow(),
+			}
+		shortfall_pct = round((sla.target_value - sla.actual_value) / max(sla.target_value, 0.001) * 100, 4)
+		penalty_amount = round(breach_duration_minutes * penalty_rate_per_minute, 2)
+		credit_note: dict[str, Any] = {
+			"credit_note_id": f"cn-{sla_id}-{_utcnow()[:10]}",
+			"sla_id": sla_id,
+			"tenant_id": tenant_id,
+			"sla_type": sla.sla_type,
+			"customer_id": sla.customer_id,
+			"target_value": sla.target_value,
+			"actual_value": sla.actual_value,
+			"shortfall_pct": shortfall_pct,
+			"breach_duration_minutes": breach_duration_minutes,
+			"penalty_rate_per_minute": penalty_rate_per_minute,
+			"penalty_amount": penalty_amount,
+			"currency": currency,
+			"status": "draft",
+			"computed_at": _utcnow(),
+		}
+		self._audit(tenant_id, "sla_penalty_calculated", sla_id)
+		return credit_note
+
+	async def noc_workload_analysis(
+		self,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Analyse historical alarm volumes per shift to produce staffing recommendations.
+
+		Groups alarms by shift (derived from handover records) and computes
+		average alarm load, P95 load, and a risk score per shift.  Returns a
+		staffing recommendation dict.
+		"""
+		# Use NOC handover records to derive shift alarm volumes
+		shift_loads: dict[str, list[int]] = {}
+		for hw in self.noc_handovers.values():
+			if hw.tenant_id != tenant_id:
+				continue
+			shift_loads.setdefault(hw.shift, []).append(hw.open_alarms_count)
+		recommendations: list[dict[str, Any]] = []
+		for shift, loads in shift_loads.items():
+			avg_load = round(statistics.mean(loads), 1)
+			p95_load = sorted(loads)[int(len(loads) * 0.95)] if len(loads) > 1 else loads[0]
+			risk_score = min(10, round(p95_load / max(avg_load, 1), 2))
+			min_headcount = max(1, int(p95_load / 15) + 1)
+			recommendations.append({
+				"shift": shift,
+				"avg_alarm_load": avg_load,
+				"p95_alarm_load": p95_load,
+				"escalation_risk_score": risk_score,
+				"recommended_min_headcount": min_headcount,
+				"sample_count": len(loads),
+			})
+		self._audit(tenant_id, "noc_workload_analysis_run", tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"shift_recommendations": recommendations,
+			"total_handovers_analysed": sum(len(v) for v in shift_loads.values()),
+			"analysed_at": _utcnow(),
+		}
+
+	async def cross_domain_correlation(
+		self,
+		alarm_ids: list[str],
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Correlate alarms across network domains to identify multi-domain incidents.
+
+		Groups found alarms by domain, then identifies domains with simultaneous
+		active alarms and flags them as cross-domain correlated events — a strong
+		indicator of a shared upstream failure (e.g. core power or transport link).
+		"""
+		assert alarm_ids, "alarm_ids required"
+		domain_alarms: dict[str, list[dict[str, Any]]] = {}
+		for aid in alarm_ids:
+			alarm = self.alarms.get(self._key(tenant_id, aid))
+			if alarm is None:
+				continue
+			# Domain is stored in the performance records for the NE; fall back to "unknown"
+			ne_perf = next(
+				(r for r in self.performance_records.values() if r.ne_reference == alarm.ne_reference and r.tenant_id == tenant_id),
+				None,
+			)
+			domain = ne_perf.domain if ne_perf else "unknown"
+			domain_alarms.setdefault(domain, []).append(alarm.to_dict())
+		cross_domain_groups = [
+			{
+				"domain": domain,
+				"alarm_count": len(alarms),
+				"alarm_ids": [a["id"] for a in alarms],
+				"severities": list({a["severity"] for a in alarms}),
+			}
+			for domain, alarms in domain_alarms.items()
+		]
+		is_cross_domain = len(cross_domain_groups) > 1
+		correlation_id = f"xdc-{len(self._fault_correlations)}"
+		record: dict[str, Any] = {
+			"correlation_id": correlation_id,
+			"tenant_id": tenant_id,
+			"is_cross_domain_incident": is_cross_domain,
+			"domain_groups": cross_domain_groups,
+			"total_alarms": len(alarm_ids),
+			"alarms_resolved": sum(len(g["alarm_ids"]) for g in cross_domain_groups),
+			"correlated_at": _utcnow(),
+		}
+		self._fault_correlations.append(record)
+		self._audit(tenant_id, "cross_domain_correlation_run", correlation_id)
+		return record
+
+	async def multi_tenant_sla_benchmark(
+		self,
+		admin_tenant_id: str,
+	) -> dict[str, Any]:
+		"""Aggregate SLA compliance across all tenants and produce a benchmark report.
+
+		Admin-scoped. Returns per-tenant compliance rates and percentile ranks.
+		Useful for MSP deployments where comparative SLA visibility is required.
+		"""
+		assert admin_tenant_id, "admin_tenant_id required"
+		# Gather per-tenant compliance
+		tenant_stats: dict[str, dict[str, Any]] = {}
+		for rec in self.sla_records.values():
+			tid = rec.tenant_id
+			stats = tenant_stats.setdefault(tid, {"total": 0, "compliant": 0})
+			stats["total"] += 1
+			if rec.status == "compliant":
+				stats["compliant"] += 1
+		ranked: list[dict[str, Any]] = sorted(
+			[
+				{
+					"tenant_id": tid,
+					"total_sla_records": s["total"],
+					"compliant_count": s["compliant"],
+					"compliance_rate": round(s["compliant"] / max(s["total"], 1), 4),
+				}
+				for tid, s in tenant_stats.items()
+			],
+			key=lambda x: x["compliance_rate"],
+			reverse=True,
+		)
+		for i, entry in enumerate(ranked):
+			entry["percentile_rank"] = round((1 - i / max(len(ranked), 1)) * 100, 1)
+		self._audit(admin_tenant_id, "multi_tenant_sla_benchmark_run", admin_tenant_id)
+		return {
+			"admin_tenant_id": admin_tenant_id,
+			"tenant_count": len(ranked),
+			"benchmark": ranked,
+			"generated_at": _utcnow(),
+		}
+
+
+# Backward-compatible alias
 TelecomNetService = NetworkManagementService

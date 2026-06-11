@@ -548,6 +548,234 @@ class ZtnaService:
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self.list_resources(tenant_id)
 
+	# ── New async methods ─────────────────────────────────────────────────────
+
+	async def async_register_identity(
+		self,
+		identity_key: str,
+		tenant_id: str,
+		subject_id: str,
+		display_name: str,
+		verified: bool = False,
+		privileged: bool = False,
+		mfa_completed: bool = False,
+		federated_provider: str | None = None,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Async wrapper for register_identity — safe for use in async adapters and I/O contexts."""
+		return self.register_identity(
+			identity_key=identity_key,
+			tenant_id=tenant_id,
+			subject_id=subject_id,
+			display_name=display_name,
+			verified=verified,
+			privileged=privileged,
+			mfa_completed=mfa_completed,
+			federated_provider=federated_provider,
+			metadata=metadata,
+		)
+
+	async def async_request_access(
+		self,
+		identity_id: str,
+		device_id: str,
+		resource_id: str,
+		requested_by: str,
+		mfa_completed: bool | None = None,
+		access_review_recorded: bool = False,
+		just_in_time_approval_present: bool = False,
+		least_privilege_scope_present: bool = True,
+		explicit_access_decision_present: bool = True,
+		access_risk_score: float | None = None,
+	) -> dict[str, Any]:
+		"""Async access request suitable for concurrent broker fan-out patterns."""
+		return self.request_access(
+			identity_id=identity_id,
+			device_id=device_id,
+			resource_id=resource_id,
+			requested_by=requested_by,
+			mfa_completed=mfa_completed,
+			access_review_recorded=access_review_recorded,
+			just_in_time_approval_present=just_in_time_approval_present,
+			least_privilege_scope_present=least_privilege_scope_present,
+			explicit_access_decision_present=explicit_access_decision_present,
+			access_risk_score=access_risk_score,
+		)
+
+	async def async_reevaluate_session(
+		self,
+		session_id: str,
+		risk_score: float,
+		identity_verified: bool = True,
+		device_posture_present: bool = True,
+		access_review_recorded: bool = False,
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""Async session reevaluation — called from telemetry pipelines on posture change events."""
+		return self.reevaluate_session(
+			session_id=session_id,
+			risk_score=risk_score,
+			identity_verified=identity_verified,
+			device_posture_present=device_posture_present,
+			access_review_recorded=access_review_recorded,
+			actor_id=actor_id,
+		)
+
+	async def async_update_device_posture(
+		self,
+		device_id: str,
+		trust_score: float,
+		posture_present: bool = True,
+		compliant: bool = True,
+		attested: bool | None = None,
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""Async posture update — suitable for continuous telemetry ingestion loops."""
+		return self.update_device_posture(
+			device_id=device_id,
+			trust_score=trust_score,
+			posture_present=posture_present,
+			compliant=compliant,
+			attested=attested,
+			actor_id=actor_id,
+		)
+
+	async def async_bulk_reevaluate_sessions(
+		self,
+		tenant_id: str,
+		risk_score: float = 0.5,
+		actor_id: str = "system",
+	) -> list[dict[str, Any]]:
+		"""Re-evaluate all active sessions for a tenant in one async sweep.
+
+		Useful when a tenant-level policy change or identity revocation requires
+		all in-flight sessions to be checked immediately.
+		"""
+		import asyncio
+		active = [s for s in self._sessions.values() if s.tenant_id == tenant_id and s.status == "active"]
+		tasks = [
+			self.async_reevaluate_session(
+				session_id=s.id,
+				risk_score=risk_score,
+				actor_id=actor_id,
+			)
+			for s in active
+		]
+		if not tasks:
+			return []
+		return list(await asyncio.gather(*tasks, return_exceptions=False))
+
+	async def async_evaluate_policy(
+		self,
+		identity_id: str,
+		resource_id: str,
+		action: str,
+		context: dict[str, Any] | None = None,
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""Async policy evaluation for identity-resource-action triples.
+
+		Resolves the identity and resource, builds a full evaluation context, runs
+		the rule engine, and returns an enriched decision payload with matched
+		rules and deny reasons. Does not mutate session state.
+		"""
+		ctx = dict(context or {})
+		try:
+			identity = self._get_identity(identity_id)
+			resource = self._get_resource(resource_id)
+		except KeyError as exc:
+			return {"allowed": False, "reason": str(exc), "action": action}
+		if identity.tenant_id != resource.tenant_id:
+			return {
+				"allowed": False,
+				"reason": "cross_tenant_access_denied",
+				"action": action,
+			}
+		ctx.update({
+			"operation": "evaluate_policy",
+			"tenant_context_present": bool(identity.tenant_id),
+			"identity_verified": identity.verified,
+			"identity_status": identity.status,
+			"resource_policy_attached": resource.policy_attached,
+			"sensitive_resource": resource.sensitive,
+			"access_level": resource.access_level,
+			"mfa_completed": identity.mfa_completed,
+			"microsegmentation_present": bool(resource.network_segment),
+		})
+		result = self.evaluate(ctx)
+		allowed = result["decision"] == "allow"
+		self._audit(
+			identity.tenant_id,
+			"policy_evaluated",
+			resource_id,
+			actor_id,
+			{"identity_id": identity_id, "action": action, "decision": result["decision"]},
+		)
+		return {
+			"allowed": allowed,
+			"decision": result["decision"],
+			"action": action,
+			"identity_id": identity_id,
+			"resource_id": resource_id,
+			"matched_rules": list(result.get("matched_rules", [])),
+			"deny_reasons": [
+				a.get("reason", "policy_denied")
+				for a in result.get("actions", [])
+				if a.get("decision") == "deny"
+			],
+			"tenant_id": identity.tenant_id,
+		}
+
+	async def async_close_session(
+		self,
+		session_id: str,
+		actor_id: str,
+	) -> dict[str, Any]:
+		"""Async session close — for use in event-driven session lifecycle handlers."""
+		return self.close_session(session_id=session_id, actor_id=actor_id)
+
+	async def async_compliance_snapshot(
+		self,
+		tenant_id: str,
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""Async ZTNA compliance snapshot for a tenant.
+
+		Aggregates identity verification, device posture, resource policy coverage,
+		active session counts, and pending review backlog into a single dict suitable
+		for export to audit dashboards or SIEM pipelines.
+		"""
+		summary = self.dashboard_summary(tenant_id)
+		posture = self._posture_detail(tenant_id)
+		self._audit(
+			tenant_id,
+			"compliance_snapshot_generated",
+			tenant_id,
+			actor_id,
+			{"session_count": summary.get("active_session_count", 0)},
+		)
+		return {
+			"tenant_id": tenant_id,
+			"generated_at": utc_now(),
+			"summary": summary,
+			"posture": posture,
+		}
+
+	def _posture_detail(self, tenant_id: str) -> dict[str, Any]:
+		"""Return a compact device posture detail dict for a tenant."""
+		devices = [d for d in self._devices.values() if d.tenant_id == tenant_id]
+		if not devices:
+			return {"total": 0, "compliant": 0, "avg_trust": 0.0, "by_status": {}}
+		by_status: dict[str, int] = {}
+		for d in devices:
+			by_status[d.status] = by_status.get(d.status, 0) + 1
+		return {
+			"total": len(devices),
+			"compliant": sum(1 for d in devices if d.compliant),
+			"avg_trust": round(sum(d.trust_score for d in devices) / len(devices), 4),
+			"by_status": by_status,
+		}
+
 	def _risk_score(self, identity: ZeroTrustIdentityRecord, device: ZeroTrustDeviceRecord, resource: ZeroTrustResourceRecord) -> float:
 		score = 1.0 - device.trust_score
 		if identity.privileged:

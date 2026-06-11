@@ -1,34 +1,34 @@
-# Incident and Case Management
+# Incident & Crisis Management (grc_icm)
+
+**Capability ID**: `grc_icm` | **Domain**: `grc` | **Version**: 1.1.0  
+© 2025 Datacraft — Author: Nyimbi Odero
 
 ## Overview
 
-Incident and Case Management provides a world-class, standalone-deployable implementation of incident and case management capabilities for the APG platform. It can be installed independently and composed with other APG capabilities via the standard contract interface.
-
-## Capability ID
-
-`grc_icm`  Version: 1.0.0
+Full-lifecycle incident response, crisis communication, business continuity
+management (BCMS), compliance testing, and regulatory notification for the APG
+platform. Standalone-deployable; composes with other APG capabilities via the
+standard contract interface.
 
 ## Provides
 
 | Service | Description |
 |---------|-------------|
-| `incident_lifecycle_management` | Incident Lifecycle Management workflow |
-| `case_management_workflow` | Case Management Workflow workflow |
-| `incident_evidence_workflow` | Incident Evidence Workflow workflow |
-| `regulatory_notification_workflow` | Regulatory Notification Workflow workflow |
-| `post_incident_review_workflow` | Post Incident Review Workflow workflow |
-
+| `incident_lifecycle_management` | Report → triage → investigate → close |
+| `case_management_workflow` | Case and evidence management |
+| `incident_evidence_workflow` | Chain-of-custody evidence collection |
+| `regulatory_notification_workflow` | GDPR/PCI-DSS/CBK regulatory dispatch |
+| `post_incident_review_workflow` | Structured PIR for high/critical incidents |
 
 ## Requires
 
 | Capability | Purpose |
 |------------|---------|
-| `auth` | Auth services |
-| `audl` | Audl services |
-| `mten` | Mten services |
-| `conf` | Conf services |
-| `ntfy` | Ntfy services |
-
+| `auth` | Identity and permission checks |
+| `audl` | Audit event logging |
+| `mten` | Multi-tenancy context |
+| `conf` | Tenant-scoped configuration |
+| `ntfy` | Notification delivery |
 
 ## Installation
 
@@ -39,22 +39,63 @@ pip install apg-grc-icm
 ## Standalone Usage
 
 ```python
-from apg_grc_icm import get_capability_contract
+from apg_grc_icm import IncidentComplianceService
 
-# Get capability contract
-contract = get_capability_contract(tenant_id="my_org")
-print(contract["capability"])  # grc_icm
+svc = IncidentComplianceService()
+inc = await svc.report_incident(
+    entity_id="ENT-1",
+    incident_type="security_breach",
+    description="Phishing attack",
+    severity="high",
+    affected_systems=["email"],
+    reported_by="alice@datacraft.co.ke",
+)
 ```
 
 ## Running the Standalone Server
 
 ```bash
-# Standalone with InMemory store
+# In-memory store (development)
 apg-grc-icm --port 8080
 
 # With PostgreSQL persistence
 apg-grc-icm --db-url postgresql+asyncpg://user:pass@localhost/icm --port 8080
 ```
+
+## Service Methods
+
+### Incident Lifecycle
+`report_incident`, `incident_triage`, `incident_investigation`, `root_cause_analysis`,
+`corrective_action`, `corrective_action_update`, `corrective_action_verify`,
+`close_incident`, `incident_reopen`, `incident_escalate`, `incident_categorise`
+
+### Investigation & Evidence
+`investigation_assign`, `verify_evidence_chain`, `find_similar_incidents`
+
+### Playbooks
+`activate_playbook`, `advance_playbook_task`
+
+### Business Continuity
+`business_continuity_activation`, `business_impact_assessment`, `bcp_activate`
+
+### Crisis Communication
+`create_war_room`, `war_room_post`, `close_war_room`, `communication_log`, `notification_send_icm`
+
+### Regulatory & Compliance
+`regulatory_notification`, `third_party_incident_notify`, `vendor_acknowledgement_record`,
+`compliance_test`, `compliance_deficiency`, `remediation_plan`, `compliance_evidence`,
+`compliance_score`, `compliance_calendar`
+
+### Reporting & Analytics
+`incident_analytics`, `incident_kpi_summary`, `compliance_dashboard`,
+`regulatory_reporting_icm`, `get_sla_status`, `generate_executive_briefing`
+
+### Post-Incident
+`post_incident_review`, `lessons_learned_capture`, `lessons_learned_library`,
+`preventive_action_plan`, `insurance_claim_trigger`, `root_cause_confirm`
+
+### ML Enhancements
+`ml_incident_severity` — Ollama-powered severity classification (optional)
 
 ## API Routes
 
@@ -69,7 +110,6 @@ apg-grc-icm --db-url postgresql+asyncpg://user:pass@localhost/icm --port 8080
 | notifications | `/grc-icm/notifications` | `grc_icm:view` |
 | timeline | `/grc-icm/timeline` | `grc_icm:view` |
 
-
 ## HTTP Endpoints
 
 ```
@@ -81,25 +121,20 @@ GET  /api/v1/...       Domain-specific REST API
 
 ## Composability
 
-This capability integrates with the APG platform via the `apg.capabilities` entry-point group. It is auto-discovered by the capability registry when installed.
-
 ```python
 from capabilities.capability_contract_registry import load_contract_registry
 registry = load_contract_registry()
 contract = registry["grc_icm"].contract
 ```
 
+APG DSL: `use grc_icm;`
+
 ## Development
 
 ```bash
-# Run tests
 pytest tests/ -q
-
-# Build wheel
+uv run pyright
 python -m build --wheel .
-
-# Validate contract
-python -c "from capability_contract import get_capability_contract; print('OK')"
 ```
 
 ## License

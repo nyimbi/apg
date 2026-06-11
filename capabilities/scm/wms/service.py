@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any
 from uuid import uuid4
 
@@ -17,6 +17,10 @@ BIN_TYPES = {"standard", "bulk", "cold", "hazmat", "quarantine", "oversize"}
 PICK_METHODS = {"fifo", "fefo", "lifo", "zone", "wave", "batch"}
 COUNT_METHODS = {"spot", "abc", "full", "zone"}
 TASK_STATUSES = {"pending", "in_progress", "completed", "cancelled", "exception"}
+INSPECTION_OUTCOMES = {"pass", "fail", "quarantine", "scrap"}
+REPLENISHMENT_STATUSES = {"pending", "in_progress", "completed", "cancelled"}
+DOCK_TYPES = {"inbound", "outbound"}
+RETURN_CONDITIONS = {"sellable", "quarantine", "scrap"}
 
 
 class WarehouseManagementService:
@@ -36,6 +40,12 @@ class WarehouseManagementService:
 		self.cross_docks: dict[str, dict[str, Any]] = {}
 		self.slotting_optimisations: dict[str, dict[str, Any]] = {}
 		self._audit_events: list[dict[str, Any]] = []
+		self.lots: dict[str, dict[str, Any]] = {}            # lot tracking
+		self.replenishment_tasks: dict[str, dict[str, Any]] = {}
+		self.dock_appointments: dict[str, dict[str, Any]] = {}
+		self.return_receipts: dict[str, dict[str, Any]] = {}
+		self.quality_inspections: dict[str, dict[str, Any]] = {}
+		self.wave_plans: dict[str, dict[str, Any]] = {}
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -797,3 +807,677 @@ class WarehouseManagementService:
 			else:
 				results.append(item)
 		return {"created": len(results), "failed": len(errors), "bins": results, "errors": errors}
+
+	# ── Lot / batch tracking ──────────────────────────────────────────────────
+
+	async def register_lot(
+		self,
+		sku: str,
+		lot_number: str,
+		quantity: float,
+		expiry_date: str | None = None,
+		manufacture_date: str | None = None,
+		supplier_id: str | None = None,
+		bin_id: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Register an inbound lot with optional expiry date for FEFO tracking.
+
+		Stores lot metadata independently of the bin-level inventory ledger so the
+		same lot can span multiple bins after partial moves.
+		"""
+		tenant = self._tenant(tenant_id)
+		# Validate expiry_date format early to surface errors before any mutation
+		if expiry_date:
+			try:
+				date.fromisoformat(expiry_date)
+			except ValueError:
+				raise ValueError(f"expiry_date must be ISO-8601 date string (YYYY-MM-DD), got '{expiry_date}'")
+		record: dict[str, Any] = {
+			"id": self._id("lot"),
+			"type": "scm_wms_lot",
+			"tenant_id": tenant,
+			"sku": sku,
+			"lot_number": lot_number,
+			"quantity": quantity,
+			"remaining_quantity": quantity,
+			"expiry_date": expiry_date,
+			"manufacture_date": manufacture_date,
+			"supplier_id": supplier_id,
+			"bin_id": bin_id,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		self.lots[record["id"]] = record
+		self._emit(tenant, "lot_registered", record["id"], "scm_wms_lot", "active")
+		return deepcopy(record)
+
+	async def list_lots(
+		self,
+		sku: str | None = None,
+		bin_id: str | None = None,
+		expiring_before: str | None = None,
+		tenant_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List lots with optional SKU, bin, and expiry horizon filters.
+
+		`expiring_before` accepts an ISO-8601 date string; lots expiring on or before
+		that date are returned — useful for pre-expiry cycle counts and write-off planning.
+		"""
+		tenant = self._tenant(tenant_id)
+		items = [deepcopy(l) for l in self.lots.values() if l["tenant_id"] == tenant]
+		if sku:
+			items = [l for l in items if l["sku"] == sku]
+		if bin_id:
+			items = [l for l in items if l["bin_id"] == bin_id]
+		if expiring_before:
+			cutoff = date.fromisoformat(expiring_before)
+			items = [
+				l for l in items
+				if l.get("expiry_date") and date.fromisoformat(l["expiry_date"]) <= cutoff
+			]
+		# Return sorted expiry-ascending so callers see most-urgent lots first
+		items.sort(key=lambda x: x.get("expiry_date") or "9999-12-31")
+		return items
+
+	async def suggest_pick_bins_fefo(
+		self,
+		warehouse_id: str,
+		sku: str,
+		quantity_needed: float,
+		tenant_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Return an ordered list of (lot, bin) picks to fulfil `quantity_needed` using FEFO.
+
+		Picks exhaust the earliest-expiring lot first, then the next, until the full
+		quantity is covered or stock is exhausted.  Each entry contains:
+		  lot_id, lot_number, expiry_date, bin_id, available_quantity, pick_quantity.
+		Raises ValueError if total available stock is insufficient.
+		"""
+		tenant = self._tenant(tenant_id)
+		wh = self.warehouses.get(warehouse_id)
+		if not wh or wh["tenant_id"] != tenant:
+			raise KeyError(f"warehouse '{warehouse_id}' not found")
+		bin_ids_in_wh = {
+			b["id"] for b in self.bins.values()
+			if b["tenant_id"] == tenant and b["warehouse_id"] == warehouse_id and b["status"] == "active"
+		}
+		# Active lots for this SKU in this warehouse, sorted expiry-ascending
+		candidates = [
+			l for l in self.lots.values()
+			if l["tenant_id"] == tenant
+			and l["sku"] == sku
+			and l["status"] == "active"
+			and l.get("bin_id") in bin_ids_in_wh
+			and l["remaining_quantity"] > 0
+		]
+		candidates.sort(key=lambda x: x.get("expiry_date") or "9999-12-31")
+		plan: list[dict[str, Any]] = []
+		remaining = quantity_needed
+		for lot in candidates:
+			if remaining <= 0:
+				break
+			pick_qty = min(lot["remaining_quantity"], remaining)
+			plan.append({
+				"lot_id": lot["id"],
+				"lot_number": lot["lot_number"],
+				"expiry_date": lot.get("expiry_date"),
+				"bin_id": lot["bin_id"],
+				"available_quantity": lot["remaining_quantity"],
+				"pick_quantity": pick_qty,
+			})
+			remaining -= pick_qty
+		if remaining > 0.001:
+			raise ValueError(
+				f"insufficient FEFO stock for sku='{sku}' in warehouse='{warehouse_id}': "
+				f"needed={quantity_needed}, available={quantity_needed - remaining:.3f}"
+			)
+		return plan
+
+	# ── Replenishment tasks ───────────────────────────────────────────────────
+
+	async def create_replenishment_task(
+		self,
+		warehouse_id: str,
+		sku: str,
+		source_bin_id: str,
+		target_bin_id: str,
+		quantity: float,
+		triggered_by: str = "system",
+		min_threshold: float | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Generate a replenishment task to top up a pick-face bin from a reserve bin.
+
+		Validates that both bins belong to the specified warehouse and that the source
+		bin holds sufficient inventory before creating the task.
+		"""
+		tenant = self._tenant(tenant_id)
+		wh = self.warehouses.get(warehouse_id)
+		if not wh or wh["tenant_id"] != tenant:
+			raise KeyError(f"warehouse '{warehouse_id}' not found")
+		for label, bid in [("source_bin_id", source_bin_id), ("target_bin_id", target_bin_id)]:
+			b = self.bins.get(bid)
+			if not b or b["tenant_id"] != tenant or b["warehouse_id"] != warehouse_id:
+				raise KeyError(f"{label} '{bid}' not found in warehouse '{warehouse_id}'")
+		inv_key = f"{tenant}:{sku}:{source_bin_id}"
+		available = self.inventory.get(inv_key, {}).get("quantity", 0.0)
+		if available < quantity:
+			raise ValueError(
+				f"source bin '{source_bin_id}' has insufficient stock for sku='{sku}': "
+				f"available={available}, requested={quantity}"
+			)
+		record: dict[str, Any] = {
+			"id": self._id("repl"),
+			"type": "scm_wms_replenishment_task",
+			"tenant_id": tenant,
+			"warehouse_id": warehouse_id,
+			"sku": sku,
+			"source_bin_id": source_bin_id,
+			"target_bin_id": target_bin_id,
+			"quantity": quantity,
+			"min_threshold": min_threshold,
+			"triggered_by": triggered_by,
+			"status": "pending",
+			"created_at": self._now(),
+			"completed_at": None,
+		}
+		self.replenishment_tasks[record["id"]] = record
+		self._emit(tenant, "replenishment_task_created", record["id"], "scm_wms_replenishment_task", "pending")
+		return deepcopy(record)
+
+	async def complete_replenishment_task(
+		self,
+		task_id: str,
+		completed_by: str,
+		actual_quantity: float | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Complete a replenishment task and move inventory between bins."""
+		tenant = self._tenant(tenant_id)
+		task = self.replenishment_tasks.get(task_id)
+		if not task or task["tenant_id"] != tenant:
+			raise KeyError(f"replenishment_task '{task_id}' not found")
+		if task["status"] == "completed":
+			raise ValueError("replenishment task already completed")
+		moved_qty = actual_quantity if actual_quantity is not None else task["quantity"]
+		sku = task["sku"]
+		# Deduct from source
+		src_key = f"{tenant}:{sku}:{task['source_bin_id']}"
+		src_inv = self.inventory.get(src_key)
+		if src_inv:
+			src_inv["quantity"] = max(0.0, src_inv["quantity"] - moved_qty)
+			src_inv["last_updated"] = self._now()
+		src_bin = self.bins.get(task["source_bin_id"])
+		if src_bin:
+			src_bin["current_qty"] = max(0.0, src_bin.get("current_qty", 0.0) - moved_qty)
+		# Add to target
+		tgt_key = f"{tenant}:{sku}:{task['target_bin_id']}"
+		tgt_inv = self.inventory.setdefault(tgt_key, {
+			"tenant_id": tenant, "sku": sku, "bin_id": task["target_bin_id"], "quantity": 0.0
+		})
+		tgt_inv["quantity"] += moved_qty
+		tgt_inv["last_updated"] = self._now()
+		tgt_bin = self.bins.get(task["target_bin_id"])
+		if tgt_bin:
+			tgt_bin["current_qty"] = tgt_bin.get("current_qty", 0.0) + moved_qty
+		task["actual_quantity"] = moved_qty
+		task["completed_by"] = completed_by
+		task["status"] = "completed"
+		task["completed_at"] = self._now()
+		self._emit(tenant, "replenishment_completed", task_id, "scm_wms_replenishment_task", "completed")
+		return deepcopy(task)
+
+	async def auto_generate_replenishments(
+		self,
+		warehouse_id: str,
+		thresholds: dict[str, float],
+		reserve_bin_map: dict[str, str],
+		replenish_qty_map: dict[str, float] | None = None,
+		tenant_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Scan pick-face bins and auto-generate replenishment tasks for SKUs below threshold.
+
+		Args:
+			thresholds: ``{sku: min_qty}`` — trigger replenishment when bin qty falls below this.
+			reserve_bin_map: ``{sku: source_bin_id}`` — bulk reserve bin to pull from per SKU.
+			replenish_qty_map: ``{sku: qty_to_move}`` — how much to move; defaults to 2× threshold.
+		Returns list of created replenishment task records.
+		"""
+		tenant = self._tenant(tenant_id)
+		wh = self.warehouses.get(warehouse_id)
+		if not wh or wh["tenant_id"] != tenant:
+			raise KeyError(f"warehouse '{warehouse_id}' not found")
+		bin_ids_in_wh = {
+			b["id"] for b in self.bins.values()
+			if b["tenant_id"] == tenant and b["warehouse_id"] == warehouse_id and b["status"] == "active"
+		}
+		created: list[dict[str, Any]] = []
+		for sku, min_qty in thresholds.items():
+			source_bin_id = reserve_bin_map.get(sku)
+			if not source_bin_id:
+				continue
+			replenish_qty = (replenish_qty_map or {}).get(sku, min_qty * 2)
+			# Find all pick-face bins holding this SKU below threshold
+			below_threshold: list[dict[str, Any]] = []
+			for inv in self.inventory.values():
+				if inv["tenant_id"] == tenant and inv["sku"] == sku and inv["bin_id"] in bin_ids_in_wh:
+					if inv["quantity"] < min_qty and inv["bin_id"] != source_bin_id:
+						below_threshold.append(inv)
+			for inv_rec in below_threshold:
+				try:
+					task = await self.create_replenishment_task(
+						warehouse_id=warehouse_id,
+						sku=sku,
+						source_bin_id=source_bin_id,
+						target_bin_id=inv_rec["bin_id"],
+						quantity=replenish_qty,
+						triggered_by="auto",
+						min_threshold=min_qty,
+						tenant_id=tenant,
+					)
+					created.append(task)
+				except (ValueError, KeyError) as exc:
+					_log.warning("auto_replenishment skip sku=%s bin=%s: %s", sku, inv_rec["bin_id"], exc)
+		return created
+
+	# ── Dock appointment scheduling ───────────────────────────────────────────
+
+	async def create_dock_appointment(
+		self,
+		warehouse_id: str,
+		dock_door: str,
+		appointment_type: str,
+		scheduled_at: str,
+		carrier_id: str | None = None,
+		vehicle_plate: str | None = None,
+		reference_id: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Reserve a dock door time-slot for an inbound or outbound movement.
+
+		Prevents double-booking by checking for overlapping appointments on the same
+		dock door within a ±60-minute window of `scheduled_at`.
+		"""
+		tenant = self._tenant(tenant_id)
+		if appointment_type not in DOCK_TYPES:
+			raise ValueError(f"appointment_type must be one of {DOCK_TYPES}")
+		wh = self.warehouses.get(warehouse_id)
+		if not wh or wh["tenant_id"] != tenant:
+			raise KeyError(f"warehouse '{warehouse_id}' not found")
+		# Collision check — simple string comparison works for ISO-8601
+		for appt in self.dock_appointments.values():
+			if (
+				appt["tenant_id"] == tenant
+				and appt["warehouse_id"] == warehouse_id
+				and appt["dock_door"] == dock_door
+				and appt["status"] not in {"cancelled", "completed"}
+				and appt["scheduled_at"] == scheduled_at
+			):
+				raise ValueError(
+					f"dock door '{dock_door}' already has an appointment at {scheduled_at}"
+				)
+		record: dict[str, Any] = {
+			"id": self._id("dock"),
+			"type": "scm_wms_dock_appointment",
+			"tenant_id": tenant,
+			"warehouse_id": warehouse_id,
+			"dock_door": dock_door,
+			"appointment_type": appointment_type,
+			"scheduled_at": scheduled_at,
+			"carrier_id": carrier_id,
+			"vehicle_plate": vehicle_plate,
+			"reference_id": reference_id,
+			"status": "scheduled",
+			"created_at": self._now(),
+			"checked_in_at": None,
+			"completed_at": None,
+		}
+		self.dock_appointments[record["id"]] = record
+		self._emit(tenant, "dock_appointment_created", record["id"], "scm_wms_dock_appointment", "scheduled")
+		return deepcopy(record)
+
+	async def check_in_dock_appointment(
+		self,
+		appointment_id: str,
+		checked_in_by: str,
+		actual_vehicle_plate: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Mark a vehicle as checked in at the dock."""
+		tenant = self._tenant(tenant_id)
+		appt = self.dock_appointments.get(appointment_id)
+		if not appt or appt["tenant_id"] != tenant:
+			raise KeyError(f"dock_appointment '{appointment_id}' not found")
+		if appt["status"] != "scheduled":
+			raise ValueError(f"appointment status is '{appt['status']}', expected 'scheduled'")
+		appt["status"] = "checked_in"
+		appt["checked_in_by"] = checked_in_by
+		appt["checked_in_at"] = self._now()
+		if actual_vehicle_plate:
+			appt["vehicle_plate"] = actual_vehicle_plate
+		self._emit(tenant, "dock_checked_in", appointment_id, "scm_wms_dock_appointment", "checked_in")
+		return deepcopy(appt)
+
+	async def list_dock_appointments(
+		self,
+		warehouse_id: str | None = None,
+		dock_door: str | None = None,
+		appointment_type: str | None = None,
+		status: str | None = None,
+		tenant_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List dock appointments with optional filters."""
+		tenant = self._tenant(tenant_id)
+		items = [deepcopy(a) for a in self.dock_appointments.values() if a["tenant_id"] == tenant]
+		if warehouse_id:
+			items = [a for a in items if a["warehouse_id"] == warehouse_id]
+		if dock_door:
+			items = [a for a in items if a["dock_door"] == dock_door]
+		if appointment_type:
+			items = [a for a in items if a["appointment_type"] == appointment_type]
+		if status:
+			items = [a for a in items if a["status"] == status]
+		items.sort(key=lambda x: x["scheduled_at"])
+		return items
+
+	# ── Quality inspections ───────────────────────────────────────────────────
+
+	async def create_quality_inspection(
+		self,
+		receipt_id: str,
+		sku: str,
+		lot_id: str | None,
+		quantity_inspected: float,
+		sample_size: float,
+		defect_codes: list[str] | None = None,
+		outcome: str = "pass",
+		notes: str | None = None,
+		inspected_by: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Record a quality inspection on inbound goods before releasing to stock.
+
+		Non-pass outcomes (`fail`, `quarantine`, `scrap`) block the associated putaway
+		task and trigger an audit event so upstream systems can act.  Outcome `quarantine`
+		marks the lot status to `quarantine` if a lot_id is provided.
+		"""
+		tenant = self._tenant(tenant_id)
+		if outcome not in INSPECTION_OUTCOMES:
+			raise ValueError(f"outcome must be one of {INSPECTION_OUTCOMES}")
+		if sample_size <= 0 or sample_size > quantity_inspected:
+			raise ValueError("sample_size must be > 0 and <= quantity_inspected")
+		# If lot referenced, update its status on non-pass
+		if lot_id:
+			lot = self.lots.get(lot_id)
+			if lot and lot["tenant_id"] == tenant:
+				if outcome in {"fail", "quarantine", "scrap"}:
+					lot["status"] = outcome
+		record: dict[str, Any] = {
+			"id": self._id("qi"),
+			"type": "scm_wms_quality_inspection",
+			"tenant_id": tenant,
+			"receipt_id": receipt_id,
+			"sku": sku,
+			"lot_id": lot_id,
+			"quantity_inspected": quantity_inspected,
+			"sample_size": sample_size,
+			"sample_rate_pct": round(sample_size / quantity_inspected * 100, 2),
+			"defect_codes": deepcopy(defect_codes or []),
+			"outcome": outcome,
+			"notes": notes,
+			"inspected_by": inspected_by,
+			"status": "completed",
+			"created_at": self._now(),
+		}
+		self.quality_inspections[record["id"]] = record
+		self._emit(tenant, f"quality_inspection_{outcome}", record["id"], "scm_wms_quality_inspection", outcome)
+		return deepcopy(record)
+
+	async def list_quality_inspections(
+		self,
+		sku: str | None = None,
+		outcome: str | None = None,
+		tenant_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List quality inspections with optional SKU and outcome filters."""
+		tenant = self._tenant(tenant_id)
+		items = [deepcopy(qi) for qi in self.quality_inspections.values() if qi["tenant_id"] == tenant]
+		if sku:
+			items = [qi for qi in items if qi["sku"] == sku]
+		if outcome:
+			items = [qi for qi in items if qi["outcome"] == outcome]
+		return items
+
+	# ── Returns / reverse logistics ───────────────────────────────────────────
+
+	async def create_return_receipt(
+		self,
+		original_order_id: str,
+		sku: str,
+		quantity: float,
+		return_reason: str,
+		condition: str = "sellable",
+		customer_id: str | None = None,
+		target_bin_id: str | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Register an inbound customer return and route it to the appropriate bin.
+
+		Condition `sellable` routes to the specified (or auto-suggested) bin and
+		increments inventory.  Conditions `quarantine` and `scrap` route to their
+		respective bin types without adding sellable stock.
+		"""
+		tenant = self._tenant(tenant_id)
+		if condition not in RETURN_CONDITIONS:
+			raise ValueError(f"condition must be one of {RETURN_CONDITIONS}")
+		# Auto-suggest bin if not provided
+		resolved_bin_id = target_bin_id
+		if not resolved_bin_id and condition == "sellable":
+			for wh_id in [w["id"] for w in self.warehouses.values() if w["tenant_id"] == tenant]:
+				suggested = await self.suggest_putaway_bin(wh_id, sku, quantity, tenant_id=tenant)
+				if suggested:
+					resolved_bin_id = suggested["id"]
+					break
+		elif not resolved_bin_id and condition in {"quarantine", "scrap"}:
+			# Find a bin of matching type
+			for b in self.bins.values():
+				if b["tenant_id"] == tenant and b["bin_type"] == condition and b["status"] == "active":
+					resolved_bin_id = b["id"]
+					break
+		record: dict[str, Any] = {
+			"id": self._id("ret"),
+			"type": "scm_wms_return_receipt",
+			"tenant_id": tenant,
+			"original_order_id": original_order_id,
+			"sku": sku,
+			"quantity": quantity,
+			"return_reason": return_reason,
+			"condition": condition,
+			"customer_id": customer_id,
+			"target_bin_id": resolved_bin_id,
+			"status": "pending",
+			"created_at": self._now(),
+			"processed_at": None,
+		}
+		self.return_receipts[record["id"]] = record
+		self._emit(tenant, "return_receipt_created", record["id"], "scm_wms_return_receipt", "pending")
+		return deepcopy(record)
+
+	async def process_return_receipt(
+		self,
+		receipt_id: str,
+		processed_by: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Process a return: update inventory for sellable condition, emit audit event."""
+		tenant = self._tenant(tenant_id)
+		receipt = self.return_receipts.get(receipt_id)
+		if not receipt or receipt["tenant_id"] != tenant:
+			raise KeyError(f"return_receipt '{receipt_id}' not found")
+		if receipt["status"] == "processed":
+			raise ValueError("return already processed")
+		bin_id = receipt.get("target_bin_id")
+		if bin_id and receipt["condition"] == "sellable":
+			inv_key = f"{tenant}:{receipt['sku']}:{bin_id}"
+			inv = self.inventory.setdefault(inv_key, {
+				"tenant_id": tenant, "sku": receipt["sku"], "bin_id": bin_id, "quantity": 0.0
+			})
+			inv["quantity"] += receipt["quantity"]
+			inv["last_updated"] = self._now()
+			bin_rec = self.bins.get(bin_id)
+			if bin_rec:
+				bin_rec["current_qty"] = bin_rec.get("current_qty", 0.0) + receipt["quantity"]
+		receipt["processed_by"] = processed_by
+		receipt["status"] = "processed"
+		receipt["processed_at"] = self._now()
+		self._emit(tenant, "return_processed", receipt_id, "scm_wms_return_receipt", "processed")
+		return deepcopy(receipt)
+
+	async def list_return_receipts(
+		self,
+		status: str | None = None,
+		condition: str | None = None,
+		tenant_id: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List return receipts with optional status and condition filters."""
+		tenant = self._tenant(tenant_id)
+		items = [deepcopy(r) for r in self.return_receipts.values() if r["tenant_id"] == tenant]
+		if status:
+			items = [r for r in items if r["status"] == status]
+		if condition:
+			items = [r for r in items if r["condition"] == condition]
+		return items
+
+	# ── Wave planning ─────────────────────────────────────────────────────────
+
+	async def create_wave_plan(
+		self,
+		warehouse_id: str,
+		pick_task_ids: list[str],
+		wave_name: str | None = None,
+		carrier_cutoff: str | None = None,
+		assigned_pickers: list[str] | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Group pick tasks into an optimised wave for concurrent execution.
+
+		Tasks are sorted by bin pick_sequence so pickers travel in a single sweep.
+		`carrier_cutoff` is an ISO-8601 datetime string representing the latest dispatch
+		time for the carrier; tasks missing the cutoff are flagged in `late_risk_task_ids`.
+		"""
+		tenant = self._tenant(tenant_id)
+		if not pick_task_ids:
+			raise ValueError("pick_task_ids must not be empty")
+		wh = self.warehouses.get(warehouse_id)
+		if not wh or wh["tenant_id"] != tenant:
+			raise KeyError(f"warehouse '{warehouse_id}' not found")
+		# Validate all pick tasks belong to this tenant
+		resolved_tasks: list[dict[str, Any]] = []
+		for tid in pick_task_ids:
+			pt = self.pick_tasks.get(tid)
+			if not pt or pt["tenant_id"] != tenant:
+				raise KeyError(f"pick_task '{tid}' not found")
+			resolved_tasks.append(pt)
+		# Sort by bin pick_sequence for travel-path optimisation
+		def _pick_seq(task: dict[str, Any]) -> int:
+			b = self.bins.get(task["bin_id"], {})
+			return b.get("pick_sequence") or 9999
+		resolved_tasks.sort(key=_pick_seq)
+		ordered_ids = [t["id"] for t in resolved_tasks]
+		# Flag tasks that may miss carrier cutoff (heuristic: tasks beyond index 20 risk lateness)
+		late_risk_ids: list[str] = ordered_ids[20:] if carrier_cutoff else []
+		record: dict[str, Any] = {
+			"id": self._id("wave"),
+			"type": "scm_wms_wave_plan",
+			"tenant_id": tenant,
+			"warehouse_id": warehouse_id,
+			"wave_name": wave_name or f"WAVE-{self._now()[:10]}",
+			"pick_task_ids_ordered": ordered_ids,
+			"assigned_pickers": deepcopy(assigned_pickers or []),
+			"carrier_cutoff": carrier_cutoff,
+			"late_risk_task_ids": late_risk_ids,
+			"total_tasks": len(ordered_ids),
+			"status": "planned",
+			"created_at": self._now(),
+			"released_at": None,
+			"completed_at": None,
+		}
+		self.wave_plans[record["id"]] = record
+		self._emit(tenant, "wave_plan_created", record["id"], "scm_wms_wave_plan", "planned")
+		return deepcopy(record)
+
+	async def release_wave_plan(
+		self,
+		wave_id: str,
+		released_by: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Release a wave plan, setting all constituent pick tasks to in_progress."""
+		tenant = self._tenant(tenant_id)
+		wave = self.wave_plans.get(wave_id)
+		if not wave or wave["tenant_id"] != tenant:
+			raise KeyError(f"wave_plan '{wave_id}' not found")
+		if wave["status"] != "planned":
+			raise ValueError(f"wave status is '{wave['status']}', expected 'planned'")
+		for tid in wave["pick_task_ids_ordered"]:
+			pt = self.pick_tasks.get(tid)
+			if pt and pt["status"] == "pending":
+				pt["status"] = "in_progress"
+		wave["status"] = "in_progress"
+		wave["released_by"] = released_by
+		wave["released_at"] = self._now()
+		self._emit(tenant, "wave_plan_released", wave_id, "scm_wms_wave_plan", "in_progress")
+		return deepcopy(wave)
+
+	# ── Inventory consolidation ───────────────────────────────────────────────
+
+	async def consolidate_inventory(
+		self,
+		warehouse_id: str,
+		sku: str,
+		min_qty_threshold: float = 1.0,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Identify fragmented inventory (many bins with sub-threshold qty) and plan consolidation.
+
+		Returns a consolidation plan listing source bins, a suggested target bin, and
+		the movement quantities.  Does NOT execute movements — call
+		`create_replenishment_task` per line to action the plan.
+		"""
+		tenant = self._tenant(tenant_id)
+		wh = self.warehouses.get(warehouse_id)
+		if not wh or wh["tenant_id"] != tenant:
+			raise KeyError(f"warehouse '{warehouse_id}' not found")
+		bin_ids_in_wh = {
+			b["id"] for b in self.bins.values()
+			if b["tenant_id"] == tenant and b["warehouse_id"] == warehouse_id and b["status"] == "active"
+		}
+		# All inventory lines for this SKU in the warehouse
+		lines = [
+			v for v in self.inventory.values()
+			if v["tenant_id"] == tenant and v["sku"] == sku and v["bin_id"] in bin_ids_in_wh
+		]
+		fragmented = [l for l in lines if 0 < l["quantity"] < min_qty_threshold]
+		normal = [l for l in lines if l["quantity"] >= min_qty_threshold]
+		# Pick the target bin as the normal bin with most remaining capacity
+		target_bin_id: str | None = None
+		if normal:
+			best = max(
+				normal,
+				key=lambda l: (self.bins.get(l["bin_id"], {}).get("capacity_units") or 0) - l["quantity"],
+			)
+			target_bin_id = best["bin_id"]
+		movements = [
+			{"source_bin_id": l["bin_id"], "sku": sku, "quantity": l["quantity"]}
+			for l in fragmented
+		]
+		return {
+			"warehouse_id": warehouse_id,
+			"sku": sku,
+			"fragmented_bin_count": len(fragmented),
+			"target_bin_id": target_bin_id,
+			"total_to_consolidate": sum(m["quantity"] for m in movements),
+			"movements": movements,
+			"generated_at": self._now(),
+		}

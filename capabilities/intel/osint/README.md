@@ -8,11 +8,17 @@ automation.
 
 ## What It Provides
 
-- Collection requirement workflow.
+- Collection requirement workflow (async `create_requirement`, `close_requirement`, `list_requirements`).
 - Source registry with source-term review and risk tier controls.
 - Collection plans linked to requirements and sources.
 - Evidence ledger with fingerprints and confidence scores.
 - Triage, assessment, dissemination, and review workflows.
+- **Pivot search** — unified cross-store search across entities, IPs, domains, and social profiles.
+- **Bulk ingestion** — concurrent raw intel ingest with semaphore-bounded backpressure.
+- **Entity merge** — human-confirmed consolidation of duplicate entity records.
+- **Watchlist management** — add/remove/list watchlist entries with per-entry alert thresholds.
+- **Confidence decay engine** — exponential, linear, or step decay models for intel freshness.
+- **Task retry** — exponential back-off rescheduling of failed collection tasks.
 - Deterministic rule guardrails enforced before service state changes.
 - AI-agent registration for `codex`, `claude_code`, `opencode`, and `pi`.
 - Bytewax lifecycle metadata through `apg.intel.osint.lifecycle`.

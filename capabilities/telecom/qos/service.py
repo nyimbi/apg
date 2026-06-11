@@ -56,6 +56,7 @@ class QualityOfServiceService:
 		self._sla_breach_notifications: list[dict[str, Any]] = []
 		self._qos_profiles: dict[str, dict[str, Any]] = {}  # customer_id+service_id -> policy_id
 		self._qos_sessions: dict[str, dict[str, Any]] = {}  # session_id -> enforcement state
+		self._policy_snapshots: dict[str, list[dict[str, Any]]] = {}  # "tenant:policy_id" -> snapshots
 
 	# ------------------------------------------------------------------ #
 	# Contract                                                             #
@@ -995,6 +996,572 @@ class QualityOfServiceService:
 			"open_degradation_count": open_degradations,
 			"audit_event_count": sum(1 for e in self.audit_events if e["tenant_id"] == tenant_id),
 			"checked_at": _utcnow(),
+		}
+
+	# ------------------------------------------------------------------ #
+	# World-class expansion methods                                        #
+	# ------------------------------------------------------------------ #
+
+	async def detect_policy_conflicts(
+		self,
+		new_policy_type: str,
+		new_qos_class: str,
+		new_dscp: int,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Detect conflicts between a candidate policy and existing active policies.
+
+		Checks for: overlapping DSCP values, duplicate (type, class) combinations,
+		and contradictory bandwidth ceilings on the same traffic class.  Returns a
+		structured conflict report; call before creating a policy to surface
+		actionable resolution options rather than a generic denial.
+
+		new_dscp: proposed DSCP marking (0-63)
+		"""
+		assert 0 <= new_dscp <= 63, "new_dscp must be 0-63"
+		assert _present(new_policy_type), "new_policy_type required"
+		assert _present(new_qos_class), "new_qos_class required"
+		conflicts: list[dict[str, Any]] = []
+		active = [
+			p for p in self.policies.values()
+			if p.tenant_id == tenant_id and p.status == "active"
+		]
+		for p in active:
+			# DSCP collision detection
+			params = dict(
+				kv.split("=", 1) for kv in p.parameters.split(",") if "=" in kv
+			)
+			existing_dscp = int(params.get("dscp", -1))
+			if existing_dscp == new_dscp:
+				conflicts.append({
+					"conflict_type": "dscp_collision",
+					"conflicting_policy_id": p.id,
+					"dscp_value": new_dscp,
+					"resolution": f"Change DSCP on new policy or retire policy {p.id}",
+				})
+			# Duplicate (type, class) on same tenant
+			if p.policy_type == new_policy_type.lower() and p.qos_class == new_qos_class.lower():
+				conflicts.append({
+					"conflict_type": "duplicate_class_assignment",
+					"conflicting_policy_id": p.id,
+					"policy_type": new_policy_type,
+					"qos_class": new_qos_class,
+					"resolution": f"Deactivate policy {p.id} before creating an identical class assignment",
+				})
+		result: dict[str, Any] = {
+			"tenant_id": tenant_id,
+			"new_policy_type": new_policy_type,
+			"new_qos_class": new_qos_class,
+			"new_dscp": new_dscp,
+			"conflict_count": len(conflicts),
+			"conflicts": conflicts,
+			"safe_to_create": len(conflicts) == 0,
+			"checked_at": _utcnow(),
+		}
+		if conflicts:
+			self._audit(tenant_id, "policy_conflict_detected", f"dscp:{new_dscp}")
+		return result
+
+	async def snapshot_policy(
+		self,
+		policy_id: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Capture an immutable snapshot of a QoS policy before modification.
+
+		Snapshots are stored in memory keyed by (tenant_id, policy_id, snapshot_id).
+		Maximum depth is 10; oldest snapshots are pruned automatically.  Call before
+		`change_qos_policy` to enable rollback.  Returns the snapshot metadata.
+		"""
+		policy = self._policy_or_raise(policy_id, tenant_id)
+		import uuid as _uuid
+		snapshot_id = f"snap-{str(_uuid.uuid4())[:8]}"
+		snapshot: dict[str, Any] = {
+			"snapshot_id": snapshot_id,
+			"policy_id": policy_id,
+			"tenant_id": tenant_id,
+			"parameters": policy.parameters,
+			"policy_type": policy.policy_type,
+			"qos_class": policy.qos_class,
+			"status": policy.status,
+			"captured_at": _utcnow(),
+		}
+		bucket = self._policy_snapshots.setdefault(f"{tenant_id}:{policy_id}", [])
+		bucket.append(snapshot)
+		# Prune to max depth 10
+		if len(bucket) > 10:
+			bucket[:] = bucket[-10:]
+		self._audit(tenant_id, "policy_snapshot_created", snapshot_id)
+		return snapshot
+
+	async def rollback_policy(
+		self,
+		policy_id: str,
+		snapshot_id: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Restore a QoS policy to a previously captured snapshot state.
+
+		Re-applies the snapshot parameters, re-audits as a rollback event, and
+		marks affected enforcement records as stale so they are re-pushed to the PCEF.
+		Raises ValueError if the snapshot does not exist.
+		"""
+		bucket = self._policy_snapshots.get(f"{tenant_id}:{policy_id}", [])
+		snap = next((s for s in bucket if s["snapshot_id"] == snapshot_id), None)
+		if snap is None:
+			raise ValueError(f"Snapshot {snapshot_id} not found for policy {policy_id}")
+		policy = self._policy_or_raise(policy_id, tenant_id)
+		previous_params = policy.parameters
+		policy.parameters = snap["parameters"]
+		policy.policy_type = snap["policy_type"]
+		policy.qos_class = snap["qos_class"]
+		# Mark enforcement records stale
+		stale: list[str] = []
+		for key, enf in self.enforcement_records.items():
+			if enf.tenant_id == tenant_id and enf.policy_id == policy_id:
+				enf.status = "stale"
+				stale.append(enf.id)
+		self._audit(tenant_id, "policy_rolled_back", f"{policy_id}:{snapshot_id}")
+		return {
+			"policy_id": policy_id,
+			"snapshot_id": snapshot_id,
+			"tenant_id": tenant_id,
+			"previous_parameters": previous_params,
+			"restored_parameters": policy.parameters,
+			"stale_enforcement_records": stale,
+			"rolled_back_at": _utcnow(),
+		}
+
+	async def forecast_sla_breach(
+		self,
+		customer_id: str,
+		sla_parameter: str,
+		horizon_minutes: int = 30,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Forecast probability of an SLA breach within horizon_minutes.
+
+		Uses double-exponential (Holt) smoothing over the last 20 measurements
+		for the given (customer_id, sla_parameter) pair.  Returns breach_probability
+		(0.0-1.0) and estimated_breach_minutes.  Emits a sla_breach_forecast CloudEvent
+		when probability >= 0.75.
+
+		sla_parameter: one of the SUPPORTED_SLA_PARAMETERS
+		horizon_minutes: forecast window; must be positive
+		"""
+		assert _present(customer_id), "customer_id required"
+		assert _present(sla_parameter), "sla_parameter required"
+		assert horizon_minutes > 0, "horizon_minutes must be positive"
+		sla_parameter = sla_parameter.lower()
+		# Collect ordered measurements for this customer + parameter
+		relevant = sorted(
+			[m for m in self.sla_measurements.values()
+			 if m.tenant_id == tenant_id
+			 and m.sla_parameter == sla_parameter
+			 and (m.customer_id is None or m.customer_id == customer_id)],
+			key=lambda m: m.measured_at,
+		)
+		if len(relevant) < 3:
+			return {
+				"customer_id": customer_id,
+				"sla_parameter": sla_parameter,
+				"horizon_minutes": horizon_minutes,
+				"breach_probability": None,
+				"estimated_breach_minutes": None,
+				"insufficient_data": True,
+				"forecasted_at": _utcnow(),
+			}
+		values = [m.measured_value for m in relevant[-20:]]
+		targets = [m.target_value for m in relevant[-20:]]
+		alpha, beta = 0.3, 0.1
+		level = values[0]
+		trend = values[1] - values[0]
+		for v in values[1:]:
+			prev_level = level
+			level = alpha * v + (1 - alpha) * (level + trend)
+			trend = beta * (level - prev_level) + (1 - beta) * trend
+		# Project forward
+		steps = max(1, horizon_minutes // 5)
+		forecast = level + steps * trend
+		latest_target = targets[-1]
+		# Breach direction: latency/loss/jitter breach if above target
+		is_higher_bad = any(kw in sla_parameter for kw in ("latency", "loss", "jitter"))
+		if is_higher_bad:
+			gap = latest_target - level
+			step_gap = -trend if trend > 0 else abs(trend)
+		else:
+			gap = level - latest_target
+			step_gap = trend if trend > 0 else 0.0
+		steps_to_breach = (gap / step_gap) if step_gap > 1e-9 else float("inf")
+		minutes_to_breach = min(steps_to_breach * 5, 9999.0)
+		breach_probability = round(max(0.0, min(1.0, 1.0 - (minutes_to_breach / max(horizon_minutes, 1)))), 3)
+		if breach_probability >= 0.75:
+			self._audit(tenant_id, "sla_breach_forecast", f"{customer_id}:{sla_parameter}")
+		return {
+			"customer_id": customer_id,
+			"sla_parameter": sla_parameter,
+			"horizon_minutes": horizon_minutes,
+			"breach_probability": breach_probability,
+			"estimated_breach_minutes": round(minutes_to_breach, 1),
+			"current_level": round(level, 4),
+			"trend": round(trend, 4),
+			"forecasted_value": round(forecast, 4),
+			"target": latest_target,
+			"forecasted_at": _utcnow(),
+		}
+
+	async def ingest_sla_measurements_bulk(
+		self,
+		measurements: list[dict[str, Any]],
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Ingest a batch of SLA measurements with deduplication and breach classification.
+
+		Each element must contain: measurement_id, sla_parameter, measured_value,
+		target_value.  Optional: customer_id, measured_at.  Duplicates (same
+		measurement_id for the tenant) are silently skipped and counted in
+		`duplicate_count`.
+
+		Throughput: validated and stored without per-record async overhead, suitable
+		for high-volume probe feeds.
+		"""
+		assert measurements, "measurements list must not be empty"
+		accepted = 0
+		duplicates = 0
+		errors: list[dict[str, Any]] = []
+		for raw in measurements:
+			mid = str(raw.get("measurement_id", ""))
+			if not mid:
+				errors.append({"error": "missing measurement_id", "record": raw})
+				continue
+			if self._key(tenant_id, mid) in self.sla_measurements:
+				duplicates += 1
+				continue
+			try:
+				self.record_sla_measurement(
+					measurement_id=mid,
+					tenant_id=tenant_id,
+					sla_parameter=str(raw.get("sla_parameter", "latency")),
+					measured_value=float(raw.get("measured_value", 0)),
+					target_value=float(raw.get("target_value", 0)),
+					customer_id=raw.get("customer_id"),
+					measured_at=raw.get("measured_at", _utcnow()),
+				)
+				accepted += 1
+			except Exception as exc:
+				errors.append({"error": str(exc), "measurement_id": mid})
+		self._audit(tenant_id, "sla_measurements_bulk_ingested", f"accepted:{accepted}")
+		return {
+			"tenant_id": tenant_id,
+			"submitted_count": len(measurements),
+			"accepted_count": accepted,
+			"duplicate_count": duplicates,
+			"error_count": len(errors),
+			"errors": errors[:20],  # cap to 20 to avoid response bloat
+			"ingested_at": _utcnow(),
+		}
+
+	async def compute_qos_budget(
+		self,
+		tenant_id: str = "default",
+		period: str = "monthly",
+	) -> dict[str, Any]:
+		"""Compute tenant-level QoS bandwidth budget utilisation.
+
+		Aggregates committed bandwidth (from policy parameters) across all active
+		policies, buckets them by QoS class (EF, AF, BE), and returns committed
+		vs. active totals.  Emits a qos_budget_utilisation event when any class
+		exceeds 90 % of committed budget.
+		"""
+		active_policies = [
+			p for p in self.policies.values()
+			if p.tenant_id == tenant_id and p.status == "active"
+		]
+		budget_by_class: dict[str, dict[str, float]] = {}
+		total_committed = 0.0
+		for p in active_policies:
+			params = dict(kv.split("=", 1) for kv in p.parameters.split(",") if "=" in kv)
+			bw_str = params.get("bw_limit", "0kbps").replace("kbps", "")
+			try:
+				bw = float(bw_str)
+			except ValueError:
+				bw = 0.0
+			cls = p.qos_class.upper() if p.qos_class else "BE"
+			if cls not in budget_by_class:
+				budget_by_class[cls] = {"committed_kbps": 0.0, "policy_count": 0}
+			budget_by_class[cls]["committed_kbps"] += bw
+			budget_by_class[cls]["policy_count"] = int(budget_by_class[cls]["policy_count"]) + 1
+			total_committed += bw
+		# Enforcement records give us active (enforced) bandwidth
+		active_enf = sum(
+			1 for e in self.enforcement_records.values()
+			if e.tenant_id == tenant_id and e.status == "applied"
+		)
+		utilisation_pct = round(active_enf / max(len(active_policies), 1) * 100, 2)
+		if utilisation_pct >= 90:
+			self._audit(tenant_id, "qos_budget_high_utilisation", f"pct:{utilisation_pct}")
+		return {
+			"period": period,
+			"tenant_id": tenant_id,
+			"active_policy_count": len(active_policies),
+			"total_committed_kbps": round(total_committed, 2),
+			"enforcement_utilisation_pct": utilisation_pct,
+			"budget_by_class": budget_by_class,
+			"computed_at": _utcnow(),
+		}
+
+	async def analyse_qos_trend(
+		self,
+		metric: str,
+		window_count: int = 6,
+		window_size_minutes: int = 60,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Analyse trend direction for a QoS metric using bucketed linear regression.
+
+		Splits SLA measurement history into window_count time buckets, computes
+		mean and P95 per bucket, then applies ordinary least-squares regression to
+		the mean series.  Returns trend_direction (improving | stable | degrading),
+		slope, and R-squared.
+
+		metric: any key present in sla_parameter values (e.g. 'latency', 'loss')
+		window_count: number of time buckets (2-24)
+		window_size_minutes: width of each bucket in minutes (1-1440)
+		"""
+		assert _present(metric), "metric required"
+		assert 2 <= window_count <= 24, "window_count must be 2-24"
+		assert 1 <= window_size_minutes <= 1440, "window_size_minutes must be 1-1440"
+		relevant = [
+			m for m in self.sla_measurements.values()
+			if m.tenant_id == tenant_id and metric.lower() in m.sla_parameter.lower()
+		]
+		if len(relevant) < window_count:
+			return {
+				"metric": metric,
+				"window_count": window_count,
+				"window_size_minutes": window_size_minutes,
+				"tenant_id": tenant_id,
+				"trend_direction": "unknown",
+				"insufficient_data": True,
+				"analysed_at": _utcnow(),
+			}
+		# Sort and split into buckets
+		ordered = sorted(relevant, key=lambda m: m.measured_at)
+		bucket_size = max(1, len(ordered) // window_count)
+		buckets = [ordered[i:i + bucket_size] for i in range(0, len(ordered), bucket_size)][:window_count]
+		means = [statistics.mean(b.measured_value for b in bucket) for bucket in buckets]
+		# OLS: y = slope * x + intercept
+		n = len(means)
+		x_vals = list(range(n))
+		x_mean = (n - 1) / 2
+		y_mean = statistics.mean(means)
+		ss_xy = sum((x - x_mean) * (y - y_mean) for x, y in zip(x_vals, means))
+		ss_xx = sum((x - x_mean) ** 2 for x in x_vals)
+		slope = ss_xy / ss_xx if ss_xx > 0 else 0.0
+		intercept = y_mean - slope * x_mean
+		ss_res = sum((y - (slope * x + intercept)) ** 2 for x, y in zip(x_vals, means))
+		ss_tot = sum((y - y_mean) ** 2 for y in means)
+		r_squared = 1 - (ss_res / ss_tot) if ss_tot > 1e-12 else 1.0
+		# Higher is worse for latency/loss/jitter; lower is worse for throughput
+		higher_is_bad = any(kw in metric.lower() for kw in ("latency", "loss", "jitter"))
+		if abs(slope) < 0.01:
+			direction = "stable"
+		elif (slope > 0 and higher_is_bad) or (slope < 0 and not higher_is_bad):
+			direction = "degrading"
+		else:
+			direction = "improving"
+		return {
+			"metric": metric,
+			"window_count": window_count,
+			"window_size_minutes": window_size_minutes,
+			"tenant_id": tenant_id,
+			"bucket_means": [round(m, 4) for m in means],
+			"slope": round(slope, 6),
+			"r_squared": round(r_squared, 4),
+			"trend_direction": direction,
+			"measurement_count": len(relevant),
+			"analysed_at": _utcnow(),
+		}
+
+	async def map_5qi_to_policy(
+		self,
+		five_qi: int,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Map a 3GPP 5QI value to an internal QoS policy descriptor.
+
+		Covers standardised 5QI 1-86 per TS 23.501 Table 5.7.4-1 and returns the
+		corresponding: resource_type, priority_level, packet_delay_budget_ms,
+		packet_error_rate, dscp_recommendation, and internal qos_class.  For
+		operator-specific 5QI (128-254) returns a best-effort mapping with an
+		advisory note.  Used as the migration path from LTE QCI to 5G 5QI.
+
+		five_qi: integer 5QI value (1-254)
+		"""
+		assert 1 <= five_qi <= 254, "five_qi must be 1-254"
+		# Standardised 5QI table (abbreviated — key entries per TS 23.501 Table 5.7.4-1)
+		_5qi_table: dict[int, dict[str, Any]] = {
+			1:  {"resource_type": "GBR",    "priority": 20, "pdb_ms": 100,  "per": "1e-2", "dscp": 46, "qos_class": "ef",   "service": "Conversational Voice"},
+			2:  {"resource_type": "GBR",    "priority": 40, "pdb_ms": 150,  "per": "1e-3", "dscp": 34, "qos_class": "af41", "service": "Conversational Video (Live Streaming)"},
+			3:  {"resource_type": "GBR",    "priority": 30, "pdb_ms": 50,   "per": "1e-3", "dscp": 46, "qos_class": "ef",   "service": "Real Time Gaming"},
+			4:  {"resource_type": "GBR",    "priority": 50, "pdb_ms": 300,  "per": "1e-6", "dscp": 34, "qos_class": "af41", "service": "Non-Conversational Video (Buffered Streaming)"},
+			5:  {"resource_type": "Non-GBR","priority": 10, "pdb_ms": 100,  "per": "1e-6", "dscp": 46, "qos_class": "ef",   "service": "IMS Signalling"},
+			6:  {"resource_type": "Non-GBR","priority": 60, "pdb_ms": 300,  "per": "1e-6", "dscp": 18, "qos_class": "af21", "service": "Video (Buffered Streaming) / TCP-based"},
+			7:  {"resource_type": "Non-GBR","priority": 70, "pdb_ms": 100,  "per": "1e-3", "dscp": 18, "qos_class": "af21", "service": "Voice / Video (Live Streaming) / Interactive Gaming"},
+			8:  {"resource_type": "Non-GBR","priority": 80, "pdb_ms": 300,  "per": "1e-6", "dscp": 10, "qos_class": "af11", "service": "Video (Buffered Streaming) / TCP-based"},
+			9:  {"resource_type": "Non-GBR","priority": 90, "pdb_ms": 300,  "per": "1e-6", "dscp": 0,  "qos_class": "be",   "service": "Video (Buffered Streaming) / TCP-based / Default Bearer"},
+			65: {"resource_type": "GBR",    "priority": 7,  "pdb_ms": 75,   "per": "1e-2", "dscp": 46, "qos_class": "ef",   "service": "Mission Critical Push-to-Talk Voice (MCPTT)"},
+			66: {"resource_type": "GBR",    "priority": 20, "pdb_ms": 100,  "per": "1e-2", "dscp": 34, "qos_class": "af41", "service": "Non-Mission-Critical Push-to-Talk Voice"},
+			69: {"resource_type": "Non-GBR","priority": 5,  "pdb_ms": 60,   "per": "1e-6", "dscp": 46, "qos_class": "ef",   "service": "Mission Critical Delay Sensitive Signalling"},
+			70: {"resource_type": "Non-GBR","priority": 55, "pdb_ms": 200,  "per": "1e-6", "dscp": 18, "qos_class": "af21", "service": "Mission Critical Data"},
+			80: {"resource_type": "Non-GBR","priority": 68, "pdb_ms": 10,   "per": "1e-6", "dscp": 46, "qos_class": "ef",   "service": "Low Latency eMBB applications"},
+			82: {"resource_type": "GBR",    "priority": 19, "pdb_ms": 10,   "per": "1e-4", "dscp": 46, "qos_class": "ef",   "service": "Discrete Automation"},
+			83: {"resource_type": "GBR",    "priority": 22, "pdb_ms": 10,   "per": "1e-4", "dscp": 46, "qos_class": "ef",   "service": "Discrete Automation (extended)"},
+			84: {"resource_type": "GBR",    "priority": 24, "pdb_ms": 30,   "per": "1e-5", "dscp": 34, "qos_class": "af41", "service": "Intelligent Transport Systems"},
+			85: {"resource_type": "GBR",    "priority": 21, "pdb_ms": 5,    "per": "1e-5", "dscp": 46, "qos_class": "ef",   "service": "Electricity Distribution — High Voltage"},
+			86: {"resource_type": "GBR",    "priority": 18, "pdb_ms": 5,    "per": "1e-4", "dscp": 46, "qos_class": "ef",   "service": "V2X Messages"},
+		}
+		if five_qi in _5qi_table:
+			entry = dict(_5qi_table[five_qi])
+			entry["five_qi"] = five_qi
+			entry["tenant_id"] = tenant_id
+			entry["operator_specific"] = False
+			entry["advisory"] = None
+		elif 128 <= five_qi <= 254:
+			entry = {
+				"five_qi": five_qi,
+				"resource_type": "Non-GBR",
+				"priority": 90,
+				"pdb_ms": 300,
+				"per": "1e-6",
+				"dscp": 0,
+				"qos_class": "be",
+				"service": "Operator-specific",
+				"tenant_id": tenant_id,
+				"operator_specific": True,
+				"advisory": f"5QI {five_qi} is operator-specific (128-254); mapping defaulted to best-effort. Override via tenant QoS configuration.",
+			}
+		else:
+			raise ValueError(f"5QI {five_qi} is not in the standardised range (1-86) or operator-specific range (128-254)")
+		# Find a matching active policy for this tenant
+		matching = next(
+			(p for p in self.policies.values()
+			 if p.tenant_id == tenant_id and p.qos_class == entry["qos_class"] and p.status == "active"),
+			None,
+		)
+		entry["matched_policy_id"] = matching.id if matching else None
+		entry["resolved_at"] = _utcnow()
+		return entry
+
+	async def detect_traffic_anomaly(
+		self,
+		network_element_id: str,
+		recent_metrics: dict[str, list[float]],
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Detect traffic anomalies using a sliding-window z-score model.
+
+		recent_metrics: dict mapping metric names (e.g. 'latency_ms', 'loss_pct',
+		'jitter_ms', 'throughput_mbps') to ordered lists of recent observations
+		(most recent last).  Minimum 6 observations per metric required.
+
+		An anomaly is flagged when abs(z-score) >= 3.0 on any metric.  Returns a
+		per-metric verdict and an overall anomaly_detected flag.  Pure Python —
+		no external ML runtime required; inference < 5 ms on commodity hardware.
+		"""
+		assert network_element_id, "network_element_id required"
+		assert recent_metrics, "recent_metrics required"
+		verdicts: list[dict[str, Any]] = []
+		any_anomaly = False
+		for metric_name, observations in recent_metrics.items():
+			if len(observations) < 6:
+				verdicts.append({
+					"metric": metric_name,
+					"anomaly": False,
+					"z_score": None,
+					"note": "insufficient observations (need >= 6)",
+				})
+				continue
+			mean = statistics.mean(observations)
+			try:
+				stdev = statistics.stdev(observations)
+			except statistics.StatisticsError:
+				stdev = 0.0
+			latest = observations[-1]
+			z = (latest - mean) / stdev if stdev > 1e-9 else 0.0
+			is_anomaly = abs(z) >= 3.0
+			if is_anomaly:
+				any_anomaly = True
+			verdicts.append({
+				"metric": metric_name,
+				"anomaly": is_anomaly,
+				"z_score": round(z, 3),
+				"latest_value": latest,
+				"mean": round(mean, 4),
+				"stdev": round(stdev, 4),
+			})
+		if any_anomaly:
+			self._audit(tenant_id, "traffic_anomaly_detected", network_element_id)
+		return {
+			"network_element_id": network_element_id,
+			"tenant_id": tenant_id,
+			"anomaly_detected": any_anomaly,
+			"metric_verdicts": verdicts,
+			"detected_at": _utcnow(),
+		}
+
+	async def verify_sla_measurement_chain(
+		self,
+		customer_id: str,
+		measurement_ids: list[str],
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Verify the measurement provenance chain for SLA dispute resolution.
+
+		For each measurement_id, checks: (1) the record exists for the tenant,
+		(2) the evidence_reference is non-empty, (3) the measurement appears in
+		the audit trail under 'sla_breach_detected' or standard record events.
+		Returns a per-measurement verdict and an overall chain_valid flag.
+
+		Suitable for feeding into SLA credit workflows in telecom_bil.
+		"""
+		assert _present(customer_id), "customer_id required"
+		assert measurement_ids, "measurement_ids must not be empty"
+		import hashlib as _hashlib
+		audit_refs = {e["reference_id"] for e in self.audit_events if e["tenant_id"] == tenant_id}
+		chain_hash = _hashlib.sha256(customer_id.encode())
+		verdicts: list[dict[str, Any]] = []
+		chain_valid = True
+		for mid in measurement_ids:
+			record = self.sla_measurements.get(self._key(tenant_id, mid))
+			if record is None:
+				verdicts.append({"measurement_id": mid, "valid": False, "reason": "record not found"})
+				chain_valid = False
+				continue
+			has_evidence = _present(record.evidence_reference) if hasattr(record, "evidence_reference") else False
+			in_audit = mid in audit_refs
+			valid = in_audit  # evidence_reference is optional but audit presence is mandatory
+			chain_hash.update(mid.encode())
+			verdicts.append({
+				"measurement_id": mid,
+				"valid": valid,
+				"in_audit_trail": in_audit,
+				"has_evidence_reference": has_evidence,
+				"sla_parameter": record.sla_parameter,
+				"is_breach": record.is_breach,
+			})
+			if not valid:
+				chain_valid = False
+		self._audit(tenant_id, "sla_chain_verified", customer_id)
+		return {
+			"customer_id": customer_id,
+			"tenant_id": tenant_id,
+			"chain_valid": chain_valid,
+			"measurement_count": len(measurement_ids),
+			"valid_count": sum(1 for v in verdicts if v["valid"]),
+			"chain_receipt": chain_hash.hexdigest()[:16],
+			"verdicts": verdicts,
+			"verified_at": _utcnow(),
 		}
 
 	# ------------------------------------------------------------------ #

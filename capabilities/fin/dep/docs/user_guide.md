@@ -217,6 +217,170 @@ Each entry contains `account_id`, `gross_amount`, `wht_amount`, and `posted_at`.
 
 ---
 
+---
+
+## v1.1 New Features
+
+### Product Cloning
+
+Quickly create product variants without re-entering all configuration:
+
+```python
+await svc.clone_product(
+    tenant_id="bank1",
+    source_code="SAV001",
+    new_code="SAV-PREMIUM",
+    new_name="Premium Savings",
+    overrides={
+        "interest_config": InterestConfig(rate=Decimal("8.5"), ...),
+    },
+    cloned_by="product_manager",
+)
+```
+
+The clone inherits all fields from the source product. Only fields listed in `overrides` are replaced. Rate history is initialised with a `cloned_from:<source_code>` entry.
+
+---
+
+### Multi-Product Comparison
+
+Compare returns across multiple products in a single call:
+
+```python
+rankings = await svc.compare_products(
+    "bank1",
+    principal=Decimal("1000000"),
+    tenor_days=90,
+    product_codes=["TD-6M", "TD-3M", "SAV-PREMIUM"],
+)
+# rankings[0] is the product with highest net_interest
+for r in rankings:
+    print(r.product_code, r.net_interest, r.effective_rate)
+```
+
+Products that cannot be simulated (inactive, wrong type) are silently excluded.
+
+---
+
+### Effective Annual Yield (EAY)
+
+Mandatory CBK/CMA disclosure — the true annual return after compounding and tax:
+
+```python
+eay = await svc.get_effective_annual_yield(
+    "bank1", "TD-6M", principal=Decimal("500000"),
+    tax_rate_override=Decimal("15"),  # optional override
+)
+print(eay["disclosure_text"])
+# → "Gross EAY 9.3807% | WHT 15% | Net EAY 7.9736% on KES 500,000.00 principal"
+```
+
+Formula used:
+- Compound: `gross_eay = (1 + r/n)^n - 1`
+- Simple / daily: `gross_eay = r` (nominal rate already annual)
+- `net_eay = gross_eay × (1 - wht_rate/100)`
+
+---
+
+### Dormancy Management
+
+CBK Prudential Guideline CBK/PG/01 requires classification of inactive accounts:
+
+```python
+# Run at month-end; accounts idle >= 365 days become dormant
+report = await svc.classify_dormant_accounts("bank1", date.today(), inactivity_days=365)
+print(report["newly_dormant"], report["fees_applied"])
+
+# Reactivate when customer transacts
+await svc.reactivate_account("bank1", "ACC-001", reactivated_by="teller_001")
+```
+
+Dormancy classification:
+1. Finds accounts with no interest postings for `inactivity_days`
+2. Marks them `dormant=True` with `dormant_since` timestamp
+3. Applies the configured maintenance fee
+
+---
+
+### Batch Maturity Sweep
+
+Process all term deposits maturing on or before a given date in a single EOD call:
+
+```python
+report = await svc.batch_process_maturities(
+    "bank1",
+    maturity_date=date.today(),
+    default_instruction=MaturityInstruction.ROLLOVER,
+)
+print(report["processed_count"], report["total_interest"], report["errors"])
+```
+
+Each account uses its per-account `maturity_instruction` if set, otherwise falls back to `default_instruction`. Errors are collected per-account — a single failure does not halt the batch.
+
+---
+
+### Accrual Reversal
+
+Correct GL divergence caused by rate errors or backdated transactions:
+
+```python
+result = await svc.reverse_accrual(
+    "bank1", "ACC-001",
+    accrual_date=date(2026, 5, 31),
+    reason="rate_correction_post_cbr_change",
+    reversed_by="finance_ops",
+)
+print(result["net_reversed"], result["reversed_at"])
+```
+
+A negating `AccrualEntry` is stored under a `REV:` key. The original entry is marked as posted to prevent double-accrual. The reversal record links back to the original via `posting_ref`.
+
+---
+
+### Account Statement
+
+Generate a period statement with running balance (CBK Banking Act s.24):
+
+```python
+stmt = await svc.generate_account_statement(
+    "bank1", "ACC-001",
+    from_date=date(2026, 1, 1),
+    to_date=date(2026, 3, 31),
+)
+print(stmt["opening_balance"])
+for item in stmt["line_items"]:
+    print(item["date"], item["type"], item["amount"], item["running_balance"])
+print(stmt["closing_balance"])
+```
+
+Statement includes:
+- `INTEREST_CREDIT` entries from `apply_interest()`
+- `FEE_DEBIT` entries from `apply_maintenance_fee()`
+- Running balance after each line item
+- Opening and closing balance
+
+---
+
+### Interest Disposition
+
+Private banking clients may prefer interest paid to a linked current account rather than capitalised:
+
+```python
+# Set pay-out mode
+await svc.set_interest_disposition(
+    "bank1", "ACC-001",
+    disposition="PAY_OUT",
+    linked_payout_account="CHQ-001",
+)
+
+# Revert to capitalisation (default)
+await svc.set_interest_disposition("bank1", "ACC-001", "CAPITALIZE")
+```
+
+`apply_interest()` respects this flag: when `PAY_OUT`, the linked account receives the net interest credit instead of the deposit account.
+
+---
+
 ## APG Integration Notes
 
 - Auth and permissions flow through `common.auth_rbac`

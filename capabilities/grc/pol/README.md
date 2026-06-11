@@ -102,7 +102,96 @@ python -m build --wheel .
 python -c "from capability_contract import get_capability_contract; print('OK')"
 ```
 
+## Service API — Full Method Reference
+
+### Lifecycle
+
+| Method | Description |
+|--------|-------------|
+| `create_policy(...)` | Create a new policy in draft status |
+| `draft_policy_content(policy_id, sections, author_id)` | Attach structured content sections |
+| `policy_review(policy_id, reviewer_id, comments, action)` | Submit peer review (SOD enforced) |
+| `approve_policy(policy_id, approver_id, approval_date)` | Formal approval |
+| `publish_policy(policy_id, distribution_list)` | Publish and trigger acknowledgements |
+| `policy_revision(policy_id, reason, summary, revised_by)` | Initiate version revision |
+| `retire_policy(policy_id, reason, retired_by)` | Archive/withdraw a policy |
+
+### Attestation
+
+| Method | Description |
+|--------|-------------|
+| `acknowledge_policy(policy_id, employee_id, date)` | Record individual acknowledgement |
+| `create_attestation_campaign(...)` | SLA-tracked bulk attestation campaign |
+| `acknowledgement_chase(policy_id, chased_by)` | Chase overdue acknowledgements |
+
+### Exceptions
+
+| Method | Description |
+|--------|-------------|
+| `policy_exception_request(...)` | Request exception with compensating controls |
+| `approve_exception(exception_id, approver_id, until, conditions)` | Approve exception |
+| `policy_exception_monitor(policy_id)` | Monitor expiring/expired exceptions |
+
+### Compliance and Mapping
+
+| Method | Description |
+|--------|-------------|
+| `policy_compliance_check(entity_id, policy_id)` | Compliance status per policy |
+| `policy_mapping(policy_id, regulation_ids, control_ids)` | Map to regulations/controls |
+| `policy_gap_analysis(entity_id, framework)` | Gap analysis vs ISO 27001, SOC 2, GDPR, CBK |
+| `regulatory_align(policy_id, regulations, aligned_by)` | Align to regulatory requirements |
+
+### Templates and Import
+
+| Method | Description |
+|--------|-------------|
+| `policy_template(name, type, scope, sections)` | Create reusable template |
+| `create_policy_from_template(template_id, title, ...)` | Instantiate policy from template |
+| `policy_bulk_import(records, imported_by)` | Bulk-import pre-parsed policy records |
+
+### Analytics and Reporting
+
+| Method | Description |
+|--------|-------------|
+| `policy_analytics(period)` | KPI metrics for a period |
+| `policy_kpi_summary(entity_id, period)` | KPI card for dashboard |
+| `policy_effectiveness(policy_id)` | Effectiveness score (ack rate + exceptions) |
+| `policy_expiry_report(days_ahead)` | Policies due for review |
+| `policy_dashboard(entity_id)` | Assembled dashboard data |
+| `policy_delta_report(policy_id, v_from, v_to)` | Delta between two versions |
+
+### Hierarchy, Events, and Cache
+
+| Method | Description |
+|--------|-------------|
+| `policy_set_parent(policy_id, parent_id, set_by)` | Establish policy hierarchy |
+| `policy_conflict_check(policy_id)` | Detect scope/type conflicts with published policies |
+| `policy_event_publish(event_type, policy_id, payload)` | Emit domain event to APG bus |
+| `policy_cache_invalidate(scope)` | Invalidate tenant-scoped read cache |
+
+## Composability
+
+Emits domain events consumed by downstream capabilities:
+
+- `grc_ris` — subscribes to `exception_approved` to update risk residuals
+- `grc_ctl` — subscribes to `policy_published` to trigger control mapping tasks
+- `grc_aud` — subscribes to `policy_archived` to close linked audit findings
+
+```apg
+use grc_pol;
+```
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GRC_POL_DB_URL` | in-memory | SQLAlchemy async database URL |
+| `GRC_POL_ACK_DEADLINE_DAYS` | 30 | Default acknowledgement deadline |
+| `GRC_POL_EXCEPTION_MAX_DAYS` | 365 | Maximum exception duration |
+| `GRC_POL_COMPLIANCE_THRESHOLD_PCT` | 95.0 | Ack rate % for compliant status |
+| `OLLAMA_BASE_URL` | (unset) | Enable AI-assisted compliance scoring |
+
 ## License
 
-Proprietary — © 2025 Datacraft  
+Proprietary — © 2025 Datacraft
 Author: Nyimbi Odero <nyimbi@gmail.com>

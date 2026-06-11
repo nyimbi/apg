@@ -15,10 +15,16 @@ Provides unified commerce orchestration across all retail touchpoints: channel r
 | customer_journey_orchestration | Stage-by-stage journey event tracking |
 | unified_cart | Channel-agnostic cart with promotion application |
 | cross_channel_fulfilment | Ship-from-store, C&C, and home delivery routing |
-| omnichannel_search | Multi-modal catalogue search with personalisation |
-| return_management | Cross-channel return initiation and refund approval |
+| omnichannel_search | Faceted catalogue search with BM25 relevance ranking |
+| return_management | Cross-channel return initiation, RMA processing, and refund approval |
 | channel_pricing_engine | Per-channel price overrides with arbitrage prevention |
-| session_attribution | Multi-touch attribution across sessions |
+| multi_touch_attribution | Linear, time-decay, first/last-touch attribution models |
+| fraud_screening | Heuristic + ML fraud scoring with auto-hold on threshold breach |
+| shipping_rate_engine | Multi-carrier rate calculation with weight and zone pricing |
+| loyalty_composability | Earn/burn lifecycle hooks into retail_loy |
+| safety_stock_management | Demand-volatility-based safety stock with low-stock alerting |
+| audit_trail | Structured CloudEvent audit log with entity-level queryability |
+| cart_merge | Guest-to-authenticated cart merge with union/keep strategies |
 
 ## Requires
 | Capability | Reason |
@@ -50,15 +56,26 @@ Provides unified commerce orchestration across all retail touchpoints: channel r
 |---|---|---|---|
 | /retail-omc/api/v1/channels | GET/POST | List/create channels | retail_omc:view/admin |
 | /retail-omc/api/v1/catalogue | GET/POST | List/create catalogue items | retail_omc:view/write |
+| /retail-omc/api/v1/catalogue/search | POST | Faceted catalogue search | retail_omc:view |
 | /retail-omc/api/v1/catalogue/<id>/price | PUT | Set channel price | retail_omc:admin |
 | /retail-omc/api/v1/inventory | GET/POST | Get/upsert inventory | retail_omc:view/write |
 | /retail-omc/api/v1/inventory/reserve | POST | Reserve inventory | retail_omc:write |
+| /retail-omc/api/v1/inventory/alerts | GET | Low-stock alert list | retail_omc:view |
+| /retail-omc/api/v1/inventory/safety-stock | POST | Compute safety stock for SKU/location | retail_omc:write |
 | /retail-omc/api/v1/orders | GET/POST | List/create orders | retail_omc:view/write |
 | /retail-omc/api/v1/orders/<id> | GET/PUT/DELETE | Order detail/update/cancel | retail_omc:view/write |
+| /retail-omc/api/v1/orders/<id>/fraud-screen | POST | Run fraud screening on order | retail_omc:write |
+| /retail-omc/api/v1/orders/<id>/shipping | POST | Get carrier rate quotes | retail_omc:write |
+| /retail-omc/api/v1/orders/<id>/attribution | POST | Compute multi-touch attribution | retail_omc:view |
+| /retail-omc/api/v1/carts/<id>/merge | POST | Merge guest cart into auth cart | retail_omc:write |
+| /retail-omc/api/v1/carts/<id>/loyalty/earn | POST | Record loyalty earn for order | retail_omc:write |
+| /retail-omc/api/v1/carts/<id>/loyalty/burn | POST | Apply loyalty point burn to cart | retail_omc:write |
 | /retail-omc/api/v1/returns | GET/POST | List/initiate returns | retail_omc:view/write |
 | /retail-omc/api/v1/returns/<id>/approve | PUT | Approve return + refund | retail_omc:write |
+| /retail-omc/api/v1/returns/<id>/rma | POST | Process RMA with condition grading | retail_omc:write |
 | /retail-omc/api/v1/pricing | GET/POST | List/create pricing rules | retail_omc:admin |
 | /retail-omc/api/v1/pricing/apply | POST | Apply pricing to SKU | retail_omc:write |
+| /retail-omc/api/v1/audit | GET | Query structured audit log | retail_omc:admin |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -102,6 +119,9 @@ Provides unified commerce orchestration across all retail touchpoints: channel r
 
 ## Composability Notes
 - **retail_pos** uses inventory reservation on transaction post
-- **retail_loy** triggers points earn on order confirmation
-- **retail_prm** applies promotion discounts to cart line items
+- **retail_loy** receives `earn_loyalty_points` / `burn_loyalty_points` events on order fulfilment and checkout
+- **retail_prm** applies promotion discounts to cart line items via `apply_promotions`
 - **retail_sin** monitors conversion events from journey tracking
+- **wflo** receives high-fraud-score orders for manual review via `fraud_screen_order`
+- **moni** receives channel health degradation alerts from circuit-breaker thresholds
+- **nlpc** augments `search_catalogue` with NLP query expansion when wired

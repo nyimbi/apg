@@ -16,6 +16,9 @@ CAPABILITY_ID = "hcm_pro"
 SKILL_CATEGORIES = {"technical", "leadership", "communication", "analytical", "domain", "soft"}
 PROFICIENCY_LEVELS = ["beginner", "intermediate", "advanced", "expert"]
 MEETING_FREQUENCIES = {"weekly", "fortnightly", "monthly", "quarterly"}
+ACTIVITY_TYPES = {"course", "workshop", "conference", "book", "elearning", "coaching", "webinar"}
+FEEDBACK_RATER_TYPES = {"self", "peer", "manager", "skip_level", "report"}
+PDI_WEIGHTS = {"plan_completion": 0.25, "skill_gap_closure": 0.25, "certifications": 0.20, "career_milestones": 0.20, "mentoring": 0.10}
 
 
 class PROService:
@@ -24,12 +27,20 @@ class PROService:
 	def __init__(self, tenant_id: str = "default") -> None:
 		self.tenant_id = tenant_id
 		self.development_plans: dict[str, dict[str, Any]] = {}
+		self.plan_templates: dict[str, dict[str, Any]] = {}
 		self.skills: dict[str, dict[str, Any]] = {}
 		self.skill_assessments: dict[str, dict[str, Any]] = {}
+		self.skill_endorsements: dict[str, dict[str, Any]] = {}
 		self.mentoring_programmes: dict[str, dict[str, Any]] = {}
 		self.mentoring_sessions: dict[str, dict[str, Any]] = {}
 		self.certifications: dict[str, dict[str, Any]] = {}
 		self.career_paths: dict[str, dict[str, Any]] = {}
+		self.learning_activities: dict[str, dict[str, Any]] = {}
+		self.learning_budgets: dict[str, dict[str, Any]] = {}
+		self.training_providers: dict[str, dict[str, Any]] = {}
+		self.feedback_requests: dict[str, dict[str, Any]] = {}
+		self.feedback_responses: dict[str, dict[str, Any]] = {}
+		self.pdi_snapshots: dict[str, list[dict[str, Any]]] = {}
 		self._audit_events: list[dict[str, Any]] = []
 
 	# ── Internal helpers ──────────────────────────────────────────────────────
@@ -78,11 +89,16 @@ class PROService:
 			"service": CAPABILITY_ID,
 			"status": "healthy",
 			"development_plans": len(self.development_plans),
+			"plan_templates": len(self.plan_templates),
 			"skills": len(self.skills),
 			"skill_assessments": len(self.skill_assessments),
+			"skill_endorsements": len(self.skill_endorsements),
 			"mentoring_programmes": len(self.mentoring_programmes),
 			"certifications": len(self.certifications),
 			"career_paths": len(self.career_paths),
+			"learning_activities": len(self.learning_activities),
+			"training_providers": len(self.training_providers),
+			"feedback_requests": len(self.feedback_requests),
 			"checked_at": self._now(),
 		}
 
@@ -714,5 +730,770 @@ class PROService:
 				),
 			},
 			"career_paths": sum(1 for r in self.career_paths.values() if r["tenant_id"] == t),
+			"learning_activities": sum(1 for r in self.learning_activities.values() if r["tenant_id"] == t),
+			"generated_at": self._now(),
+		}
+
+	# ── Plan Templates ────────────────────────────────────────────────────────
+
+	async def create_plan_template(
+		self,
+		tenant_id: str,
+		name: str,
+		target_role: str | None = None,
+		department: str | None = None,
+		objectives: list[str] | None = None,
+		focus_areas: list[str] | None = None,
+		recommended_skills: list[dict[str, Any]] | None = None,
+		created_by: str | None = None,
+	) -> dict[str, Any]:
+		"""Create a reusable development plan template for a role or department.
+
+		Templates seed new plans with standardised objectives and focus areas,
+		reducing authoring effort and ensuring institutional consistency.
+		"""
+		t = self._tenant(tenant_id)
+		guard_non_empty_string(name, "name")
+		record: dict[str, Any] = {
+			"id": self._uid("pt"),
+			"tenant_id": t,
+			"name": name,
+			"target_role": target_role,
+			"department": department,
+			"objectives": objectives or [],
+			"focus_areas": focus_areas or [],
+			"recommended_skills": recommended_skills or [],
+			"created_by": created_by,
+			"usage_count": 0,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		self.plan_templates[record["id"]] = record
+		self._emit(t, "plan_template_created", "plan_template", record["id"], record)
+		_log.info("plan_template created: %s name=%s", record["id"], name)
+		return deepcopy(record)
+
+	async def list_plan_templates(
+		self,
+		tenant_id: str,
+		target_role: str | None = None,
+		department: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List development plan templates, optionally filtered by role or department."""
+		t = self._tenant(tenant_id)
+		items = [deepcopy(r) for r in self.plan_templates.values() if r["tenant_id"] == t]
+		if target_role:
+			items = [r for r in items if r.get("target_role") == target_role]
+		if department:
+			items = [r for r in items if r.get("department") == department]
+		return items
+
+	async def apply_plan_template(
+		self,
+		tenant_id: str,
+		template_id: str,
+		employee_id: str,
+		plan_year: int,
+		reviewed_by: str | None = None,
+	) -> dict[str, Any]:
+		"""Create a development plan pre-seeded from a template.
+
+		Increments the template's usage_count so adoption can be tracked.
+		"""
+		t = self._tenant(tenant_id)
+		tmpl = self.plan_templates.get(template_id)
+		if not tmpl or tmpl["tenant_id"] != t:
+			raise KeyError(f"plan_template {template_id} not found")
+		plan = await self.create_development_plan(
+			t,
+			employee_id=employee_id,
+			plan_year=plan_year,
+			objectives=list(tmpl["objectives"]),
+			focus_areas=list(tmpl["focus_areas"]),
+			target_role_id=tmpl.get("target_role"),
+			reviewed_by=reviewed_by,
+		)
+		tmpl["usage_count"] += 1
+		self._emit(t, "plan_template_applied", "plan_template", template_id, {"plan_id": plan["id"], "employee_id": employee_id})
+		return plan
+
+	async def clone_development_plan(
+		self,
+		tenant_id: str,
+		source_plan_id: str,
+		new_plan_year: int,
+		employee_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Clone an existing development plan into a new draft for a new year.
+
+		Copies objectives, focus_areas, and target_role_id; resets progress and
+		status to draft. Useful for annual rollover without data loss.
+		"""
+		t = self._tenant(tenant_id)
+		source = self.development_plans.get(source_plan_id)
+		if not source or source["tenant_id"] != t:
+			raise KeyError(f"development_plan {source_plan_id} not found")
+		cloned = await self.create_development_plan(
+			t,
+			employee_id=employee_id or source["employee_id"],
+			plan_year=new_plan_year,
+			objectives=list(source["objectives"]),
+			focus_areas=list(source["focus_areas"]),
+			target_role_id=source.get("target_role_id"),
+		)
+		self._emit(t, "development_plan_cloned", "development_plan", cloned["id"], {"source_plan_id": source_plan_id})
+		return cloned
+
+	# ── Learning Activities ───────────────────────────────────────────────────
+
+	async def add_learning_activity(
+		self,
+		tenant_id: str,
+		employee_id: str,
+		title: str,
+		activity_type: str,
+		plan_id: str | None = None,
+		provider_name: str | None = None,
+		provider_id: str | None = None,
+		hours_cpe: float = 0.0,
+		cost: float = 0.0,
+		currency: str = "KES",
+		scheduled_date: str | None = None,
+		completed_date: str | None = None,
+	) -> dict[str, Any]:
+		"""Record a learning activity (course, workshop, conference, book, etc.).
+
+		Links optionally to a development plan and/or training provider. CPE hours
+		are tracked for certification renewal calculations.
+		"""
+		t = self._tenant(tenant_id)
+		guard_non_empty_string(employee_id, "employee_id")
+		guard_non_empty_string(title, "title")
+		if activity_type not in ACTIVITY_TYPES:
+			raise ValueError(f"activity_type must be one of {ACTIVITY_TYPES}")
+		if plan_id:
+			p = self.development_plans.get(plan_id)
+			if not p or p["tenant_id"] != t:
+				raise KeyError(f"development_plan {plan_id} not found")
+		if provider_id:
+			prov = self.training_providers.get(provider_id)
+			if not prov or prov["tenant_id"] != t:
+				raise KeyError(f"training_provider {provider_id} not found")
+			provider_name = provider_name or prov["name"]
+		record: dict[str, Any] = {
+			"id": self._uid("la"),
+			"tenant_id": t,
+			"employee_id": employee_id,
+			"plan_id": plan_id,
+			"provider_id": provider_id,
+			"provider_name": provider_name,
+			"title": title,
+			"activity_type": activity_type,
+			"hours_cpe": hours_cpe,
+			"cost": cost,
+			"currency": currency,
+			"scheduled_date": scheduled_date,
+			"completed_date": completed_date,
+			"status": "completed" if completed_date else "planned",
+			"created_at": self._now(),
+		}
+		self.learning_activities[record["id"]] = record
+		self._emit(t, "learning_activity_added", "learning_activity", record["id"], record)
+		_log.info("learning_activity added: %s employee=%s type=%s", record["id"], employee_id, activity_type)
+		return deepcopy(record)
+
+	async def list_learning_activities(
+		self,
+		tenant_id: str,
+		employee_id: str | None = None,
+		plan_id: str | None = None,
+		provider_id: str | None = None,
+		activity_type: str | None = None,
+		status: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""List learning activities with flexible filters."""
+		t = self._tenant(tenant_id)
+		items = [deepcopy(r) for r in self.learning_activities.values() if r["tenant_id"] == t]
+		if employee_id:
+			items = [r for r in items if r["employee_id"] == employee_id]
+		if plan_id:
+			items = [r for r in items if r.get("plan_id") == plan_id]
+		if provider_id:
+			items = [r for r in items if r.get("provider_id") == provider_id]
+		if activity_type:
+			items = [r for r in items if r["activity_type"] == activity_type]
+		if status:
+			items = [r for r in items if r["status"] == status]
+		return items
+
+	async def complete_learning_activity(
+		self,
+		tenant_id: str,
+		activity_id: str,
+		completed_date: str,
+		notes: str | None = None,
+	) -> dict[str, Any]:
+		"""Mark a learning activity as completed and record the completion date."""
+		t = self._tenant(tenant_id)
+		record = self.learning_activities.get(activity_id)
+		if not record or record["tenant_id"] != t:
+			raise KeyError(f"learning_activity {activity_id} not found")
+		record["status"] = "completed"
+		record["completed_date"] = completed_date
+		if notes:
+			record["completion_notes"] = notes
+		self._emit(t, "learning_activity_completed", "learning_activity", activity_id, {"completed_date": completed_date})
+		return deepcopy(record)
+
+	# ── Training Providers ────────────────────────────────────────────────────
+
+	async def add_training_provider(
+		self,
+		tenant_id: str,
+		name: str,
+		website: str | None = None,
+		specialisations: list[str] | None = None,
+		contact_email: str | None = None,
+	) -> dict[str, Any]:
+		"""Register an external training provider in the catalogue.
+
+		Linking activities to providers enables spend aggregation and quality
+		comparison across vendors.
+		"""
+		t = self._tenant(tenant_id)
+		guard_non_empty_string(name, "name")
+		record: dict[str, Any] = {
+			"id": self._uid("tp"),
+			"tenant_id": t,
+			"name": name,
+			"website": website,
+			"specialisations": specialisations or [],
+			"contact_email": contact_email,
+			"total_activities": 0,
+			"total_spend": 0.0,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		self.training_providers[record["id"]] = record
+		self._emit(t, "training_provider_added", "training_provider", record["id"], record)
+		return deepcopy(record)
+
+	async def list_training_providers(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""List all registered training providers."""
+		t = self._tenant(tenant_id)
+		return [deepcopy(r) for r in self.training_providers.values() if r["tenant_id"] == t]
+
+	async def get_provider_stats(self, tenant_id: str, provider_id: str) -> dict[str, Any]:
+		"""Return spend, activity count, and CPE hours for a training provider."""
+		t = self._tenant(tenant_id)
+		prov = self.training_providers.get(provider_id)
+		if not prov or prov["tenant_id"] != t:
+			raise KeyError(f"training_provider {provider_id} not found")
+		activities = [r for r in self.learning_activities.values() if r["tenant_id"] == t and r.get("provider_id") == provider_id]
+		total_spend = sum(r.get("cost", 0.0) for r in activities)
+		total_cpe = sum(r.get("hours_cpe", 0.0) for r in activities)
+		completed = [r for r in activities if r["status"] == "completed"]
+		return {
+			"provider_id": provider_id,
+			"provider_name": prov["name"],
+			"total_activities": len(activities),
+			"completed_activities": len(completed),
+			"completion_rate_pct": round(100 * len(completed) / len(activities), 1) if activities else 0.0,
+			"total_spend": total_spend,
+			"currency": "KES",
+			"total_cpe_hours": total_cpe,
+			"generated_at": self._now(),
+		}
+
+	# ── Skill Endorsements ────────────────────────────────────────────────────
+
+	async def endorse_skill(
+		self,
+		tenant_id: str,
+		endorsee_employee_id: str,
+		endorser_employee_id: str,
+		skill_id: str,
+		endorsed_level: str,
+		evidence: str | None = None,
+	) -> dict[str, Any]:
+		"""Peer-endorse an employee's proficiency at a given level for a skill.
+
+		Self-endorsement is rejected. Endorsements complement manager assessments
+		by surfacing peer visibility of expertise.
+		"""
+		t = self._tenant(tenant_id)
+		guard_non_empty_string(endorsee_employee_id, "endorsee_employee_id")
+		guard_non_empty_string(endorser_employee_id, "endorser_employee_id")
+		if endorsee_employee_id == endorser_employee_id:
+			raise ValueError("self_endorsement_not_permitted")
+		skill = self.skills.get(skill_id)
+		if not skill or skill["tenant_id"] != t:
+			raise KeyError(f"skill {skill_id} not found")
+		if endorsed_level not in PROFICIENCY_LEVELS:
+			raise ValueError(f"endorsed_level must be one of {PROFICIENCY_LEVELS}")
+		record: dict[str, Any] = {
+			"id": self._uid("end"),
+			"tenant_id": t,
+			"endorsee_employee_id": endorsee_employee_id,
+			"endorser_employee_id": endorser_employee_id,
+			"skill_id": skill_id,
+			"skill_name": skill["name"],
+			"endorsed_level": endorsed_level,
+			"evidence": evidence,
+			"created_at": self._now(),
+		}
+		self.skill_endorsements[record["id"]] = record
+		self._emit(t, "skill_endorsed", "skill_endorsement", record["id"], record)
+		return deepcopy(record)
+
+	async def get_endorsement_summary(self, tenant_id: str, employee_id: str, skill_id: str) -> dict[str, Any]:
+		"""Aggregate endorsements for one employee-skill pair.
+
+		Returns endorsement_count, highest_endorsed_level, and a level frequency
+		breakdown. Useful for calibration and promotion evidence.
+		"""
+		t = self._tenant(tenant_id)
+		skill = self.skills.get(skill_id)
+		if not skill or skill["tenant_id"] != t:
+			raise KeyError(f"skill {skill_id} not found")
+		endorsements = [
+			r for r in self.skill_endorsements.values()
+			if r["tenant_id"] == t and r["endorsee_employee_id"] == employee_id and r["skill_id"] == skill_id
+		]
+		if not endorsements:
+			return {
+				"employee_id": employee_id,
+				"skill_id": skill_id,
+				"skill_name": skill["name"],
+				"endorsement_count": 0,
+				"highest_endorsed_level": None,
+				"level_breakdown": {},
+			}
+		level_freq: dict[str, int] = {}
+		for e in endorsements:
+			level_freq[e["endorsed_level"]] = level_freq.get(e["endorsed_level"], 0) + 1
+		highest = max(endorsements, key=lambda e: self._level_index(e["endorsed_level"]))["endorsed_level"]
+		return {
+			"employee_id": employee_id,
+			"skill_id": skill_id,
+			"skill_name": skill["name"],
+			"endorsement_count": len(endorsements),
+			"highest_endorsed_level": highest,
+			"level_breakdown": level_freq,
+			"generated_at": self._now(),
+		}
+
+	# ── Team Skill Gap Report ─────────────────────────────────────────────────
+
+	async def get_team_skill_gap_report(
+		self,
+		tenant_id: str,
+		employee_ids: list[str],
+	) -> dict[str, Any]:
+		"""Aggregate skill gap analysis across a team of employees.
+
+		Gathers individual gap reports in parallel, then computes per-skill gap
+		prevalence and identifies the top gaps by frequency. Returns a heat_map
+		keyed by skill category.
+		"""
+		t = self._tenant(tenant_id)
+		if not employee_ids:
+			raise ValueError("employee_ids must not be empty")
+		# Fetch all per-employee gap reports concurrently
+		results = await asyncio.gather(
+			*[self.get_skill_gap_report(t, eid) for eid in employee_ids],
+			return_exceptions=True,
+		)
+		skill_gap_counts: dict[str, int] = {}
+		category_gap_counts: dict[str, int] = {}
+		total_assessments = 0
+		total_gaps = 0
+		for res in results:
+			if isinstance(res, Exception):
+				continue
+			total_assessments += res.get("total_skills_assessed", 0)
+			total_gaps += res.get("skills_with_gaps", 0)
+			for gap in res.get("gap_details", []):
+				sk_name = gap.get("skill_name", gap.get("skill_id", "unknown"))
+				skill_gap_counts[sk_name] = skill_gap_counts.get(sk_name, 0) + 1
+				# Resolve category from skills store
+				sk = self.skills.get(gap.get("skill_id", ""))
+				if sk:
+					cat = sk.get("category", "unknown")
+					category_gap_counts[cat] = category_gap_counts.get(cat, 0) + 1
+		top_gaps = sorted(skill_gap_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+		return {
+			"team_size": len(employee_ids),
+			"reports_processed": sum(1 for r in results if not isinstance(r, Exception)),
+			"total_assessments": total_assessments,
+			"total_gaps": total_gaps,
+			"gap_prevalence_pct": round(100 * total_gaps / total_assessments, 1) if total_assessments else 0.0,
+			"top_skill_gaps": [{"skill_name": name, "affected_employees": count} for name, count in top_gaps],
+			"heat_map": category_gap_counts,
+			"generated_at": self._now(),
+		}
+
+	# ── 360-Degree Feedback ───────────────────────────────────────────────────
+
+	async def request_360_feedback(
+		self,
+		tenant_id: str,
+		subject_employee_id: str,
+		skill_id: str,
+		rater_employee_ids: list[str],
+		rater_types: list[str],
+		due_date: str | None = None,
+	) -> dict[str, Any]:
+		"""Create a 360-degree feedback request for a specific skill.
+
+		Validates rater_types against FEEDBACK_RATER_TYPES. Each rater gets an
+		individual response slot tracked in feedback_responses.
+		"""
+		t = self._tenant(tenant_id)
+		guard_non_empty_string(subject_employee_id, "subject_employee_id")
+		if len(rater_employee_ids) != len(rater_types):
+			raise ValueError("rater_employee_ids and rater_types must have equal length")
+		invalid_types = set(rater_types) - FEEDBACK_RATER_TYPES
+		if invalid_types:
+			raise ValueError(f"invalid rater_types {invalid_types}; allowed: {FEEDBACK_RATER_TYPES}")
+		skill = self.skills.get(skill_id)
+		if not skill or skill["tenant_id"] != t:
+			raise KeyError(f"skill {skill_id} not found")
+		record: dict[str, Any] = {
+			"id": self._uid("fr"),
+			"tenant_id": t,
+			"subject_employee_id": subject_employee_id,
+			"skill_id": skill_id,
+			"skill_name": skill["name"],
+			"raters": [
+				{"employee_id": eid, "rater_type": rt, "responded": False}
+				for eid, rt in zip(rater_employee_ids, rater_types)
+			],
+			"due_date": due_date,
+			"status": "open",
+			"created_at": self._now(),
+		}
+		self.feedback_requests[record["id"]] = record
+		self._emit(t, "feedback_request_created", "feedback_request", record["id"], record)
+		return deepcopy(record)
+
+	async def submit_feedback_response(
+		self,
+		tenant_id: str,
+		request_id: str,
+		rater_employee_id: str,
+		observed_level: str,
+		comments: str | None = None,
+	) -> dict[str, Any]:
+		"""Submit one rater's response to a 360 feedback request.
+
+		Marks the rater slot as responded. When all raters have responded the
+		request status moves to 'complete'.
+		"""
+		t = self._tenant(tenant_id)
+		req = self.feedback_requests.get(request_id)
+		if not req or req["tenant_id"] != t:
+			raise KeyError(f"feedback_request {request_id} not found")
+		if observed_level not in PROFICIENCY_LEVELS:
+			raise ValueError(f"observed_level must be one of {PROFICIENCY_LEVELS}")
+		rater_slot = next((r for r in req["raters"] if r["employee_id"] == rater_employee_id), None)
+		if rater_slot is None:
+			raise KeyError(f"rater {rater_employee_id} not in feedback request {request_id}")
+		if rater_slot["responded"]:
+			raise PermissionError("rater_already_responded")
+		response: dict[str, Any] = {
+			"id": self._uid("frs"),
+			"tenant_id": t,
+			"request_id": request_id,
+			"rater_employee_id": rater_employee_id,
+			"rater_type": rater_slot["rater_type"],
+			"observed_level": observed_level,
+			"comments": comments,
+			"submitted_at": self._now(),
+		}
+		self.feedback_responses[response["id"]] = response
+		rater_slot["responded"] = True
+		if all(r["responded"] for r in req["raters"]):
+			req["status"] = "complete"
+		self._emit(t, "feedback_response_submitted", "feedback_response", response["id"], response)
+		return deepcopy(response)
+
+	async def aggregate_360_results(self, tenant_id: str, request_id: str) -> dict[str, Any]:
+		"""Aggregate multi-rater feedback into a consensus score.
+
+		Returns per-rater-type average level index, overall consensus, and a
+		variance indicator (high/medium/low) based on level spread.
+		"""
+		t = self._tenant(tenant_id)
+		req = self.feedback_requests.get(request_id)
+		if not req or req["tenant_id"] != t:
+			raise KeyError(f"feedback_request {request_id} not found")
+		responses = [r for r in self.feedback_responses.values() if r["tenant_id"] == t and r["request_id"] == request_id]
+		if not responses:
+			return {"request_id": request_id, "response_count": 0, "consensus": None, "variance": None}
+		indices = [self._level_index(r["observed_level"]) for r in responses]
+		avg_idx = sum(indices) / len(indices)
+		variance = max(indices) - min(indices)
+		consensus_level = PROFICIENCY_LEVELS[round(avg_idx)] if 0 <= round(avg_idx) < len(PROFICIENCY_LEVELS) else PROFICIENCY_LEVELS[-1]
+		by_type: dict[str, list[int]] = {}
+		for r in responses:
+			by_type.setdefault(r["rater_type"], []).append(self._level_index(r["observed_level"]))
+		type_averages = {rt: PROFICIENCY_LEVELS[min(round(sum(v) / len(v)), len(PROFICIENCY_LEVELS) - 1)] for rt, v in by_type.items()}
+		return {
+			"request_id": request_id,
+			"skill_id": req["skill_id"],
+			"skill_name": req["skill_name"],
+			"subject_employee_id": req["subject_employee_id"],
+			"response_count": len(responses),
+			"consensus_level": consensus_level,
+			"variance_levels": variance,
+			"consensus_quality": "high" if variance <= 1 else ("medium" if variance == 2 else "low"),
+			"by_rater_type": type_averages,
+			"generated_at": self._now(),
+		}
+
+	# ── Automated Nudges ──────────────────────────────────────────────────────
+
+	async def generate_nudges(
+		self,
+		tenant_id: str,
+		stale_plan_days: int = 60,
+		cert_expiry_warning_days: int = 30,
+		mentoring_inactive_days: int = 45,
+	) -> list[dict[str, Any]]:
+		"""Scan all entities and return a prioritised list of actionable nudges.
+
+		Nudge categories: stale_plan, cert_expiring, mentoring_inactive, cert_expired.
+		Each nudge carries a priority (high/medium/low) and a message.
+		"""
+		t = self._tenant(tenant_id)
+		nudges: list[dict[str, Any]] = []
+		today = date.today()
+
+		# Stale active plans (progress < 10%, older than stale_plan_days)
+		for p in self.development_plans.values():
+			if p["tenant_id"] != t or p["status"] != "active":
+				continue
+			created = date.fromisoformat(p["created_at"][:10])
+			age_days = (today - created).days
+			if age_days >= stale_plan_days and p.get("progress_pct", 0.0) < 10.0:
+				nudges.append({
+					"type": "stale_plan",
+					"priority": "high",
+					"entity_type": "development_plan",
+					"entity_id": p["id"],
+					"employee_id": p["employee_id"],
+					"message": f"Development plan {p['id']} has been active for {age_days} days with < 10% progress.",
+				})
+
+		# Certifications expiring soon or already expired
+		for c in self.certifications.values():
+			if c["tenant_id"] != t:
+				continue
+			days = self._days_to_expiry(c.get("expiry_date"))
+			if days is None:
+				continue
+			if days < 0:
+				nudges.append({
+					"type": "cert_expired",
+					"priority": "high",
+					"entity_type": "certification",
+					"entity_id": c["id"],
+					"employee_id": c["employee_id"],
+					"message": f"Certification '{c['certification_name']}' expired {abs(days)} days ago.",
+				})
+			elif days <= cert_expiry_warning_days:
+				nudges.append({
+					"type": "cert_expiring",
+					"priority": "medium",
+					"entity_type": "certification",
+					"entity_id": c["id"],
+					"employee_id": c["employee_id"],
+					"message": f"Certification '{c['certification_name']}' expires in {days} days.",
+				})
+
+		# Mentoring programmes with no session in mentoring_inactive_days
+		for mp in self.mentoring_programmes.values():
+			if mp["tenant_id"] != t or mp["status"] != "active":
+				continue
+			sessions = [s for s in self.mentoring_sessions.values() if s["tenant_id"] == t and s["programme_id"] == mp["id"]]
+			if sessions:
+				latest_date = max(date.fromisoformat(s["session_date"][:10]) for s in sessions)
+				inactive = (today - latest_date).days
+			else:
+				inactive = (today - date.fromisoformat(mp["created_at"][:10])).days
+			if inactive >= mentoring_inactive_days:
+				nudges.append({
+					"type": "mentoring_inactive",
+					"priority": "medium",
+					"entity_type": "mentoring_programme",
+					"entity_id": mp["id"],
+					"employee_id": mp["mentee_employee_id"],
+					"message": f"Mentoring programme '{mp['programme_name']}' has had no session in {inactive} days.",
+				})
+
+		priority_order = {"high": 0, "medium": 1, "low": 2}
+		nudges.sort(key=lambda n: priority_order.get(n["priority"], 3))
+		return nudges
+
+	# ── Professional Development Index ───────────────────────────────────────
+
+	async def compute_pdi(self, tenant_id: str, employee_id: str) -> dict[str, Any]:
+		"""Compute a Professional Development Index (0–100) for one employee.
+
+		Weighted composite of five sub-scores:
+		  - plan_completion (25%): avg progress_pct of active/completed plans
+		  - skill_gap_closure (25%): % assessments where gap_exists is False
+		  - certifications (20%): ratio of active certs to total certs (0 certs = 50)
+		  - career_milestones (20%): milestone completion rate across active paths
+		  - mentoring (10%): 100 if any active mentoring programme, else 0
+
+		Snapshots the result for trend analysis.
+		"""
+		t = self._tenant(tenant_id)
+
+		plans, assessments, certs, paths, programmes = await asyncio.gather(
+			self.list_development_plans(t, employee_id=employee_id),
+			self.list_skill_assessments(t, employee_id=employee_id),
+			self.list_certifications(t, employee_id=employee_id),
+			self.list_career_paths(t, employee_id=employee_id, status="active"),
+			self.list_mentoring_programmes(t, employee_id=employee_id, status="active"),
+      return_exceptions=True,
+		)
+
+		# Plan completion sub-score
+		if plans:
+			plan_score = sum(p.get("progress_pct", 0.0) for p in plans) / len(plans)
+		else:
+			plan_score = 0.0
+
+		# Skill gap closure sub-score
+		if assessments:
+			no_gap = sum(1 for a in assessments if not a["gap_exists"])
+			gap_score = 100.0 * no_gap / len(assessments)
+		else:
+			gap_score = 50.0  # neutral when no data
+
+		# Certification sub-score
+		if certs:
+			active_certs = sum(1 for c in certs if c.get("status") == "active")
+			cert_score = 100.0 * active_certs / len(certs)
+		else:
+			cert_score = 50.0
+
+		# Career milestone sub-score
+		total_milestones = sum(len(p["milestones"]) for p in paths)
+		completed_milestones = sum(p.get("milestones_completed", 0) for p in paths)
+		if total_milestones:
+			milestone_score = 100.0 * completed_milestones / total_milestones
+		else:
+			milestone_score = 50.0
+
+		# Mentoring sub-score
+		mentoring_score = 100.0 if programmes else 0.0
+
+		w = PDI_WEIGHTS
+		pdi = (
+			plan_score * w["plan_completion"]
+			+ gap_score * w["skill_gap_closure"]
+			+ cert_score * w["certifications"]
+			+ milestone_score * w["career_milestones"]
+			+ mentoring_score * w["mentoring"]
+		)
+		pdi = round(pdi, 1)
+
+		snapshot: dict[str, Any] = {
+			"employee_id": employee_id,
+			"pdi": pdi,
+			"sub_scores": {
+				"plan_completion": round(plan_score, 1),
+				"skill_gap_closure": round(gap_score, 1),
+				"certifications": round(cert_score, 1),
+				"career_milestones": round(milestone_score, 1),
+				"mentoring": round(mentoring_score, 1),
+			},
+			"computed_at": self._now(),
+		}
+		key = f"{t}:{employee_id}"
+		self.pdi_snapshots.setdefault(key, []).append(snapshot)
+		return deepcopy(snapshot)
+
+	async def get_pdi_trend(self, tenant_id: str, employee_id: str, last_n: int = 8) -> dict[str, Any]:
+		"""Return PDI snapshots over time, most recent first (up to last_n).
+
+		Use compute_pdi periodically (e.g., quarterly) to build trend data.
+		"""
+		t = self._tenant(tenant_id)
+		key = f"{t}:{employee_id}"
+		snapshots = self.pdi_snapshots.get(key, [])
+		ordered = list(reversed(snapshots))[:last_n]
+		return {
+			"employee_id": employee_id,
+			"snapshots": ordered,
+			"trend": "improving" if len(ordered) >= 2 and ordered[0]["pdi"] > ordered[-1]["pdi"] else (
+				"declining" if len(ordered) >= 2 and ordered[0]["pdi"] < ordered[-1]["pdi"] else "stable"
+			),
+		}
+
+	# ── Learning Budget ───────────────────────────────────────────────────────
+
+	async def set_learning_budget(
+		self,
+		tenant_id: str,
+		employee_id: str,
+		fiscal_year: int,
+		amount: float,
+		currency: str = "KES",
+	) -> dict[str, Any]:
+		"""Set or replace a learning budget allocation for an employee and fiscal year.
+
+		Budget utilisation is computed dynamically from completed learning_activities.
+		"""
+		t = self._tenant(tenant_id)
+		guard_non_empty_string(employee_id, "employee_id")
+		if amount < 0:
+			raise ValueError("amount must be non-negative")
+		key = f"{t}:{employee_id}:{fiscal_year}"
+		record: dict[str, Any] = {
+			"id": self._uid("lb"),
+			"tenant_id": t,
+			"employee_id": employee_id,
+			"fiscal_year": fiscal_year,
+			"amount": amount,
+			"currency": currency,
+			"created_at": self._now(),
+		}
+		self.learning_budgets[key] = record
+		self._emit(t, "learning_budget_set", "learning_budget", key, record)
+		return deepcopy(record)
+
+	async def get_budget_utilisation(self, tenant_id: str, employee_id: str, fiscal_year: int) -> dict[str, Any]:
+		"""Return budget allocation vs actual spend for an employee and fiscal year.
+
+		Spend is summed from completed learning_activities irrespective of whether
+		they are linked to a plan.
+		"""
+		t = self._tenant(tenant_id)
+		key = f"{t}:{employee_id}:{fiscal_year}"
+		budget = self.learning_budgets.get(key)
+		allocated = budget["amount"] if budget else 0.0
+		currency = budget["currency"] if budget else "KES"
+		activities = [
+			r for r in self.learning_activities.values()
+			if r["tenant_id"] == t
+			and r["employee_id"] == employee_id
+			and r["status"] == "completed"
+			and r.get("scheduled_date", "")[:4] == str(fiscal_year)
+		]
+		spent = sum(r.get("cost", 0.0) for r in activities)
+		return {
+			"employee_id": employee_id,
+			"fiscal_year": fiscal_year,
+			"allocated": allocated,
+			"spent": round(spent, 2),
+			"remaining": round(allocated - spent, 2),
+			"utilisation_pct": round(100 * spent / allocated, 1) if allocated else 0.0,
+			"currency": currency,
+			"activity_count": len(activities),
 			"generated_at": self._now(),
 		}

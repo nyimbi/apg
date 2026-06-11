@@ -85,5 +85,38 @@ Manages pharmaceutical manufacturing operations from batch record creation throu
 - Line clearance status resets to dirty on batch start and must be re-verified before next batch
 - Critical deviations trigger 24-hour reporting even when the batch is subsequently rejected
 
+## Key Service Methods
+
+### Core (synchronous)
+| Method | Description |
+|--------|-------------|
+| `create_batch()` / `start_batch()` | Create and initiate batch manufacturing |
+| `release_batch()` / `reject_batch()` | QP disposition with electronic signature |
+| `register_equipment()` / `qualify_equipment()` | Equipment registration and IQ/OQ/PQ lifecycle |
+| `raise_deviation()` / `close_deviation()` | GMP deviation capture and investigation closure |
+| `record_yield()` / `reconcile_batch_yield()` | Step yield recording and batch reconciliation |
+| `register_line()` / `clear_line()` | Production line management and clearance |
+| `receive_material()` / `release_material()` | Raw material quarantine and QC release |
+| `gmp_compliance_check()` | Facility-level compliance score and findings |
+| `batch_analytics()` | Right-first-time, yield, and deviation KPIs |
+| `dashboard_summary()` | Manufacturing operations overview |
+
+### Async (scheduling, EBR, EM, genealogy, SPC, calibration, CAPA)
+| Method | Description |
+|--------|-------------|
+| `schedule_batch_production()` | Line-conflict-aware production slot booking |
+| `execute_ebr_step()` | 21 CFR Part 11 EBR step execution with operator sign-off |
+| `verify_ebr_step()` | Dual-person integrity review of EBR steps |
+| `record_environmental_sample()` | EM data ingestion with automatic OOL deviation |
+| `open_capa()` | Structured CAPA record linked to deviation root cause |
+| `close_capa()` | Effectiveness-verified CAPA closure |
+| `link_material_to_batch()` | Genealogy link with stock deduction |
+| `trace_batch_genealogy()` | Forward/backward traceability DAG for recall |
+| `get_spc_data()` | SPC control limits and Western Electric rule violations |
+| `record_calibration()` | Calibration event with schedule update and blocked-use enforcement |
+| `export_records()` / `compliance_report()` | Data export and regulatory compliance report |
+| `get_audit_events()` / `search_records()` | Audit trail access and full-text search |
+| `ml_deviation_detect()` | OLLAMA-backed deviation risk classification |
+
 ## Composability Notes
-Released batches feed `pharma_dis` for dispatch. Deviation records integrate with `pharma_qms` CAPA workflow. Equipment qualification references are cited in `pharma_qms` validation lifecycle. Batch genealogy data supports `pharma_dis` recall management.
+Released batches feed `pharma_dis` for dispatch. Deviation records integrate with `pharma_qms` CAPA workflow. Equipment qualification references are cited in `pharma_qms` validation lifecycle. Batch genealogy data supports `pharma_dis` recall management. SPC data feeds `pharma_qms` continuous process verification (CPV) programme.

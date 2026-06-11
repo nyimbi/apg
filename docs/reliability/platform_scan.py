@@ -84,8 +84,12 @@ def scan(domain_filter: str | None = None, fast: bool = False) -> dict[str, list
                 for i, line in enumerate(lines):
                     if "asyncio.gather(" in line and not line.lstrip().startswith("#"):
                         call_lines: list[str] = []
-                        depth = 0
-                        for j in range(i, min(i + 30, len(lines))):
+                        # Count depth from the asyncio.gather( opening, ignoring prior ) on same line
+                        gather_pos = line.index("asyncio.gather(")
+                        line_from_gather = line[gather_pos:]
+                        depth = line_from_gather.count("(") - line_from_gather.count(")")
+                        call_lines.append(line)
+                        for j in range(i + 1, min(i + 30, len(lines))):
                             call_lines.append(lines[j])
                             depth += lines[j].count("(") - lines[j].count(")")
                             if depth <= 0:

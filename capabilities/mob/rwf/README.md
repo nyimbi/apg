@@ -131,6 +131,66 @@ The Remote Workforce (RWF) capability provides a complete remote and hybrid work
 - Compliance next-due date automatically scheduled 30 days from check date
 - VPN sessions track bytes transferred and compute duration on close
 
+## Key Service Methods
+
+### Contract & Rules
+- `describe()` — capability contract for the tenant
+- `evaluate(context)` — run domain rules against an operation context
+
+### Work Policies
+- `create_work_policy()`, `activate_work_policy()`, `update_work_policy()`
+- `list_work_policies()`, `get_work_policy()`
+- `acknowledge_policy()`, `list_acknowledgments()`
+
+### VPN Access
+- `provision_vpn()`, `revoke_vpn()`
+- `start_vpn_session()`, `end_vpn_session()`, `list_vpn_access()`
+
+### Productivity
+- `record_productivity_metric()`, `get_productivity_summary()`, `list_productivity_metrics()`
+
+### Equipment Requisition
+- `request_equipment()`, `approve_equipment()`, `ship_equipment()`
+- `deliver_equipment()`, `return_equipment()`, `list_equipment()`
+
+### Digital Onboarding
+- `start_onboarding()`, `complete_onboarding_step()`
+- `list_onboarding_records()`, `get_onboarding_record()`
+- `bulk_start_onboarding()` — batch with partial-failure semantics
+
+### Compliance & Incidents
+- `record_compliance_check()`, `list_compliance_checks()`
+- `raise_incident()`, `resolve_incident()`, `list_incidents()`
+
+### Field Shifts (new)
+- `check_in_shift()` — GPS-stamped shift start
+- `check_out_shift()` — computes duration automatically
+- `get_active_shifts()` — real-time site headcount
+
+### Field Tasks (new)
+- `assign_field_task()` — geo-region-aware, dependency-aware assignment
+- `complete_field_task()` — close with outcome notes
+- `list_field_tasks()` — filter by employee, state, or region
+
+### Field Certifications (new)
+- `record_certification()` — auto-raises incident for expired certs
+- `list_certifications()` — filter by type or validity state
+
+### Route Optimisation (new)
+- `optimize_field_route(waypoints)` — nearest-neighbour + 2-opt TSP, no ML dependency
+
+### Offline Sync (new)
+- `enqueue_offline_operation()` — capture operations without connectivity
+- `sync_offline_queue()` — causal-order replay with per-op error capture
+
+### Audit & Observability (new)
+- `export_audit_log()` — filtered export with SHA-256 tamper-evident checksum
+- `health_check()` — liveness/readiness structured report
+
+### Analytics & Dashboard
+- `dashboard_summary()`, `rwf_analytics()`, `productivity_report()`
+- `security_compliance_remote()` — worker security posture snapshot
+
 ## Composability Notes
 - `mob_mdm` device enrolment state can gate VPN provisioning for corporate devices
 - `mob_map` biometric enrollment can be triggered as an onboarding step

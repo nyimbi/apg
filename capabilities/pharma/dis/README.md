@@ -44,11 +44,20 @@ Manages pharmaceutical distribution operations including cold chain monitoring, 
 |------|--------|-------------|------------|
 | /pharma-dis/api/v1/shipments | POST | Create shipment | pharma_dis:shipments |
 | /pharma-dis/api/v1/shipments/<id>/dispatch | POST | Dispatch shipment | pharma_dis:shipments |
+| /pharma-dis/api/v1/shipments/<id>/integrity | GET | Supply chain integrity check | pharma_dis:shipments |
 | /pharma-dis/api/v1/cold-chain/excursions | POST | Report temperature excursion | pharma_dis:cold_chain |
+| /pharma-dis/api/v1/cold-chain/telemetry | POST | Ingest IoT temperature telemetry | pharma_dis:cold_chain |
+| /pharma-dis/api/v1/cold-chain/mkt | POST | Calculate MKT for a shipment | pharma_dis:cold_chain |
 | /pharma-dis/api/v1/serialisation/verify | POST | Verify serial number | pharma_dis:serialisation |
+| /pharma-dis/api/v1/serialisation/bulk | POST | Bulk-serialise product units | pharma_dis:serialisation |
+| /pharma-dis/api/v1/serialisation/hierarchy/<sscc> | GET | Validate GS1 aggregation hierarchy | pharma_dis:serialisation |
 | /pharma-dis/api/v1/recalls | POST | Initiate recall | pharma_dis:recalls |
+| /pharma-dis/api/v1/recalls/<id>/propagate | POST | Propagate recall through network | pharma_dis:recalls |
 | /pharma-dis/api/v1/wda | POST | Register WDA | pharma_dis:wda |
 | /pharma-dis/api/v1/wda/expiry-alerts | GET | WDA expiry alerts | pharma_dis:wda |
+| /pharma-dis/api/v1/wda/<id>/renew | POST | Initiate WDA renewal workflow | pharma_dis:wda |
+| /pharma-dis/api/v1/distributors/<id>/gdp-risk | GET | GDP risk score for distributor | pharma_dis:gdp |
+| /pharma-dis/api/v1/reports/regulatory | POST | Regulatory distribution report | pharma_dis:reports |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -83,5 +92,21 @@ Manages pharmaceutical distribution operations including cold chain monitoring, 
 - Class I recall clock starts at initiation regardless of whether batches have been fully identified
 - WDA renewal alerts fire 90 days before expiry; a second alert fires at 30 days if renewal not submitted
 
+## Async Service Methods (v1.1+)
+| Method | Description |
+|--------|-------------|
+| `async_create_shipment(payload)` | Non-blocking shipment creation |
+| `async_dispatch_shipment(...)` | Non-blocking dispatch with WDA/CoA checks |
+| `async_deliver_shipment(...)` | Non-blocking delivery confirmation |
+| `calculate_mkt(temperature_log, ...)` | ICH Q1A(R2) Mean Kinetic Temperature via Haynes equation |
+| `ingest_cold_chain_telemetry(shipment_id, readings, ...)` | IoT logger batch ingest with Z-score anomaly detection |
+| `propagate_recall_notification(recall_id, network, ...)` | Tiered recall notification across distribution network |
+| `validate_aggregation_hierarchy(tenant_id, sscc)` | GS1 SSCC→case→unit hierarchy validation with GTIN check digit |
+| `initiate_wda_renewal(wda_id, tenant_id, ...)` | WDA renewal with GDP Annex 17 document checklist |
+| `gdp_risk_score(distributor_id, tenant_id, ...)` | Weighted GDP Risk Score (0–100) with band classification |
+| `supply_chain_integrity_check(shipment_id, tenant_id)` | 5-point integrity gate: serials, recalls, cold chain, WDA, GDP |
+| `async_regulatory_report(period, jurisdiction, ...)` | Extended FMD/DSCSA report with serialisation breakdown |
+| `bulk_serialise_products(tenant_id, specs, ...)` | Batch serialisation with per-spec error isolation |
+
 ## Composability Notes
-Receives released batches from `pharma_mfg` for dispatch. Recall data feeds `pharma_rec` post-market surveillance. Serialisation events integrate with national verification systems. GDP deviations link to `pharma_qms` CAPA workflow.
+Receives released batches from `pharma_mfg` for dispatch. Recall data feeds `pharma_rec` post-market surveillance. Serialisation events integrate with national verification systems (EMVS, DSCSA Hub). GDP deviations link to `pharma_qms` CAPA workflow. IoT telemetry ingestion integrates with cold-chain logger vendors (Elpro, Sensitech, DeltaTrak) via MQTT/REST webhooks.

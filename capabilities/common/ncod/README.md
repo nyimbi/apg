@@ -31,6 +31,18 @@ contract, local runtime behavior, and generated application evidence testable.
   review, target runtime, and rollback-plan evidence.
 - Bytewax lifecycle stream contract for batch and runtime builder mutations.
 
+### New in v1.1 — Async-First Enhancements
+
+- `async_create_app` — coroutine-native app creation for concurrent build pipelines.
+- `infer_form_from_data_model` — scaffolds a complete form page from a `DataModelDefinition`.
+- `clone_app` — deep-clones an app and all sub-resources to another tenant namespace.
+- `validate_app_incremental` — content-hash-cached validation; only changed domains re-evaluated.
+- `snapshot_app` / `restore_snapshot` — full app-graph serialization and atomic rollback.
+- `preview_data_binding` — validates sample rows against a binding schema with field scores.
+- `accessibility_audit` — automated WCAG 2.1 Level AA heuristic scan; replaces the boolean flag.
+- `enforce_performance_budget` — per-page component and global binding quota enforcement.
+- `app_diff` — logical diff between two snapshots (added / removed / modified per category).
+
 ## Runtime Surfaces
 
 | File | Responsibility |
@@ -38,7 +50,7 @@ contract, local runtime behavior, and generated application evidence testable.
 | `capability_contract.py` | Configuration, deterministic rules, UI routes, theme, Bytewax stream contract, and adapter map. |
 | `models.py` | Dataclasses for apps, screens, components, data models, data bindings, workflows, themes, scripts, connectors, AI agents, validations, releases, deployments, and audit events. |
 | `builder_runtime.py` | Deterministic IDs, type normalization, accessibility checks, field/schema/theme validation, versioning, validation checks, and publish posture helpers. |
-| `service.py` | In-process builder service that enforces tenant, owner, policy, AI-agent, publish, deployment, and state-change guardrails. |
+| `service.py` | In-process builder service that enforces tenant, owner, policy, AI-agent, publish, deployment, and state-change guardrails. Includes 10 async methods added in v1.1. |
 | `api.py` | Payload-oriented helpers for app builder, modeler, workflows, agents, validation, publishing, deployment, and compatibility calls. |
 | `views.py` | UI model helpers for dashboards, app library, builder, data modeler, workflow designer, publish/deploy centers, agents, audit, analytics, and settings. |
 | `app.py` | Publishable APG package entrypoint generated from the capability contract. |
@@ -77,6 +89,22 @@ release = service.publish_app("release-field-service", tenant_id, app["id"], "pr
 deployment = service.deploy_release("deploy-field-service", tenant_id, release["id"], "python", "apg://apps/field-service", True, "rollback:field-service")
 ```
 
+## Key Service Methods
+
+**Sync (existing)**: `describe`, `evaluate`, `create_app`, `add_page`, `add_component`,
+`define_data_model`, `bind_data_source`, `attach_workflow`, `create_theme_variant`,
+`add_script_extension`, `add_connector_binding`, `register_builder_agent`,
+`validate_app`, `publish_app`, `deploy_release`, `change_app_state`, `app_template`,
+`widget_library`, `data_connector`, `trigger_define`, `action_block`,
+`condition_builder`, `preview_deploy`, `version_control_app`, `ncod_analytics`,
+`dashboard_summary`
+
+**Async (v1.1)**: `async_create_app`, `infer_form_from_data_model`, `clone_app`,
+`validate_app_incremental`, `snapshot_app`, `restore_snapshot`, `preview_data_binding`,
+`accessibility_audit`, `enforce_performance_budget`, `app_diff`
+
+_(See `service.py` for complete signatures and docstrings.)_
+
 ## Guardrail Summary
 
 NCOD denies operations that lack tenant context, app ownership, app name, theme,
@@ -103,4 +131,3 @@ Battery-conscious checks for this capability:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/ncod --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/ncod --json
 ```
-

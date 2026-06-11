@@ -112,6 +112,32 @@ REST API prefix: `/composition-orchestration/api/v1`
 Supported task types: `automated`, `human`, `approval`, `notification`, `integration`, `conditional`, `parallel`, `subprocess`, `timer`, `script`.
 Supported trigger types: `manual`, `scheduled`, `event`, `api`, `webhook`, `condition`, `file`, `email`.
 
+## New Features (v2)
+
+### Execution Snapshotting and Recovery
+
+`snapshot_execution` serialises the full runtime state (execution record, instance variables, signal queue, compensation log, suspension record) to a durable record. `restore_from_snapshot` re-hydrates a previous snapshot into the live stores — enabling point-in-time recovery for long-running workflows without reprocessing completed steps.
+
+### SLA Breach Detection and Monitoring
+
+`check_sla_breaches(tenant_id)` scans all active task assignments for overdue deadlines, emitting `sla_warning` events at 80% elapsed time and `sla_breached` events when deadlines have passed. `get_sla_status(tenant_id)` returns a triage view partitioned into `healthy`, `at_risk`, and `breached` buckets for the operations dashboard.
+
+### AI-Assisted Anomaly Detection
+
+`record_execution_duration` maintains a rolling 100-sample window of completion times per workflow. `detect_anomalies(tenant_id)` applies z-score analysis (threshold: 3σ) across workflows with 10+ samples, emitting `workflow_execution_anomaly` events for statistical outliers. Integrates with `ntfy` for on-call alerting.
+
+### Cost Attribution and FinOps
+
+`get_execution_cost` returns accumulated cost-weight for a specific execution. `get_tenant_cost_report` aggregates consumption by workflow ID across a period, giving FinOps teams a ranked cost breakdown without requiring an external billing tool.
+
+### Distributed Tracing
+
+`get_execution_trace` reconstructs a waterfall trace from audit events, annotating each span with elapsed milliseconds since execution start. Execution records accept an optional `trace_context` dict (W3C `traceparent`/`tracestate`) that is propagated to cross-capability task invocations, enabling end-to-end distributed traces across APG services.
+
+### Multi-Tenant Execution Quotas
+
+`set_tenant_quota(tenant_id, max_concurrent, max_starts_per_minute)` configures concurrency and throughput limits per tenant. `get_quota_status(tenant_id)` returns real-time usage against configured limits. The `start_execution` path will enforce these limits in the next release, raising `QuotaExceededError` with a `retry_after` hint when either limit is breached.
+
 ## Streaming Events
 
 Events emitted to the composition event stream via Bytewax (`apg.composition.orchestration.lifecycle`).

@@ -15,10 +15,13 @@ from __future__ import annotations
 import csv
 import io
 import json
+import math
+import random
 import statistics
 import time
 from datetime import datetime, timedelta
-from typing import Any
+from decimal import Decimal
+from typing import Any, AsyncIterator, Awaitable, Callable
 
 from uuid6 import uuid7
 
@@ -88,6 +91,30 @@ class CacheService:
 		# operation counters
 		self._op_count = 0
 		self._error_count = 0
+		# stale-while-revalidate grace windows (full_key -> swr_grace_seconds)
+		self._swr_grace: dict[str, int] = {}
+		# refresh callbacks per namespace (ns_key -> async callable)
+		self._refresh_callbacks: dict[str, Callable[..., Awaitable[Any]]] = {}
+		# write-mode per namespace (ns_key -> str)
+		self._write_modes: dict[str, str] = {}
+		# write-behind queue (full_key -> (value, ttl, tags))
+		self._write_queue: list[_R] = []
+		# adaptive TTL config per namespace (ns_key -> _R)
+		self._adaptive_ttl_cfg: dict[str, _R] = {}
+		# tenant quota config (tenant_id -> {soft_bytes, hard_bytes})
+		self._quotas: dict[str, _R] = {}
+		# schema version per full_key
+		self._schema_versions: dict[str, str] = {}
+		# tag hierarchy graph (ns_key -> {parent_tag -> [child_tags]})
+		self._tag_graph: dict[str, dict[str, list[str]]] = {}
+		# active warming progress tracking
+		self._warming_progress: dict[str, _R] = {}
+		# xfetch last recompute deltas (full_key -> seconds)
+		self._xfetch_deltas: dict[str, float] = {}
+		# session writes (session_id -> {full_key -> value})
+		self._session_writes: dict[str, dict[str, Any]] = {}
+		# monetary amount cache (full_key -> Decimal)
+		self._money_cache: dict[str, Decimal] = {}
 
 	# ------------------------------------------------------------------
 	# helpers
@@ -911,6 +938,725 @@ class CacheService:
 		)
 		await self._audit("compliance_report_generated", "system", {"framework": framework})
 		return report
+
+	# ------------------------------------------------------------------
+	# 45. cache_set_swr  — stale-while-revalidate write
+	# ------------------------------------------------------------------
+
+	async def cache_set_swr(
+		self,
+		namespace: str,
+		key: str,
+		value: Any,
+		ttl_seconds: int = 3600,
+		swr_grace_seconds: int = 60,
+		tags: list[str] | None = None,
+	) -> _R:
+		"""Store a value with a stale-while-revalidate grace window.
+
+		When the entry expires, calls within the grace window receive the
+		stale value immediately (stale=True) while a background refresh is
+		triggered via the namespace refresh callback (if registered).
+		"""
+		guard_tenant_id(self.tenant_id)
+		guard_non_empty_string(key, "key")
+		assert ttl_seconds > 0, "ttl_seconds must be positive"
+		assert swr_grace_seconds >= 0, "swr_grace_seconds must be non-negative"
+		result = await self.cache_set(namespace, key, value, ttl_seconds, tags)
+		fk = self._full_key(namespace, key)
+		self._swr_grace[fk] = swr_grace_seconds
+		await self._audit(
+			"cache_set_swr", fk,
+			{"swr_grace_seconds": swr_grace_seconds, "ttl_seconds": ttl_seconds},
+		)
+		return _R(**result, swr_grace_seconds=swr_grace_seconds)
+
+	# ------------------------------------------------------------------
+	# 46. cache_get_swr  — stale-while-revalidate read
+	# ------------------------------------------------------------------
+
+	async def cache_get_swr(self, namespace: str, key: str) -> _R:
+		"""Read with stale-while-revalidate semantics.
+
+		If the key is within its SWR grace window after expiry, returns the
+		stale value with stale=True and triggers background revalidation via
+		the registered namespace refresh callback.
+		"""
+		guard_tenant_id(self.tenant_id)
+		fk = self._full_key(namespace, key)
+		record = self._store.get(fk)
+		grace = self._swr_grace.get(fk, 0)
+
+		if record is None:
+			self._misses[fk] = self._misses.get(fk, 0) + 1
+			await self._audit("cache_miss", fk, {"namespace": namespace, "swr": True})
+			return _R(hit=False, stale=False, key=key, namespace=namespace, value=None)
+
+		now = datetime.utcnow()
+		expires_dt = datetime.fromisoformat(record["expires_at"]) if record.get("expires_at") else None
+
+		# Within normal TTL — clean hit
+		if expires_dt is None or now <= expires_dt:
+			record["access_count"] = record.get("access_count", 0) + 1
+			record["last_accessed_at"] = _ts()
+			self._hits[fk] = self._hits.get(fk, 0) + 1
+			self._op_count += 1
+			await self._audit("cache_hit", fk, {"namespace": namespace, "swr": False})
+			return _R(hit=True, stale=False, key=key, namespace=namespace,
+				value=record["value"], expires_at=record.get("expires_at"))
+
+		# Within SWR grace window — serve stale, trigger background refresh
+		grace_deadline = expires_dt + timedelta(seconds=grace)
+		if now <= grace_deadline:
+			stale_value = record["value"]
+			cb = self._refresh_callbacks.get(self._ns_key(namespace))
+			if cb is not None:
+				try:
+					new_value = await cb(namespace, key)
+					if new_value is not None:
+						await self.cache_set(namespace, key, new_value,
+							ttl_seconds=record.get("ttl_seconds", 3600))
+				except Exception as exc:
+					logger.warning("SWR refresh failed for %s: %s", fk, exc)
+			await self._audit("cache_hit_stale", fk,
+				{"namespace": namespace, "grace_remaining_s": (grace_deadline - now).total_seconds()})
+			return _R(hit=True, stale=True, key=key, namespace=namespace,
+				value=stale_value, expires_at=record.get("expires_at"))
+
+		# Fully expired, past grace — hard miss
+		del self._store[fk]
+		self._misses[fk] = self._misses.get(fk, 0) + 1
+		await self._audit("cache_miss", fk, {"namespace": namespace, "swr": True, "past_grace": True})
+		return _R(hit=False, stale=False, key=key, namespace=namespace, value=None)
+
+	# ------------------------------------------------------------------
+	# 47. register_refresh_callback
+	# ------------------------------------------------------------------
+
+	async def register_refresh_callback(
+		self,
+		namespace: str,
+		callback: Callable[[str, str], Awaitable[Any]],
+	) -> _R:
+		"""Register an async callback for SWR background revalidation.
+
+		The callback signature is ``async def cb(namespace, key) -> value``.
+		"""
+		guard_tenant_id(self.tenant_id)
+		self._refresh_callbacks[self._ns_key(namespace)] = callback
+		await self._audit("refresh_callback_registered", namespace, {})
+		return _R(namespace=namespace, registered=True, registered_at=_ts())
+
+	# ------------------------------------------------------------------
+	# 48. adaptive_ttl_configure  — per-namespace adaptive TTL policy
+	# ------------------------------------------------------------------
+
+	async def adaptive_ttl_configure(
+		self,
+		namespace: str,
+		ttl_min_seconds: int = 60,
+		ttl_max_seconds: int = 86400,
+		growth_factor: float = 1.5,
+	) -> _R:
+		"""Configure adaptive TTL for a namespace.
+
+		On each cache hit the remaining TTL is extended by ``growth_factor``
+		(capped at ``ttl_max_seconds``). Entries that go cold shrink naturally
+		to ``ttl_min_seconds`` on next rewrite.
+		"""
+		guard_tenant_id(self.tenant_id)
+		assert ttl_min_seconds > 0, "ttl_min_seconds must be positive"
+		assert ttl_max_seconds >= ttl_min_seconds, "ttl_max must be >= ttl_min"
+		assert growth_factor > 1.0, "growth_factor must be > 1.0"
+		cfg = _R(
+			namespace=namespace,
+			ttl_min_seconds=ttl_min_seconds,
+			ttl_max_seconds=ttl_max_seconds,
+			growth_factor=growth_factor,
+			configured_at=_ts(),
+		)
+		self._adaptive_ttl_cfg[self._ns_key(namespace)] = cfg
+		await self._audit("adaptive_ttl_configured", namespace, dict(cfg))
+		return cfg
+
+	# ------------------------------------------------------------------
+	# 49. cache_get_adaptive — get with automatic TTL extension on hit
+	# ------------------------------------------------------------------
+
+	async def cache_get_adaptive(self, namespace: str, key: str) -> _R:
+		"""Get a cache entry and automatically extend TTL based on adaptive policy.
+
+		Requires ``adaptive_ttl_configure`` to have been called for the namespace.
+		Returns the same shape as ``cache_get`` with an additional
+		``ttl_extended_to_seconds`` field when the TTL was grown.
+		"""
+		guard_tenant_id(self.tenant_id)
+		result = await self.cache_get(namespace, key)
+		if not result["hit"]:
+			return result
+
+		cfg = self._adaptive_ttl_cfg.get(self._ns_key(namespace))
+		if cfg is None:
+			return result
+
+		fk = self._full_key(namespace, key)
+		record = self._store.get(fk)
+		if record is None:
+			return result
+
+		expires_dt = datetime.fromisoformat(record["expires_at"]) if record.get("expires_at") else None
+		if expires_dt is None:
+			return result
+
+		remaining = max(0.0, (expires_dt - datetime.utcnow()).total_seconds())
+		new_ttl = min(int(remaining * cfg["growth_factor"]), cfg["ttl_max_seconds"])
+		new_ttl = max(new_ttl, cfg["ttl_min_seconds"])
+		if new_ttl > remaining:
+			await self.ttl_update(namespace, key, new_ttl)
+			await self._audit("adaptive_ttl_extended", fk,
+				{"old_remaining_s": remaining, "new_ttl_s": new_ttl})
+			return _R(**result, ttl_extended_to_seconds=new_ttl)
+		return result
+
+	# ------------------------------------------------------------------
+	# 50. set_tenant_quota — quota governance for cache writes
+	# ------------------------------------------------------------------
+
+	async def set_tenant_quota(
+		self,
+		tenant_id: str,
+		soft_bytes: int,
+		hard_bytes: int,
+	) -> _R:
+		"""Define soft and hard byte quotas for a tenant.
+
+		Soft limit: emits a ``quota_warning`` audit event on ``cache_set``.
+		Hard limit: raises ``PermissionError`` and blocks the write.
+		"""
+		guard_tenant_id(tenant_id)
+		assert hard_bytes >= soft_bytes > 0, "hard_bytes >= soft_bytes > 0 required"
+		self._quotas[tenant_id] = _R(
+			tenant_id=tenant_id,
+			soft_bytes=soft_bytes,
+			hard_bytes=hard_bytes,
+			configured_at=_ts(),
+		)
+		await self._audit("tenant_quota_set", tenant_id,
+			{"soft_bytes": soft_bytes, "hard_bytes": hard_bytes})
+		return _R(tenant_id=tenant_id, soft_bytes=soft_bytes,
+			hard_bytes=hard_bytes, set_at=_ts())
+
+	# ------------------------------------------------------------------
+	# 51. quota_usage_report — current tenant memory utilisation vs quotas
+	# ------------------------------------------------------------------
+
+	async def quota_usage_report(self, tenant_id: str | None = None) -> _R:
+		"""Report current byte usage against configured quotas for a tenant.
+
+		Estimates size via ``json.dumps``; sufficient for governance decisions.
+		"""
+		guard_tenant_id(self.tenant_id)
+		tid = tenant_id or self.tenant_id
+		prefix = f"{tid}:"
+		active_entries = [
+			v for k, v in self._store.items()
+			if k.startswith(prefix) and not self._is_expired(v)
+		]
+		estimated_bytes = sum(
+			len(json.dumps(e.get("value", ""), default=str).encode())
+			for e in active_entries
+		)
+		quota = self._quotas.get(tid)
+		utilisation_pct: float | None = None
+		if quota:
+			utilisation_pct = round(estimated_bytes / max(quota["hard_bytes"], 1) * 100, 2)
+		return _R(
+			tenant_id=tid,
+			estimated_bytes=estimated_bytes,
+			entry_count=len(active_entries),
+			soft_bytes=quota["soft_bytes"] if quota else None,
+			hard_bytes=quota["hard_bytes"] if quota else None,
+			utilisation_pct=utilisation_pct,
+			generated_at=_ts(),
+		)
+
+	# ------------------------------------------------------------------
+	# 52. cache_set_versioned — write with schema version tracking
+	# ------------------------------------------------------------------
+
+	async def cache_set_versioned(
+		self,
+		namespace: str,
+		key: str,
+		value: Any,
+		schema_version: str,
+		ttl_seconds: int = 3600,
+		tags: list[str] | None = None,
+	) -> _R:
+		"""Store a value with an explicit schema version label.
+
+		Readers can use ``cache_get_versioned`` to enforce schema compatibility
+		and automatically invalidate stale-schema entries.
+		"""
+		guard_tenant_id(self.tenant_id)
+		guard_non_empty_string(schema_version, "schema_version")
+		result = await self.cache_set(namespace, key, value, ttl_seconds, tags)
+		fk = self._full_key(namespace, key)
+		self._schema_versions[fk] = schema_version
+		if fk in self._store:
+			self._store[fk]["_schema_version"] = schema_version
+		await self._audit("cache_set_versioned", fk,
+			{"schema_version": schema_version, "ttl_seconds": ttl_seconds})
+		return _R(**result, schema_version=schema_version)
+
+	# ------------------------------------------------------------------
+	# 53. cache_get_versioned — read with schema version enforcement
+	# ------------------------------------------------------------------
+
+	async def cache_get_versioned(
+		self,
+		namespace: str,
+		key: str,
+		expected_version: str,
+	) -> _R:
+		"""Read a cache entry and validate schema version.
+
+		If the stored version does not match ``expected_version`` the entry is
+		deleted and ``version_mismatch=True`` is returned — forcing the caller
+		to re-populate with the correct schema.
+		"""
+		guard_tenant_id(self.tenant_id)
+		guard_non_empty_string(expected_version, "expected_version")
+		fk = self._full_key(namespace, key)
+		result = await self.cache_get(namespace, key)
+		if not result["hit"]:
+			return _R(**result, version_mismatch=False, stored_version=None,
+				expected_version=expected_version)
+
+		stored_version = self._schema_versions.get(fk) or \
+			(self._store.get(fk) or {}).get("_schema_version")
+
+		if stored_version != expected_version:
+			await self.cache_delete(namespace, key)
+			self._schema_versions.pop(fk, None)
+			await self._audit("schema_version_mismatch", fk,
+				{"stored": stored_version, "expected": expected_version})
+			return _R(hit=False, key=key, namespace=namespace, value=None,
+				version_mismatch=True, stored_version=stored_version,
+				expected_version=expected_version)
+
+		return _R(**result, version_mismatch=False,
+			stored_version=stored_version, expected_version=expected_version)
+
+	# ------------------------------------------------------------------
+	# 54. register_tag_hierarchy — cascading tag invalidation graph
+	# ------------------------------------------------------------------
+
+	async def register_tag_hierarchy(
+		self,
+		namespace: str,
+		parent_tag: str,
+		child_tags: list[str],
+	) -> _R:
+		"""Register a parent→children tag relationship for cascading invalidation.
+
+		When ``tag_invalidate`` is called with ``cascade=True``, all descendant
+		tags are resolved via BFS and their entries are also deleted.
+		"""
+		guard_tenant_id(self.tenant_id)
+		guard_non_empty_string(parent_tag, "parent_tag")
+		assert child_tags, "child_tags must not be empty"
+		ns = self._ns_key(namespace)
+		if ns not in self._tag_graph:
+			self._tag_graph[ns] = {}
+		existing = self._tag_graph[ns].get(parent_tag, [])
+		merged = list(set(existing) | set(child_tags))
+		self._tag_graph[ns][parent_tag] = merged
+		await self._audit("tag_hierarchy_registered", namespace,
+			{"parent": parent_tag, "children": merged})
+		return _R(namespace=namespace, parent_tag=parent_tag,
+			child_tags=merged, registered_at=_ts())
+
+	# ------------------------------------------------------------------
+	# 55. tag_invalidate_cascade — BFS cascading tag invalidation
+	# ------------------------------------------------------------------
+
+	async def tag_invalidate_cascade(self, namespace: str, tag: str) -> _R:
+		"""Invalidate a tag and all its descendants in the tag hierarchy.
+
+		Uses BFS over the registered tag graph.  Falls back to flat
+		``tag_invalidate`` behaviour when no hierarchy is registered.
+		"""
+		guard_tenant_id(self.tenant_id)
+		ns = self._ns_key(namespace)
+		graph = self._tag_graph.get(ns, {})
+
+		# BFS to collect all tags to invalidate
+		tags_to_invalidate: list[str] = []
+		queue = [tag]
+		visited: set[str] = set()
+		while queue:
+			current = queue.pop(0)
+			if current in visited:
+				continue
+			visited.add(current)
+			tags_to_invalidate.append(current)
+			for child in graph.get(current, []):
+				if child not in visited:
+					queue.append(child)
+
+		total_invalidated = 0
+		tag_counts: dict[str, int] = {}
+		for t in tags_to_invalidate:
+			r = await self.tag_invalidate(namespace, t)
+			count = r["invalidated_count"]
+			tag_counts[t] = count
+			total_invalidated += count
+
+		await self._audit("tag_invalidate_cascade", namespace,
+			{"root_tag": tag, "tags_resolved": len(tags_to_invalidate),
+			"total_invalidated": total_invalidated})
+		return _R(namespace=namespace, root_tag=tag,
+			tags_resolved=tags_to_invalidate,
+			per_tag_counts=tag_counts,
+			total_invalidated=total_invalidated)
+
+	# ------------------------------------------------------------------
+	# 56. warm_cache_stream — streaming incremental cache warming
+	# ------------------------------------------------------------------
+
+	async def warm_cache_stream(
+		self,
+		namespace: str,
+		source_iter: AsyncIterator[tuple[str, Any]],
+		ttl_seconds: int = 7200,
+		batch_size: int = 100,
+		progress_callback: Callable[[int, int, float], Awaitable[None]] | None = None,
+	) -> _R:
+		"""Warm the cache from an async iterator of (key, value) tuples.
+
+		Processes entries in batches of ``batch_size``, yielding the event loop
+		between batches via ``asyncio.sleep(0)``.  Reports progress via the
+		optional ``progress_callback(loaded, failed, elapsed_ms)`` coroutine.
+		"""
+		import asyncio
+		guard_tenant_id(self.tenant_id)
+		op_id = uuid7str()
+		self._warming_progress[op_id] = _R(
+			op_id=op_id, namespace=namespace, loaded=0, failed=0,
+			status="running", started_at=_ts(),
+		)
+		start = time.monotonic()
+		loaded = 0
+		failed = 0
+		batch: list[tuple[str, Any]] = []
+
+		async def _flush(b: list[tuple[str, Any]]) -> tuple[int, int]:
+			ok = 0
+			err = 0
+			for k, v in b:
+				try:
+					await self.cache_set(namespace, k, v, ttl_seconds)
+					ok += 1
+				except Exception as exc:
+					logger.warning("warm_cache_stream: failed key=%s: %s", k, exc)
+					err += 1
+			return ok, err
+
+		async for item in source_iter:
+			batch.append(item)
+			if len(batch) >= batch_size:
+				ok, err = await _flush(batch)
+				loaded += ok
+				failed += err
+				batch.clear()
+				elapsed_ms = (time.monotonic() - start) * 1000
+				if progress_callback:
+					try:
+						await progress_callback(loaded, failed, elapsed_ms)
+					except Exception as _exc:
+						_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+				import asyncio as _aio
+				await _aio.sleep(0)
+
+		if batch:
+			ok, err = await _flush(batch)
+			loaded += ok
+			failed += err
+
+		elapsed_ms = (time.monotonic() - start) * 1000
+		self._warming_progress[op_id] = _R(
+			op_id=op_id, namespace=namespace, loaded=loaded, failed=failed,
+			status="completed", started_at=self._warming_progress[op_id]["started_at"],
+			completed_at=_ts(), elapsed_ms=round(elapsed_ms, 2),
+		)
+		await self._audit("cache_warmed_stream", namespace,
+			{"op_id": op_id, "loaded": loaded, "failed": failed,
+			"elapsed_ms": round(elapsed_ms, 2)})
+		return _R(op_id=op_id, namespace=namespace, loaded=loaded,
+			failed=failed, elapsed_ms=round(elapsed_ms, 2))
+
+	# ------------------------------------------------------------------
+	# 57. cache_set_money — store monetary values as Decimal, preserving precision
+	# ------------------------------------------------------------------
+
+	async def cache_set_money(
+		self,
+		namespace: str,
+		key: str,
+		amount: Decimal,
+		currency: str,
+		ttl_seconds: int = 3600,
+		tags: list[str] | None = None,
+	) -> _R:
+		"""Store a monetary amount with full Decimal precision and currency tag.
+
+		Values are stored as string representations to avoid floating-point
+		precision loss.  Use ``cache_get_money`` to retrieve as ``Decimal``.
+		"""
+		guard_tenant_id(self.tenant_id)
+		guard_non_empty_string(currency, "currency")
+		assert isinstance(amount, Decimal), "amount must be a Decimal"
+		fk = self._full_key(namespace, key)
+		payload = {"amount_str": str(amount), "currency": currency.upper()}
+		result = await self.cache_set(namespace, key, payload, ttl_seconds, tags)
+		self._money_cache[fk] = amount
+		await self._audit("cache_set_money", fk,
+			{"currency": currency.upper(), "ttl_seconds": ttl_seconds})
+		return _R(**result, currency=currency.upper(), amount_str=str(amount))
+
+	# ------------------------------------------------------------------
+	# 58. cache_get_money — retrieve monetary value as Decimal
+	# ------------------------------------------------------------------
+
+	async def cache_get_money(self, namespace: str, key: str) -> _R:
+		"""Retrieve a monetary cache entry, returning ``amount`` as ``Decimal``.
+
+		Returns ``hit=False`` on miss or expiry.  Restores ``Decimal`` from the
+		string representation, guaranteeing precision parity with the stored value.
+		"""
+		guard_tenant_id(self.tenant_id)
+		result = await self.cache_get(namespace, key)
+		if not result["hit"]:
+			return _R(**result, amount=None, currency=None)
+		payload = result["value"]
+		if not isinstance(payload, dict) or "amount_str" not in payload:
+			return _R(**result, amount=None, currency=None,
+				error="not_a_money_entry")
+		amount = Decimal(payload["amount_str"])
+		fk = self._full_key(namespace, key)
+		self._money_cache[fk] = amount
+		return _R(hit=True, key=key, namespace=namespace,
+			amount=amount, currency=payload.get("currency"),
+			expires_at=result.get("expires_at"))
+
+	# ------------------------------------------------------------------
+	# 59. xfetch_get — probabilistic early expiry (XFetch) anti-stampede read
+	# ------------------------------------------------------------------
+
+	async def xfetch_get(
+		self,
+		namespace: str,
+		key: str,
+		beta: float = 1.0,
+	) -> _R:
+		"""Cache read with XFetch probabilistic early-expiry stampede protection.
+
+		When the key is approaching expiry, requests are probabilistically treated
+		as misses (triggering recompute) before the hard expiry hits.  This
+		distributes recompute cost across time, preventing thundering-herd failure.
+
+		``beta > 1`` increases early recompute probability; ``0 < beta < 1`` reduces it.
+		"""
+		guard_tenant_id(self.tenant_id)
+		fk = self._full_key(namespace, key)
+		record = self._store.get(fk)
+		if record is None or self._is_expired(record):
+			if record:
+				del self._store[fk]
+			self._misses[fk] = self._misses.get(fk, 0) + 1
+			await self._audit("cache_miss_xfetch", fk, {"beta": beta, "reason": "expired_or_missing"})
+			return _R(hit=False, early_miss=False, key=key, namespace=namespace, value=None)
+
+		if record.get("expires_at") is None:
+			# No TTL — permanent entry, no stampede risk
+			record["access_count"] = record.get("access_count", 0) + 1
+			record["last_accessed_at"] = _ts()
+			self._hits[fk] = self._hits.get(fk, 0) + 1
+			return _R(hit=True, early_miss=False, key=key, namespace=namespace,
+				value=record["value"], expires_at=None)
+
+		expires_dt = datetime.fromisoformat(record["expires_at"])
+		now = datetime.utcnow()
+		ttl_remaining = max(0.0, (expires_dt - now).total_seconds())
+		delta = self._xfetch_deltas.get(fk, 1.0)
+
+		# XFetch probability: early_expiry = -delta * beta * ln(uniform(0,1))
+		# If now + early_expiry >= expires_at → treat as miss
+		u = random.random()
+		if u <= 0.0:
+			u = 1e-10
+		early_expiry = -delta * beta * math.log(u)
+		if ttl_remaining <= early_expiry:
+			await self._audit("cache_miss_xfetch", fk,
+				{"beta": beta, "ttl_remaining": ttl_remaining,
+				"early_expiry": early_expiry, "reason": "probabilistic_early_miss"})
+			return _R(hit=False, early_miss=True, key=key, namespace=namespace,
+				value=None, ttl_remaining_seconds=ttl_remaining)
+
+		record["access_count"] = record.get("access_count", 0) + 1
+		record["last_accessed_at"] = _ts()
+		self._hits[fk] = self._hits.get(fk, 0) + 1
+		self._op_count += 1
+		return _R(hit=True, early_miss=False, key=key, namespace=namespace,
+			value=record["value"], expires_at=record["expires_at"],
+			ttl_remaining_seconds=ttl_remaining)
+
+	# ------------------------------------------------------------------
+	# 60. schema_version_report — distribution of schema versions in namespace
+	# ------------------------------------------------------------------
+
+	async def schema_version_report(self, namespace: str) -> _R:
+		"""Report the distribution of ``_schema_version`` values across live entries.
+
+		Helps identify stale-schema entries that should be re-populated.
+		"""
+		guard_tenant_id(self.tenant_id)
+		prefix = f"{self.tenant_id}:{namespace}:"
+		version_counts: dict[str, int] = {}
+		unversioned = 0
+		for k, v in self._store.items():
+			if not k.startswith(prefix) or self._is_expired(v):
+				continue
+			sv = v.get("_schema_version") or self._schema_versions.get(k)
+			if sv:
+				version_counts[sv] = version_counts.get(sv, 0) + 1
+			else:
+				unversioned += 1
+		total = sum(version_counts.values()) + unversioned
+		return _R(
+			namespace=namespace,
+			total_entries=total,
+			version_distribution=version_counts,
+			unversioned_entries=unversioned,
+			generated_at=_ts(),
+		)
+
+	# ------------------------------------------------------------------
+	# 61. tier_stats — per-tier (L1/L2) hit-rate breakdown
+	# ------------------------------------------------------------------
+
+	async def tier_stats(self, namespace: str | None = None) -> _R:
+		"""Return hit-rate statistics broken down by logical cache tier.
+
+		In the in-memory implementation, L1 represents entries accessed more than
+		``l1_threshold`` times (hot) and L2 the remainder (warm/cold).
+		"""
+		guard_tenant_id(self.tenant_id)
+		prefix = (f"{self.tenant_id}:{namespace}:" if namespace
+			else f"{self.tenant_id}:")
+		l1_threshold = 5
+		l1_entries = 0
+		l2_entries = 0
+		for k, v in self._store.items():
+			if not k.startswith(prefix) or self._is_expired(v):
+				continue
+			if v.get("access_count", 0) >= l1_threshold:
+				l1_entries += 1
+			else:
+				l2_entries += 1
+
+		total_hits = sum(v for k, v in self._hits.items() if k.startswith(prefix))
+		total_misses = sum(v for k, v in self._misses.items() if k.startswith(prefix))
+		total_ops = total_hits + total_misses
+		return _R(
+			namespace=namespace,
+			l1_hot_entries=l1_entries,
+			l2_warm_entries=l2_entries,
+			total_entries=l1_entries + l2_entries,
+			total_hits=total_hits,
+			total_misses=total_misses,
+			overall_hit_rate=round(total_hits / max(total_ops, 1), 4),
+			l1_threshold_access_count=l1_threshold,
+			generated_at=_ts(),
+		)
+
+	# ------------------------------------------------------------------
+	# 62. write_behind_flush — drain the write-behind queue
+	# ------------------------------------------------------------------
+
+	async def write_behind_flush(
+		self,
+		backend_fn: Callable[[str, str, Any], Awaitable[None]] | None = None,
+	) -> _R:
+		"""Flush pending write-behind queue entries to the backend.
+
+		Pass ``backend_fn(namespace, key, value)`` or rely on per-namespace
+		registered writers set by ``register_write_backend``.  Entries are
+		processed in FIFO order; failures are counted and left in the queue
+		for retry.
+		"""
+		guard_tenant_id(self.tenant_id)
+		if not self._write_queue:
+			return _R(flushed=0, failed=0, remaining=0, flushed_at=_ts())
+
+		flushed = 0
+		failed = 0
+		retry_queue: list[_R] = []
+		for entry in list(self._write_queue):
+			fn = backend_fn
+			if fn is None:
+				ns_fn = self._refresh_callbacks.get(
+					self._ns_key(entry.get("namespace", "")))
+				fn = ns_fn
+			if fn is None:
+				retry_queue.append(entry)
+				continue
+			try:
+				await fn(entry["namespace"], entry["key"], entry["value"])
+				flushed += 1
+			except Exception as exc:
+				logger.warning("write_behind_flush: backend write failed: %s", exc)
+				retry_queue.append(entry)
+				failed += 1
+
+		self._write_queue = retry_queue
+		await self._audit("write_behind_flushed", "system",
+			{"flushed": flushed, "failed": failed, "remaining": len(retry_queue)})
+		return _R(flushed=flushed, failed=failed,
+			remaining=len(retry_queue), flushed_at=_ts())
+
+	# ------------------------------------------------------------------
+	# 63. cache_set_write_behind — enqueue value for asynchronous backend write
+	# ------------------------------------------------------------------
+
+	async def cache_set_write_behind(
+		self,
+		namespace: str,
+		key: str,
+		value: Any,
+		ttl_seconds: int = 3600,
+		tags: list[str] | None = None,
+	) -> _R:
+		"""Write-behind: store in cache immediately, enqueue for async backend write.
+
+		Call ``write_behind_flush`` (or run it in a background task) to drain
+		the queue.  Useful for high-write workloads where backend IOPS are a
+		bottleneck — reduces write latency to in-memory speeds.
+		"""
+		guard_tenant_id(self.tenant_id)
+		result = await self.cache_set(namespace, key, value, ttl_seconds, tags)
+		self._write_queue.append(_R(
+			namespace=namespace,
+			key=key,
+			value=value,
+			ttl_seconds=ttl_seconds,
+			enqueued_at=_ts(),
+		))
+		await self._audit("write_behind_enqueued",
+			self._full_key(namespace, key),
+			{"queue_depth": len(self._write_queue)})
+		return _R(**result, write_behind=True, queue_depth=len(self._write_queue))
 
 from dataclasses import dataclass, field as _f
 @dataclass

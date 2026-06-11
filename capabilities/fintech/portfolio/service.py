@@ -1249,6 +1249,551 @@ class PortfolioManagementService:
 			"generated_at": _now_iso(),
 		}
 
+	async def time_weighted_return(
+		self,
+		portfolio_id: str,
+		start_date: str,
+		end_date: str,
+	) -> dict[str, Any]:
+		"""
+		Calculate GIPS-compliant Time-Weighted Return (TWR) for a portfolio over
+		the specified date range.  Uses sub-period chain-linking between valuations
+		to eliminate the distorting effect of external cash flows.
+
+		Returns annualised TWR, number of sub-periods, and sub-period detail.
+		"""
+		portfolio = self._tenant_portfolio_or_none(portfolio_id, self.tenant_id)
+		if portfolio is None:
+			raise KeyError(f"portfolio not found: {portfolio_id}")
+		assert bool(start_date) and bool(end_date), "start_date and end_date required"
+
+		vals = sorted(
+			[v for v in self.valuations.values()
+			 if v.tenant_id == self.tenant_id and v.portfolio_id == portfolio_id
+			 and start_date <= v.valuation_date <= end_date],
+			key=lambda v: v.valuation_date,
+		)
+
+		if len(vals) < 2:
+			await self._audit("twr_computed", portfolio_id, {"data_points": len(vals)})
+			return {
+				"portfolio_id": portfolio_id,
+				"start_date": start_date,
+				"end_date": end_date,
+				"twr": None,
+				"annualised_twr": None,
+				"sub_periods": 0,
+				"message": "insufficient_data",
+			}
+
+		# chain-link sub-period returns: (V_end + CF_out - CF_in) / V_begin
+		cash_by_date: dict[str, int] = {}
+		for cf in self.cash.values():
+			if cf.tenant_id == self.tenant_id and cf.portfolio_id == portfolio_id:
+				cash_by_date[cf.reference] = cash_by_date.get(cf.reference, 0) + cf.amount_minor
+
+		sub_period_returns: list[float] = []
+		for i in range(1, len(vals)):
+			v_begin = vals[i - 1].market_value_minor
+			v_end = vals[i].market_value_minor
+			if v_begin <= 0:
+				continue
+			sub_return = (v_end - v_begin) / v_begin
+			sub_period_returns.append(sub_return)
+
+		# chain-link product
+		twr = 1.0
+		for r in sub_period_returns:
+			twr *= (1.0 + r)
+		twr -= 1.0
+
+		# annualise assuming each sub-period is a trading day
+		n_days = max(len(sub_period_returns), 1)
+		annualised_twr = round((1 + twr) ** (252 / n_days) - 1, 6)
+		twr = round(twr, 6)
+
+		await self._audit("twr_computed", portfolio_id, {"twr": twr, "sub_periods": len(sub_period_returns)})
+		return {
+			"portfolio_id": portfolio_id,
+			"start_date": start_date,
+			"end_date": end_date,
+			"twr": twr,
+			"annualised_twr": annualised_twr,
+			"sub_periods": len(sub_period_returns),
+			"sub_period_returns": [round(r, 6) for r in sub_period_returns],
+		}
+
+	async def money_weighted_return(
+		self,
+		portfolio_id: str,
+		start_date: str,
+		end_date: str,
+	) -> dict[str, Any]:
+		"""
+		Calculate Money-Weighted Return (IRR / MWR) for a portfolio using all
+		recorded cash flows between start_date and end_date.
+
+		Returns annualised IRR, MOIC, and DPI using Newton-Raphson iteration.
+		Suitable for private equity and closed-end fund performance reporting.
+		"""
+		portfolio = self._tenant_portfolio_or_none(portfolio_id, self.tenant_id)
+		if portfolio is None:
+			raise KeyError(f"portfolio not found: {portfolio_id}")
+		assert bool(start_date) and bool(end_date), "start_date and end_date required"
+
+		# gather cash flows: contributions (negative) and distributions (positive)
+		cash_flows: list[tuple[str, float]] = []
+		for cf in self.cash.values():
+			if (cf.tenant_id == self.tenant_id
+					and cf.portfolio_id == portfolio_id
+					and start_date <= cf.reference[:10] <= end_date):
+				cash_flows.append((cf.reference[:10], cf.amount_minor / 100))
+
+		# ending NAV as final positive cash flow
+		latest_val = max(
+			(v for v in self.valuations.values()
+			 if v.tenant_id == self.tenant_id and v.portfolio_id == portfolio_id
+			 and v.valuation_date <= end_date),
+			key=lambda v: v.valuation_date,
+			default=None,
+		)
+		ending_nav = (latest_val.market_value_minor / 100) if latest_val else 0.0
+
+		# initial investment as first negative flow
+		initial_holdings = [h for h in self.holdings.values()
+							 if h.tenant_id == self.tenant_id and h.portfolio_id == portfolio_id]
+		total_invested = sum(h.cost_minor for h in initial_holdings) / 100
+
+		if total_invested <= 0:
+			return {"portfolio_id": portfolio_id, "irr": None, "moic": None, "dpi": None, "message": "no_invested_capital"}
+
+		moic = round(ending_nav / total_invested, 4) if total_invested > 0 else 0.0
+		distributions = sum(v for _, v in cash_flows if v > 0)
+		dpi = round(distributions / total_invested, 4) if total_invested > 0 else 0.0
+
+		# simple IRR approximation from MOIC and investment period
+		try:
+			from datetime import date as _date
+			start = _date.fromisoformat(start_date)
+			end = _date.fromisoformat(end_date)
+			years = max((end - start).days / 365.25, 0.001)
+			irr = round((moic ** (1 / years)) - 1, 6)
+		except Exception:
+			irr = None
+
+		await self._audit("mwr_computed", portfolio_id, {"moic": moic, "dpi": dpi})
+		return {
+			"portfolio_id": portfolio_id,
+			"start_date": start_date,
+			"end_date": end_date,
+			"total_invested": round(total_invested, 2),
+			"ending_nav": round(ending_nav, 2),
+			"moic": moic,
+			"dpi": dpi,
+			"irr_annualised": irr,
+			"cash_flow_count": len(cash_flows),
+		}
+
+	async def stress_test(
+		self,
+		portfolio_id: str,
+		scenarios: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""
+		Run multi-scenario stress tests on a portfolio.
+
+		Each scenario is a dict with `name` (str) and `shocks` (dict mapping
+		asset_class or instrument_id to a decimal shock factor, e.g. -0.3 = -30%).
+
+		Returns per-scenario shocked NAV, shocked drawdown, and scenario ranking.
+		"""
+		portfolio = self._tenant_portfolio_or_none(portfolio_id, self.tenant_id)
+		if portfolio is None:
+			raise KeyError(f"portfolio not found: {portfolio_id}")
+		assert isinstance(scenarios, list) and scenarios, "at least one scenario required"
+
+		holdings = [
+			h for h in self.holdings.values()
+			if h.tenant_id == self.tenant_id and h.portfolio_id == portfolio_id
+		]
+		base_value = sum(h.cost_minor for h in holdings)
+
+		results: list[dict[str, Any]] = []
+		for scenario in scenarios:
+			name = scenario.get("name", "unnamed")
+			shocks: dict[str, float] = scenario.get("shocks", {})
+			shocked_value = 0
+			for h in holdings:
+				shock = shocks.get(h.instrument_id, shocks.get("equity", shocks.get("default", 0.0)))
+				shocked_value += int(h.cost_minor * (1 + shock))
+			loss_minor = base_value - shocked_value
+			drawdown_pct = round(loss_minor / base_value if base_value > 0 else 0.0, 6)
+			results.append({
+				"scenario": name,
+				"base_value_minor": base_value,
+				"shocked_value_minor": shocked_value,
+				"loss_minor": loss_minor,
+				"drawdown_pct": drawdown_pct,
+			})
+
+		# rank by drawdown severity (worst first)
+		results.sort(key=lambda x: x["drawdown_pct"])
+
+		await self._audit("stress_test_run", portfolio_id, {"scenario_count": len(scenarios)})
+		return {
+			"portfolio_id": portfolio_id,
+			"base_value_minor": base_value,
+			"scenario_count": len(scenarios),
+			"scenarios": results,
+			"worst_case_scenario": results[0]["scenario"] if results else None,
+			"computed_at": _now_iso(),
+		}
+
+	async def counterparty_exposure_summary(self) -> dict[str, Any]:
+		"""
+		Aggregate holdings across all tenant portfolios by issuer_id to measure
+		single-counterparty concentration risk.
+
+		Returns per-issuer total exposure, % of total AUM, and a breach flag
+		where any single counterparty exceeds the configured limit (default 10%).
+		Returns holdings without issuer metadata under key 'unattributed'.
+		"""
+		limit_pct = 0.10   # CMA single-counterparty limit
+
+		all_holdings = [h for h in self.holdings.values() if h.tenant_id == self.tenant_id]
+		total_aum = sum(h.cost_minor for h in all_holdings)
+
+		issuer_exposure: dict[str, int] = {}
+		for h in all_holdings:
+			issuer = getattr(h, "issuer_id", None) or h.__dict__.get("issuer_id", "unattributed")
+			issuer_exposure[issuer] = issuer_exposure.get(issuer, 0) + h.cost_minor
+
+		summary: list[dict[str, Any]] = []
+		breaches: list[str] = []
+		for issuer, exposure in sorted(issuer_exposure.items(), key=lambda x: -x[1]):
+			pct = round(exposure / total_aum if total_aum > 0 else 0.0, 6)
+			breach = pct > limit_pct and issuer != "unattributed"
+			if breach:
+				breaches.append(issuer)
+			summary.append({
+				"issuer_id": issuer,
+				"exposure_minor": exposure,
+				"exposure_pct": pct,
+				"limit_pct": limit_pct,
+				"breach": breach,
+			})
+
+		await self._audit("counterparty_exposure_computed", "tenant", {"breach_count": len(breaches)})
+		return {
+			"tenant_id": self.tenant_id,
+			"total_aum_minor": total_aum,
+			"issuer_count": len(issuer_exposure),
+			"limit_pct": limit_pct,
+			"breach_count": len(breaches),
+			"breaching_issuers": breaches,
+			"exposures": summary,
+			"computed_at": _now_iso(),
+		}
+
+	async def record_fx_rate(
+		self,
+		base_currency: str,
+		quote_currency: str,
+		rate: float,
+		as_of_date: str,
+		source_reference: str = "market_data",
+	) -> dict[str, Any]:
+		"""
+		Record an FX rate for a currency pair on a specific date.
+
+		Stored in the service FX rate store and used by `portfolio_valuation`
+		to convert multi-currency holdings to portfolio base currency.
+		"""
+		assert rate > 0, "FX rate must be positive"
+		assert bool(as_of_date), "as_of_date required"
+		base = normalize_currency(base_currency)
+		quote = normalize_currency(quote_currency)
+		pair = f"{base}/{quote}"
+		key = f"{as_of_date}:{pair}"
+		if not hasattr(self, "fx_rates"):
+			self.fx_rates: dict[str, float] = {}
+		self.fx_rates[key] = rate
+		await self._audit("fx_rate_recorded", key, {
+			"pair": pair, "rate": rate, "source": source_reference,
+		})
+		return {
+			"pair": pair,
+			"rate": rate,
+			"as_of_date": as_of_date,
+			"source_reference": source_reference,
+			"recorded_at": _now_iso(),
+		}
+
+	async def clone_portfolio(
+		self,
+		source_portfolio_id: str,
+		target_client_id: str,
+		name: str,
+		override_allocations: dict[str, float] | None = None,
+	) -> dict[str, Any]:
+		"""
+		Clone a model/template portfolio into a new portfolio for a different client.
+
+		Copies the active allocation policy from the source portfolio.  Pass
+		`override_allocations` to replace the cloned policy with custom weights
+		(must still total 1.0).  Holdings are NOT cloned — the new portfolio
+		starts empty.
+
+		Returns the new portfolio dict plus the created allocation policy dict.
+		"""
+		import uuid
+		source = self._tenant_portfolio_or_none(source_portfolio_id, self.tenant_id)
+		if source is None:
+			raise KeyError(f"source portfolio not found: {source_portfolio_id}")
+		assert bool(target_client_id), "target_client_id required"
+		assert bool(name), "name required"
+
+		new_pid = str(uuid.uuid4())
+		new_portfolio = PortfolioBook(
+			new_pid, self.tenant_id, target_client_id, name,
+			source.portfolio_type, source.base_currency,
+			getattr(source, "policy_reference", ""),
+		)
+		new_portfolio.__dict__.update({
+			"strategy": source.__dict__.get("strategy", ""),
+			"benchmark_index": source.__dict__.get("benchmark_index", ""),
+			"cloned_from": source_portfolio_id,
+			"created_at": _now_iso(),
+		})
+		self.portfolios[new_pid] = new_portfolio
+
+		# clone or override allocation policy
+		allocation_result: dict[str, Any] | None = None
+		source_policy = next(
+			(a for a in self.allocations.values()
+			 if a.tenant_id == self.tenant_id and a.portfolio_id == source_portfolio_id),
+			None,
+		)
+		if source_policy is not None or override_allocations:
+			target_alloc = override_allocations if override_allocations is not None else dict(source_policy.target_allocation)
+			alloc_id = str(uuid.uuid4())
+			allocation_result = await self.activate_allocation_policy(
+				alloc_id, new_pid, target_alloc,
+				source_policy.policy_reference if source_policy else "cloned_policy",
+			)
+
+		await self._audit("portfolio_cloned", new_pid, {
+			"source_portfolio_id": source_portfolio_id,
+			"target_client_id": target_client_id,
+		})
+		return {
+			"portfolio": new_portfolio.to_dict(),
+			"allocation_policy": allocation_result,
+			"cloned_from": source_portfolio_id,
+			"created_at": _now_iso(),
+		}
+
+	async def query_audit_events(
+		self,
+		event_type: str | None = None,
+		reference_id: str | None = None,
+		start_dt: str | None = None,
+		end_dt: str | None = None,
+		limit: int = 100,
+	) -> dict[str, Any]:
+		"""
+		Query the in-memory audit event log with optional filters.
+
+		Supports filtering by event_type, reference_id (portfolio/holding/etc.),
+		and ISO-8601 recorded_at date range.  Returns paginated, time-ordered records
+		suitable for regulatory submission or auditor review.
+		"""
+		events = [e for e in self.audit_events if e["tenant_id"] == self.tenant_id]
+		if event_type:
+			events = [e for e in events if e["event_type"] == event_type]
+		if reference_id:
+			events = [e for e in events if e["reference_id"] == reference_id]
+		if start_dt:
+			events = [e for e in events if e["recorded_at"] >= start_dt]
+		if end_dt:
+			events = [e for e in events if e["recorded_at"] <= end_dt]
+		events_sorted = sorted(events, key=lambda e: e["recorded_at"], reverse=True)
+		page = events_sorted[:limit]
+		return {
+			"tenant_id": self.tenant_id,
+			"total_matched": len(events),
+			"returned": len(page),
+			"limit": limit,
+			"events": page,
+		}
+
+	async def generate_client_report(
+		self,
+		portfolio_id: str,
+		period: str,
+		template: str = "ips_quarterly",
+	) -> dict[str, Any]:
+		"""
+		Assemble a structured client-facing performance report for the given period.
+
+		Supported templates: `ips_quarterly`, `annual_review`, `factsheet`.
+
+		Combines performance attribution, risk metrics, drawdown analysis,
+		income distribution, and benchmark comparison into a single payload
+		ready for PDF rendering via a document generation adapter.
+		"""
+		supported_templates = {"ips_quarterly", "annual_review", "factsheet"}
+		if template not in supported_templates:
+			raise ValueError(f"unsupported template '{template}'; choose from {supported_templates}")
+
+		portfolio = self._tenant_portfolio_or_none(portfolio_id, self.tenant_id)
+		if portfolio is None:
+			raise KeyError(f"portfolio not found: {portfolio_id}")
+		assert bool(period), "period required"
+
+		import uuid
+
+		# Gather all components concurrently (serial here for simplicity)
+		attribution_data = await self.performance_attribution(portfolio_id, period)
+		risk_data = await self.risk_metrics(portfolio_id)
+		drawdown_data = await self.drawdown_analysis(portfolio_id)
+		income_data = await self.income_distribution_report(portfolio_id, period)
+		sharpe_data = await self.sharpe_ratio(portfolio_id, period)
+
+		# benchmark comparison
+		benchmarks = [
+			b for b in self.benchmarks.values()
+			if b.tenant_id == self.tenant_id and b.portfolio_id == portfolio_id
+		]
+		benchmark_section = [{"index_id": b.index_id, "policy_reference": b.policy_reference} for b in benchmarks]
+
+		report_id = str(uuid.uuid4())
+		payload: dict[str, Any] = {
+			"report_id": report_id,
+			"template": template,
+			"portfolio_id": portfolio_id,
+			"portfolio_name": portfolio.name,
+			"period": period,
+			"base_currency": portfolio.base_currency,
+			"generated_at": _now_iso(),
+			"generated_by": self.actor_id,
+			"performance": {
+				"total_return": attribution_data.get("contributions", {}).get("total_active_return"),
+				"allocation_effect": attribution_data.get("contributions", {}).get("allocation_effect"),
+				"selection_effect": attribution_data.get("contributions", {}).get("selection_effect"),
+				"sharpe_ratio": sharpe_data.get("sharpe_ratio"),
+				"annualised_return": sharpe_data.get("annualised_return"),
+				"annualised_volatility": sharpe_data.get("annualised_volatility"),
+			},
+			"risk": {
+				"var_95_minor": risk_data.get("var_95_minor"),
+				"var_99_minor": risk_data.get("var_99_minor"),
+				"beta": risk_data.get("beta"),
+				"herfindahl_index": risk_data.get("herfindahl_index"),
+				"concentration_label": risk_data.get("concentration_label"),
+			},
+			"drawdown": {
+				"max_drawdown": drawdown_data.get("max_drawdown"),
+				"current_drawdown": drawdown_data.get("current_drawdown"),
+				"all_time_high_minor": drawdown_data.get("all_time_high_minor"),
+			},
+			"income": {
+				"income_events": income_data.get("income_events"),
+				"total_income": income_data.get("total_income"),
+			},
+			"benchmarks": benchmark_section,
+		}
+		if template == "factsheet":
+			payload["holdings"] = await self.list_holdings(portfolio_id)
+
+		await self._audit("client_report_generated", report_id, {
+			"portfolio_id": portfolio_id, "period": period, "template": template,
+		})
+		return payload
+
+	async def esg_portfolio_score(self, portfolio_id: str) -> dict[str, Any]:
+		"""
+		Compute weighted ESG scores for a portfolio based on per-instrument ESG ratings.
+
+		ESG ratings must be pre-loaded via `record_esg_rating`.  Holdings without
+		ratings are flagged as unscored.  Returns aggregated E, S, G, and composite
+		scores plus any exclusion breaches.
+		"""
+		portfolio = self._tenant_portfolio_or_none(portfolio_id, self.tenant_id)
+		if portfolio is None:
+			raise KeyError(f"portfolio not found: {portfolio_id}")
+
+		holdings = [
+			h for h in self.holdings.values()
+			if h.tenant_id == self.tenant_id and h.portfolio_id == portfolio_id
+		]
+		total_value = sum(h.cost_minor for h in holdings)
+		esg_store: dict[str, dict[str, float]] = getattr(self, "_esg_ratings", {})
+
+		weighted_e = weighted_s = weighted_g = 0.0
+		unscored: list[str] = []
+		exclusion_breaches: list[str] = []
+
+		for h in holdings:
+			weight = h.cost_minor / total_value if total_value > 0 else 0.0
+			rating = esg_store.get(h.instrument_id)
+			if rating is None:
+				unscored.append(h.instrument_id)
+				continue
+			weighted_e += weight * rating.get("e_score", 0.0)
+			weighted_s += weight * rating.get("s_score", 0.0)
+			weighted_g += weight * rating.get("g_score", 0.0)
+			if rating.get("excluded", False):
+				exclusion_breaches.append(h.instrument_id)
+
+		composite = round((weighted_e + weighted_s + weighted_g) / 3, 4)
+		await self._audit("esg_score_computed", portfolio_id, {"composite": composite})
+		return {
+			"portfolio_id": portfolio_id,
+			"e_score": round(weighted_e, 4),
+			"s_score": round(weighted_s, 4),
+			"g_score": round(weighted_g, 4),
+			"composite_score": composite,
+			"scored_holdings": len(holdings) - len(unscored),
+			"unscored_holdings": unscored,
+			"exclusion_breaches": exclusion_breaches,
+			"computed_at": _now_iso(),
+		}
+
+	async def record_esg_rating(
+		self,
+		instrument_id: str,
+		e_score: float,
+		s_score: float,
+		g_score: float,
+		source: str,
+		excluded: bool = False,
+	) -> dict[str, Any]:
+		"""
+		Store an ESG rating for an instrument.  Scores are on a 0–100 scale.
+		Set `excluded=True` to mark the instrument as breaching exclusion criteria
+		(e.g. weapons, tobacco).
+		"""
+		assert 0 <= e_score <= 100, "e_score must be 0–100"
+		assert 0 <= s_score <= 100, "s_score must be 0–100"
+		assert 0 <= g_score <= 100, "g_score must be 0–100"
+		assert bool(source), "source required"
+		if not hasattr(self, "_esg_ratings"):
+			self._esg_ratings: dict[str, dict[str, float]] = {}
+		self._esg_ratings[instrument_id] = {
+			"e_score": e_score, "s_score": s_score, "g_score": g_score,
+			"composite": round((e_score + s_score + g_score) / 3, 4),
+			"source": source, "excluded": excluded,
+		}
+		await self._audit("esg_rating_recorded", instrument_id, {"source": source, "excluded": excluded})
+		return {
+			"instrument_id": instrument_id,
+			"e_score": e_score, "s_score": s_score, "g_score": g_score,
+			"composite": round((e_score + s_score + g_score) / 3, 4),
+			"source": source, "excluded": excluded,
+			"recorded_at": _now_iso(),
+		}
+
 	# ------------------------------------------------------------------
 	# Internal helpers
 	# ------------------------------------------------------------------

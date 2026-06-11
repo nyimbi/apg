@@ -590,6 +590,91 @@ Each component includes:
 - **Interactive Reports**: Web-based interactive dashboards
 - **API Access**: Programmatic access to report data
 
+## New Features (v2)
+
+### Execution Snapshotting and Recovery
+
+Long-running workflows (multi-day approvals, batch ETL) can now be checkpointed without interrupting execution.
+
+**Creating a snapshot**
+
+Call `snapshot_execution(tenant_id, execution_id)` at any point during a running execution. The service captures the execution record, instance variables, pending signals, compensation log, and suspension record into a named snapshot record. The `snapshot_id` is written back to the execution record as `snapshot_id` and `last_snapshotted_at`.
+
+**Restoring from a snapshot**
+
+Call `restore_from_snapshot(tenant_id, snapshot_id)` to re-hydrate all stored state into a fresh service instance. This is the recommended recovery path after a host process restart. Restored executions resume from the exact task boundary where the snapshot was taken — no completed tasks are replayed.
+
+**Automatic snapshotting** (configured via `snapshot_interval_tasks`): the service can be configured to auto-snapshot every N completed tasks (default 5).
+
+---
+
+### SLA Monitoring and Proactive Escalation
+
+**Checking for breaches**
+
+`check_sla_breaches(tenant_id)` scans all active human task assignments that carry a `due_at` deadline.
+
+- Assignments at 80% elapsed time receive a `sla_warning` event.
+- Assignments past their deadline receive a `sla_breached` event.
+
+Both events are forwarded to the `ntfy` capability for notification delivery to the task assignee and the escalation chain defined in the task's `escalation` field.
+
+**Operations triage view**
+
+`get_sla_status(tenant_id)` returns three buckets — `healthy`, `at_risk`, and `breached` — without emitting events. Use this endpoint to populate the SLA widget on the operations dashboard. Each entry includes `seconds_remaining` for healthy and at-risk assignments and `overdue_seconds` for breached ones.
+
+---
+
+### Workflow Anomaly Detection
+
+The orchestration engine maintains a rolling 100-sample window of execution durations per workflow. This powers statistical anomaly detection without requiring an external ML platform.
+
+**Recording durations**
+
+`record_execution_duration(tenant_id, workflow_id, duration_seconds)` appends a duration sample. Call this immediately after a workflow execution reaches a terminal state (completed or failed). The method returns the current sample count and rolling mean.
+
+**Detecting anomalies**
+
+`detect_anomalies(tenant_id)` applies z-score analysis to each workflow with 10 or more samples. Executions with an absolute z-score >= 3.0 are flagged as anomalous and a `workflow_execution_anomaly` event is emitted, including the z-score, mean, and standard deviation. The event is forwarded to `ntfy` for on-call alerting.
+
+---
+
+### Cost Attribution and FinOps
+
+**Per-execution cost**
+
+`get_execution_cost(tenant_id, execution_id)` returns the accumulated `cost_weight` for a specific execution. Cost weights are dimensionless floats assigned to tasks via the `cost_weight` task field — operators map them to currency or compute credits outside the service.
+
+**Tenant cost report**
+
+`get_tenant_cost_report(tenant_id, period)` aggregates cost by workflow definition ID for the specified period, returning a ranked list of the highest-consuming workflows. Use this to populate FinOps dashboards or to trigger budget alerts.
+
+---
+
+### Distributed Tracing
+
+**Attaching a trace context**
+
+Pass a `trace_context` dict (containing W3C `traceparent` and optionally `tracestate`) to `start_execution`. The context is stored on the execution record and propagated to every cross-capability task invocation payload, allowing downstream capabilities to create child spans under the same trace.
+
+**Viewing the execution trace**
+
+`get_execution_trace(tenant_id, execution_id)` reconstructs a waterfall of all audit events for the execution, annotating each span with `elapsed_ms` since execution start. Use this for post-incident debugging without needing an external APM tool.
+
+---
+
+### Multi-Tenant Execution Quotas
+
+**Configuring quotas**
+
+`set_tenant_quota(tenant_id, max_concurrent, max_starts_per_minute, admin_id)` sets concurrency and throughput limits for a tenant. Setting either value to 0 disables the corresponding limit. Quota changes are recorded in the audit log with the `admin_id` for traceability.
+
+**Monitoring quota usage**
+
+`get_quota_status(tenant_id)` returns real-time consumption metrics — `current_concurrent` (live count of running executions), `starts_this_minute` (rolling count), and the configured limits. Use this to implement client-side backpressure before hitting `QuotaExceededError`.
+
+---
+
 ## Advanced Features
 
 ### Intelligent Automation

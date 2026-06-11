@@ -1601,6 +1601,606 @@ class OSINTService:
 		return "/".join(parts[-3:]) if len(parts) > 3 else path
 
 	# -----------------------------------------------------------------------
+	# Pivot search — unified cross-store search
+	# -----------------------------------------------------------------------
+
+	async def pivot_search(
+		self,
+		query: str,
+		pivot_type: str | None = None,
+		min_confidence: float = 0.0,
+		limit: int = 50,
+	) -> dict[str, Any]:
+		"""Search across all entity stores simultaneously using a single query string.
+
+		Searches entities, IP intelligence, domain records, and social profiles.
+		Results are ranked by confidence score weighted by available credibility data.
+
+		Args:
+			query: Free-text search term (case-insensitive substring match).
+			pivot_type: Optional store filter — one of 'entity', 'ip', 'domain', 'social'.
+			min_confidence: Minimum confidence score threshold.
+			limit: Maximum total results to return.
+
+		Returns:
+			Dict with 'query', 'pivot_type', 'results' list, and 'total_hits' count.
+		"""
+		assert_tenant_context(self._tenant_id)
+		guard_non_empty_string(query, "query")
+		q = query.lower()
+		hits: list[dict[str, Any]] = []
+
+		if pivot_type in (None, "entity"):
+			for e in self._tenant_values(self._entities):
+				if q in e.name.lower() or any(q in a.lower() for a in e.aliases):
+					if e.confidence_score >= min_confidence:
+						hits.append({
+							"store": "entity",
+							"id": e.id,
+							"label": e.name,
+							"entity_type": e.entity_type.value,
+							"confidence_score": e.confidence_score,
+						})
+
+		if pivot_type in (None, "ip"):
+			for ip in self._tenant_values(self._ip_intel):
+				if q in ip.ip_address or (ip.reverse_dns and q in ip.reverse_dns.lower()):
+					hits.append({
+						"store": "ip",
+						"id": ip.id,
+						"label": ip.ip_address,
+						"country_code": ip.country_code,
+						"confidence_score": 1.0 - (ip.abuse_confidence_score or 0.0),
+					})
+
+		if pivot_type in (None, "domain"):
+			for dr in self._tenant_values(self._domain_records):
+				if q in dr.domain.lower() or (dr.registrant_email and q in dr.registrant_email.lower()):
+					hits.append({
+						"store": "domain",
+						"id": dr.id,
+						"label": dr.domain,
+						"registrar": dr.registrar,
+						"confidence_score": 0.8,
+					})
+
+		if pivot_type in (None, "social"):
+			for sp in self._tenant_values(self._social_profiles):
+				if q in sp.handle.lower() or (sp.display_name and q in sp.display_name.lower()):
+					hits.append({
+						"store": "social",
+						"id": sp.id,
+						"label": sp.handle,
+						"platform": sp.platform,
+						"confidence_score": 0.7,
+					})
+
+		hits.sort(key=lambda x: x["confidence_score"], reverse=True)
+		self._emit_event("osint_pivot_search_executed", "batch", self._tenant_id, {
+			"query": query,
+			"total_hits": len(hits),
+		})
+		return {
+			"tenant_id": self._tenant_id,
+			"query": query,
+			"pivot_type": pivot_type,
+			"total_hits": len(hits),
+			"results": hits[:limit],
+		}
+
+	# -----------------------------------------------------------------------
+	# Bulk ingestion with backpressure
+	# -----------------------------------------------------------------------
+
+	async def bulk_ingest_raw_intel(
+		self,
+		payloads: list[RawIntelligenceCreate],
+		max_concurrency: int = 50,
+	) -> dict[str, Any]:
+		"""Ingest multiple raw intelligence items concurrently with bounded parallelism.
+
+		Uses asyncio.Semaphore to prevent memory pressure on large batches.
+		Collects per-item results without aborting on individual failures.
+
+		Args:
+			payloads: List of RawIntelligenceCreate items to ingest.
+			max_concurrency: Maximum simultaneous ingest coroutines.
+
+		Returns:
+			Dict with 'succeeded', 'failed', 'duplicate_skipped', 'results', 'errors'.
+		"""
+		guard_non_empty_string(self._tenant_id, "tenant_id")
+		sem = asyncio.Semaphore(max_concurrency)
+		succeeded: list[RawIntelligenceResponse] = []
+		failed: list[dict[str, str]] = []
+		duplicate_skipped: int = 0
+
+		async def _ingest_one(payload: RawIntelligenceCreate) -> None:
+			nonlocal duplicate_skipped
+			async with sem:
+				try:
+					result = await self.ingest_raw_intel(payload)
+					succeeded.append(result)
+				except ValueError as exc:
+					if "duplicate" in str(exc).lower():
+						duplicate_skipped += 1
+					else:
+						failed.append({"fingerprint": payload.fingerprint, "error": str(exc)})
+				except Exception as exc:
+					failed.append({"fingerprint": payload.fingerprint, "error": str(exc)})
+
+		await asyncio.gather(*[_ingest_one(p) for p in payloads], return_exceptions=True)
+		self._emit_event("osint_bulk_ingest_completed", "batch", self._tenant_id, {
+			"total": len(payloads),
+			"succeeded": len(succeeded),
+			"failed": len(failed),
+			"duplicate_skipped": duplicate_skipped,
+		})
+		self._log_operation("bulk_ingest_raw_intel", f"{len(succeeded)}/{len(payloads)} succeeded")
+		return {
+			"tenant_id": self._tenant_id,
+			"total": len(payloads),
+			"succeeded": len(succeeded),
+			"failed": len(failed),
+			"duplicate_skipped": duplicate_skipped,
+			"results": [r.id for r in succeeded],
+			"errors": failed,
+		}
+
+	# -----------------------------------------------------------------------
+	# Entity merge (human-confirmed)
+	# -----------------------------------------------------------------------
+
+	async def merge_entities(
+		self,
+		primary_id: str,
+		secondary_ids: list[str],
+		analyst_id: str,
+		evidence_reference: str,
+	) -> OSEntityResponse:
+		"""Merge one or more secondary entities into a primary entity.
+
+		Consolidates aliases, relationship IDs, source intel IDs, and tags into
+		the primary. Soft-deletes secondaries.  Requires explicit analyst sign-off.
+
+		Args:
+			primary_id: ID of the entity to retain.
+			secondary_ids: IDs of entities to merge and soft-delete.
+			analyst_id: Analyst authorising the merge.
+			evidence_reference: Non-empty evidence reference for audit trail.
+
+		Returns:
+			Updated primary OSEntityResponse.
+
+		Raises:
+			KeyError: If primary or any secondary entity is not found.
+			ValueError: If secondary_ids is empty or contains primary_id.
+		"""
+		assert_tenant_context(self._tenant_id)
+		guard_non_empty_string(analyst_id, "analyst_id")
+		guard_non_empty_string(evidence_reference, "evidence_reference")
+		if not secondary_ids:
+			raise ValueError("secondary_ids must not be empty")
+		if primary_id in secondary_ids:
+			raise ValueError("primary_id must not appear in secondary_ids")
+
+		primary = self._get_or_raise(self._entities, primary_id, "OSEntity")
+		merged_aliases = list(primary.aliases)
+		merged_rel_ids = list(primary.relationship_ids)
+		merged_source_ids = list(primary.source_intel_ids)
+		merged_tags = list(primary.tags)
+
+		for sec_id in secondary_ids:
+			sec = self._get_or_raise(self._entities, sec_id, "OSEntity")
+			merged_aliases += [a for a in sec.aliases if a not in merged_aliases]
+			if sec.name not in merged_aliases and sec.name != primary.name:
+				merged_aliases.append(sec.name)
+			merged_rel_ids += [r for r in sec.relationship_ids if r not in merged_rel_ids]
+			merged_source_ids += [s for s in sec.source_intel_ids if s not in merged_source_ids]
+			merged_tags += [t for t in sec.tags if t not in merged_tags]
+			object.__setattr__(sec, "is_deleted", True)
+			object.__setattr__(sec, "updated_at", _now())
+			self._emit_event("osint_entity_merged_secondary", sec_id, self._tenant_id, {
+				"primary_id": primary_id,
+				"analyst_id": analyst_id,
+			})
+
+		object.__setattr__(primary, "aliases", merged_aliases)
+		object.__setattr__(primary, "relationship_ids", merged_rel_ids)
+		object.__setattr__(primary, "source_intel_ids", merged_source_ids)
+		object.__setattr__(primary, "tags", merged_tags)
+		object.__setattr__(primary, "evidence_reference", evidence_reference)
+		object.__setattr__(primary, "updated_at", _now())
+		self._emit_event("osint_entities_merged", primary_id, self._tenant_id, {
+			"secondary_count": len(secondary_ids),
+			"analyst_id": analyst_id,
+		})
+		self._log_operation("merge_entities", f"{len(secondary_ids)} merged into {primary_id}")
+		return primary
+
+	# -----------------------------------------------------------------------
+	# Watchlist management
+	# -----------------------------------------------------------------------
+
+	async def add_to_watchlist(
+		self,
+		reference_id: str,
+		reference_type: str,
+		reason: str,
+		analyst_id: str,
+		evidence_reference: str,
+		alert_threshold: float = 0.7,
+	) -> dict[str, Any]:
+		"""Flag an entity, IP, or domain for elevated monitoring.
+
+		Watchlist entries are evaluated on new raw intel ingest and fire
+		'osint_watchlist_hit' events when alert_threshold is exceeded.
+
+		Args:
+			reference_id: ID of the entity/IP/domain being watchlisted.
+			reference_type: One of 'entity', 'ip', 'domain', 'social'.
+			reason: Human-readable justification for watchlisting.
+			analyst_id: Analyst authorising the watchlist entry.
+			evidence_reference: Non-empty evidence reference.
+			alert_threshold: Confidence threshold that triggers an alert (0.0–1.0).
+
+		Returns:
+			Watchlist entry dict with 'id', 'reference_id', 'alert_threshold'.
+
+		Raises:
+			PermissionError: On policy violation.
+			ValueError: If alert_threshold is outside [0.0, 1.0].
+		"""
+		assert_tenant_context(self._tenant_id)
+		guard_non_empty_string(reference_id, "reference_id")
+		guard_non_empty_string(reason, "reason")
+		guard_non_empty_string(analyst_id, "analyst_id")
+		guard_non_empty_string(evidence_reference, "evidence_reference")
+		assert_confidence_bounds(alert_threshold)
+
+		if not hasattr(self, "_watchlist"):
+			object.__setattr__(self, "_watchlist", {})
+		entry: dict[str, Any] = {
+			"id": uuid7str(),
+			"tenant_id": self._tenant_id,
+			"reference_id": reference_id,
+			"reference_type": reference_type,
+			"reason": reason,
+			"analyst_id": analyst_id,
+			"evidence_reference": evidence_reference,
+			"alert_threshold": alert_threshold,
+			"created_at": _now().isoformat(),
+			"active": True,
+		}
+		self._watchlist[(self._tenant_id, entry["id"])] = entry
+		self._emit_event("osint_watchlist_entry_added", entry["id"], self._tenant_id, {
+			"reference_id": reference_id,
+			"reference_type": reference_type,
+			"alert_threshold": alert_threshold,
+		})
+		self._log_operation("add_to_watchlist", entry["id"])
+		return entry
+
+	async def remove_from_watchlist(
+		self,
+		watchlist_id: str,
+		analyst_id: str,
+	) -> dict[str, Any]:
+		"""Deactivate a watchlist entry.
+
+		Args:
+			watchlist_id: ID of the watchlist entry to remove.
+			analyst_id: Analyst authorising the removal.
+
+		Returns:
+			Updated watchlist entry dict with 'active': False.
+
+		Raises:
+			KeyError: If entry not found.
+		"""
+		assert_tenant_context(self._tenant_id)
+		guard_non_empty_string(analyst_id, "analyst_id")
+		if not hasattr(self, "_watchlist"):
+			object.__setattr__(self, "_watchlist", {})
+		key = (self._tenant_id, watchlist_id)
+		entry = self._watchlist.get(key)
+		if entry is None:
+			raise KeyError(f"WatchlistEntry '{watchlist_id}' not found for tenant '{self._tenant_id}'")
+		entry["active"] = False
+		entry["removed_by"] = analyst_id
+		entry["removed_at"] = _now().isoformat()
+		self._emit_event("osint_watchlist_entry_removed", watchlist_id, self._tenant_id, {
+			"analyst_id": analyst_id,
+		})
+		return entry
+
+	async def list_watchlist(
+		self,
+		reference_type: str | None = None,
+		active_only: bool = True,
+	) -> list[dict[str, Any]]:
+		"""List watchlist entries for this tenant.
+
+		Args:
+			reference_type: Optional filter by reference_type.
+			active_only: If True, return only active entries.
+
+		Returns:
+			List of watchlist entry dicts sorted by created_at descending.
+		"""
+		assert_tenant_context(self._tenant_id)
+		if not hasattr(self, "_watchlist"):
+			return []
+		entries = [
+			v for (tid, _), v in self._watchlist.items()
+			if tid == self._tenant_id
+		]
+		if active_only:
+			entries = [e for e in entries if e.get("active", True)]
+		if reference_type:
+			entries = [e for e in entries if e.get("reference_type") == reference_type]
+		return sorted(entries, key=lambda x: x["created_at"], reverse=True)
+
+	# -----------------------------------------------------------------------
+	# Confidence decay engine
+	# -----------------------------------------------------------------------
+
+	async def apply_confidence_decay(
+		self,
+		decay_model: str = "exponential",
+		half_life_days: int = 90,
+		min_score: float = 0.05,
+	) -> dict[str, Any]:
+		"""Recompute confidence scores for all intel items based on age.
+
+		Older items receive lower confidence scores to reflect information staleness.
+
+		Args:
+			decay_model: One of 'exponential', 'linear', 'step'.
+			half_life_days: Days after which confidence halves (exponential/step model).
+			min_score: Floor confidence score — items never decay below this value.
+
+		Returns:
+			Dict with 'updated_raw', 'updated_processed', 'decay_model' summary.
+
+		Raises:
+			ValueError: If decay_model is not recognised.
+		"""
+		assert_tenant_context(self._tenant_id)
+		if decay_model not in {"exponential", "linear", "step"}:
+			raise ValueError(f"Unknown decay_model '{decay_model}'. Choose from: exponential, linear, step")
+		assert_confidence_bounds(min_score)
+
+		import math
+		now = _now()
+		updated_raw = 0
+		updated_processed = 0
+
+		def _decay(original: float, age_days: float) -> float:
+			if age_days <= 0:
+				return original
+			if decay_model == "exponential":
+				factor = math.exp(-math.log(2) * age_days / half_life_days)
+			elif decay_model == "linear":
+				factor = max(0.0, 1.0 - age_days / (half_life_days * 2))
+			else:  # step
+				factor = 0.5 if age_days >= half_life_days else 1.0
+			return max(min_score, original * factor)
+
+		for item in self._tenant_values(self._raw_intel):
+			age_days = (now - item.captured_at).days
+			new_score = _decay(item.confidence_score, age_days)
+			if abs(new_score - item.confidence_score) > 0.001:
+				object.__setattr__(item, "confidence_score", round(new_score, 4))
+				object.__setattr__(item, "updated_at", now)
+				updated_raw += 1
+
+		for item in self._tenant_values(self._processed_intel):
+			age_days = (now - item.created_at).days
+			new_score = _decay(item.confidence_score, age_days)
+			if abs(new_score - item.confidence_score) > 0.001:
+				object.__setattr__(item, "confidence_score", round(new_score, 4))
+				object.__setattr__(item, "updated_at", now)
+				updated_processed += 1
+
+		self._emit_event("osint_confidence_decayed", "batch", self._tenant_id, {
+			"decay_model": decay_model,
+			"half_life_days": half_life_days,
+			"updated_raw": updated_raw,
+			"updated_processed": updated_processed,
+		})
+		self._log_operation("apply_confidence_decay", f"raw={updated_raw} processed={updated_processed}")
+		return {
+			"tenant_id": self._tenant_id,
+			"decay_model": decay_model,
+			"half_life_days": half_life_days,
+			"min_score": min_score,
+			"updated_raw": updated_raw,
+			"updated_processed": updated_processed,
+		}
+
+	# -----------------------------------------------------------------------
+	# Task retry with exponential back-off
+	# -----------------------------------------------------------------------
+
+	async def retry_task(
+		self,
+		task_id: str,
+		max_retries: int = 3,
+		backoff_base_seconds: float = 2.0,
+	) -> CollectionTaskResponse:
+		"""Reschedule a failed task with exponential back-off.
+
+		Increments the retry counter, computes next scheduled_at, and resets
+		status to PENDING.  Raises ValueError if max_retries is exceeded.
+
+		Args:
+			task_id: ID of the failed task to retry.
+			max_retries: Maximum total retry attempts allowed.
+			backoff_base_seconds: Base for exponential back-off (seconds).
+
+		Returns:
+			Updated CollectionTaskResponse with new scheduled_at.
+
+		Raises:
+			KeyError: If task not found.
+			ValueError: If retry_count >= max_retries.
+		"""
+		item = self._get_or_raise(self._tasks, task_id, "CollectionTask")
+		retry_count: int = getattr(item, "retry_count", 0)
+		if retry_count >= max_retries:
+			raise ValueError(
+				f"Task '{task_id}' has reached max_retries={max_retries}. "
+				"Fail permanently or create a new task."
+			)
+		import datetime as _dt
+		delay_seconds = backoff_base_seconds ** (retry_count + 1)
+		next_scheduled = _now() + _dt.timedelta(seconds=delay_seconds)
+		try:
+			object.__setattr__(item, "retry_count", retry_count + 1)
+		except Exception as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+		object.__setattr__(item, "status", TaskStatus.PENDING)
+		object.__setattr__(item, "scheduled_at", next_scheduled)
+		object.__setattr__(item, "error_message", None)
+		object.__setattr__(item, "completed_at", None)
+		object.__setattr__(item, "updated_at", _now())
+		self._emit_event("osint_task_retry_scheduled", task_id, item.tenant_id, {
+			"retry_count": retry_count + 1,
+			"delay_seconds": delay_seconds,
+			"scheduled_at": next_scheduled.isoformat(),
+		})
+		self._log_operation("retry_task", f"task={task_id} retry={retry_count + 1}/{max_retries}")
+		return item
+
+	# -----------------------------------------------------------------------
+	# Intelligence requirement lifecycle (async)
+	# -----------------------------------------------------------------------
+
+	async def create_requirement(
+		self,
+		tenant_id: str,
+		topic: str,
+		priority: str,
+		requester_id: str,
+		classification: str,
+		evidence_reference: str,
+	) -> dict[str, Any]:
+		"""Register an intelligence collection requirement (async interface).
+
+		Args:
+			tenant_id: Tenant context (must match service tenant).
+			topic: Description of the intelligence need.
+			priority: One of 'low', 'medium', 'high', 'critical'.
+			requester_id: ID of the requesting party.
+			classification: Classification level string.
+			evidence_reference: Non-empty evidence reference.
+
+		Returns:
+			Requirement dict with 'id', 'status', and all input fields.
+
+		Raises:
+			PermissionError: If priority unsupported or tenant context missing.
+		"""
+		assert_tenant_context(tenant_id)
+		self._assert_tenant_match(tenant_id)
+		guard_non_empty_string(topic, "topic")
+		guard_non_empty_string(requester_id, "requester_id")
+		guard_non_empty_string(evidence_reference, "evidence_reference")
+		if priority not in SUPPORTED_PRIORITIES:
+			raise PermissionError(f"priority_not_supported: '{priority}'")
+		req_id = uuid7str()
+		item: dict[str, Any] = {
+			"id": req_id,
+			"tenant_id": tenant_id,
+			"topic": topic,
+			"priority": priority,
+			"requester_id": requester_id,
+			"classification": classification,
+			"evidence_reference": evidence_reference,
+			"status": "open",
+			"created_at": _now().isoformat(),
+			"updated_at": _now().isoformat(),
+			"created_by": self._actor_id,
+		}
+		if not hasattr(self, "_requirements"):
+			object.__setattr__(self, "_requirements", {})
+		self._requirements[(tenant_id, req_id)] = item
+		self._emit_event("osint_requirement_created", req_id, tenant_id, {"priority": priority})
+		self._log_operation("create_requirement", req_id)
+		return item
+
+	async def close_requirement(
+		self,
+		requirement_id: str,
+		resolution: str,
+		analyst_id: str,
+	) -> dict[str, Any]:
+		"""Close an open intelligence requirement.
+
+		Args:
+			requirement_id: ID of the requirement to close.
+			resolution: One of 'satisfied', 'cancelled', 'superseded'.
+			analyst_id: Analyst closing the requirement.
+
+		Returns:
+			Updated requirement dict with 'status': resolution.
+
+		Raises:
+			KeyError: If requirement not found.
+			ValueError: If resolution value is unsupported.
+		"""
+		assert_tenant_context(self._tenant_id)
+		guard_non_empty_string(analyst_id, "analyst_id")
+		valid_resolutions = {"satisfied", "cancelled", "superseded"}
+		if resolution not in valid_resolutions:
+			raise ValueError(f"resolution must be one of {valid_resolutions}")
+		if not hasattr(self, "_requirements"):
+			raise KeyError(f"Requirement '{requirement_id}' not found for tenant '{self._tenant_id}'")
+		key = (self._tenant_id, requirement_id)
+		item = self._requirements.get(key)
+		if item is None:
+			raise KeyError(f"Requirement '{requirement_id}' not found for tenant '{self._tenant_id}'")
+		item["status"] = resolution
+		item["closed_by"] = analyst_id
+		item["closed_at"] = _now().isoformat()
+		item["updated_at"] = _now().isoformat()
+		self._emit_event("osint_requirement_closed", requirement_id, self._tenant_id, {
+			"resolution": resolution,
+			"analyst_id": analyst_id,
+		})
+		return item
+
+	async def list_requirements(
+		self,
+		status: str | None = None,
+		priority: str | None = None,
+		limit: int = 50,
+		offset: int = 0,
+	) -> list[dict[str, Any]]:
+		"""List intelligence requirements for this tenant.
+
+		Args:
+			status: Optional filter — 'open', 'satisfied', 'cancelled', 'superseded'.
+			priority: Optional priority filter.
+			limit: Maximum results.
+			offset: Pagination offset.
+
+		Returns:
+			List of requirement dicts sorted by created_at descending.
+		"""
+		assert_tenant_context(self._tenant_id)
+		if not hasattr(self, "_requirements"):
+			return []
+		items = [v for (tid, _), v in self._requirements.items() if tid == self._tenant_id]
+		if status:
+			items = [i for i in items if i.get("status") == status]
+		if priority:
+			items = [i for i in items if i.get("priority") == priority]
+		items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+		return items[offset: offset + limit]
+
+	# -----------------------------------------------------------------------
 	# Legacy synchronous positional-arg interface
 	# These thin wrappers satisfy the capability contract test harness which
 	# calls synchronous methods with positional args and expects plain dicts.

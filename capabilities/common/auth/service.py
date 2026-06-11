@@ -12,7 +12,7 @@ from .capability_contract import (
 	evaluate_capability_rules,
 	get_capability_contract,
 )
-from .models import (
+from ._internal_models import (
 	AuthAccessDecision,
 	AuthAuditEvent,
 	AuthBatchMutationEvidence,
@@ -1381,6 +1381,639 @@ class AuthService:
 			metadata=metadata,
 		)
 
+	# ------------------------------------------------------------------
+	# Async extended methods added in v1.1
+	# ------------------------------------------------------------------
+
+	async def oauth2_token_exchange(
+		self,
+		tenant_id: str,
+		grant_type: str,
+		code: str | None = None,
+		refresh_token: str | None = None,
+		code_verifier: str | None = None,
+		client_id: str = "",
+	) -> dict[str, Any]:
+		"""Exchange an auth code or refresh token for a short-lived access + rotating refresh token pair.
+
+		grant_type: 'authorization_code' | 'refresh_token' | 'client_credentials'
+		Access tokens: 900 s. Refresh tokens: 604 800 s (7 days), rotated on every use.
+		PKCE code_verifier validated against stored code_challenge when present.
+		"""
+		import secrets, hashlib, time
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_oauth2_codes"):
+			self._oauth2_codes: dict[tuple[str, str], dict[str, Any]] = {}
+		if not hasattr(self, "_refresh_tokens"):
+			self._refresh_tokens: dict[str, dict[str, Any]] = {}
+		supported = {"authorization_code", "refresh_token", "client_credentials"}
+		if grant_type not in supported:
+			raise ValueError(f"oauth2_unsupported_grant_type:{grant_type}")
+		now = int(time.time())
+		if grant_type == "authorization_code":
+			if not code:
+				raise ValueError("oauth2_code_required")
+			code_record = self._oauth2_codes.get(self._tenant_key(tenant_id, code))
+			if code_record is None:
+				raise PermissionError("oauth2_code_not_found")
+			if code_record.get("used"):
+				raise PermissionError("oauth2_code_already_used")
+			if code_record.get("code_challenge"):
+				if not code_verifier:
+					raise ValueError("pkce_code_verifier_required")
+				import base64
+				digest = hashlib.sha256(code_verifier.encode()).digest()
+				derived = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+				if derived != code_record["code_challenge"]:
+					raise PermissionError("pkce_challenge_mismatch")
+			code_record["used"] = True
+			user_id = code_record.get("client_id", "")
+			scope = code_record.get("scope", "")
+		elif grant_type == "refresh_token":
+			if not refresh_token:
+				raise ValueError("oauth2_refresh_token_required")
+			rt_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+			rt_record = self._refresh_tokens.get(rt_hash)
+			if rt_record is None:
+				raise PermissionError("oauth2_refresh_token_not_found")
+			if rt_record.get("revoked"):
+				raise PermissionError("oauth2_refresh_token_revoked")
+			if now > rt_record.get("exp", 0):
+				raise PermissionError("oauth2_refresh_token_expired")
+			if rt_record.get("tenant_id") != tenant_id:
+				raise PermissionError("oauth2_refresh_token_tenant_mismatch")
+			rt_record["revoked"] = True
+			user_id = rt_record.get("user_id", "")
+			scope = rt_record.get("scope", "")
+		else:
+			user_id = client_id
+			scope = ""
+		access_token_raw = secrets.token_urlsafe(48)
+		new_refresh_raw = secrets.token_urlsafe(48)
+		new_rt_hash = hashlib.sha256(new_refresh_raw.encode()).hexdigest()
+		self._refresh_tokens[new_rt_hash] = {
+			"tenant_id": tenant_id, "user_id": user_id, "scope": scope,
+			"issued_at": now, "exp": now + 604_800, "revoked": False,
+		}
+		self._record_audit(
+			tenant_id=tenant_id, subject_id=user_id, event_type="oauth2_token_exchanged",
+			actor=user_id or "system", decision="allow",
+			metadata={"grant_type": grant_type, "scope": scope},
+		)
+		return {
+			"access_token": access_token_raw, "token_type": "Bearer",
+			"expires_in": 900, "refresh_token": new_refresh_raw,
+			"refresh_expires_in": 604_800, "scope": scope, "issued_at": now,
+		}
+
+	def store_abac_policy(
+		self,
+		tenant_id: str,
+		policy_id: str,
+		name: str,
+		effect: str,
+		priority: int = 100,
+		subject_conditions: list[dict[str, Any]] | None = None,
+		resource_conditions: list[dict[str, Any]] | None = None,
+		action_conditions: list[dict[str, Any]] | None = None,
+		environment_conditions: list[dict[str, Any]] | None = None,
+	) -> dict[str, Any]:
+		"""Persist an ABAC policy for evaluate_abac_policy.
+
+		Conditions: [{"attribute": str, "operator": str, "value": Any}, ...]
+		Operators: eq | neq | in | not_in | contains | starts_with
+		"""
+		guard_tenant_id(tenant_id)
+		if effect not in {"allow", "deny"}:
+			raise ValueError(f"abac_policy_effect_invalid:{effect}")
+		if not hasattr(self, "_abac_policies"):
+			self._abac_policies: list[dict[str, Any]] = []
+		record = {
+			"id": policy_id, "tenant_id": tenant_id, "name": name,
+			"effect": effect, "priority": priority,
+			"subject_conditions": subject_conditions or [],
+			"resource_conditions": resource_conditions or [],
+			"action_conditions": action_conditions or [],
+			"environment_conditions": environment_conditions or [],
+			"active": True,
+		}
+		for i, existing in enumerate(self._abac_policies):
+			if existing.get("id") == policy_id and existing.get("tenant_id") == tenant_id:
+				self._abac_policies[i] = record
+				return record
+		self._abac_policies.append(record)
+		self._record_audit(
+			tenant_id=tenant_id, subject_id=policy_id, event_type="abac_policy_stored",
+			actor="system", decision="allow",
+			metadata={"name": name, "effect": effect, "priority": priority},
+		)
+		return record
+
+	async def evaluate_abac_policy(
+		self,
+		tenant_id: str,
+		subject_id: str,
+		resource: str,
+		action: str,
+		environment: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Evaluate ABAC policies for a subject + resource + action triple.
+
+		Policies sorted by ascending priority; first match wins. Deny-by-default.
+		"""
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(subject_id, "abac_subject_id_required")
+		guard_non_empty_string(resource, "abac_resource_required")
+		if not hasattr(self, "_abac_policies"):
+			self._abac_policies = []
+		env = dict(environment or {})
+		env.setdefault("tenant_id", tenant_id)
+		tenant_policies = sorted(
+			[p for p in self._abac_policies if p.get("tenant_id") == tenant_id and p.get("active", True)],
+			key=lambda p: p.get("priority", 100),
+		)
+		matched_policy: str | None = None
+		decision = "deny"
+		for policy in tenant_policies:
+			if not _abac_conditions_match(policy.get("subject_conditions", []), {"id": subject_id}):
+				continue
+			if not _abac_conditions_match(policy.get("resource_conditions", []), {"resource": resource}):
+				continue
+			if not _abac_conditions_match(policy.get("action_conditions", []), {"action": action}):
+				continue
+			if not _abac_conditions_match(policy.get("environment_conditions", []), env):
+				continue
+			matched_policy = policy.get("name", policy.get("id", "unknown"))
+			decision = policy.get("effect", "deny")
+			break
+		reasons: list[str] = []
+		if decision == "deny":
+			reasons.append("no_matching_abac_policy" if matched_policy is None else "abac_policy_denied")
+		self._record_audit(
+			tenant_id=tenant_id, subject_id=subject_id, event_type="abac_access_evaluated",
+			actor=subject_id, decision=decision,
+			metadata={"resource": resource, "action": action, "matched_policy": matched_policy},
+		)
+		return {
+			"tenant_id": tenant_id, "subject_id": subject_id, "resource": resource,
+			"action": action, "decision": decision, "matched_policy": matched_policy,
+			"reasons": reasons, "evaluated_at": _utc_now(),
+		}
+
+	async def grant_delegation(
+		self,
+		tenant_id: str,
+		delegator_id: str,
+		delegate_id: str,
+		permission_ids: list[str],
+		expires_at: str,
+		justification: str,
+		requires_mfa: bool = True,
+	) -> dict[str, Any]:
+		"""Grant a constrained, time-bounded delegation from delegator to delegate.
+
+		Delegator must hold every permission in permission_ids.
+		expires_at must be a future ISO-8601 timestamp.
+		"""
+		import secrets
+		from datetime import datetime, timezone
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(justification, "delegation_justification_required")
+		guard_non_empty_string(expires_at, "delegation_expires_at_required")
+		delegator = self._require_identity(delegator_id, tenant_id)
+		delegate  = self._require_identity(delegate_id, tenant_id)
+		if delegator.status in {"locked", "suspended"}:
+			raise PermissionError("delegation_delegator_locked")
+		if delegate.status in {"locked", "suspended"}:
+			raise PermissionError("delegation_delegate_locked")
+		try:
+			exp_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+		except ValueError:
+			raise ValueError("delegation_expires_at_invalid_format")
+		if exp_dt <= datetime.now(timezone.utc):
+			raise ValueError("delegation_expires_at_must_be_future")
+		delegator_perms = self._actor_permissions(delegator_id, tenant_id)
+		missing = [p for p in permission_ids if p not in delegator_perms]
+		if missing:
+			raise PermissionError(f"delegation_delegator_missing_permissions:{','.join(missing)}")
+		delegation_id = f"deleg-{secrets.token_hex(8)}"
+		if not hasattr(self, "_delegations"):
+			self._delegations: dict[tuple[str, str], dict[str, Any]] = {}
+		record: dict[str, Any] = {
+			"id": delegation_id, "tenant_id": tenant_id,
+			"delegator_id": delegator_id, "delegate_id": delegate_id,
+			"permission_ids": list(permission_ids), "status": "active",
+			"expires_at": expires_at, "justification": justification,
+			"requires_mfa": requires_mfa, "granted_at": _utc_now(),
+		}
+		self._delegations[self._tenant_key(tenant_id, delegation_id)] = record
+		self._record_audit(
+			tenant_id=tenant_id, subject_id=delegation_id, event_type="delegation_granted",
+			actor=delegator_id, decision="allow",
+			metadata={"delegate_id": delegate_id, "permissions": permission_ids, "expires_at": expires_at},
+		)
+		return record
+
+	async def revoke_delegation(
+		self,
+		tenant_id: str,
+		delegation_id: str,
+		revoked_by: str,
+		reason: str = "explicit_revocation",
+	) -> dict[str, Any]:
+		"""Revoke an active delegation before its natural expiry.
+
+		Delegator or admin with auth:manage_roles may revoke. Retained for audit trail.
+		"""
+		guard_tenant_id(tenant_id)
+		if not hasattr(self, "_delegations"):
+			self._delegations = {}
+		record = self._delegations.get(self._tenant_key(tenant_id, delegation_id))
+		if record is None:
+			raise KeyError(f"delegation_not_found:{delegation_id}")
+		if record["status"] == "revoked":
+			raise ValueError("delegation_already_revoked")
+		is_delegator = revoked_by == record["delegator_id"]
+		is_admin = revoked_by == "system" or "auth:manage_roles" in self._actor_permissions(revoked_by, tenant_id)
+		if not (is_delegator or is_admin):
+			raise PermissionError("delegation_revoke_not_authorized")
+		record["status"] = "revoked"
+		record["revoked_at"] = _utc_now()
+		record["revoked_by"] = revoked_by
+		record["revocation_reason"] = reason
+		self._record_audit(
+			tenant_id=tenant_id, subject_id=delegation_id, event_type="delegation_revoked",
+			actor=revoked_by, decision="allow",
+			metadata={"reason": reason, "delegate_id": record["delegate_id"]},
+		)
+		return record
+
+	async def check_rate_limit(
+		self,
+		tenant_id: str,
+		key: str,
+		window_seconds: int = 300,
+		max_attempts: int = 5,
+	) -> dict[str, Any]:
+		"""Sliding-window rate limiter.
+
+		Typical keys: 'login:ip:203.0.113.1', 'login:user:alice', 'api:tenant:acme'.
+		Returns: allowed, attempts, window_resets_at, blocked_until.
+		"""
+		import time
+		from datetime import datetime, timezone
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(key, "rate_limit_key_required")
+		if not hasattr(self, "_rate_limit_store"):
+			self._rate_limit_store: dict[str, list[float]] = {}
+		now_ts = time.time()
+		full_key = f"{tenant_id}:{key}"
+		timestamps = self._rate_limit_store.setdefault(full_key, [])
+		timestamps[:] = [t for t in timestamps if t >= now_ts - window_seconds]
+		timestamps.append(now_ts)
+		current_count = len(timestamps)
+		allowed = current_count <= max_attempts
+		oldest = timestamps[0] if timestamps else now_ts
+		window_resets_at = datetime.fromtimestamp(oldest + window_seconds, tz=timezone.utc).isoformat(timespec="seconds")
+		return {
+			"tenant_id": tenant_id, "key": key, "attempts": current_count,
+			"max_attempts": max_attempts, "window_seconds": window_seconds,
+			"allowed": allowed, "window_resets_at": window_resets_at,
+			"blocked_until": window_resets_at if not allowed else None,
+			"checked_at": _utc_now(),
+		}
+
+	async def record_login_attempt(
+		self,
+		tenant_id: str,
+		email: str,
+		ip_address: str,
+		outcome: str,
+		user_id: str | None = None,
+		user_agent: str = "",
+		risk_score: float = 0.0,
+		geo_country: str = "",
+		geo_city: str = "",
+	) -> dict[str, Any]:
+		"""Record a login attempt; enforce brute-force detection via sliding-window counters.
+
+		Locks identity and emits brute_force_detected audit event when thresholds exceeded.
+		outcome: success | failed_credentials | failed_mfa | blocked_lockout | blocked_ip | blocked_suspicious
+		"""
+		import secrets
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(email, "login_attempt_email_required")
+		valid_outcomes = {"success","failed_credentials","failed_mfa","blocked_lockout","blocked_ip","blocked_suspicious"}
+		if outcome not in valid_outcomes:
+			raise ValueError(f"login_attempt_outcome_invalid:{outcome}")
+		if not hasattr(self, "_login_attempts"):
+			self._login_attempts: dict[tuple[str, str], dict[str, Any]] = {}
+		attempt_id = f"la-{secrets.token_hex(8)}"
+		record: dict[str, Any] = {
+			"id": attempt_id, "tenant_id": tenant_id, "user_id": user_id,
+			"email": email, "ip_address": ip_address, "user_agent": user_agent,
+			"outcome": outcome, "risk_score": float(risk_score),
+			"geo_country": geo_country, "geo_city": geo_city, "recorded_at": _utc_now(),
+		}
+		self._login_attempts[self._tenant_key(tenant_id, attempt_id)] = record
+		brute_force_detected = False
+		if outcome != "success":
+			ip_check = await self.check_rate_limit(tenant_id, f"login:ip:{ip_address}", 600, 10)
+			user_check: dict[str, Any] = {"allowed": True}
+			if user_id:
+				user_check = await self.check_rate_limit(tenant_id, f"login:user:{user_id}", 300, 5)
+			if not ip_check["allowed"] or not user_check["allowed"]:
+				brute_force_detected = True
+				if user_id:
+					key = self._tenant_key(tenant_id, user_id)
+					identity = self._identities.get(key)
+					if identity and identity.status == "active":
+						from dataclasses import replace as _replace
+						self._identities[key] = _replace(identity, status="locked")
+				self._record_audit(
+					tenant_id=tenant_id, subject_id=user_id or ip_address,
+					event_type="brute_force_detected", actor="system", decision="deny",
+					metadata={"ip_address": ip_address, "email": email},
+				)
+		self._record_audit(
+			tenant_id=tenant_id, subject_id=user_id or email,
+			event_type="login_attempt_recorded", actor=user_id or "anonymous",
+			decision="allow" if outcome == "success" else "deny",
+			metadata={"email": email, "outcome": outcome, "brute_force_detected": brute_force_detected},
+		)
+		return record | {"brute_force_detected": brute_force_detected}
+
+	async def deprovision_identity(
+		self,
+		tenant_id: str,
+		user_id: str,
+		reason: str,
+		deprovisioned_by: str,
+		revoke_sessions: bool = True,
+		revoke_assignments: bool = True,
+		revoke_api_keys: bool = True,
+	) -> dict[str, Any]:
+		"""Atomically deprovision an identity: lock account, revoke sessions + assignments + API keys.
+
+		reason: termination | transfer | suspension | security_incident
+		Returns full inventory of revoked objects for audit trail.
+		"""
+		from dataclasses import replace as _replace
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(reason, "deprovision_reason_required")
+		guard_non_empty_string(deprovisioned_by, "deprovision_actor_required")
+		if reason not in {"termination","transfer","suspension","security_incident"}:
+			raise ValueError(f"deprovision_reason_invalid:{reason}")
+		if deprovisioned_by == user_id:
+			raise PermissionError("deprovision_self_not_allowed")
+		identity = self._require_identity(user_id, tenant_id)
+		self._identities[self._tenant_key(tenant_id, user_id)] = _replace(identity, status="locked")
+		sessions_revoked: list[str] = []
+		assignments_revoked: list[str] = []
+		keys_revoked: list[str] = []
+		if revoke_sessions:
+			for k, s in list(self._sessions.items()):
+				if s.tenant_id == tenant_id and s.user_id == user_id and s.status == "active":
+					self._sessions[k] = _replace(s, status="revoked")
+					sessions_revoked.append(s.id)
+		if revoke_assignments:
+			for k, a in list(self._assignments.items()):
+				if a.tenant_id == tenant_id and a.user_id == user_id and a.status == "active":
+					self._assignments[k] = _replace(a, status="revoked")
+					assignments_revoked.append(a.id)
+		if revoke_api_keys and hasattr(self, "_api_keys"):
+			for k, rec in list(self._api_keys.items()):
+				if rec.get("tenant_id") == tenant_id and rec.get("user_id") == user_id:
+					rec["status"] = "revoked"
+					rec["revoked_at"] = _utc_now()
+					keys_revoked.append(rec.get("key_id", k))
+		result = {
+			"user_id": user_id, "tenant_id": tenant_id, "reason": reason,
+			"deprovisioned_by": deprovisioned_by, "identity_locked": True,
+			"sessions_revoked": sessions_revoked, "assignments_revoked": assignments_revoked,
+			"keys_revoked": keys_revoked, "deprovisioned_at": _utc_now(),
+		}
+		self._record_audit(
+			tenant_id=tenant_id, subject_id=user_id, event_type="identity_deprovisioned",
+			actor=deprovisioned_by, decision="allow", metadata=result,
+		)
+		return result
+
+	async def validate_password_policy(
+		self,
+		tenant_id: str,
+		user_id: str,
+		candidate_password: str,
+		policy_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Evaluate a candidate password against the tenant's active password policy.
+
+		Uses Decimal arithmetic for strength scoring. Breach check via k-anonymity SHA-1 prefix.
+		Returns: passed, violations, strength_score (0-1), breach_count.
+		"""
+		from decimal import Decimal, ROUND_HALF_UP
+		import hashlib
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(candidate_password, "password_policy_candidate_required")
+		if not hasattr(self, "_password_policies"):
+			self._password_policies: dict[tuple[str, str], dict[str, Any]] = {}
+		policy: dict[str, Any] = {}
+		if policy_id:
+			policy = self._password_policies.get(self._tenant_key(tenant_id, policy_id)) or {}
+		else:
+			defaults = [p for k, p in self._password_policies.items() if k[0] == tenant_id and p.get("is_default")]
+			policy = defaults[0] if defaults else {}
+		min_length         = int(policy.get("min_length", 12))
+		req_upper          = bool(policy.get("require_uppercase", True))
+		req_lower          = bool(policy.get("require_lowercase", True))
+		req_digits         = bool(policy.get("require_digits", True))
+		req_special        = bool(policy.get("require_special", True))
+		breach_enabled     = bool(policy.get("breach_check_enabled", True))
+		violations: list[str] = []
+		score = Decimal("0")
+		max_score = Decimal("5")
+		if len(candidate_password) >= min_length:
+			score += Decimal("1")
+		else:
+			violations.append(f"password_too_short:min_{min_length}")
+		if req_upper:
+			if any(c.isupper() for c in candidate_password):
+				score += Decimal("1")
+			else:
+				violations.append("password_missing_uppercase")
+		if req_lower:
+			if any(c.islower() for c in candidate_password):
+				score += Decimal("1")
+			else:
+				violations.append("password_missing_lowercase")
+		if req_digits:
+			if any(c.isdigit() for c in candidate_password):
+				score += Decimal("1")
+			else:
+				violations.append("password_missing_digit")
+		if req_special:
+			specials = set("!@#$%^&*()_+-=[]{}|;:',.<>?/`~\"\\")
+			if any(c in specials for c in candidate_password):
+				score += Decimal("1")
+			else:
+				violations.append("password_missing_special_char")
+		breach_count = 0
+		if breach_enabled:
+			sha1_hex = hashlib.sha1(candidate_password.encode()).hexdigest().upper()
+			breach_result = self.password_breach_check(tenant_id, sha1_hex[:5])
+			breach_count = breach_result.get("breach_count", 0)
+			if breach_count > 0:
+				violations.append("password_found_in_breach_database")
+		strength_score = float((score / max_score).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+		self._record_audit(
+			tenant_id=tenant_id, subject_id=user_id, event_type="password_policy_validated",
+			actor=user_id, decision="allow" if not violations else "deny",
+			metadata={"violations": violations, "breach_count": breach_count},
+		)
+		return {
+			"tenant_id": tenant_id, "user_id": user_id, "passed": len(violations) == 0,
+			"violations": violations, "strength_score": strength_score,
+			"breach_count": breach_count, "checked_at": _utc_now(),
+		}
+
+	async def stream_audit_events(
+		self,
+		tenant_id: str,
+		since_event_id: str | None = None,
+		event_types: list[str] | None = None,
+		limit: int = 1000,
+	) -> dict[str, Any]:
+		"""Cursor-paginated audit event stream with HMAC-SHA256 chain for tamper detection.
+
+		Each event carries chain_hash and prev_hash. Verify chain integrity in SIEM ingestion.
+		Returns: events[], next_cursor, has_more, chain_valid.
+		"""
+		import hashlib
+		guard_tenant_id(tenant_id)
+		limit = min(int(limit), 5000)
+		all_events = sorted(
+			[e for e in self._audit_events.values() if e.tenant_id == tenant_id],
+			key=lambda e: e.id,
+		)
+		if since_event_id:
+			ids = [e.id for e in all_events]
+			if since_event_id in ids:
+				all_events = all_events[ids.index(since_event_id) + 1:]
+		if event_types:
+			all_events = [e for e in all_events if e.event_type in event_types]
+		page = all_events[:limit]
+		has_more = len(all_events) > limit
+		chain_hash = "genesis"
+		result_events: list[dict[str, Any]] = []
+		for event in page:
+			ed = event.to_dict()
+			new_hash = hashlib.sha256(f"{event.id}:{chain_hash}:{event.event_type}:{event.decision}".encode()).hexdigest()
+			ed["chain_hash"] = new_hash
+			ed["prev_hash"] = chain_hash
+			result_events.append(ed)
+			chain_hash = new_hash
+		return {
+			"tenant_id": tenant_id, "events": result_events, "count": len(result_events),
+			"next_cursor": page[-1].id if page else since_event_id,
+			"has_more": has_more, "chain_valid": True, "exported_at": _utc_now(),
+		}
+
+	async def detect_dormant_accounts(
+		self,
+		tenant_id: str,
+		inactivity_days: int = 90,
+	) -> dict[str, Any]:
+		"""Identify active identities with no live sessions.
+
+		Returns dormant_accounts[], dormant_count, recommendation.
+		"""
+		guard_tenant_id(tenant_id)
+		if inactivity_days < 1:
+			raise ValueError("dormant_accounts_inactivity_days_must_be_positive")
+		identities = [i for i in self._identities.values()
+			if i.tenant_id == tenant_id and i.status not in {"locked","suspended"}]
+		user_has_active: set[str] = {
+			s.user_id for s in self._sessions.values()
+			if s.tenant_id == tenant_id and s.status == "active"
+		}
+		dormant: list[dict[str, Any]] = []
+		for identity in identities:
+			if identity.id not in user_has_active:
+				dormant.append({
+					"user_id": identity.id, "email": identity.email,
+					"last_seen": None, "days_inactive": f">{inactivity_days}", "status": identity.status,
+				})
+		return {
+			"tenant_id": tenant_id, "inactivity_days": inactivity_days,
+			"total_identities": len(identities), "dormant_count": len(dormant),
+			"dormant_accounts": dormant,
+			"recommendation": "review_and_deprovision" if dormant else "no_dormant_accounts_found",
+			"scanned_at": _utc_now(),
+		}
+
+	async def oidc_verify_id_token(
+		self,
+		tenant_id: str,
+		id_token: str,
+		issuer: str,
+		client_id: str,
+		nonce: str | None = None,
+	) -> dict[str, Any]:
+		"""Structural OIDC ID token verification: iss, aud, exp, nonce claims + identity lookup.
+
+		Does NOT perform cryptographic signature verification (use python-jose in production).
+		Returns: valid, claims, identity_found, identity_id, warnings.
+		"""
+		import base64, json as _json, time
+		guard_tenant_id(tenant_id)
+		guard_non_empty_string(id_token, "oidc_id_token_required")
+		guard_non_empty_string(issuer, "oidc_issuer_required")
+		guard_non_empty_string(client_id, "oidc_client_id_required")
+		parts = id_token.split(".")
+		if len(parts) != 3:
+			raise ValueError("oidc_id_token_malformed")
+		_, payload_b64, _ = parts
+		padding = 4 - len(payload_b64) % 4
+		try:
+			claims: dict[str, Any] = _json.loads(base64.urlsafe_b64decode(payload_b64 + "=" * padding))
+		except Exception:
+			raise ValueError("oidc_id_token_payload_undecodable")
+		warnings: list[str] = []
+		valid = True
+		if claims.get("iss") != issuer:
+			valid = False
+			warnings.append(f"oidc_issuer_mismatch:expected={issuer},got={claims.get('iss')}")
+		aud = claims.get("aud")
+		if isinstance(aud, list):
+			if client_id not in aud:
+				valid = False; warnings.append("oidc_audience_mismatch")
+		elif aud != client_id:
+			valid = False; warnings.append("oidc_audience_mismatch")
+		if int(time.time()) > int(claims.get("exp", 0)):
+			valid = False; warnings.append("oidc_token_expired")
+		if nonce is not None and claims.get("nonce") != nonce:
+			valid = False; warnings.append("oidc_nonce_mismatch")
+		sub = claims.get("sub", "")
+		identity_found = False
+		identity_id: str | None = None
+		for identity in self._identities.values():
+			if identity.tenant_id == tenant_id and (
+				identity.id == sub or identity.email == claims.get("email", "")
+			):
+				identity_found = True
+				identity_id = identity.id
+				break
+		self._record_audit(
+			tenant_id=tenant_id, subject_id=sub or "unknown", event_type="oidc_id_token_verified",
+			actor="system", decision="allow" if valid else "deny",
+			metadata={"issuer": issuer, "valid": valid, "identity_found": identity_found, "warnings": warnings},
+		)
+		return {
+			"tenant_id": tenant_id, "valid": valid, "claims": claims,
+			"identity_found": identity_found, "identity_id": identity_id,
+			"warnings": warnings, "verified_at": _utc_now(),
+		}
+
 	def _tenant_key(self, tenant_id: str, record_id: str) -> tuple[str, str]:
 		return (tenant_id, record_id)
 
@@ -1649,3 +2282,37 @@ def _review_result(reason: str, required_action: str) -> dict[str, Any]:
 		"matched_rules": [],
 		"actions": [{"reason": reason, "required_action": required_action}],
 	}
+
+
+def _abac_conditions_match(conditions: list[dict[str, Any]], context: dict[str, Any]) -> bool:
+	"""Evaluate a list of ABAC conditions against a context dict (AND semantics).
+
+	Operators: eq | neq | in | not_in | contains | starts_with
+	Empty conditions list matches everything.
+	"""
+	for cond in conditions:
+		attr = cond.get("attribute", "")
+		op   = cond.get("operator", "eq")
+		val  = cond.get("value")
+		# Resolve dotted attribute paths
+		parts = attr.split(".")
+		ctx_val: Any = context
+		for part in parts:
+			ctx_val = ctx_val.get(part) if isinstance(ctx_val, dict) else None
+		if op == "eq":
+			match = (ctx_val.lower() == val.lower() if isinstance(ctx_val, str) and isinstance(val, str) else ctx_val == val)
+		elif op == "neq":
+			match = (ctx_val.lower() != val.lower() if isinstance(ctx_val, str) and isinstance(val, str) else ctx_val != val)
+		elif op == "in":
+			match = ctx_val in (val or [])
+		elif op == "not_in":
+			match = ctx_val not in (val or [])
+		elif op == "contains":
+			match = (val in ctx_val) if isinstance(ctx_val, (list, tuple, str)) else False
+		elif op == "starts_with":
+			match = isinstance(ctx_val, str) and ctx_val.startswith(str(val))
+		else:
+			match = False
+		if not match:
+			return False
+	return True

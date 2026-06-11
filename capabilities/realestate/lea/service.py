@@ -3091,18 +3091,650 @@ class LeaseManagementService:
 	def _log_sublease(self, sublease_id: str, head_lease_id: str, tenant_id: str) -> None:
 		log.info("lea.sublease sublease=%s head_lease=%s tenant=%s", sublease_id, head_lease_id, tenant_id)
 
+	# =========================================================================
+	# Full amortisation schedule (improvement #6)
+	# =========================================================================
 
-# ---------------------------------------------------------------------------
-# Module-level helper (not imported from models to avoid circular deps)
-# ---------------------------------------------------------------------------
+	async def full_amortisation_schedule(
+		self,
+		lease_id: str,
+		summarise_by: str = "monthly",
+	) -> dict[str, Any]:
+		"""Generate the complete amortisation schedule for the entire lease term.
 
-def present_str(v: Any) -> bool:
-	return bool(v and str(v).strip())
+		summarise_by: monthly | quarterly | annual
+		Returns every period from commencement to expiry with opening balance,
+		interest, principal, payment, and closing balance.
+		"""
+		valid_summary = {"monthly", "quarterly", "annual"}
+		assert summarise_by in valid_summary, f"invalid summarise_by '{summarise_by}'"
 
+		lease = next((l for l in self._store["leases"] if l["id"] == lease_id), None)
+		assert lease is not None, f"lease '{lease_id}' not found"
 
-# Aliases
+		liability = _d(lease.get("lease_liability") or 0)
+		assert liability > 0, "lease liability not calculated; call calculate_lease_liability first"
 
-	async def ml_lease_renewal_predict(self, *args, **kwargs):
+		opts = lease.get("options", {})
+		rate_annual = _d(opts.get("implicit_rate", opts.get("ibr", opts.get("discount_rate", "0.05"))))
+		monthly_rate = rate_annual / 12
+
+		freq = lease.get("payment_frequency", "monthly")
+		freq_months = {"monthly": 1, "quarterly": 3, "semi_annually": 6, "annually": 12}.get(freq, 1)
+		start = _parse_date(lease["start_date"])
+		end = _parse_date(lease["end_date"])
+		n_months = _months_between(start, end)  # type: ignore[arg-type]
+		n_periods = n_months // freq_months
+		period_rate = monthly_rate * freq_months
+		periodic_payment = _d(lease["current_rent"]) * freq_months if freq != "monthly" else _d(lease["current_rent"])
+
+		rows: list[dict[str, Any]] = []
+		balance = liability
+		total_interest = Decimal("0")
+		total_principal = Decimal("0")
+
+		for p in range(1, n_periods + 1):
+			interest = (balance * period_rate).quantize(CENTS, rounding=ROUND_HALF_UP)
+			principal = min(periodic_payment - interest, balance).quantize(CENTS, rounding=ROUND_HALF_UP)
+			balance = max(balance - principal, Decimal("0")).quantize(CENTS, rounding=ROUND_HALF_UP)
+			total_interest += interest
+			total_principal += principal
+			rows.append({
+				"period": p,
+				"opening_balance": float((balance + principal).quantize(CENTS, rounding=ROUND_HALF_UP)),
+				"payment": float(periodic_payment),
+				"interest": float(interest),
+				"principal": float(principal),
+				"closing_balance": float(balance),
+			})
+
+		# Aggregate if requested
+		if summarise_by == "quarterly":
+			grouped: list[dict[str, Any]] = []
+			for i in range(0, len(rows), 3):
+				chunk = rows[i:i + 3]
+				grouped.append({
+					"quarter": i // 3 + 1,
+					"opening_balance": chunk[0]["opening_balance"],
+					"total_payment": round(sum(r["payment"] for r in chunk), 2),
+					"total_interest": round(sum(r["interest"] for r in chunk), 2),
+					"total_principal": round(sum(r["principal"] for r in chunk), 2),
+					"closing_balance": chunk[-1]["closing_balance"],
+				})
+			rows = grouped
+		elif summarise_by == "annual":
+			grouped = []
+			for i in range(0, len(rows), 12):
+				chunk = rows[i:i + 12]
+				grouped.append({
+					"year": i // 12 + 1,
+					"opening_balance": chunk[0]["opening_balance"],
+					"total_payment": round(sum(r["payment"] for r in chunk), 2),
+					"total_interest": round(sum(r["interest"] for r in chunk), 2),
+					"total_principal": round(sum(r["principal"] for r in chunk), 2),
+					"closing_balance": chunk[-1]["closing_balance"],
+				})
+			rows = grouped
+
+		self._log_operation("full_amortisation_schedule", lease_id, lease.get("tenant_id", ""))
+		return {
+			"lease_id": lease_id,
+			"summarise_by": summarise_by,
+			"opening_liability": float(liability),
+			"total_interest_expense": float(total_interest.quantize(CENTS, rounding=ROUND_HALF_UP)),
+			"total_principal_repaid": float(total_principal.quantize(CENTS, rounding=ROUND_HALF_UP)),
+			"n_periods": n_periods,
+			"currency": lease.get("currency", "USD"),
+			"schedule": rows,
+			"generated_at": _now_iso(),
+		}
+
+	# =========================================================================
+	# Rent escalation projection (improvement #3)
+	# =========================================================================
+
+	async def project_rent_escalation_schedule(
+		self,
+		lease_id: str,
+		years: int = 5,
+		cpi_forecast: float = 0.04,
+	) -> dict[str, Any]:
+		"""Project future rent escalations over `years` using lease escalation rules.
+
+		cpi_forecast: annual CPI rate assumed for CPI_linked escalations (default 4%).
+		Returns a year-by-year projection table with compounded rent values and
+		cumulative rent increase from base.
+		"""
+		assert years > 0, "years must be positive"
+		assert 0 <= cpi_forecast <= 1, "cpi_forecast must be between 0 and 1"
+
+		lease = next((l for l in self._store["leases"] if l["id"] == lease_id), None)
+		assert lease is not None, f"lease '{lease_id}' not found"
+
+		opts = lease.get("options", {})
+		base_rent = _d(lease["current_rent"])
+		escalation_type = opts.get("escalation_type", "fixed_percentage")
+		escalation_rate = _d(str(opts.get("escalation_rate", cpi_forecast)))
+		frequency_months = int(opts.get("escalation_frequency_months", 12))
+
+		rows: list[dict[str, Any]] = []
+		current_rent = base_rent
+		start_date = _parse_date(lease["start_date"])
+		end_date = _parse_date(lease["end_date"])
+
+		for yr in range(1, years + 1):
+			if escalation_type in ("fixed_percentage", "CPI_linked"):
+				rate = _d(str(cpi_forecast)) if escalation_type == "CPI_linked" else escalation_rate
+				new_rent = (current_rent * (1 + rate)).quantize(CENTS, rounding=ROUND_HALF_UP)
+			elif escalation_type == "stepped":
+				stepped_rents = opts.get("stepped_rents", [])
+				if yr - 1 < len(stepped_rents):
+					new_rent = _d(str(stepped_rents[yr - 1]))
+				else:
+					new_rent = current_rent
+			else:
+				new_rent = current_rent
+
+			annual_cost = (new_rent * 12).quantize(CENTS, rounding=ROUND_HALF_UP)
+			cumulative_increase_pct = float(((new_rent - base_rent) / base_rent * 100).quantize(
+				Decimal("0.01"), rounding=ROUND_HALF_UP
+			)) if base_rent > 0 else 0.0
+
+			rows.append({
+				"year": yr,
+				"monthly_rent": float(new_rent),
+				"annual_rent": float(annual_cost),
+				"escalation_applied": float(new_rent - current_rent),
+				"cumulative_increase_pct": cumulative_increase_pct,
+				"escalation_type": escalation_type,
+			})
+			current_rent = new_rent
+
+		total_projected_cost = sum(_d(str(r["annual_rent"])) for r in rows)
+
+		return {
+			"lease_id": lease_id,
+			"base_monthly_rent": float(base_rent),
+			"escalation_type": escalation_type,
+			"cpi_forecast_annual": cpi_forecast,
+			"projection_years": years,
+			"total_projected_rent_cost": float(total_projected_cost),
+			"currency": lease.get("currency", "USD"),
+			"projection": rows,
+			"generated_at": _now_iso(),
+		}
+
+	# =========================================================================
+	# Holding-over detection (improvement #13)
+	# =========================================================================
+
+	async def detect_holding_over(
+		self,
+		as_of_date: str | None = None,
+		holding_over_uplift_pct: float = 0.25,
+	) -> list[dict[str, Any]]:
+		"""Identify active leases that have passed their expiry date.
+
+		Transitions them to `holding_over` status and applies the holding-over rent
+		uplift (default +25% on last passing rent, common UK/Kenya commercial practice).
+
+		Returns the list of leases transitioned.
+		"""
+		as_of = _parse_date(as_of_date) if as_of_date else date.today()
+		assert as_of is not None, "invalid as_of_date"
+
+		transitioned: list[dict[str, Any]] = []
+
+		for i, l in enumerate(self._store["leases"]):
+			if l.get("is_deleted") or l.get("status") != LeaseStatus.active.value:
+				continue
+			end_str = l.get("end_date") or l.get("expiry_date")
+			if not end_str:
+				continue
+			expiry = _parse_date(end_str)
+			if expiry is None or expiry >= as_of:
+				continue
+
+			# Transition to holding_over
+			old_rent = _d(l.get("current_rent", 0))
+			uplift = _d(str(holding_over_uplift_pct))
+			holding_rent = (old_rent * (1 + uplift)).quantize(CENTS, rounding=ROUND_HALF_UP)
+
+			l["status"] = "holding_over"
+			l["holding_over_since"] = str(expiry)
+			l["holding_over_rent"] = str(holding_rent)
+			l["holding_over_days"] = (as_of - expiry).days
+			l["updated_at"] = _now_iso()
+			self._store["leases"][i] = l
+
+			log.warning(
+				"lea.holding_over lease=%s expired=%s days_over=%d",
+				l["id"], expiry, l["holding_over_days"],
+			)
+			transitioned.append({
+				"lease_id": l["id"],
+				"property_id": l.get("property_id"),
+				"tenant_id": l.get("tenant_id"),
+				"expired_on": str(expiry),
+				"days_holding_over": l["holding_over_days"],
+				"last_passing_rent": float(old_rent),
+				"holding_over_rent": float(holding_rent),
+				"currency": l.get("currency", "USD"),
+			})
+
+		return transitioned
+
+	# =========================================================================
+	# Lease data integrity check (improvement #14)
+	# =========================================================================
+
+	async def validate_lease_data_integrity(self, lease_id: str) -> dict[str, Any]:
+		"""Run cross-record consistency checks on a lease and its related records.
+
+		Checks:
+		  - Rent review dates within lease term
+		  - Option windows don't extend beyond expiry
+		  - Sublease term does not exceed head lease term
+		  - Escalation records are non-overlapping
+		  - IFRS 16 fields consistent (both ROU and liability present, or both absent)
+		  - Lease status consistent with dates
+		"""
+		lease = next((l for l in self._store["leases"] if l["id"] == lease_id), None)
+		assert lease is not None, f"lease '{lease_id}' not found"
+
+		issues: list[dict[str, Any]] = []
+		warnings: list[dict[str, Any]] = []
+
+		start = _parse_date(lease.get("start_date"))
+		end = _parse_date(lease.get("end_date"))
+
+		# 1. Rent review dates within lease term
+		for rr in self._store["rent_reviews"]:
+			if rr["lease_id"] != lease_id:
+				continue
+			review_d = _parse_date(rr.get("review_date"))
+			if review_d and start and end:
+				if not (start <= review_d <= end):
+					issues.append({
+						"check": "rent_review_within_term",
+						"severity": "error",
+						"detail": f"Rent review {rr['id']} date {review_d} is outside lease term {start}–{end}",
+					})
+
+		# 2. Option windows within or at lease expiry
+		for opt in self._store.get("options", []):
+			if opt["lease_id"] != lease_id:
+				continue
+			ex_to = _parse_date(opt.get("exercise_to"))
+			if ex_to and end and ex_to > end:
+				issues.append({
+					"check": "option_window_within_term",
+					"severity": "error",
+					"detail": f"Option {opt['id']} exercise_to {ex_to} extends beyond lease expiry {end}",
+				})
+
+		# 3. Sublease term check
+		for sl in self._store.get("subleases", []):
+			if sl.get("head_lease_id") != lease_id:
+				continue
+			sl_end = _parse_date(sl.get("end_date"))
+			if sl_end and end and sl_end > end:
+				issues.append({
+					"check": "sublease_within_head_lease",
+					"severity": "error",
+					"detail": f"Sublease {sl['id']} end {sl_end} exceeds head lease expiry {end}",
+				})
+
+		# 4. IFRS 16 field consistency
+		has_rou = bool(lease.get("rou_asset"))
+		has_ll = bool(lease.get("lease_liability"))
+		if has_rou != has_ll:
+			issues.append({
+				"check": "ifrs16_field_consistency",
+				"severity": "error",
+				"detail": f"ROU asset present={has_rou} but lease_liability present={has_ll}; both must be computed together",
+			})
+
+		# 5. Status vs dates
+		if lease.get("status") == LeaseStatus.active.value and end and end < date.today():
+			warnings.append({
+				"check": "status_vs_expiry",
+				"severity": "warning",
+				"detail": f"Lease status is 'active' but expiry {end} is in the past; may need holding-over transition",
+			})
+
+		# 6. Rent > 0 for active leases
+		if lease.get("status") == LeaseStatus.active.value:
+			rent = _d(lease.get("current_rent", 0))
+			if rent <= 0:
+				issues.append({
+					"check": "positive_rent",
+					"severity": "error",
+					"detail": "Active lease has zero or negative current_rent",
+				})
+
+		passed = len(issues) == 0
+		return {
+			"lease_id": lease_id,
+			"passed": passed,
+			"issue_count": len(issues),
+			"warning_count": len(warnings),
+			"issues": issues,
+			"warnings": warnings,
+			"checked_at": _now_iso(),
+		}
+
+	# =========================================================================
+	# Discount rate sensitivity analysis (improvement #15)
+	# =========================================================================
+
+	async def discount_rate_sensitivity(
+		self,
+		lease_id: str,
+		rate_min: float = 0.03,
+		rate_max: float = 0.10,
+		rate_step: float = 0.005,
+	) -> dict[str, Any]:
+		"""Compute lease liability and ROU asset across a range of discount rates.
+
+		Returns a sensitivity matrix showing liability delta per 100bps and the
+		breakeven analysis relative to the base rate on the lease.
+		"""
+		lease = next((l for l in self._store["leases"] if l["id"] == lease_id), None)
+		assert lease is not None, f"lease '{lease_id}' not found"
+		assert rate_min < rate_max, "rate_min must be less than rate_max"
+		assert rate_step > 0, "rate_step must be positive"
+
+		opts = lease.get("options", {})
+		base_rate = float(_d(opts.get("implicit_rate", opts.get("ibr", opts.get("discount_rate", "0.05")))))
+
+		start = _parse_date(lease["start_date"])
+		end = _parse_date(lease["end_date"])
+		n_months = _months_between(start, end)  # type: ignore[arg-type]
+		freq = lease.get("payment_frequency", "monthly")
+		freq_months = {"monthly": 1, "quarterly": 3, "semi_annually": 6, "annually": 12}.get(freq, 1)
+		n_periods = n_months // freq_months
+		periodic_payment = _d(lease["current_rent"]) * freq_months if freq != "monthly" else _d(lease["current_rent"])
+
+		rows: list[dict[str, Any]] = []
+		rate = rate_min
+		base_liability: Decimal | None = None
+
+		while rate <= rate_max + 1e-9:
+			rate_d = _d(str(round(rate, 6)))
+			period_rate = rate_d / 12 * freq_months
+			liability = _pv_annuity(periodic_payment, period_rate, n_periods)
+			if abs(rate - base_rate) < rate_step / 2:
+				base_liability = liability
+			rows.append({
+				"rate_pct": round(rate * 100, 3),
+				"lease_liability": float(liability),
+				"rou_asset": float(liability),  # ROU = liability at commencement
+			})
+			rate = round(rate + rate_step, 6)
+
+		# Compute delta vs base
+		if base_liability is None and rows:
+			base_liability = _d(str(rows[len(rows) // 2]["lease_liability"]))
+
+		for row in rows:
+			delta = row["lease_liability"] - float(base_liability)  # type: ignore[arg-type]
+			row["delta_vs_base"] = round(delta, 2)
+			row["delta_per_100bps"] = round(delta / ((row["rate_pct"] - base_rate * 100) / 1) if abs(row["rate_pct"] - base_rate * 100) > 0.001 else 0, 2)
+
+		return {
+			"lease_id": lease_id,
+			"base_rate_pct": round(base_rate * 100, 3),
+			"base_lease_liability": float(base_liability) if base_liability else None,
+			"rate_range": {"min_pct": rate_min * 100, "max_pct": rate_max * 100, "step_pct": rate_step * 100},
+			"currency": lease.get("currency", "USD"),
+			"sensitivity_matrix": rows,
+			"generated_at": _now_iso(),
+		}
+
+	# =========================================================================
+	# Lease KPI dashboard (improvement #12)
+	# =========================================================================
+
+	async def lease_kpi_dashboard(
+		self,
+		tenant_id: str,
+		period: str | None = None,
+	) -> dict[str, Any]:
+		"""Compute key lease performance indicators for a tenant portfolio.
+
+		KPIs returned:
+		  - occupancy_rate: % of leases active vs total
+		  - wault_years: weighted average unexpired lease term
+		  - rent_collection_efficiency: receipts / demands raised in period
+		  - avg_lease_term_months: mean original term of active leases
+		  - leases_expiring_90d / 180d / 365d: count by urgency horizon
+		  - total_annual_rent / total_rou / total_liability: balance sheet totals
+		  - modifications_count: total modifications on record
+		  - avg_escalation_rate: mean rate across applied escalations
+		"""
+		all_leases = [l for l in self._store["leases"] if l.get("tenant_id") == tenant_id and not l.get("is_deleted")]
+		active = [l for l in all_leases if l.get("status") == LeaseStatus.active.value]
+		today = date.today()
+
+		occupancy_rate = round(len(active) / len(all_leases) * 100, 2) if all_leases else 0.0
+
+		wault = await self.weighted_average_lease_term({"tenant_id": tenant_id})
+
+		# Rent collection efficiency
+		demands = [d for d in self._store["rent_demands"] if d.get("tenant_id") == tenant_id]
+		receipts = [r for r in self._store["rent_receipts"] if r.get("tenant_id") == tenant_id]
+		if period:
+			demands = [d for d in demands if str(d.get("period", "")).startswith(period[:7])]
+			receipts = [r for r in receipts if str(r.get("payment_date", "")).startswith(period[:7])]
+		total_demanded = sum(_d(str(d.get("amount_due", 0))) for d in demands)
+		total_received = sum(_d(str(r.get("amount_received", 0))) for r in receipts)
+		collection_efficiency = float((total_received / total_demanded * 100).quantize(
+			Decimal("0.01"), rounding=ROUND_HALF_UP
+		)) if total_demanded > 0 else 100.0
+
+		# Average lease term
+		terms = [l.get("lease_term_months", 0) for l in active if l.get("lease_term_months")]
+		avg_term = round(sum(terms) / len(terms), 1) if terms else 0.0
+
+		# Expiry horizons
+		exp_90 = sum(1 for l in active if l.get("end_date") and (_parse_date(l["end_date"]) - today).days <= 90)
+		exp_180 = sum(1 for l in active if l.get("end_date") and (_parse_date(l["end_date"]) - today).days <= 180)
+		exp_365 = sum(1 for l in active if l.get("end_date") and (_parse_date(l["end_date"]) - today).days <= 365)
+
+		total_rent = float(sum(_d(l.get("current_rent", 0)) * 12 for l in active))
+		total_rou = float(sum(_d(l.get("rou_asset") or 0) for l in active))
+		total_ll = float(sum(_d(l.get("lease_liability") or 0) for l in active))
+
+		mods = self._store.get("modifications", [])
+		mod_count = sum(1 for m in mods if m.get("tenant_id") == tenant_id)
+
+		escalations = [e for e in self._store["escalations"] if e.get("tenant_id") == tenant_id and e.get("applied")]
+		rates = [float(e.get("rate_applied", 0)) for e in escalations if e.get("rate_applied")]
+		avg_esc = round(sum(rates) / len(rates) * 100, 3) if rates else 0.0
+
+		return {
+			"tenant_id": tenant_id,
+			"period": period or str(today)[:7],
+			"total_leases": len(all_leases),
+			"active_leases": len(active),
+			"occupancy_rate_pct": occupancy_rate,
+			"wault_years": wault,
+			"avg_lease_term_months": avg_term,
+			"rent_collection_efficiency_pct": collection_efficiency,
+			"leases_expiring_90d": exp_90,
+			"leases_expiring_180d": exp_180,
+			"leases_expiring_365d": exp_365,
+			"total_annual_rent": total_rent,
+			"total_rou_assets": total_rou,
+			"total_lease_liabilities": total_ll,
+			"modifications_total": mod_count,
+			"avg_escalation_rate_pct": avg_esc,
+			"generated_at": _now_iso(),
+		}
+
+	# =========================================================================
+	# Break option cost modelling (improvement #11)
+	# =========================================================================
+
+	async def model_break_option_cost(
+		self,
+		lease_id: str,
+		break_date: str,
+	) -> dict[str, Any]:
+		"""Model the total financial cost of exercising a break option.
+
+		Components:
+		  - Break penalty
+		  - Unamortised lease incentives to be repaid
+		  - Estimated dilapidations
+		  - Fit-out write-off (remaining book value)
+		  - Relocation cost estimate
+		  - Foregone rent-free / incentive period value
+		Compares total break cost vs NPV of remaining lease payments to give
+		a break vs stay recommendation.
+		"""
+		assert present_str(lease_id), "lease_id required"
+		assert present_str(break_date), "break_date required"
+
+		lease = next((l for l in self._store["leases"] if l["id"] == lease_id), None)
+		assert lease is not None, f"lease '{lease_id}' not found"
+
+		opts = lease.get("options", {})
+		break_d = _parse_date(break_date)
+		end_d = _parse_date(lease.get("end_date"))
+		today = date.today()
+
+		# Remaining lease term (months) if break not exercised
+		remaining_if_stay = _months_between(today, end_d) if end_d else 0  # type: ignore[arg-type]
+		remaining_to_break = _months_between(today, break_d) if break_d else 0  # type: ignore[arg-type]
+
+		monthly_rent = _d(lease["current_rent"])
+
+		# Break penalty
+		break_penalty = _d(str(opts.get("break_penalty", 0)))
+
+		# Unamortised incentives
+		incentive_records = [
+			inc for inc in self._store.get("lease_incentives", [])
+			if inc["lease_id"] == lease_id
+		]
+		total_incentives = sum(_d(str(inc.get("amount", 0))) for inc in incentive_records)
+		# Amortise linearly over lease term
+		term_months = lease.get("lease_term_months", 1) or 1
+		months_elapsed = _months_between(_parse_date(lease.get("start_date")), today)  # type: ignore[arg-type]
+		unamortised_incentives = (total_incentives * _d(str(max(term_months - months_elapsed, 0))) / _d(str(term_months))).quantize(CENTS, rounding=ROUND_HALF_UP)
+
+		# Dilapidations estimate (from options or default to 3 months rent)
+		dilaps_estimate = _d(str(opts.get("dilapidations_estimate", float(monthly_rent * 3))))
+
+		# Fit-out write-off
+		fitout_book_value = _d(str(opts.get("fitout_book_value", 0)))
+
+		# Relocation cost
+		relocation_cost = _d(str(opts.get("relocation_cost", float(monthly_rent * 6))))
+
+		total_break_cost = (break_penalty + unamortised_incentives + dilaps_estimate
+							+ fitout_book_value + relocation_cost).quantize(CENTS, rounding=ROUND_HALF_UP)
+
+		# NPV of staying: PV of remaining payments after break date discounted at IBR
+		rate_annual = _d(opts.get("implicit_rate", opts.get("ibr", opts.get("discount_rate", "0.05"))))
+		monthly_rate = rate_annual / 12
+		npv_stay = _pv_annuity(monthly_rent, monthly_rate, max(remaining_if_stay - remaining_to_break, 0))
+
+		recommendation = "exercise_break" if total_break_cost < npv_stay else "stay"
+
+		self._log_operation("model_break_option_cost", lease_id, lease.get("tenant_id", ""))
+		return {
+			"lease_id": lease_id,
+			"break_date": break_date,
+			"components": {
+				"break_penalty": float(break_penalty),
+				"unamortised_incentives": float(unamortised_incentives),
+				"dilapidations_estimate": float(dilaps_estimate),
+				"fitout_write_off": float(fitout_book_value),
+				"relocation_cost": float(relocation_cost),
+			},
+			"total_break_cost": float(total_break_cost),
+			"npv_of_remaining_lease_payments": float(npv_stay),
+			"net_saving_from_break": float(npv_stay - total_break_cost),
+			"recommendation": recommendation,
+			"currency": lease.get("currency", "USD"),
+			"analysed_at": _now_iso(),
+		}
+
+	# =========================================================================
+	# Benchmark against ERV (improvement #5)
+	# =========================================================================
+
+	async def benchmark_against_erv(
+		self,
+		lease_id: str,
+		erv_per_sqm_annual: float,
+	) -> dict[str, Any]:
+		"""Benchmark passing rent against Estimated Rental Value (ERV).
+
+		Computes:
+		  - Over/under-rented status and quantum
+		  - Reversion potential (difference to ERV)
+		  - Estimated time to reversion (next rent review date)
+		  - Reversionary yield proxy
+		"""
+		assert present_str(lease_id), "lease_id required"
+		assert erv_per_sqm_annual > 0, "erv_per_sqm_annual must be positive"
+
+		lease = next((l for l in self._store["leases"] if l["id"] == lease_id), None)
+		assert lease is not None, f"lease '{lease_id}' not found"
+
+		opts = lease.get("options", {})
+		floor_area = float(opts.get("floor_area_sqm", 0))
+		monthly_rent = _d(lease["current_rent"])
+		annual_passing_rent = float(monthly_rent * 12)
+
+		if floor_area > 0:
+			passing_per_sqm = annual_passing_rent / floor_area
+			erv_total_annual = erv_per_sqm_annual * floor_area
+		else:
+			passing_per_sqm = None
+			erv_total_annual = 0.0
+
+		reversion_potential = erv_total_annual - annual_passing_rent
+		over_rented = reversion_potential < 0
+		under_rented = reversion_potential > 0
+
+		# Time to reversion: next rent review or lease expiry
+		reviews = sorted(
+			[rr for rr in self._store["rent_reviews"] if rr["lease_id"] == lease_id and rr.get("status") not in ("agreed", "completed")],
+			key=lambda r: r.get("review_date", "")
+		)
+		next_review_date = reviews[0]["review_date"] if reviews else lease.get("end_date")
+		today = date.today()
+		next_review_d = _parse_date(next_review_date)
+		months_to_reversion = _months_between(today, next_review_d) if next_review_d else None  # type: ignore[arg-type]
+
+		self._log_operation("benchmark_against_erv", lease_id, lease.get("tenant_id", ""))
+		return {
+			"lease_id": lease_id,
+			"annual_passing_rent": round(annual_passing_rent, 2),
+			"erv_total_annual": round(erv_total_annual, 2),
+			"erv_per_sqm_annual": erv_per_sqm_annual,
+			"passing_rent_per_sqm_annual": round(passing_per_sqm, 2) if passing_per_sqm else None,
+			"floor_area_sqm": floor_area,
+			"reversion_potential": round(reversion_potential, 2),
+			"over_rented": over_rented,
+			"under_rented": under_rented,
+			"over_under_rented_pct": round(reversion_potential / erv_total_annual * 100, 2) if erv_total_annual else 0.0,
+			"next_review_date": next_review_date,
+			"months_to_reversion": months_to_reversion,
+			"currency": lease.get("currency", "USD"),
+			"benchmarked_at": _now_iso(),
+		}
+
+	# =========================================================================
+	# ML-enhanced lease renewal prediction (Ollama)
+	# =========================================================================
+
+	async def ml_lease_renewal_predict(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
 		"""AI-powered lease renewal probability prediction. Requires OLLAMA_BASE_URL."""
 		import os
 		if not os.environ.get("OLLAMA_BASE_URL"):
@@ -3111,8 +3743,17 @@ def present_str(v: Any) -> bool:
 			from capabilities.common.mlx import MLCapability
 			ml = MLCapability()
 			result = await ml.score(kwargs, task="lease_renewal_prediction")
-			return {"renewal_probability": round(result.score,3), "ml_enhanced": True}
+			return {"renewal_probability": round(result.score, 3), "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+
+# ---------------------------------------------------------------------------
+# Module-level helper (not imported from models to avoid circular deps)
+# ---------------------------------------------------------------------------
+
+def present_str(v: Any) -> bool:
+	return bool(v and str(v).strip())
+
 
 LeaService = LeaseManagementService

@@ -1,7 +1,7 @@
 # Property Insurance
 
 ## Overview
-End-to-end property insurance portfolio management: policy creation and binding with asset schedules, claims lodgement through settlement with large-claim senior-approval gates, endorsement issuance, premium allocation across properties, automated coverage gap detection, insurer/broker registry, and renewal pipeline tracking.
+End-to-end property insurance portfolio management: policy creation and binding with asset schedules, claims lodgement through settlement with large-claim senior-approval gates, endorsement issuance, premium allocation across properties, automated coverage gap detection, insurer/broker registry, renewal pipeline tracking, parametric catastrophe triggers, fraud scoring, subrogation workflow, portfolio stress testing, and structured certificate issuance.
 
 ## Capability ID
 `realestate_ins`
@@ -9,14 +9,21 @@ End-to-end property insurance portfolio management: policy creation and binding 
 ## Provides
 - `policy_lifecycle_management`: Property all-risk, fire, liability, and 8 other policy types
 - `asset_schedule_management`: Insured asset register linked to policies with valuation basis
-- `claims_processing_workflow`: Lodge, investigate, approve (senior for large), settle
+- `claims_processing_workflow`: Lodge, investigate, approve (senior for large), settle, subrogation
 - `premium_allocation_engine`: 5 allocation methods including GLA and risk-weighted
 - `coverage_gap_analysis`: Automated gap detection with critical-gap mandatory alerting
 - `endorsement_management`: 7 endorsement types with sum-insured adjustment
 - `insurer_broker_registry`: Graded insurer panel with suspension enforcement
-- `renewal_pipeline_tracking`: 90-day advance renewal pipeline
-- `insurance_reporting`: Claims frequency, premium adequacy, gap summary
+- `renewal_pipeline_tracking`: Structured 90-day renewal pipeline with stage transitions
+- `insurance_reporting`: Claims frequency, premium adequacy, gap summary, loss run generation
 - `compliance_certificate_management`: Certificate issue against active policies only
+- `parametric_insurance`: Oracle-driven catastrophe peril auto-claim triggers
+- `fraud_detection`: ML-heuristic fraud scoring with senior-adjuster routing
+- `subrogation_management`: Third-party recovery file tracking and settlement
+- `portfolio_stress_testing`: PML scenario analysis with reinsurance netting
+- `tenant_premium_apportionment`: Floor-area / value-based charge schedule for billing
+- `broker_performance_scoring`: Retention, turnaround, and placement scorecard
+- `claim_evidence_vault`: SHA-256 hash chain-of-custody evidence management
 
 ## Requires
 | Capability | Reason |
@@ -44,14 +51,25 @@ End-to-end property insurance portfolio management: policy creation and binding 
 | `/realestate/ins/policies` | GET/POST | List/create policies | `policies` |
 | `/realestate/ins/policies/<id>/bind` | POST | Bind policy | `policies` |
 | `/realestate/ins/renewals` | GET | Renewal pipeline | `renewals` |
+| `/realestate/ins/renewals/<id>/advance` | POST | Advance renewal stage | `renewals` |
 | `/realestate/ins/assets` | GET/POST | Asset schedule | `assets` |
 | `/realestate/ins/claims` | GET/POST | Claims | `claims` |
 | `/realestate/ins/claims/<id>/approve` | POST | Approve claim | `claims` |
 | `/realestate/ins/claims/<id>/settle` | POST | Settle claim | `claims` |
+| `/realestate/ins/claims/<id>/fraud-score` | POST | Score claim fraud risk | `claims` |
+| `/realestate/ins/claims/<id>/evidence` | POST | Attach claim evidence | `claims` |
+| `/realestate/ins/claims/<id>/subrogation` | POST | Initiate subrogation | `claims` |
+| `/realestate/ins/subrogations/<id>/recovery` | POST | Record recovery | `claims` |
 | `/realestate/ins/endorsements` | GET/POST | Endorsements | `endorsements` |
 | `/realestate/ins/premiums` | POST | Allocate premium | `premiums` |
+| `/realestate/ins/premiums/apportion` | POST | Apportion to tenants | `premiums` |
 | `/realestate/ins/gaps` | GET | Coverage gaps | `gaps` |
 | `/realestate/ins/gaps/detect/<property_id>` | POST | Detect gaps | `gaps` |
+| `/realestate/ins/certificates` | POST | Issue certificate | `certificates` |
+| `/realestate/ins/loss-run` | GET | Generate loss run | `reporting` |
+| `/realestate/ins/stress-test` | POST | Portfolio stress test | `reporting` |
+| `/realestate/ins/brokers/<id>/scorecard` | GET | Broker scorecard | `reporting` |
+| `/realestate/ins/parametric/evaluate` | POST | Parametric trigger eval | `parametric` |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -96,3 +114,22 @@ End-to-end property insurance portfolio management: policy creation and binding 
 - Asset schedule references `realestate_prm` property and asset register
 - Coverage gap detection triggers `ntfy` alerts to property managers
 - Reinstatement cost valuations link to `realestate_val` assessment
+- Tenant premium apportionment charges written to `realestate_acc` billing runs
+- Parametric trigger data fed from `mqeb` oracle/sensor events
+- Certificate payloads rendered via `docx`/`pdf` capability
+- Subrogation recovery files linked to `realestate_lea` for tenant damage recovery
+
+## New Service Methods (v2)
+| Method | Description |
+|--------|-------------|
+| `parametric_trigger_evaluate()` | Oracle-driven auto-claim for catastrophe perils |
+| `score_claim_fraud_risk()` | Heuristic fraud scoring 0–100 with senior routing |
+| `initiate_subrogation()` | Open third-party recovery file on settled claim |
+| `record_subrogation_recovery()` | Record cash recovery against subrogation file |
+| `generate_loss_run()` | 5-year structured loss run for underwriter renewal |
+| `issue_certificate()` | Issue formal insurance certificate with document payload |
+| `run_portfolio_stress_test()` | PML scenario with reinsurance netting |
+| `advance_renewal_stage()` | Structured renewal pipeline stage transitions |
+| `apportion_insurance_to_tenants()` | Per-tenant charge schedule for billing |
+| `get_broker_scorecard()` | Retention, turnaround, placement performance score |
+| `attach_claim_evidence()` | SHA-256 chain-of-custody evidence vault |

@@ -45,16 +45,32 @@ Full CAFM-grade maintenance management: asset register with lifecycle tracking, 
 |------|--------|-------------|-----------|
 | `/realestate/mai/assets` | GET/POST | Asset register | `assets` |
 | `/realestate/mai/assets/end-of-life` | GET | EOL assets | `assets` |
+| `/realestate/mai/assets/<id>/condition` | PATCH | Update condition score | `assets` |
+| `/realestate/mai/assets/condition/below-threshold` | GET | Assets below condition threshold | `assets` |
 | `/realestate/mai/ppm` | GET/POST | PPM schedules | `ppm` |
 | `/realestate/mai/ppm/overdue` | GET | Overdue PPMs | `ppm` |
 | `/realestate/mai/work-orders` | GET/POST | Work orders | `work_orders` |
 | `/realestate/mai/work-orders/<id>/assign` | POST | Assign contractor | `work_orders` |
 | `/realestate/mai/work-orders/<id>/close` | POST | Close (verified) | `work_orders` |
+| `/realestate/mai/work-orders/<id>/checkin` | POST | Technician check-in | `work_orders` |
+| `/realestate/mai/work-orders/<id>/checkout` | POST | Technician check-out | `work_orders` |
+| `/realestate/mai/work-orders/near-sla-breach` | GET | WOs near SLA breach | `work_orders` |
 | `/realestate/mai/contractors` | GET/POST | Contractor registry | `contractors` |
+| `/realestate/mai/contractors/<id>/scorecard` | GET | Performance scorecard | `contractors` |
+| `/realestate/mai/contractors/league-table` | GET | Ranked contractor table | `contractors` |
 | `/realestate/mai/inspections` | POST | Create inspection | `inspections` |
 | `/realestate/mai/inspections/overdue` | GET | Overdue inspections | `inspections` |
 | `/realestate/mai/defects` | GET/POST | Defect tracker | `defects` |
 | `/realestate/mai/sla` | GET | SLA dashboard | `sla` |
+| `/realestate/mai/compliance/certificates` | GET/POST | Statutory certificates | `compliance` |
+| `/realestate/mai/compliance/expiring` | GET | Expiring certificates | `compliance` |
+| `/realestate/mai/compliance/properties/<id>` | GET | Property compliance status | `compliance` |
+| `/realestate/mai/budgets` | POST | Set maintenance budget | `budgets` |
+| `/realestate/mai/budgets/variance` | GET | Budget vs actual | `budgets` |
+| `/realestate/mai/analytics/portfolio/benchmark` | GET | Portfolio benchmarking | `analytics` |
+| `/realestate/mai/analytics/reactive-patterns` | GET | Reactive failure patterns | `analytics` |
+| `/realestate/mai/escalation/policies` | POST | Create escalation policy | `escalations` |
+| `/realestate/mai/escalation/process` | POST | Run escalation tick | `escalations` |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -97,3 +113,27 @@ Full CAFM-grade maintenance management: asset register with lifecycle tracking, 
 - Maintenance costs post to `realestate_acc` property ledger
 - Contractor registry shared with `realestate_con` contractor management
 - Inspection findings create defects that may generate work orders
+- Statutory certificates auto-schedule renewal inspections 60 days before expiry
+- Portfolio benchmarking consumes `cost_per_sqm`, PPM, defect, and SLA metrics across properties
+- Escalation policies evaluated per scheduler tick via `process_escalations()`
+
+## New Service Methods (v1.1)
+
+| Method | Category | Description |
+|--------|----------|-------------|
+| `update_asset_condition_score()` | Asset Intelligence | Set 0–100 condition score; auto-escalates lifecycle phase |
+| `get_assets_below_condition_threshold()` | Asset Intelligence | Filter assets with score below threshold |
+| `get_work_orders_near_sla_breach()` | SLA Management | WOs with ≥N% of SLA elapsed, sorted by urgency |
+| `compute_contractor_scorecard()` | Contractor Performance | Rolling FTFR, resolution hours, breach rate per contractor |
+| `get_contractor_league_table()` | Contractor Performance | Ranked contractor list by composite performance score |
+| `set_maintenance_budget()` | Cost Management | Set property/year budget |
+| `get_budget_vs_actual()` | Cost Management | Budget vs committed vs actual with variance |
+| `checkin_work_order()` | Field Operations | GPS-stamped technician arrival; starts resolution clock |
+| `checkout_work_order()` | Field Operations | Technician departure with elapsed time |
+| `detect_reactive_patterns()` | Failure Analysis | Assets with repeated corrective WOs in rolling window |
+| `register_compliance_certificate()` | Statutory Compliance | Register certificate with auto-renewal scheduling |
+| `get_expiring_certificates()` | Statutory Compliance | Certificates expiring within N days |
+| `get_property_compliance_status()` | Statutory Compliance | Full compliance snapshot per property |
+| `benchmark_portfolio()` | Portfolio Analytics | Cross-property ranking with percentile positions |
+| `create_escalation_policy()` | Escalation | Define multi-level escalation chain by priority |
+| `process_escalations()` | Escalation | Advance due escalation levels; designed for scheduler tick |

@@ -106,3 +106,21 @@ Provides complete POS transaction processing for physical retail: terminal regis
 - **retail_prm** discounts applied to transaction line items before posting
 - **retail_omc** inventory reservation released or confirmed on sale
 - **retail_sin** conversion events derived from POS session close
+
+## New Capabilities (v2)
+
+| Method | Description |
+|---|---|
+| `basket_suggestions(customer_id, current_skus)` | Co-purchase frequency analysis from loyalty history; no external ML required |
+| `session_performance_metrics(store_id)` | Real-time cashier throughput, void rate, discount rate per open session |
+| `predict_cash_runway(session_id)` | Projects minutes until till needs safe drop based on cash velocity |
+| `score_transaction_fraud_risk(transaction_id)` | 0–100 fraud score from override, discount, void rate, and speed signals |
+| `get_live_dashboard_metrics(store_id)` | Rolling TPM, hour revenue, payment mix — designed for SSE push |
+| `reserve_inventory(transaction_id, sku, qty, store_id)` | Soft-reserve stock against an open basket to prevent overselling |
+| `release_inventory_hold(transaction_id, sku, store_id)` | Release soft-reserve on void or basket abandonment |
+| `initiate_shift_handover(outgoing_session_id, incoming_cashier_id)` | Lock session and require dual cash counts for handover |
+| `submit_handover_count(handover_id, cashier_id, counted_cash)` | Submit a count; auto-completes when both parties have counted |
+| `customer_purchase_history(customer_id)` | Full purchase history with spend analytics, top SKUs, and loyalty balance |
+
+## World-Class Improvements
+See `WORLD_CLASS_IMPROVEMENTS.md` for 15 detailed improvements with implementation sketches, ROI analysis, and competitive positioning.

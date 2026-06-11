@@ -16,6 +16,14 @@ The generated-app surface is dependency-light. It uses in-process domain records
 - Validation reports for publication readiness.
 - Publication lifecycle with approval, duplicate checks, draft-term checks, mapping-review checks, and version bumps.
 - Export records for RDF, OWL, JSON-LD, SKOS, and CSV style interchange.
+- W3C SKOS concept-scheme export with full `skos:broader` / `skos:narrower` / `skos:altLabel` mappings.
+- Cross-ontology alignment with lexical and synonym-aware strategies and optional auto-mapping.
+- Semantic version diffing — detects added/removed/deprecated terms and recommends patch/minor/major bump.
+- Merkle-style audit-chain integrity verification with SHA-256 event hashing.
+- LLM-assisted term-definition generation via local Ollama (dependency-free template fallback).
+- Jaccard-similarity near-duplicate term detection (drop-in for embedding-based cosine similarity).
+- Graph capability sync adapter (`sync_to_graph`) for pushing nodes and edges to the `grph` capability.
+- Async bulk term creation for high-throughput vocabulary imports.
 - First-class ontology-agent registration for Codex, Claude Code, opencode, and Pi style assistants behind provider-neutral AICR adapter contracts.
 - Bytewax lifecycle batch validation for ontology, namespace, term, taxonomy, mapping, validation, publication, exchange, and agent changes.
 - UI route metadata, view models, theme tokens, and audit evidence for generated APG applications.
