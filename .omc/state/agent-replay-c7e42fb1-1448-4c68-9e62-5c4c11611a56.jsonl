@@ -762,3 +762,4 @@
 {"t":0,"agent":"a435d12","agent_type":"workflow-subagent","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"af52e4f","agent_type":"workflow-subagent","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"af52e4f","agent_type":"workflow-subagent","event":"agent_stop","success":true,"duration_ms":558000}
+{"t":0,"agent":"a5cdaa1","agent_type":"unknown","event":"agent_stop","success":true}

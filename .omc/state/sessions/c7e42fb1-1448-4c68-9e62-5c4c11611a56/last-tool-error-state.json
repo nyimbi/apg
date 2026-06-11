@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"python3 << 'PYEOF'\\nimport re, py_compile\\n\\nfp = 'capabilities/fin/acct/capability_contract.py'\\ncontent = open(fp).read()\\n\\n# Determine indent style\\nuses_tabs = '\\\\t' in content[:2000]...",
-  "error": "Exit code 1\nERROR: Sorry: TabError: inconsistent use of tabs and spaces in indentation (capability_contract.py, line 70)\n68: ''\n69: '# Required contract keys,'\n70: '        \"ui\": {\"type\": \"object\"},'\n71: '        \"theme\": {\"type\": \"object\"},'\n72: '        \"default_currency\": {\"type\": \"string\", \"default\": \"KES\"},'",
-  "timestamp": "2026-06-11T05:46:22.082Z",
-  "retry_count": 2
+  "tool_input_preview": "{\"command\":\"python3 -c \\\"\\nfrom capabilities.capability_contract_registry import load_contract_registry\\nreg = load_contract_registry()\\ncc = reg.get('fin_acct')\\nif cc:\\n    contract = cc.contract.ge...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 6, in <module>\nAttributeError: 'dict' object has no attribute 'get_capability_contract'",
+  "timestamp": "2026-06-11T06:39:18.557Z",
+  "retry_count": 1
 }

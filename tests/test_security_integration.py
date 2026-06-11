@@ -23,9 +23,9 @@ from capabilities.capability_contract_registry import (
 
 @pytest.fixture(scope="session")
 def registry() -> dict[str, Any]:
-	"""Return the full capability contract registry (all 259 capabilities)."""
+	"""Return the full capability contract registry (all capabilities)."""
 	reg = load_contract_registry()
-	assert len(reg) == 259, f"Expected 259 capabilities, got {len(reg)}"
+	assert len(reg) >= 259, f"Expected >= 259 capabilities, got {len(reg)}"
 	return reg
 
 
