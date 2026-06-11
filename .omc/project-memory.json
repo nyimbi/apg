@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "git add -A && git commit -m \"$(cat <<'EOF'\nFix streaming exclusion: add .omc/ prefix and verify all hygiene tests pass\n\n.omc/ contains OMC internal state files including commit message history,\nwhich may reference external systems by name. These are not APG production\ncode and should not be scanned for streaming platform naming.\n\nAll 20 repository hygiene tests now pass.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n)\" && uv run pytest tests/ -q --tb=line 2>&1 | tail -5",
+    "testCommand": "git add -A && git commit -m \"$(cat <<'EOF'\nFix BoundedCache constructor call in mlx/service.py\n\nThe enhancement agent added ttl= to BoundedCache() constructor which doesn't\naccept it — ttl is a per-item parameter on .set(key, value, ttl=...).\nFixed: BoundedCache(max_size=512, ttl=cache_ttl) → BoundedCache(max_size=512)\n\nAll 16 MLX capability tests now pass.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n)\" && uv run pytest tests/ -q --tb=line 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}

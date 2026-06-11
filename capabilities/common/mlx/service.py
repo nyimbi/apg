@@ -117,7 +117,7 @@ class MLCapability:
 		self._base_url = self._ollama_url  # backward-compat alias
 		self._client = httpx.AsyncClient(base_url=self._ollama_url, timeout=_TIMEOUT)
 		self._sem = asyncio.Semaphore(batch_concurrency)
-		self._cache: BoundedCache | None = BoundedCache(max_size=512, ttl=cache_ttl) if cache_ttl > 0 else None
+		self._cache: BoundedCache | None = BoundedCache(max_size=512) if cache_ttl > 0 else None
 		self._auto_route = auto_route
 		# Inference counters
 		self._total_calls: int = 0

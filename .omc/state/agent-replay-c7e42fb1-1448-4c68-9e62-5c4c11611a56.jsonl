@@ -1203,3 +1203,4 @@
 {"t":0,"agent":"ac240dd","agent_type":"workflow-subagent","event":"agent_stop","success":true}
 {"t":0,"agent":"a7365bf","agent_type":"workflow-subagent","event":"agent_stop","success":true}
 {"t":0,"agent":"a458fd4","agent_type":"workflow-subagent","event":"agent_stop","success":true}
+{"t":0,"agent":"acb9c97","agent_type":"unknown","event":"agent_stop","success":true}
