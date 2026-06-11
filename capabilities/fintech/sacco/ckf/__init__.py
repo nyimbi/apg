@@ -1,0 +1,5 @@
+"""SACCO Check-off Management capability."""
+CAPABILITY_ID = "fintech_sacco_ckf"
+DOMAIN = "fintech"
+VERSION = "1.0.0"
+DESCRIPTION = "Employer salary deduction and remittance management for SACCO loan repayments and savings contributions."

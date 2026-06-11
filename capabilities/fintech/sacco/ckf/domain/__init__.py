@@ -1,0 +1,1 @@
+"""Check-off domain adapters."""
