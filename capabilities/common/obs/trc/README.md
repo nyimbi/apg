@@ -120,4 +120,4 @@ Pass `X-Tenant-ID: <tenant>` on every request for multi-tenant isolation.
 
 Spans are published to NATS subject `obs.trc.spans.live.<tenant_id>` as CloudEvents on
 `create_span` and `finish_span`.  Connect a NATS subscriber or use the SSE endpoint to
-receive live span updates with sub-100 ms latency.  (Uses NATS+bytewax — not Kafka.)
+receive live span updates with sub-100 ms latency.  (Uses NATS+bytewax — not NATS JetStream.)

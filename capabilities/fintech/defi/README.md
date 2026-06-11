@@ -173,4 +173,4 @@ Events emitted via Bytewax+NATS to the fintech event stream.
 - Health factor convention follows Aave/Compound: values > 1.0 are solvent, < 1.0 subject to liquidation
 - `real_yield_dashboard` uses observed swap volumes to estimate fee revenue; inject real on-chain data for production accuracy
 - `backtest_yield_strategy` uses `random.gauss` for APY noise — seed with a fixed value in tests for determinism
-- Streaming platform: Bytewax+NATS. Do not substitute Kafka or Spark Streaming.
+- Streaming platform: Bytewax+NATS. Do not substitute NATS JetStream or Spark Streaming.

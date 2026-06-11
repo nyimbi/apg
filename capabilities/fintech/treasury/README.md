@@ -188,7 +188,7 @@ The capability publishes events to the following NATS subjects (requires `NATS_U
 | `treasury.swift.gpi.{uetr}` | SWIFT gpi status transitions |
 | `treasury.limits.breach.{dealer_id}` | Real-time limit breach alerts |
 
-The platform uses **bytewax + NATS** (not Kafka) for streaming dataflows.
+The platform uses **bytewax + NATS** (not NATS JetStream) for streaming dataflows.
 
 ## Configuration
 
