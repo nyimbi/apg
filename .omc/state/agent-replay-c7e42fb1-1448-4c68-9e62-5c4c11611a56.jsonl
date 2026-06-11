@@ -763,3 +763,16 @@
 {"t":0,"agent":"af52e4f","agent_type":"workflow-subagent","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"af52e4f","agent_type":"workflow-subagent","event":"agent_stop","success":true,"duration_ms":558000}
 {"t":0,"agent":"a5cdaa1","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a33fc35","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a10ccee","agent_type":"code-review-expert","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"adfd79b","agent_type":"code-review-expert","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ac48b78","agent_type":"code-review-expert","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ae90470","agent_type":"code-review-expert","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"aa7477f","agent_type":"code-review-expert","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a3633f1","agent_type":"code-review-expert","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"adfd79b","agent_type":"code-review-expert","event":"agent_stop","success":true,"duration_ms":194219}
+{"t":0,"agent":"a10ccee","agent_type":"code-review-expert","event":"agent_stop","success":true,"duration_ms":220589}
+{"t":0,"agent":"ae90470","agent_type":"code-review-expert","event":"agent_stop","success":true,"duration_ms":200076}
+{"t":0,"agent":"a3633f1","agent_type":"code-review-expert","event":"agent_stop","success":true,"duration_ms":184568}
+{"t":0,"agent":"aa7477f","agent_type":"code-review-expert","event":"agent_stop","success":true,"duration_ms":327248}
+{"t":0,"agent":"ac48b78","agent_type":"code-review-expert","event":"agent_stop","success":true,"duration_ms":357578}

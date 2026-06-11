@@ -1,0 +1,9 @@
+{
+  "format": "apg.package-manifest.v1",
+  "capability_id": "fin_acct",
+  "package": "apg-fin-acct",
+  "version": "1.0.0",
+  "module": "apg_fin_acct",
+  "description": "Bank account lifecycle engine",
+  "dependencies": []
+}

@@ -34,6 +34,13 @@ _log = logging.getLogger(__name__)
 _DEFAULT_TIMEOUT = 10.0
 
 
+
+import hashlib as _hashlib
+
+def _cache_key(token: str) -> str:
+    """Blake2b hash of the full token — collision-resistant cache key."""
+    return _hashlib.blake2b(token.encode(), digest_size=32).hexdigest()
+
 class KeycloakAuthProvider:
     """Keycloak OIDC authentication provider."""
 
@@ -147,7 +154,7 @@ class KeycloakAuthProvider:
 
     @with_timeout(5.0)
     async def validate_token(self, token: str) -> TokenPayload:
-        cached = self._token_cache.get(token[:32])
+        cached = self._token_cache.get(_cache_key(token))
         if cached:
             return cached
 
@@ -181,8 +188,8 @@ class KeycloakAuthProvider:
                 expires_at=expires_at,
                 extra=data,
             )
-            ttl = (expires_at - datetime.now(timezone.utc)).seconds if expires_at else 300
-            self._token_cache.set(token[:32], payload, ttl=min(ttl, 300))
+            ttl = int((expires_at - datetime.now(timezone.utc)).total_seconds()) if expires_at else 300
+            self._token_cache.set(_cache_key(token), payload, ttl=min(ttl, 300))
             await self._cb._on_success()
             return payload
         except AuthenticationError:
@@ -215,7 +222,7 @@ class KeycloakAuthProvider:
 
     @with_timeout(10.0)
     async def logout(self, token: str, refresh_token: str | None = None) -> None:
-        self._token_cache.delete(token[:32])
+        self._token_cache.delete(_cache_key(token))
         if refresh_token:
             async with self._http() as client:
                 await client.post(

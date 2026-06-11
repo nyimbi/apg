@@ -54,16 +54,26 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 }
 
 
-def evaluate_capability_rules(config: dict[str, Any]) -> list[str]:
-	"""Return list of rule violations; empty = pass."""
-	violations: list[str] = []
-	cfg = deepcopy(DEFAULT_CONFIGURATION)
-	cfg.update(config)
-	if cfg.get("dormancy_threshold_days", 0) < 1:
-		violations.append("dormancy_threshold_days must be >= 1")
-	if cfg.get("max_overdraft_limit", 0) < 0:
-		violations.append("max_overdraft_limit must be >= 0")
-	return violations
+def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:
+	"""Evaluate governance rules. Returns {decision, matched_rules, effects}."""
+	matched: list[dict[str, Any]] = []
+	decision = "allow"
+	effects: list[dict[str, Any]] = []
+
+	for rule in rule_engine["rules"]:
+		condition = rule.get("condition", {})
+		for field, expected_falsy in condition.items():
+			# Condition fires when context field equals the expected value
+			ctx_val = context.get(field, not expected_falsy if isinstance(expected_falsy, bool) else None)
+			if ctx_val == expected_falsy:
+				effect = rule.get("effect", {})
+				matched.append(rule["name"])
+				effects.append(effect)
+				if effect.get("decision") == "deny":
+					decision = "deny"
+				break
+
+	return {"decision": decision, "matched_rules": matched, "effects": effects}
 
 THEME = {
 	"name": "fin_acct_banking",

@@ -48,16 +48,38 @@ def get_authz_provider() -> Any:
     return _authz_provider
 
 
-def reset_providers() -> None:
-    """Reset provider singletons — used in tests."""
+def reset_providers(*, _testing_only: bool = False) -> None:
+    """Reset provider singletons. Only call with _testing_only=True in tests."""
+    if not _testing_only:
+        raise RuntimeError(
+            "reset_providers() requires _testing_only=True. "
+            "Calling in production code resets auth to the null provider."
+        )
     global _auth_provider, _authz_provider
     _auth_provider = None
     _authz_provider = None
 
 
+_PROD_ENVS = frozenset(["production", "prod", "staging", "stg"])
+_DEV_PROVIDERS = frozenset(["null", "dev", "test", ""])
+
+
+def _assert_not_dev_in_production(name: str, var: str) -> None:
+    """Fail hard if a dev-only provider is used in a production environment."""
+    import os as _os
+    env = _os.environ.get("APG_ENV", _os.environ.get("FLASK_ENV", "development")).lower()
+    if env in _PROD_ENVS and name in _DEV_PROVIDERS:
+        raise RuntimeError(
+            f"SECURITY: {var}={name!r} is a dev-only provider "
+            f"and must NOT be used in APG_ENV={env!r}. "
+            f"Valid providers: keycloak, clerk, betterauth, fab"
+        )
+
+
 def _create_auth_provider() -> Any:
     name = os.environ.get("APG_AUTH_PROVIDER", "null").lower().strip()
     _log.info("Initialising auth provider: %s", name)
+    _assert_not_dev_in_production(name or "null", "APG_AUTH_PROVIDER")
 
     if name == "keycloak":
         from .providers.keycloak_provider import KeycloakAuthProvider
@@ -89,6 +111,7 @@ def _create_authz_provider() -> Any:
     name = os.environ.get("APG_AUTHZ_PROVIDER", "null").lower().strip()
     auth_name = os.environ.get("APG_AUTH_PROVIDER", "null").lower().strip()
     _log.info("Initialising authz provider: %s", name)
+    _assert_not_dev_in_production(name or "null", "APG_AUTHZ_PROVIDER")
 
     if name == "spicedb":
         from .providers.spicedb_provider import SpiceDBAuthzProvider

@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"python3 -c \\\"\\nfrom capabilities.capability_contract_registry import load_contract_registry\\nreg = load_contract_registry()\\ncc = reg.get('fin_acct')\\nif cc:\\n    contract = cc.contract.ge...",
-  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 6, in <module>\nAttributeError: 'dict' object has no attribute 'get_capability_contract'",
-  "timestamp": "2026-06-11T06:39:18.557Z",
+  "tool_input_preview": "{\"command\":\"for doc in /Users/nyimbiodero/src/pjs/apg/CLAUDE.md /Users/nyimbiodero/src/pjs/apg/CLAUDE.local.md /Users/nyimbiodero/src/pjs/apg/README.md /Users/nyimbiodero/src/pjs/apg/AGENTS.md; do [ -...",
+  "error": "Exit code 1\n=== /Users/nyimbiodero/src/pjs/apg/CLAUDE.md ===\n## Company Information\n- Company: Datacraft\n- Copyright: © 2025\n- Author: Nyimbi Odero\n\n## Contact Information\n- Website: www.datacraft.co.ke\n- Email: nyimbi@gmail.com\n\nMake your responses succinct and to the point.\n\n## Development Process\n- When developing a capability, follow the process outlined in this file .claude/commands/dev.md. Essentially execute the /dev command\n\n## Technology Strategy\n- For generative AI we focus on locally ...",
+  "timestamp": "2026-06-11T07:09:55.623Z",
   "retry_count": 1
 }

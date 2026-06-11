@@ -424,7 +424,7 @@ class GLService:
 	async def get_pending_approval_entries(self) -> list[dict[str, Any]]:
 		return [je for je in self._journal_entries if je.get("status") == "PENDING"]
 
-	@idempotent(key_fn=lambda self, tenant_id, batch_id, **_: f"gl_batch:{tenant_id}:{batch_id}")
+	@idempotent(key_fn=lambda self, entries_batch, batch_id, **_: f"gl_batch:{self._tenant_id}:{batch_id}")
 	async def post_batch_entries(
 		self,
 		entries_batch: list[dict[str, Any]],
@@ -803,16 +803,51 @@ class GLService:
 		return self._compute_balance("3300", as_of_date)
 
 	async def close_year(self, year: int, closed_by: str = "system") -> dict[str, Any]:
+		"""Close the year by zeroing ALL income and expense accounts to retained earnings (3300).
+
+		Correctly sweeps every P&L account (4xxx income, 5xxx expense) — not just 4100.
+		Required for SASRA capital adequacy calculations to be correct on year-end data.
+		"""
 		pnl = await self.get_profit_and_loss(f"{year}-01-01", f"{year}-12-31")
 		net = Decimal(pnl["net_surplus"])
-		# Transfer net to retained earnings
-		if net != 0:
+		lines: list[dict[str, Any]] = []
+
+		# Debit all income accounts to zero them (credit-normal → debit to close)
+		for item in pnl["income"]:
+			bal = Decimal(item["amount"])
+			if bal != 0:
+				lines.append({
+					"account_code": item["code"],
+					"debit_amount": bal, "credit_amount": Decimal("0"),
+					"narrative": f"Year {year} income close",
+				})
+
+		# Credit all expense accounts to zero them (debit-normal → credit to close)
+		for item in pnl["expenses"]:
+			bal = Decimal(item["amount"])
+			if bal != 0:
+				lines.append({
+					"account_code": item["code"],
+					"debit_amount": Decimal("0"), "credit_amount": bal,
+					"narrative": f"Year {year} expense close",
+				})
+
+		# Transfer net surplus/deficit to retained earnings (3300)
+		if net > 0:
+			lines.append({
+				"account_code": "3300", "debit_amount": Decimal("0"), "credit_amount": net,
+				"narrative": "Transfer net surplus to retained earnings",
+			})
+		elif net < 0:
+			lines.append({
+				"account_code": "3300", "debit_amount": abs(net), "credit_amount": Decimal("0"),
+				"narrative": "Transfer net deficit from retained earnings",
+			})
+
+		if lines:
 			await self.post_journal_entry(
-				entries=[
-					{"account_code": "4100", "debit_amount": net if net > 0 else Decimal("0"), "credit_amount": Decimal("0") if net > 0 else abs(net), "narrative": "Year-end close"},
-					{"account_code": "3300", "debit_amount": Decimal("0") if net > 0 else abs(net), "credit_amount": net if net > 0 else Decimal("0"), "narrative": "Transfer to retained earnings"},
-				],
-				description=f"Year {year} close to retained earnings",
+				entries=lines,
+				description=f"Year {year} close — P&L accounts to retained earnings",
 				reference=f"YEARCLOSE-{year}",
 				posting_date=f"{year}-12-31",
 				period_id=f"{year}-12",

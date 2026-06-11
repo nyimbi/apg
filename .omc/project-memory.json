@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "python3 docs/reliability/platform_scan.py --fast 2>&1 | tail -3 && uv run pytest tests/test_composability_comprehensive.py tests/test_integration_platform.py -q 2>&1 | tail -3",
+    "testCommand": "uv run pytest tests/test_tooling_audit.py::test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces -q --tb=short 2>&1 | tail -8",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}

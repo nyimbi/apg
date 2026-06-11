@@ -1,7 +1,7 @@
 """Domain adapters for EOD/BOD Processing Engine.
 
 Swap these adapters to connect to real data stores (PostgreSQL via SQLAlchemy,
-Redis for idempotency, Kafka for events). The service.py uses these hooks via
+Redis for idempotency, NATS JetStream for events). The service.py uses these hooks via
 dependency injection — pass adapter instances to EODService.__init__().
 
 Pattern: each adapter is a Protocol + default in-memory implementation.
@@ -147,7 +147,7 @@ class EventBusAdapter(Protocol):
 
 	@abstractmethod
 	async def publish(self, tenant_id: str, event_type: str, payload: dict[str, Any]) -> None:
-		"""Publish an EOD event for downstream consumers (NATS, Kafka, etc.)."""
+		"""Publish an EOD event for downstream consumers via NATS JetStream."""
 		...
 
 

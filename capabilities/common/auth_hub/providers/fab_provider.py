@@ -52,12 +52,29 @@ def _get_security_manager() -> Any:
 		) from exc
 
 
+def _get_jwt_secret() -> str:
+	"""Get JWT signing secret — must be set in production."""
+	import os as _os
+	secret = _os.environ.get("APG_JWT_SECRET") or _os.environ.get("SECRET_KEY")
+	if not secret:
+		raise RuntimeError(
+			"APG_JWT_SECRET must be set for FABAuthProvider. "
+			"Generate: python -c \"import secrets; print(secrets.token_hex(32))\""
+		)
+	if len(secret) < 32:
+		raise RuntimeError(
+			f"APG_JWT_SECRET is only {len(secret)} chars — minimum 32 required. "
+			"Short secrets are brute-forceable."
+		)
+	return secret
+
+
 def _make_jwt_token(user_id: str, email: str, roles: list[str], expires_in: int = 3600) -> str:
 	"""Generate a signed JWT for FAB users (uses PyJWT if available)."""
 	import os
 	try:
 		import jwt
-		secret = os.environ.get("APG_JWT_SECRET", os.environ.get("SECRET_KEY", "apg-dev-secret"))
+		secret = _get_jwt_secret()
 		now = datetime.now(timezone.utc)
 		payload = {
 			"sub": user_id,
@@ -71,6 +88,13 @@ def _make_jwt_token(user_id: str, email: str, roles: list[str], expires_in: int 
 		# Fallback: opaque token (store in cache)
 		return f"fab-{uuid7str()}"
 
+
+
+import hashlib as _hashlib
+
+def _cache_key(token: str) -> str:
+    """Blake2b hash of the full token — collision-resistant cache key."""
+    return _hashlib.blake2b(token.encode(), digest_size=32).hexdigest()
 
 class FABAuthProvider:
 	"""Flask-AppBuilder authentication provider.
@@ -139,14 +163,14 @@ class FABAuthProvider:
 		)
 
 	async def validate_token(self, token: str) -> TokenPayload:
-		cached = self._token_cache.get(token[:32])
+		cached = self._token_cache.get(_cache_key(token))
 		if cached:
 			return cached
 
 		# Try JWT validation first
 		try:
 			import os, jwt as pyjwt
-			secret = os.environ.get("APG_JWT_SECRET", os.environ.get("SECRET_KEY", "apg-dev-secret"))
+			secret = _get_jwt_secret()
 			payload_data = pyjwt.decode(token, secret, algorithms=["HS256"])
 			payload = TokenPayload(
 				user_id=payload_data["sub"],
@@ -154,7 +178,7 @@ class FABAuthProvider:
 				roles=payload_data.get("roles", []),
 				expires_at=datetime.fromtimestamp(payload_data["exp"], tz=timezone.utc),
 			)
-			self._token_cache.set(token[:32], payload, ttl=300)
+			self._token_cache.set(_cache_key(token), payload, ttl=300)
 			return payload
 		except ImportError:
 			pass
@@ -170,7 +194,7 @@ class FABAuthProvider:
 				roles=session["roles"],
 				expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
 			)
-			self._token_cache.set(token[:32], payload, ttl=300)
+			self._token_cache.set(_cache_key(token), payload, ttl=300)
 			return payload
 
 		raise AuthenticationError("Invalid or expired token", "token_invalid")
@@ -184,7 +208,7 @@ class FABAuthProvider:
 		raise AuthenticationError("Refresh token invalid or expired", "refresh_expired")
 
 	async def logout(self, token: str, refresh_token: str | None = None) -> None:
-		self._token_cache.delete(token[:32])
+		self._token_cache.delete(_cache_key(token))
 		self._session_store.pop(token, None)
 
 	async def create_user(self, user_data: dict[str, Any]) -> AuthUser:

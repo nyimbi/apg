@@ -1,0 +1,18 @@
+{
+  "format": "apg.semantic-model.v1",
+  "capability_id": "fin_acct",
+  "domain": "fin",
+  "version": "1.0.0",
+  "description": "Bank account lifecycle engine",
+  "entities": {
+    "BankAccount": {
+      "fields": [
+        "id",
+        "tenant_id",
+        "account_number",
+        "balance"
+      ]
+    }
+  },
+  "agents": {}
+}

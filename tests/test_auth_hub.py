@@ -17,9 +17,9 @@ def use_null_providers(monkeypatch):
 	monkeypatch.setenv("APG_AUTHZ_PROVIDER", "null")
 	# Reset singletons between tests
 	from capabilities.common.auth_hub.factory import reset_providers
-	reset_providers()
+	reset_providers(_testing_only=True)
 	yield
-	reset_providers()
+	reset_providers(_testing_only=True)
 
 
 # ── Factory tests ─────────────────────────────────────────────────
@@ -47,7 +47,7 @@ class TestFactory:
 	def test_unknown_provider_raises(self, monkeypatch):
 		monkeypatch.setenv("APG_AUTH_PROVIDER", "invalid_provider")
 		from capabilities.common.auth_hub.factory import reset_providers, _create_auth_provider
-		reset_providers()
+		reset_providers(_testing_only=True)
 		with pytest.raises(ValueError, match="Unknown APG_AUTH_PROVIDER"):
 			_create_auth_provider()
 

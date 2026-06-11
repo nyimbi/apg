@@ -78,15 +78,13 @@ def require_auth(fn: Callable) -> Callable:
 
         return await fn(*args, **kwargs)
 
-    @functools.wraps(fn)
-    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-        loop = asyncio.new_event_loop()
-        try:
-            return loop.run_until_complete(async_wrapper(*args, **kwargs))
-        finally:
-            loop.close()
+    if not asyncio.iscoroutinefunction(fn):
+        raise TypeError(
+            f"@require_auth requires an async view function. "
+            f"Decorate {fn.__name__!r} with 'async def' or install flask[async]."
+        )
 
-    return async_wrapper if asyncio.iscoroutinefunction(fn) else sync_wrapper
+    return async_wrapper
 
 
 def require_permission(

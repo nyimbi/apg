@@ -32,6 +32,13 @@ _log = logging.getLogger(__name__)
 _CLERK_API = "https://api.clerk.com/v1"
 
 
+
+import hashlib as _hashlib
+
+def _cache_key(token: str) -> str:
+    """Blake2b hash of the full token — collision-resistant cache key."""
+    return _hashlib.blake2b(token.encode(), digest_size=32).hexdigest()
+
 class ClerkAuthProvider:
     """Clerk authentication provider.
 
@@ -111,7 +118,7 @@ class ClerkAuthProvider:
     @with_timeout(5.0)
     async def validate_token(self, token: str) -> TokenPayload:
         """Verify a Clerk session token via the sessions API."""
-        cached = self._token_cache.get(token[:32])
+        cached = self._token_cache.get(_cache_key(token))
         if cached:
             return cached
 
@@ -143,7 +150,7 @@ class ClerkAuthProvider:
                 extra=session,
             )
             ttl = int((expires_at - datetime.now(timezone.utc)).total_seconds()) if expires_at else 300
-            self._token_cache.set(token[:32], payload, ttl=min(ttl, 300))
+            self._token_cache.set(_cache_key(token), payload, ttl=min(ttl, 300))
             await self._cb._on_success()
             return payload
         except AuthenticationError:
@@ -162,7 +169,7 @@ class ClerkAuthProvider:
     @with_timeout(10.0)
     async def logout(self, token: str, refresh_token: str | None = None) -> None:
         """Revoke the Clerk session."""
-        self._token_cache.delete(token[:32])
+        self._token_cache.delete(_cache_key(token))
         try:
             payload = await self.validate_token(token)
             session_id = payload.extra.get("id", "")

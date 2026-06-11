@@ -1,0 +1,33 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Bank Account Management",
+        "errors": [],
+        "route_count": 7,
+        "rule_count": 11,
+        "streaming_processor": "bytewax",
+        "theme": "fin_acct_banking"
+      }
+    },
+    "self_test": {
+      "capability": "fin_acct",
+      "errors": [],
+      "passed": true,
+      "routes": [
+        "/health"
+      ],
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "fin_acct",
+      "errors": [],
+      "version": "1.0.0"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "package": "apg-fin-acct",
+  "source": "capabilities/fin/acct",
+  "target": "pypi"
+}
