@@ -33,6 +33,7 @@ CAPABILITY_META = {
 		'dep',  # Deposit Products Engine
 		'acct', # Bank Account Management
 		'eod',  # EOD/BOD Processing Engine
+		'lms',  # Loan Management System
 	],
 	'implemented_subcapabilities': [
 		'glr',  # General Ledger
@@ -53,6 +54,7 @@ CAPABILITY_META = {
 		'dep',  # Deposit Products Engine
 		'acct', # Bank Account Management
 		'eod',  # EOD/BOD Processing Engine
+		'lms',  # Loan Management System
 	],
 	'database_prefix': 'cf_',
 	'menu_category': 'Financials',
@@ -85,6 +87,10 @@ except Exception:
 	pass
 try:
 	from . import eod   # EOD/BOD Processing Engine
+except Exception:
+	pass
+try:
+	from . import lms   # Loan Management System
 except Exception:
 	pass
 
