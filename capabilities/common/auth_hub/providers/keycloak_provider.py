@@ -73,29 +73,42 @@ class KeycloakAuthProvider:
         # Token validation cache (avoids hitting Keycloak on every request)
         self._token_cache = BoundedCache(max_size=5000)
         self._cb = get_circuit_breaker("keycloak_auth", failure_threshold=5, reset_timeout=60.0)
+        self._shared_client = httpx.AsyncClient(
+            timeout=10.0,
+            limits=httpx.Limits(
+                max_connections=50,
+                max_keepalive_connections=20,
+                keepalive_expiry=30.0,
+            ),
+        )
 
     def _http(self, timeout: float = _DEFAULT_TIMEOUT) -> httpx.AsyncClient:
-        return httpx.AsyncClient(timeout=timeout)
+        """Return shared persistent client — connection pool reuse."""
+        return self._shared_client
+
+    async def close(self) -> None:
+        """Release connection pool. Call from application shutdown."""
+        await self._shared_client.aclose()
 
     async def _get_admin_token(self) -> str:
         """Get or refresh the admin access token."""
         if time.monotonic() < self._admin_token_expires - 30:
             return self._admin_token
-        async with self._http() as client:
-            resp = await client.post(
-                f"{self._realm_url}/protocol/openid-connect/token",
-                data={
-                    "grant_type": "password",
-                    "client_id": "admin-cli",
-                    "username": self._admin_user,
-                    "password": self._admin_pass,
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            self._admin_token = data["access_token"]
-            self._admin_token_expires = time.monotonic() + data.get("expires_in", 60)
-            return self._admin_token
+        client = self._shared_client
+        resp = await client.post(
+            f"{self._realm_url}/protocol/openid-connect/token",
+            data={
+                "grant_type": "password",
+                "client_id": "admin-cli",
+                "username": self._admin_user,
+                "password": self._admin_pass,
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        self._admin_token = data["access_token"]
+        self._admin_token_expires = time.monotonic() + data.get("expires_in", 60)
+        return self._admin_token
 
     def _parse_token_response(self, data: dict[str, Any], user_info: dict[str, Any]) -> AuthResult:
         user = AuthUser(
@@ -121,31 +134,31 @@ class KeycloakAuthProvider:
     async def authenticate(self, credentials: dict[str, Any]) -> AuthResult:
         await self._cb._before_call()
         try:
-            async with self._http() as client:
-                resp = await client.post(
-                    f"{self._oidc_url}/token",
-                    data={
-                        "grant_type": "password",
-                        "client_id": self._client_id,
-                        "client_secret": self._client_secret,
-                        "username": credentials.get("username", ""),
-                        "password": credentials.get("password", ""),
-                        "scope": "openid profile email",
-                    },
-                )
-                if resp.status_code in (401, 403):
-                    raise AuthenticationError("Invalid username or password", "invalid_credentials")
-                resp.raise_for_status()
-                token_data = resp.json()
+            client = self._shared_client
+            resp = await client.post(
+                f"{self._oidc_url}/token",
+                data={
+                    "grant_type": "password",
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret,
+                    "username": credentials.get("username", ""),
+                    "password": credentials.get("password", ""),
+                    "scope": "openid profile email",
+                },
+            )
+            if resp.status_code in (401, 403):
+                raise AuthenticationError("Invalid username or password", "invalid_credentials")
+            resp.raise_for_status()
+            token_data = resp.json()
 
-                # Get user info
-                userinfo_resp = await client.get(
-                    f"{self._oidc_url}/userinfo",
-                    headers={"Authorization": f"Bearer {token_data['access_token']}"},
-                )
-                userinfo_resp.raise_for_status()
-                await self._cb._on_success()
-                return self._parse_token_response(token_data, userinfo_resp.json())
+            # Get user info
+            userinfo_resp = await client.get(
+                f"{self._oidc_url}/userinfo",
+                headers={"Authorization": f"Bearer {token_data['access_token']}"},
+            )
+            userinfo_resp.raise_for_status()
+            await self._cb._on_success()
+            return self._parse_token_response(token_data, userinfo_resp.json())
         except AuthenticationError:
             raise
         except Exception as exc:
@@ -160,17 +173,17 @@ class KeycloakAuthProvider:
 
         await self._cb._before_call()
         try:
-            async with self._http() as client:
-                resp = await client.post(
-                    f"{self._oidc_url}/token/introspect",
-                    data={
-                        "client_id": self._client_id,
-                        "client_secret": self._client_secret,
-                        "token": token,
-                    },
-                )
-                resp.raise_for_status()
-                data = resp.json()
+            client = self._shared_client
+            resp = await client.post(
+                f"{self._oidc_url}/token/introspect",
+                data={
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret,
+                    "token": token,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
 
             if not data.get("active"):
                 raise AuthenticationError("Token is inactive or expired", "token_expired")
@@ -200,121 +213,121 @@ class KeycloakAuthProvider:
 
     @with_timeout(10.0)
     async def refresh_token(self, refresh_token: str) -> TokenPair:
-        async with self._http() as client:
-            resp = await client.post(
-                f"{self._oidc_url}/token",
-                data={
-                    "grant_type": "refresh_token",
-                    "client_id": self._client_id,
-                    "client_secret": self._client_secret,
-                    "refresh_token": refresh_token,
-                },
-            )
-            if resp.status_code in (400, 401):
-                raise AuthenticationError("Refresh token expired or invalid", "refresh_expired")
-            resp.raise_for_status()
-            data = resp.json()
-            return TokenPair(
-                access_token=data["access_token"],
-                refresh_token=data.get("refresh_token", refresh_token),
-                expires_in=data.get("expires_in", 3600),
-            )
+        client = self._shared_client
+        resp = await client.post(
+            f"{self._oidc_url}/token",
+            data={
+                "grant_type": "refresh_token",
+                "client_id": self._client_id,
+                "client_secret": self._client_secret,
+                "refresh_token": refresh_token,
+            },
+        )
+        if resp.status_code in (400, 401):
+            raise AuthenticationError("Refresh token expired or invalid", "refresh_expired")
+        resp.raise_for_status()
+        data = resp.json()
+        return TokenPair(
+            access_token=data["access_token"],
+            refresh_token=data.get("refresh_token", refresh_token),
+            expires_in=data.get("expires_in", 3600),
+        )
 
     @with_timeout(10.0)
     async def logout(self, token: str, refresh_token: str | None = None) -> None:
         self._token_cache.delete(_cache_key(token))
         if refresh_token:
-            async with self._http() as client:
-                await client.post(
-                    f"{self._oidc_url}/logout",
-                    data={
-                        "client_id": self._client_id,
-                        "client_secret": self._client_secret,
-                        "refresh_token": refresh_token,
-                    },
-                )
+            client = self._shared_client
+            await client.post(
+                f"{self._oidc_url}/logout",
+                data={
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret,
+                    "refresh_token": refresh_token,
+                },
+            )
 
     @with_timeout(10.0)
     async def create_user(self, user_data: dict[str, Any]) -> AuthUser:
         admin_token = await self._get_admin_token()
-        async with self._http() as client:
-            payload = {
-                "username": user_data.get("username", user_data.get("email", "")),
-                "email": user_data.get("email", ""),
-                "firstName": user_data.get("first_name", ""),
-                "lastName": user_data.get("last_name", ""),
-                "enabled": True,
-                "emailVerified": False,
-            }
-            if password := user_data.get("password"):
-                payload["credentials"] = [{"type": "password", "value": password, "temporary": False}]
-            resp = await client.post(
-                f"{self._admin_url}/users",
-                json=payload,
-                headers={"Authorization": f"Bearer {admin_token}"},
-            )
-            resp.raise_for_status()
-            location = resp.headers.get("Location", "")
-            user_id = location.split("/")[-1] if location else ""
-            return AuthUser(
-                id=user_id,
-                email=user_data.get("email", ""),
-                username=user_data.get("username", user_data.get("email", "")),
-                first_name=user_data.get("first_name", ""),
-                last_name=user_data.get("last_name", ""),
-                is_active=True,
-            )
+        client = self._shared_client
+        payload = {
+            "username": user_data.get("username", user_data.get("email", "")),
+            "email": user_data.get("email", ""),
+            "firstName": user_data.get("first_name", ""),
+            "lastName": user_data.get("last_name", ""),
+            "enabled": True,
+            "emailVerified": False,
+        }
+        if password := user_data.get("password"):
+            payload["credentials"] = [{"type": "password", "value": password, "temporary": False}]
+        resp = await client.post(
+            f"{self._admin_url}/users",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        resp.raise_for_status()
+        location = resp.headers.get("Location", "")
+        user_id = location.split("/")[-1] if location else ""
+        return AuthUser(
+            id=user_id,
+            email=user_data.get("email", ""),
+            username=user_data.get("username", user_data.get("email", "")),
+            first_name=user_data.get("first_name", ""),
+            last_name=user_data.get("last_name", ""),
+            is_active=True,
+        )
 
     @with_timeout(10.0)
     async def get_user(self, user_id: str) -> AuthUser:
         admin_token = await self._get_admin_token()
-        async with self._http() as client:
-            resp = await client.get(
-                f"{self._admin_url}/users/{user_id}",
-                headers={"Authorization": f"Bearer {admin_token}"},
-            )
-            resp.raise_for_status()
-            d = resp.json()
-            return AuthUser(
-                id=d.get("id", user_id),
-                email=d.get("email", ""),
-                username=d.get("username", ""),
-                first_name=d.get("firstName", ""),
-                last_name=d.get("lastName", ""),
-                is_active=d.get("enabled", True),
-                is_email_verified=d.get("emailVerified", False),
-            )
+        client = self._shared_client
+        resp = await client.get(
+            f"{self._admin_url}/users/{user_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        resp.raise_for_status()
+        d = resp.json()
+        return AuthUser(
+            id=d.get("id", user_id),
+            email=d.get("email", ""),
+            username=d.get("username", ""),
+            first_name=d.get("firstName", ""),
+            last_name=d.get("lastName", ""),
+            is_active=d.get("enabled", True),
+            is_email_verified=d.get("emailVerified", False),
+        )
 
     @with_timeout(10.0)
     async def update_user(self, user_id: str, updates: dict[str, Any]) -> AuthUser:
         admin_token = await self._get_admin_token()
-        async with self._http() as client:
-            payload: dict[str, Any] = {}
-            if "email" in updates:
-                payload["email"] = updates["email"]
-            if "first_name" in updates:
-                payload["firstName"] = updates["first_name"]
-            if "last_name" in updates:
-                payload["lastName"] = updates["last_name"]
-            if "is_active" in updates:
-                payload["enabled"] = updates["is_active"]
-            resp = await client.put(
-                f"{self._admin_url}/users/{user_id}",
-                json=payload,
-                headers={"Authorization": f"Bearer {admin_token}"},
-            )
-            resp.raise_for_status()
-            return await self.get_user(user_id)
+        client = self._shared_client
+        payload: dict[str, Any] = {}
+        if "email" in updates:
+            payload["email"] = updates["email"]
+        if "first_name" in updates:
+            payload["firstName"] = updates["first_name"]
+        if "last_name" in updates:
+            payload["lastName"] = updates["last_name"]
+        if "is_active" in updates:
+            payload["enabled"] = updates["is_active"]
+        resp = await client.put(
+            f"{self._admin_url}/users/{user_id}",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        resp.raise_for_status()
+        return await self.get_user(user_id)
 
     @with_timeout(10.0)
     async def delete_user(self, user_id: str) -> None:
         admin_token = await self._get_admin_token()
-        async with self._http() as client:
-            resp = await client.delete(
-                f"{self._admin_url}/users/{user_id}",
-                headers={"Authorization": f"Bearer {admin_token}"},
-            )
-            resp.raise_for_status()
+        client = self._shared_client
+        resp = await client.delete(
+            f"{self._admin_url}/users/{user_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        resp.raise_for_status()
 
     @with_timeout(15.0)
     async def list_users(self, search: str | None = None, limit: int = 50, page: int = 1) -> UserList:
@@ -322,20 +335,20 @@ class KeycloakAuthProvider:
         params: dict[str, Any] = {"max": limit, "first": (page - 1) * limit}
         if search:
             params["search"] = search
-        async with self._http() as client:
-            resp = await client.get(
-                f"{self._admin_url}/users",
-                params=params,
-                headers={"Authorization": f"Bearer {admin_token}"},
-            )
-            resp.raise_for_status()
-            users_data = resp.json()
-            count_resp = await client.get(
-                f"{self._admin_url}/users/count",
-                params={"search": search} if search else {},
-                headers={"Authorization": f"Bearer {admin_token}"},
-            )
-            total = count_resp.json() if count_resp.status_code == 200 else len(users_data)
+        client = self._shared_client
+        resp = await client.get(
+            f"{self._admin_url}/users",
+            params=params,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        resp.raise_for_status()
+        users_data = resp.json()
+        count_resp = await client.get(
+            f"{self._admin_url}/users/count",
+            params={"search": search} if search else {},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        total = count_resp.json() if count_resp.status_code == 200 else len(users_data)
 
         users = [
             AuthUser(
@@ -352,12 +365,12 @@ class KeycloakAuthProvider:
         users = await self.list_users(search=email, limit=1)
         if users.users:
             admin_token = await self._get_admin_token()
-            async with self._http() as client:
-                await client.put(
-                    f"{self._admin_url}/users/{users.users[0].id}/execute-actions-email",
-                    json=["UPDATE_PASSWORD"],
-                    headers={"Authorization": f"Bearer {admin_token}"},
-                )
+            client = self._shared_client
+            await client.put(
+                f"{self._admin_url}/users/{users.users[0].id}/execute-actions-email",
+                json=["UPDATE_PASSWORD"],
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
 
     async def reset_password(self, token: str, new_password: str) -> None:
         raise ProviderNotImplementedError("Keycloak handles password reset via email link — use send_password_reset()")
@@ -382,34 +395,34 @@ class KeycloakAuthProvider:
         )
 
     async def exchange_oauth_code(self, code: str, state: str, redirect_uri: str, provider: str) -> AuthResult:
-        async with self._http() as client:
-            resp = await client.post(
-                f"{self._oidc_url}/token",
-                data={
-                    "grant_type": "authorization_code",
-                    "client_id": self._client_id,
-                    "client_secret": self._client_secret,
-                    "code": code,
-                    "redirect_uri": redirect_uri,
-                },
-            )
-            resp.raise_for_status()
-            token_data = resp.json()
-            userinfo_resp = await client.get(
-                f"{self._oidc_url}/userinfo",
-                headers={"Authorization": f"Bearer {token_data['access_token']}"},
-            )
-            return self._parse_token_response(token_data, userinfo_resp.json())
+        client = self._shared_client
+        resp = await client.post(
+            f"{self._oidc_url}/token",
+            data={
+                "grant_type": "authorization_code",
+                "client_id": self._client_id,
+                "client_secret": self._client_secret,
+                "code": code,
+                "redirect_uri": redirect_uri,
+            },
+        )
+        resp.raise_for_status()
+        token_data = resp.json()
+        userinfo_resp = await client.get(
+            f"{self._oidc_url}/userinfo",
+            headers={"Authorization": f"Bearer {token_data['access_token']}"},
+        )
+        return self._parse_token_response(token_data, userinfo_resp.json())
 
     async def setup_mfa(self, user_id: str, mfa_type: str) -> MFASetup:
         # Keycloak TOTP: trigger required action
         admin_token = await self._get_admin_token()
-        async with self._http() as client:
-            await client.put(
-                f"{self._admin_url}/users/{user_id}/execute-actions-email",
-                json=["CONFIGURE_TOTP"],
-                headers={"Authorization": f"Bearer {admin_token}"},
-            )
+        client = self._shared_client
+        await client.put(
+            f"{self._admin_url}/users/{user_id}/execute-actions-email",
+            json=["CONFIGURE_TOTP"],
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
         return MFASetup(mfa_type="totp", session_token=user_id)
 
     async def verify_mfa(self, user_id: str, code: str, session_token: str) -> AuthResult:
@@ -417,36 +430,36 @@ class KeycloakAuthProvider:
 
     async def disable_mfa(self, user_id: str, mfa_type: str) -> None:
         admin_token = await self._get_admin_token()
-        async with self._http() as client:
-            resp = await client.get(
-                f"{self._admin_url}/users/{user_id}/credentials",
-                headers={"Authorization": f"Bearer {admin_token}"},
-            )
-            resp.raise_for_status()
-            for cred in resp.json():
-                if cred.get("type") == "otp":
-                    await client.delete(
-                        f"{self._admin_url}/users/{user_id}/credentials/{cred['id']}",
-                        headers={"Authorization": f"Bearer {admin_token}"},
-                    )
+        client = self._shared_client
+        resp = await client.get(
+            f"{self._admin_url}/users/{user_id}/credentials",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        resp.raise_for_status()
+        for cred in resp.json():
+            if cred.get("type") == "otp":
+                await client.delete(
+                    f"{self._admin_url}/users/{user_id}/credentials/{cred['id']}",
+                    headers={"Authorization": f"Bearer {admin_token}"},
+                )
 
     async def get_sessions(self, user_id: str) -> list[dict[str, Any]]:
         admin_token = await self._get_admin_token()
-        async with self._http() as client:
-            resp = await client.get(
-                f"{self._admin_url}/users/{user_id}/sessions",
-                headers={"Authorization": f"Bearer {admin_token}"},
-            )
-            resp.raise_for_status()
-            return resp.json()
+        client = self._shared_client
+        resp = await client.get(
+            f"{self._admin_url}/users/{user_id}/sessions",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        resp.raise_for_status()
+        return resp.json()
 
     async def revoke_session(self, session_id: str) -> None:
         admin_token = await self._get_admin_token()
-        async with self._http() as client:
-            await client.delete(
-                f"{self._admin_url}/sessions/{session_id}",
-                headers={"Authorization": f"Bearer {admin_token}"},
-            )
+        client = self._shared_client
+        await client.delete(
+            f"{self._admin_url}/sessions/{session_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
 
     async def health_check(self) -> dict[str, Any]:
         try:

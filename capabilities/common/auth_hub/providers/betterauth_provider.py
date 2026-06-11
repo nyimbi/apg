@@ -65,6 +65,14 @@ class BetterAuthProvider:
         self._secret = secret or os.environ.get("APG_BETTERAUTH_SECRET", "")
         self._token_cache = BoundedCache(max_size=5000)
         self._cb = get_circuit_breaker("betterauth", failure_threshold=5, reset_timeout=60.0)
+        self._shared_client = httpx.AsyncClient(
+            timeout=10.0,
+            limits=httpx.Limits(
+                max_connections=50,
+                max_keepalive_connections=20,
+                keepalive_expiry=30.0,
+            ),
+        )
 
     def _headers(self, session_token: str | None = None) -> dict[str, str]:
         h = {"X-APG-Secret": self._secret, "Content-Type": "application/json"}
@@ -73,7 +81,12 @@ class BetterAuthProvider:
         return h
 
     def _http(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(timeout=10.0)
+        """Return shared persistent client — connection pool reuse."""
+        return self._shared_client
+
+    async def close(self) -> None:
+        """Release connection pool. Call from application shutdown."""
+        await self._shared_client.aclose()
 
     def _parse_user(self, u: dict[str, Any]) -> AuthUser:
         return AuthUser(
@@ -111,19 +124,19 @@ class BetterAuthProvider:
     async def authenticate(self, credentials: dict[str, Any]) -> AuthResult:
         await self._cb._before_call()
         try:
-            async with self._http() as client:
-                resp = await client.post(
-                    f"{self._base_url}/auth/sign-in/email",
-                    json={
-                        "email": credentials.get("email") or credentials.get("username", ""),
-                        "password": credentials.get("password", ""),
-                    },
-                    headers=self._headers(),
-                )
-                if resp.status_code in (401, 403):
-                    raise AuthenticationError("Invalid email or password", "invalid_credentials")
-                resp.raise_for_status()
-                data = resp.json()
+            client = self._shared_client
+            resp = await client.post(
+                f"{self._base_url}/auth/sign-in/email",
+                json={
+                    "email": credentials.get("email") or credentials.get("username", ""),
+                    "password": credentials.get("password", ""),
+                },
+                headers=self._headers(),
+            )
+            if resp.status_code in (401, 403):
+                raise AuthenticationError("Invalid email or password", "invalid_credentials")
+            resp.raise_for_status()
+            data = resp.json()
             await self._cb._on_success()
             return self._parse_session(data.get("session", {}), data.get("user", {}))
         except AuthenticationError:
@@ -140,15 +153,15 @@ class BetterAuthProvider:
 
         await self._cb._before_call()
         try:
-            async with self._http() as client:
-                resp = await client.get(
-                    f"{self._base_url}/auth/get-session",
-                    headers=self._headers(session_token=token),
-                )
-                if resp.status_code in (401, 403, 404):
-                    raise AuthenticationError("Invalid or expired session token", "token_invalid")
-                resp.raise_for_status()
-                data = resp.json()
+            client = self._shared_client
+            resp = await client.get(
+                f"{self._base_url}/auth/get-session",
+                headers=self._headers(session_token=token),
+            )
+            if resp.status_code in (401, 403, 404):
+                raise AuthenticationError("Invalid or expired session token", "token_invalid")
+            resp.raise_for_status()
+            data = resp.json()
 
             user = data.get("user", {})
             session = data.get("session", {})
@@ -180,83 +193,83 @@ class BetterAuthProvider:
 
     @with_timeout(10.0)
     async def refresh_token(self, refresh_token: str) -> TokenPair:
-        async with self._http() as client:
-            resp = await client.post(
-                f"{self._base_url}/auth/refresh",
-                json={"refreshToken": refresh_token},
-                headers=self._headers(),
-            )
-            if resp.status_code in (400, 401):
-                raise AuthenticationError("Refresh token invalid or expired", "refresh_expired")
-            resp.raise_for_status()
-            data = resp.json()
-            return TokenPair(
-                access_token=data.get("token", data.get("accessToken", "")),
-                refresh_token=data.get("refreshToken", refresh_token),
-                expires_in=data.get("expiresIn", 3600),
-            )
+        client = self._shared_client
+        resp = await client.post(
+            f"{self._base_url}/auth/refresh",
+            json={"refreshToken": refresh_token},
+            headers=self._headers(),
+        )
+        if resp.status_code in (400, 401):
+            raise AuthenticationError("Refresh token invalid or expired", "refresh_expired")
+        resp.raise_for_status()
+        data = resp.json()
+        return TokenPair(
+            access_token=data.get("token", data.get("accessToken", "")),
+            refresh_token=data.get("refreshToken", refresh_token),
+            expires_in=data.get("expiresIn", 3600),
+        )
 
     @with_timeout(10.0)
     async def logout(self, token: str, refresh_token: str | None = None) -> None:
         self._token_cache.delete(_cache_key(token))
         try:
-            async with self._http() as client:
-                await client.post(
-                    f"{self._base_url}/auth/sign-out",
-                    headers=self._headers(session_token=token),
-                )
+            client = self._shared_client
+            await client.post(
+                f"{self._base_url}/auth/sign-out",
+                headers=self._headers(session_token=token),
+            )
         except Exception as exc:
             _log.debug("Suppressed %s: %s", type(exc).__name__, exc)
 
     @with_timeout(10.0)
     async def create_user(self, user_data: dict[str, Any]) -> AuthUser:
-        async with self._http() as client:
-            resp = await client.post(
-                f"{self._base_url}/auth/sign-up/email",
-                json={
-                    "email": user_data.get("email", ""),
-                    "password": user_data.get("password", ""),
-                    "name": f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip(),
-                },
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return self._parse_user(data.get("user", data))
+        client = self._shared_client
+        resp = await client.post(
+            f"{self._base_url}/auth/sign-up/email",
+            json={
+                "email": user_data.get("email", ""),
+                "password": user_data.get("password", ""),
+                "name": f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip(),
+            },
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return self._parse_user(data.get("user", data))
 
     @with_timeout(5.0)
     async def get_user(self, user_id: str) -> AuthUser:
-        async with self._http() as client:
-            resp = await client.get(f"{self._base_url}/auth/user/{user_id}", headers=self._headers())
-            resp.raise_for_status()
-            return self._parse_user(resp.json())
+        client = self._shared_client
+        resp = await client.get(f"{self._base_url}/auth/user/{user_id}", headers=self._headers())
+        resp.raise_for_status()
+        return self._parse_user(resp.json())
 
     @with_timeout(10.0)
     async def update_user(self, user_id: str, updates: dict[str, Any]) -> AuthUser:
-        async with self._http() as client:
-            resp = await client.patch(
-                f"{self._base_url}/auth/user/{user_id}",
-                json=updates,
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
-            return self._parse_user(resp.json())
+        client = self._shared_client
+        resp = await client.patch(
+            f"{self._base_url}/auth/user/{user_id}",
+            json=updates,
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        return self._parse_user(resp.json())
 
     @with_timeout(10.0)
     async def delete_user(self, user_id: str) -> None:
-        async with self._http() as client:
-            resp = await client.delete(f"{self._base_url}/auth/user/{user_id}", headers=self._headers())
-            resp.raise_for_status()
+        client = self._shared_client
+        resp = await client.delete(f"{self._base_url}/auth/user/{user_id}", headers=self._headers())
+        resp.raise_for_status()
 
     @with_timeout(15.0)
     async def list_users(self, search: str | None = None, limit: int = 50, page: int = 1) -> UserList:
         params: dict[str, Any] = {"limit": limit, "page": page}
         if search:
             params["search"] = search
-        async with self._http() as client:
-            resp = await client.get(f"{self._base_url}/auth/users", params=params, headers=self._headers())
-            resp.raise_for_status()
-            data = resp.json()
+        client = self._shared_client
+        resp = await client.get(f"{self._base_url}/auth/users", params=params, headers=self._headers())
+        resp.raise_for_status()
+        data = resp.json()
         users_data = data.get("users", data) if isinstance(data, dict) else data
         users = [self._parse_user(u) for u in users_data]
         return UserList(
@@ -267,121 +280,121 @@ class BetterAuthProvider:
 
     @with_timeout(10.0)
     async def send_password_reset(self, email: str) -> None:
-        async with self._http() as client:
-            resp = await client.post(
-                f"{self._base_url}/auth/forget-password",
-                json={"email": email},
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
+        client = self._shared_client
+        resp = await client.post(
+            f"{self._base_url}/auth/forget-password",
+            json={"email": email},
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
 
     @with_timeout(10.0)
     async def reset_password(self, token: str, new_password: str) -> None:
-        async with self._http() as client:
-            resp = await client.post(
-                f"{self._base_url}/auth/reset-password",
-                json={"token": token, "newPassword": new_password},
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
+        client = self._shared_client
+        resp = await client.post(
+            f"{self._base_url}/auth/reset-password",
+            json={"token": token, "newPassword": new_password},
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
 
     @with_timeout(10.0)
     async def send_magic_link(self, email: str, redirect_url: str) -> None:
-        async with self._http() as client:
-            resp = await client.post(
-                f"{self._base_url}/auth/sign-in/magic-link",
-                json={"email": email, "callbackURL": redirect_url},
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
+        client = self._shared_client
+        resp = await client.post(
+            f"{self._base_url}/auth/sign-in/magic-link",
+            json={"email": email, "callbackURL": redirect_url},
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
 
     async def verify_magic_link(self, token: str) -> AuthResult:
-        async with self._http() as client:
-            resp = await client.get(
-                f"{self._base_url}/auth/magic-link/verify?token={token}",
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return self._parse_session(data.get("session", {}), data.get("user", {}))
+        client = self._shared_client
+        resp = await client.get(
+            f"{self._base_url}/auth/magic-link/verify?token={token}",
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return self._parse_session(data.get("session", {}), data.get("user", {}))
 
     async def get_oauth_authorization_url(
         self, provider: str, redirect_uri: str, state: str, scopes: list[str] | None = None
     ) -> str:
-        async with self._http() as client:
-            resp = await client.get(
-                f"{self._base_url}/auth/sign-in/social",
-                params={"provider": provider, "callbackURL": redirect_uri, "state": state},
-                headers=self._headers(),
-                follow_redirects=False,
-            )
-            location = resp.headers.get("Location", "")
-            if location:
-                return location
-            resp.raise_for_status()
-            return resp.json().get("url", "")
+        client = self._shared_client
+        resp = await client.get(
+            f"{self._base_url}/auth/sign-in/social",
+            params={"provider": provider, "callbackURL": redirect_uri, "state": state},
+            headers=self._headers(),
+            follow_redirects=False,
+        )
+        location = resp.headers.get("Location", "")
+        if location:
+            return location
+        resp.raise_for_status()
+        return resp.json().get("url", "")
 
     async def exchange_oauth_code(self, code: str, state: str, redirect_uri: str, provider: str) -> AuthResult:
-        async with self._http() as client:
-            resp = await client.post(
-                f"{self._base_url}/auth/callback/{provider}",
-                json={"code": code, "state": state, "redirectUri": redirect_uri},
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return self._parse_session(data.get("session", {}), data.get("user", {}))
+        client = self._shared_client
+        resp = await client.post(
+            f"{self._base_url}/auth/callback/{provider}",
+            json={"code": code, "state": state, "redirectUri": redirect_uri},
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return self._parse_session(data.get("session", {}), data.get("user", {}))
 
     async def setup_mfa(self, user_id: str, mfa_type: str) -> MFASetup:
-        async with self._http() as client:
-            resp = await client.post(
-                f"{self._base_url}/auth/two-factor/enable",
-                json={"userId": user_id, "type": mfa_type},
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return MFASetup(
-                mfa_type=mfa_type,
-                secret=data.get("secret"),
-                qr_code_url=data.get("qrCode"),
-                backup_codes=data.get("backupCodes", []),
-            )
+        client = self._shared_client
+        resp = await client.post(
+            f"{self._base_url}/auth/two-factor/enable",
+            json={"userId": user_id, "type": mfa_type},
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return MFASetup(
+            mfa_type=mfa_type,
+            secret=data.get("secret"),
+            qr_code_url=data.get("qrCode"),
+            backup_codes=data.get("backupCodes", []),
+        )
 
     async def verify_mfa(self, user_id: str, code: str, session_token: str) -> AuthResult:
-        async with self._http() as client:
-            resp = await client.post(
-                f"{self._base_url}/auth/two-factor/verify",
-                json={"userId": user_id, "code": code},
-                headers=self._headers(session_token=session_token),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return self._parse_session(data.get("session", {}), data.get("user", {}))
+        client = self._shared_client
+        resp = await client.post(
+            f"{self._base_url}/auth/two-factor/verify",
+            json={"userId": user_id, "code": code},
+            headers=self._headers(session_token=session_token),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return self._parse_session(data.get("session", {}), data.get("user", {}))
 
     async def disable_mfa(self, user_id: str, mfa_type: str) -> None:
-        async with self._http() as client:
-            await client.post(
-                f"{self._base_url}/auth/two-factor/disable",
-                json={"userId": user_id, "type": mfa_type},
-                headers=self._headers(),
-            )
+        client = self._shared_client
+        await client.post(
+            f"{self._base_url}/auth/two-factor/disable",
+            json={"userId": user_id, "type": mfa_type},
+            headers=self._headers(),
+        )
 
     async def get_sessions(self, user_id: str) -> list[dict[str, Any]]:
-        async with self._http() as client:
-            resp = await client.get(
-                f"{self._base_url}/auth/user/{user_id}/sessions", headers=self._headers()
-            )
-            resp.raise_for_status()
-            return resp.json()
+        client = self._shared_client
+        resp = await client.get(
+            f"{self._base_url}/auth/user/{user_id}/sessions", headers=self._headers()
+        )
+        resp.raise_for_status()
+        return resp.json()
 
     async def revoke_session(self, session_id: str) -> None:
-        async with self._http() as client:
-            await client.post(
-                f"{self._base_url}/auth/revoke-session",
-                json={"sessionId": session_id},
-                headers=self._headers(),
-            )
+        client = self._shared_client
+        await client.post(
+            f"{self._base_url}/auth/revoke-session",
+            json={"sessionId": session_id},
+            headers=self._headers(),
+        )
 
     async def health_check(self) -> dict[str, Any]:
         try:

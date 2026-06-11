@@ -20,14 +20,14 @@ CAPABILITY_ID = "fintech_sacco_fosa"
 
 # GL account codes (chart of accounts stubs)
 GL_CASH_TELLER     = "1001"
-GL_CASH_MPESA      = "1002"
-GL_CASH_BANK       = "1003"
-GL_ATM_SUSPENSE    = "1004"
-GL_FOSA_DEPOSITS   = "2101"   # CR — member FOSA deposits liability
-GL_BOSA_CONTROL    = "2201"   # BOSA inter-fund control
-GL_OVERDRAFT_ASSET = "1201"   # DR — overdraft receivable
-GL_INTEREST_INCOME = "4101"
-GL_CHARGES_INCOME  = "4102"
+GL_CASH_MPESA      = "1010"   # Bank - Current Account (MPESA float)
+GL_CASH_BANK       = "1020"   # Bank - Settlement Account
+GL_ATM_SUSPENSE    = "1520"   # Suspense - Debit (ATM settlements)
+GL_FOSA_DEPOSITS   = "2100"   # Member Deposits - FOSA   # CR — member FOSA deposits liability
+GL_BOSA_CONTROL    = "2110"   # Member Deposits - BOSA   # BOSA inter-fund control
+GL_OVERDRAFT_ASSET = "1100"   # Member Loans - FOSA (overdraft)   # DR — overdraft receivable
+GL_INTEREST_INCOME = "4110"   # Interest Income - FOSA Loans
+GL_CHARGES_INCOME  = "4300"   # Fee Income
 
 # Daily withdrawal limit default (KES)
 DEFAULT_WITHDRAWAL_LIMIT = Decimal("100000")
@@ -44,7 +44,7 @@ class FOSAService:
 	"""Async service for SACCO FOSA operations: deposits, withdrawals,
 	M-PESA, ATM cards, standing orders, overdrafts, and portfolio management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", gl_service=None) -> None:
 		self.tenant_id = tenant_id
 		self.accounts: dict[str, dict[str, Any]] = {}
 		self.transactions: dict[str, dict[str, Any]] = {}

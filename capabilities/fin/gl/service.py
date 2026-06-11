@@ -39,7 +39,7 @@ except ImportError:
 
 class GLImbalanceError(ValueError):
 	"""Raised when a journal entry's debits do not equal its credits."""
-	def __init__(self, debits: Decimal, credits: Decimal) -> None:
+	def __init__(self, debits: 'Decimal', credits: 'Decimal') -> None:
 		self.debits = debits
 		self.credits = credits
 		super().__init__(
@@ -50,7 +50,7 @@ class GLImbalanceError(ValueError):
 
 class PostingToClosedPeriodError(ValueError):
 	"""Raised when attempting to post to a closed accounting period."""
-	def __init__(self, period_id: str, posting_date: date) -> None:
+	def __init__(self, period_id: str, posting_date) -> None:
 		super().__init__(f"Period {period_id!r} is closed — cannot post on {posting_date}")
 
 
@@ -141,6 +141,8 @@ class GLService:
 		self._journal_entries: list[dict[str, Any]] = []        # append-only
 		self._periods: dict[str, dict[str, Any]] = {}           # period_id -> period
 		self._balance_cache = BoundedCache(max_size=500)
+		# Running balance index: O(1) lookup, maintained incrementally on every post
+		self._running_balances: dict[str, 'Decimal'] = {}
 
 	# ── Chart of Accounts ─────────────────────────────────────────────
 
@@ -351,7 +353,7 @@ class GLService:
 			"posted_at": datetime.now(timezone.utc).isoformat(),
 		}
 		self._journal_entries.append(je)
-		self._balance_cache.clear()  # invalidate on every post
+		self._apply_entry_to_balance(je)  # maintain O(1) running balance
 
 		_log.info(
 			"Journal entry posted: id=%s ref=%s dr=%s cr=%s lines=%d",
@@ -446,6 +448,25 @@ class GLService:
 			posted.append(je["id"])
 		return {"batch_id": batch_id, "entries_posted": len(posted), "entry_ids": posted}
 
+
+	# ── Running balance index (O(1)) ─────────────────────────────────────
+
+	def _apply_entry_to_balance(self, je: dict[str, Any]) -> None:
+		"""Update running balances incrementally — O(lines_in_entry).
+
+		Called once per post. Maintains self._running_balances for O(1)
+		account balance lookups without scanning all journal entries.
+		"""
+		for line in je.get("lines", []):
+			code = line.get("account_code", "")
+			acc = self._accounts.get(code)
+			if acc is None:
+				continue
+			dr = Decimal(str(line.get("debit_amount", 0)))
+			cr = Decimal(str(line.get("credit_amount", 0)))
+			delta = (dr - cr) if acc["normal_balance"] == "DEBIT" else (cr - dr)
+			self._running_balances[code] = self._running_balances.get(code, Decimal("0")) + delta
+
 	# ── Balance Queries ───────────────────────────────────────────────
 
 	def _compute_balance(
@@ -453,8 +474,17 @@ class GLService:
 		account_code: str,
 		as_of_date: str | None = None,
 	) -> Decimal:
-		"""Compute running balance for an account from journal entries."""
-		cache_key = f"{self._tenant_id}:{account_code}:{as_of_date or 'now'}"
+		"""Return account balance.
+
+		O(1) for current balance (uses materialized running balance).
+		O(n) only for historical as_of_date queries (rare — reports, audits).
+		"""
+		if as_of_date is None:
+			# Fast path: O(1) from materialized running balance
+			return self._running_balances.get(account_code, Decimal("0"))
+
+		# Historical path: O(entries) — only for date-specific queries
+		cache_key = f"{self._tenant_id}:{account_code}:{as_of_date}"
 		cached = self._balance_cache.get(cache_key)
 		if cached is not None:
 			return Decimal(str(cached))
@@ -463,22 +493,19 @@ class GLService:
 		if acc is None:
 			return Decimal("0")
 
-		normal = acc["normal_balance"]  # DEBIT or CREDIT
+		normal = acc["normal_balance"]
 		balance = Decimal("0")
 		for je in self._journal_entries:
-			if as_of_date and je["posting_date"] > as_of_date:
+			if je["posting_date"] > as_of_date:
 				continue
 			for line in je["lines"]:
 				if line["account_code"] != account_code:
 					continue
 				dr = Decimal(str(line["debit_amount"]))
 				cr = Decimal(str(line["credit_amount"]))
-				if normal == "DEBIT":
-					balance += dr - cr
-				else:
-					balance += cr - dr
+				balance += (dr - cr) if normal == "DEBIT" else (cr - dr)
 
-		self._balance_cache.set(cache_key, str(balance), ttl=60)
+		self._balance_cache.set(cache_key, str(balance), ttl=300)
 		return balance
 
 	async def get_account_balance(

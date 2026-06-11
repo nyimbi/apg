@@ -57,6 +57,14 @@ class ClerkAuthProvider:
         self._publishable = publishable_key or os.environ.get("APG_CLERK_PUBLISHABLE_KEY", "")
         self._token_cache = BoundedCache(max_size=5000)
         self._cb = get_circuit_breaker("clerk_auth", failure_threshold=5, reset_timeout=60.0)
+        self._shared_client = httpx.AsyncClient(
+            timeout=10.0,
+            limits=httpx.Limits(
+                max_connections=50,
+                max_keepalive_connections=20,
+                keepalive_expiry=30.0,
+            ),
+        )
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -65,7 +73,12 @@ class ClerkAuthProvider:
         }
 
     def _http(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(timeout=10.0)
+        """Return shared persistent client — connection pool reuse."""
+        return self._shared_client
+
+    async def close(self) -> None:
+        """Release connection pool. Call from application shutdown."""
+        await self._shared_client.aclose()
 
     def _parse_user(self, u: dict[str, Any]) -> AuthUser:
         emails = u.get("email_addresses", [])
@@ -124,17 +137,17 @@ class ClerkAuthProvider:
 
         await self._cb._before_call()
         try:
-            async with self._http() as client:
-                # Clerk v2: verify session token
-                resp = await client.post(
-                    f"{_CLERK_API}/sessions/verify",
-                    headers=self._headers(),
-                    json={"token": token},
-                )
-                if resp.status_code in (401, 403, 404):
-                    raise AuthenticationError("Invalid or expired Clerk session token", "token_invalid")
-                resp.raise_for_status()
-                session = resp.json()
+            client = self._shared_client
+            # Clerk v2: verify session token
+            resp = await client.post(
+                f"{_CLERK_API}/sessions/verify",
+                headers=self._headers(),
+                json={"token": token},
+            )
+            if resp.status_code in (401, 403, 404):
+                raise AuthenticationError("Invalid or expired Clerk session token", "token_invalid")
+            resp.raise_for_status()
+            session = resp.json()
 
             user_id = session.get("user_id", "")
             expires_at = None
@@ -174,11 +187,11 @@ class ClerkAuthProvider:
             payload = await self.validate_token(token)
             session_id = payload.extra.get("id", "")
             if session_id:
-                async with self._http() as client:
-                    await client.delete(
-                        f"{_CLERK_API}/sessions/{session_id}/revoke",
-                        headers=self._headers(),
-                    )
+                client = self._shared_client
+                await client.delete(
+                    f"{_CLERK_API}/sessions/{session_id}/revoke",
+                    headers=self._headers(),
+                )
         except Exception as exc:
             _log.debug("Suppressed %s: %s", type(exc).__name__, exc)
 
@@ -196,9 +209,9 @@ class ClerkAuthProvider:
                 payload["username"] = username
             if password := user_data.get("password"):
                 payload["password"] = password
-            async with self._http() as client:
-                resp = await client.post(f"{_CLERK_API}/users", json=payload, headers=self._headers())
-                resp.raise_for_status()
+            client = self._shared_client
+            resp = await client.post(f"{_CLERK_API}/users", json=payload, headers=self._headers())
+            resp.raise_for_status()
             await self._cb._on_success()
             return self._parse_user(resp.json())
         except Exception as exc:
@@ -207,10 +220,10 @@ class ClerkAuthProvider:
 
     @with_timeout(5.0)
     async def get_user(self, user_id: str) -> AuthUser:
-        async with self._http() as client:
-            resp = await client.get(f"{_CLERK_API}/users/{user_id}", headers=self._headers())
-            resp.raise_for_status()
-            return self._parse_user(resp.json())
+        client = self._shared_client
+        resp = await client.get(f"{_CLERK_API}/users/{user_id}", headers=self._headers())
+        resp.raise_for_status()
+        return self._parse_user(resp.json())
 
     @with_timeout(10.0)
     async def update_user(self, user_id: str, updates: dict[str, Any]) -> AuthUser:
@@ -221,41 +234,41 @@ class ClerkAuthProvider:
             payload["last_name"] = updates["last_name"]
         if "roles" in updates:
             payload["public_metadata"] = {"roles": updates["roles"]}
-        async with self._http() as client:
-            resp = await client.patch(
-                f"{_CLERK_API}/users/{user_id}", json=payload, headers=self._headers()
-            )
-            resp.raise_for_status()
-            return self._parse_user(resp.json())
+        client = self._shared_client
+        resp = await client.patch(
+            f"{_CLERK_API}/users/{user_id}", json=payload, headers=self._headers()
+        )
+        resp.raise_for_status()
+        return self._parse_user(resp.json())
 
     @with_timeout(10.0)
     async def delete_user(self, user_id: str) -> None:
-        async with self._http() as client:
-            resp = await client.delete(f"{_CLERK_API}/users/{user_id}", headers=self._headers())
-            resp.raise_for_status()
+        client = self._shared_client
+        resp = await client.delete(f"{_CLERK_API}/users/{user_id}", headers=self._headers())
+        resp.raise_for_status()
 
     @with_timeout(15.0)
     async def list_users(self, search: str | None = None, limit: int = 50, page: int = 1) -> UserList:
         params: dict[str, Any] = {"limit": limit, "offset": (page - 1) * limit}
         if search:
             params["query"] = search
-        async with self._http() as client:
-            resp = await client.get(f"{_CLERK_API}/users", params=params, headers=self._headers())
-            resp.raise_for_status()
-            data = resp.json()
+        client = self._shared_client
+        resp = await client.get(f"{_CLERK_API}/users", params=params, headers=self._headers())
+        resp.raise_for_status()
+        data = resp.json()
         users = [self._parse_user(u) for u in (data if isinstance(data, list) else data.get("data", []))]
         total_count_resp_data = data.get("total_count", len(users)) if isinstance(data, dict) else len(users)
         return UserList(users=users, total=total_count_resp_data, page=page, limit=limit)
 
     @with_timeout(10.0)
     async def send_password_reset(self, email: str) -> None:
-        async with self._http() as client:
-            resp = await client.post(
-                f"{_CLERK_API}/users/reset_password",
-                json={"email_address": email},
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
+        client = self._shared_client
+        resp = await client.post(
+            f"{_CLERK_API}/users/reset_password",
+            json={"email_address": email},
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
 
     async def reset_password(self, token: str, new_password: str) -> None:
         raise ProviderNotImplementedError("Clerk password reset is handled via Frontend SDK link")
@@ -268,13 +281,13 @@ class ClerkAuthProvider:
         if not users.users:
             raise KeyError(f"No user found with email {email!r}")
         user = users.users[0]
-        async with self._http() as client:
-            resp = await client.post(
-                f"{_CLERK_API}/magic_links",
-                json={"user_id": user.id, "email_address_id": email, "redirect_url": redirect_url},
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
+        client = self._shared_client
+        resp = await client.post(
+            f"{_CLERK_API}/magic_links",
+            json={"user_id": user.id, "email_address_id": email, "redirect_url": redirect_url},
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
 
     async def verify_magic_link(self, token: str) -> AuthResult:
         raise ProviderNotImplementedError(
@@ -296,49 +309,49 @@ class ClerkAuthProvider:
 
     @with_timeout(10.0)
     async def setup_mfa(self, user_id: str, mfa_type: str) -> MFASetup:
-        async with self._http() as client:
-            if mfa_type == "totp":
-                resp = await client.post(
-                    f"{_CLERK_API}/users/{user_id}/totp",
-                    headers=self._headers(),
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                return MFASetup(
-                    mfa_type="totp",
-                    secret=data.get("secret"),
-                    qr_code_url=data.get("uri"),
-                    backup_codes=data.get("backup_codes", []),
-                )
-            raise ProviderNotImplementedError(f"Clerk MFA type {mfa_type!r} not supported via Backend API")
+        client = self._shared_client
+        if mfa_type == "totp":
+            resp = await client.post(
+                f"{_CLERK_API}/users/{user_id}/totp",
+                headers=self._headers(),
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return MFASetup(
+                mfa_type="totp",
+                secret=data.get("secret"),
+                qr_code_url=data.get("uri"),
+                backup_codes=data.get("backup_codes", []),
+            )
+        raise ProviderNotImplementedError(f"Clerk MFA type {mfa_type!r} not supported via Backend API")
 
     async def verify_mfa(self, user_id: str, code: str, session_token: str) -> AuthResult:
         raise ProviderNotImplementedError("Clerk MFA verification happens via Frontend SDK")
 
     @with_timeout(10.0)
     async def disable_mfa(self, user_id: str, mfa_type: str) -> None:
-        async with self._http() as client:
-            if mfa_type == "totp":
-                await client.delete(f"{_CLERK_API}/users/{user_id}/totp", headers=self._headers())
+        client = self._shared_client
+        if mfa_type == "totp":
+            await client.delete(f"{_CLERK_API}/users/{user_id}/totp", headers=self._headers())
 
     @with_timeout(10.0)
     async def get_sessions(self, user_id: str) -> list[dict[str, Any]]:
-        async with self._http() as client:
-            resp = await client.get(
-                f"{_CLERK_API}/sessions",
-                params={"user_id": user_id, "status": "active"},
-                headers=self._headers(),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data if isinstance(data, list) else data.get("data", [])
+        client = self._shared_client
+        resp = await client.get(
+            f"{_CLERK_API}/sessions",
+            params={"user_id": user_id, "status": "active"},
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data if isinstance(data, list) else data.get("data", [])
 
     @with_timeout(10.0)
     async def revoke_session(self, session_id: str) -> None:
-        async with self._http() as client:
-            await client.delete(
-                f"{_CLERK_API}/sessions/{session_id}/revoke", headers=self._headers()
-            )
+        client = self._shared_client
+        await client.delete(
+            f"{_CLERK_API}/sessions/{session_id}/revoke", headers=self._headers()
+        )
 
     async def health_check(self) -> dict[str, Any]:
         try:
