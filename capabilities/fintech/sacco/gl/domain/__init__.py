@@ -1,0 +1,1 @@
+"""SACCO GL domain layer."""
