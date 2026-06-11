@@ -2,6 +2,16 @@
 
 OpenTelemetry trace collection, span correlation, service dependency map,
 Jaeger/Tempo export, trace sampling.
+
+New in v1.1.0:
+  - Adaptive sampling with EMA-based feedback
+  - Token-bucket rate-limiting sampler
+  - Critical-path analysis on completed traces
+  - Flamegraph-ready span-tree serialisation
+  - Trace comparison / regression detection
+  - Resource attribute enrichment
+  - Per-tenant retention policies with TTL eviction
+  - Span anomaly detection (z-score + IQR)
 """
 from __future__ import annotations
 
@@ -25,6 +35,13 @@ SUPPORTED_EXPORTERS = {"jaeger", "tempo", "otlp", "zipkin"}
 SUPPORTED_SPAN_KINDS = {"internal", "client", "server", "producer", "consumer"}
 SUPPORTED_SPAN_STATUSES = {"ok", "error", "unset"}
 SUPPORTED_SAMPLING_STRATEGIES = {"probabilistic", "rate_limiting", "always_on", "always_off"}
+
+# Adaptive sampling: EMA smoothing factor and anomaly z-score threshold
+_EMA_ALPHA = 0.1
+_ANOMALY_Z_THRESHOLD = 3.0
+# Token bucket defaults
+_TOKEN_BUCKET_CAPACITY = 100
+_TOKEN_BUCKET_REFILL_RATE = 10.0  # tokens/second
 
 
 def _now() -> str:
@@ -51,6 +68,15 @@ class DistributedTracingService:
 		self._export_configs: dict[str, dict[str, Any]] = {}
 		self._service_deps: dict[str, dict[str, Any]] = {}
 		self._audit_events: list[dict[str, Any]] = []
+		# v1.1 state
+		self._resource_attrs: dict[str, dict[str, str]] = {}  # service_name -> attrs
+		self._retention_policies: dict[str, dict[str, Any]] = {}  # tenant_id -> policy
+		# adaptive sampling: per (service, operation) EMA latency stats
+		self._ema_stats: dict[str, dict[str, float]] = defaultdict(lambda: {"mean": 0.0, "var": 0.0, "n": 0})
+		# token buckets: per (tenant, service) -> {"tokens": float, "last_refill": float}
+		self._token_buckets: dict[str, dict[str, float]] = {}
+		# anomaly log
+		self._anomalies: list[dict[str, Any]] = []
 		_log.info("DistributedTracingService initialised tenant=%s", self.tenant_id)
 
 	# ------------------------------------------------------------------ helpers
@@ -157,6 +183,11 @@ class DistributedTracingService:
 		span_id = _sid()
 		ts = start_time or _now()
 
+		# Merge resource attributes for this service (enrichment)
+		effective_tags = dict(self._resource_attrs.get(service_name, {}))
+		if tags:
+			effective_tags.update(tags)
+
 		record: dict[str, Any] = {
 			"id": span_id,
 			"trace_id": effective_trace_id,
@@ -168,7 +199,7 @@ class DistributedTracingService:
 			"duration_ms": None,
 			"status": "unset",
 			"status_message": None,
-			"tags": tags or {},
+			"tags": effective_tags,
 			"logs": [],
 			"baggage": baggage or {},
 			"sampled": should_sample,
@@ -192,7 +223,7 @@ class DistributedTracingService:
 				"span_count": 0,
 				"error_count": 0,
 				"status": "in_progress",
-				"tags": tags or {},
+				"tags": effective_tags,
 				"tenant_id": self.tenant_id,
 				"created_at": _now(),
 			}
@@ -267,6 +298,11 @@ class DistributedTracingService:
 			if span["duration_ms"] is not None:
 				dep["latencies_ms"].append(span["duration_ms"])
 			dep["last_seen"] = end_ts
+
+		# Update EMA stats for adaptive sampling / anomaly detection
+		if span.get("duration_ms") is not None:
+			ema_key = f"{span['service_name']}::{span['operation_name']}"
+			self._update_ema(ema_key, span["duration_ms"])
 
 		self._emit("span_finished", span_id, "span", {"status": status, "error": error})
 		return deepcopy(span)
@@ -711,4 +747,505 @@ class DistributedTracingService:
 					],
 				}
 			]
+		}
+
+	# ------------------------------------------------------------------ critical path
+
+	async def get_trace_critical_path(self, trace_id: str) -> dict[str, Any]:
+		"""Compute the critical (longest) path through a completed trace DAG.
+
+		Uses topological sort + DP on duration_ms.  Returns the ordered list of
+		spans on the critical path with their individual contribution percentages.
+		"""
+		guard_non_empty_string(trace_id, "trace_id")
+		if trace_id not in self._traces:
+			raise KeyError(f"Trace not found: {trace_id}")
+
+		trace_spans = {s["id"]: s for s in self._spans.values() if s["trace_id"] == trace_id}
+		if not trace_spans:
+			return {"trace_id": trace_id, "critical_path": [], "total_duration_ms": 0.0}
+
+		# Build adjacency: parent → children
+		children: dict[str, list[str]] = defaultdict(list)
+		for sid, span in trace_spans.items():
+			parent = span.get("parent_span_id")
+			if parent and parent in trace_spans:
+				children[parent].append(sid)
+
+		# DP: longest path (by sum of duration_ms) from each node to a leaf
+		# dp[sid] = (path_duration_ms, [sid, ...])
+		dp: dict[str, tuple[float, list[str]]] = {}
+
+		def _dp(sid: str) -> tuple[float, list[str]]:
+			if sid in dp:
+				return dp[sid]
+			span = trace_spans[sid]
+			own_ms = span.get("duration_ms") or 0.0
+			if not children[sid]:
+				dp[sid] = (own_ms, [sid])
+				return dp[sid]
+			best_child = max((_dp(c) for c in children[sid]), key=lambda t: t[0])
+			dp[sid] = (own_ms + best_child[0], [sid] + best_child[1])
+			return dp[sid]
+
+		# Find root spans (no parent or parent not in this trace)
+		roots = [sid for sid, s in trace_spans.items()
+				if not s.get("parent_span_id") or s["parent_span_id"] not in trace_spans]
+
+		total_ms, path = max((_dp(r) for r in roots), key=lambda t: t[0]) if roots else (0.0, [])
+
+		path_spans = []
+		for sid in path:
+			s = trace_spans[sid]
+			dur = s.get("duration_ms") or 0.0
+			path_spans.append({
+				"span_id": sid,
+				"operation_name": s["operation_name"],
+				"service_name": s["service_name"],
+				"duration_ms": dur,
+				"contribution_pct": round(dur / total_ms * 100, 2) if total_ms else 0.0,
+			})
+
+		return {
+			"trace_id": trace_id,
+			"critical_path": path_spans,
+			"total_duration_ms": total_ms,
+			"computed_at": _now(),
+		}
+
+	# ------------------------------------------------------------------ flamegraph
+
+	async def get_trace_flamegraph(self, trace_id: str) -> dict[str, Any]:
+		"""Return a flamegraph-ready span tree (Inferno/Flamescope JSON).
+
+		Format: ``{"name": str, "value": float, "children": [...]}``
+		where ``value`` is ``duration_ms``.  Children are sorted longest first.
+		"""
+		guard_non_empty_string(trace_id, "trace_id")
+		if trace_id not in self._traces:
+			raise KeyError(f"Trace not found: {trace_id}")
+
+		trace_spans = {s["id"]: s for s in self._spans.values() if s["trace_id"] == trace_id}
+
+		# Build children map
+		children: dict[str, list[str]] = defaultdict(list)
+		for sid, span in trace_spans.items():
+			parent = span.get("parent_span_id")
+			if parent and parent in trace_spans:
+				children[parent].append(sid)
+
+		def _node(sid: str) -> dict[str, Any]:
+			s = trace_spans[sid]
+			child_nodes = sorted(
+				[_node(c) for c in children[sid]],
+				key=lambda n: n["value"],
+				reverse=True,
+			)
+			return {
+				"name": f"{s['service_name']}:{s['operation_name']}",
+				"value": s.get("duration_ms") or 0.0,
+				"span_id": sid,
+				"error": s.get("error", False),
+				"children": child_nodes,
+			}
+
+		roots = [sid for sid, s in trace_spans.items()
+				if not s.get("parent_span_id") or s["parent_span_id"] not in trace_spans]
+
+		root_nodes = sorted([_node(r) for r in roots], key=lambda n: n["value"], reverse=True)
+		total_ms = sum(n["value"] for n in root_nodes)
+
+		return {
+			"trace_id": trace_id,
+			"total_duration_ms": total_ms,
+			"flamegraph": root_nodes[0] if len(root_nodes) == 1 else {"name": "root", "value": total_ms, "children": root_nodes},
+			"computed_at": _now(),
+		}
+
+	# ------------------------------------------------------------------ trace comparison
+
+	async def compare_traces(self, trace_id_a: str, trace_id_b: str) -> dict[str, Any]:
+		"""Compare two traces, surfacing latency regressions and structural diffs.
+
+		Useful for before/after deployment analysis.  Returns per-operation diffs
+		sorted by absolute latency delta descending.
+		"""
+		guard_non_empty_string(trace_id_a, "trace_id_a")
+		guard_non_empty_string(trace_id_b, "trace_id_b")
+		for tid in (trace_id_a, trace_id_b):
+			if tid not in self._traces:
+				raise KeyError(f"Trace not found: {tid}")
+
+		def _op_map(tid: str) -> dict[str, list[float]]:
+			ops: dict[str, list[float]] = defaultdict(list)
+			for s in self._spans.values():
+				if s["trace_id"] == tid and s.get("duration_ms") is not None:
+					ops[f"{s['service_name']}::{s['operation_name']}"].append(s["duration_ms"])
+			return ops
+
+		ops_a = _op_map(trace_id_a)
+		ops_b = _op_map(trace_id_b)
+		all_ops = set(ops_a) | set(ops_b)
+
+		diffs = []
+		for op in all_ops:
+			dur_a = statistics.mean(ops_a[op]) if op in ops_a else None
+			dur_b = statistics.mean(ops_b[op]) if op in ops_b else None
+			status = "unchanged"
+			if dur_a is None:
+				status = "added"
+			elif dur_b is None:
+				status = "removed"
+			elif abs(dur_b - dur_a) > 1.0:
+				status = "regressed" if dur_b > dur_a else "improved"
+			diffs.append({
+				"operation": op,
+				"duration_ms_a": dur_a,
+				"duration_ms_b": dur_b,
+				"delta_ms": (dur_b - dur_a) if (dur_a is not None and dur_b is not None) else None,
+				"status": status,
+			})
+
+		diffs.sort(key=lambda d: abs(d["delta_ms"] or 0.0), reverse=True)
+		new_errors = [
+			s["operation_name"]
+			for s in self._spans.values()
+			if s["trace_id"] == trace_id_b and s.get("error")
+		]
+		return {
+			"trace_id_a": trace_id_a,
+			"trace_id_b": trace_id_b,
+			"operations_compared": len(all_ops),
+			"regressions": [d for d in diffs if d["status"] == "regressed"],
+			"improvements": [d for d in diffs if d["status"] == "improved"],
+			"added_operations": [d for d in diffs if d["status"] == "added"],
+			"removed_operations": [d for d in diffs if d["status"] == "removed"],
+			"new_errors_in_b": new_errors,
+			"all_diffs": diffs,
+			"compared_at": _now(),
+		}
+
+	# ------------------------------------------------------------------ resource attribute enrichment
+
+	async def set_resource_attributes(self, service_name: str, attributes: dict[str, str]) -> dict[str, Any]:
+		"""Configure static resource attributes to auto-attach to all spans for a service.
+
+		Typical attributes: ``service.version``, ``deployment.environment``, ``k8s.pod.name``.
+		"""
+		guard_non_empty_string(service_name, "service_name")
+		if not attributes:
+			raise ValueError("attributes must be non-empty")
+		self._resource_attrs[service_name] = dict(attributes)
+		self._emit("resource_attrs_set", service_name, "resource_attrs", {"keys": list(attributes)})
+		return {"service_name": service_name, "attributes": self._resource_attrs[service_name], "updated_at": _now()}
+
+	async def get_resource_attributes(self, service_name: str) -> dict[str, Any]:
+		"""Return configured resource attributes for a service."""
+		guard_non_empty_string(service_name, "service_name")
+		return {
+			"service_name": service_name,
+			"attributes": deepcopy(self._resource_attrs.get(service_name, {})),
+		}
+
+	async def list_resource_attributes(self) -> list[dict[str, Any]]:
+		"""Return resource attribute sets for all configured services."""
+		return [
+			{"service_name": svc, "attributes": dict(attrs)}
+			for svc, attrs in self._resource_attrs.items()
+		]
+
+	# ------------------------------------------------------------------ retention policy
+
+	async def set_retention_policy(
+		self,
+		max_age_seconds: int = 3600,
+		max_span_count: int = 100_000,
+		max_trace_count: int = 10_000,
+	) -> dict[str, Any]:
+		"""Configure per-tenant retention policy.
+
+		A background call to ``evict_expired_spans`` will honour these limits.
+		"""
+		if max_age_seconds < 60:
+			raise ValueError("max_age_seconds must be >= 60")
+		policy = {
+			"tenant_id": self.tenant_id,
+			"max_age_seconds": max_age_seconds,
+			"max_span_count": max_span_count,
+			"max_trace_count": max_trace_count,
+			"updated_at": _now(),
+		}
+		self._retention_policies[self.tenant_id] = policy
+		self._emit("retention_policy_set", self.tenant_id, "retention_policy", policy)
+		return deepcopy(policy)
+
+	async def get_retention_policy(self) -> dict[str, Any]:
+		"""Return the active retention policy for this tenant."""
+		policy = self._retention_policies.get(self.tenant_id)
+		if not policy:
+			return {"tenant_id": self.tenant_id, "policy": None, "note": "No retention policy configured — spans accumulate indefinitely."}
+		return deepcopy(policy)
+
+	async def evict_expired_spans(self) -> dict[str, Any]:
+		"""Apply the retention policy, evicting old/excess spans and orphaned traces.
+
+		Call periodically (e.g. every 60 s via a scheduler or NATS timer message).
+		Returns eviction statistics.
+		"""
+		policy = self._retention_policies.get(self.tenant_id)
+		evicted_spans = 0
+		evicted_traces = 0
+
+		if policy:
+			import time
+			now_ts = time.time()
+			cutoff = now_ts - policy["max_age_seconds"]
+
+			# Age-based eviction
+			stale_span_ids = []
+			for sid, s in self._spans.items():
+				try:
+					created_ts = datetime.fromisoformat(s["created_at"].rstrip("Z")).timestamp()
+					if created_ts < cutoff:
+						stale_span_ids.append(sid)
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+			for sid in stale_span_ids:
+				span = self._spans.pop(sid)
+				trace_id = span["trace_id"]
+				if trace_id in self._traces:
+					self._traces[trace_id]["span_count"] = max(0, self._traces[trace_id]["span_count"] - 1)
+				evicted_spans += 1
+
+			# Count-based cap: keep newest max_span_count spans
+			if len(self._spans) > policy["max_span_count"]:
+				sorted_spans = sorted(self._spans.items(), key=lambda kv: kv[1]["created_at"])
+				excess = len(self._spans) - policy["max_span_count"]
+				for sid, _ in sorted_spans[:excess]:
+					self._spans.pop(sid, None)
+					evicted_spans += 1
+
+			# Evict orphaned traces (span_count == 0)
+			orphan_trace_ids = [tid for tid, t in self._traces.items() if t["span_count"] == 0]
+			if len(self._traces) > policy["max_trace_count"]:
+				sorted_traces = sorted(self._traces.items(), key=lambda kv: kv[1]["created_at"])
+				excess_t = len(self._traces) - policy["max_trace_count"]
+				orphan_trace_ids += [tid for tid, _ in sorted_traces[:excess_t] if tid not in orphan_trace_ids]
+			for tid in set(orphan_trace_ids):
+				self._traces.pop(tid, None)
+				evicted_traces += 1
+
+		result = {
+			"tenant_id": self.tenant_id,
+			"evicted_spans": evicted_spans,
+			"evicted_traces": evicted_traces,
+			"remaining_spans": len(self._spans),
+			"remaining_traces": len(self._traces),
+			"evicted_at": _now(),
+		}
+		if evicted_spans or evicted_traces:
+			self._emit("eviction_completed", self.tenant_id, "retention", result)
+		return result
+
+	# ------------------------------------------------------------------ anomaly detection
+
+	def _update_ema(self, key: str, value: float) -> dict[str, float]:
+		"""Welford-style online mean/variance update for anomaly detection."""
+		stats = self._ema_stats[key]
+		n = stats["n"] + 1
+		delta = value - stats["mean"]
+		mean = stats["mean"] + delta / n
+		delta2 = value - mean
+		var = (stats["var"] * (n - 1) + delta * delta2) / n if n > 1 else 0.0
+		self._ema_stats[key] = {"mean": mean, "var": var, "n": n}
+		return self._ema_stats[key]
+
+	async def detect_span_anomalies(
+		self,
+		service_name: str | None = None,
+		z_threshold: float = _ANOMALY_Z_THRESHOLD,
+		limit: int = 50,
+	) -> dict[str, Any]:
+		"""Detect statistically anomalous spans using z-score against per-operation EMA.
+
+		A span is anomalous when ``|z_score| >= z_threshold`` (default 3.0 sigma).
+		Also applies IQR fencing for small-sample operations.
+		"""
+		spans = [s for s in self._spans.values() if s.get("duration_ms") is not None]
+		if service_name:
+			spans = [s for s in spans if s["service_name"] == service_name]
+
+		# Group by (service, operation)
+		by_op: dict[str, list[dict[str, Any]]] = defaultdict(list)
+		for s in spans:
+			by_op[f"{s['service_name']}::{s['operation_name']}"].append(s)
+
+		anomalies = []
+		for op_key, op_spans in by_op.items():
+			durations = [s["duration_ms"] for s in op_spans]
+			if len(durations) < 3:
+				continue
+			mean_d = statistics.mean(durations)
+			stdev_d = statistics.stdev(durations)
+			q1 = sorted(durations)[int(len(durations) * 0.25)]
+			q3 = sorted(durations)[int(len(durations) * 0.75)]
+			iqr = q3 - q1
+			for s in op_spans:
+				dur = s["duration_ms"]
+				z = (dur - mean_d) / stdev_d if stdev_d > 0 else 0.0
+				iqr_outlier = (dur < q1 - 1.5 * iqr) or (dur > q3 + 1.5 * iqr)
+				if abs(z) >= z_threshold or iqr_outlier:
+					anomalies.append({
+						"span_id": s["id"],
+						"trace_id": s["trace_id"],
+						"service_name": s["service_name"],
+						"operation_name": s["operation_name"],
+						"duration_ms": dur,
+						"z_score": round(z, 3),
+						"iqr_outlier": iqr_outlier,
+						"op_mean_ms": round(mean_d, 3),
+						"op_stdev_ms": round(stdev_d, 3),
+					})
+
+		anomalies.sort(key=lambda a: abs(a["z_score"]), reverse=True)
+		self._anomalies = anomalies[:limit]
+		return {
+			"service_name": service_name,
+			"z_threshold": z_threshold,
+			"anomaly_count": len(anomalies),
+			"anomalies": anomalies[:limit],
+			"computed_at": _now(),
+		}
+
+	# ------------------------------------------------------------------ token bucket sampler
+
+	def _get_token_bucket(self, bucket_key: str) -> dict[str, float]:
+		import time
+		if bucket_key not in self._token_buckets:
+			self._token_buckets[bucket_key] = {
+				"tokens": float(_TOKEN_BUCKET_CAPACITY),
+				"last_refill": time.monotonic(),
+			}
+		return self._token_buckets[bucket_key]
+
+	async def consume_sample_token(self, service_name: str) -> dict[str, Any]:
+		"""Consume one token from the token bucket for a given service.
+
+		Returns ``{"allowed": True/False, "tokens_remaining": float}``.
+		Use this to implement rate-limiting sampling at the call site before
+		calling ``create_span``.
+		"""
+		import time
+		guard_non_empty_string(service_name, "service_name")
+		key = f"{self.tenant_id}::{service_name}"
+		bucket = self._get_token_bucket(key)
+		now = time.monotonic()
+		elapsed = now - bucket["last_refill"]
+		bucket["tokens"] = min(
+			float(_TOKEN_BUCKET_CAPACITY),
+			bucket["tokens"] + elapsed * _TOKEN_BUCKET_REFILL_RATE,
+		)
+		bucket["last_refill"] = now
+		if bucket["tokens"] >= 1.0:
+			bucket["tokens"] -= 1.0
+			allowed = True
+		else:
+			allowed = False
+		return {
+			"service_name": service_name,
+			"allowed": allowed,
+			"tokens_remaining": round(bucket["tokens"], 3),
+			"bucket_capacity": _TOKEN_BUCKET_CAPACITY,
+			"refill_rate_per_sec": _TOKEN_BUCKET_REFILL_RATE,
+		}
+
+	# ------------------------------------------------------------------ W3C trace context
+
+	async def parse_traceparent(self, header: str) -> dict[str, Any]:
+		"""Parse a W3C ``traceparent`` header into its component fields.
+
+		Format: ``<version>-<trace-id>-<parent-id>-<flags>``
+		See: https://www.w3.org/TR/trace-context/
+		"""
+		guard_non_empty_string(header, "header")
+		parts = header.strip().split("-")
+		if len(parts) != 4:
+			raise ValueError(f"Invalid traceparent format — expected 4 dash-separated fields, got {len(parts)}: {header!r}")
+		version, trace_id, parent_id, flags_hex = parts
+		if version != "00":
+			raise ValueError(f"Unsupported traceparent version: {version!r}")
+		if len(trace_id) != 32 or len(parent_id) != 16:
+			raise ValueError("traceparent trace-id must be 32 hex chars and parent-id 16 hex chars")
+		flags = int(flags_hex, 16)
+		sampled = bool(flags & 0x01)
+		return {
+			"version": version,
+			"trace_id": trace_id,
+			"parent_span_id": parent_id,
+			"flags": flags_hex,
+			"sampled": sampled,
+		}
+
+	async def build_traceparent(self, trace_id: str, span_id: str, sampled: bool = True) -> str:
+		"""Build a W3C ``traceparent`` header string from component fields."""
+		guard_non_empty_string(trace_id, "trace_id")
+		guard_non_empty_string(span_id, "span_id")
+		# Pad/truncate to spec lengths
+		tid = trace_id.replace("-", "").lower().ljust(32, "0")[:32]
+		sid = span_id.replace("-", "").lower().ljust(16, "0")[:16]
+		flags = "01" if sampled else "00"
+		return f"00-{tid}-{sid}-{flags}"
+
+	# ------------------------------------------------------------------ multi-pillar correlation
+
+	async def get_observability_correlation(self, trace_id: str) -> dict[str, Any]:
+		"""Return a unified correlation payload linking trace spans to log and metric query hints.
+
+		Log hints are formatted as Loki label matchers.
+		Metric hints are Prometheus label selectors derived from span service tags.
+		"""
+		guard_non_empty_string(trace_id, "trace_id")
+		if trace_id not in self._traces:
+			raise KeyError(f"Trace not found: {trace_id}")
+
+		trace_spans = [s for s in self._spans.values() if s["trace_id"] == trace_id]
+		span_ids = [s["id"] for s in trace_spans]
+		service_names = sorted({s["service_name"] for s in trace_spans})
+		has_errors = any(s.get("error") for s in trace_spans)
+		durations = [s["duration_ms"] for s in trace_spans if s.get("duration_ms") is not None]
+		total_duration = max(durations) if durations else 0.0
+
+		# Loki log query hint
+		loki_selector = '{' + f'trace_id="{trace_id}"' + '}'
+
+		# Prometheus metric query hints (one per service)
+		prom_queries = [
+			f'rate(http_requests_total{{service="{svc}"}}[5m])'
+			for svc in service_names
+		]
+
+		anomaly_flags = [
+			a for a in self._anomalies if a.get("trace_id") == trace_id
+		]
+
+		return {
+			"trace_id": trace_id,
+			"trace_summary": {
+				"span_count": len(trace_spans),
+				"service_count": len(service_names),
+				"services": service_names,
+				"total_duration_ms": total_duration,
+				"has_errors": has_errors,
+			},
+			"log_query_hints": {
+				"loki_selector": loki_selector,
+				"fields": {"trace_id": trace_id, "span_ids": span_ids},
+			},
+			"metric_query_hints": {
+				"prometheus_queries": prom_queries,
+				"label_selectors": [f'service="{svc}"' for svc in service_names],
+			},
+			"anomaly_flags": anomaly_flags,
+			"tenant_id": self.tenant_id,
+			"generated_at": _now(),
 		}

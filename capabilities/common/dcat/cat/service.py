@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
+import re
+from collections import defaultdict
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -15,6 +18,25 @@ _log = logging.getLogger(__name__)
 CAPABILITY_ID = "dcat_cat"
 SUPPORTED_FORMATS = {"csv", "parquet", "avro", "json", "orc", "delta", "iceberg", "unknown"}
 SUPPORTED_CLASSIFICATIONS = {"public", "internal", "confidential", "restricted", "pii"}
+
+# PII field-name patterns for auto-detection
+_PII_PATTERNS: list[re.Pattern[str]] = [
+	re.compile(r, re.IGNORECASE)
+	for r in [
+		r"\bemail\b", r"\bphone\b", r"\bssn\b", r"\bpassport\b", r"\bdob\b",
+		r"\bbirthdate\b", r"\bdate_of_birth\b", r"\bip_address\b", r"\bip\b",
+		r"\bfirst_name\b", r"\blast_name\b", r"\bfull_name\b", r"\baddress\b",
+		r"\bcredit_card\b", r"\bcard_number\b", r"\bnational_id\b", r"\buser_id\b",
+		r"\bsocial_security\b", r"\bpassword\b", r"\bsalary\b", r"\bgps\b",
+		r"\blatitude\b", r"\blongitude\b",
+	]
+]
+
+# Completeness check fields — datasets are scored against these
+_COMPLETENESS_FIELDS = [
+	"description", "schema", "tags", "owner", "classification",
+	"location_uri", "format", "domain",
+]
 
 
 class DataCatalogService:
@@ -29,6 +51,13 @@ class DataCatalogService:
 		self.ownership_records: dict[str, dict[str, Any]] = {}
 		self.schema_versions: dict[str, list[dict[str, Any]]] = {}
 		self._audit_events: list[dict[str, Any]] = []
+		# New state stores
+		self._quality_scores: dict[str, list[dict[str, Any]]] = {}          # dataset_id -> list of score records
+		self._access_log: list[dict[str, Any]] = []                          # raw access events
+		self._term_column_links: list[dict[str, Any]] = []                   # glossary-term → column bindings
+		self._data_contracts: dict[str, dict[str, Any]] = {}                 # contract_id -> contract
+		self._deprecations: dict[str, dict[str, Any]] = {}                   # dataset_id -> deprecation record
+		self._embeddings: dict[str, list[float]] = {}                        # dataset_id -> embedding vector
 
 	def _tenant(self, tenant_id: str | None = None) -> str:
 		value = tenant_id or self.tenant_id
@@ -626,4 +655,621 @@ class DataCatalogService:
 			"impacted_datasets": impacted,
 			"lineage_depth": downstream["depth"],
 			"generated_at": self._now(),
+		}
+
+	# ── Data Quality ─────────────────────────────────────────────────
+
+	async def record_quality_score(
+		self,
+		tenant_id: str,
+		dataset_id: str,
+		dimension: str,
+		score: float,
+		job_id: str = "",
+		details: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Record a quality metric for a dataset dimension (completeness, freshness, validity…).
+
+		Args:
+			tenant_id:  Tenant namespace.
+			dataset_id: Target dataset.
+			dimension:  One of completeness | freshness | validity | uniqueness | accuracy.
+			score:      Float in [0.0, 1.0].
+			job_id:     Optional job/run that produced this score.
+			details:    Arbitrary dict with per-rule breakdown.
+
+		Returns:
+			The persisted quality score record.
+		"""
+		tenant = self._tenant(tenant_id)
+		record = self.datasets.get(dataset_id)
+		if not record or record["tenant_id"] != tenant:
+			raise KeyError(f"dataset not found: {dataset_id}")
+		if not (0.0 <= score <= 1.0):
+			raise ValueError("score must be in [0.0, 1.0]")
+		entry: dict[str, Any] = {
+			"id": self._id("qsc"),
+			"tenant_id": tenant,
+			"dataset_id": dataset_id,
+			"dimension": dimension,
+			"score": score,
+			"job_id": job_id,
+			"details": details or {},
+			"measured_at": self._now(),
+		}
+		self._quality_scores.setdefault(dataset_id, []).append(entry)
+		self._emit(tenant, "quality_score_recorded", dataset_id, "dataset", {
+			"dimension": dimension, "score": score
+		})
+		_log.info("quality score recorded: dataset=%s dimension=%s score=%.3f", dataset_id, dimension, score)
+		return deepcopy(entry)
+
+	async def get_quality_profile(self, tenant_id: str, dataset_id: str) -> dict[str, Any]:
+		"""Return the latest quality score per dimension for a dataset, with an aggregate.
+
+		Computes the arithmetic mean of the most-recent score across all measured
+		dimensions as the ``trust_score``.
+
+		Returns:
+			Dict with keys ``dataset_id``, ``trust_score``, ``dimensions``, ``measured_count``.
+		"""
+		tenant = self._tenant(tenant_id)
+		record = self.datasets.get(dataset_id)
+		if not record or record["tenant_id"] != tenant:
+			raise KeyError(f"dataset not found: {dataset_id}")
+		entries = self._quality_scores.get(dataset_id, [])
+		# Latest score per dimension
+		latest: dict[str, dict[str, Any]] = {}
+		for e in entries:
+			dim = e["dimension"]
+			if dim not in latest or e["measured_at"] > latest[dim]["measured_at"]:
+				latest[dim] = e
+		scores = [v["score"] for v in latest.values()]
+		trust_score = round(sum(scores) / len(scores), 4) if scores else None
+		return {
+			"dataset_id": dataset_id,
+			"trust_score": trust_score,
+			"dimensions": {dim: deepcopy(entry) for dim, entry in latest.items()},
+			"measured_count": len(entries),
+			"generated_at": self._now(),
+		}
+
+	# ── PII Detection ────────────────────────────────────────────────
+
+	async def scan_pii_fields(self, tenant_id: str, dataset_id: str) -> dict[str, Any]:
+		"""Scan schema column names for PII-indicative patterns.
+
+		If PII columns are detected the dataset classification is promoted to ``pii``
+		(never demoted). Returns a scan result with flagged fields and confidence.
+
+		Returns:
+			``{dataset_id, pii_detected, flagged_fields, classification_upgraded, ...}``
+		"""
+		tenant = self._tenant(tenant_id)
+		record = self.datasets.get(dataset_id)
+		if not record or record["tenant_id"] != tenant:
+			raise KeyError(f"dataset not found: {dataset_id}")
+		schema = record.get("schema") or {}
+		columns: list[str] = list(schema.keys()) if isinstance(schema, dict) else []
+		flagged: list[dict[str, Any]] = []
+		for col in columns:
+			matched = [p.pattern for p in _PII_PATTERNS if p.search(col)]
+			if matched:
+				flagged.append({"column": col, "matched_patterns": matched, "confidence": 0.9})
+		upgraded = False
+		if flagged and record["classification"] != "pii":
+			record["classification"] = "pii"
+			record["updated_at"] = self._now()
+			upgraded = True
+			self._emit(tenant, "classification_upgraded_to_pii", dataset_id, "dataset", {
+				"flagged_fields": [f["column"] for f in flagged]
+			})
+		result: dict[str, Any] = {
+			"dataset_id": dataset_id,
+			"pii_detected": bool(flagged),
+			"flagged_fields": flagged,
+			"classification_upgraded": upgraded,
+			"scanned_columns": len(columns),
+			"scanned_at": self._now(),
+		}
+		_log.info("pii scan: dataset=%s flagged=%d upgraded=%s", dataset_id, len(flagged), upgraded)
+		return result
+
+	# ── Popularity / Usage ───────────────────────────────────────────
+
+	async def record_dataset_access(
+		self,
+		tenant_id: str,
+		dataset_id: str,
+		accessor: str,
+		access_type: str = "read",
+	) -> dict[str, Any]:
+		"""Log a dataset access event for popularity tracking.
+
+		Args:
+			tenant_id:   Tenant namespace.
+			dataset_id:  Accessed dataset.
+			accessor:    User or service that accessed the dataset.
+			access_type: One of ``read`` | ``query`` | ``export`` | ``preview``.
+
+		Returns:
+			The persisted access event.
+		"""
+		tenant = self._tenant(tenant_id)
+		record = self.datasets.get(dataset_id)
+		if not record or record["tenant_id"] != tenant:
+			raise KeyError(f"dataset not found: {dataset_id}")
+		guard_non_empty_string(accessor, "accessor")
+		event: dict[str, Any] = {
+			"id": self._id("acc"),
+			"tenant_id": tenant,
+			"dataset_id": dataset_id,
+			"accessor": accessor,
+			"access_type": access_type,
+			"accessed_at": self._now(),
+		}
+		self._access_log.append(event)
+		return deepcopy(event)
+
+	async def get_popular_datasets(
+		self,
+		tenant_id: str,
+		limit: int = 10,
+		since_days: int = 30,
+	) -> list[dict[str, Any]]:
+		"""Return datasets ranked by access frequency within a trailing window.
+
+		Args:
+			tenant_id:  Tenant namespace.
+			limit:      Maximum results to return.
+			since_days: Trailing window in calendar days.
+
+		Returns:
+			List of ``{dataset_id, name, access_count, unique_accessors}`` sorted descending.
+		"""
+		tenant = self._tenant(tenant_id)
+		from datetime import timedelta
+		cutoff = (datetime.now(timezone.utc) - timedelta(days=since_days)).isoformat(timespec="seconds")
+		counts: dict[str, int] = defaultdict(int)
+		accessors: dict[str, set[str]] = defaultdict(set)
+		for event in self._access_log:
+			if event["tenant_id"] == tenant and event["accessed_at"] >= cutoff:
+				did = event["dataset_id"]
+				counts[did] += 1
+				accessors[did].add(event["accessor"])
+		ranked = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:limit]
+		result = []
+		for did, count in ranked:
+			ds = self.datasets.get(did)
+			result.append({
+				"dataset_id": did,
+				"name": ds["name"] if ds else did,
+				"access_count": count,
+				"unique_accessors": len(accessors[did]),
+			})
+		return result
+
+	# ── Catalog Completeness Scoring ─────────────────────────────────
+
+	async def score_dataset_completeness(self, tenant_id: str, dataset_id: str) -> dict[str, Any]:
+		"""Compute metadata completeness score for a single dataset.
+
+		Checks presence and non-emptiness of description, schema, tags, owner,
+		classification, location_uri, format, and domain. Also checks whether the
+		dataset has at least one lineage edge and one quality score.
+
+		Returns:
+			``{dataset_id, score, missing, present, has_lineage, has_quality}``
+		"""
+		tenant = self._tenant(tenant_id)
+		record = self.datasets.get(dataset_id)
+		if not record or record["tenant_id"] != tenant:
+			raise KeyError(f"dataset not found: {dataset_id}")
+		present: list[str] = []
+		missing: list[str] = []
+		for field in _COMPLETENESS_FIELDS:
+			val = record.get(field)
+			if val and val not in ("unknown", "default", "internal", ""):
+				present.append(field)
+			elif field == "tags" and isinstance(val, list) and val:
+				present.append(field)
+			elif field == "schema" and isinstance(val, dict) and val:
+				present.append(field)
+			else:
+				missing.append(field)
+		has_lineage = any(
+			e["tenant_id"] == tenant and (
+				e["source_dataset_id"] == dataset_id or e["target_dataset_id"] == dataset_id
+			)
+			for e in self.lineage_edges.values()
+		)
+		has_quality = bool(self._quality_scores.get(dataset_id))
+		bonus = (1 if has_lineage else 0) + (1 if has_quality else 0)
+		total_checks = len(_COMPLETENESS_FIELDS) + 2
+		score = round((len(present) + bonus) / total_checks, 4)
+		return {
+			"dataset_id": dataset_id,
+			"score": score,
+			"present": present,
+			"missing": missing,
+			"has_lineage": has_lineage,
+			"has_quality": has_quality,
+			"generated_at": self._now(),
+		}
+
+	async def get_governance_health(self, tenant_id: str) -> dict[str, Any]:
+		"""Compute aggregate governance health across all active datasets for a tenant.
+
+		Fans out completeness scoring across all active datasets concurrently and
+		returns per-domain averages plus an overall ``health_score``.
+
+		Returns:
+			``{health_score, total_datasets, avg_by_domain, low_quality_datasets, ...}``
+		"""
+		tenant = self._tenant(tenant_id)
+		active_ids = [
+			did for did, ds in self.datasets.items()
+			if ds["tenant_id"] == tenant and ds["status"] == "active"
+		]
+		if not active_ids:
+			return {"health_score": None, "total_datasets": 0, "generated_at": self._now()}
+		profiles = await asyncio.gather(*[
+			self.score_dataset_completeness(tenant_id, did, return_exceptions=True) for did in active_ids
+		])
+		scores_by_domain: dict[str, list[float]] = defaultdict(list)
+		low_quality: list[dict[str, Any]] = []
+		all_scores: list[float] = []
+		for profile in profiles:
+			did = profile["dataset_id"]
+			ds = self.datasets[did]
+			domain = ds["domain"]
+			sc = profile["score"]
+			all_scores.append(sc)
+			scores_by_domain[domain].append(sc)
+			if sc < 0.5:
+				low_quality.append({"dataset_id": did, "name": ds["name"], "score": sc})
+		health_score = round(sum(all_scores) / len(all_scores), 4) if all_scores else None
+		avg_by_domain = {
+			d: round(sum(vs) / len(vs), 4) for d, vs in scores_by_domain.items()
+		}
+		return {
+			"health_score": health_score,
+			"total_datasets": len(active_ids),
+			"avg_by_domain": avg_by_domain,
+			"low_quality_datasets": sorted(low_quality, key=lambda x: x["score"]),
+			"generated_at": self._now(),
+		}
+
+	# ── Schema Diff ──────────────────────────────────────────────────
+
+	async def compute_schema_diff(
+		self,
+		tenant_id: str,
+		dataset_id: str,
+		from_version: int,
+		to_version: int,
+	) -> dict[str, Any]:
+		"""Compute a structured diff between two schema versions.
+
+		Classifies each change as:
+
+		- ``COMPATIBLE``  — new nullable column added
+		- ``WARNING``     — column type changed
+		- ``BREAKING``    — column removed or renamed
+
+		Emits a ``schema_breaking_change`` audit event when any BREAKING changes exist.
+
+		Returns:
+			``{dataset_id, from_version, to_version, compatibility, changes}``
+		"""
+		tenant = self._tenant(tenant_id)
+		record = self.datasets.get(dataset_id)
+		if not record or record["tenant_id"] != tenant:
+			raise KeyError(f"dataset not found: {dataset_id}")
+		versions = self.schema_versions.get(dataset_id, [])
+		version_map = {v["version"]: v["schema"] for v in versions}
+		if from_version not in version_map:
+			raise KeyError(f"schema version {from_version} not found for dataset {dataset_id}")
+		if to_version not in version_map:
+			raise KeyError(f"schema version {to_version} not found for dataset {dataset_id}")
+		old_schema: dict[str, Any] = version_map[from_version]
+		new_schema: dict[str, Any] = version_map[to_version]
+		old_fields = set(old_schema.keys())
+		new_fields = set(new_schema.keys())
+		changes: list[dict[str, Any]] = []
+		# Removed fields → BREAKING
+		for col in old_fields - new_fields:
+			changes.append({"column": col, "change": "removed", "severity": "BREAKING"})
+		# Added fields → COMPATIBLE
+		for col in new_fields - old_fields:
+			changes.append({"column": col, "change": "added", "severity": "COMPATIBLE"})
+		# Type changes → WARNING
+		for col in old_fields & new_fields:
+			old_type = old_schema[col]
+			new_type = new_schema[col]
+			if old_type != new_type:
+				changes.append({"column": col, "change": "type_changed",
+				                 "from": old_type, "to": new_type, "severity": "WARNING"})
+		severity_rank = {"BREAKING": 2, "WARNING": 1, "COMPATIBLE": 0}
+		overall = "COMPATIBLE"
+		for c in changes:
+			if severity_rank[c["severity"]] > severity_rank[overall]:
+				overall = c["severity"]
+		if overall == "BREAKING":
+			self._emit(tenant, "schema_breaking_change", dataset_id, "dataset", {
+				"from_version": from_version, "to_version": to_version,
+				"breaking_columns": [c["column"] for c in changes if c["severity"] == "BREAKING"],
+			})
+		return {
+			"dataset_id": dataset_id,
+			"from_version": from_version,
+			"to_version": to_version,
+			"compatibility": overall,
+			"changes": changes,
+			"change_count": len(changes),
+			"computed_at": self._now(),
+		}
+
+	# ── Dataset Deprecation ──────────────────────────────────────────
+
+	async def deprecate_dataset(
+		self,
+		tenant_id: str,
+		dataset_id: str,
+		reason: str,
+		successor_id: str | None = None,
+		deprecation_date: str | None = None,
+	) -> dict[str, Any]:
+		"""Initiate a deprecation workflow for a dataset.
+
+		Sets dataset status to ``deprecated``, records successor pointer and reason,
+		and emits a ``dataset_deprecated`` event for downstream alert routing.
+
+		Args:
+			reason:          Human-readable deprecation rationale.
+			successor_id:    ID of the recommended replacement dataset.
+			deprecation_date: ISO date when the dataset will be removed (YYYY-MM-DD).
+
+		Returns:
+			The deprecation record.
+		"""
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(reason, "reason")
+		record = self.datasets.get(dataset_id)
+		if not record or record["tenant_id"] != tenant:
+			raise KeyError(f"dataset not found: {dataset_id}")
+		record["status"] = "deprecated"
+		record["updated_at"] = self._now()
+		deprecation: dict[str, Any] = {
+			"id": self._id("dep"),
+			"tenant_id": tenant,
+			"dataset_id": dataset_id,
+			"dataset_name": record["name"],
+			"reason": reason,
+			"successor_id": successor_id,
+			"deprecation_date": deprecation_date,
+			"created_at": self._now(),
+		}
+		self._deprecations[dataset_id] = deprecation
+		self._emit(tenant, "dataset_deprecated", dataset_id, "dataset", {
+			"reason": reason, "successor_id": successor_id
+		})
+		_log.info("dataset deprecated: %s tenant=%s successor=%s", dataset_id, tenant, successor_id)
+		return deepcopy(deprecation)
+
+	async def list_deprecated_datasets(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""Return all deprecation records for a tenant, including days until removal.
+
+		Returns:
+			List of deprecation records sorted by ``deprecation_date`` ascending.
+			Each record includes ``days_until_removal`` (None if no date set).
+		"""
+		tenant = self._tenant(tenant_id)
+		result = []
+		today_str = datetime.now(timezone.utc).date().isoformat()
+		for dep in self._deprecations.values():
+			if dep["tenant_id"] != tenant:
+				continue
+			entry = deepcopy(dep)
+			if dep["deprecation_date"]:
+				try:
+					delta = (
+						datetime.fromisoformat(dep["deprecation_date"]).date()
+						- datetime.fromisoformat(today_str).date()
+					)
+					entry["days_until_removal"] = delta.days
+				except ValueError:
+					entry["days_until_removal"] = None
+			else:
+				entry["days_until_removal"] = None
+			result.append(entry)
+		return sorted(result, key=lambda x: x.get("deprecation_date") or "9999-12-31")
+
+	# ── Catalog Facets ───────────────────────────────────────────────
+
+	async def get_catalog_facets(
+		self,
+		tenant_id: str,
+		active_filters: dict[str, str] | None = None,
+	) -> dict[str, Any]:
+		"""Return per-facet counts for the discovery sidebar in a single pass.
+
+		Applies ``active_filters`` (e.g. ``{domain: "payments"}``) before computing
+		counts so the UI can render dependent facet narrowing correctly.
+
+		Facets returned: ``domain``, ``classification``, ``format``, ``source_system``,
+		``status``, ``owner``.
+
+		Returns:
+			``{facets: {domain: {payments: 12, ...}, ...}, total_matching: int}``
+		"""
+		tenant = self._tenant(tenant_id)
+		af = active_filters or {}
+		facets: dict[str, dict[str, int]] = {
+			"domain": {}, "classification": {}, "format": {},
+			"source_system": {}, "status": {}, "owner": {},
+		}
+		total = 0
+		for ds in self.datasets.values():
+			if ds["tenant_id"] != tenant:
+				continue
+			# Apply active filters
+			if af.get("domain") and ds["domain"] != af["domain"]:
+				continue
+			if af.get("classification") and ds["classification"] != af["classification"]:
+				continue
+			if af.get("format") and ds["format"] != af["format"]:
+				continue
+			if af.get("source_system") and ds["source_system"] != af["source_system"]:
+				continue
+			if af.get("status") and ds["status"] != af["status"]:
+				continue
+			total += 1
+			for facet_key in facets:
+				val = ds.get(facet_key, "unknown") or "unknown"
+				facets[facet_key][val] = facets[facet_key].get(val, 0) + 1
+		return {"facets": facets, "total_matching": total, "generated_at": self._now()}
+
+	# ── Glossary-Column Linkage ──────────────────────────────────────
+
+	async def link_term_to_column(
+		self,
+		tenant_id: str,
+		term_id: str,
+		dataset_id: str,
+		column_name: str,
+	) -> dict[str, Any]:
+		"""Bind a glossary term to a specific column in a dataset.
+
+		Enables column-level semantic search: "find all columns representing
+		``net_revenue``" returns exactly the column, not the dataset.
+
+		Returns:
+			The created linkage record.
+		"""
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(column_name, "column_name")
+		term = self.glossary_terms.get(term_id)
+		if not term or term["tenant_id"] != tenant:
+			raise KeyError(f"glossary term not found: {term_id}")
+		record = self.datasets.get(dataset_id)
+		if not record or record["tenant_id"] != tenant:
+			raise KeyError(f"dataset not found: {dataset_id}")
+		link: dict[str, Any] = {
+			"id": self._id("tcl"),
+			"tenant_id": tenant,
+			"term_id": term_id,
+			"term_name": term["term"],
+			"dataset_id": dataset_id,
+			"dataset_name": record["name"],
+			"column_name": column_name,
+			"created_at": self._now(),
+		}
+		self._term_column_links.append(link)
+		self._emit(tenant, "term_linked_to_column", term_id, "glossary_term", {
+			"dataset_id": dataset_id, "column_name": column_name
+		})
+		return deepcopy(link)
+
+	async def find_columns_by_term(self, tenant_id: str, term_id: str) -> list[dict[str, Any]]:
+		"""Return all dataset columns linked to a glossary term.
+
+		Returns:
+			List of ``{dataset_id, dataset_name, column_name}`` records.
+		"""
+		tenant = self._tenant(tenant_id)
+		term = self.glossary_terms.get(term_id)
+		if not term or term["tenant_id"] != tenant:
+			raise KeyError(f"glossary term not found: {term_id}")
+		return [
+			deepcopy(lnk) for lnk in self._term_column_links
+			if lnk["tenant_id"] == tenant and lnk["term_id"] == term_id
+		]
+
+	# ── Federated Search ─────────────────────────────────────────────
+
+	async def federate_search(
+		self,
+		root_tenant_id: str,
+		query: str,
+		child_tenant_ids: list[str],
+	) -> dict[str, Any]:
+		"""Fan out search across multiple tenant namespaces concurrently.
+
+		Useful for data mesh topologies where each domain runs an isolated
+		tenant but a root governance tenant needs cross-domain discovery.
+
+		Returns:
+			``{query, results: [{source_tenant, ...dataset}], total}``
+		"""
+		guard_non_empty_string(query, "query")
+		all_tenants = [root_tenant_id] + (child_tenant_ids or [])
+		tenant_results = await asyncio.gather(*[
+			self.search_datasets(tid, query, return_exceptions=True) for tid in all_tenants
+		], return_exceptions=True)
+		merged: list[dict[str, Any]] = []
+		errors: list[dict[str, Any]] = []
+		for tid, res in zip(all_tenants, tenant_results):
+			if isinstance(res, Exception):
+				errors.append({"tenant_id": tid, "error": str(res)})
+			else:
+				for ds in res:
+					annotated = deepcopy(ds)
+					annotated["source_tenant"] = tid
+					merged.append(annotated)
+		return {
+			"query": query,
+			"results": merged,
+			"total": len(merged),
+			"tenants_searched": all_tenants,
+			"errors": errors,
+			"generated_at": self._now(),
+		}
+
+	# ── OpenMetadata / DCAT-AP Export ────────────────────────────────
+
+	async def export_dcat_ap(self, tenant_id: str) -> dict[str, Any]:
+		"""Serialise active datasets as W3C DCAT-AP JSON-LD.
+
+		DCAT-AP is the EU application profile of DCAT, used by government open data
+		portals and data mesh platforms. Returns a ``@graph`` of ``dcat:Dataset`` nodes.
+
+		Returns:
+			JSON-LD document with ``@context`` and ``@graph`` keys.
+		"""
+		tenant = self._tenant(tenant_id)
+		datasets = [
+			ds for ds in self.datasets.values()
+			if ds["tenant_id"] == tenant and ds["status"] == "active"
+		]
+		graph: list[dict[str, Any]] = []
+		for ds in datasets:
+			node: dict[str, Any] = {
+				"@type": "dcat:Dataset",
+				"@id": f"urn:dcat:dataset:{ds['id']}",
+				"dcterms:title": ds["name"],
+				"dcterms:description": ds["description"],
+				"dcterms:creator": ds["owner"],
+				"dcterms:modified": ds.get("updated_at") or ds["created_at"],
+				"dcterms:identifier": ds["id"],
+				"dcat:keyword": ds["tags"],
+				"dcterms:accessRights": ds["classification"],
+				"dcat:distribution": [
+					{
+						"@type": "dcat:Distribution",
+						"dcat:accessURL": ds.get("location_uri", ""),
+						"dcterms:format": ds["format"],
+					}
+				] if ds.get("location_uri") else [],
+			}
+			graph.append(node)
+		return {
+			"@context": {
+				"dcat": "http://www.w3.org/ns/dcat#",
+				"dcterms": "http://purl.org/dc/terms/",
+				"xsd": "http://www.w3.org/2001/XMLSchema#",
+			},
+			"@graph": graph,
+			"generated_at": self._now(),
+			"total": len(graph),
 		}

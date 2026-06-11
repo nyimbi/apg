@@ -710,3 +710,544 @@ class USSDGovService:
 			"average_menu_depth": round(avg_depth, 2),
 			"generated_at": self._now(),
 		}
+
+	# ── Citizen portfolio ─────────────────────────────────────────────────────
+
+	async def get_citizen_portfolio(self, msisdn: str, tenant_id: str = "default") -> dict[str, Any]:
+		"""Return a consolidated service history for a citizen keyed by MSISDN.
+
+		Aggregates all resource types (permits, tax, IDs, certificates, payments)
+		into a single compact view suitable for USSD display or API consumption.
+		"""
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(msisdn, "msisdn")
+		permits = [
+			deepcopy(r) for r in self.permit_enquiries.values()
+			if r["tenant_id"] == tenant and r["msisdn"] == msisdn
+		]
+		taxes = [
+			deepcopy(r) for r in self.tax_enquiries.values()
+			if r["tenant_id"] == tenant and r["msisdn"] == msisdn
+		]
+		ids = [
+			deepcopy(r) for r in self.id_verifications.values()
+			if r["tenant_id"] == tenant and r["msisdn"] == msisdn
+		]
+		certs = [
+			deepcopy(r) for r in self.certificate_requests.values()
+			if r["tenant_id"] == tenant and r["msisdn"] == msisdn
+		]
+		payments = [
+			deepcopy(r) for r in self.payment_references.values()
+			if r["tenant_id"] == tenant and r["msisdn"] == msisdn
+		]
+		last_id = max((r["created_at"] for r in ids), default=None)
+		active_permits = [p for p in permits if p.get("is_valid")]
+		pending_certs = [c for c in certs if c["status"] in {"submitted", "processing"}]
+		unpaid = [p for p in payments if p["status"] == "pending"]
+		portfolio = {
+			"msisdn": msisdn,
+			"tenant_id": tenant,
+			"permit_enquiries_count": len(permits),
+			"active_permits": len(active_permits),
+			"tax_enquiry_count": len(taxes),
+			"id_verifications_count": len(ids),
+			"last_id_verified_at": last_id,
+			"certificate_requests_count": len(certs),
+			"pending_certificate_requests": len(pending_certs),
+			"pending_certificate_types": [c["certificate_type"] for c in pending_certs],
+			"payment_references_count": len(payments),
+			"unpaid_references": len(unpaid),
+			"unpaid_total": round(sum(p["amount"] for p in unpaid), 2),
+			"generated_at": self._now(),
+		}
+		self._emit(tenant, "citizen_portfolio_fetched", msisdn, {"msisdn": msisdn})
+		return portfolio
+
+	# ── Rate limiting & fraud ─────────────────────────────────────────────────
+
+	async def check_rate_limit(
+		self,
+		msisdn: str,
+		operation: str,
+		tenant_id: str = "default",
+		window_seconds: int = 60,
+		max_calls: int = 10,
+	) -> dict[str, Any]:
+		"""Enforce per-MSISDN rolling-window rate limits.
+
+		Counts matching audit events within the last `window_seconds` for the
+		given MSISDN and operation.  Returns `allowed: False` and raises
+		PermissionError when the limit is exceeded.
+		"""
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(msisdn, "msisdn")
+		guard_non_empty_string(operation, "operation")
+		cutoff = datetime.utcnow().timestamp() - window_seconds
+		# Count relevant audit events in the window
+		count = 0
+		for ev in self._audit_events:
+			if ev["tenant_id"] != tenant:
+				continue
+			if ev["details"].get("msisdn") != msisdn:
+				continue
+			try:
+				ts = datetime.fromisoformat(ev["emitted_at"].rstrip("Z")).timestamp()
+			except (ValueError, AttributeError):
+				continue
+			if ts >= cutoff:
+				count += 1
+		allowed = count < max_calls
+		result = {
+			"msisdn": msisdn,
+			"operation": operation,
+			"tenant_id": tenant,
+			"calls_in_window": count,
+			"max_calls": max_calls,
+			"window_seconds": window_seconds,
+			"allowed": allowed,
+			"checked_at": self._now(),
+		}
+		if not allowed:
+			self._emit(tenant, "rate_limit_exceeded", msisdn, {"operation": operation, "count": count})
+			raise PermissionError(f"rate_limit_exceeded: {msisdn!r} exceeded {max_calls} calls/{window_seconds}s for {operation!r}")
+		return result
+
+	async def score_fraud_risk(self, msisdn: str, tenant_id: str = "default") -> dict[str, Any]:
+		"""Compute a 0-1 fraud risk score for a MSISDN based on behavioural signals.
+
+		Signals:
+		- Failed ID verification rate
+		- OTP failure rate
+		- High-frequency enquiry bursts (>20 in 60s)
+		- Multiple distinct IDs queried in a short window
+		"""
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(msisdn, "msisdn")
+		id_verifs = [r for r in self.id_verifications.values()
+			if r["tenant_id"] == tenant and r["msisdn"] == msisdn]
+		failed_ids = sum(1 for r in id_verifs if not r["verified"])
+		id_failure_rate = (failed_ids / len(id_verifs)) if id_verifs else 0.0
+		otp_records = [r for r in self.otp_store.values() if r["tenant_id"] == tenant and r["msisdn"] == msisdn]
+		failed_otps = sum(1 for r in otp_records if r["status"] == "failed")
+		otp_failure_rate = (failed_otps / len(otp_records)) if otp_records else 0.0
+		# Burst score: events in last 60 seconds
+		cutoff = datetime.utcnow().timestamp() - 60
+		recent = sum(
+			1 for ev in self._audit_events
+			if ev["tenant_id"] == tenant
+			and ev["details"].get("msisdn") == msisdn
+			and (() or True)  # type guard
+			and (__import__("datetime").datetime.fromisoformat(ev["emitted_at"].rstrip("Z")).timestamp() >= cutoff
+				if ev.get("emitted_at") else False)
+		)
+		burst_score = min(recent / 20.0, 1.0)
+		# Distinct IDs queried
+		distinct_ids = len({r["id_number"] for r in id_verifs})
+		id_enum_score = min(distinct_ids / 5.0, 1.0)
+		# Composite weighted score
+		risk_score = round(
+			0.35 * id_failure_rate
+			+ 0.25 * otp_failure_rate
+			+ 0.25 * burst_score
+			+ 0.15 * id_enum_score,
+			4,
+		)
+		risk_level = "high" if risk_score >= 0.7 else "medium" if risk_score >= 0.35 else "low"
+		result = {
+			"msisdn": msisdn,
+			"tenant_id": tenant,
+			"risk_score": risk_score,
+			"risk_level": risk_level,
+			"signals": {
+				"id_failure_rate": round(id_failure_rate, 4),
+				"otp_failure_rate": round(otp_failure_rate, 4),
+				"burst_score": round(burst_score, 4),
+				"id_enum_score": round(id_enum_score, 4),
+			},
+			"scored_at": self._now(),
+		}
+		self._emit(tenant, "fraud_risk_scored", msisdn, {"risk_level": risk_level, "risk_score": risk_score})
+		return result
+
+	# ── Permit expiry alerts ──────────────────────────────────────────────────
+
+	async def schedule_permit_expiry_alerts(
+		self,
+		tenant_id: str = "default",
+		warning_days: list[int] | None = None,
+	) -> dict[str, Any]:
+		"""Scan all permit enquiries and enqueue expiry alert SMS for records
+		whose expiry_date falls within `warning_days` (default: [90, 30, 7]).
+
+		Returns a summary of alerts scheduled and skipped.
+		"""
+		tenant = self._tenant(tenant_id)
+		if warning_days is None:
+			warning_days = [90, 30, 7]
+		today = datetime.utcnow().date()
+		scheduled: list[dict[str, Any]] = []
+		skipped = 0
+		for record in self.permit_enquiries.values():
+			if record["tenant_id"] != tenant:
+				continue
+			expiry_str = record.get("expiry_date")
+			if not expiry_str:
+				skipped += 1
+				continue
+			try:
+				expiry = datetime.fromisoformat(expiry_str).date()
+			except ValueError:
+				skipped += 1
+				continue
+			days_remaining = (expiry - today).days
+			for threshold in sorted(warning_days, reverse=True):
+				if 0 <= days_remaining <= threshold:
+					msg = (
+						f"PERMIT ALERT: Your {record['permit_type'].replace('_',' ').title()} "
+						f"({record['permit_number']}) expires in {days_remaining} day(s) "
+						f"on {expiry_str}. Dial *384# to renew."
+					)[:160]
+					sms = await self.send_sms_notification(
+						msisdn=record["msisdn"],
+						message=msg,
+						tenant_id=tenant,
+						reference_id=record["id"],
+					)
+					scheduled.append({
+						"permit_id": record["id"],
+						"msisdn": record["msisdn"],
+						"days_remaining": days_remaining,
+						"threshold": threshold,
+						"sms_id": sms["id"],
+					})
+					break  # send only the most-urgent threshold alert
+		result = {
+			"tenant_id": tenant,
+			"alerts_scheduled": len(scheduled),
+			"records_skipped": skipped,
+			"details": scheduled,
+			"generated_at": self._now(),
+		}
+		self._emit(tenant, "permit_expiry_alerts_scheduled", "batch", {"count": len(scheduled)})
+		return result
+
+	# ── SLA compliance ────────────────────────────────────────────────────────
+
+	async def check_sla_compliance(
+		self,
+		tenant_id: str = "default",
+		sla_windows_days: dict[str, int] | None = None,
+	) -> dict[str, Any]:
+		"""Evaluate SLA compliance for all pending certificate requests.
+
+		`sla_windows_days` maps certificate_type → target-days. Defaults:
+		  good_conduct=7, tax_compliance=3, birth_certificate=5, default=10.
+
+		Returns per-request breach status and aggregate compliance rate.
+		"""
+		tenant = self._tenant(tenant_id)
+		defaults: dict[str, int] = {
+			"good_conduct": 7,
+			"tax_compliance": 3,
+			"birth_certificate": 5,
+			"death_certificate": 5,
+			"marriage_certificate": 5,
+			"business_registration": 10,
+			"clearance_certificate": 14,
+		}
+		windows = {**defaults, **(sla_windows_days or {})}
+		now = datetime.utcnow()
+		compliant = []
+		breached = []
+		for record in self.certificate_requests.values():
+			if record["tenant_id"] != tenant:
+				continue
+			if record["status"] in {"issued", "rejected", "cancelled"}:
+				continue  # terminal states excluded
+			target_days = windows.get(record["certificate_type"], 10)
+			created = datetime.fromisoformat(record["created_at"].rstrip("Z"))
+			elapsed_days = (now - created).total_seconds() / 86400
+			is_breached = elapsed_days > target_days
+			entry = {
+				"request_id": record["id"],
+				"certificate_type": record["certificate_type"],
+				"msisdn": record["msisdn"],
+				"elapsed_days": round(elapsed_days, 2),
+				"target_days": target_days,
+				"status": record["status"],
+				"is_breached": is_breached,
+			}
+			if is_breached:
+				breached.append(entry)
+				self._emit(tenant, "sla_breach_detected", record["id"], {
+					"certificate_type": record["certificate_type"],
+					"elapsed_days": entry["elapsed_days"],
+					"target_days": target_days,
+				})
+			else:
+				compliant.append(entry)
+		total = len(compliant) + len(breached)
+		compliance_rate = (len(compliant) / total) if total > 0 else 1.0
+		return {
+			"tenant_id": tenant,
+			"total_pending": total,
+			"compliant": len(compliant),
+			"breached": len(breached),
+			"compliance_rate": round(compliance_rate, 4),
+			"breached_requests": breached,
+			"generated_at": self._now(),
+		}
+
+	# ── Bulk operations ───────────────────────────────────────────────────────
+
+	async def bulk_update_certificate_requests(
+		self,
+		updates: list[dict[str, Any]],
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Atomically update multiple certificate requests in a single call.
+
+		Each entry in `updates` must contain `request_id` and at least one of:
+		`status`, `certificate_number`, `issued_by`, `notes`.
+
+		Validates all entries first; applies all-or-nothing on validation failure.
+		Returns per-item success/failure.
+		"""
+		tenant = self._tenant(tenant_id)
+		if not updates:
+			raise ValueError("updates list must not be empty")
+		# Validate pass
+		errors: list[dict[str, Any]] = []
+		for i, upd in enumerate(updates):
+			rid = upd.get("request_id")
+			if not rid:
+				errors.append({"index": i, "error": "missing request_id"})
+				continue
+			rec = self.certificate_requests.get(rid)
+			if not rec or rec["tenant_id"] != tenant:
+				errors.append({"index": i, "request_id": rid, "error": "not_found"})
+		if errors:
+			return {
+				"success": False,
+				"applied": 0,
+				"errors": errors,
+				"message": "validation_failed — no changes applied",
+			}
+		# Apply pass
+		applied: list[dict[str, Any]] = []
+		for upd in updates:
+			rid = upd["request_id"]
+			result = await self.update_certificate_request(
+				request_id=rid,
+				tenant_id=tenant,
+				status=upd.get("status"),
+				certificate_number=upd.get("certificate_number"),
+				issued_by=upd.get("issued_by"),
+				notes=upd.get("notes"),
+			)
+			applied.append({"request_id": rid, "status": result["status"]})
+		self._emit(tenant, "bulk_certificate_update", "batch", {"count": len(applied)})
+		return {"success": True, "applied": len(applied), "results": applied}
+
+	# ── Cryptographic receipt ─────────────────────────────────────────────────
+
+	async def generate_signed_receipt(
+		self,
+		reference_id: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Generate a tamper-evident HMAC-SHA256 receipt for a confirmed payment.
+
+		The receipt code is a 16-character uppercase base-36 string derived from
+		the HMAC of (reference_id + amount + paid_at + tenant_id).  Citizens can
+		verify it by re-dialling `*500*VERIFY*{code}#`.
+		"""
+		import hashlib
+		import hmac
+		tenant = self._tenant(tenant_id)
+		record = self.payment_references.get(reference_id)
+		if not record or record["tenant_id"] != tenant:
+			raise KeyError(f"payment reference {reference_id!r} not found")
+		if record.get("status") != "paid":
+			raise ValueError("receipt can only be generated for paid references")
+		secret = f"{tenant}-{CAPABILITY_ID}".encode()
+		payload = f"{reference_id}|{record['amount']}|{record.get('paid_at','')}|{tenant}".encode()
+		digest = hmac.new(secret, payload, hashlib.sha256).hexdigest()
+		# Encode lower 64 bits of digest as base-36 → ~16 chars
+		numeric = int(digest[:16], 16)
+		chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		code_parts = []
+		n = numeric
+		while n:
+			code_parts.append(chars[n % 36])
+			n //= 36
+		receipt_code = "".join(reversed(code_parts)).zfill(12)[:16]
+		receipt = {
+			"id": self._record_id("rcpt"),
+			"reference_id": reference_id,
+			"receipt_code": receipt_code,
+			"amount": record["amount"],
+			"currency": record["currency"],
+			"service_type": record["service_type"],
+			"tenant_id": tenant,
+			"issued_at": self._now(),
+			"verify_ussd": f"*500*VERIFY*{receipt_code}#",
+		}
+		self._emit(tenant, "receipt_generated", reference_id, {"receipt_code": receipt_code})
+		return receipt
+
+	async def verify_receipt_code(
+		self,
+		receipt_code: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Verify a previously issued USSD receipt code.
+
+		Scans all paid payment references for a matching code.  Useful for
+		`*500*VERIFY*{code}#` short-code handler or counter staff verification.
+		"""
+		import hashlib
+		import hmac
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(receipt_code, "receipt_code")
+		secret = f"{tenant}-{CAPABILITY_ID}".encode()
+		for ref_id, record in self.payment_references.items():
+			if record["tenant_id"] != tenant or record.get("status") != "paid":
+				continue
+			payload = f"{ref_id}|{record['amount']}|{record.get('paid_at','')}|{tenant}".encode()
+			digest = hmac.new(secret, payload, hashlib.sha256).hexdigest()
+			numeric = int(digest[:16], 16)
+			chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+			code_parts: list[str] = []
+			n = numeric
+			while n:
+				code_parts.append(chars[n % 36])
+				n //= 36
+			candidate = "".join(reversed(code_parts)).zfill(12)[:16]
+			if candidate == receipt_code.upper():
+				self._emit(tenant, "receipt_verified", ref_id, {"receipt_code": receipt_code})
+				return {
+					"valid": True,
+					"reference_id": ref_id,
+					"amount": record["amount"],
+					"currency": record["currency"],
+					"service_type": record["service_type"],
+					"paid_at": record.get("paid_at"),
+					"verified_at": self._now(),
+				}
+		self._emit(tenant, "receipt_verification_failed", receipt_code, {})
+		return {"valid": False, "receipt_code": receipt_code, "verified_at": self._now()}
+
+	# ── Permit workflow orchestration ─────────────────────────────────────────
+
+	async def orchestrate_permit_workflow(
+		self,
+		msisdn: str,
+		id_number: str,
+		id_type: str,
+		tax_pin: str,
+		permit_number: str,
+		permit_type: str,
+		tenant_id: str = "default",
+	) -> dict[str, Any]:
+		"""Orchestrate a multi-step permit compliance workflow concurrently.
+
+		Fans out: ID verification + tax compliance check + permit status enquiry
+		in parallel via asyncio.gather.  Gates workflow completion on all steps
+		passing.  Publishes per-step progress.
+		"""
+		tenant = self._tenant(tenant_id)
+		workflow_id = self._record_id("wf")
+		self._emit(tenant, "permit_workflow_started", workflow_id, {
+			"msisdn": msisdn, "permit_type": permit_type,
+		})
+		id_task = self.verify_id(msisdn=msisdn, id_number=id_number, id_type=id_type, tenant_id=tenant)
+		tax_task = self.enquire_tax_balance(msisdn=msisdn, tax_pin=tax_pin, tax_type="income_tax", tenant_id=tenant)
+		permit_task = self.enquire_permit_status(
+			msisdn=msisdn, permit_number=permit_number, permit_type=permit_type, tenant_id=tenant
+		)
+		id_result, tax_result, permit_result = await asyncio.gather(
+			id_task, tax_task, permit_task, return_exceptions=True
+		)
+		steps: dict[str, Any] = {}
+		all_passed = True
+		for name, res in [("id_verification", id_result), ("tax_compliance", tax_result), ("permit_status", permit_result)]:
+			if isinstance(res, Exception):
+				steps[name] = {"passed": False, "error": str(res)}
+				all_passed = False
+			else:
+				passed = (
+					res.get("verified", False) if name == "id_verification"
+					else res.get("compliance_status") == "compliant" if name == "tax_compliance"
+					else res.get("is_valid", False)
+				)
+				steps[name] = {"passed": passed, "result_id": res.get("id")}
+				if not passed:
+					all_passed = False
+		outcome = "approved" if all_passed else "rejected"
+		self._emit(tenant, f"permit_workflow_{outcome}", workflow_id, {"steps": steps})
+		return {
+			"workflow_id": workflow_id,
+			"msisdn": msisdn,
+			"permit_type": permit_type,
+			"outcome": outcome,
+			"all_steps_passed": all_passed,
+			"steps": steps,
+			"completed_at": self._now(),
+		}
+
+	# ── Telemetry snapshot ────────────────────────────────────────────────────
+
+	async def emit_telemetry_snapshot(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Compute and return a structured telemetry snapshot for NATS publishing.
+
+		Metrics include: session funnel drop-offs by level, error rates by
+		event type, service-code breakdown, and resource counts.  Intended to
+		be consumed by bytewax pipelines for time-series aggregation.
+		"""
+		tenant = self._tenant(tenant_id)
+		sessions = [s for s in self.sessions.values() if s["tenant_id"] == tenant]
+		events = [e for e in self._audit_events if e["tenant_id"] == tenant]
+		# Drop-off by menu level: sessions that stopped at each level
+		level_counts: dict[int, int] = {}
+		for s in sessions:
+			lvl = s["menu_level"]
+			level_counts[lvl] = level_counts.get(lvl, 0) + 1
+		# Error events
+		error_events = [e for e in events if "failed" in e["event_type"] or "exceeded" in e["event_type"]]
+		error_counts: dict[str, int] = {}
+		for e in error_events:
+			et = e["event_type"]
+			error_counts[et] = error_counts.get(et, 0) + 1
+		# Service code breakdown
+		sc_counts: dict[str, int] = {}
+		for s in sessions:
+			sc = s["service_code"]
+			sc_counts[sc] = sc_counts.get(sc, 0) + 1
+		snapshot = {
+			"tenant_id": tenant,
+			"snapshot_at": self._now(),
+			"nats_subject": f"gov.usd.metrics.{tenant}",
+			"sessions": {
+				"total": len(sessions),
+				"active": sum(1 for s in sessions if s["status"] == "active"),
+				"closed": sum(1 for s in sessions if s["status"] == "closed"),
+				"by_service_code": sc_counts,
+				"drop_off_by_level": level_counts,
+			},
+			"resources": {
+				"permit_enquiries": len([r for r in self.permit_enquiries.values() if r["tenant_id"] == tenant]),
+				"tax_enquiries": len([r for r in self.tax_enquiries.values() if r["tenant_id"] == tenant]),
+				"id_verifications": len([r for r in self.id_verifications.values() if r["tenant_id"] == tenant]),
+				"certificate_requests": len([r for r in self.certificate_requests.values() if r["tenant_id"] == tenant]),
+				"payment_references": len([r for r in self.payment_references.values() if r["tenant_id"] == tenant]),
+			},
+			"errors": {
+				"total": len(error_events),
+				"by_type": error_counts,
+			},
+			"audit_events_total": len(events),
+		}
+		self._emit(tenant, "telemetry_snapshot_emitted", "telemetry", {"snapshot_at": snapshot["snapshot_at"]})
+		return snapshot

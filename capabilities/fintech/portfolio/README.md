@@ -3,10 +3,12 @@
 ## Overview
 Portfolio Management provides regulated investment book operations: portfolio book creation, holding ledger recording, allocation policy activation (totals must equal exactly 100%), valuation capture, benchmark assignment, risk exposure tracking, performance attribution, cash movement recording, corporate action processing, compliance breach recording, and governance reviews. It is the investment operations layer for discretionary, advisory, model, and execution-only portfolios.
 
-Allocation policies must total exactly 100% before activation. Valuations require a source and valuation date. Performance attribution requires a benchmark. All portfolio lifecycle events stream to `apg.fintech.portfolio.lifecycle` via Bytewax.
+Version 3.0.0 adds Barra-style factor risk decomposition, liquidity risk scoring (days-to-liquidate), glide path management for target-date funds, specific-lot tax tracking with Kenya CGT calculation, pre-trade compliance checking, risk budget monitoring, transaction cost analysis (TCA), household/sleeve consolidated views, and DRIP (dividend reinvestment) automation.
+
+Allocation policies must total exactly 100% before activation. Valuations require a source and valuation date. Performance attribution requires a benchmark. All portfolio lifecycle events stream to `apg.fintech.portfolio.lifecycle` via Bytewax. DRIP executions and risk budget breaches publish to NATS `apg.fintech.portfolio.*` subjects.
 
 ## Capability ID
-`fintech_portfolio`  Version: 2.0.0
+`fintech_portfolio`  Version: 3.0.0
 
 ## Provides
 | Service | Description |
@@ -32,6 +34,15 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | portfolio_audit_query_workflow | Query and export the structured audit event log |
 | portfolio_client_report_workflow | Assemble structured client-facing performance reports (IPS, factsheet) |
 | portfolio_esg_workflow | Weighted ESG scoring and exclusion breach detection |
+| portfolio_factor_risk_workflow | Barra-style MCTR factor risk decomposition |
+| portfolio_liquidity_workflow | Days-to-liquidate scoring and ADV bucket classification |
+| portfolio_glide_path_workflow | Target-date glide path registration and application |
+| portfolio_tax_lot_workflow | Specific-lot FIFO/LIFO/highest-cost disposal with Kenya CGT |
+| portfolio_pre_trade_workflow | Pre-trade compliance: prohibited list, concentration, mandate check |
+| portfolio_risk_budget_workflow | Risk budget registration and utilisation monitoring |
+| portfolio_tca_workflow | Transaction cost analysis: implementation shortfall and broker ranking |
+| portfolio_household_workflow | Household/sleeve consolidated AUM, allocation, and ESG view |
+| portfolio_drip_workflow | Dividend reinvestment automation with fractional unit support |
 
 ## Requires
 | Capability | Purpose |
@@ -86,6 +97,15 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | audit_query | /fintech-portfolio/audit | GET | fintech_portfolio:admin | Administration |
 | client_report | /fintech-portfolio/client-report | POST | fintech_portfolio:view | Reports |
 | esg | /fintech-portfolio/esg | GET/POST | fintech_portfolio:view | ESG |
+| factor_risk | /fintech-portfolio/factor-risk | GET/POST | fintech_portfolio:risk | Risk |
+| liquidity | /fintech-portfolio/liquidity | GET/POST | fintech_portfolio:risk | Risk |
+| glide_path | /fintech-portfolio/glide-path | GET/POST | fintech_portfolio:admin | Administration |
+| tax_lots | /fintech-portfolio/tax-lots | GET/POST | fintech_portfolio:operations | Operations |
+| pre_trade | /fintech-portfolio/pre-trade-check | POST | fintech_portfolio:compliance | Compliance |
+| risk_budget | /fintech-portfolio/risk-budget | GET/POST | fintech_portfolio:risk | Risk |
+| tca | /fintech-portfolio/tca | GET/POST | fintech_portfolio:performance | Performance |
+| household | /fintech-portfolio/household | GET/POST | fintech_portfolio:view | Reports |
+| drip | /fintech-portfolio/drip | GET/POST | fintech_portfolio:operations | Operations |
 
 ## Business Rules
 | Rule | Condition | Effect |
@@ -104,6 +124,11 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | corporate_action_evidence_required | Corporate action without evidence | deny |
 | portfolio_batch_requires_bytewax | Batch without Bytewax | deny |
 | privileged_portfolio_agent_action_requires_human_approval | AI agent privileged scope without approval | deny |
+| prohibited_instrument_blocked | Trade against prohibited instrument list | deny |
+| concentration_limit_enforced | Post-trade single-issuer weight exceeds 10% AUM | deny |
+| glide_path_allocation_totals_100 | Glide path waypoint allocation does not sum to 100% | deny |
+| risk_budget_breach_notified | Risk metric exceeds registered budget limit | notify+breach |
+| drip_reinvestment_requires_market_price | DRIP process called with zero market price | deny |
 
 ## Data Models
 | Model | Key Fields |
@@ -120,21 +145,25 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | ComplianceBreach | id, portfolio_id, severity, evidence_reference, status |
 
 ## Streaming Events
-Events emitted to the fintech event stream via Bytewax.
-| Event | Trigger |
-|-------|---------|
-| portfolio_book_created | Portfolio book created |
-| portfolio_holding_recorded | Holding recorded |
-| allocation_policy_activated | Allocation policy activated |
-| portfolio_valuation_recorded | Valuation recorded |
-| benchmark_assigned | Benchmark assigned |
-| risk_exposure_recorded | Risk exposure recorded |
-| performance_attribution_recorded | Attribution recorded |
-| cash_movement_recorded | Cash movement recorded |
-| corporate_action_recorded | Corporate action processed |
-| compliance_breach_recorded | Breach recorded |
-| portfolio_review_recorded | Review completed |
-| portfolio_agent_registered | AI agent registered |
+Events emitted to the fintech event stream via Bytewax and NATS.
+| Event | Trigger | Subject |
+|-------|---------|---------|
+| portfolio_book_created | Portfolio book created | apg.fintech.portfolio.lifecycle |
+| portfolio_holding_recorded | Holding recorded | apg.fintech.portfolio.lifecycle |
+| allocation_policy_activated | Allocation policy activated | apg.fintech.portfolio.lifecycle |
+| portfolio_valuation_recorded | Valuation recorded | apg.fintech.portfolio.lifecycle |
+| benchmark_assigned | Benchmark assigned | apg.fintech.portfolio.lifecycle |
+| risk_exposure_recorded | Risk exposure recorded | apg.fintech.portfolio.risk |
+| performance_attribution_recorded | Attribution recorded | apg.fintech.portfolio.lifecycle |
+| cash_movement_recorded | Cash movement recorded | apg.fintech.portfolio.lifecycle |
+| corporate_action_recorded | Corporate action processed | apg.fintech.portfolio.lifecycle |
+| compliance_breach_recorded | Breach recorded | apg.fintech.portfolio.compliance |
+| portfolio_review_recorded | Review completed | apg.fintech.portfolio.governance |
+| portfolio_agent_registered | AI agent registered | apg.fintech.portfolio.agents |
+| risk_budget_breach | Risk metric exceeds registered limit | apg.fintech.portfolio.risk_budget_breach |
+| drip_executed | DRIP reinvestment completed | apg.fintech.portfolio.lifecycle |
+| glide_path_applied | Glide path waypoint applied | apg.fintech.portfolio.lifecycle |
+| prohibited_instrument_registered | Prohibited instrument added | apg.fintech.portfolio.compliance |
 
 ## Edge Cases Handled
 - Allocation totals must equal exactly 100% — rounding errors (e.g., 99.99%) are not tolerated; the `allocation_totals_100` flag must be set by the service layer after verifying exact equality
@@ -148,6 +177,13 @@ Events emitted to the fintech event stream via Bytewax.
 - Counterparty concentration is computed only against holdings with an `issuer_id` attribute; unattributed holdings are grouped under `unattributed` and excluded from the limit check
 - ESG score aggregation requires explicit `record_esg_rating` calls per instrument; unscored holdings are listed separately and do not dilute the weighted average
 - Portfolio cloning copies the allocation policy from the source but starts with zero holdings, preventing unintended position duplication across client books
+- Liquidity scoring classifies holdings without ADV metadata as `locked` (worst case) rather than silently excluding them from the score
+- Glide path waypoints must individually total 100% — partial-allocation waypoints are rejected at registration time, not at apply time
+- Tax lot disposal falls back to aggregate average-cost disposal when no lots have been explicitly recorded; `dispose_lots` is non-destructive against portfolios that predate lot tracking
+- Pre-trade compliance checks automatically record `ComplianceBreach` records for violations so every blocked trade has a durable audit record
+- DRIP process with a zero market price returns an error dict rather than raising — this prevents cascading failures during dividend processing when prices are temporarily unavailable
+- Risk budget monitoring computes `max_drawdown` using absolute value comparison so negative drawdown limits (e.g. -0.15) are handled correctly
+- Consolidated portfolio view excludes portfolios not found in this tenant's scope rather than raising — callers can safely pass a superset of IDs
 
 ## Composability
 - **Upstream**: `fintech_wealth` provides client profile and mandate context; `fintech_robo` provides model portfolio templates; market data feeds are adapter boundaries referenced by ID

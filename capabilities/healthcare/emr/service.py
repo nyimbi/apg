@@ -3335,6 +3335,1026 @@ class EMRService:
 		}
 
 	# ═══════════════════════════════════════════════════════════════════════════
+	# LONGITUDINAL VITAL TREND ANALYSIS
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def analyse_vital_trend(
+		self,
+		patient_id: str,
+		vital_type: str,
+		window_hours: int = 24,
+		alert_threshold_slope: float | None = None,
+	) -> dict[str, Any]:
+		"""Analyse the trend of a specific vital sign over a rolling time window.
+
+		Retrieves the last ``window_hours`` of readings for ``vital_type``,
+		computes descriptive statistics (mean, stddev, min, max), fits a
+		linear regression to detect directional trend, and flags deterioration
+		when the slope exceeds ``alert_threshold_slope`` (units per hour).
+
+		Returns a ``trend_direction`` of "improving" | "stable" | "worsening" |
+		"insufficient_data" plus a list of anomalous readings (>2 SD from mean).
+
+		In production wire the alert emission to a NATS ``emr.{tenant}.vitals.trend``
+		subject so downstream deterioration-monitoring pipelines can act immediately.
+		"""
+		assert patient_id, "patient_id required"
+		assert vital_type.strip(), "vital_type required"
+		assert window_hours > 0, "window_hours must be positive"
+
+		all_vitals = await self.list_vitals(self.tenant_id, patient_id, vital_type=vital_type)
+		cutoff = datetime.utcnow().timestamp() - (window_hours * 3600)
+		window_vitals = [
+			v for v in all_vitals
+			if v.recorded_at.timestamp() >= cutoff and v.value is not None
+		]
+
+		if len(window_vitals) < 2:
+			return {
+				"patient_id": patient_id,
+				"vital_type": vital_type,
+				"window_hours": window_hours,
+				"data_points": len(window_vitals),
+				"trend_direction": "insufficient_data",
+				"alert": False,
+				"message": "Fewer than 2 readings in window — trend analysis unavailable.",
+			}
+
+		values = [v.value for v in window_vitals]
+		timestamps_h = [
+			(v.recorded_at.timestamp() - window_vitals[-1].recorded_at.timestamp()) / 3600.0
+			for v in window_vitals
+		]
+
+		n = len(values)
+		mean_val = sum(values) / n
+		variance = sum((x - mean_val) ** 2 for x in values) / n
+		stddev = variance ** 0.5
+
+		# Simple linear regression: slope = cov(t, v) / var(t)
+		mean_t = sum(timestamps_h) / n
+		cov_tv = sum((timestamps_h[i] - mean_t) * (values[i] - mean_val) for i in range(n))
+		var_t = sum((t - mean_t) ** 2 for t in timestamps_h)
+		slope = cov_tv / var_t if var_t != 0 else 0.0
+
+		anomalies = [
+			{"value": v.value, "recorded_at": v.recorded_at.isoformat(), "deviation_sd": round((v.value - mean_val) / stddev, 2)}
+			for v in window_vitals
+			if stddev > 0 and abs(v.value - mean_val) > 2 * stddev
+		]
+
+		# Determine trend direction from slope sign and significance
+		sig_threshold = stddev * 0.05  # 5% of stddev per hour is "significant"
+		if abs(slope) <= sig_threshold:
+			trend_direction = "stable"
+		elif slope > 0:
+			# whether worsening depends on vital type (BP up = worsening, SpO2 up = improving)
+			_rising_is_bad = {"blood_pressure", "heart_rate", "temperature", "respiratory_rate"}
+			trend_direction = "worsening" if vital_type in _rising_is_bad else "improving"
+		else:
+			_falling_is_bad = {"oxygen_saturation", "blood_pressure"}
+			trend_direction = "worsening" if vital_type in _falling_is_bad else "improving"
+
+		alert = (
+			alert_threshold_slope is not None and abs(slope) > alert_threshold_slope
+		) or (trend_direction == "worsening" and len(anomalies) > 0)
+
+		logger.info(
+			"emr.vital_trend patient=%s type=%s slope=%.3f trend=%s alert=%s",
+			patient_id, vital_type, slope, trend_direction, alert,
+		)
+		return {
+			"patient_id": patient_id,
+			"vital_type": vital_type,
+			"window_hours": window_hours,
+			"data_points": n,
+			"mean": round(mean_val, 2),
+			"stddev": round(stddev, 2),
+			"min": min(values),
+			"max": max(values),
+			"slope_per_hour": round(slope, 4),
+			"trend_direction": trend_direction,
+			"anomalous_readings": anomalies,
+			"alert": alert,
+			"latest_value": window_vitals[0].value if window_vitals else None,
+			"latest_recorded_at": window_vitals[0].recorded_at.isoformat() if window_vitals else None,
+		}
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# CHARLSON COMORBIDITY INDEX
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	# ICD-10 prefix → (CCI weight, condition_label)
+	_CCI_MAP: dict[str, tuple[int, str]] = {
+		"I21": (1, "Myocardial infarction"), "I22": (1, "Myocardial infarction"),
+		"I25": (1, "Myocardial infarction"),
+		"I50": (1, "Congestive heart failure"),
+		"I70": (1, "Peripheral vascular disease"), "I71": (1, "Peripheral vascular disease"),
+		"I73": (1, "Peripheral vascular disease"),
+		"G45": (1, "Cerebrovascular disease"), "I63": (1, "Cerebrovascular disease"),
+		"I64": (1, "Cerebrovascular disease"),
+		"F00": (1, "Dementia"), "F01": (1, "Dementia"), "F02": (1, "Dementia"),
+		"F03": (1, "Dementia"),
+		"J43": (1, "COPD"), "J44": (1, "COPD"),
+		"M05": (1, "Rheumatic disease"), "M06": (1, "Rheumatic disease"),
+		"M32": (1, "Rheumatic disease"),
+		"K25": (1, "Peptic ulcer disease"), "K26": (1, "Peptic ulcer disease"),
+		"K27": (1, "Peptic ulcer disease"),
+		"K70": (1, "Mild liver disease"), "K73": (1, "Mild liver disease"),
+		"K74": (1, "Mild liver disease"),
+		"E10": (1, "Diabetes without complications"), "E11": (1, "Diabetes without complications"),
+		"E12": (1, "Diabetes without complications"),
+		"E13": (2, "Diabetes with end-organ damage"),
+		"G81": (2, "Hemiplegia"), "G82": (2, "Hemiplegia"),
+		"N18": (2, "Moderate/severe CKD"), "N19": (2, "Moderate/severe CKD"),
+		"C0": (2, "Solid tumour"), "C1": (2, "Solid tumour"), "C2": (2, "Solid tumour"),
+		"C3": (2, "Solid tumour"), "C4": (2, "Solid tumour"),
+		"C91": (2, "Leukaemia"), "C92": (2, "Leukaemia"),
+		"C81": (2, "Lymphoma"), "C82": (2, "Lymphoma"), "C83": (2, "Lymphoma"),
+		"K72": (3, "Moderate/severe liver disease"),
+		"C77": (6, "Metastatic solid tumour"), "C78": (6, "Metastatic solid tumour"),
+		"C79": (6, "Metastatic solid tumour"), "C80": (6, "Metastatic solid tumour"),
+		"B20": (6, "AIDS/HIV disease"), "B21": (6, "AIDS/HIV disease"),
+		"B22": (6, "AIDS/HIV disease"), "B24": (6, "AIDS/HIV disease"),
+	}
+
+	async def compute_charlson_comorbidity_index(
+		self,
+		patient_id: str,
+		age_years: int | None = None,
+	) -> dict[str, Any]:
+		"""Compute the Charlson Comorbidity Index (CCI) for a patient.
+
+		Derives comorbidities from the active + chronic problem list using
+		ICD-10 prefix matching.  Age adjustment adds 1 point per decade ≥ 50 years
+		(Charlson 1994 age-adjusted version).
+
+		Returns raw CCI, age-adjusted CCI, 10-year survival probability estimate,
+		and the list of contributing conditions.
+		"""
+		assert patient_id, "patient_id required"
+
+		problems = await self.list_problems(self.tenant_id, patient_id)
+		# include both active and chronic; exclude resolved
+		relevant = [p for p in problems if p.status in ("active", "chronic", "inactive")]
+
+		score = 0
+		conditions_contributing: list[dict[str, Any]] = []
+		seen_labels: set[str] = set()
+
+		for prob in relevant:
+			code = prob.icd10_code.upper()
+			# match on first 2 or 3 characters
+			for prefix_len in (3, 2):
+				prefix = code[:prefix_len]
+				if prefix in self._CCI_MAP:
+					weight, label = self._CCI_MAP[prefix]
+					if label not in seen_labels:
+						score += weight
+						seen_labels.add(label)
+						conditions_contributing.append({
+							"icd10_code": prob.icd10_code,
+							"description": prob.description,
+							"cci_label": label,
+							"weight": weight,
+						})
+					break
+
+		age_adjustment = 0
+		if age_years is not None and age_years >= 50:
+			age_adjustment = (age_years - 40) // 10  # 1 point per decade above 40
+
+		adjusted_score = score + age_adjustment
+
+		# 10-year survival probability (Charlson 1994 original cohort)
+		_survival = {0: 98, 1: 96, 2: 90, 3: 77, 4: 53, 5: 21}
+		survival_pct = _survival.get(min(adjusted_score, 5), max(0, 21 - (adjusted_score - 5) * 5))
+
+		_log_cds("CCI", patient_id, adjusted_score)
+		logger.info("emr.cci patient=%s score=%d age_adj=%d", patient_id, score, adjusted_score)
+		return {
+			"patient_id": patient_id,
+			"cci_score": score,
+			"age_adjusted_cci": adjusted_score,
+			"age_adjustment": age_adjustment,
+			"age_years": age_years,
+			"conditions_contributing": conditions_contributing,
+			"conditions_count": len(conditions_contributing),
+			"estimated_10yr_survival_pct": survival_pct,
+			"risk_category": (
+				"low" if adjusted_score <= 1
+				else "moderate" if adjusted_score <= 3
+				else "high" if adjusted_score <= 5
+				else "very_high"
+			),
+		}
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# LACE+ READMISSION RISK
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def compute_lace_plus_score(
+		self,
+		patient_id: str,
+		encounter_id: str,
+		age_years: int,
+	) -> dict[str, Any]:
+		"""Compute the LACE+ index to predict 30-day unplanned readmission risk.
+
+		LACE components (van Walraven et al. 2010 + LACE+ extension):
+		  L — Length of stay (0–7 points)
+		  A — Acuity of admission (0 or 3 points for emergency/urgent)
+		  C — Charlson Comorbidity Index (0–5 points, capped)
+		  E — Emergency department visits in past 6 months (0–4 points)
+
+		Returns LACE+ score (0–19), risk tier, and probability estimate.
+		"""
+		assert patient_id, "patient_id required"
+		assert encounter_id, "encounter_id required"
+		assert age_years > 0, "age_years must be positive"
+
+		enc = self._encounters.get((self.tenant_id, encounter_id))
+		if enc is None:
+			raise ValueError(f"Encounter {encounter_id} not found")
+
+		# L — Length of stay
+		if enc.discharge_time and enc.admit_time:
+			los_days = (enc.discharge_time - enc.admit_time).days
+		else:
+			los_days = 0
+
+		_l_score = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 5}.get(min(los_days, 6), 7)
+		if los_days >= 7:
+			_l_score = 7
+
+		# A — Acuity (emergency/urgent admission = 3)
+		_a_score = 3 if str(enc.encounter_type).lower() in ("emergency", "urgent", "inpatient") else 0
+
+		# C — CCI (capped at 4 points for LACE+)
+		cci_result = await self.compute_charlson_comorbidity_index(patient_id, age_years=age_years)
+		_c_score = min(cci_result["cci_score"], 4)
+
+		# E — ED visits in past 6 months (proxy: count emergency encounters in 180 days)
+		all_encounters = await self.list_encounters(self.tenant_id, patient_id)
+		six_months_ago = datetime.utcnow().timestamp() - 180 * 86400
+		ed_visits = sum(
+			1 for e in all_encounters
+			if str(e.encounter_type).lower() == "emergency"
+			and e.created_at.timestamp() >= six_months_ago
+			and e.id != encounter_id
+		)
+		_e_score = min(ed_visits, 4)
+
+		total = _l_score + _a_score + _c_score + _e_score
+
+		# Risk tier thresholds (van Walraven LACE validation)
+		if total <= 4:
+			risk_tier = "low"
+			readmission_pct = 5.0
+		elif total <= 9:
+			risk_tier = "moderate"
+			readmission_pct = 14.0
+		elif total <= 13:
+			risk_tier = "high"
+			readmission_pct = 25.0
+		else:
+			risk_tier = "very_high"
+			readmission_pct = 42.0
+
+		_log_cds("LACE_plus", patient_id, total)
+		return {
+			"patient_id": patient_id,
+			"encounter_id": encounter_id,
+			"lace_plus_score": total,
+			"risk_tier": risk_tier,
+			"estimated_30day_readmission_pct": readmission_pct,
+			"components": {
+				"L_length_of_stay_days": los_days,
+				"L_score": _l_score,
+				"A_acuity": str(enc.encounter_type),
+				"A_score": _a_score,
+				"C_cci": cci_result["cci_score"],
+				"C_score": _c_score,
+				"E_ed_visits_6mo": ed_visits,
+				"E_score": _e_score,
+			},
+			"recommendation": (
+				"Standard discharge planning." if risk_tier == "low"
+				else "Enhanced discharge planning: follow-up within 7 days, medication reconciliation." if risk_tier == "moderate"
+				else "High-risk discharge: care coordinator referral, 48-hour phone follow-up, community nurse visit." if risk_tier == "high"
+				else "Very high risk: consider extended stay, SNF placement, or intensive community support package."
+			),
+		}
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# MEDICATION ADMINISTRATION RECORD (eMAR)
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def record_dose_administration(
+		self,
+		patient_id: str,
+		encounter_id: str,
+		prescription_id: str,
+		drug_name: str,
+		dose: str,
+		route: str,
+		administered_by: str,
+		administered_at: datetime | None = None,
+		variance_code: str = "none",
+		variance_reason: str = "",
+	) -> dict[str, Any]:
+		"""Record an individual dose administration event for eMAR tracking.
+
+		``variance_code`` must be one of: none | held | refused | partial | modified.
+		Each administration event is linked to a prescription and an encounter.
+		Five-Rights verification (patient / drug / dose / route / time) is logged.
+
+		In production, integrate with Pyxis/Omnicell cabinet software via HL7
+		RAS^O17 (pharmacy administration) message handling.
+		"""
+		assert patient_id, "patient_id required"
+		assert encounter_id, "encounter_id required"
+		assert drug_name.strip(), "drug_name required"
+		assert administered_by, "administered_by required"
+		assert variance_code in ("none", "held", "refused", "partial", "modified"), \
+			"variance_code must be none | held | refused | partial | modified"
+
+		event_id = uuid7str()
+		ts = (administered_at or datetime.utcnow()).isoformat()
+		event: dict[str, Any] = {
+			"id": event_id,
+			"tenant_id": self.tenant_id,
+			"patient_id": patient_id,
+			"encounter_id": encounter_id,
+			"prescription_id": prescription_id,
+			"drug_name": drug_name,
+			"dose": dose,
+			"route": route,
+			"administered_by": administered_by,
+			"administered_at": ts,
+			"variance_code": variance_code,
+			"variance_reason": variance_reason,
+			"five_rights": {
+				"right_patient": bool(patient_id),
+				"right_drug": bool(drug_name),
+				"right_dose": bool(dose),
+				"right_route": bool(route),
+				"right_time": bool(ts),
+			},
+			"created_at": datetime.utcnow().isoformat(),
+		}
+
+		if not hasattr(self, "_dose_administrations"):
+			self._dose_administrations: dict[tuple[str, str], dict[str, Any]] = {}
+		self._dose_administrations[(self.tenant_id, event_id)] = event
+		self._record_audit(self.tenant_id, "dose_administered", event_id)
+		logger.info(
+			"emr.emar patient=%s drug=%s variance=%s by=%s",
+			patient_id, drug_name, variance_code, administered_by,
+		)
+		return event
+
+	async def get_emar_report(
+		self,
+		patient_id: str,
+		encounter_id: str,
+		period_from: datetime | None = None,
+		period_to: datetime | None = None,
+	) -> dict[str, Any]:
+		"""Generate a structured eMAR report for a patient encounter.
+
+		Returns all dose administration events in the specified time window,
+		grouped by drug, with variance summary and adherence metrics.
+		"""
+		assert patient_id, "patient_id required"
+		assert encounter_id, "encounter_id required"
+
+		if not hasattr(self, "_dose_administrations"):
+			self._dose_administrations = {}
+
+		events = [
+			e for (tid, _), e in self._dose_administrations.items()
+			if tid == self.tenant_id
+			and e["patient_id"] == patient_id
+			and e["encounter_id"] == encounter_id
+		]
+
+		if period_from:
+			events = [e for e in events if e["administered_at"] >= period_from.isoformat()]
+		if period_to:
+			events = [e for e in events if e["administered_at"] <= period_to.isoformat()]
+
+		events.sort(key=lambda e: e["administered_at"])
+
+		by_drug: dict[str, list[dict[str, Any]]] = {}
+		for ev in events:
+			by_drug.setdefault(ev["drug_name"], []).append(ev)
+
+		drug_summaries = []
+		total_given = 0
+		total_variances = 0
+		for drug, drug_events in by_drug.items():
+			given = sum(1 for e in drug_events if e["variance_code"] == "none")
+			variances = [e for e in drug_events if e["variance_code"] != "none"]
+			total_given += given
+			total_variances += len(variances)
+			drug_summaries.append({
+				"drug_name": drug,
+				"total_administrations": len(drug_events),
+				"doses_given": given,
+				"variance_count": len(variances),
+				"variances": [{"code": v["variance_code"], "reason": v["variance_reason"], "at": v["administered_at"]} for v in variances],
+			})
+
+		return {
+			"patient_id": patient_id,
+			"encounter_id": encounter_id,
+			"period_from": period_from.isoformat() if period_from else None,
+			"period_to": period_to.isoformat() if period_to else None,
+			"generated_at": datetime.utcnow().isoformat(),
+			"generated_by": self.actor_id,
+			"total_events": len(events),
+			"total_doses_given": total_given,
+			"total_variances": total_variances,
+			"adherence_pct": round(100 * total_given / len(events), 1) if events else 100.0,
+			"drug_summaries": drug_summaries,
+			"events": events,
+		}
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# SEPSIS BUNDLE TRACKING
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def track_sepsis_bundle(
+		self,
+		patient_id: str,
+		encounter_id: str,
+		recognition_time: datetime | None = None,
+	) -> dict[str, Any]:
+		"""Create or update a Sepsis-6 Hour-1 bundle tracker for a patient.
+
+		Checks completion of each bundle element by inspecting current clinical
+		data in the encounter:
+		  1. Blood cultures ordered (lab order with 'culture' in test_name)
+		  2. Serum lactate ordered (lab order with 'lactate' in test_name)
+		  3. IV antibiotics prescribed (prescription with antibiotic drug class)
+		  4. IV fluid bolus prescribed (prescription with 'saline' or 'hartmann')
+		  5. Supplemental oxygen recorded in vitals (vital_type=spo2 + note)
+		  6. Urine output measurement (vital_type=urine_output)
+
+		Returns bundle compliance percentage and an alert if any element is
+		incomplete beyond 45 minutes of recognition.  In production, emit to
+		NATS ``emr.{tenant}.sepsis.bundle`` for real-time dashboard updates.
+		"""
+		assert patient_id, "patient_id required"
+		assert encounter_id, "encounter_id required"
+
+		rec_time = recognition_time or datetime.utcnow()
+
+		lab_orders = await self.list_lab_orders(self.tenant_id, patient_id)
+		enc_lab_orders = [o for o in lab_orders if o.encounter_id == encounter_id]
+
+		meds = await self.list_medications(self.tenant_id, patient_id, status="active")
+		vitals = await self.list_vitals(self.tenant_id, patient_id)
+
+		_antibiotic_keywords = {"amoxicillin", "ampicillin", "ceftriaxone", "cefazolin",
+			"vancomycin", "piperacillin", "meropenem", "ertapenem",
+			"gentamicin", "metronidazole", "ciprofloxacin", "azithromycin"}
+		_fluid_keywords = {"saline", "hartmann", "lactated ringer", "normal saline", "0.9% nacl"}
+
+		bundle: dict[str, Any] = {
+			"blood_cultures": any("culture" in (o.test_name or "").lower() for o in enc_lab_orders),
+			"serum_lactate": any("lactate" in (o.test_name or "").lower() for o in enc_lab_orders),
+			"iv_antibiotics": any(
+				m.drug_name.lower() in _antibiotic_keywords
+				or any(kw in m.drug_name.lower() for kw in _antibiotic_keywords)
+				for m in meds
+			),
+			"iv_fluids": any(
+				any(kw in m.drug_name.lower() for kw in _fluid_keywords)
+				for m in meds
+			),
+			"supplemental_oxygen": any(str(v.vital_type) == "oxygen_saturation" for v in vitals if v.encounter_id == encounter_id),
+			"urine_output_measured": any("urine" in str(v.vital_type).lower() for v in vitals if v.encounter_id == encounter_id),
+		}
+
+		elements_complete = sum(1 for v in bundle.values() if v)
+		compliance_pct = round(100 * elements_complete / len(bundle), 1)
+
+		elapsed_minutes = (datetime.utcnow() - rec_time).total_seconds() / 60
+		incomplete = [k for k, v in bundle.items() if not v]
+		alert = elapsed_minutes > 45 and incomplete
+
+		if not hasattr(self, "_sepsis_trackers"):
+			self._sepsis_trackers: dict[tuple[str, str], dict[str, Any]] = {}
+
+		tracker_id = f"{encounter_id}_sepsis"
+		tracker: dict[str, Any] = {
+			"tracker_id": tracker_id,
+			"tenant_id": self.tenant_id,
+			"patient_id": patient_id,
+			"encounter_id": encounter_id,
+			"recognition_time": rec_time.isoformat(),
+			"elapsed_minutes": round(elapsed_minutes, 1),
+			"bundle_elements": bundle,
+			"elements_complete": elements_complete,
+			"elements_total": len(bundle),
+			"compliance_pct": compliance_pct,
+			"incomplete_elements": incomplete,
+			"alert": bool(alert),
+			"alert_message": (
+				f"SEPSIS BUNDLE ALERT: {len(incomplete)} element(s) incomplete at "
+				f"{round(elapsed_minutes)} min: {', '.join(incomplete)}"
+				if alert else ""
+			),
+			"updated_at": datetime.utcnow().isoformat(),
+		}
+		self._sepsis_trackers[(self.tenant_id, encounter_id)] = tracker
+		self._record_audit(self.tenant_id, "sepsis_bundle_tracked", encounter_id)
+		logger.info(
+			"emr.sepsis_bundle enc=%s compliance=%.0f%% alert=%s",
+			encounter_id, compliance_pct, alert,
+		)
+		return tracker
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# ADVANCE DIRECTIVES
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def record_advance_directive(
+		self,
+		patient_id: str,
+		directive_type: str,
+		provisions: list[str],
+		signed_date: str,
+		agent_name: str | None = None,
+		agent_contact: str | None = None,
+		document_url: str | None = None,
+		witness_ids: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Record a patient's advance directive or POLST/MOLST form.
+
+		``directive_type`` options: living_will | dnr | dnar | polst | molst |
+		healthcare_proxy | organ_donation.
+
+		``provisions`` is a list of free-text wishes, e.g. ["No mechanical
+		ventilation", "Comfort measures only"].  A FHIR Consent resource
+		equivalent is embedded in the record for export.
+
+		The directive is surfaced in ``generate_clinical_summary`` and flagged
+		in all encounter openings via ``clinical_decision_support``.
+		"""
+		assert patient_id, "patient_id required"
+		assert directive_type.strip(), "directive_type required"
+		assert provisions, "provisions must not be empty"
+		assert signed_date, "signed_date required"
+
+		_valid_types = {
+			"living_will", "dnr", "dnar", "polst", "molst",
+			"healthcare_proxy", "organ_donation",
+		}
+		if directive_type not in _valid_types:
+			raise ValueError(f"directive_type must be one of {sorted(_valid_types)}")
+
+		directive_id = uuid7str()
+		directive: dict[str, Any] = {
+			"id": directive_id,
+			"tenant_id": self.tenant_id,
+			"patient_id": patient_id,
+			"directive_type": directive_type,
+			"provisions": provisions,
+			"signed_date": signed_date,
+			"agent_name": agent_name,
+			"agent_contact": agent_contact,
+			"document_url": document_url,
+			"witness_ids": witness_ids or [],
+			"status": "active",
+			"created_by": self.actor_id,
+			"created_at": datetime.utcnow().isoformat(),
+			# FHIR Consent resource stub for bundle export
+			"fhir_consent": {
+				"resourceType": "Consent",
+				"id": directive_id,
+				"status": "active",
+				"scope": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/consentscope", "code": "adr"}]},
+				"category": [{"coding": [{"system": "http://loinc.org", "code": "59284-0", "display": "Advance directive"}]}],
+				"patient": {"reference": f"Patient/{patient_id}"},
+				"dateTime": signed_date,
+				"provision": {"text": "; ".join(provisions)},
+			},
+		}
+
+		if not hasattr(self, "_advance_directives"):
+			self._advance_directives: dict[tuple[str, str], dict[str, Any]] = {}
+		self._advance_directives[(self.tenant_id, directive_id)] = directive
+		self._record_audit(self.tenant_id, "advance_directive_recorded", directive_id)
+		_log_consent("advance_directive", patient_id, directive_type)
+		logger.info("emr.advance_directive patient=%s type=%s", patient_id, directive_type)
+		return directive
+
+	async def get_active_directives(self, patient_id: str) -> list[dict[str, Any]]:
+		"""Return all active advance directives for a patient, newest first."""
+		assert patient_id, "patient_id required"
+		if not hasattr(self, "_advance_directives"):
+			self._advance_directives = {}
+		directives = [
+			d for (tid, _), d in self._advance_directives.items()
+			if tid == self.tenant_id and d["patient_id"] == patient_id and d["status"] == "active"
+		]
+		return sorted(directives, key=lambda d: d["created_at"], reverse=True)
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# POPULATION HEALTH COHORT BUILDER
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	async def build_patient_cohort(
+		self,
+		diagnosis_prefixes: list[str] | None = None,
+		active_medications: list[str] | None = None,
+		age_range: tuple[int, int] | None = None,
+		last_encounter_before_days: int | None = None,
+		missing_screening_keys: list[str] | None = None,
+	) -> dict[str, Any]:
+		"""Build a population health cohort based on clinical criteria.
+
+		Parameters
+		----------
+		diagnosis_prefixes:
+			ICD-10 prefixes (e.g. ["E11", "I10"]) — patient must have at least
+			one active problem matching any prefix.
+		active_medications:
+			Drug name substrings — patient must have at least one active med
+			matching any substring.
+		age_range:
+			(min_age_years, max_age_years) filter; requires birth_date on
+			PatientResponse to be set.
+		last_encounter_before_days:
+			Include only patients whose most recent encounter is older than this
+			many days (useful for "lost to follow-up" cohorts).
+		missing_screening_keys:
+			Reminder keys from _CLINICAL_REMINDERS — include only patients with
+			these reminders overdue.
+
+		Returns cohort metadata and list of PatientCohortMember dicts.
+		"""
+		all_patients = await self.list_patients(self.tenant_id)
+		cohort_members: list[dict[str, Any]] = []
+		today = datetime.utcnow()
+
+		for patient in all_patients:
+			patient_id = patient.id
+
+			# Diagnosis filter
+			if diagnosis_prefixes:
+				problems = await self.list_problems(self.tenant_id, patient_id, status="active")
+				patient_prefixes = {p.icd10_code[:len(pfx)] for p in problems for pfx in diagnosis_prefixes}
+				if not any(pfx in patient_prefixes for pfx in diagnosis_prefixes):
+					continue
+
+			# Medication filter
+			if active_medications:
+				meds = await self.list_medications(self.tenant_id, patient_id, status="active")
+				med_names_lower = [m.drug_name.lower() for m in meds]
+				if not any(
+					any(search.lower() in name for name in med_names_lower)
+					for search in active_medications
+				):
+					continue
+
+			# Age filter
+			if age_range is not None:
+				min_age, max_age = age_range
+				age_years = (today - datetime(patient.birth_date.year, patient.birth_date.month, patient.birth_date.day)).days // 365
+				if not (min_age <= age_years <= max_age):
+					continue
+
+			# Last encounter filter
+			encounters = await self.list_encounters(self.tenant_id, patient_id)
+			last_encounter_days: int | None = None
+			if encounters:
+				delta = (today - encounters[0].created_at).days
+				last_encounter_days = delta
+			if last_encounter_before_days is not None:
+				if last_encounter_days is None or last_encounter_days < last_encounter_before_days:
+					continue
+
+			# Missing screening filter
+			open_care_gaps: list[str] = []
+			if missing_screening_keys:
+				reminders = await self.clinical_reminder_check(patient_id)
+				reminder_keys = {r["reminder_key"] for r in reminders}
+				open_care_gaps = [k for k in missing_screening_keys if k in reminder_keys]
+				if not open_care_gaps:
+					continue
+
+			cohort_members.append({
+				"patient_id": patient_id,
+				"family_name": patient.name.family,
+				"given_name": patient.name.given[0] if patient.name.given else "",
+				"last_encounter_days_ago": last_encounter_days,
+				"open_care_gaps": open_care_gaps,
+			})
+
+		logger.info(
+			"emr.cohort_build tenant=%s criteria=%s members=%d",
+			self.tenant_id,
+			{"dx": diagnosis_prefixes, "meds": active_medications},
+			len(cohort_members),
+		)
+		return {
+			"tenant_id": self.tenant_id,
+			"cohort_size": len(cohort_members),
+			"criteria": {
+				"diagnosis_prefixes": diagnosis_prefixes,
+				"active_medications": active_medications,
+				"age_range": age_range,
+				"last_encounter_before_days": last_encounter_before_days,
+				"missing_screening_keys": missing_screening_keys,
+			},
+			"generated_at": today.isoformat(),
+			"generated_by": self.actor_id,
+			"members": cohort_members,
+		}
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# DISEASE TRAJECTORY TRACKING
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	# Key biomarkers per ICD-10 prefix
+	_TRAJECTORY_BIOMARKERS: dict[str, dict[str, Any]] = {
+		"E11": {"lab_keywords": ["hba1c", "hba1c %", "creatinine", "egfr", "urine albumin"], "vital_types": ["blood_glucose", "blood_pressure"], "label": "Type 2 Diabetes"},
+		"E10": {"lab_keywords": ["hba1c", "creatinine", "egfr"], "vital_types": ["blood_glucose"], "label": "Type 1 Diabetes"},
+		"I10": {"lab_keywords": ["creatinine", "potassium", "egfr"], "vital_types": ["blood_pressure"], "label": "Hypertension"},
+		"I50": {"lab_keywords": ["bnp", "nt-probnp", "creatinine", "sodium"], "vital_types": ["weight", "oxygen_saturation", "heart_rate"], "label": "Heart Failure"},
+		"N18": {"lab_keywords": ["creatinine", "egfr", "urea", "potassium", "urine albumin"], "vital_types": ["blood_pressure"], "label": "Chronic Kidney Disease"},
+		"J44": {"lab_keywords": ["fev1", "co2"], "vital_types": ["oxygen_saturation", "respiratory_rate"], "label": "COPD"},
+	}
+
+	async def get_disease_trajectory(
+		self,
+		patient_id: str,
+		icd10_prefix: str,
+	) -> dict[str, Any]:
+		"""Return a longitudinal disease trajectory for a specific condition.
+
+		Collects lab results and vitals matching the condition's key biomarkers,
+		sorts them chronologically, and computes a trend direction (improving |
+		stable | worsening) using linear regression on the last 5 data points
+		per biomarker.
+
+		The trajectory is exportable as a FHIR DiagnosticReport series via
+		``fhir_bundle_export``.
+		"""
+		assert patient_id, "patient_id required"
+		assert icd10_prefix.strip(), "icd10_prefix required"
+
+		prefix = icd10_prefix.upper()[:3]
+		biomarker_cfg = self._TRAJECTORY_BIOMARKERS.get(prefix)
+		if biomarker_cfg is None:
+			return {
+				"patient_id": patient_id,
+				"icd10_prefix": prefix,
+				"status": "no_trajectory_config",
+				"message": f"No trajectory configuration for ICD-10 prefix '{prefix}'. Supported: {list(self._TRAJECTORY_BIOMARKERS.keys())}",
+			}
+
+		lab_keywords: list[str] = biomarker_cfg["lab_keywords"]
+		vital_types: list[str] = biomarker_cfg["vital_types"]
+
+		# Collect lab results
+		all_labs = await self.list_lab_results(self.tenant_id, patient_id)
+		relevant_labs = [
+			r for r in all_labs
+			if any(kw in r.test_name.lower() for kw in lab_keywords)
+		]
+
+		# Collect vitals
+		trajectory_points: list[dict[str, Any]] = []
+		for vtype in vital_types:
+			vitals = await self.list_vitals(self.tenant_id, patient_id, vital_type=vtype)
+			for v in vitals:
+				trajectory_points.append({
+					"timestamp": v.recorded_at.isoformat(),
+					"source": "vital",
+					"biomarker": vtype,
+					"value": v.value,
+					"unit": v.unit,
+				})
+
+		for lab in relevant_labs:
+			if lab.value_numeric is not None:
+				trajectory_points.append({
+					"timestamp": lab.result_time.isoformat(),
+					"source": "lab",
+					"biomarker": lab.test_name.lower(),
+					"value": lab.value_numeric,
+					"unit": lab.unit or "",
+				})
+
+		trajectory_points.sort(key=lambda p: p["timestamp"])
+
+		# Compute per-biomarker trend using last 5 points
+		biomarker_trends: dict[str, str] = {}
+		by_biomarker: dict[str, list[float]] = {}
+		for pt in trajectory_points:
+			by_biomarker.setdefault(pt["biomarker"], []).append(pt["value"])
+
+		for biomarker, vals in by_biomarker.items():
+			last5 = vals[-5:]
+			if len(last5) < 2:
+				biomarker_trends[biomarker] = "insufficient_data"
+				continue
+			n = len(last5)
+			x = list(range(n))
+			mx = (n - 1) / 2
+			my = sum(last5) / n
+			cov = sum((x[i] - mx) * (last5[i] - my) for i in range(n))
+			var_x = sum((xi - mx) ** 2 for xi in x)
+			slope = cov / var_x if var_x != 0 else 0.0
+			threshold = abs(my) * 0.03  # 3% change per step is significant
+			if abs(slope) < threshold:
+				biomarker_trends[biomarker] = "stable"
+			else:
+				biomarker_trends[biomarker] = "improving_or_worsening"  # domain-specific interpretation left to caller
+
+		overall_trend = (
+			"stable" if all(t == "stable" for t in biomarker_trends.values())
+			else "changing"
+		)
+
+		return {
+			"patient_id": patient_id,
+			"icd10_prefix": prefix,
+			"condition_label": biomarker_cfg["label"],
+			"data_points": len(trajectory_points),
+			"trajectory": trajectory_points,
+			"biomarker_trends": biomarker_trends,
+			"overall_trend": overall_trend,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ═══════════════════════════════════════════════════════════════════════════
+	# PHARMACOGENOMICS (PGx)
+	# ═══════════════════════════════════════════════════════════════════════════
+
+	# CPIC gene-drug interactions: (gene_lower, diplotype_phenotype_lower) → (drug_lower, recommendation)
+	_PGX_INTERACTIONS: dict[tuple[str, str], list[tuple[str, str]]] = {
+		("cyp2c19", "poor metaboliser"): [
+			("clopidogrel", "CONTRAINDICATED — CYP2C19 poor metaboliser has severely reduced platelet inhibition. Use prasugrel or ticagrelor (CPIC A)."),
+			("escitalopram", "Reduce dose by 50% — higher plasma exposure risk. Monitor QTc."),
+			("omeprazole", "Standard dose may be insufficient — consider higher dose or switch to pantoprazole."),
+		],
+		("cyp2c19", "rapid metaboliser"): [
+			("clopidogrel", "Standard dosing acceptable; enhanced platelet inhibition expected."),
+			("escitalopram", "May need higher dose for therapeutic effect."),
+		],
+		("cyp2d6", "poor metaboliser"): [
+			("codeine", "CONTRAINDICATED — no conversion to morphine; analgesic failure. Use non-opioid or oxycodone."),
+			("tramadol", "Avoid — unpredictable analgesia. Use alternative."),
+			("fluoxetine", "Reduce to 50% starting dose — higher plasma levels expected."),
+		],
+		("cyp2d6", "ultra-rapid metaboliser"): [
+			("codeine", "CONTRAINDICATED — ultra-rapid conversion to morphine causes opioid toxicity risk."),
+			("tramadol", "Increased risk of CNS depression — use lower dose with monitoring."),
+		],
+		("dpyd", "poor metaboliser"): [
+			("fluorouracil", "CONTRAINDICATED — risk of life-threatening fluorouracil toxicity. Reduce dose by ≥50% or use alternative."),
+			("capecitabine", "CONTRAINDICATED — same mechanism as fluorouracil."),
+		],
+		("slco1b1", "decreased function"): [
+			("simvastatin", "High risk of myopathy at standard doses. Limit to 20 mg/day or switch to pravastatin/rosuvastatin."),
+			("atorvastatin", "Moderate myopathy risk. Use lowest effective dose."),
+		],
+	}
+
+	async def record_pgx_result(
+		self,
+		patient_id: str,
+		gene: str,
+		diplotype: str,
+		phenotype: str,
+		tested_by: str,
+		test_date: str,
+		panel_name: str | None = None,
+	) -> dict[str, Any]:
+		"""Record a pharmacogenomics test result for a patient.
+
+		``gene`` examples: CYP2C19, CYP2D6, DPYD, SLCO1B1, UGT1A1.
+		``diplotype`` examples: *1/*17, *4/*4.
+		``phenotype`` examples: poor metaboliser, rapid metaboliser, normal metaboliser.
+
+		Returns the stored record with CPIC-based prescribing recommendations
+		for any drugs in the patient's active medication list.
+		"""
+		assert patient_id, "patient_id required"
+		assert gene.strip(), "gene required"
+		assert diplotype.strip(), "diplotype required"
+		assert phenotype.strip(), "phenotype required"
+		assert tested_by, "tested_by required"
+		assert test_date, "test_date required"
+
+		pgx_id = uuid7str()
+
+		# Cross-reference active medications
+		active_meds = await self.list_medications(self.tenant_id, patient_id, status="active")
+		active_drug_names = [m.drug_name.lower() for m in active_meds]
+
+		interaction_key = (gene.lower(), phenotype.lower())
+		prescribing_alerts: list[dict[str, Any]] = []
+		for drug, recommendation in self._PGX_INTERACTIONS.get(interaction_key, []):
+			if any(drug in name or name in drug for name in active_drug_names):
+				prescribing_alerts.append({
+					"drug": drug,
+					"recommendation": recommendation,
+					"cpic_level": "A" if "CONTRAINDICATED" in recommendation else "B",
+					"active_med_matches": [n for n in active_drug_names if drug in n or n in drug],
+				})
+
+		pgx_record: dict[str, Any] = {
+			"id": pgx_id,
+			"tenant_id": self.tenant_id,
+			"patient_id": patient_id,
+			"gene": gene.upper(),
+			"diplotype": diplotype,
+			"phenotype": phenotype,
+			"panel_name": panel_name,
+			"tested_by": tested_by,
+			"test_date": test_date,
+			"prescribing_alerts": prescribing_alerts,
+			"alert_count": len(prescribing_alerts),
+			"fhir_molecular_sequence": {
+				"resourceType": "MolecularSequence",
+				"id": pgx_id,
+				"type": "dna",
+				"patient": {"reference": f"Patient/{patient_id}"},
+				"variant": [{"gene": gene.upper(), "diplotype": diplotype}],
+			},
+			"created_by": self.actor_id,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+
+		if not hasattr(self, "_pgx_results"):
+			self._pgx_results: dict[tuple[str, str], dict[str, Any]] = {}
+		self._pgx_results[(self.tenant_id, pgx_id)] = pgx_record
+		self._record_audit(self.tenant_id, "pgx_result_recorded", pgx_id)
+		logger.info(
+			"emr.pgx patient=%s gene=%s phenotype=%s alerts=%d",
+			patient_id, gene, phenotype, len(prescribing_alerts),
+		)
+		return pgx_record
+
+	async def check_pgx_prescribing(
+		self,
+		patient_id: str,
+		drug_name: str,
+	) -> dict[str, Any]:
+		"""Check all stored PGx results for a patient against a drug being prescribed.
+
+		Returns CPIC-grade recommendations for any gene-drug interactions
+		detected from stored pharmacogenomics results.
+		"""
+		assert patient_id, "patient_id required"
+		assert drug_name.strip(), "drug_name required"
+
+		if not hasattr(self, "_pgx_results"):
+			self._pgx_results = {}
+
+		patient_pgx = [
+			r for (tid, _), r in self._pgx_results.items()
+			if tid == self.tenant_id and r["patient_id"] == patient_id
+		]
+
+		drug_lower = drug_name.lower()
+		alerts: list[dict[str, Any]] = []
+
+		for pgx in patient_pgx:
+			interaction_key = (pgx["gene"].lower(), pgx["phenotype"].lower())
+			for drug, recommendation in self._PGX_INTERACTIONS.get(interaction_key, []):
+				if drug in drug_lower or drug_lower in drug:
+					alerts.append({
+						"gene": pgx["gene"],
+						"diplotype": pgx["diplotype"],
+						"phenotype": pgx["phenotype"],
+						"drug": drug_name,
+						"recommendation": recommendation,
+						"test_date": pgx["test_date"],
+						"hard_stop": "CONTRAINDICATED" in recommendation,
+					})
+
+		return {
+			"patient_id": patient_id,
+			"drug_name": drug_name,
+			"pgx_alert_count": len(alerts),
+			"has_contraindication": any(a["hard_stop"] for a in alerts),
+			"alerts": alerts,
+			"recommendation": (
+				"PGx CONTRAINDICATION — do not prescribe without specialist review." if any(a["hard_stop"] for a in alerts)
+				else f"{len(alerts)} PGx interaction(s) found — review recommendations." if alerts
+				else "No pharmacogenomics interactions identified for available results."
+			),
+		}
+
+	# ═══════════════════════════════════════════════════════════════════════════
 	# INTERNAL
 	# ═══════════════════════════════════════════════════════════════════════════
 

@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "./.venv/bin/pytest -q capabilities/common/recs/tests/test_package_contract.py 2>&1",
+    "testCommand": "python3 -m pytest capabilities/fintech/portfolio/tests/ -v 2>&1",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}

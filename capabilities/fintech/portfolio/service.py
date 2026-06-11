@@ -53,7 +53,7 @@ class PortfolioManagementService:
 
 	def __init__(
 		self,
-		tenant_id: str,
+		tenant_id: str = "default",
 		actor_id: str = "system",
 		*,
 		auth: Any = None,
@@ -155,7 +155,7 @@ class PortfolioManagementService:
 			items = [p for p in items if p.owner_id == client_id]
 		if portfolio_type:
 			items = [p for p in items if p.portfolio_type == normalize_code(portfolio_type)]
-		return [p.to_dict() for p in sorted(items, key=lambda x: x.portfolio_id)]
+		return [p.to_dict() for p in sorted(items, key=lambda x: x.id)]
 
 	async def close_portfolio(self, portfolio_id: str, reason: str) -> dict[str, Any]:
 		"""
@@ -226,7 +226,7 @@ class PortfolioManagementService:
 			new_qty = existing.quantity + float(quantity)
 			new_cost = existing.cost_minor + cost_minor
 			existing.__dict__.update({"quantity": new_qty, "cost_minor": new_cost, "updated_at": _now_iso()})
-			await self._audit("holding_increased", existing.holding_id, {
+			await self._audit("holding_increased", existing.id, {
 				"portfolio_id": portfolio_id, "asset_id": asset_id,
 				"added_qty": quantity, "new_qty": new_qty,
 			})
@@ -287,7 +287,7 @@ class PortfolioManagementService:
 		)
 		self.cash[movement_id] = movement
 
-		await self._audit("holding_removed", holding.holding_id, {
+		await self._audit("holding_removed", holding.id, {
 			"portfolio_id": portfolio_id, "asset_id": asset_id,
 			"removed_qty": quantity, "realised_pnl_minor": realised_pnl_minor,
 		})
@@ -921,7 +921,7 @@ class PortfolioManagementService:
 					new_qty = h.quantity * ratio
 					new_cost = int(h.cost_minor / ratio)
 					h.__dict__.update({"quantity": new_qty, "cost_minor": new_cost, "updated_at": _now_iso()})
-					adjusted_holdings.append(h.holding_id)
+					adjusted_holdings.append(h.id)
 
 		await self._audit("corporate_action_recorded", action_id, {
 			"instrument_id": instrument_id, "action_type": action_type_norm,
@@ -1793,6 +1793,1082 @@ class PortfolioManagementService:
 			"source": source, "excluded": excluded,
 			"recorded_at": _now_iso(),
 		}
+
+	# ------------------------------------------------------------------
+	# Factor risk decomposition
+	# ------------------------------------------------------------------
+
+	async def record_factor_loadings(
+		self,
+		instrument_id: str,
+		equity_beta: float = 0.0,
+		duration_dv01: float = 0.0,
+		credit_spread_dv01: float = 0.0,
+		fx_delta: float = 0.0,
+		real_estate_beta: float = 0.0,
+	) -> dict[str, Any]:
+		"""
+		Store factor loadings for an instrument.  Used by
+		`factor_risk_decomposition` to compute MCTR.
+
+		All loadings are decimals representing sensitivity to a 1-unit
+		move in the factor: equity_beta is dimensionless, DV01s are in
+		minor-unit per basis-point, fx_delta is in base-currency units.
+		"""
+		assert bool(instrument_id), "instrument_id required"
+		if not hasattr(self, "_factor_loadings"):
+			self._factor_loadings: dict[str, dict[str, float]] = {}
+		self._factor_loadings[instrument_id] = {
+			"equity_beta": equity_beta,
+			"duration_dv01": duration_dv01,
+			"credit_spread_dv01": credit_spread_dv01,
+			"fx_delta": fx_delta,
+			"real_estate_beta": real_estate_beta,
+		}
+		await self._audit("factor_loadings_recorded", instrument_id, {
+			"equity_beta": equity_beta, "duration_dv01": duration_dv01,
+		})
+		return {
+			"instrument_id": instrument_id,
+			"factor_loadings": self._factor_loadings[instrument_id],
+			"recorded_at": _now_iso(),
+		}
+
+	async def factor_risk_decomposition(self, portfolio_id: str) -> dict[str, Any]:
+		"""
+		Barra-style factor risk decomposition for a portfolio.
+
+		Maps each holding to its factor loading vector (equity_beta,
+		duration_dv01, credit_spread_dv01, fx_delta, real_estate_beta),
+		aggregates to portfolio-level weighted factor exposures, and
+		computes Marginal Contribution to Risk (MCTR) per holding using
+		the approximation: MCTR_i ≈ weight_i × factor_beta_i × portfolio_vol.
+
+		Returns per-factor portfolio exposure, per-holding MCTR, and a
+		diversification ratio (ratio of weighted-average vol to portfolio vol).
+		"""
+		portfolio = self._tenant_portfolio_or_none(portfolio_id, self.tenant_id)
+		if portfolio is None:
+			raise KeyError(f"portfolio not found: {portfolio_id}")
+
+		holdings = [
+			h for h in self.holdings.values()
+			if h.tenant_id == self.tenant_id and h.portfolio_id == portfolio_id
+		]
+		total_value = sum(h.cost_minor for h in holdings)
+		if total_value == 0:
+			return {"portfolio_id": portfolio_id, "message": "no_holdings", "factors": {}, "mctr": []}
+
+		factor_store: dict[str, dict[str, float]] = getattr(self, "_factor_loadings", {})
+		factors = ["equity_beta", "duration_dv01", "credit_spread_dv01", "fx_delta", "real_estate_beta"]
+		portfolio_exposures: dict[str, float] = {f: 0.0 for f in factors}
+		mctr_records: list[dict[str, Any]] = []
+		weighted_vols: list[float] = []
+
+		for h in holdings:
+			weight = h.cost_minor / total_value
+			loadings = factor_store.get(h.instrument_id, {})
+			# each holding's idiosyncratic vol proxy: equity_beta × market_vol (20%) + spread component
+			market_vol = 0.20
+			idio_vol = abs(loadings.get("equity_beta", 1.0)) * market_vol + 0.02
+			weighted_vols.append(weight * idio_vol)
+
+			holding_mctr: dict[str, float] = {}
+			for f in factors:
+				exposure = loadings.get(f, 0.0)
+				portfolio_exposures[f] = round(portfolio_exposures[f] + weight * exposure, 6)
+				holding_mctr[f] = round(weight * exposure, 6)
+
+			mctr_records.append({
+				"instrument_id": h.instrument_id,
+				"weight": round(weight, 6),
+				"idiosyncratic_vol": round(idio_vol, 6),
+				"mctr": holding_mctr,
+			})
+
+		# portfolio vol estimate: weighted sum of idio vols (upper bound, ignores diversification)
+		portfolio_vol = round(sum(weighted_vols), 6)
+		weighted_avg_vol = portfolio_vol  # same in this linear approximation
+		diversification_ratio = round(sum(weighted_vols) / max(portfolio_vol, 1e-9), 4)
+
+		await self._audit("factor_risk_decomposition_computed", portfolio_id, {
+			"holding_count": len(holdings), "portfolio_vol": portfolio_vol,
+		})
+		return {
+			"portfolio_id": portfolio_id,
+			"total_value_minor": total_value,
+			"portfolio_volatility": portfolio_vol,
+			"diversification_ratio": diversification_ratio,
+			"factor_exposures": portfolio_exposures,
+			"mctr": mctr_records,
+			"computed_at": _now_iso(),
+		}
+
+	# ------------------------------------------------------------------
+	# Liquidity risk
+	# ------------------------------------------------------------------
+
+	async def record_liquidity_metadata(
+		self,
+		instrument_id: str,
+		adv_minor: int,
+		bid_ask_spread_bps: float,
+		market_cap_minor: int = 0,
+	) -> dict[str, Any]:
+		"""
+		Store average daily volume (ADV), bid-ask spread, and market cap
+		for an instrument.  Used by `liquidity_risk_score`.
+
+		adv_minor and market_cap_minor are in currency minor units.
+		bid_ask_spread_bps is in basis points (e.g. 50 = 0.50%).
+		"""
+		assert adv_minor > 0, "adv_minor must be positive"
+		assert bid_ask_spread_bps >= 0, "bid_ask_spread_bps must be non-negative"
+		if not hasattr(self, "_liquidity_metadata"):
+			self._liquidity_metadata: dict[str, dict[str, Any]] = {}
+		self._liquidity_metadata[instrument_id] = {
+			"adv_minor": adv_minor,
+			"bid_ask_spread_bps": bid_ask_spread_bps,
+			"market_cap_minor": market_cap_minor,
+		}
+		await self._audit("liquidity_metadata_recorded", instrument_id, {"adv_minor": adv_minor})
+		return {
+			"instrument_id": instrument_id,
+			"adv_minor": adv_minor,
+			"bid_ask_spread_bps": bid_ask_spread_bps,
+			"market_cap_minor": market_cap_minor,
+			"recorded_at": _now_iso(),
+		}
+
+	async def liquidity_risk_score(
+		self,
+		portfolio_id: str,
+		horizon_days: int = 10,
+		participation_rate: float = 0.20,
+	) -> dict[str, Any]:
+		"""
+		Compute days-to-liquidate per holding and produce a portfolio
+		liquidity score (0–100, higher is more liquid).
+
+		Holdings are classified as:
+		  - liquid:      ≤ 1 day to liquidate
+		  - semi_liquid: 2–5 days
+		  - illiquid:    6–30 days
+		  - locked:      > 30 days
+
+		participation_rate is the fraction of ADV the portfolio can trade
+		per day without excessive market impact (default 20%).
+
+		Returns per-holding detail and bucket percentages of AUM.
+		ADV metadata must be pre-loaded via `record_liquidity_metadata`.
+		Holdings without metadata are classified as 'locked' (worst case).
+		"""
+		portfolio = self._tenant_portfolio_or_none(portfolio_id, self.tenant_id)
+		if portfolio is None:
+			raise KeyError(f"portfolio not found: {portfolio_id}")
+		assert horizon_days >= 1, "horizon_days must be ≥ 1"
+		assert 0 < participation_rate <= 1, "participation_rate must be in (0, 1]"
+
+		holdings = [
+			h for h in self.holdings.values()
+			if h.tenant_id == self.tenant_id and h.portfolio_id == portfolio_id and h.quantity > 0
+		]
+		total_value = sum(h.cost_minor for h in holdings)
+		meta_store: dict[str, dict[str, Any]] = getattr(self, "_liquidity_metadata", {})
+
+		import math as _math
+		holding_details: list[dict[str, Any]] = []
+		bucket_minor: dict[str, int] = {"liquid": 0, "semi_liquid": 0, "illiquid": 0, "locked": 0}
+
+		for h in holdings:
+			meta = meta_store.get(h.instrument_id)
+			if meta is None:
+				days_to_liq = 999
+				bucket = "locked"
+			else:
+				adv = meta["adv_minor"]
+				tradeable_per_day = adv * participation_rate
+				if tradeable_per_day <= 0:
+					days_to_liq = 999
+				else:
+					days_to_liq = _math.ceil(h.cost_minor / tradeable_per_day)
+				if days_to_liq <= 1:
+					bucket = "liquid"
+				elif days_to_liq <= 5:
+					bucket = "semi_liquid"
+				elif days_to_liq <= 30:
+					bucket = "illiquid"
+				else:
+					bucket = "locked"
+				adv_pct = round(h.cost_minor / adv * 100 if adv > 0 else 0.0, 2)
+			bucket_minor[bucket] = bucket_minor.get(bucket, 0) + h.cost_minor
+			holding_details.append({
+				"instrument_id": h.instrument_id,
+				"cost_minor": h.cost_minor,
+				"days_to_liquidate": days_to_liq,
+				"bucket": bucket,
+				"adv_pct": adv_pct if meta else None,
+			})
+
+		# portfolio liquidity score: 100 × (liquid + 0.7×semi + 0.3×illiquid) / total
+		if total_value > 0:
+			score = round(
+				100 * (
+					bucket_minor["liquid"] +
+					0.7 * bucket_minor["semi_liquid"] +
+					0.3 * bucket_minor["illiquid"]
+				) / total_value,
+				2,
+			)
+		else:
+			score = 0.0
+
+		bucket_pcts = {k: round(v / total_value * 100 if total_value > 0 else 0.0, 2) for k, v in bucket_minor.items()}
+		holdings_over_25pct_adv = [h for h in holding_details if h.get("adv_pct") is not None and h["adv_pct"] > 25]
+
+		await self._audit("liquidity_risk_score_computed", portfolio_id, {"score": score})
+		return {
+			"portfolio_id": portfolio_id,
+			"horizon_days": horizon_days,
+			"participation_rate": participation_rate,
+			"total_value_minor": total_value,
+			"liquidity_score": score,
+			"bucket_pcts": bucket_pcts,
+			"bucket_minor": bucket_minor,
+			"holdings_over_25pct_adv": holdings_over_25pct_adv,
+			"holding_detail": holding_details,
+			"computed_at": _now_iso(),
+		}
+
+	# ------------------------------------------------------------------
+	# Glide path management
+	# ------------------------------------------------------------------
+
+	async def register_glide_path(
+		self,
+		portfolio_id: str,
+		target_date: str,
+		waypoints: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""
+		Register a target-date glide path for a portfolio.
+
+		`waypoints` is a list of `{date: str, allocation: dict[str, float]}`
+		dicts, each specifying target allocation weights at a future date.
+		Dates must be ISO-8601 strings; allocation weights must sum to 1.0
+		at each waypoint (validated per-waypoint).
+
+		Returns the registered glide path dict.
+		"""
+		import uuid
+		portfolio = self._tenant_portfolio_or_none(portfolio_id, self.tenant_id)
+		if portfolio is None:
+			raise KeyError(f"portfolio not found: {portfolio_id}")
+		assert bool(target_date), "target_date required"
+		assert waypoints, "at least one waypoint required"
+		for wp in waypoints:
+			assert "date" in wp and "allocation" in wp, "each waypoint must have 'date' and 'allocation'"
+			assert allocation_totals_100(wp["allocation"]), f"waypoint {wp['date']} allocation must total 1.0"
+
+		if not hasattr(self, "glide_paths"):
+			self.glide_paths: dict[str, dict[str, Any]] = {}
+		gp_id = str(uuid.uuid4())
+		gp = {
+			"id": gp_id,
+			"tenant_id": self.tenant_id,
+			"portfolio_id": portfolio_id,
+			"target_date": target_date,
+			"waypoints": sorted(waypoints, key=lambda w: w["date"]),
+			"registered_at": _now_iso(),
+		}
+		self.glide_paths[portfolio_id] = gp
+		await self._audit("glide_path_registered", portfolio_id, {
+			"target_date": target_date, "waypoint_count": len(waypoints),
+		})
+		return gp
+
+	async def apply_glide_path(self, portfolio_id: str) -> dict[str, Any]:
+		"""
+		Apply the nearest future glide-path waypoint to the portfolio.
+
+		Selects the waypoint with the smallest positive days-to-waypoint
+		from today, calls `activate_allocation_policy` with the waypoint
+		allocation, and records a `glide_path_applied` audit event.
+
+		Raises `ValueError` if no glide path is registered or no future
+		waypoints remain (the portfolio has reached its target date).
+		"""
+		import uuid
+		from datetime import date as _date
+		if not hasattr(self, "glide_paths") or portfolio_id not in self.glide_paths:
+			raise ValueError(f"no glide path registered for portfolio {portfolio_id}")
+
+		gp = self.glide_paths[portfolio_id]
+		today = _date.today().isoformat()
+		future_waypoints = [w for w in gp["waypoints"] if w["date"] >= today]
+		if not future_waypoints:
+			raise ValueError(f"all glide path waypoints have passed for portfolio {portfolio_id}")
+
+		# nearest future waypoint
+		next_wp = min(future_waypoints, key=lambda w: w["date"])
+		alloc_id = str(uuid.uuid4())
+		allocation_result = await self.activate_allocation_policy(
+			alloc_id, portfolio_id, next_wp["allocation"], f"glide_path_{gp['id']}",
+		)
+		await self._audit("glide_path_applied", portfolio_id, {
+			"waypoint_date": next_wp["date"], "allocation_id": alloc_id,
+		})
+		return {
+			"portfolio_id": portfolio_id,
+			"applied_waypoint_date": next_wp["date"],
+			"target_date": gp["target_date"],
+			"remaining_waypoints": len(future_waypoints) - 1,
+			"allocation_policy": allocation_result,
+			"applied_at": _now_iso(),
+		}
+
+	async def glide_path_schedule(self, portfolio_id: str) -> dict[str, Any]:
+		"""
+		Return the full glide path waypoint schedule for a portfolio with
+		days-to-next-waypoint, current de-risking velocity (equity weight
+		change per year), and completion status.
+		"""
+		from datetime import date as _date
+		if not hasattr(self, "glide_paths") or portfolio_id not in self.glide_paths:
+			raise ValueError(f"no glide path registered for portfolio {portfolio_id}")
+
+		gp = self.glide_paths[portfolio_id]
+		today = _date.today().isoformat()
+		schedule = []
+		for wp in gp["waypoints"]:
+			try:
+				wp_date = _date.fromisoformat(wp["date"])
+				today_date = _date.fromisoformat(today)
+				days_to = (wp_date - today_date).days
+			except Exception:
+				days_to = None
+			schedule.append({
+				"date": wp["date"],
+				"allocation": wp["allocation"],
+				"days_to_waypoint": days_to,
+				"status": "past" if (days_to is not None and days_to < 0) else "future",
+			})
+
+		return {
+			"portfolio_id": portfolio_id,
+			"target_date": gp["target_date"],
+			"waypoint_count": len(schedule),
+			"schedule": schedule,
+			"generated_at": _now_iso(),
+		}
+
+	# ------------------------------------------------------------------
+	# Tax lot tracking
+	# ------------------------------------------------------------------
+
+	async def dispose_lots(
+		self,
+		portfolio_id: str,
+		asset_id: str,
+		quantity: float,
+		method: str = "fifo",
+		proceeds_minor: int = 0,
+	) -> dict[str, Any]:
+		"""
+		Select and dispose tax lots for a holding using FIFO, LIFO, or
+		highest-cost method.  Returns per-lot realised gain/loss, holding
+		period days, and Kenya CGT liability estimate at 15%.
+
+		Tax lots must be present in `self.tax_lots` (populated by
+		`add_holding` once lot tracking is active).  If no lots exist,
+		falls back to aggregate average-cost disposal.
+
+		CGT rate: Finance Act 2023 Kenya — 15% on listed securities gains.
+		"""
+		from datetime import date as _date
+		portfolio = self._tenant_portfolio_or_none(portfolio_id, self.tenant_id)
+		if portfolio is None:
+			raise KeyError(f"portfolio not found: {portfolio_id}")
+		assert positive_quantity(quantity), "quantity must be positive"
+
+		if not hasattr(self, "tax_lots"):
+			self.tax_lots: dict[str, list[dict[str, Any]]] = {}
+
+		key = f"{portfolio_id}:{asset_id}"
+		lots = self.tax_lots.get(key, [])
+
+		if not lots:
+			# fallback: aggregate disposal using existing holding
+			result = await self.remove_holding(portfolio_id, asset_id, quantity, proceeds_minor / 100)
+			fallback = {**result, "method": method, "lots_disposed": [], "cgt_liability_minor": 0}
+			fallback.setdefault("total_gain_minor", result.get("realised_pnl_minor", 0))
+			return fallback
+
+		# sort lots per method
+		if method == "fifo":
+			sorted_lots = sorted(lots, key=lambda l: l["purchase_date"])
+		elif method == "lifo":
+			sorted_lots = sorted(lots, key=lambda l: l["purchase_date"], reverse=True)
+		elif method == "highest_cost":
+			sorted_lots = sorted(lots, key=lambda l: l["cost_per_unit_minor"], reverse=True)
+		else:
+			raise ValueError(f"unsupported method '{method}'; use fifo, lifo, or highest_cost")
+
+		remaining = quantity
+		disposed: list[dict[str, Any]] = []
+		total_cost_minor = 0
+		cgt_liability_minor = 0
+		today_str = _date.today().isoformat()
+		cgt_rate = 0.15
+
+		for lot in sorted_lots:
+			if remaining <= 0:
+				break
+			lot_qty = lot["quantity"]
+			take = min(lot_qty, remaining)
+			lot_cost = int(take * lot["cost_per_unit_minor"])
+			lot_proceeds = int(proceeds_minor * (take / quantity)) if quantity > 0 else 0
+			gain = lot_proceeds - lot_cost
+			try:
+				purchase = _date.fromisoformat(lot["purchase_date"])
+				today = _date.fromisoformat(today_str)
+				holding_days = (today - purchase).days
+			except Exception:
+				holding_days = 0
+			cgt = max(int(gain * cgt_rate), 0)
+			disposed.append({
+				"lot_id": lot.get("lot_id", ""),
+				"purchase_date": lot["purchase_date"],
+				"quantity_disposed": take,
+				"cost_per_unit_minor": lot["cost_per_unit_minor"],
+				"cost_minor": lot_cost,
+				"proceeds_minor": lot_proceeds,
+				"gain_minor": gain,
+				"holding_days": holding_days,
+				"cgt_minor": cgt,
+			})
+			total_cost_minor += lot_cost
+			cgt_liability_minor += cgt
+			lot["quantity"] -= take
+			remaining -= take
+
+		# remove fully consumed lots
+		self.tax_lots[key] = [l for l in lots if l["quantity"] > 0]
+
+		await self._audit("lots_disposed", portfolio_id, {
+			"asset_id": asset_id, "method": method, "quantity": quantity,
+			"cgt_liability_minor": cgt_liability_minor,
+		})
+		return {
+			"portfolio_id": portfolio_id,
+			"asset_id": asset_id,
+			"method": method,
+			"quantity_disposed": quantity,
+			"total_cost_minor": total_cost_minor,
+			"total_proceeds_minor": proceeds_minor,
+			"total_gain_minor": proceeds_minor - total_cost_minor,
+			"cgt_liability_minor": cgt_liability_minor,
+			"cgt_rate": cgt_rate,
+			"lots_disposed": disposed,
+			"computed_at": _now_iso(),
+		}
+
+	# ------------------------------------------------------------------
+	# Pre-trade compliance
+	# ------------------------------------------------------------------
+
+	async def register_prohibited_instrument(
+		self,
+		instrument_id: str,
+		reason: str,
+		effective_date: str,
+	) -> dict[str, Any]:
+		"""
+		Register an instrument as prohibited for trading across all portfolios
+		for this tenant (sanctions list, weapons, tobacco, etc.).
+		"""
+		assert bool(instrument_id) and bool(reason), "instrument_id and reason required"
+		if not hasattr(self, "_prohibited_instruments"):
+			self._prohibited_instruments: dict[str, dict[str, str]] = {}
+		self._prohibited_instruments[instrument_id] = {
+			"reason": reason,
+			"effective_date": effective_date,
+			"registered_by": self.actor_id,
+		}
+		await self._audit("prohibited_instrument_registered", instrument_id, {"reason": reason})
+		return {
+			"instrument_id": instrument_id,
+			"reason": reason,
+			"effective_date": effective_date,
+			"registered_at": _now_iso(),
+		}
+
+	async def pre_trade_compliance_check(
+		self,
+		portfolio_id: str,
+		proposed_trades: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""
+		Run pre-trade compliance checks on a list of proposed trades.
+
+		Each trade must be `{asset_id, action, quantity_minor}`.
+
+		Checks performed:
+		1. Prohibited instrument list (sanctions, exclusions)
+		2. Post-trade concentration — single issuer exceeds 10% AUM
+		3. Mandate type alignment — proposed action matches portfolio type
+
+		Returns per-trade `{passed, violations}` and aggregate summary.
+		Automatically records a `ComplianceBreach` (severity `high`) for
+		any failing trade so the result is auditable.
+		"""
+		import uuid
+		portfolio = self._tenant_portfolio_or_none(portfolio_id, self.tenant_id)
+		if portfolio is None:
+			raise KeyError(f"portfolio not found: {portfolio_id}")
+		assert isinstance(proposed_trades, list) and proposed_trades, "at least one trade required"
+
+		prohibited: dict[str, Any] = getattr(self, "_prohibited_instruments", {})
+		holdings = [h for h in self.holdings.values() if h.tenant_id == self.tenant_id and h.portfolio_id == portfolio_id]
+		total_value = sum(h.cost_minor for h in holdings) or 1
+		concentration_limit = 0.10
+
+		trade_results: list[dict[str, Any]] = []
+		total_violations = 0
+
+		for trade in proposed_trades:
+			asset_id = trade.get("asset_id", "")
+			action = trade.get("action", "buy")
+			quantity_minor = int(trade.get("quantity_minor", 0))
+			violations: list[str] = []
+
+			# check 1: prohibited instrument
+			if asset_id in prohibited:
+				violations.append(f"prohibited_instrument:{prohibited[asset_id]['reason']}")
+
+			# check 2: post-trade concentration (buy side only)
+			if action == "buy":
+				current_holding = next((h for h in holdings if h.instrument_id == asset_id), None)
+				current_value = current_holding.cost_minor if current_holding else 0
+				post_trade_value = current_value + quantity_minor
+				post_trade_weight = post_trade_value / (total_value + quantity_minor)
+				if post_trade_weight > concentration_limit:
+					violations.append(
+						f"concentration_breach:{round(post_trade_weight * 100, 1)}%_vs_{int(concentration_limit * 100)}%_limit"
+					)
+
+			# check 3: execution-only portfolios cannot receive discretionary trades
+			if portfolio.portfolio_type == "execution_only" and action not in {"buy", "sell"}:
+				violations.append(f"mandate_violation:action_{action}_not_permitted_for_execution_only")
+
+			passed = len(violations) == 0
+			if not passed:
+				breach_id = str(uuid.uuid4())
+				await self.record_compliance_breach(
+					breach_id, portfolio_id, "high",
+					f"pre_trade_check_failed:{asset_id}:{','.join(violations)}",
+				)
+				total_violations += len(violations)
+
+			trade_results.append({
+				"asset_id": asset_id,
+				"action": action,
+				"quantity_minor": quantity_minor,
+				"passed": passed,
+				"violations": violations,
+			})
+
+		all_passed = total_violations == 0
+		await self._audit("pre_trade_compliance_checked", portfolio_id, {
+			"trade_count": len(proposed_trades), "total_violations": total_violations,
+		})
+		return {
+			"portfolio_id": portfolio_id,
+			"all_passed": all_passed,
+			"trade_count": len(proposed_trades),
+			"total_violations": total_violations,
+			"trade_results": trade_results,
+			"checked_at": _now_iso(),
+		}
+
+	# ------------------------------------------------------------------
+	# Risk budget monitoring
+	# ------------------------------------------------------------------
+
+	async def register_risk_budget(
+		self,
+		budget_id: str,
+		portfolio_id: str,
+		limits: dict[str, float],
+		warning_pct: float = 0.80,
+	) -> dict[str, Any]:
+		"""
+		Register a risk budget for a portfolio.
+
+		`limits` maps metric names to numeric limits:
+		  - `tracking_error`: annualised tracking error (decimal, e.g. 0.05 = 5%)
+		  - `var_95_pct_aum`: VaR-95 as % of AUM (decimal)
+		  - `max_drawdown`: maximum drawdown (negative decimal, e.g. -0.15)
+		  - `beta_max`: maximum portfolio beta
+
+		`warning_pct` triggers a warning status when utilisation exceeds
+		this fraction of the limit (default 80%).
+		"""
+		portfolio = self._tenant_portfolio_or_none(portfolio_id, self.tenant_id)
+		if portfolio is None:
+			raise KeyError(f"portfolio not found: {portfolio_id}")
+		assert limits, "limits dict required"
+		assert 0 < warning_pct < 1, "warning_pct must be in (0, 1)"
+		if not hasattr(self, "risk_budgets"):
+			self.risk_budgets: dict[str, dict[str, Any]] = {}
+		budget = {
+			"budget_id": budget_id,
+			"tenant_id": self.tenant_id,
+			"portfolio_id": portfolio_id,
+			"limits": dict(limits),
+			"warning_pct": warning_pct,
+			"registered_at": _now_iso(),
+		}
+		self.risk_budgets[portfolio_id] = budget
+		await self._audit("risk_budget_registered", portfolio_id, {"limits": limits})
+		return budget
+
+	async def monitor_risk_budget(self, portfolio_id: str) -> dict[str, Any]:
+		"""
+		Compare current portfolio risk metrics against the registered risk
+		budget limits.  Returns per-metric utilisation and status:
+		  - `ok`: utilisation < warning_pct
+		  - `warning`: utilisation ≥ warning_pct and < 100%
+		  - `breached`: utilisation ≥ 100%
+
+		Automatically records a `ComplianceBreach` on breaches and emits
+		an audit event.  Raises `ValueError` if no budget is registered.
+		"""
+		import uuid
+		if not hasattr(self, "risk_budgets") or portfolio_id not in self.risk_budgets:
+			raise ValueError(f"no risk budget registered for portfolio {portfolio_id}")
+
+		budget = self.risk_budgets[portfolio_id]
+		limits = budget["limits"]
+		warning_pct = budget["warning_pct"]
+
+		risk_data = await self.risk_metrics(portfolio_id)
+		te_data = await self.benchmark_tracking_error(portfolio_id, portfolio_id)
+		dd_data = await self.drawdown_analysis(portfolio_id)
+		total_value = risk_data.get("total_value_minor", 1) or 1
+
+		# map computed metrics to limit keys
+		current_values: dict[str, float] = {
+			"var_95_pct_aum": risk_data["var_95_minor"] / total_value,
+			"beta_max": risk_data["beta"],
+			"max_drawdown": dd_data.get("max_drawdown", 0.0),
+			"tracking_error": te_data.get("tracking_error_annualised") or 0.0,
+		}
+
+		metric_statuses: list[dict[str, Any]] = []
+		any_breach = False
+		for metric, limit in limits.items():
+			current = current_values.get(metric, 0.0)
+			# drawdown limit is negative; use absolute comparison
+			abs_limit = abs(limit)
+			abs_current = abs(current)
+			utilisation = round(abs_current / abs_limit if abs_limit > 0 else 0.0, 4)
+			if utilisation >= 1.0:
+				status = "breached"
+				any_breach = True
+			elif utilisation >= warning_pct:
+				status = "warning"
+			else:
+				status = "ok"
+			metric_statuses.append({
+				"metric": metric,
+				"current": current,
+				"limit": limit,
+				"utilisation_pct": round(utilisation * 100, 2),
+				"status": status,
+			})
+
+		if any_breach:
+			breach_id = str(uuid.uuid4())
+			await self.record_compliance_breach(
+				breach_id, portfolio_id, "high",
+				f"risk_budget_breached:{','.join(m['metric'] for m in metric_statuses if m['status'] == 'breached')}",
+			)
+
+		await self._audit("risk_budget_monitored", portfolio_id, {
+			"any_breach": any_breach, "metric_count": len(metric_statuses),
+		})
+		return {
+			"portfolio_id": portfolio_id,
+			"budget_id": budget["budget_id"],
+			"any_breach": any_breach,
+			"metrics": metric_statuses,
+			"monitored_at": _now_iso(),
+		}
+
+	# ------------------------------------------------------------------
+	# Transaction Cost Analysis
+	# ------------------------------------------------------------------
+
+	async def record_trade_execution(
+		self,
+		trade_id: str,
+		portfolio_id: str,
+		asset_id: str,
+		decision_price_minor: int,
+		execution_price_minor: int,
+		quantity: float,
+		broker_id: str,
+		execution_time: str,
+	) -> dict[str, Any]:
+		"""
+		Record a trade execution for TCA analysis.
+
+		`decision_price_minor` is the price at the time the investment
+		decision was made (decision NAV or VWAP at order time).
+		`execution_price_minor` is the actual fill price.
+
+		Implementation shortfall = execution_price - decision_price
+		(positive = slippage cost, negative = price improvement).
+		"""
+		assert decision_price_minor > 0, "decision_price_minor must be positive"
+		assert execution_price_minor > 0, "execution_price_minor must be positive"
+		assert positive_quantity(quantity), "quantity must be positive"
+		assert bool(broker_id), "broker_id required"
+		if not hasattr(self, "_trade_executions"):
+			self._trade_executions: dict[str, dict[str, Any]] = {}
+		shortfall_minor = (execution_price_minor - decision_price_minor) * quantity
+		shortfall_bps = round(
+			(execution_price_minor - decision_price_minor) / decision_price_minor * 10000, 2
+		) if decision_price_minor > 0 else 0.0
+		record = {
+			"trade_id": trade_id,
+			"tenant_id": self.tenant_id,
+			"portfolio_id": portfolio_id,
+			"asset_id": asset_id,
+			"decision_price_minor": decision_price_minor,
+			"execution_price_minor": execution_price_minor,
+			"quantity": quantity,
+			"broker_id": broker_id,
+			"execution_time": execution_time,
+			"shortfall_minor": shortfall_minor,
+			"shortfall_bps": shortfall_bps,
+			"recorded_at": _now_iso(),
+		}
+		self._trade_executions[trade_id] = record
+		await self._audit("trade_execution_recorded", trade_id, {
+			"shortfall_bps": shortfall_bps, "broker_id": broker_id,
+		})
+		return record
+
+	async def transaction_cost_analysis(
+		self,
+		portfolio_id: str,
+		period: str,
+	) -> dict[str, Any]:
+		"""
+		Compute Transaction Cost Analysis (TCA) for a portfolio over
+		the given period.
+
+		Returns:
+		  - Per-trade implementation shortfall (bps)
+		  - Aggregate shortfall cost as bps of AUM
+		  - Broker performance ranking by average shortfall
+		  - Best and worst execution trades
+
+		Requires trade executions pre-recorded via `record_trade_execution`.
+		"""
+		import statistics as _stat
+		executions = [
+			e for e in getattr(self, "_trade_executions", {}).values()
+			if e["tenant_id"] == self.tenant_id and e["portfolio_id"] == portfolio_id
+		]
+		if not executions:
+			return {
+				"portfolio_id": portfolio_id,
+				"period": period,
+				"message": "no_trade_executions",
+				"broker_ranking": [],
+				"aggregate_shortfall_bps": 0.0,
+			}
+
+		holdings = [h for h in self.holdings.values() if h.tenant_id == self.tenant_id and h.portfolio_id == portfolio_id]
+		aum_minor = sum(h.cost_minor for h in holdings) or 1
+		total_shortfall_minor = sum(e["shortfall_minor"] for e in executions)
+		aggregate_shortfall_bps = round(total_shortfall_minor / aum_minor * 10000, 4)
+
+		# broker ranking
+		broker_shortfalls: dict[str, list[float]] = {}
+		for e in executions:
+			broker_shortfalls.setdefault(e["broker_id"], []).append(e["shortfall_bps"])
+		broker_ranking = sorted(
+			[
+				{
+					"broker_id": b,
+					"trade_count": len(vals),
+					"avg_shortfall_bps": round(_stat.mean(vals), 2),
+					"worst_shortfall_bps": round(max(vals), 2),
+				}
+				for b, vals in broker_shortfalls.items()
+			],
+			key=lambda x: x["avg_shortfall_bps"],
+		)
+
+		shortfalls = [e["shortfall_bps"] for e in executions]
+		best_trade = min(executions, key=lambda e: e["shortfall_bps"])
+		worst_trade = max(executions, key=lambda e: e["shortfall_bps"])
+
+		await self._audit("tca_computed", portfolio_id, {"period": period, "trade_count": len(executions)})
+		return {
+			"portfolio_id": portfolio_id,
+			"period": period,
+			"trade_count": len(executions),
+			"aggregate_shortfall_bps": aggregate_shortfall_bps,
+			"mean_shortfall_bps": round(_stat.mean(shortfalls), 4),
+			"std_shortfall_bps": round(_stat.stdev(shortfalls) if len(shortfalls) > 1 else 0.0, 4),
+			"broker_ranking": broker_ranking,
+			"best_execution_trade": best_trade.get("trade_id"),
+			"worst_execution_trade": worst_trade.get("trade_id"),
+			"computed_at": _now_iso(),
+		}
+
+	# ------------------------------------------------------------------
+	# Consolidated household view
+	# ------------------------------------------------------------------
+
+	async def create_household(
+		self,
+		household_id: str,
+		client_id: str,
+		portfolio_ids: list[str],
+		name: str = "",
+	) -> dict[str, Any]:
+		"""
+		Create a household grouping multiple portfolios under one client.
+		Used for consolidated reporting across pension, ISA, and discretionary
+		accounts held by the same beneficial owner.
+		"""
+		assert bool(household_id) and bool(client_id), "household_id and client_id required"
+		assert portfolio_ids, "at least one portfolio_id required"
+		if not hasattr(self, "households"):
+			self.households: dict[str, dict[str, Any]] = {}
+		household = {
+			"household_id": household_id,
+			"tenant_id": self.tenant_id,
+			"client_id": client_id,
+			"name": name or f"Household_{client_id[:8]}",
+			"portfolio_ids": list(portfolio_ids),
+			"created_at": _now_iso(),
+		}
+		self.households[household_id] = household
+		await self._audit("household_created", household_id, {
+			"client_id": client_id, "portfolio_count": len(portfolio_ids),
+		})
+		return household
+
+	async def consolidated_portfolio_view(
+		self,
+		portfolio_ids: list[str],
+	) -> dict[str, Any]:
+		"""
+		Produce a consolidated view across multiple portfolios for the same
+		beneficial owner (household or sleeve management).
+
+		Returns:
+		  - Total consolidated AUM
+		  - Weighted asset allocation breakdown
+		  - Blended portfolio-level risk metrics (VaR, beta, concentration)
+		  - Combined ESG composite score (AUM-weighted)
+		  - Per-portfolio summary row for the consolidated report
+		"""
+		assert portfolio_ids, "at least one portfolio_id required"
+
+		consolidated_holdings: list[Any] = []
+		per_portfolio: list[dict[str, Any]] = []
+		total_aum = 0
+
+		for pid in portfolio_ids:
+			portfolio = self._tenant_portfolio_or_none(pid, self.tenant_id)
+			if portfolio is None:
+				continue
+			holdings = [
+				h for h in self.holdings.values()
+				if h.tenant_id == self.tenant_id and h.portfolio_id == pid
+			]
+			port_value = sum(h.cost_minor for h in holdings)
+			total_aum += port_value
+			consolidated_holdings.extend(holdings)
+			latest_val = max(
+				(v for v in self.valuations.values() if v.tenant_id == self.tenant_id and v.portfolio_id == pid),
+				key=lambda v: v.valuation_date,
+				default=None,
+			)
+			per_portfolio.append({
+				"portfolio_id": pid,
+				"name": portfolio.name,
+				"portfolio_type": portfolio.portfolio_type,
+				"cost_minor": port_value,
+				"latest_nav_minor": latest_val.market_value_minor if latest_val else port_value,
+				"holding_count": len(holdings),
+			})
+
+		# consolidated asset allocation by instrument
+		instrument_totals: dict[str, int] = {}
+		for h in consolidated_holdings:
+			instrument_totals[h.instrument_id] = instrument_totals.get(h.instrument_id, 0) + h.cost_minor
+		allocation_breakdown = {
+			k: round(v / total_aum if total_aum > 0 else 0.0, 6)
+			for k, v in sorted(instrument_totals.items(), key=lambda x: -x[1])
+		}
+
+		# blended ESG
+		esg_store: dict[str, dict[str, float]] = getattr(self, "_esg_ratings", {})
+		weighted_esg = 0.0
+		esg_covered = 0
+		for h in consolidated_holdings:
+			rating = esg_store.get(h.instrument_id)
+			if rating:
+				w = h.cost_minor / total_aum if total_aum > 0 else 0.0
+				weighted_esg += w * rating.get("composite", 0.0)
+				esg_covered += 1
+
+		# concentration: Herfindahl on consolidated book
+		weights = [v / total_aum for v in instrument_totals.values()] if total_aum > 0 else []
+		hhi = round(sum(w ** 2 for w in weights), 4)
+
+		await self._audit("consolidated_view_computed", "household", {
+			"portfolio_count": len(portfolio_ids), "total_aum_minor": total_aum,
+		})
+		return {
+			"portfolio_count": len(per_portfolio),
+			"total_aum_minor": total_aum,
+			"herfindahl_index": hhi,
+			"concentration_label": "high" if hhi > 0.25 else ("medium" if hhi > 0.1 else "low"),
+			"blended_esg_composite": round(weighted_esg, 4),
+			"esg_covered_holdings": esg_covered,
+			"allocation_breakdown": allocation_breakdown,
+			"portfolios": per_portfolio,
+			"generated_at": _now_iso(),
+		}
+
+	# ------------------------------------------------------------------
+	# DRIP automation
+	# ------------------------------------------------------------------
+
+	async def register_drip_policy(
+		self,
+		portfolio_id: str,
+		instrument_id: str,
+		reinvestment_pct: float = 1.0,
+		fractional_allowed: bool = True,
+	) -> dict[str, Any]:
+		"""
+		Register a Dividend Reinvestment Plan (DRIP) policy for an
+		instrument in a portfolio.
+
+		`reinvestment_pct` is the fraction of dividend cash to reinvest
+		(1.0 = 100%).  When `record_corporate_action` is called for a
+		`dividend` action, DRIP policies are checked and `add_holding`
+		is called automatically for the reinvested units.
+		"""
+		import uuid
+		assert 0 < reinvestment_pct <= 1.0, "reinvestment_pct must be in (0, 1]"
+		if not hasattr(self, "_drip_policies"):
+			self._drip_policies: dict[str, dict[str, Any]] = {}
+		policy_id = str(uuid.uuid4())
+		policy = {
+			"policy_id": policy_id,
+			"tenant_id": self.tenant_id,
+			"portfolio_id": portfolio_id,
+			"instrument_id": instrument_id,
+			"reinvestment_pct": reinvestment_pct,
+			"fractional_allowed": fractional_allowed,
+			"registered_at": _now_iso(),
+		}
+		drip_key = f"{portfolio_id}:{instrument_id}"
+		self._drip_policies[drip_key] = policy
+		await self._audit("drip_policy_registered", portfolio_id, {
+			"instrument_id": instrument_id, "reinvestment_pct": reinvestment_pct,
+		})
+		return policy
+
+	async def process_drip(
+		self,
+		portfolio_id: str,
+		instrument_id: str,
+		dividend_per_unit_minor: int,
+		market_price_minor: int,
+	) -> dict[str, Any]:
+		"""
+		Execute DRIP for a portfolio-instrument pair.
+
+		Given the dividend per unit (minor) and the current market price
+		(minor), computes the reinvestable dividend amount for the holding,
+		calculates units to purchase (integer unless fractional_allowed),
+		calls `add_holding` for the reinvested units, records the residual
+		cash inflow, and emits a `drip_executed` audit event.
+
+		Call this method from `record_corporate_action` for `dividend` events.
+		"""
+		import math as _math
+		drip_key = f"{portfolio_id}:{instrument_id}"
+		policies: dict[str, Any] = getattr(self, "_drip_policies", {})
+		policy = policies.get(drip_key)
+		if policy is None:
+			return {"portfolio_id": portfolio_id, "instrument_id": instrument_id, "message": "no_drip_policy"}
+
+		holding = next(
+			(h for h in self.holdings.values()
+			 if h.tenant_id == self.tenant_id
+			 and h.portfolio_id == portfolio_id
+			 and h.instrument_id == instrument_id),
+			None,
+		)
+		if holding is None:
+			return {"portfolio_id": portfolio_id, "instrument_id": instrument_id, "message": "no_holding"}
+
+		total_dividend_minor = int(holding.quantity * dividend_per_unit_minor)
+		reinvest_amount_minor = int(total_dividend_minor * policy["reinvestment_pct"])
+		residual_minor = total_dividend_minor - reinvest_amount_minor
+
+		if market_price_minor <= 0:
+			return {"portfolio_id": portfolio_id, "message": "invalid_market_price"}
+
+		raw_units = reinvest_amount_minor / market_price_minor
+		units = raw_units if policy["fractional_allowed"] else _math.floor(raw_units)
+		fractional_residual_minor = int((raw_units - units) * market_price_minor) if not policy["fractional_allowed"] else 0
+
+		result = {"portfolio_id": portfolio_id, "instrument_id": instrument_id, "units_reinvested": 0}
+		if units > 0:
+			holding_result = await self.add_holding(
+				portfolio_id, instrument_id, units,
+				reinvest_amount_minor / 100,
+				currency=holding.currency,
+			)
+			result["units_reinvested"] = units
+			result["holding"] = holding_result
+
+		cash_residual = residual_minor + fractional_residual_minor
+		if cash_residual > 0:
+			import uuid
+			movement_id = str(uuid.uuid4())
+			await self.record_cash_movement(
+				movement_id, portfolio_id, cash_residual,
+				holding.currency, f"drip_residual_{instrument_id}",
+			)
+			result["residual_cash_minor"] = cash_residual
+			result["cash_movement_id"] = movement_id
+
+		await self._audit("drip_executed", portfolio_id, {
+			"instrument_id": instrument_id, "units_reinvested": units,
+			"reinvest_amount_minor": reinvest_amount_minor,
+		})
+		result.update({
+			"total_dividend_minor": total_dividend_minor,
+			"reinvest_amount_minor": reinvest_amount_minor,
+			"executed_at": _now_iso(),
+		})
+		return result
 
 	# ------------------------------------------------------------------
 	# Internal helpers

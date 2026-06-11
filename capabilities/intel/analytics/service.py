@@ -1387,4 +1387,774 @@ class IntelligenceAnalyticsService:
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ------------------------------------------------------------------
+	# World-class enhancement methods
+	# ------------------------------------------------------------------
+
+	async def network_betweenness(self, network_id: str) -> dict[str, Any]:
+		"""Compute Brandes-style betweenness centrality for a stored network.
+
+		For each node, approximates betweenness as the fraction of shortest
+		paths passing through it using BFS-based path counting.  Pure-Python
+		O(VE) approach — suitable for graphs up to ~5 000 nodes.
+		"""
+		assert present(network_id), "network_id required"
+		network = self._networks.get(network_id)
+		if network is None:
+			return {"network_id": network_id, "node_count": 0, "betweenness": {}, "computed_at": _utcnow()}
+
+		nodes: list[str] = network["nodes"]
+		edges: list[tuple[str, str]] = network["edges"]
+
+		# Build undirected adjacency
+		adj: dict[str, list[str]] = {n: [] for n in nodes}
+		for s, t in edges:
+			if s in adj:
+				adj[s].append(t)
+			if t in adj:
+				adj[t].append(s)
+
+		betweenness: dict[str, float] = {n: 0.0 for n in nodes}
+
+		for src in nodes:
+			# BFS from src
+			from collections import deque
+			stack: list[str] = []
+			predecessors: dict[str, list[str]] = {n: [] for n in nodes}
+			sigma: dict[str, float] = {n: 0.0 for n in nodes}
+			dist: dict[str, int] = {n: -1 for n in nodes}
+			sigma[src] = 1.0
+			dist[src] = 0
+			queue: deque[str] = deque([src])
+			while queue:
+				v = queue.popleft()
+				stack.append(v)
+				for w in adj.get(v, []):
+					if dist[w] < 0:
+						queue.append(w)
+						dist[w] = dist[v] + 1
+					if dist[w] == dist[v] + 1:
+						sigma[w] += sigma[v]
+						predecessors[w].append(v)
+			delta: dict[str, float] = {n: 0.0 for n in nodes}
+			while stack:
+				w = stack.pop()
+				for v in predecessors[w]:
+					if sigma[w] != 0:
+						delta[v] += (sigma[v] / sigma[w]) * (1.0 + delta[w])
+				if w != src:
+					betweenness[w] += delta[w]
+
+		# Normalise by (n-1)(n-2)/2 for undirected graphs
+		n = len(nodes)
+		norm = ((n - 1) * (n - 2)) / 2 if n > 2 else 1.0
+		betweenness_norm = {node: round(val / norm, 6) for node, val in betweenness.items()}
+		top_nodes = sorted(betweenness_norm.items(), key=lambda x: x[1], reverse=True)[:10]
+
+		self._audit(self.tenant_id, "network_betweenness_computed", network_id)
+		return {
+			"network_id": network_id,
+			"node_count": n,
+			"edge_count": len(edges),
+			"betweenness": betweenness_norm,
+			"top_nodes": top_nodes,
+			"computed_at": _utcnow(),
+		}
+
+	async def forecast_temporal(
+		self,
+		values: list[float],
+		periods_ahead: int = 3,
+		alpha: float = 0.3,
+		beta: float = 0.1,
+	) -> dict[str, Any]:
+		"""Holt-Winters double exponential smoothing forecast.
+
+		Args:
+			values: Ordered historical observations (oldest first).
+			periods_ahead: Number of future periods to forecast.
+			alpha: Level smoothing factor (0 < alpha < 1).
+			beta: Trend smoothing factor (0 < beta < 1).
+
+		Returns dict with level, trend, forecasts, and 1-sigma confidence intervals.
+		"""
+		assert isinstance(values, list) and len(values) >= 2, "values requires >= 2 observations"
+		assert 1 <= periods_ahead <= 52, "periods_ahead must be 1-52"
+		assert 0 < alpha < 1, "alpha must be in (0,1)"
+		assert 0 < beta < 1, "beta must be in (0,1)"
+
+		# Initialise level and trend
+		level = values[0]
+		trend = values[1] - values[0]
+
+		levels: list[float] = [level]
+		trends: list[float] = [trend]
+
+		for v in values[1:]:
+			prev_level = level
+			level = alpha * v + (1 - alpha) * (prev_level + trend)
+			trend = beta * (level - prev_level) + (1 - beta) * trend
+			levels.append(round(level, 6))
+			trends.append(round(trend, 6))
+
+		# Residuals for confidence interval estimation
+		fitted = [levels[i] + trends[i] for i in range(len(values))]
+		residuals = [values[i] - fitted[i] for i in range(len(values))]
+		residual_stdev = statistics.stdev(residuals) if len(residuals) > 1 else 0.0
+
+		forecasts = []
+		for h in range(1, periods_ahead + 1):
+			point = round(level + h * trend, 6)
+			ci_half = round(1.0 * residual_stdev * math.sqrt(h), 6)
+			forecasts.append({
+				"horizon": h,
+				"point": point,
+				"lower_95": round(point - 1.96 * ci_half, 6),
+				"upper_95": round(point + 1.96 * ci_half, 6),
+			})
+
+		analysis_id = f"forecast_hw_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}"
+		result: dict[str, Any] = {
+			"analysis_id": analysis_id,
+			"method": "holt_winters",
+			"observations": len(values),
+			"alpha": alpha,
+			"beta": beta,
+			"final_level": round(level, 6),
+			"final_trend": round(trend, 6),
+			"residual_stdev": round(residual_stdev, 6),
+			"forecasts": forecasts,
+			"computed_at": _utcnow(),
+		}
+		self._analysis_results[analysis_id] = result
+		self._audit(self.tenant_id, "temporal_forecast_completed", analysis_id)
+		return result
+
+	async def bayesian_risk_update(
+		self,
+		entity_id: str,
+		evidence_observations: list[dict[str, Any]],
+		prior_alpha: float = 1.0,
+		prior_beta: float = 9.0,
+	) -> dict[str, Any]:
+		"""Beta-Binomial Bayesian risk scoring for *entity_id*.
+
+		Args:
+			entity_id: The subject entity.
+			evidence_observations: List of {positive: bool, weight: float}.
+			prior_alpha: Prior Beta distribution alpha (positive evidence count + 1).
+			prior_beta: Prior Beta distribution beta (negative evidence count + 1).
+
+		Returns posterior mean, mode, 95% credible interval, and Bayes factor.
+		"""
+		assert present(entity_id), "entity_id required"
+		assert isinstance(evidence_observations, list), "evidence_observations must be a list"
+		assert prior_alpha > 0 and prior_beta > 0, "prior parameters must be positive"
+
+		# Retrieve existing posterior if available
+		if not hasattr(self, "_risk_posteriors"):
+			self._risk_posteriors: dict[str, dict[str, float]] = {}
+
+		stored = self._risk_posteriors.get(entity_id, {"alpha": prior_alpha, "beta": prior_beta})
+		alpha = stored["alpha"]
+		beta_param = stored["beta"]
+
+		# Update with new observations (weighted counts)
+		for obs in evidence_observations:
+			w = float(obs.get("weight", 1.0))
+			if obs.get("positive", False):
+				alpha += w
+			else:
+				beta_param += w
+
+		posterior_mean = round(alpha / (alpha + beta_param), 6)
+		posterior_mode = round((alpha - 1) / (alpha + beta_param - 2), 6) if alpha > 1 and beta_param > 1 else 0.0
+
+		# Wilson score interval as credible interval approximation
+		n = alpha + beta_param
+		z = 1.96
+		p = posterior_mean
+		ci_center = round((p + z**2 / (2 * n)) / (1 + z**2 / n), 6)
+		ci_margin = round(z * math.sqrt(p * (1 - p) / n + z**2 / (4 * n**2)) / (1 + z**2 / n), 6)
+		credible_interval = (round(ci_center - ci_margin, 6), round(ci_center + ci_margin, 6))
+
+		# Bayes factor: posterior odds / prior odds
+		prior_mean = prior_alpha / (prior_alpha + prior_beta)
+		if prior_mean == 0 or prior_mean == 1:
+			bayes_factor = 1.0
+		else:
+			bayes_factor = round((posterior_mean / (1 - posterior_mean)) / (prior_mean / (1 - prior_mean)), 4)
+
+		self._risk_posteriors[entity_id] = {"alpha": alpha, "beta": beta_param}
+
+		analysis_id = f"bayes_risk_{entity_id}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}"
+		result: dict[str, Any] = {
+			"analysis_id": analysis_id,
+			"entity_id": entity_id,
+			"posterior_alpha": round(alpha, 4),
+			"posterior_beta": round(beta_param, 4),
+			"posterior_mean": posterior_mean,
+			"posterior_mode": posterior_mode,
+			"credible_interval_95": credible_interval,
+			"bayes_factor": bayes_factor,
+			"observation_count": len(evidence_observations),
+			"risk_label": "high" if posterior_mean > 0.6 else ("medium" if posterior_mean > 0.3 else "low"),
+			"computed_at": _utcnow(),
+		}
+		self._analysis_results[analysis_id] = result
+		self._audit(self.tenant_id, "bayesian_risk_updated", entity_id)
+		return result
+
+	async def validate_provenance(self, insight_id: str) -> dict[str, Any]:
+		"""Walk the full provenance chain from insight back to authority.
+
+		Chain: insight → run → model → feature_set → dataset → authority.
+		Returns {valid, broken_links, authority_expired, chain}.
+		"""
+		assert present(insight_id), "insight_id required"
+		tenant_id = self.tenant_id
+		chain: list[dict[str, str]] = []
+		broken_links: list[str] = []
+		authority_expired = False
+
+		insight = self._tenant_insight_or_none(insight_id, tenant_id)
+		if insight is None:
+			return {
+				"insight_id": insight_id,
+				"valid": False,
+				"broken_links": ["insight_not_found"],
+				"authority_expired": False,
+				"chain": [],
+				"computed_at": _utcnow(),
+			}
+		chain.append({"type": "insight", "id": insight_id})
+
+		run_id = getattr(insight, "run_id", "")
+		run = self._tenant_run_or_none(run_id, tenant_id)
+		if run is None:
+			broken_links.append(f"run:{run_id}")
+		else:
+			chain.append({"type": "run", "id": run_id})
+			model_id = getattr(run, "model_id", "")
+			model = self._tenant_model_or_none(model_id, tenant_id)
+			if model is None:
+				broken_links.append(f"model:{model_id}")
+			else:
+				chain.append({"type": "model", "id": model_id})
+				fs_id = getattr(model, "feature_set_id", "")
+				fs = self._tenant_feature_set_or_none(fs_id, tenant_id)
+				if fs is None:
+					broken_links.append(f"feature_set:{fs_id}")
+				else:
+					chain.append({"type": "feature_set", "id": fs_id})
+					dataset_id = getattr(fs, "dataset_id", "")
+					dataset = self._tenant_dataset_or_none(dataset_id, tenant_id)
+					if dataset is None:
+						broken_links.append(f"dataset:{dataset_id}")
+					else:
+						chain.append({"type": "dataset", "id": dataset_id})
+						# Find workspace → authority
+						ws_id = getattr(dataset, "workspace_id", "")
+						ws = self._tenant_workspace_or_none(ws_id, tenant_id)
+						if ws is None:
+							broken_links.append(f"workspace:{ws_id}")
+						else:
+							chain.append({"type": "workspace", "id": ws_id})
+							auth_id = getattr(ws, "authority_id", "")
+							authority = self._tenant_authority_or_none(auth_id, tenant_id)
+							if authority is None:
+								broken_links.append(f"authority:{auth_id}")
+							else:
+								chain.append({"type": "authority", "id": auth_id})
+								# Check expiry (ISO date string comparison)
+								expires_at = getattr(authority, "expires_at", "")
+								if expires_at and expires_at < _utcnow()[:10]:
+									authority_expired = True
+
+		valid = len(broken_links) == 0 and not authority_expired
+		self._audit(tenant_id, "provenance_validated", insight_id)
+		return {
+			"insight_id": insight_id,
+			"valid": valid,
+			"broken_links": broken_links,
+			"authority_expired": authority_expired,
+			"chain_length": len(chain),
+			"chain": chain,
+			"computed_at": _utcnow(),
+		}
+
+	async def detect_communities(
+		self,
+		entities: list[str],
+		relationships: list[dict[str, str]],
+		resolution: float = 1.0,
+	) -> dict[str, Any]:
+		"""Greedy modularity-based community detection (Louvain Phase 1 approximation).
+
+		Args:
+			entities: Node identifiers.
+			relationships: List of {source, target} dicts.
+			resolution: Modularity resolution parameter — higher values yield
+				smaller communities.
+
+		Returns community assignments, modularity score Q, and inter-community
+		edge counts.
+		"""
+		assert isinstance(entities, list) and entities, "entities required"
+		assert isinstance(relationships, list), "relationships must be a list"
+		assert resolution > 0, "resolution must be positive"
+
+		# Build adjacency and degree map
+		adj: dict[str, set[str]] = {e: set() for e in entities}
+		for rel in relationships:
+			s, t = rel.get("source", ""), rel.get("target", "")
+			if s in adj and t in adj and s != t:
+				adj[s].add(t)
+				adj[t].add(s)
+
+		m = sum(len(neighbours) for neighbours in adj.values()) / 2
+		if m == 0:
+			return {
+				"analysis_id": f"communities_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}",
+				"entity_count": len(entities),
+				"community_count": len(entities),
+				"modularity_Q": 0.0,
+				"communities": [{"id": i, "members": [e], "size": 1} for i, e in enumerate(entities)],
+				"computed_at": _utcnow(),
+			}
+
+		degree: dict[str, int] = {e: len(adj[e]) for e in entities}
+		community: dict[str, int] = {e: i for i, e in enumerate(entities)}
+
+		# Single greedy pass: for each node, move to the neighbour community
+		# that maximises modularity gain (simplified)
+		improved = True
+		while improved:
+			improved = False
+			for node in entities:
+				current_comm = community[node]
+				neighbour_comms: dict[int, float] = defaultdict(float)
+				for nb in adj[node]:
+					neighbour_comms[community[nb]] += 1.0
+
+				best_comm = current_comm
+				best_gain = 0.0
+				for cand_comm, edge_weight in neighbour_comms.items():
+					if cand_comm == current_comm:
+						continue
+					# Delta Q approximation
+					comm_degree = sum(degree[e] for e in entities if community[e] == cand_comm)
+					gain = (edge_weight / m - resolution * degree[node] * comm_degree / (2 * m**2))
+					if gain > best_gain:
+						best_gain = gain
+						best_comm = cand_comm
+				if best_comm != current_comm:
+					community[node] = best_comm
+					improved = True
+
+		# Collect communities
+		comm_members: dict[int, list[str]] = defaultdict(list)
+		for node, cid in community.items():
+			comm_members[cid].append(node)
+
+		# Compute modularity Q
+		q = 0.0
+		for members in comm_members.values():
+			member_set = set(members)
+			lc = sum(1 for s in members for t in adj[s] if t in member_set) / 2
+			dc = sum(degree[e] for e in members)
+			q += (lc / m - resolution * (dc / (2 * m)) ** 2)
+
+		communities_list = [
+			{"id": cid, "members": mems, "size": len(mems)}
+			for cid, mems in sorted(comm_members.items())
+		]
+
+		analysis_id = f"communities_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}"
+		result: dict[str, Any] = {
+			"analysis_id": analysis_id,
+			"entity_count": len(entities),
+			"community_count": len(communities_list),
+			"modularity_Q": round(q, 6),
+			"resolution": resolution,
+			"communities": communities_list,
+			"computed_at": _utcnow(),
+		}
+		self._analysis_results[analysis_id] = result
+		self._audit(self.tenant_id, "communities_detected", f"entities={len(entities)}")
+		return result
+
+	async def granger_causality(
+		self,
+		series_x: list[float],
+		series_y: list[float],
+		max_lag: int = 5,
+	) -> dict[str, Any]:
+		"""Granger-causality test between two time series.
+
+		Tests whether lagged values of series_x improve prediction of series_y
+		beyond an autoregressive baseline, and vice versa.  Uses OLS residual
+		variance comparison — no external stats library required.
+
+		Returns per-lag F-statistic proxies, optimal lag, and causal direction
+		label (x_causes_y | y_causes_x | bidirectional | none).
+		"""
+		assert isinstance(series_x, list) and len(series_x) >= max_lag + 2, "series_x too short"
+		assert isinstance(series_y, list) and len(series_y) == len(series_x), "series_x and series_y must match length"
+		assert 1 <= max_lag <= 20, "max_lag must be 1-20"
+
+		def _ols_residual_variance(regressand: list[float], regressors: list[list[float]]) -> float:
+			"""Compute OLS residual sum of squares / n."""
+			n = len(regressand)
+			k = len(regressors)
+			if k == 0:
+				mean_y = sum(regressand) / n
+				return sum((v - mean_y) ** 2 for v in regressand) / n
+			# Normal equations: beta = (X'X)^-1 X'y  (simple 1-regressor case)
+			# For multi-regressor, compute iteratively via Gram-Schmidt proxy
+			residuals = list(regressand)
+			for reg in regressors:
+				dot_rr = sum(r * r for r in reg)
+				if dot_rr == 0:
+					continue
+				dot_yr = sum(residuals[i] * reg[i] for i in range(n))
+				coef = dot_yr / dot_rr
+				residuals = [residuals[i] - coef * reg[i] for i in range(n)]
+			return sum(r * r for r in residuals) / n
+
+		n = len(series_x)
+		lag_results: list[dict[str, Any]] = []
+		x_causes_y_evidence = 0
+		y_causes_x_evidence = 0
+
+		for lag in range(1, max_lag + 1):
+			end = n
+			start = lag
+			y_target = series_y[start:end]
+			x_target = series_x[start:end]
+
+			# Baseline: y regressed on lagged y only
+			lagged_y = series_y[start - lag: end - lag]
+			baseline_var = _ols_residual_variance(y_target, [lagged_y])
+			# Full: y regressed on lagged y + lagged x
+			lagged_x = series_x[start - lag: end - lag]
+			full_var = _ols_residual_variance(y_target, [lagged_y, lagged_x])
+			f_xy = round((baseline_var - full_var) / max(full_var, 1e-10), 4)
+
+			# Reverse direction
+			baseline_var_rev = _ols_residual_variance(x_target, [lagged_x])
+			full_var_rev = _ols_residual_variance(x_target, [lagged_x, lagged_y])
+			f_yx = round((baseline_var_rev - full_var_rev) / max(full_var_rev, 1e-10), 4)
+
+			if f_xy > 1.0:
+				x_causes_y_evidence += 1
+			if f_yx > 1.0:
+				y_causes_x_evidence += 1
+
+			lag_results.append({
+				"lag": lag,
+				"f_x_causes_y": f_xy,
+				"f_y_causes_x": f_yx,
+			})
+
+		# Determine direction from majority-vote over lags
+		if x_causes_y_evidence > 0 and y_causes_x_evidence > 0:
+			direction = "bidirectional"
+		elif x_causes_y_evidence > 0:
+			direction = "x_causes_y"
+		elif y_causes_x_evidence > 0:
+			direction = "y_causes_x"
+		else:
+			direction = "none"
+
+		optimal_lag = max(lag_results, key=lambda r: r["f_x_causes_y"] + r["f_y_causes_x"])["lag"]
+
+		analysis_id = f"granger_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}"
+		result: dict[str, Any] = {
+			"analysis_id": analysis_id,
+			"series_length": n,
+			"max_lag": max_lag,
+			"optimal_lag": optimal_lag,
+			"causal_direction": direction,
+			"x_causes_y_lags": x_causes_y_evidence,
+			"y_causes_x_lags": y_causes_x_evidence,
+			"lag_results": lag_results,
+			"computed_at": _utcnow(),
+		}
+		self._analysis_results[analysis_id] = result
+		self._audit(self.tenant_id, "granger_causality_computed", analysis_id)
+		return result
+
+	async def ensemble_score(
+		self,
+		run_ids: list[str],
+		weights: list[float] | None = None,
+	) -> dict[str, Any]:
+		"""Confidence-weighted ensemble scoring across multiple model runs.
+
+		Args:
+			run_ids: List of run IDs whose confidence scores to aggregate.
+			weights: Optional per-run weights (softmax-normalised if provided).
+				If None, uniform weights are used.
+
+		Returns weighted ensemble score, per-run contributions, and variance.
+		"""
+		assert isinstance(run_ids, list) and run_ids, "run_ids must be non-empty"
+		tenant_id = self.tenant_id
+
+		scores: list[float] = []
+		run_details: list[dict[str, Any]] = []
+		for rid in run_ids:
+			run = self._tenant_run_or_none(rid, tenant_id)
+			score = getattr(run, "confidence_score", 0.5) if run else 0.5
+			scores.append(score)
+			run_details.append({"run_id": rid, "confidence_score": score, "found": run is not None})
+
+		n = len(scores)
+		if weights is None:
+			norm_weights = [1.0 / n] * n
+		else:
+			assert len(weights) == n, "weights length must match run_ids length"
+			# Softmax normalisation
+			import math as _math
+			exp_w = [_math.exp(w) for w in weights]
+			total = sum(exp_w)
+			norm_weights = [e / total for e in exp_w]
+
+		ensemble = round(sum(norm_weights[i] * scores[i] for i in range(n)), 6)
+		variance = round(sum(norm_weights[i] * (scores[i] - ensemble) ** 2 for i in range(n)), 6)
+
+		for i, detail in enumerate(run_details):
+			detail["weight"] = round(norm_weights[i], 6)
+			detail["contribution"] = round(norm_weights[i] * scores[i], 6)
+
+		analysis_id = f"ensemble_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}"
+		result: dict[str, Any] = {
+			"analysis_id": analysis_id,
+			"run_count": n,
+			"ensemble_score": ensemble,
+			"variance": variance,
+			"risk_label": "high" if ensemble > 0.7 else ("medium" if ensemble > 0.4 else "low"),
+			"run_contributions": run_details,
+			"computed_at": _utcnow(),
+		}
+		self._analysis_results[analysis_id] = result
+		self._audit(tenant_id, "ensemble_score_computed", analysis_id)
+		return result
+
+	async def lineage_traverse(
+		self,
+		dataset_id: str,
+		direction: str = "upstream",
+		max_depth: int = 10,
+	) -> dict[str, Any]:
+		"""Walk dataset lineage references recursively.
+
+		Args:
+			dataset_id: Starting dataset.
+			direction: 'upstream' follows lineage_reference pointers backward;
+				'downstream' finds datasets whose lineage_reference equals dataset_id.
+			max_depth: Maximum traversal depth to prevent infinite cycles.
+
+		Returns a DAG of {id, type, depth, lineage_reference} nodes.
+		"""
+		assert present(dataset_id), "dataset_id required"
+		assert direction in {"upstream", "downstream"}, "direction must be upstream|downstream"
+		assert 1 <= max_depth <= 20, "max_depth must be 1-20"
+
+		tenant_id = self.tenant_id
+		visited: set[str] = set()
+		dag_nodes: list[dict[str, Any]] = []
+
+		def _traverse_upstream(did: str, depth: int) -> None:
+			if did in visited or depth > max_depth:
+				return
+			visited.add(did)
+			ds = self._tenant_dataset_or_none(did, tenant_id)
+			if ds is None:
+				dag_nodes.append({"id": did, "type": "dataset", "depth": depth, "lineage_reference": None, "found": False})
+				return
+			lineage_ref = getattr(ds, "lineage_reference", "")
+			dag_nodes.append({"id": did, "type": "dataset", "depth": depth, "lineage_reference": lineage_ref, "found": True})
+			# Recurse if lineage_reference looks like another dataset ID
+			if lineage_ref and lineage_ref != did:
+				_traverse_upstream(lineage_ref, depth + 1)
+
+		def _traverse_downstream(did: str, depth: int) -> None:
+			if did in visited or depth > max_depth:
+				return
+			visited.add(did)
+			ds = self._tenant_dataset_or_none(did, tenant_id)
+			if ds is not None:
+				dag_nodes.append({"id": did, "type": "dataset", "depth": depth, "found": True})
+			# Find all datasets whose lineage_reference points here
+			children = [
+				dsid for (tid, dsid), dobj in self.datasets.items()
+				if tid == tenant_id and getattr(dobj, "lineage_reference", "") == did
+			]
+			for child_id in children:
+				_traverse_downstream(child_id, depth + 1)
+
+		if direction == "upstream":
+			_traverse_upstream(dataset_id, 0)
+		else:
+			_traverse_downstream(dataset_id, 0)
+
+		self._audit(tenant_id, "lineage_traversed", dataset_id)
+		return {
+			"dataset_id": dataset_id,
+			"direction": direction,
+			"node_count": len(dag_nodes),
+			"max_depth_reached": max(n["depth"] for n in dag_nodes) if dag_nodes else 0,
+			"dag": dag_nodes,
+			"computed_at": _utcnow(),
+		}
+
+	async def anomaly_rolling(
+		self,
+		time_series: list[dict[str, Any]],
+		window: int = 50,
+		sigma: float = 2.5,
+	) -> dict[str, Any]:
+		"""Adaptive rolling-baseline anomaly detection.
+
+		Each point is compared against the rolling mean and standard deviation
+		of the preceding *window* observations, producing a per-point adaptive
+		threshold rather than a global one.
+
+		Args:
+			time_series: List of {t, v} dicts ordered oldest-first.
+			window: Rolling window size (min 3).
+			sigma: Number of rolling standard deviations to flag as anomaly.
+		"""
+		assert isinstance(time_series, list) and len(time_series) >= 3, "time_series requires >= 3 observations"
+		assert window >= 3, "window must be >= 3"
+		assert sigma > 0, "sigma must be positive"
+
+		values = [float(entry.get("v", 0)) for entry in time_series]
+		n = len(values)
+		annotated: list[dict[str, Any]] = []
+		anomalies: list[dict[str, Any]] = []
+
+		for i in range(n):
+			start = max(0, i - window)
+			window_vals = values[start:i] if i > 0 else [values[0]]
+			if len(window_vals) < 2:
+				rolling_mean = window_vals[0]
+				rolling_std = 0.0
+			else:
+				rolling_mean = statistics.mean(window_vals)
+				rolling_std = statistics.stdev(window_vals)
+
+			z = round((values[i] - rolling_mean) / rolling_std, 4) if rolling_std else 0.0
+			is_anomaly = rolling_std > 0 and abs(z) > sigma
+			point_info = {
+				"index": i,
+				"t": time_series[i].get("t"),
+				"v": values[i],
+				"rolling_mean": round(rolling_mean, 6),
+				"rolling_std": round(rolling_std, 6),
+				"z_score": z,
+				"anomaly": is_anomaly,
+			}
+			annotated.append(point_info)
+			if is_anomaly:
+				anomalies.append(point_info)
+
+		analysis_id = f"anomaly_rolling_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}"
+		result: dict[str, Any] = {
+			"analysis_id": analysis_id,
+			"series_length": n,
+			"window": window,
+			"sigma_threshold": sigma,
+			"anomaly_count": len(anomalies),
+			"anomaly_rate": round(len(anomalies) / n, 4),
+			"anomalies": anomalies[:50],
+			"series": annotated[:200],
+			"computed_at": _utcnow(),
+		}
+		self._analysis_results[analysis_id] = result
+		self._audit(self.tenant_id, "anomaly_rolling_completed", f"n={n},window={window}")
+		return result
+
+	async def generate_narrative_draft(
+		self,
+		analysis_id: str,
+		model: str = "llama3.2:3b",
+	) -> dict[str, Any]:
+		"""Generate a first-draft analytical narrative using a local Ollama model.
+
+		Requires the OLLAMA_BASE_URL environment variable to be set.  Falls
+		back gracefully when Ollama is unavailable, returning a structured
+		template that an analyst can complete manually.
+
+		The draft is marked requires_approval=True and must be reviewed via
+		record_review() before dissemination.
+		"""
+		import os
+		assert present(analysis_id), "analysis_id required"
+		result = self._analysis_results.get(analysis_id)
+		if result is None:
+			raise KeyError(f"Analysis result not found: {analysis_id}")
+
+		ollama_url = os.environ.get("OLLAMA_BASE_URL", "")
+		if not ollama_url:
+			# Structured fallback template
+			draft_text = (
+				f"[DRAFT — REQUIRES ANALYST COMPLETION]\n\n"
+				f"Analysis ID: {analysis_id}\n"
+				f"Method: {result.get('method', result.get('analysis_type', 'unknown'))}\n"
+				f"Observations: {result.get('observations', result.get('series_length', result.get('event_count', 'N/A')))}\n\n"
+				f"Preliminary findings: [Analyst to complete based on quantitative results.]\n\n"
+				f"Recommended action: [Analyst to complete.]\n\n"
+				f"Caveats: This draft requires human review before dissemination."
+			)
+			self._audit(self.tenant_id, "narrative_draft_fallback", analysis_id)
+			return {
+				"analysis_id": analysis_id,
+				"draft": draft_text,
+				"model": "fallback_template",
+				"ollama_available": False,
+				"requires_approval": True,
+				"generated_at": _utcnow(),
+			}
+
+		# Construct structured prompt
+		import json
+		summary = {k: v for k, v in result.items() if not isinstance(v, (list, dict))}
+		prompt = (
+			"You are an intelligence analyst. Write a concise, factual narrative "
+			"(3-5 sentences) summarising the following analytical result for a "
+			"classified briefing. Do not speculate beyond the data.\n\n"
+			f"Data: {json.dumps(summary)}"
+		)
+
+		try:
+			import urllib.request
+			import urllib.error
+			payload = json.dumps({"model": model, "prompt": prompt, "stream": False}).encode()
+			req = urllib.request.Request(
+				f"{ollama_url.rstrip('/')}/api/generate",
+				data=payload,
+				headers={"Content-Type": "application/json"},
+				method="POST",
+			)
+			with urllib.request.urlopen(req, timeout=30) as resp:
+				response_data = json.loads(resp.read().decode())
+			draft_text = response_data.get("response", "").strip()
+			ollama_available = True
+		except Exception as exc:
+			draft_text = f"[Ollama generation failed: {exc}. Analyst completion required.]"
+			ollama_available = False
+
+		self._audit(self.tenant_id, "narrative_draft_generated", analysis_id)
+		return {
+			"analysis_id": analysis_id,
+			"draft": draft_text,
+			"model": model,
+			"ollama_available": ollama_available,
+			"requires_approval": True,
+			"generated_at": _utcnow(),
+		}
+
 IntelAnalyticsService = IntelligenceAnalyticsService

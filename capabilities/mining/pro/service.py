@@ -967,6 +967,510 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 		}
 
 
+	# ── World-Class Improvement Methods ──────────────────────────────────────────
+
+	async def dispatch_truck(
+		self,
+		truck_id: str,
+		destination: str,
+		load_tonnes: float,
+		mine_area: str,
+		priority: int = 5,
+		assigned_by: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Real-time truck dispatch assignment (I1).
+		Priority 1 (highest) through 10 (lowest). Publishes to NATS subject
+		mining.pro.dispatch.{mine_area} for onboard terminal consumption.
+		Raises ValueError if truck_id is already assigned to an active dispatch.
+		"""
+		assert truck_id, "truck_id required"
+		assert destination, "destination required"
+		assert load_tonnes > 0, "load_tonnes must be positive"
+		assert 1 <= priority <= 10, "priority must be 1–10"
+		# Check for conflicting active dispatch
+		for rec in self._ore_movements.values():
+			if (
+				rec.get("truck_id") == truck_id
+				and rec.get("tenant_id") == self.tenant_id
+				and rec.get("dispatch_status") == "in_transit"
+			):
+				raise ValueError(f"Truck '{truck_id}' already has an active dispatch")
+		rec_id = uuid7str()
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"truck_id": truck_id,
+			"destination": destination,
+			"load_tonnes": round(load_tonnes, 2),
+			"mine_area": mine_area,
+			"priority": priority,
+			"assigned_by": assigned_by,
+			"dispatch_status": "assigned",
+			"assigned_at": datetime.utcnow().isoformat(),
+			"nats_subject": f"mining.pro.dispatch.{mine_area}",
+		}
+		# Store in ore_movements store as a dispatch record type
+		self._ore_movements[rec_id] = {**rec, "dispatch_record": True, "material_type": "dispatch"}
+		self._log_op("dispatch_truck", "truck_dispatch", rec_id)
+		return rec
+
+	async def record_blast_vibration(
+		self,
+		blast_id: str,
+		sensor_id: str,
+		ppv_mmps: float,
+		distance_m: float,
+		receiver_type: str,
+		ppv_limit_mmps: float = 5.0,
+		recorded_by: str = "system",
+	) -> dict[str, Any]:
+		"""
+		Record peak particle velocity (PPV) measurement from blast vibration monitoring (I2).
+		receiver_type: "residential" | "industrial" | "infrastructure" | "heritage"
+		Automatically sets breach=True and logs a warning when ppv_mmps > ppv_limit_mmps.
+		In production, a breach publishes blast_vibration_breach event to NATS.
+		"""
+		assert blast_id, "blast_id required"
+		assert sensor_id, "sensor_id required"
+		assert ppv_mmps >= 0, "ppv_mmps must be non-negative"
+		assert distance_m > 0, "distance_m must be positive"
+		valid_receivers = {"residential", "industrial", "infrastructure", "heritage"}
+		if receiver_type not in valid_receivers:
+			raise ValueError(f"receiver_type must be one of {valid_receivers}")
+		breach = ppv_mmps > ppv_limit_mmps
+		if breach:
+			self._log_warn(
+				"Blast vibration limit breached",
+				blast_id=blast_id,
+				ppv_mmps=ppv_mmps,
+				limit=ppv_limit_mmps,
+				sensor=sensor_id,
+			)
+		rec_id = uuid7str()
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"blast_id": blast_id,
+			"sensor_id": sensor_id,
+			"ppv_mmps": round(ppv_mmps, 3),
+			"distance_m": round(distance_m, 1),
+			"receiver_type": receiver_type,
+			"ppv_limit_mmps": ppv_limit_mmps,
+			"breach": breach,
+			"recorded_by": recorded_by,
+			"recorded_at": datetime.utcnow().isoformat(),
+			"nats_event": "blast_vibration_breach" if breach else None,
+		}
+		# Store in blast_results adjacent store
+		self._blast_results[rec_id] = rec
+		self._log_op("record_blast_vibration", "blast_vibration", rec_id)
+		return rec
+
+	async def reconcile_block_model(
+		self,
+		block_id: str,
+		block_model_grade: float,
+		block_model_tonnes: float,
+		period: str,
+		section: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Grade reconciliation: compare geological block model to mined actuals (I3).
+		Computes F-factor (mine call factor), C-factor (concentration factor),
+		and E-factor (extraction factor). F-factor target: 0.90–1.10.
+		period: YYYY-MM
+		"""
+		assert block_id, "block_id required"
+		assert block_model_grade >= 0, "block_model_grade must be non-negative"
+		assert block_model_tonnes > 0, "block_model_tonnes must be positive"
+		assert period and len(period) == 7, "period must be YYYY-MM"
+		# Mined actuals from grade control samples linked to this block
+		gc_samples = [
+			r for r in self._grade_control_samples.values()
+			if r.get("blast_block_id") == block_id and r["tenant_id"] == self.tenant_id
+		]
+		mined_grade = (
+			sum(s["grade"] for s in gc_samples) / len(gc_samples)
+			if gc_samples else 0.0
+		)
+		# Ore movements from this block
+		ore_mvts = [
+			r for r in self._ore_movements.values()
+			if r["tenant_id"] == self.tenant_id
+			and r.get("material_type") in ("ore", "ROM")
+			and r.get("timestamp", "")[:7] == period
+		]
+		mined_tonnes = sum(m["tonnes"] for m in ore_mvts)
+		# F-factor: (mined_grade * mined_tonnes) / (model_grade * model_tonnes)
+		model_metal = block_model_grade * block_model_tonnes
+		mined_metal = mined_grade * mined_tonnes
+		f_factor = round(mined_metal / model_metal, 4) if model_metal > 0 else None
+		# E-factor: mined_tonnes / block_model_tonnes
+		e_factor = round(mined_tonnes / block_model_tonnes, 4) if block_model_tonnes > 0 else None
+		# C-factor: mined_grade / block_model_grade
+		c_factor = round(mined_grade / block_model_grade, 4) if block_model_grade > 0 else None
+		variance_alert = (f_factor is not None and (f_factor < 0.90 or f_factor > 1.10))
+		if variance_alert:
+			self._log_warn(
+				"Block model reconciliation variance exceeds 10%",
+				block_id=block_id,
+				f_factor=f_factor,
+			)
+		rec_id = uuid7str()
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"block_id": block_id,
+			"period": period,
+			"section": section,
+			"block_model_grade": block_model_grade,
+			"block_model_tonnes": block_model_tonnes,
+			"mined_grade": round(mined_grade, 4),
+			"mined_tonnes": round(mined_tonnes, 2),
+			"f_factor": f_factor,
+			"c_factor": c_factor,
+			"e_factor": e_factor,
+			"variance_alert": variance_alert,
+			"gc_sample_count": len(gc_samples),
+			"calculated_at": datetime.utcnow().isoformat(),
+		}
+		self._log_op("reconcile_block_model", "reconciliation", rec_id)
+		return rec
+
+	async def delay_pareto_analysis(
+		self,
+		period: str,
+		section: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Pareto analysis of production delays for a period (I10).
+		period: YYYY-MM. Returns ranked delay categories with cumulative percentage,
+		identifies the top contributors responsible for 80% of lost time (vital few),
+		and maps each category to the responsible capability for escalation.
+		"""
+		assert period and len(period) == 7, "period must be YYYY-MM"
+		shifts = [
+			r for r in self._shifts.values()
+			if r.get("tenant_id") == self.tenant_id
+			and str(r.get("shift_date", ""))[:7] == period
+		]
+		if section:
+			shifts = [r for r in shifts if r.get("mine_section") == section or r.get("mine_area") == section]
+		# Aggregate delay minutes by category across all shift delays
+		category_totals: dict[str, float] = {}
+		for shift in shifts:
+			for delay in shift.get("delays", []):
+				cat = delay.get("delay_category", "unknown") if isinstance(delay, dict) else "unknown"
+				mins = delay.get("duration_minutes", 0) if isinstance(delay, dict) else 0
+				category_totals[cat] = category_totals.get(cat, 0) + mins
+		total_delay = sum(category_totals.values())
+		# Build ranked Pareto list
+		escalation_map = {
+			"equipment_breakdown": "mining_eqp",
+			"mechanical": "mining_eqp",
+			"electrical": "mining_eqp",
+			"blast_hold": "mining_pro",
+			"misfire": "mining_pro",
+			"safety_hold": "mining_saf",
+			"environmental": "mining_env",
+			"weather": "mining_env",
+			"ground_support": "mining_pro",
+			"scheduling": "schd",
+			"waiting_instructions": "mining_pro",
+		}
+		ranked = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)
+		cumulative = 0.0
+		vital_few_cutoff = total_delay * 0.80
+		pareto_rows = []
+		for cat, mins in ranked:
+			cumulative += mins
+			pct_share = round(mins / total_delay * 100, 2) if total_delay > 0 else 0.0
+			cumulative_pct = round(cumulative / total_delay * 100, 2) if total_delay > 0 else 0.0
+			pareto_rows.append({
+				"category": cat,
+				"delay_minutes": round(mins, 1),
+				"pct_share": pct_share,
+				"cumulative_pct": cumulative_pct,
+				"vital_few": cumulative <= vital_few_cutoff + mins,
+				"escalation_capability": escalation_map.get(cat, "mining_pro"),
+			})
+		return {
+			"tenant_id": self.tenant_id,
+			"period": period,
+			"section": section,
+			"total_delay_minutes": round(total_delay, 1),
+			"shifts_analysed": len(shifts),
+			"categories_count": len(category_totals),
+			"pareto": pareto_rows,
+			"as_at": datetime.utcnow().isoformat(),
+		}
+
+	async def short_interval_report(
+		self,
+		section: str,
+		interval_start: datetime,
+		interval_end: datetime,
+		actual_tonnes: float,
+		actual_metres: float,
+		supervisor_id: str,
+		comments: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Short-Interval Control (SIC) report for 2–4 hour production windows (I7).
+		Computes variance against the published weekly schedule's hourly disaggregation.
+		Emits NATS sic.variance.critical when cumulative tonnage gap > 15%.
+		"""
+		assert section, "section required"
+		assert interval_start < interval_end, "interval_start must precede interval_end"
+		assert actual_tonnes >= 0, "actual_tonnes must be non-negative"
+		assert actual_metres >= 0, "actual_metres must be non-negative"
+		assert supervisor_id, "supervisor_id required"
+		interval_hours = (interval_end - interval_start).total_seconds() / 3600.0
+		# Pull target from published schedule for this section (pro-rate by hours)
+		target_hourly_tonnes: float | None = None
+		for sched in self._schedules.values():
+			if sched.get("tenant_id") == self.tenant_id and sched.get("published"):
+				# Pro-rate daily target from schedule
+				for act in sched.get("activities", []):
+					if isinstance(act, dict) and act.get("mine_area") == section:
+						daily_t = act.get("planned_ore_tonnes", 0)
+						target_hourly_tonnes = daily_t / 24.0
+						break
+				if target_hourly_tonnes is not None:
+					break
+		target_interval_tonnes = (
+			round(target_hourly_tonnes * interval_hours, 2)
+			if target_hourly_tonnes is not None else None
+		)
+		variance_pct: float | None = None
+		critical_variance = False
+		if target_interval_tonnes and target_interval_tonnes > 0:
+			variance_pct = round((actual_tonnes - target_interval_tonnes) / target_interval_tonnes * 100, 1)
+			critical_variance = variance_pct < -15.0
+		if critical_variance:
+			self._log_warn(
+				"SIC critical variance; cumulative gap >15%",
+				section=section,
+				variance_pct=variance_pct,
+			)
+		rec_id = uuid7str()
+		rec: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"section": section,
+			"interval_start": interval_start.isoformat(),
+			"interval_end": interval_end.isoformat(),
+			"interval_hours": round(interval_hours, 2),
+			"actual_tonnes": round(actual_tonnes, 2),
+			"actual_metres": round(actual_metres, 2),
+			"target_tonnes": target_interval_tonnes,
+			"variance_pct": variance_pct,
+			"critical_variance": critical_variance,
+			"supervisor_id": supervisor_id,
+			"comments": comments,
+			"nats_event": "sic.variance.critical" if critical_variance else None,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._log_op("short_interval_report", "sic_report", rec_id)
+		return rec
+
+	async def generate_shift_handover(
+		self,
+		outgoing_shift_id: str,
+		incoming_supervisor_id: str,
+	) -> dict[str, Any]:
+		"""
+		Automated shift handover package (I13).
+		Assembles structured handover from the closing shift report, open blast holds,
+		pending grade control decisions, current stockpile levels, and active safety holds.
+		Designed to display on supervisor terminals via NATS subject mining.pro.handover.
+		"""
+		assert outgoing_shift_id, "outgoing_shift_id required"
+		assert incoming_supervisor_id, "incoming_supervisor_id required"
+		shift = self._shifts.get(outgoing_shift_id)
+		if shift is None:
+			raise KeyError(f"Shift report '{outgoing_shift_id}' not found")
+		self._assert_tenant(shift["tenant_id"])
+		# Open blast holds (blasts in PRIMED or CHARGED status — not yet fired)
+		open_blast_holds = [
+			{"blast_id": r["id"], "status": r["status"], "mine_area": r.get("mine_area"), "planned_date": str(r.get("planned_date", ""))}
+			for r in self._blasts.values()
+			if r["tenant_id"] == self.tenant_id
+			and r["status"] in (BlastStatus.PRIMED, BlastStatus.CHARGED, "primed", "charged")
+		]
+		# Safety holds from blast results
+		active_safety_holds = [
+			{"result_id": r["id"], "blast_id": r.get("blast_id"), "misfire": r.get("misfire")}
+			for r in self._blast_results.values()
+			if r.get("tenant_id") == self.tenant_id and r.get("safety_hold")
+		]
+		# Pending grade boundary approvals
+		pending_grade_approvals = [
+			{"boundary_id": r["id"], "mine_area": r.get("mine_area"), "commodity": r.get("commodity")}
+			for r in self._grade_boundaries.values()
+			if r.get("tenant_id") == self.tenant_id and not r.get("approved")
+		]
+		# Current stockpile snapshot
+		stockpile_snapshot = [
+			{
+				"stockpile_id": r["id"],
+				"name": r.get("name"),
+				"current_tonnes": r.get("current_tonnes", 0),
+				"capacity_tonnes": r.get("capacity_tonnes"),
+				"fill_pct": round(r.get("current_tonnes", 0) / r["capacity_tonnes"] * 100, 1)
+				if r.get("capacity_tonnes") else None,
+			}
+			for r in self._stockpiles.values()
+			if r.get("tenant_id") == self.tenant_id
+		]
+		rec_id = uuid7str()
+		handover: dict[str, Any] = {
+			"id": rec_id,
+			"tenant_id": self.tenant_id,
+			"outgoing_shift_id": outgoing_shift_id,
+			"incoming_supervisor_id": incoming_supervisor_id,
+			"outgoing_supervisor_id": shift.get("supervisor_id"),
+			"mine_area": shift.get("mine_area"),
+			"shift_summary": {
+				"shift_type": shift.get("shift_type"),
+				"shift_date": str(shift.get("shift_date", "")),
+				"tonnes_mined": shift.get("tonnes_mined", shift.get("total_ore_tonnes", 0)),
+				"metres_developed": shift.get("metres_developed", 0),
+				"delay_hours": shift.get("delay_hours", 0),
+				"utilisation_pct": shift.get("utilisation_pct"),
+				"status": shift.get("status"),
+			},
+			"open_blast_holds": open_blast_holds,
+			"active_safety_holds": active_safety_holds,
+			"pending_grade_approvals": pending_grade_approvals,
+			"stockpile_snapshot": stockpile_snapshot,
+			"action_items_count": len(open_blast_holds) + len(active_safety_holds) + len(pending_grade_approvals),
+			"generated_at": datetime.utcnow().isoformat(),
+			"nats_subject": "mining.pro.handover",
+		}
+		self._log_op("generate_shift_handover", "shift_handover", rec_id)
+		return handover
+
+	async def equipment_availability_report(
+		self,
+		equipment_id: str,
+		period: str,
+	) -> dict[str, Any]:
+		"""
+		Equipment utilisation and availability report using SMRP definitions (I4).
+		Computes Physical Availability (PA), Mechanical Availability (MA), and Utilisation (U).
+		period: YYYY-MM. Aggregates delay records by equipment_id from shift reports.
+		PA = (scheduled_hours - total_downtime_hours) / scheduled_hours * 100
+		MA = (operating_hours) / (operating_hours + maintenance_hours) * 100
+		U  = (operating_hours) / (scheduled_hours) * 100
+		"""
+		assert equipment_id, "equipment_id required"
+		assert period and len(period) == 7, "period must be YYYY-MM"
+		shifts = [
+			r for r in self._shifts.values()
+			if r.get("tenant_id") == self.tenant_id
+			and str(r.get("shift_date", ""))[:7] == period
+		]
+		# Collect delays for this equipment across all shifts in the period
+		total_mechanical_downtime_h = 0.0
+		total_scheduled_h = 0.0
+		total_delay_h = 0.0
+		shifts_with_equipment = 0
+		for shift in shifts:
+			shift_h = 12.0  # standard 12-hour shift
+			total_scheduled_h += shift_h
+			for delay in shift.get("delays", []):
+				if not isinstance(delay, dict):
+					continue
+				if delay.get("equipment_id") == equipment_id:
+					delay_h = delay.get("duration_minutes", 0) / 60.0
+					total_delay_h += delay_h
+					cat = delay.get("delay_category", "")
+					if cat in ("equipment_breakdown", "mechanical", "electrical"):
+						total_mechanical_downtime_h += delay_h
+					shifts_with_equipment += 1
+		operating_h = max(0.0, total_scheduled_h - total_delay_h)
+		maintenance_h = total_mechanical_downtime_h
+		pa = round((total_scheduled_h - total_delay_h) / total_scheduled_h * 100, 1) if total_scheduled_h > 0 else None
+		ma = round(operating_h / (operating_h + maintenance_h) * 100, 1) if (operating_h + maintenance_h) > 0 else None
+		u = round(operating_h / total_scheduled_h * 100, 1) if total_scheduled_h > 0 else None
+		return {
+			"tenant_id": self.tenant_id,
+			"equipment_id": equipment_id,
+			"period": period,
+			"shifts_analysed": len(shifts),
+			"scheduled_hours": round(total_scheduled_h, 1),
+			"operating_hours": round(operating_h, 1),
+			"total_downtime_hours": round(total_delay_h, 1),
+			"mechanical_downtime_hours": round(maintenance_h, 1),
+			"physical_availability_pct": pa,
+			"mechanical_availability_pct": ma,
+			"utilisation_pct": u,
+			"jorc_compliant_pa_target": 85.0,
+			"pa_meets_target": pa >= 85.0 if pa is not None else None,
+			"as_at": datetime.utcnow().isoformat(),
+		}
+
+	async def reconcile_explosives(
+		self,
+		period: str,
+		magazine_id: str,
+		magazine_issues: dict[str, float],
+	) -> dict[str, Any]:
+		"""
+		Explosives consumption reconciliation against blast plans (I9).
+		magazine_issues: dict of explosive_type → kg_issued, e.g. {"ANFO_kg": 1500.0, "booster_kg": 30.0}
+		Compares magazine issues to sum of blast_plan quantities for the period.
+		Flags any per-type variance > 2 kg to compliance officer.
+		period: YYYY-MM
+		"""
+		assert magazine_id, "magazine_id required"
+		assert period and len(period) == 7, "period must be YYYY-MM"
+		assert magazine_issues, "magazine_issues must not be empty"
+		# Sum blast plan quantities for the period
+		period_plans = [
+			r for r in self._blast_plans.values()
+			if r["tenant_id"] == self.tenant_id and r.get("blast_date", "")[:7] == period
+		]
+		plan_totals: dict[str, float] = {}
+		for plan in period_plans:
+			for exp_type, qty in plan.get("explosives_qty", {}).items():
+				plan_totals[exp_type] = plan_totals.get(exp_type, 0.0) + qty
+		# Compute variance per type
+		all_types = set(magazine_issues.keys()) | set(plan_totals.keys())
+		variances = {}
+		compliance_flags = []
+		for exp_type in all_types:
+			issued = magazine_issues.get(exp_type, 0.0)
+			planned = plan_totals.get(exp_type, 0.0)
+			variance = round(issued - planned, 3)
+			breach = abs(variance) > 2.0
+			variances[exp_type] = {
+				"issued_kg": issued,
+				"planned_kg": planned,
+				"variance_kg": variance,
+				"compliance_breach": breach,
+			}
+			if breach:
+				compliance_flags.append(exp_type)
+				self._log_warn(
+					"Explosives reconciliation breach",
+					magazine_id=magazine_id,
+					exp_type=exp_type,
+					variance_kg=variance,
+				)
+		return {
+			"tenant_id": self.tenant_id,
+			"period": period,
+			"magazine_id": magazine_id,
+			"blast_plans_counted": len(period_plans),
+			"explosive_variances": variances,
+			"compliance_flags": compliance_flags,
+			"all_compliant": len(compliance_flags) == 0,
+			"as_at": datetime.utcnow().isoformat(),
+		}
+
 	# ── Auto-generated expansion methods ────────────────────────────────────────
 	async def export_records(self, format: str = "json") -> dict[str, Any]:
 		"""Export Records"""

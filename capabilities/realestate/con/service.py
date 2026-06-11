@@ -822,3 +822,488 @@ class ConService:
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ── Snagging ──────────────────────────────────────────────────────────────
+
+	async def create_snag_item(
+		self,
+		contract_id: str,
+		tenant_id: str,
+		title: str,
+		location: str,
+		trade: str,
+		severity: str = "minor",
+		description: str = "",
+		reported_by: str = "inspector",
+		evidence_ids: list[str] | None = None,
+		due_date: date | None = None,
+	) -> dict[str, Any]:
+		"""Create a snagging / defect item linked to a contract.
+
+		Severity must be one of: critical | major | minor | observation.
+		Trade identifies the responsible sub-trade (electrical, plumbing, finishes, etc.).
+		"""
+		assert contract_id and title and location and trade, \
+			"contract_id, title, location, trade required"
+		assert severity in ("critical", "major", "minor", "observation"), \
+			f"unsupported severity: {severity}"
+		from uuid6 import uuid7
+		snag_id = str(uuid7())
+		snag_ref = f"SNF-{snag_id[:8].upper()}"
+		# SLA resolution days by severity
+		sla_days: dict[str, int] = {"critical": 2, "major": 7, "minor": 14, "observation": 28}
+		resolve_by = (date.today() + timedelta(days=sla_days[severity])) if due_date is None else due_date
+		snag: dict[str, Any] = {
+			"id": snag_id,
+			"tenant_id": tenant_id,
+			"contract_id": contract_id,
+			"snag_ref": snag_ref,
+			"title": title,
+			"location": location,
+			"trade": trade,
+			"severity": severity,
+			"description": description,
+			"reported_by": reported_by,
+			"evidence_ids": evidence_ids or [],
+			"due_date": str(resolve_by),
+			"status": "open",
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("snags", []).append(snag)
+		self._log_operation("snag_created", snag_id, tenant_id)
+		return snag
+
+	async def resolve_snag_item(
+		self,
+		snag_id: str,
+		tenant_id: str,
+		resolution_notes: str,
+		resolved_by: str,
+		evidence_ids: list[str] | None = None,
+	) -> dict[str, Any] | None:
+		"""Mark a snag item as resolved, capturing resolution evidence."""
+		assert snag_id and resolution_notes and resolved_by, \
+			"snag_id, resolution_notes, resolved_by required"
+		for i, s in enumerate(self._store.get("snags", [])):
+			if s["id"] == snag_id and s["tenant_id"] == tenant_id:
+				s["status"] = "resolved"
+				s["resolution_notes"] = resolution_notes
+				s["resolved_by"] = resolved_by
+				s["resolved_at"] = datetime.utcnow().isoformat()
+				if evidence_ids:
+					s.setdefault("evidence_ids", []).extend(evidence_ids)
+				self._store["snags"][i] = s
+				self._log_operation("snag_resolved", snag_id, tenant_id)
+				return s
+		return None
+
+	async def get_snag_list(
+		self,
+		tenant_id: str,
+		contract_id: str | None = None,
+		status: str | None = None,
+		severity: str | None = None,
+		trade: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Return filtered snag list for a contract or tenant.
+
+		Supports filtering by status (open/resolved/disputed), severity, and trade.
+		"""
+		results = [s for s in self._store.get("snags", []) if s["tenant_id"] == tenant_id]
+		if contract_id:
+			results = [s for s in results if s.get("contract_id") == contract_id]
+		if status:
+			results = [s for s in results if s.get("status") == status]
+		if severity:
+			results = [s for s in results if s.get("severity") == severity]
+		if trade:
+			results = [s for s in results if s.get("trade") == trade]
+		return sorted(results, key=lambda x: x.get("due_date", ""))
+
+	async def get_snag_summary(self, tenant_id: str, contract_id: str) -> dict[str, Any]:
+		"""Return a snagging summary: counts by status and severity for a contract."""
+		snags = await self.get_snag_list(tenant_id, contract_id=contract_id)
+		by_status: dict[str, int] = {}
+		by_severity: dict[str, int] = {}
+		by_trade: dict[str, int] = {}
+		overdue_count = 0
+		today_str = str(date.today())
+		for s in snags:
+			st = s.get("status", "open")
+			sv = s.get("severity", "minor")
+			tr = s.get("trade", "unknown")
+			by_status[st] = by_status.get(st, 0) + 1
+			by_severity[sv] = by_severity.get(sv, 0) + 1
+			by_trade[tr] = by_trade.get(tr, 0) + 1
+			if st == "open" and s.get("due_date", "9999") < today_str:
+				overdue_count += 1
+		return {
+			"contract_id": contract_id,
+			"tenant_id": tenant_id,
+			"total_snags": len(snags),
+			"open_snags": by_status.get("open", 0),
+			"resolved_snags": by_status.get("resolved", 0),
+			"overdue_snags": overdue_count,
+			"by_status": by_status,
+			"by_severity": by_severity,
+			"by_trade": by_trade,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	# ── Payment Certificates ──────────────────────────────────────────────────
+
+	async def issue_payment_certificate(
+		self,
+		contract_id: str,
+		tenant_id: str,
+		period_end: date,
+		gross_value: Decimal,
+		variations_included: list[str],
+		certified_by: str,
+		retention_percentage: Decimal = Decimal("5"),
+		advance_payment_deduction: Decimal = Decimal("0"),
+	) -> dict[str, Any]:
+		"""Issue an interim payment certificate (IPC) for a construction contract.
+
+		Computes retention deduction and net certified amount.
+		Stores certificate and updates cumulative certified total on the contract.
+		"""
+		assert contract_id and certified_by, "contract_id and certified_by required"
+		assert gross_value >= 0, "gross_value must be non-negative"
+		assert 0 <= retention_percentage <= 100, "retention_percentage must be 0-100"
+		from uuid6 import uuid7
+		cert_id = str(uuid7())
+		cert_ref = f"IPC-{cert_id[:8].upper()}"
+		retention_amount = (gross_value * retention_percentage / Decimal("100")).quantize(Decimal("0.01"))
+		net_certified = gross_value - retention_amount - advance_payment_deduction
+		cert: dict[str, Any] = {
+			"id": cert_id,
+			"tenant_id": tenant_id,
+			"contract_id": contract_id,
+			"cert_ref": cert_ref,
+			"period_end": str(period_end),
+			"gross_value": str(gross_value),
+			"retention_amount": str(retention_amount),
+			"advance_payment_deduction": str(advance_payment_deduction),
+			"net_certified": str(net_certified),
+			"variations_included": variations_included,
+			"certified_by": certified_by,
+			"status": "issued",
+			"issued_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("payment_certs", []).append(cert)
+		# accumulate on the contract record
+		for i, c in enumerate(self._store["contracts"]):
+			if c["id"] == contract_id and c["tenant_id"] == tenant_id:
+				prev = Decimal(str(c.get("total_certified", 0)))
+				c["total_certified"] = str(prev + gross_value)
+				c["updated_at"] = datetime.utcnow()
+				self._store["contracts"][i] = c
+				break
+		self._log_operation("payment_cert_issued", cert_id, tenant_id)
+		return cert
+
+	# ── Risk Register ─────────────────────────────────────────────────────────
+
+	async def register_risk(
+		self,
+		contract_id: str,
+		tenant_id: str,
+		title: str,
+		category: str,
+		probability: float,
+		impact_cost: Decimal,
+		impact_days: int,
+		owner: str,
+		mitigation_action: str = "",
+		risk_type: str = "project",
+	) -> dict[str, Any]:
+		"""Add a risk item to the project risk register.
+
+		Probability must be 0.0–1.0. Category: ground_conditions | supply_chain |
+		regulatory | weather | design | contractor_default | force_majeure | other.
+		risk_type: project | programme | commercial | health_safety | environmental.
+		"""
+		assert contract_id and title and owner, "contract_id, title, owner required"
+		assert 0.0 <= probability <= 1.0, "probability must be 0.0-1.0"
+		assert impact_cost >= 0 and impact_days >= 0, "impact_cost and impact_days must be non-negative"
+		from uuid6 import uuid7
+		risk_id = str(uuid7())
+		expected_value = (Decimal(str(probability)) * impact_cost).quantize(Decimal("0.01"))
+		# risk score on 1-25 scale (probability bands × impact bands)
+		prob_band = min(5, max(1, int(probability * 5) + 1))
+		impact_band = min(5, max(1, int(float(impact_cost) / 500_000) + 1))
+		risk_score = prob_band * impact_band
+		risk: dict[str, Any] = {
+			"id": risk_id,
+			"tenant_id": tenant_id,
+			"contract_id": contract_id,
+			"title": title,
+			"category": category,
+			"risk_type": risk_type,
+			"probability": probability,
+			"impact_cost": str(impact_cost),
+			"impact_days": impact_days,
+			"expected_value": str(expected_value),
+			"risk_score": risk_score,
+			"owner": owner,
+			"mitigation_action": mitigation_action,
+			"status": "open",
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("risks", []).append(risk)
+		self._log_operation("risk_registered", risk_id, tenant_id)
+		return risk
+
+	async def get_risk_register(
+		self,
+		tenant_id: str,
+		contract_id: str | None = None,
+		status: str | None = None,
+		min_risk_score: int | None = None,
+	) -> list[dict[str, Any]]:
+		"""Return risk register items, sorted by risk score descending.
+
+		Supports filtering by contract, status (open/mitigated/closed), and minimum risk score.
+		"""
+		results = [r for r in self._store.get("risks", []) if r["tenant_id"] == tenant_id]
+		if contract_id:
+			results = [r for r in results if r.get("contract_id") == contract_id]
+		if status:
+			results = [r for r in results if r.get("status") == status]
+		if min_risk_score is not None:
+			results = [r for r in results if r.get("risk_score", 0) >= min_risk_score]
+		return sorted(results, key=lambda x: x.get("risk_score", 0), reverse=True)
+
+	# ── Drawing Register ──────────────────────────────────────────────────────
+
+	async def register_drawing(
+		self,
+		contract_id: str,
+		tenant_id: str,
+		drawing_number: str,
+		revision: str,
+		title: str,
+		discipline: str,
+		document_id: str,
+		drawn_by: str,
+		scale: str = "1:100",
+	) -> dict[str, Any]:
+		"""Register a drawing revision in the project drawing register.
+
+		Automatically supersedes previous revisions of the same drawing number.
+		discipline: architectural | structural | mechanical | electrical | civil | landscape.
+		"""
+		assert contract_id and drawing_number and revision and title and discipline and document_id, \
+			"contract_id, drawing_number, revision, title, discipline, document_id required"
+		from uuid6 import uuid7
+		drawing_id = str(uuid7())
+		# supersede previous revisions for this drawing number
+		superseded_by = drawing_id
+		for i, d in enumerate(self._store.get("drawings", [])):
+			if (d.get("contract_id") == contract_id
+					and d.get("drawing_number") == drawing_number
+					and d.get("tenant_id") == tenant_id
+					and d.get("status") == "current"):
+				self._store["drawings"][i]["status"] = "superseded"
+				self._store["drawings"][i]["superseded_by"] = superseded_by
+				self._store["drawings"][i]["superseded_at"] = datetime.utcnow().isoformat()
+		drawing: dict[str, Any] = {
+			"id": drawing_id,
+			"tenant_id": tenant_id,
+			"contract_id": contract_id,
+			"drawing_number": drawing_number,
+			"revision": revision,
+			"title": title,
+			"discipline": discipline,
+			"document_id": document_id,
+			"drawn_by": drawn_by,
+			"scale": scale,
+			"status": "current",
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("drawings", []).append(drawing)
+		self._log_operation("drawing_registered", drawing_id, tenant_id)
+		return drawing
+
+	async def get_current_drawing_set(
+		self,
+		tenant_id: str,
+		contract_id: str,
+		discipline: str | None = None,
+	) -> list[dict[str, Any]]:
+		"""Return only the current (non-superseded) revision of each drawing for a contract.
+
+		Optionally filter by discipline.
+		"""
+		results = [
+			d for d in self._store.get("drawings", [])
+			if d["tenant_id"] == tenant_id
+			and d.get("contract_id") == contract_id
+			and d.get("status") == "current"
+		]
+		if discipline:
+			results = [d for d in results if d.get("discipline") == discipline]
+		return sorted(results, key=lambda x: (x.get("discipline", ""), x.get("drawing_number", "")))
+
+	# ── Practical Completion ──────────────────────────────────────────────────
+
+	async def issue_practical_completion_certificate(
+		self,
+		contract_id: str,
+		tenant_id: str,
+		issued_by: str,
+		dlp_months: int = 12,
+		outstanding_snags_allowed: int = 0,
+		commissioning_complete: bool = True,
+		o_and_m_manuals_received: bool = True,
+		notes: str = "",
+	) -> dict[str, Any]:
+		"""Issue a Practical Completion (PC) certificate after validating snag and commissioning status.
+
+		Validates that outstanding snag count is within the allowed threshold.
+		Sets DLP start date and computes DLP end date. Updates contract status to completed.
+		Raises ValueError if validation conditions are not met.
+		"""
+		assert contract_id and issued_by, "contract_id and issued_by required"
+		assert dlp_months > 0, "dlp_months must be positive"
+		assert outstanding_snags_allowed >= 0, "outstanding_snags_allowed must be non-negative"
+		# validate outstanding snags
+		snag_summary = await self.get_snag_summary(tenant_id, contract_id)
+		open_snags = snag_summary.get("open_snags", 0)
+		if open_snags > outstanding_snags_allowed:
+			raise ValueError(
+				f"practical_completion_blocked: {open_snags} open snags, "
+				f"threshold is {outstanding_snags_allowed}"
+			)
+		if not commissioning_complete:
+			raise ValueError("practical_completion_blocked: commissioning not complete")
+		from uuid6 import uuid7
+		pc_id = str(uuid7())
+		pc_ref = f"PC-{pc_id[:8].upper()}"
+		dlp_start = date.today()
+		dlp_end = date(
+			dlp_start.year + (dlp_start.month + dlp_months - 1) // 12,
+			((dlp_start.month + dlp_months - 1) % 12) + 1,
+			dlp_start.day,
+		)
+		pc_cert: dict[str, Any] = {
+			"id": pc_id,
+			"tenant_id": tenant_id,
+			"contract_id": contract_id,
+			"cert_ref": pc_ref,
+			"issued_by": issued_by,
+			"issued_date": str(dlp_start),
+			"dlp_start": str(dlp_start),
+			"dlp_end": str(dlp_end),
+			"dlp_months": dlp_months,
+			"open_snags_at_issue": open_snags,
+			"commissioning_complete": commissioning_complete,
+			"o_and_m_manuals_received": o_and_m_manuals_received,
+			"notes": notes,
+			"status": "issued",
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("pc_certs", []).append(pc_cert)
+		# update contract
+		for i, c in enumerate(self._store["contracts"]):
+			if c["id"] == contract_id and c["tenant_id"] == tenant_id:
+				c["status"] = ContractStatus.completed.value
+				c["defects_liability_end"] = str(dlp_end)
+				c["pc_cert_ref"] = pc_ref
+				c["updated_at"] = datetime.utcnow()
+				self._store["contracts"][i] = c
+				break
+		self._log_operation("pc_cert_issued", pc_id, tenant_id)
+		return pc_cert
+
+	# ── Extension of Time ─────────────────────────────────────────────────────
+
+	async def submit_extension_of_time(
+		self,
+		contract_id: str,
+		tenant_id: str,
+		days_claimed: int,
+		cause: str,
+		cause_category: str,
+		submitted_by: str,
+		supporting_evidence_ids: list[str] | None = None,
+		affected_milestone_ids: list[str] | None = None,
+		delay_description: str = "",
+	) -> dict[str, Any]:
+		"""Submit an Extension of Time (EOT) claim against a construction contract.
+
+		cause_category: employer_risk | neutral_risk | force_majeure | contractor_risk.
+		Employer risk and neutral risk categories are eligible for EOT; contractor risk is not.
+		"""
+		assert contract_id and cause and submitted_by, \
+			"contract_id, cause, submitted_by required"
+		assert days_claimed > 0, "days_claimed must be positive"
+		eligible_categories = ("employer_risk", "neutral_risk", "force_majeure")
+		assert cause_category in ("employer_risk", "neutral_risk", "force_majeure", "contractor_risk"), \
+			f"unsupported cause_category: {cause_category}"
+		from uuid6 import uuid7
+		eot_id = str(uuid7())
+		eot_ref = f"EOT-{eot_id[:8].upper()}"
+		eligible = cause_category in eligible_categories
+		eot: dict[str, Any] = {
+			"id": eot_id,
+			"tenant_id": tenant_id,
+			"contract_id": contract_id,
+			"eot_ref": eot_ref,
+			"days_claimed": days_claimed,
+			"cause": cause,
+			"cause_category": cause_category,
+			"eligible_for_eot": eligible,
+			"submitted_by": submitted_by,
+			"supporting_evidence_ids": supporting_evidence_ids or [],
+			"affected_milestone_ids": affected_milestone_ids or [],
+			"delay_description": delay_description,
+			"status": "submitted",
+			"days_awarded": 0,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self._store.setdefault("eot_claims", []).append(eot)
+		if not eligible:
+			log.warning("con.eot_ineligible contract=%s category=%s", contract_id, cause_category)
+		self._log_operation("eot_submitted", eot_id, tenant_id)
+		return eot
+
+	async def assess_extension_of_time(
+		self,
+		eot_id: str,
+		tenant_id: str,
+		days_awarded: int,
+		assessed_by: str,
+		assessment_notes: str = "",
+	) -> dict[str, Any] | None:
+		"""Assess and grant (or reject) an EOT claim.
+
+		Extends affected milestone due dates by days_awarded when granted.
+		"""
+		assert eot_id and assessed_by, "eot_id and assessed_by required"
+		assert days_awarded >= 0, "days_awarded must be non-negative"
+		for i, e in enumerate(self._store.get("eot_claims", [])):
+			if e["id"] == eot_id and e["tenant_id"] == tenant_id:
+				status = "granted" if days_awarded > 0 else "rejected"
+				e["days_awarded"] = days_awarded
+				e["assessed_by"] = assessed_by
+				e["assessment_notes"] = assessment_notes
+				e["status"] = status
+				e["assessed_at"] = datetime.utcnow().isoformat()
+				self._store["eot_claims"][i] = e
+				# extend affected milestones
+				if days_awarded > 0:
+					for mid in e.get("affected_milestone_ids", []):
+						for j, m in enumerate(self._store["milestones"]):
+							if m["id"] == mid and m["tenant_id"] == tenant_id and m["status"] == "pending":
+								try:
+									old_due = datetime.strptime(m["due_date"], "%Y-%m-%d").date()
+									m["due_date"] = str(old_due + timedelta(days=days_awarded))
+									m["eot_applied"] = eot_id
+									self._store["milestones"][j] = m
+								except Exception as _exc:
+									_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+				self._log_operation("eot_assessed", eot_id, tenant_id)
+				return e
+		return None
+

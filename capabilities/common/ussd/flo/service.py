@@ -1003,3 +1003,832 @@ class UssdFloService:
 		tenant = self._tenant(tenant_id)
 		events = [deepcopy(e) for e in self._audit_events if e["tenant_id"] == tenant]
 		return events[-limit:]
+
+	# ── Session simulation ────────────────────────────────────────────────────
+
+	async def simulate_session(
+		self,
+		flow_id: str,
+		script: list[str],
+		tenant_id: str | None = None,
+		language: str = "en",
+		context_seed: dict[str, Any] | None = None,
+		expected_terminal_node: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Dry-run a scripted USSD conversation against a flow without deploying.
+
+		Walk the flow graph node-by-node, feeding items from *script* as
+		successive user inputs.  Each step renders the current node (with
+		translation), evaluates outgoing edges with the accumulated context,
+		and advances to the matched target.
+
+		Returns a full SessionTrace: every screen rendered, every edge taken,
+		every context variable accumulated, plus a pass/fail verdict against
+		*expected_terminal_node* if provided.
+
+		Args:
+			flow_id: The flow to simulate.
+			script: Ordered list of user inputs, one per interaction step.
+			language: BCP-47 language code used for rendering.
+			context_seed: Initial context variables (e.g. subscriber info).
+			expected_terminal_node: If given, the trace fails when the session
+				terminates at a different node.
+
+		Returns:
+			Trace dict with keys: flow_id, steps, terminal_node_id, passed,
+			failure_reason, simulated_at.
+		"""
+		tenant = self._tenant(tenant_id)
+		flow = self.flows.get(flow_id)
+		if not flow or flow["tenant_id"] != tenant:
+			raise KeyError(f"flow_not_found: {flow_id}")
+
+		context: dict[str, Any] = deepcopy(context_seed or {})
+		steps: list[dict[str, Any]] = []
+		current_node_id = flow["root_node_id"]
+		script_idx = 0
+		max_steps = min(len(script) + 1, MAX_NODES_PER_FLOW)
+		terminal_node_id: str | None = None
+		failure_reason: str | None = None
+
+		for _ in range(max_steps):
+			node_key = self._flow_node_key(flow_id, current_node_id)
+			node = self.nodes.get(node_key)
+			if not node:
+				failure_reason = f"node_not_found_during_sim: {current_node_id}"
+				break
+
+			# Render with translation
+			rendered = await self.render_node_translated(
+				flow_id, current_node_id, language, tenant_id, variables=context
+			)
+
+			# Capture user input if any remains in script
+			user_input: str | None = None
+			if script_idx < len(script):
+				user_input = script[script_idx]
+				script_idx += 1
+				# Store input under conventional key for condition evaluation
+				context["user_input"] = user_input
+				context[f"input_{current_node_id}"] = user_input
+				# If it's an input node, store under node_id key too
+				if node["node_type"] == "input":
+					context[current_node_id] = user_input
+
+			steps.append({
+				"step": len(steps) + 1,
+				"node_id": current_node_id,
+				"node_type": node["node_type"],
+				"rendered_title": rendered["title"],
+				"rendered_body": rendered["body"],
+				"user_input": user_input,
+				"context_snapshot": deepcopy(context),
+			})
+
+			if node["node_type"] == "end":
+				terminal_node_id = current_node_id
+				break
+
+			# Resolve next node
+			resolution = await self.resolve_next_node(
+				flow_id, current_node_id, context, tenant_id
+			)
+			if not resolution["target_node"]:
+				failure_reason = f"no_edge_matched_at: {current_node_id}"
+				terminal_node_id = current_node_id
+				break
+
+			current_node_id = resolution["target_node"]["node_id"]
+
+		# Assess verdict
+		passed = True
+		if failure_reason:
+			passed = False
+		elif expected_terminal_node and terminal_node_id != expected_terminal_node:
+			passed = False
+			failure_reason = (
+				f"expected terminal={expected_terminal_node}, "
+				f"got={terminal_node_id}"
+			)
+
+		_log.info(
+			"simulate_session flow=%s steps=%d passed=%s tenant=%s",
+			flow_id, len(steps), passed, tenant,
+		)
+		return {
+			"flow_id": flow_id,
+			"language": language,
+			"steps": steps,
+			"terminal_node_id": terminal_node_id,
+			"expected_terminal_node": expected_terminal_node,
+			"passed": passed,
+			"failure_reason": failure_reason,
+			"simulated_at": self._now(),
+		}
+
+	# ── Flow scoring ──────────────────────────────────────────────────────────
+
+	async def score_flow(self, flow_id: str, tenant_id: str | None = None) -> dict[str, Any]:
+		"""
+		Compute a usability scorecard for a flow.
+
+		Metrics:
+		- avg_path_depth / max_path_depth: mean and max hops from root to any
+		  end node via BFS on the unweighted graph.
+		- cyclomatic_complexity: E - N + 2 (McCabe).
+		- avg_branching_factor: average outgoing edge count across menu nodes.
+		- estimated_session_seconds: avg_path_depth * 10 (10 s/node heuristic).
+		- usability_score: 0-100 composite with penalties for depth > 5,
+		  cyclomatic complexity > 20, branching factor > 8.
+
+		Returns:
+			FlowScorecard dict.
+		"""
+		tenant = self._tenant(tenant_id)
+		flow = self.flows.get(flow_id)
+		if not flow or flow["tenant_id"] != tenant:
+			raise KeyError(f"flow_not_found: {flow_id}")
+
+		# Build adjacency list
+		adj: dict[str, list[str]] = {}
+		for e in self.edges.values():
+			if e["flow_id"] != flow_id:
+				continue
+			adj.setdefault(e["source_node_id"], []).append(e["target_node_id"])
+
+		flow_nodes = {
+			k.split(":", 1)[1]: v
+			for k, v in self.nodes.items()
+			if k.startswith(f"{flow_id}:")
+		}
+		end_nodes = {nid for nid, n in flow_nodes.items() if n["node_type"] == "end"}
+
+		# BFS from root to all end nodes — collect path depths
+		root = flow["root_node_id"]
+		from collections import deque
+		depth_map: dict[str, int] = {root: 0}
+		q: deque[str] = deque([root])
+		while q:
+			nid = q.popleft()
+			for nbr in adj.get(nid, []):
+				if nbr not in depth_map:
+					depth_map[nbr] = depth_map[nid] + 1
+					q.append(nbr)
+
+		end_depths = [depth_map[n] for n in end_nodes if n in depth_map]
+		avg_path_depth = sum(end_depths) / len(end_depths) if end_depths else 0.0
+		max_path_depth = max(end_depths) if end_depths else 0
+
+		# Cyclomatic complexity: E - N + 2
+		n_edges = sum(1 for e in self.edges.values() if e["flow_id"] == flow_id)
+		n_nodes = len(flow_nodes)
+		cyclomatic = n_edges - n_nodes + 2
+
+		# Branching factor from menu nodes
+		menu_out = [
+			len(adj.get(nid, []))
+			for nid, n in flow_nodes.items()
+			if n["node_type"] == "menu"
+		]
+		avg_branching = sum(menu_out) / len(menu_out) if menu_out else 0.0
+
+		estimated_session_seconds = avg_path_depth * 10
+
+		# Usability score
+		score = 100.0
+		if avg_path_depth > 5:
+			score -= min(30, (avg_path_depth - 5) * 6)
+		if cyclomatic > 20:
+			score -= min(20, (cyclomatic - 20) * 1)
+		if avg_branching > 8:
+			score -= min(15, (avg_branching - 8) * 3)
+		if n_nodes == 0:
+			score = 0.0
+		score = max(0.0, round(score, 1))
+
+		return {
+			"flow_id": flow_id,
+			"node_count": n_nodes,
+			"edge_count": n_edges,
+			"avg_path_depth": round(avg_path_depth, 2),
+			"max_path_depth": max_path_depth,
+			"cyclomatic_complexity": cyclomatic,
+			"avg_branching_factor": round(avg_branching, 2),
+			"estimated_session_seconds": round(estimated_session_seconds, 1),
+			"usability_score": score,
+			"scored_at": self._now(),
+		}
+
+	# ── Translation completeness ──────────────────────────────────────────────
+
+	async def check_translation_completeness(
+		self,
+		flow_id: str,
+		language: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Report missing translation keys for a given language.
+
+		For each node in the flow, check that title, body, and all item labels
+		are present in the translation dict.  Returns a per-node coverage
+		breakdown and an overall coverage percentage.
+
+		Args:
+			flow_id: Target flow.
+			language: BCP-47 code to check (e.g. 'sw', 'fr').
+
+		Returns:
+			TranslationCoverageReport with keys: flow_id, language,
+			coverage_pct, missing, node_reports.
+		"""
+		tenant = self._tenant(tenant_id)
+		flow = self.flows.get(flow_id)
+		if not flow or flow["tenant_id"] != tenant:
+			raise KeyError(f"flow_not_found: {flow_id}")
+		guard_non_empty_string(language, "language")
+
+		trans_key = f"{flow_id}:{language}"
+		trans_record = self.translations.get(trans_key, {})
+		trans_map: dict[str, dict[str, str]] = trans_record.get("translations", {})
+
+		flow_nodes = [
+			v for k, v in self.nodes.items() if k.startswith(f"{flow_id}:")
+		]
+
+		total_keys = 0
+		missing_keys = 0
+		missing: list[dict[str, Any]] = []
+		node_reports: list[dict[str, Any]] = []
+
+		for node in flow_nodes:
+			nid = node["node_id"]
+			node_trans = trans_map.get(nid, {})
+			node_missing: list[str] = []
+
+			# title
+			total_keys += 1
+			if not node_trans.get("title"):
+				missing_keys += 1
+				node_missing.append("title")
+
+			# body (only if non-empty in source)
+			if node.get("body"):
+				total_keys += 1
+				if not node_trans.get("body"):
+					missing_keys += 1
+					node_missing.append("body")
+
+			# item labels
+			for idx in range(len(node.get("items", []))):
+				total_keys += 1
+				label_key = str(idx)
+				item_labels = node_trans.get("item_labels", {})
+				if not item_labels.get(label_key):
+					missing_keys += 1
+					node_missing.append(f"item_labels[{label_key}]")
+
+			if node_missing:
+				missing.append({"node_id": nid, "missing_keys": node_missing})
+
+			node_reports.append({
+				"node_id": nid,
+				"node_type": node["node_type"],
+				"missing": node_missing,
+				"complete": len(node_missing) == 0,
+			})
+
+		coverage_pct = (
+			round((total_keys - missing_keys) / total_keys * 100, 1)
+			if total_keys else 100.0
+		)
+
+		return {
+			"flow_id": flow_id,
+			"language": language,
+			"total_keys": total_keys,
+			"missing_keys": missing_keys,
+			"coverage_pct": coverage_pct,
+			"missing": missing,
+			"node_reports": node_reports,
+			"checked_at": self._now(),
+		}
+
+	# ── Screen budget validation ───────────────────────────────────────────────
+
+	async def validate_screen_budgets(
+		self,
+		flow_id: str,
+		tenant_id: str | None = None,
+		budget: int = 182,
+	) -> dict[str, Any]:
+		"""
+		Check that every node's rendered content fits within the USSD character budget.
+
+		Most networks (MTN, Safaricom) truncate USSD pages at 182 bytes.
+		This method renders each node in each registered language and flags
+		content that would be silently cut by the network layer.
+
+		Args:
+			flow_id: Target flow.
+			budget: Maximum bytes per screen (default 182, UTF-8 encoded).
+
+		Returns:
+			ScreenBudgetReport with over-budget nodes per language.
+		"""
+		tenant = self._tenant(tenant_id)
+		flow = self.flows.get(flow_id)
+		if not flow or flow["tenant_id"] != tenant:
+			raise KeyError(f"flow_not_found: {flow_id}")
+		if budget < 1:
+			raise ValueError("budget must be >= 1")
+
+		languages = flow.get("languages", ["en"])
+		violations: list[dict[str, Any]] = []
+		checks_total = 0
+
+		for language in languages:
+			for k, node in self.nodes.items():
+				if not k.startswith(f"{flow_id}:"):
+					continue
+				nid = node["node_id"]
+				rendered = await self.render_node_translated(
+					flow_id, nid, language, tenant_id
+				)
+				# Build the full USSD page string (title + newline + body + items)
+				page_parts = [rendered["title"]]
+				if rendered["body"]:
+					page_parts.append(rendered["body"])
+				for idx, item in enumerate(rendered.get("items", []), 1):
+					page_parts.append(f"{idx}. {item.get('label', '')}")
+				page_text = "\n".join(page_parts)
+				byte_len = len(page_text.encode("utf-8"))
+				checks_total += 1
+				if byte_len > budget:
+					violations.append({
+						"node_id": nid,
+						"language": language,
+						"byte_length": byte_len,
+						"budget": budget,
+						"overflow": byte_len - budget,
+						"preview": page_text[:80] + ("..." if len(page_text) > 80 else ""),
+					})
+
+		return {
+			"flow_id": flow_id,
+			"budget": budget,
+			"languages_checked": languages,
+			"nodes_checked": checks_total,
+			"violations": violations,
+			"violation_count": len(violations),
+			"passed": len(violations) == 0,
+			"validated_at": self._now(),
+		}
+
+	# ── Flow diff ─────────────────────────────────────────────────────────────
+
+	async def diff_flow_versions(
+		self,
+		flow_id: str,
+		version_id_a: str,
+		version_id_b: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Compute a structural diff between two flow snapshots.
+
+		Compares node sets and edge sets by their logical IDs (node_id,
+		source+target pair).  Does NOT require version_id_b to be newer than
+		version_id_a — the diff is directional: a → b.
+
+		Returns:
+			FlowDiff with added_nodes, removed_nodes, modified_nodes,
+			added_edges, removed_edges.
+		"""
+		tenant = self._tenant(tenant_id)
+		flow = self.flows.get(flow_id)
+		if not flow or flow["tenant_id"] != tenant:
+			raise KeyError(f"flow_not_found: {flow_id}")
+
+		versions = self.flow_versions.get(flow_id, [])
+		ver_a = next((v for v in versions if v["version_id"] == version_id_a), None)
+		ver_b = next((v for v in versions if v["version_id"] == version_id_b), None)
+		if not ver_a:
+			raise KeyError(f"version_not_found: {version_id_a}")
+		if not ver_b:
+			raise KeyError(f"version_not_found: {version_id_b}")
+
+		# Index nodes by node_id
+		nodes_a = {n["node_id"]: n for n in ver_a["nodes"]}
+		nodes_b = {n["node_id"]: n for n in ver_b["nodes"]}
+
+		added_nodes = [deepcopy(nodes_b[nid]) for nid in nodes_b if nid not in nodes_a]
+		removed_nodes = [deepcopy(nodes_a[nid]) for nid in nodes_a if nid not in nodes_b]
+		modified_nodes: list[dict[str, Any]] = []
+		for nid in nodes_a:
+			if nid in nodes_b:
+				fields_changed: list[str] = []
+				for field in ("title", "body", "items", "node_type"):
+					if nodes_a[nid].get(field) != nodes_b[nid].get(field):
+						fields_changed.append(field)
+				if fields_changed:
+					modified_nodes.append({
+						"node_id": nid,
+						"fields_changed": fields_changed,
+						"before": {f: nodes_a[nid].get(f) for f in fields_changed},
+						"after": {f: nodes_b[nid].get(f) for f in fields_changed},
+					})
+
+		# Index edges by (source, target) pair
+		def edge_key(e: dict[str, Any]) -> str:
+			return f"{e['source_node_id']}→{e['target_node_id']}"
+
+		edges_a = {edge_key(e): e for e in ver_a["edges"]}
+		edges_b = {edge_key(e): e for e in ver_b["edges"]}
+
+		added_edges = [deepcopy(edges_b[k]) for k in edges_b if k not in edges_a]
+		removed_edges = [deepcopy(edges_a[k]) for k in edges_a if k not in edges_b]
+
+		return {
+			"flow_id": flow_id,
+			"version_a": version_id_a,
+			"version_b": version_id_b,
+			"added_nodes": added_nodes,
+			"removed_nodes": removed_nodes,
+			"modified_nodes": modified_nodes,
+			"added_edges": added_edges,
+			"removed_edges": removed_edges,
+			"summary": {
+				"nodes_added": len(added_nodes),
+				"nodes_removed": len(removed_nodes),
+				"nodes_modified": len(modified_nodes),
+				"edges_added": len(added_edges),
+				"edges_removed": len(removed_edges),
+			},
+			"diffed_at": self._now(),
+		}
+
+	# ── Bulk flow migration ───────────────────────────────────────────────────
+
+	async def migrate_service_code(
+		self,
+		old_code: str,
+		new_code: str,
+		tenant_id: str | None = None,
+		dry_run: bool = True,
+	) -> dict[str, Any]:
+		"""
+		Rename a USSD service code across all affected flows.
+
+		Scans all tenant flows for ``old_code`` in their ``service_code`` field
+		and node metadata.  In dry-run mode only reports; when ``dry_run=False``
+		snapshots every affected flow first, then applies the rename atomically.
+
+		Args:
+			old_code: The service code to replace (e.g. '*123#').
+			new_code: The replacement service code.
+			dry_run: When True (default) only report — do not mutate.
+
+		Returns:
+			MigrationReport with migration_id (only populated on live run),
+			affected_flows, dry_run flag, and per-flow details.
+		"""
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(old_code, "old_code")
+		guard_non_empty_string(new_code, "new_code")
+		if old_code == new_code:
+			raise ValueError("old_code and new_code must differ")
+
+		tenant_flows = [f for f in self.flows.values() if f["tenant_id"] == tenant]
+		affected: list[dict[str, Any]] = []
+
+		for flow in tenant_flows:
+			flow_touched = False
+			node_updates: list[str] = []
+
+			if flow["service_code"] == old_code:
+				flow_touched = True
+
+			# Check node metadata for service_code references
+			for nk, node in self.nodes.items():
+				if not nk.startswith(f"{flow['id']}:"):
+					continue
+				if node.get("metadata", {}).get("service_code") == old_code:
+					node_updates.append(node["node_id"])
+
+			if flow_touched or node_updates:
+				affected.append({
+					"flow_id": flow["id"],
+					"flow_name": flow["name"],
+					"service_code_changed": flow_touched,
+					"node_metadata_updated": node_updates,
+				})
+
+		migration_id: str | None = None
+
+		if not dry_run and affected:
+			migration_id = self._record_id("mig")
+			for entry in affected:
+				fid = entry["flow_id"]
+				# Auto-snapshot before mutation
+				await self.snapshot_flow(fid, f"pre-migration-{migration_id}", tenant_id)
+				# Apply mutation
+				if entry["service_code_changed"]:
+					self.flows[fid]["service_code"] = new_code
+					self.flows[fid]["updated_at"] = self._now()
+				for nid in entry["node_metadata_updated"]:
+					nk = self._flow_node_key(fid, nid)
+					if nk in self.nodes:
+						self.nodes[nk]["metadata"]["service_code"] = new_code
+						self.nodes[nk]["updated_at"] = self._now()
+
+			self._emit(
+				tenant, "service_code_migrated", migration_id, "ussd_flow",
+				{"old_code": old_code, "new_code": new_code, "flows_affected": len(affected)},
+			)
+			_log.info(
+				"migrate_service_code old=%s new=%s flows=%d tenant=%s",
+				old_code, new_code, len(affected), tenant,
+			)
+
+		return {
+			"migration_id": migration_id,
+			"old_code": old_code,
+			"new_code": new_code,
+			"dry_run": dry_run,
+			"affected_flows": len(affected),
+			"details": affected,
+			"generated_at": self._now(),
+		}
+
+	# ── Dead-path analysis ────────────────────────────────────────────────────
+
+	async def compute_dead_paths(
+		self,
+		flow_id: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Identify nodes that can never be reached or can never reach an end node.
+
+		A node is *forward-dead* if it is not reachable from the root.
+		A node is *backward-dead* if no end node is reachable from it.
+		A node is *fully-dead* if both conditions apply.
+
+		Returns:
+			DeadPathReport with forward_dead, backward_dead, fully_dead node
+			lists and suggested actions.
+		"""
+		tenant = self._tenant(tenant_id)
+		flow = self.flows.get(flow_id)
+		if not flow or flow["tenant_id"] != tenant:
+			raise KeyError(f"flow_not_found: {flow_id}")
+
+		all_node_ids = {
+			k.split(":", 1)[1]
+			for k in self.nodes
+			if k.startswith(f"{flow_id}:")
+		}
+		if not all_node_ids:
+			return {
+				"flow_id": flow_id,
+				"forward_dead": [],
+				"backward_dead": [],
+				"fully_dead": [],
+				"suggestions": [],
+				"analysed_at": self._now(),
+			}
+
+		# Forward reachability from root via BFS
+		forward_reachable = set(
+			await self.get_reachable_nodes(flow_id, flow["root_node_id"], tenant_id)
+		)
+		forward_dead = all_node_ids - forward_reachable
+
+		# Backward reachability: reverse graph BFS from end nodes
+		rev_adj: dict[str, list[str]] = {}
+		for e in self.edges.values():
+			if e["flow_id"] != flow_id:
+				continue
+			rev_adj.setdefault(e["target_node_id"], []).append(e["source_node_id"])
+
+		end_nodes = {
+			k.split(":", 1)[1]
+			for k, v in self.nodes.items()
+			if k.startswith(f"{flow_id}:") and v["node_type"] == "end"
+		}
+
+		backward_reachable: set[str] = set()
+		queue = list(end_nodes)
+		while queue:
+			nid = queue.pop(0)
+			if nid in backward_reachable:
+				continue
+			backward_reachable.add(nid)
+			queue.extend(n for n in rev_adj.get(nid, []) if n not in backward_reachable)
+
+		backward_dead = all_node_ids - backward_reachable
+		fully_dead = forward_dead & backward_dead
+
+		suggestions: list[str] = []
+		for nid in sorted(forward_dead):
+			suggestions.append(f"add_incoming_edge_to: {nid}")
+		for nid in sorted(backward_dead - forward_dead):
+			suggestions.append(f"add_path_to_end_from: {nid}")
+		for nid in sorted(fully_dead):
+			suggestions.append(f"safe_to_delete: {nid}")
+
+		return {
+			"flow_id": flow_id,
+			"forward_dead": sorted(forward_dead),
+			"backward_dead": sorted(backward_dead),
+			"fully_dead": sorted(fully_dead),
+			"suggestions": suggestions,
+			"analysed_at": self._now(),
+		}
+
+	# ── Session event recording ───────────────────────────────────────────────
+
+	async def record_session_event(
+		self,
+		session_id: str,
+		flow_id: str,
+		node_id: str,
+		user_input: str | None = None,
+		context_snapshot: dict[str, Any] | None = None,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Record a live session interaction event for later replay and debugging.
+
+		Events are stored in ``self.session_events`` keyed by *session_id*.
+		Each event captures the node visited, user input received, and a full
+		context snapshot so the exact session state can be reconstructed.
+
+		Args:
+			session_id: Unique identifier for the subscriber's session.
+			flow_id: The flow being executed.
+			node_id: The node displayed to the subscriber.
+			user_input: Raw user response (may be None for first display).
+			context_snapshot: Full session context at the moment of the event.
+
+		Returns:
+			The recorded session event dict.
+		"""
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(session_id, "session_id")
+		guard_non_empty_string(flow_id, "flow_id")
+		guard_non_empty_string(node_id, "node_id")
+
+		if not hasattr(self, "session_events"):
+			self.session_events: dict[str, list[dict[str, Any]]] = {}
+
+		event: dict[str, Any] = {
+			"id": self._record_id("se"),
+			"session_id": session_id,
+			"flow_id": flow_id,
+			"node_id": node_id,
+			"user_input": user_input,
+			"context_snapshot": deepcopy(context_snapshot or {}),
+			"tenant_id": tenant,
+			"recorded_at": self._now(),
+		}
+		self.session_events.setdefault(session_id, []).append(event)
+		return deepcopy(event)
+
+	async def replay_session(
+		self,
+		session_id: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Replay a recorded live session through the current flow graph.
+
+		Walks the stored session events and re-evaluates each routing decision
+		against the *current* flow graph.  Divergences (where the current graph
+		would have routed differently from what was observed) are flagged, making
+		it trivial to identify which flow change caused a subscriber complaint.
+
+		Args:
+			session_id: The session to replay.
+
+		Returns:
+			SessionReplayReport with steps, divergences, and verdict.
+		"""
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(session_id, "session_id")
+
+		if not hasattr(self, "session_events"):
+			self.session_events = {}
+
+		events = self.session_events.get(session_id, [])
+		if not events:
+			raise KeyError(f"session_not_found: {session_id}")
+
+		flow_id = events[0]["flow_id"]
+		flow = self.flows.get(flow_id)
+		if not flow or flow["tenant_id"] != tenant:
+			raise KeyError(f"flow_not_found: {flow_id}")
+
+		replay_steps: list[dict[str, Any]] = []
+		divergences: list[dict[str, Any]] = []
+		context: dict[str, Any] = {}
+
+		for i, event in enumerate(events):
+			current_node_id = event["node_id"]
+			user_input = event.get("user_input")
+
+			if user_input is not None:
+				context["user_input"] = user_input
+				context[f"input_{current_node_id}"] = user_input
+
+			# Determine what the *current* graph would route to
+			resolution = await self.resolve_next_node(
+				flow_id, current_node_id, context, tenant_id
+			)
+			current_next = (
+				resolution["target_node"]["node_id"]
+				if resolution["target_node"] else None
+			)
+
+			# What was actually observed
+			observed_next = events[i + 1]["node_id"] if i + 1 < len(events) else None
+
+			step: dict[str, Any] = {
+				"step": i + 1,
+				"node_id": current_node_id,
+				"user_input": user_input,
+				"observed_next": observed_next,
+				"replayed_next": current_next,
+				"diverged": current_next != observed_next,
+			}
+			replay_steps.append(step)
+
+			if step["diverged"]:
+				divergences.append({
+					"step": i + 1,
+					"node_id": current_node_id,
+					"observed_next": observed_next,
+					"replayed_next": current_next,
+				})
+
+		return {
+			"session_id": session_id,
+			"flow_id": flow_id,
+			"total_steps": len(replay_steps),
+			"divergences": divergences,
+			"divergence_count": len(divergences),
+			"clean_replay": len(divergences) == 0,
+			"steps": replay_steps,
+			"replayed_at": self._now(),
+		}
+
+	# ── Bulk edge operations ──────────────────────────────────────────────────
+
+	async def bulk_add_edges(
+		self,
+		flow_id: str,
+		edges: list[dict[str, Any]],
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Add multiple edges to a flow in a single call.
+
+		Mirrors ``bulk_add_nodes``.  Each entry in *edges* must contain at
+		minimum ``source_node_id`` and ``target_node_id``.  Optional fields:
+		``label``, ``condition``, ``priority``, ``metadata``.
+
+		Returns:
+			Summary dict with added count, failed count, edges list, errors list.
+		"""
+		tenant = self._tenant(tenant_id)
+		results: list[dict[str, Any]] = []
+		errors: list[dict[str, Any]] = []
+
+		tasks = [
+			self.add_edge(
+				flow_id=flow_id,
+				source_node_id=e["source_node_id"],
+				target_node_id=e["target_node_id"],
+				tenant_id=tenant,
+				label=e.get("label", ""),
+				condition=e.get("condition"),
+				priority=e.get("priority", 0),
+				metadata=e.get("metadata"),
+			)
+			for e in edges
+		]
+		raw = await asyncio.gather(*tasks, return_exceptions=True)
+		for e, r in zip(edges, raw):
+			if isinstance(r, Exception):
+				errors.append({"input": e, "error": str(r)})
+			else:
+				results.append(r)
+
+		return {
+			"added": len(results),
+			"failed": len(errors),
+			"edges": results,
+			"errors": errors,
+		}

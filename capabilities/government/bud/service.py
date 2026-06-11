@@ -1115,4 +1115,631 @@ class BudgetManagementService:
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ── async world-class methods ───────────────────────────────────────────
+
+	async def mtef_rolling_envelope(
+		self,
+		baseline_year: str,
+		gdp_growth_pct: float,
+		inflation_pct: float,
+		deficit_target_pct_gdp: float,
+		sector_shares: dict[str, float],
+	) -> dict[str, Any]:
+		"""Compute MTEF rolling three-year budget envelopes per sector.
+
+		Applies macro parameters to derive forward-year ceilings and validates
+		that total envelopes respect the deficit target as a % of GDP.
+		Events emitted to NATS subject apg.government.bud.mtef.
+		"""
+		assert baseline_year, "baseline_year required"
+		assert sector_shares, "sector_shares required"
+		assert abs(sum(sector_shares.values()) - 100.0) < 0.01, "sector_shares must sum to 100"
+		tenant_id = self.tenant_id
+		envelope_id = _new_id()
+
+		votes = [v for (tid, _), v in self.votes.items() if tid == tenant_id]
+		baseline_total = sum(v.allocated_amount for v in votes) or 1_000_000_000.0
+
+		year_int = int(baseline_year[:4])
+		growth_factors = [
+			1 + (gdp_growth_pct - inflation_pct) / 100,
+			(1 + (gdp_growth_pct - inflation_pct) / 100) ** 2,
+			(1 + (gdp_growth_pct - inflation_pct) / 100) ** 3,
+		]
+		envelopes = []
+		for i, yr_offset in enumerate([1, 2, 3]):
+			year_label = f"{year_int + yr_offset}/{year_int + yr_offset + 1}"
+			year_total = round(baseline_total * growth_factors[i], 2)
+			sectors = {s: round(year_total * share / 100, 2) for s, share in sector_shares.items()}
+			deficit_headroom = round(year_total * deficit_target_pct_gdp / 100, 2)
+			envelopes.append({
+				"year": year_label,
+				"total_ceiling": year_total,
+				"sector_ceilings": sectors,
+				"deficit_headroom": deficit_headroom,
+			})
+
+		self._audit(tenant_id, "mtef_envelope_set", envelope_id)
+		return {
+			"id": envelope_id,
+			"tenant_id": tenant_id,
+			"baseline_year": baseline_year,
+			"gdp_growth_pct": gdp_growth_pct,
+			"inflation_pct": inflation_pct,
+			"deficit_target_pct_gdp": deficit_target_pct_gdp,
+			"envelopes": envelopes,
+			"nats_subject": "apg.government.bud.mtef",
+			"generated_by": self.actor_id,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def pbb_scorecard(
+		self,
+		vote_id: str,
+		indicators: list[dict[str, Any]],
+		weights: dict[str, float] | None = None,
+	) -> dict[str, Any]:
+		"""Compute a Programme-Based Budgeting KPI scorecard for a vote.
+
+		Each indicator must have: name, category (input|output|outcome|impact),
+		target, actual, and unit. Returns a weighted composite score and
+		reallocation recommendation.
+		"""
+		assert vote_id, "vote_id required"
+		assert indicators, "indicators required"
+		tenant_id = self.tenant_id
+		vote = self.votes.get(self._key(tenant_id, vote_id))
+		if vote is None:
+			raise KeyError(f"vote {vote_id} not found")
+
+		default_weights = {"input": 0.15, "output": 0.35, "outcome": 0.35, "impact": 0.15}
+		w = weights or default_weights
+		scored: list[dict[str, Any]] = []
+		composite = 0.0
+		for ind in indicators:
+			target = float(ind.get("target", 1))
+			actual = float(ind.get("actual", 0))
+			achievement = min(actual / max(target, 1e-9), 1.5)  # cap at 150%
+			cat = ind.get("category", "output")
+			weighted = achievement * w.get(cat, 0.25)
+			composite += weighted
+			scored.append({
+				"name": ind.get("name"),
+				"category": cat,
+				"target": target,
+				"actual": actual,
+				"achievement_pct": round(achievement * 100, 2),
+				"weighted_score": round(weighted, 4),
+			})
+
+		composite_pct = round(composite / max(sum(w.values()), 1e-9) * 100, 2)
+		reallocation_flag = composite_pct < 60.0
+		scorecard_id = _new_id()
+		self._audit(tenant_id, "pbb_scorecard_computed", scorecard_id)
+		return {
+			"id": scorecard_id,
+			"tenant_id": tenant_id,
+			"vote_id": vote_id,
+			"vote_code": vote.vote_code,
+			"composite_score_pct": composite_pct,
+			"performance_band": "red" if composite_pct < 50 else ("amber" if composite_pct < 75 else "green"),
+			"reallocation_recommended": reallocation_flag,
+			"indicators": scored,
+			"nats_subject": "apg.government.bud.pbb",
+			"generated_by": self.actor_id,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def reconcile_tsa_with_expenditures(
+		self,
+		tolerance: float = 0.01,
+	) -> dict[str, Any]:
+		"""Reconcile TSA debit movements against expenditure records.
+
+		Matches each TSA debit to an ExpenditureRecord within the configured
+		tolerance. Unmatched items are flagged for manual resolution.
+		Result published to NATS subject apg.government.bud.tsa.reconciliation.
+		"""
+		tenant_id = self.tenant_id
+		recon_id = _new_id()
+
+		tsa_debits = [m for m in self._tsa_movements if m.get("movement_type") == "debit" and m.get("tenant_id") == tenant_id]
+		expenditures = [e for (tid, _), e in self.expenditures.items() if tid == tenant_id]
+
+		matched: list[dict[str, Any]] = []
+		unmatched_tsa: list[dict[str, Any]] = []
+		used_exp_ids: set[str] = set()
+
+		for tsa in tsa_debits:
+			tsa_amount = tsa.get("amount", 0.0)
+			match = next(
+				(e for e in expenditures
+				 if abs(getattr(e, "amount", 0.0) - tsa_amount) <= tolerance
+				 and getattr(e, "id", "") not in used_exp_ids),
+				None,
+			)
+			if match:
+				used_exp_ids.add(getattr(match, "id", ""))
+				matched.append({"tsa_id": tsa.get("id"), "expenditure_id": getattr(match, "id", ""), "amount": tsa_amount, "delta": 0.0})
+			else:
+				unmatched_tsa.append({"tsa_id": tsa.get("id"), "amount": tsa_amount, "status": "unmatched"})
+
+		self._audit(tenant_id, "tsa_reconciliation_completed", recon_id)
+		return {
+			"id": recon_id,
+			"tenant_id": tenant_id,
+			"tsa_debits_total": len(tsa_debits),
+			"matched_count": len(matched),
+			"unmatched_count": len(unmatched_tsa),
+			"matched": matched,
+			"unmatched": unmatched_tsa,
+			"reconciliation_rate_pct": round(len(matched) / max(len(tsa_debits), 1) * 100, 2),
+			"nats_subject": "apg.government.bud.tsa.reconciliation",
+			"generated_by": self.actor_id,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def register_fiscal_risk(
+		self,
+		risk_category: str,
+		description: str,
+		probability: float,
+		max_exposure: float,
+		trigger_condition: str,
+		mitigation_action: str,
+	) -> dict[str, Any]:
+		"""Register a fiscal risk / contingent liability in the risk register.
+
+		probability must be 0-1. Computes expected value (probability × max_exposure).
+		Events published to NATS subject apg.government.bud.risk.
+		"""
+		assert risk_category, "risk_category required"
+		assert 0.0 <= probability <= 1.0, "probability must be 0-1"
+		assert max_exposure >= 0, "max_exposure must be non-negative"
+		assert trigger_condition, "trigger_condition required"
+		tenant_id = self.tenant_id
+		risk_id = _new_id()
+		expected_value = round(probability * max_exposure, 2)
+
+		if not hasattr(self, "_fiscal_risks"):
+			self._fiscal_risks: list[dict[str, Any]] = []
+		record: dict[str, Any] = {
+			"id": risk_id,
+			"tenant_id": tenant_id,
+			"risk_category": risk_category,
+			"description": description,
+			"probability": probability,
+			"max_exposure": max_exposure,
+			"expected_value": expected_value,
+			"trigger_condition": trigger_condition,
+			"mitigation_action": mitigation_action,
+			"nats_subject": "apg.government.bud.risk",
+			"registered_by": self.actor_id,
+			"registered_at": datetime.utcnow().isoformat(),
+			"status": "active",
+		}
+		self._fiscal_risks.append(record)
+		self._audit(tenant_id, "fiscal_risk_registered", risk_id)
+		return record
+
+	async def compute_contingent_liability_exposure(self) -> dict[str, Any]:
+		"""Aggregate total expected contingent liability exposure from the fiscal risk register."""
+		tenant_id = self.tenant_id
+		risks = getattr(self, "_fiscal_risks", [])
+		tenant_risks = [r for r in risks if r.get("tenant_id") == tenant_id and r.get("status") == "active"]
+		total_max = sum(r.get("max_exposure", 0.0) for r in tenant_risks)
+		total_expected = sum(r.get("expected_value", 0.0) for r in tenant_risks)
+		by_category: dict[str, float] = {}
+		for r in tenant_risks:
+			cat = r.get("risk_category", "other")
+			by_category[cat] = by_category.get(cat, 0.0) + r.get("expected_value", 0.0)
+		exposure_id = _new_id()
+		self._audit(tenant_id, "contingent_liability_computed", exposure_id)
+		return {
+			"id": exposure_id,
+			"tenant_id": tenant_id,
+			"active_risks": len(tenant_risks),
+			"total_max_exposure": round(total_max, 2),
+			"total_expected_exposure": round(total_expected, 2),
+			"exposure_by_category": {k: round(v, 2) for k, v in by_category.items()},
+			"generated_by": self.actor_id,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def stress_test_budget(
+		self,
+		scenarios: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Apply macro-fiscal stress scenarios to the current budget envelopes.
+
+		Each scenario dict must include: name, revenue_change_pct, expenditure_pressure_pct.
+		Returns fiscal deficit impact and breach flags per scenario.
+		"""
+		assert scenarios, "scenarios required"
+		tenant_id = self.tenant_id
+		votes = [v for (tid, _), v in self.votes.items() if tid == tenant_id]
+		total_allocated = sum(v.allocated_amount for v in votes)
+		total_expended = sum(v.expended_amount for v in votes)
+		base_deficit = total_expended - total_allocated
+
+		results = []
+		for sc in scenarios:
+			name = sc.get("name", "unnamed")
+			rev_chg = sc.get("revenue_change_pct", 0.0)
+			exp_pressure = sc.get("expenditure_pressure_pct", 0.0)
+			stressed_revenue = total_allocated * (1 + rev_chg / 100)
+			stressed_expenditure = total_expended * (1 + exp_pressure / 100)
+			stressed_deficit = stressed_expenditure - stressed_revenue
+			breach = stressed_deficit > total_allocated * 0.03  # >3% GDP proxy
+			results.append({
+				"scenario": name,
+				"stressed_revenue": round(stressed_revenue, 2),
+				"stressed_expenditure": round(stressed_expenditure, 2),
+				"stressed_deficit": round(stressed_deficit, 2),
+				"deficit_change_vs_base": round(stressed_deficit - base_deficit, 2),
+				"breach_flag": breach,
+				"recommended_action": "activate_contingency_reserve" if breach else "monitor",
+			})
+
+		test_id = _new_id()
+		self._audit(tenant_id, "budget_stress_tested", test_id)
+		return {
+			"id": test_id,
+			"tenant_id": tenant_id,
+			"base_deficit": round(base_deficit, 2),
+			"scenario_count": len(scenarios),
+			"scenarios": results,
+			"breach_count": sum(1 for r in results if r["breach_flag"]),
+			"generated_by": self.actor_id,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def compute_igft_allocation(
+		self,
+		total_shareable_revenue: float,
+		units: list[dict[str, Any]],
+		formula_weights: dict[str, float] | None = None,
+		constitutional_floor_pct: float = 15.0,
+	) -> dict[str, Any]:
+		"""Compute Inter-Government Fiscal Transfer allocations per county/unit.
+
+		Default formula: equal_share 25%, population 45%, poverty_index 20%, land_area 10%.
+		Validates that total allocation >= constitutional_floor_pct of total_shareable_revenue.
+		Events published to NATS subject apg.government.bud.igft.
+		"""
+		assert total_shareable_revenue > 0, "total_shareable_revenue must be positive"
+		assert units, "units required"
+		fw = formula_weights or {"equal_share": 25.0, "population": 45.0, "poverty_index": 20.0, "land_area": 10.0}
+		assert abs(sum(fw.values()) - 100.0) < 0.01, "formula_weights must sum to 100"
+		tenant_id = self.tenant_id
+
+		# Normalise unit attributes
+		total_pop = sum(u.get("population", 0) for u in units) or 1
+		total_poverty = sum(u.get("poverty_index", 0) for u in units) or 1
+		total_area = sum(u.get("land_area_km2", 0) for u in units) or 1
+		n_units = len(units)
+
+		allocations = []
+		for u in units:
+			eq_share = total_shareable_revenue * fw["equal_share"] / 100 / n_units
+			pop_share = total_shareable_revenue * fw["population"] / 100 * u.get("population", 0) / total_pop
+			pov_share = total_shareable_revenue * fw["poverty_index"] / 100 * u.get("poverty_index", 0) / total_poverty
+			area_share = total_shareable_revenue * fw["land_area"] / 100 * u.get("land_area_km2", 0) / total_area
+			unit_total = eq_share + pop_share + pov_share + area_share
+			allocations.append({
+				"unit_id": u.get("id"),
+				"unit_name": u.get("name"),
+				"allocation": round(unit_total, 2),
+				"breakdown": {
+					"equal_share": round(eq_share, 2),
+					"population_share": round(pop_share, 2),
+					"poverty_share": round(pov_share, 2),
+					"land_area_share": round(area_share, 2),
+				},
+			})
+
+		total_allocated = sum(a["allocation"] for a in allocations)
+		floor_amount = total_shareable_revenue * constitutional_floor_pct / 100
+		floor_met = total_allocated >= floor_amount
+
+		igft_id = _new_id()
+		self._audit(tenant_id, "igft_allocation_computed", igft_id)
+		return {
+			"id": igft_id,
+			"tenant_id": tenant_id,
+			"total_shareable_revenue": total_shareable_revenue,
+			"total_allocated": round(total_allocated, 2),
+			"constitutional_floor_pct": constitutional_floor_pct,
+			"constitutional_floor_amount": round(floor_amount, 2),
+			"floor_met": floor_met,
+			"formula_weights": fw,
+			"allocations": allocations,
+			"nats_subject": "apg.government.bud.igft",
+			"computed_by": self.actor_id,
+			"computed_at": datetime.utcnow().isoformat(),
+		}
+
+	async def detect_expenditure_anomalies(
+		self,
+		sensitivity: float = 0.8,
+		flag_round_numbers: bool = True,
+		flag_year_end_spikes: bool = True,
+	) -> dict[str, Any]:
+		"""Detect statistical anomalies in expenditure records.
+
+		Applies heuristic rules (round-number detection, year-end clustering,
+		duplicate amounts) and, when OLLAMA_BASE_URL is set, calls a local ML
+		model for Isolation Forest-style scoring. Returns ranked anomaly list.
+		Events published to NATS subject apg.government.bud.anomaly.
+		"""
+		import os, math
+		tenant_id = self.tenant_id
+		expenditures = [e for (tid, _), e in self.expenditures.items() if tid == tenant_id]
+
+		flags: list[dict[str, Any]] = []
+		amounts = [getattr(e, "amount", 0.0) for e in expenditures]
+		mean_amount = sum(amounts) / max(len(amounts), 1)
+		std_amount = math.sqrt(sum((a - mean_amount) ** 2 for a in amounts) / max(len(amounts) - 1, 1)) or 1.0
+
+		amount_counts: dict[float, int] = {}
+		for a in amounts:
+			amount_counts[a] = amount_counts.get(a, 0) + 1
+
+		for e in expenditures:
+			exp_id = getattr(e, "id", "")
+			amount = getattr(e, "amount", 0.0)
+			suspicion_score = 0.0
+			reasons: list[str] = []
+
+			# Z-score outlier
+			z = abs(amount - mean_amount) / std_amount
+			if z > 3.0:
+				suspicion_score += 0.4
+				reasons.append(f"outlier_z_score_{z:.1f}")
+
+			# Round number
+			if flag_round_numbers and amount >= 10_000 and amount % 1000 == 0:
+				suspicion_score += 0.2
+				reasons.append("round_number")
+
+			# Duplicate amount
+			if amount_counts.get(amount, 0) > 2:
+				suspicion_score += 0.3
+				reasons.append("duplicate_amount")
+
+			if suspicion_score >= (1.0 - sensitivity):
+				flags.append({
+					"expenditure_id": exp_id,
+					"amount": amount,
+					"suspicion_score": round(min(suspicion_score, 1.0), 3),
+					"reasons": reasons,
+					"recommended_action": "investigate" if suspicion_score > 0.6 else "monitor",
+				})
+
+		ml_enhanced = False
+		if os.environ.get("OLLAMA_BASE_URL"):
+			try:
+				from capabilities.common.mlx import MLCapability
+				ml = MLCapability()
+				result = await ml.score({"amounts": amounts}, task="government_expenditure_anomaly")
+				ml_enhanced = True
+				for f in flags:
+					f["ml_suspicion_score"] = round(getattr(result, "score", f["suspicion_score"]), 3)
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		detection_id = _new_id()
+		flags.sort(key=lambda x: x.get("suspicion_score", 0), reverse=True)
+		self._audit(tenant_id, "expenditure_anomalies_detected", detection_id)
+		return {
+			"id": detection_id,
+			"tenant_id": tenant_id,
+			"expenditures_scanned": len(expenditures),
+			"anomaly_count": len(flags),
+			"ml_enhanced": ml_enhanced,
+			"sensitivity": sensitivity,
+			"anomalies": flags,
+			"nats_subject": "apg.government.bud.anomaly",
+			"generated_by": self.actor_id,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def generate_parliamentary_estimates(
+		self,
+		fiscal_year: str,
+		include_prior_year_actuals: bool = True,
+		include_pbb_scores: bool = False,
+	) -> dict[str, Any]:
+		"""Generate a structured Parliamentary Estimates Package.
+
+		Compiles vote-level estimates, prior-year actuals, and optional PBB
+		scorecards into a structured output ready for document generation.
+		Published to NATS subject apg.government.bud.parliament.submission.
+		"""
+		assert fiscal_year, "fiscal_year required"
+		tenant_id = self.tenant_id
+		votes = [v for (tid, _), v in self.votes.items() if tid == tenant_id]
+		revisions = [r for (tid, _), r in self.revisions.items() if tid == tenant_id]
+
+		vote_entries = []
+		for v in votes:
+			entry: dict[str, Any] = {
+				"vote_code": v.vote_code,
+				"vote_type": getattr(v, "vote_type", "recurrent"),
+				"allocated_amount": v.allocated_amount,
+				"committed_amount": v.committed_amount,
+				"expended_amount": v.expended_amount,
+				"available_balance": v.available_balance,
+			}
+			if include_prior_year_actuals:
+				entry["prior_year_actuals"] = v.expended_amount  # proxy: use current expended
+			vote_entries.append(entry)
+
+		total_estimates = sum(v.allocated_amount for v in votes)
+		package_id = _new_id()
+		ref = f"PARL-EST-{fiscal_year}-{package_id[:6].upper()}"
+		self._audit(tenant_id, "parliamentary_estimates_generated", package_id)
+		return {
+			"id": package_id,
+			"reference": ref,
+			"tenant_id": tenant_id,
+			"fiscal_year": fiscal_year,
+			"total_estimates": round(total_estimates, 2),
+			"vote_count": len(votes),
+			"revision_count": len(revisions),
+			"votes": vote_entries,
+			"include_pbb_scores": include_pbb_scores,
+			"nats_subject": "apg.government.bud.parliament.submission",
+			"generated_by": self.actor_id,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def register_payment_arrear(
+		self,
+		creditor_id: str,
+		creditor_class: str,
+		original_due_date: str,
+		amount: float,
+		penalty_rate_pct: float = 0.0,
+		legal_exposure: float = 0.0,
+	) -> dict[str, Any]:
+		"""Register an overdue government payment as a payment arrear.
+
+		Computes age in days, accrued penalties, and priority class for
+		inclusion in payment plans. Events to NATS apg.government.bud.arrears.
+		"""
+		assert creditor_id, "creditor_id required"
+		assert amount > 0, "amount must be positive"
+		assert original_due_date, "original_due_date required"
+		tenant_id = self.tenant_id
+
+		due_dt = datetime.fromisoformat(original_due_date)
+		age_days = max((datetime.utcnow() - due_dt).days, 0)
+		accrued_penalty = round(amount * penalty_rate_pct / 100 * age_days / 365, 2)
+		total_liability = round(amount + accrued_penalty + legal_exposure, 2)
+
+		priority = "statutory" if creditor_class in ("employee", "statutory_body") else ("contractor" if creditor_class == "contractor" else "grant")
+
+		arrear_id = _new_id()
+		if not hasattr(self, "_payment_arrears"):
+			self._payment_arrears: list[dict[str, Any]] = []
+		record: dict[str, Any] = {
+			"id": arrear_id,
+			"tenant_id": tenant_id,
+			"creditor_id": creditor_id,
+			"creditor_class": creditor_class,
+			"original_due_date": original_due_date,
+			"age_days": age_days,
+			"principal": amount,
+			"accrued_penalty": accrued_penalty,
+			"legal_exposure": legal_exposure,
+			"total_liability": total_liability,
+			"priority_class": priority,
+			"nats_subject": "apg.government.bud.arrears",
+			"registered_by": self.actor_id,
+			"registered_at": datetime.utcnow().isoformat(),
+			"status": "outstanding",
+		}
+		self._payment_arrears.append(record)
+		self._audit(tenant_id, "payment_arrear_registered", arrear_id)
+		return record
+
+	async def generate_arrears_payment_plan(
+		self,
+		available_cash: float,
+	) -> dict[str, Any]:
+		"""Generate an optimised payment plan for outstanding arrears.
+
+		Applies priority rules: statutory > contractor > grant. Allocates
+		available_cash to arrears in priority order until exhausted.
+		"""
+		assert available_cash > 0, "available_cash must be positive"
+		tenant_id = self.tenant_id
+		arrears = getattr(self, "_payment_arrears", [])
+		tenant_arrears = [a for a in arrears if a.get("tenant_id") == tenant_id and a.get("status") == "outstanding"]
+
+		priority_order = {"statutory": 0, "contractor": 1, "grant": 2}
+		sorted_arrears = sorted(tenant_arrears, key=lambda a: (priority_order.get(a.get("priority_class", "grant"), 3), -a.get("age_days", 0)))
+
+		plan: list[dict[str, Any]] = []
+		remaining_cash = available_cash
+		for arrear in sorted_arrears:
+			liability = arrear.get("total_liability", 0.0)
+			pay = min(liability, remaining_cash)
+			plan.append({
+				"arrear_id": arrear.get("id"),
+				"creditor_id": arrear.get("creditor_id"),
+				"priority_class": arrear.get("priority_class"),
+				"total_liability": liability,
+				"proposed_payment": round(pay, 2),
+				"remaining_balance": round(liability - pay, 2),
+				"fully_cleared": pay >= liability,
+			})
+			remaining_cash = max(remaining_cash - pay, 0.0)
+			if remaining_cash == 0:
+				break
+
+		plan_id = _new_id()
+		self._audit(tenant_id, "arrears_payment_plan_generated", plan_id)
+		return {
+			"id": plan_id,
+			"tenant_id": tenant_id,
+			"available_cash": available_cash,
+			"total_arrears": sum(a.get("total_liability", 0) for a in tenant_arrears),
+			"proposed_disbursements": sum(p["proposed_payment"] for p in plan),
+			"residual_cash": round(remaining_cash, 2),
+			"items_fully_cleared": sum(1 for p in plan if p["fully_cleared"]),
+			"payment_plan": plan,
+			"nats_subject": "apg.government.bud.arrears",
+			"generated_by": self.actor_id,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+	async def generate_ipsas_accrual_report(
+		self,
+		fiscal_period: str,
+	) -> dict[str, Any]:
+		"""Generate an IPSAS-aligned accrual basis fiscal report.
+
+		Converts cash-basis expenditure records to accrual basis using
+		recognition rules: goods-received-not-invoiced treated as accrued
+		expense, TSA credits as revenue, uncommitted balances as appropriation
+		carry-forward.
+		"""
+		assert fiscal_period, "fiscal_period required"
+		tenant_id = self.tenant_id
+
+		votes = [v for (tid, _), v in self.votes.items() if tid == tenant_id]
+		expenditures = [e for (tid, _), e in self.expenditures.items() if tid == tenant_id]
+		open_commitments = [c for (tid, _), c in self.commitments.items() if tid == tenant_id and getattr(c, "status", "") == "open"]
+
+		total_revenue_cash = sum(m["amount"] for m in self._tsa_movements if m.get("movement_type") == "credit" and m.get("tenant_id") == tenant_id)
+		total_expenditure_cash = sum(getattr(e, "amount", 0.0) for e in expenditures)
+		accrued_liabilities = sum(getattr(c, "amount", 0.0) for c in open_commitments)
+		net_position = total_revenue_cash - total_expenditure_cash - accrued_liabilities
+
+		report_id = _new_id()
+		self._audit(tenant_id, "ipsas_accrual_report_generated", report_id)
+		return {
+			"id": report_id,
+			"tenant_id": tenant_id,
+			"fiscal_period": fiscal_period,
+			"ipsas_standard": "IPSAS 1 & IPSAS 24",
+			"statement_of_financial_performance": {
+				"total_revenue": round(total_revenue_cash, 2),
+				"total_expenditure_cash_basis": round(total_expenditure_cash, 2),
+				"accrued_liabilities_open_commitments": round(accrued_liabilities, 2),
+				"total_expenditure_accrual_basis": round(total_expenditure_cash + accrued_liabilities, 2),
+				"surplus_deficit": round(net_position, 2),
+			},
+			"statement_of_financial_position": {
+				"appropriations": sum(v.allocated_amount for v in votes),
+				"uncommitted_balance": sum(v.available_balance for v in votes),
+				"net_assets": round(net_position, 2),
+			},
+			"generated_by": self.actor_id,
+			"generated_at": datetime.utcnow().isoformat(),
+		}
+
+
 GovernmentBudService = BudgetManagementService

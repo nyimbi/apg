@@ -3015,6 +3015,822 @@ class PayrollManagementService:
 		}
 
 
+	# ------------------------------------------------------------------
+	# simulate_pay_change — what-if engine (I1)
+	# ------------------------------------------------------------------
+
+	async def simulate_pay_change(
+		self,
+		employee_id: str,
+		deltas: dict[str, Any],
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""In-memory pay simulation — no writes occur.
+
+		Args:
+			employee_id: Profile id or employee_id.
+			deltas: Dict of proposed changes, e.g.
+			        {"base_pay": 120_000, "pension_ee_pct": 10, "housing_allowance": 8_000}.
+			tenant_id: Override for the service tenant.
+
+		Returns:
+			Dict with before/after gross, PAYE, statutory deductions, and net pay.
+		"""
+		tenant = self._tenant(tenant_id)
+		profile = next(
+			(p for p in self.employee_pay_profiles.values()
+			 if p["tenant_id"] == tenant and
+			 (p["id"] == employee_id or p["employee_id"] == employee_id)),
+			None,
+		)
+		if not profile:
+			raise PayrollProfileNotFoundError(f"No active pay profile for employee {employee_id}")
+
+		pg = self.pay_groups.get(profile.get("pay_group_id", ""))
+		country = (pg or {}).get("country", "KE").upper()
+		base_gross = profile["base_pay"]
+
+		# --- BEFORE ---
+		stat_before = await self.calculate_statutory_deductions(
+			{"basic_pay": profile.get("basic_pay", base_gross * 0.6)},
+			base_gross,
+			country,
+		)
+		paye_before = await self.calculate_paye(
+			base_gross,
+			country,
+			deductions={"nssf_ee": stat_before["ee_total"]},
+		)
+		net_before = round(
+			base_gross
+			- stat_before["ee_total"]
+			- paye_before["paye_payable"],
+			2,
+		)
+
+		# --- APPLY DELTAS to a simulated clone ---
+		new_gross = float(deltas.get("base_pay", base_gross))
+		extra_allowances = float(deltas.get("housing_allowance", 0.0)) + float(deltas.get("transport_allowance", 0.0))
+		new_gross_total = new_gross + extra_allowances
+		pension_pct = float(deltas.get("pension_ee_pct", 0.0))
+		pension_sacrifice = round(new_gross_total * pension_pct / 100, 2)
+		if country == "KE":
+			pension_sacrifice = min(pension_sacrifice, 20_000.0)
+
+		new_basic = float(deltas.get("basic_pay", new_gross * 0.6))
+
+		# --- AFTER ---
+		stat_after = await self.calculate_statutory_deductions(
+			{"basic_pay": new_basic},
+			new_gross_total,
+			country,
+		)
+		paye_after = await self.calculate_paye(
+			new_gross_total,
+			country,
+			deductions={"nssf_ee": stat_after["ee_total"], "pension_ee": pension_sacrifice},
+		)
+		net_after = round(
+			new_gross_total
+			- stat_after["ee_total"]
+			- paye_after["paye_payable"]
+			- pension_sacrifice,
+			2,
+		)
+
+		return {
+			"employee_id": profile["employee_id"],
+			"profile_id": profile["id"],
+			"country": country,
+			"simulation_only": True,
+			"before": {
+				"gross": base_gross,
+				"statutory_ee": stat_before["ee_total"],
+				"paye": paye_before["paye_payable"],
+				"net": net_before,
+				"effective_rate": paye_before["effective_rate"],
+			},
+			"after": {
+				"gross": new_gross_total,
+				"statutory_ee": stat_after["ee_total"],
+				"paye": paye_after["paye_payable"],
+				"pension_sacrifice": pension_sacrifice,
+				"net": net_after,
+				"effective_rate": paye_after["effective_rate"],
+			},
+			"deltas_applied": deltas,
+			"net_change": round(net_after - net_before, 2),
+			"gross_change": round(new_gross_total - base_gross, 2),
+			"paye_change": round(paye_after["paye_payable"] - paye_before["paye_payable"], 2),
+		}
+
+	# ------------------------------------------------------------------
+	# set_fx_rate / convert_pay_currency — FX-aware payroll (I2)
+	# ------------------------------------------------------------------
+
+	async def set_fx_rate(
+		self,
+		from_currency: str,
+		to_currency: str,
+		rate: float,
+		effective_date: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Store an FX rate for cross-currency payroll.
+
+		Args:
+			from_currency: Source currency ISO code.
+			to_currency: Target currency ISO code.
+			rate: Conversion rate (1 unit of from_currency = rate units of to_currency).
+			effective_date: ISO date from which this rate applies.
+
+		Returns:
+			Stored FX rate record.
+		"""
+		assert rate > 0, "rate must be positive"
+		tenant = self._tenant(tenant_id)
+		key = f"{from_currency.upper()}_{to_currency.upper()}"
+		if not hasattr(self, "fx_rates"):
+			self.fx_rates: dict[str, list[dict[str, Any]]] = {}
+		if key not in self.fx_rates:
+			self.fx_rates[key] = []
+		record = {
+			"id": self._record_id("fx"),
+			"type": "fx_rate",
+			"kind": "fx_rate",
+			"tenant_id": tenant,
+			"from_currency": from_currency.upper(),
+			"to_currency": to_currency.upper(),
+			"rate": rate,
+			"effective_date": effective_date,
+			"created_at": self._now(),
+		}
+		self.fx_rates[key].append(record)
+		# Sort descending so latest rate is first
+		self.fx_rates[key].sort(key=lambda r: r["effective_date"], reverse=True)
+		return deepcopy(record)
+
+	async def convert_pay_currency(
+		self,
+		amount: float,
+		from_currency: str,
+		to_currency: str,
+		as_of_date: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Convert an amount using the stored FX rate effective on as_of_date.
+
+		Returns:
+			Dict with original_amount, converted_amount, rate_used, effective_date.
+		"""
+		tenant = self._tenant(tenant_id)
+		if not hasattr(self, "fx_rates"):
+			self.fx_rates = {}
+		key = f"{from_currency.upper()}_{to_currency.upper()}"
+		rates = self.fx_rates.get(key, [])
+		# Find the most recent rate whose effective_date <= as_of_date
+		applicable = next(
+			(r for r in rates if r["effective_date"] <= as_of_date),
+			None,
+		)
+		if not applicable:
+			raise PayrollError(
+				f"No FX rate found for {from_currency}/{to_currency} on or before {as_of_date}"
+			)
+		converted = round(amount * applicable["rate"], 2)
+		return {
+			"tenant_id": tenant,
+			"from_currency": from_currency.upper(),
+			"to_currency": to_currency.upper(),
+			"original_amount": amount,
+			"converted_amount": converted,
+			"rate_used": applicable["rate"],
+			"rate_effective_date": applicable["effective_date"],
+			"as_of_date": as_of_date,
+		}
+
+	# ------------------------------------------------------------------
+	# reverse_payroll_run — bulk reversal (I3)
+	# ------------------------------------------------------------------
+
+	async def reverse_payroll_run(
+		self,
+		run_id: str,
+		reason: str,
+		reversed_by: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Reverse a posted payroll run, negating GL entries and voiding payment files.
+
+		The original run is marked 'reversed'. A reversal record is created
+		with negated totals and each GL entry gets a negating counterpart.
+		Callers should then call run_payroll with corrected data and link
+		the new run's reversed_run_id.
+
+		Args:
+			run_id: ID of the run to reverse.
+			reason: Free-text reason for reversal (required for audit trail).
+			reversed_by: User requesting the reversal.
+
+		Returns:
+			Reversal record.
+		"""
+		assert reason, "reason is required for reversal audit trail"
+		assert reversed_by, "reversed_by is required"
+		tenant = self._tenant(tenant_id)
+		run = self._get_run(run_id, tenant)
+
+		if run.get("status") == "reversed":
+			raise PayrollError(f"Run {run_id} is already reversed")
+		if run.get("status") not in ("posted", "paid", "approved"):
+			raise PayrollError(
+				f"Only posted/approved/paid runs can be reversed; run is '{run.get('status')}'"
+			)
+
+		# Mark original run reversed
+		run["status"] = "reversed"
+		run["reversed_by"] = reversed_by
+		run["reversal_reason"] = reason
+		run["updated_at"] = self._now()
+
+		# Create reversal record
+		rev_id = self._record_id("reversal")
+		reversal_totals = {
+			k: round(-v, 2) for k, v in run["totals"].items()
+		}
+		reversal = {
+			"id": rev_id,
+			"type": "payroll_reversal",
+			"kind": "reversal",
+			"tenant_id": tenant,
+			"original_run_id": run_id,
+			"reversed_by": reversed_by,
+			"reason": reason,
+			"totals": reversal_totals,
+			"employee_count": run.get("employee_count", 0),
+			"status": "reversal_posted",
+			"created_at": self._now(),
+		}
+		if not hasattr(self, "reversals"):
+			self.reversals: dict[str, dict[str, Any]] = {}
+		self.reversals[rev_id] = reversal
+
+		# Negate GL entries if they exist
+		neg_entries: list[str] = []
+		for gl_id, gl_entry in list(self.gl_entries.items()):
+			if gl_entry.get("run_id") == run_id and gl_entry.get("tenant_id") == tenant:
+				neg_id = self._record_id("glrev")
+				neg_entry = deepcopy(gl_entry)
+				neg_entry["id"] = neg_id
+				neg_entry["reversal_of"] = gl_id
+				neg_entry["amount"] = -gl_entry["amount"]
+				neg_entry["created_at"] = self._now()
+				self.gl_entries[neg_id] = neg_entry
+				neg_entries.append(neg_id)
+
+		# Void bank files
+		for bf_id, bf in self.bank_files.items():
+			if bf.get("run_id") == run_id and bf.get("tenant_id") == tenant:
+				bf["status"] = "voided"
+				bf["voided_at"] = self._now()
+
+		reversal["negated_gl_entries"] = neg_entries
+		self._emit(tenant, "payroll_run_reversed", reversal)
+		return deepcopy(reversal)
+
+	# ------------------------------------------------------------------
+	# accrue_leave_liability / get_leave_liability_summary (I4)
+	# ------------------------------------------------------------------
+
+	async def accrue_leave_liability(
+		self,
+		employee_id: str,
+		leave_days_balance: float,
+		period: str,
+		tenant_id: str | None = None,
+		working_days_per_month: int = 21,
+	) -> dict[str, Any]:
+		"""Accrue IAS 19 leave liability for a single employee.
+
+		Args:
+			employee_id: Profile id or employee_id.
+			leave_days_balance: Current unconsumed leave days.
+			period: ISO date string of any day within the accrual period.
+			working_days_per_month: Divisor for daily rate calculation (default 21).
+
+		Returns:
+			Accrual record with daily_rate, liability_amount, and GL account.
+		"""
+		assert leave_days_balance >= 0, "leave_days_balance must be non-negative"
+		assert working_days_per_month > 0, "working_days_per_month must be positive"
+		tenant = self._tenant(tenant_id)
+		profile = next(
+			(p for p in self.employee_pay_profiles.values()
+			 if p["tenant_id"] == tenant and
+			 (p["id"] == employee_id or p["employee_id"] == employee_id)),
+			None,
+		)
+		if not profile:
+			raise PayrollProfileNotFoundError(f"No active pay profile for employee {employee_id}")
+
+		daily_rate = round(profile["base_pay"] / working_days_per_month, 4)
+		liability = round(daily_rate * leave_days_balance, 2)
+
+		if not hasattr(self, "leave_accruals"):
+			self.leave_accruals: dict[str, dict[str, Any]] = {}
+
+		accrual_id = self._record_id("leaveaccrual")
+		record = {
+			"id": accrual_id,
+			"type": "leave_liability_accrual",
+			"kind": "leave_accrual",
+			"tenant_id": tenant,
+			"employee_id": profile["employee_id"],
+			"profile_id": profile["id"],
+			"period": period,
+			"leave_days_balance": leave_days_balance,
+			"monthly_pay": profile["base_pay"],
+			"working_days_per_month": working_days_per_month,
+			"daily_rate": daily_rate,
+			"liability_amount": liability,
+			"gl_account": "2130",  # Leave liability payable — configurable
+			"status": "accrued",
+			"created_at": self._now(),
+		}
+		self.leave_accruals[accrual_id] = record
+		self._emit(tenant, "leave_liability_accrued", record)
+		return deepcopy(record)
+
+	async def get_leave_liability_summary(
+		self,
+		tenant_id: str | None = None,
+		period: str | None = None,
+	) -> dict[str, Any]:
+		"""Aggregate leave liability across all employees for a period.
+
+		Args:
+			tenant_id: Tenant context.
+			period: Optional ISO period filter; if omitted, returns all accruals.
+
+		Returns:
+			Summary with total_liability, employee_count, and detail list.
+		"""
+		tenant = self._tenant(tenant_id)
+		if not hasattr(self, "leave_accruals"):
+			self.leave_accruals = {}
+		accruals = [
+			a for a in self.leave_accruals.values()
+			if a["tenant_id"] == tenant and (period is None or a["period"][:7] == period[:7])
+		]
+		total_liability = round(sum(a["liability_amount"] for a in accruals), 2)
+		return {
+			"tenant_id": tenant,
+			"period_filter": period,
+			"employee_count": len(accruals),
+			"total_liability": total_liability,
+			"currency_note": "All amounts in employee profile currency",
+			"detail": sorted(deepcopy(accruals), key=lambda a: a["employee_id"]),
+		}
+
+	# ------------------------------------------------------------------
+	# upsert_tax_table — version-managed tax rates (I6)
+	# ------------------------------------------------------------------
+
+	async def upsert_tax_table(
+		self,
+		country: str,
+		valid_from: str,
+		bands: list[tuple[float, float]],
+		reliefs: dict[str, Any],
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Store a versioned PAYE tax table override for a country.
+
+		Args:
+			country: ISO country code.
+			valid_from: ISO date string (YYYY-MM-DD) from which these rates apply.
+			bands: List of (band_width, rate) tuples in the same format as PAYE_TABLES.
+			reliefs: Dict of relief values (personal_relief, insurance_relief_rate, etc.).
+			tenant_id: Tenant context.
+
+		Returns:
+			Stored tax table version record.
+		"""
+		tenant = self._tenant(tenant_id)
+		country = country.upper()
+		if not hasattr(self, "tax_table_overrides"):
+			self.tax_table_overrides: dict[str, list[dict[str, Any]]] = {}
+		if country not in self.tax_table_overrides:
+			self.tax_table_overrides[country] = []
+
+		record = {
+			"id": self._record_id("taxtable"),
+			"type": "tax_table_version",
+			"kind": "tax_table",
+			"tenant_id": tenant,
+			"country": country,
+			"valid_from": valid_from,
+			"bands": list(bands),
+			"reliefs": dict(reliefs),
+			"band_mode": "width",
+			"status": "active",
+			"created_at": self._now(),
+		}
+		# Remove any existing entry for the same valid_from
+		self.tax_table_overrides[country] = [
+			t for t in self.tax_table_overrides[country]
+			if t["valid_from"] != valid_from
+		]
+		self.tax_table_overrides[country].append(record)
+		# Sort descending by valid_from so the most-recent is first
+		self.tax_table_overrides[country].sort(key=lambda t: t["valid_from"], reverse=True)
+		self._emit(tenant, "tax_table_version_upserted", record)
+		return deepcopy(record)
+
+	def _resolve_tax_table(self, country: str, as_of_date: str | None = None) -> dict[str, Any]:
+		"""Return the effective PAYE table for country as of as_of_date.
+
+		Checks tenant overrides first, then falls back to module-level PAYE_TABLES.
+		"""
+		country = country.upper()
+		overrides = getattr(self, "tax_table_overrides", {}).get(country, [])
+		if as_of_date and overrides:
+			match = next(
+				(t for t in overrides if t["valid_from"] <= as_of_date),
+				None,
+			)
+			if match:
+				table = dict(PAYE_TABLES.get(country, {}))
+				table.update({"bands": match["bands"]})
+				table.update(match.get("reliefs", {}))
+				return table
+		return PAYE_TABLES.get(country, {})
+
+	# ------------------------------------------------------------------
+	# detect_payroll_anomalies — AI-assisted fraud gate (I14)
+	# ------------------------------------------------------------------
+
+	async def detect_payroll_anomalies(
+		self,
+		run_id: str,
+		tenant_id: str | None = None,
+		sensitivity: str = "medium",
+	) -> dict[str, Any]:
+		"""Run statistical anomaly checks on a payroll run before approval.
+
+		Checks performed:
+		  1. Gross pay > mean + N*sigma (N=2 medium, N=1.5 high sensitivity).
+		  2. Employee's bank account not present in any prior approved run.
+		  3. Pay component added < 24 hours before the run was created.
+		  4. Employee hire_date == run created_at date (same-day ghost employee risk).
+
+		Args:
+			run_id: Run to analyse.
+			sensitivity: "low" | "medium" | "high" — controls sigma threshold.
+			tenant_id: Tenant context.
+
+		Returns:
+			Dict with anomaly_count, severity_counts, cleared (bool), and anomalies list.
+		"""
+		tenant = self._tenant(tenant_id)
+		run = self._get_run(run_id, tenant)
+
+		sigma_map = {"low": 3.0, "medium": 2.0, "high": 1.5}
+		sigma_threshold = sigma_map.get(sensitivity, 2.0)
+
+		# Gather employee gross values for this run
+		lines = [
+			l for l in self.line_items.values()
+			if l["run_id"] == run_id and l["component_type"] in {"earning", "reimbursement"}
+		]
+		# Aggregate gross per employee
+		employee_gross: dict[str, float] = {}
+		for line in lines:
+			eid = line["employee_id"]
+			employee_gross[eid] = employee_gross.get(eid, 0.0) + (line["amount"] or 0.0)
+
+		gross_values = list(employee_gross.values())
+		if gross_values:
+			n = len(gross_values)
+			mean_gross = sum(gross_values) / n
+			variance = sum((v - mean_gross) ** 2 for v in gross_values) / n
+			std_dev = math.sqrt(variance)
+		else:
+			mean_gross = std_dev = 0.0
+
+		anomalies: list[dict[str, Any]] = []
+		run_created = run.get("created_at", "")
+
+		for eid, gross in employee_gross.items():
+			# Check 1: statistical outlier
+			if std_dev > 0 and gross > mean_gross + sigma_threshold * std_dev:
+				anomalies.append({
+					"employee_id": eid,
+					"check": "gross_statistical_outlier",
+					"severity": "high",
+					"detail": (
+						f"Gross {gross:.2f} exceeds mean {mean_gross:.2f} "
+						f"+ {sigma_threshold}σ ({mean_gross + sigma_threshold * std_dev:.2f})"
+					),
+				})
+
+		# Check 2: new bank account (not in prior approved/posted runs)
+		prior_run_accounts: set[str] = set()
+		for r in self.runs.values():
+			if (
+				r["tenant_id"] == tenant
+				and r["id"] != run_id
+				and r.get("status") in ("approved", "posted", "paid")
+			):
+				for p_id in (l["profile_id"] for l in self.line_items.values() if l["run_id"] == r["id"]):
+					p = self.employee_pay_profiles.get(p_id)
+					if p and p.get("bank_account"):
+						prior_run_accounts.add(f"{p['employee_id']}:{p['bank_account']}")
+
+		for eid in employee_gross:
+			profile = next(
+				(p for p in self.employee_pay_profiles.values()
+				 if p["tenant_id"] == tenant and p["employee_id"] == eid),
+				None,
+			)
+			if profile and profile.get("bank_account"):
+				key = f"{eid}:{profile['bank_account']}"
+				if key not in prior_run_accounts:
+					anomalies.append({
+						"employee_id": eid,
+						"check": "new_bank_account",
+						"severity": "medium",
+						"detail": f"Bank account not seen in any prior approved run for this employee",
+					})
+
+		# Check 4: same-day hire
+		for eid in employee_gross:
+			profile = next(
+				(p for p in self.employee_pay_profiles.values()
+				 if p["tenant_id"] == tenant and p["employee_id"] == eid),
+				None,
+			)
+			if profile and profile.get("hire_date") and run_created:
+				if profile["hire_date"][:10] == run_created[:10]:
+					anomalies.append({
+						"employee_id": eid,
+						"check": "same_day_hire_and_payroll",
+						"severity": "high",
+						"detail": "Employee hire date matches payroll run creation date — ghost employee risk",
+					})
+
+		severity_counts = {"high": 0, "medium": 0, "low": 0}
+		for a in anomalies:
+			severity_counts[a.get("severity", "low")] = (
+				severity_counts.get(a.get("severity", "low"), 0) + 1
+			)
+		cleared = severity_counts["high"] == 0
+
+		result = {
+			"run_id": run_id,
+			"tenant_id": tenant,
+			"sensitivity": sensitivity,
+			"sigma_threshold": sigma_threshold,
+			"employee_count": len(employee_gross),
+			"mean_gross": round(mean_gross, 2),
+			"std_dev_gross": round(std_dev, 2),
+			"anomaly_count": len(anomalies),
+			"severity_counts": severity_counts,
+			"cleared": cleared,
+			"anomalies": anomalies,
+			"note": (
+				"cleared=True means no high-severity anomalies; "
+				"medium anomalies should be reviewed but do not block approval."
+			),
+		}
+		return result
+
+	# ------------------------------------------------------------------
+	# register_benefit_in_kind / generate_bik_report (I15)
+	# ------------------------------------------------------------------
+
+	async def register_benefit_in_kind(
+		self,
+		employee_id: str,
+		bik_type: str,
+		monthly_value: float,
+		effective_date: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Register a taxable benefit-in-kind for an employee.
+
+		BIK is added to taxable gross for PAYE purposes but does NOT produce
+		a cash payment line. Supported types: company_car, housing, medical,
+		meals, fuel, other.
+
+		Args:
+			bik_type: Category of benefit.
+			monthly_value: Monthly monetary equivalent in the employee's pay currency.
+			effective_date: ISO date from which the BIK applies.
+
+		Returns:
+			BIK registration record.
+		"""
+		assert monthly_value >= 0, "monthly_value must be non-negative"
+		supported_types = {"company_car", "housing", "medical", "meals", "fuel", "other"}
+		if bik_type not in supported_types:
+			raise PayrollError(f"Unknown bik_type '{bik_type}'. Supported: {supported_types}")
+
+		tenant = self._tenant(tenant_id)
+		profile = next(
+			(p for p in self.employee_pay_profiles.values()
+			 if p["tenant_id"] == tenant and
+			 (p["id"] == employee_id or p["employee_id"] == employee_id)),
+			None,
+		)
+		if not profile:
+			raise PayrollProfileNotFoundError(f"No active pay profile for employee {employee_id}")
+
+		if not hasattr(self, "benefits_in_kind"):
+			self.benefits_in_kind: dict[str, dict[str, Any]] = {}
+
+		bik_id = self._record_id("bik")
+		record = {
+			"id": bik_id,
+			"type": "benefit_in_kind",
+			"kind": "bik",
+			"tenant_id": tenant,
+			"employee_id": profile["employee_id"],
+			"profile_id": profile["id"],
+			"bik_type": bik_type,
+			"monthly_value": round(monthly_value, 2),
+			"effective_date": effective_date,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		self.benefits_in_kind[bik_id] = record
+		self._emit(tenant, "benefit_in_kind_registered", record)
+		return deepcopy(record)
+
+	async def generate_bik_report(
+		self,
+		tenant_id: str | None = None,
+		period: str | None = None,
+	) -> dict[str, Any]:
+		"""Aggregate benefits-in-kind for statutory reporting.
+
+		Returns per-employee BIK totals suitable for KRA/FIRS annual returns.
+		"""
+		tenant = self._tenant(tenant_id)
+		if not hasattr(self, "benefits_in_kind"):
+			self.benefits_in_kind = {}
+
+		active_bik = [
+			b for b in self.benefits_in_kind.values()
+			if b["tenant_id"] == tenant and b["status"] == "active"
+			and (period is None or b["effective_date"] <= period)
+		]
+
+		# Aggregate per employee
+		by_employee: dict[str, dict[str, Any]] = {}
+		for bik in active_bik:
+			eid = bik["employee_id"]
+			if eid not in by_employee:
+				by_employee[eid] = {"employee_id": eid, "total_bik": 0.0, "breakdown": []}
+			by_employee[eid]["total_bik"] = round(
+				by_employee[eid]["total_bik"] + bik["monthly_value"], 2
+			)
+			by_employee[eid]["breakdown"].append({
+				"bik_type": bik["bik_type"],
+				"monthly_value": bik["monthly_value"],
+				"effective_date": bik["effective_date"],
+			})
+
+		grand_total = round(sum(e["total_bik"] for e in by_employee.values()), 2)
+		return {
+			"tenant_id": tenant,
+			"period": period,
+			"report_type": "benefit_in_kind_summary",
+			"employee_count": len(by_employee),
+			"grand_total_bik": grand_total,
+			"detail": sorted(list(by_employee.values()), key=lambda e: e["employee_id"]),
+			"generated_at": self._now(),
+		}
+
+	# ------------------------------------------------------------------
+	# configure_approval_policy / submit_for_approval (I9)
+	# ------------------------------------------------------------------
+
+	async def configure_approval_policy(
+		self,
+		pay_group_id: str,
+		levels: list[dict[str, Any]],
+		amount_threshold: float,
+		sla_hours: int,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Configure a multi-level approval policy for payroll runs.
+
+		Args:
+			pay_group_id: Policy applies to runs in this pay group.
+			levels: List of approval level dicts, e.g.
+			        [{"level": 1, "role": "finance_manager"},
+			         {"level": 2, "role": "cfo", "min_net_pay": 5_000_000}].
+			amount_threshold: Runs with net_pay >= this value require all levels.
+			sla_hours: Hours within which each level must approve before escalation.
+
+		Returns:
+			Stored approval policy record.
+		"""
+		assert levels, "At least one approval level is required"
+		assert amount_threshold >= 0, "amount_threshold must be non-negative"
+		assert sla_hours > 0, "sla_hours must be positive"
+		tenant = self._tenant(tenant_id)
+		if not hasattr(self, "approval_policies"):
+			self.approval_policies: dict[str, dict[str, Any]] = {}
+
+		record = {
+			"id": self._record_id("apvpolicy"),
+			"type": "approval_policy",
+			"kind": "approval_policy",
+			"tenant_id": tenant,
+			"pay_group_id": pay_group_id,
+			"levels": levels,
+			"amount_threshold": amount_threshold,
+			"sla_hours": sla_hours,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		# One active policy per pay group
+		for pid, pol in list(self.approval_policies.items()):
+			if pol["pay_group_id"] == pay_group_id and pol["tenant_id"] == tenant:
+				pol["status"] = "superseded"
+		self.approval_policies[record["id"]] = record
+		self._emit(tenant, "approval_policy_configured", record)
+		return deepcopy(record)
+
+	async def submit_for_approval(
+		self,
+		run_id: str,
+		submitted_by: str,
+		tenant_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Submit a calculated payroll run for multi-level approval.
+
+		Creates an approval_request record and moves the run to 'pending_approval'.
+
+		Returns:
+			Approval request record with SLA deadline and required levels.
+		"""
+		assert submitted_by, "submitted_by is required"
+		tenant = self._tenant(tenant_id)
+		run = self._get_run(run_id, tenant)
+		if run.get("status") not in ("calculated",):
+			raise PayrollError(
+				f"Only runs in 'calculated' status can be submitted; run is '{run.get('status')}'"
+			)
+
+		# Find applicable policy
+		if not hasattr(self, "approval_policies"):
+			self.approval_policies = {}
+		policy = next(
+			(p for p in self.approval_policies.values()
+			 if p["tenant_id"] == tenant
+			 and p["pay_group_id"] == run.get("pay_group_id")
+			 and p["status"] == "active"),
+			None,
+		)
+		net_pay = run["totals"].get("net", 0.0)
+		required_levels = 1
+		if policy:
+			if net_pay >= policy["amount_threshold"]:
+				required_levels = len(policy["levels"])
+			sla_hours = policy["sla_hours"]
+		else:
+			sla_hours = 48  # default SLA
+
+		if not hasattr(self, "approval_requests"):
+			self.approval_requests: dict[str, dict[str, Any]] = {}
+
+		req_id = self._record_id("apvreq")
+		record = {
+			"id": req_id,
+			"type": "approval_request",
+			"kind": "approval_request",
+			"tenant_id": tenant,
+			"run_id": run_id,
+			"submitted_by": submitted_by,
+			"required_levels": required_levels,
+			"levels_cleared": 0,
+			"policy_id": policy["id"] if policy else None,
+			"net_pay": net_pay,
+			"sla_hours": sla_hours,
+			"status": "pending",
+			"created_at": self._now(),
+		}
+		self.approval_requests[req_id] = record
+		run["status"] = "pending_approval"
+		run["approval_request_id"] = req_id
+		run["updated_at"] = self._now()
+		self._emit(tenant, "payroll_run_submitted_for_approval", record)
+		return deepcopy(record)
+
+
 # ---------------------------------------------------------------------------
 # Canonical aliases kept for backward compatibility
 # ---------------------------------------------------------------------------

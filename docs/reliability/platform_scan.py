@@ -98,12 +98,13 @@ def scan(domain_filter: str | None = None, fast: bool = False) -> dict[str, list
                             issues["I4_unsafe_gather"].append(f"{rel}:{i+1}")
 
             # I1: guard_tenant_id in service.py
-            if filename == "service.py" and not is_test:
+            _is_reliability = rel.startswith("capabilities/common/reliability/")
+            if filename == "service.py" and not is_test and not _is_reliability:
                 if "guard_tenant_id" not in content and "guard_" not in content:
                     issues["I1_missing_guard"].append(rel)
 
             # Check reliability import in service.py
-            if filename == "service.py" and not is_test:
+            if filename == "service.py" and not is_test and not _is_reliability:
                 if "capabilities.common.reliability" not in content:
                     issues["I1_missing_reliability_import"].append(rel)
 

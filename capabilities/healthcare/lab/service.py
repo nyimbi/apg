@@ -2350,3 +2350,670 @@ class LaboratoryInformationService:
 		except Exception:
 			return {"ml_enhanced": False}
 
+	# ── new enhanced methods ───────────────────────────────────────────────────
+
+	async def export_fhir_diagnostic_report(
+		self,
+		tenant_id: str,
+		order_id: str,
+	) -> dict[str, Any]:
+		"""Serialise a completed lab order as a FHIR R4 DiagnosticReport + Observation bundle.
+
+		Maps LabOrderResponse → DiagnosticReport, each LabResultResponse → Observation,
+		each CriticalValueNotification → Communication resource.
+		LOINC codes sourced from LabTestResponse catalogue entries.
+		SNOMED status codes mapped from result_status:
+		  preliminary → 33694004 | final → 36998000 | corrected → 397963008.
+
+		Returns a FHIR Bundle (type=collection) containing all resources.
+		Raises KeyError if the order is not found.
+		"""
+		_SNOMED_STATUS = {
+			"preliminary": "33694004",
+			"validated": "33694004",
+			"final": "36998000",
+			"corrected": "397963008",
+		}
+		order = self._orders.get((tenant_id, order_id))
+		if order is None:
+			raise KeyError(f"order {order_id} not found")
+
+		results = [
+			r for (tid, _), r in self._results.items()
+			if tid == tenant_id and r.order_id == order_id
+		]
+		critical_values = [
+			cv for (tid, _), cv in self._critical_values.items()
+			if tid == tenant_id and any(r.id == cv.result_id for r in results)
+		]
+
+		observations: list[dict[str, Any]] = []
+		for r in results:
+			obs: dict[str, Any] = {
+				"resourceType": "Observation",
+				"id": r.id,
+				"status": r.result_status,
+				"code": {
+					"coding": [{"system": "http://loinc.org", "code": r.analyte}],
+					"text": r.analyte,
+				},
+				"subject": {"reference": f"Patient/{order.patient_id}"},
+				"valueQuantity": {
+					"value": r.value,
+					"unit": r.unit,
+					"system": "http://unitsofmeasure.org",
+				},
+				"interpretation": [{"coding": [{
+					"system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+					"code": r.abnormal_flag or "N",
+				}]}],
+			}
+			if r.reference_low is not None or r.reference_high is not None:
+				obs["referenceRange"] = [{"low": {"value": r.reference_low}, "high": {"value": r.reference_high}}]
+			observations.append(obs)
+
+		communications: list[dict[str, Any]] = []
+		for cv in critical_values:
+			communications.append({
+				"resourceType": "Communication",
+				"id": cv.id,
+				"status": "completed" if cv.acknowledged_by else "in-progress",
+				"subject": {"reference": f"Patient/{cv.patient_id}"},
+				"about": [{"reference": f"Observation/{cv.result_id}"}],
+				"payload": [{"contentString": f"Critical {cv.analyte}: {cv.value} {cv.unit}"}],
+				"recipient": [{"display": cv.notified_to}],
+			})
+
+		diagnostic_report: dict[str, Any] = {
+			"resourceType": "DiagnosticReport",
+			"id": order_id,
+			"status": _SNOMED_STATUS.get(order.status, "unknown"),
+			"code": {
+				"coding": [{"system": "http://loinc.org", "code": order.test_code}],
+				"text": order.test_name,
+			},
+			"subject": {"reference": f"Patient/{order.patient_id}"},
+			"issued": order.ordered_at.isoformat(),
+			"result": [{"reference": f"Observation/{r.id}"} for r in results],
+		}
+
+		bundle_id = uuid7str()
+		bundle: dict[str, Any] = {
+			"resourceType": "Bundle",
+			"id": bundle_id,
+			"type": "collection",
+			"timestamp": datetime.utcnow().isoformat(),
+			"entry": (
+				[{"resource": diagnostic_report}]
+				+ [{"resource": o} for o in observations]
+				+ [{"resource": c} for c in communications]
+			),
+		}
+		self._audit(tenant_id, "fhir_bundle_exported", bundle_id)
+		_log_op("export_fhir_diagnostic_report", tenant_id, bundle_id)
+		return bundle
+
+	async def configure_reflex_rule(
+		self,
+		tenant_id: str,
+		trigger_test_code: str,
+		condition: str,
+		threshold: float,
+		reflex_test_code: str,
+		reflex_test_name: str,
+		reflex_priority: str = "routine",
+		configured_by: str = "",
+	) -> dict[str, Any]:
+		"""Define an auto-reflex rule: when trigger_test_code result meets condition,
+		automatically place a new order for reflex_test_code.
+
+		condition: gt | lt | gte | lte | eq | abnormal | critical
+		reflex_priority: stat | asap | routine | reflex
+
+		Example: creatinine > 2.0 → order eGFR reflex; TSH abnormal → order free T4.
+		Rules are evaluated in `enter_result` after each result is stored.
+		"""
+		_VALID_CONDITIONS = {"gt", "lt", "gte", "lte", "eq", "abnormal", "critical"}
+		_VALID_PRIORITIES = {"stat", "asap", "routine", "reflex"}
+		assert condition in _VALID_CONDITIONS, f"invalid condition: {condition}"
+		assert reflex_priority in _VALID_PRIORITIES, f"invalid reflex_priority: {reflex_priority}"
+		assert bool(trigger_test_code), "trigger_test_code required"
+		assert bool(reflex_test_code), "reflex_test_code required"
+
+		if not hasattr(self, "_reflex_rules"):
+			self._reflex_rules: dict[str, list[dict[str, Any]]] = {}
+
+		rule_id = uuid7str()
+		rule: dict[str, Any] = {
+			"id": rule_id,
+			"tenant_id": tenant_id,
+			"trigger_test_code": trigger_test_code,
+			"condition": condition,
+			"threshold": threshold,
+			"reflex_test_code": reflex_test_code,
+			"reflex_test_name": reflex_test_name,
+			"reflex_priority": reflex_priority,
+			"configured_by": configured_by,
+			"created_at": datetime.utcnow().isoformat(),
+			"active": True,
+		}
+		key = f"{tenant_id}:{trigger_test_code}"
+		self._reflex_rules.setdefault(key, []).append(rule)
+		self._audit(tenant_id, "reflex_rule_configured", rule_id)
+		_log_op("configure_reflex_rule", tenant_id, rule_id)
+		return rule
+
+	async def evaluate_reflex_rules(
+		self,
+		tenant_id: str,
+		test_code: str,
+		value: Any,
+		abnormal_flag: str | None,
+		is_critical: bool,
+		order: Any,
+	) -> list[dict[str, Any]]:
+		"""Evaluate all active reflex rules for the given test code and result value.
+
+		Returns list of triggered reflex rule records. Callers (e.g. enter_result)
+		should create new orders for each triggered rule.  Numeric comparisons use
+		float coercion; non-numeric values only match 'abnormal'/'critical' conditions.
+		"""
+		if not hasattr(self, "_reflex_rules"):
+			return []
+		triggered: list[dict[str, Any]] = []
+		key = f"{tenant_id}:{test_code}"
+		rules = self._reflex_rules.get(key, [])
+		for rule in rules:
+			if not rule.get("active"):
+				continue
+			cond = rule["condition"]
+			thresh = rule["threshold"]
+			fired = False
+			if cond == "abnormal" and abnormal_flag is not None:
+				fired = True
+			elif cond == "critical" and is_critical:
+				fired = True
+			else:
+				try:
+					v = float(value)
+					if cond == "gt" and v > thresh:
+						fired = True
+					elif cond == "lt" and v < thresh:
+						fired = True
+					elif cond == "gte" and v >= thresh:
+						fired = True
+					elif cond == "lte" and v <= thresh:
+						fired = True
+					elif cond == "eq" and v == thresh:
+						fired = True
+				except (TypeError, ValueError) as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+			if fired:
+				triggered.append(rule)
+				self._audit(tenant_id, "reflex_rule_triggered", rule["id"])
+				logger.info(
+					"lab.reflex_triggered trigger=%s reflex=%s tenant=%s",
+					test_code, rule["reflex_test_code"], tenant_id,
+				)
+		return triggered
+
+	async def generate_compliance_scorecard(
+		self,
+		tenant_id: str,
+		period: str,
+		standard: str = "CAP",
+	) -> dict[str, Any]:
+		"""Generate an accreditation compliance scorecard for the specified standard.
+
+		standard: CAP | CLIA | ISO_15189 | SANAS
+
+		Criteria evaluated:
+		- QC frequency: hours between consecutive QC runs per instrument (target: ≤8 h)
+		- Critical value SLA: notifications within 60 min (target: ≥95%)
+		- Specimen rejection rate (target: ≤2%)
+		- EQA/proficiency testing participation (target: ≥80% score)
+		- STAT TAT 90th percentile (target: ≤60 min)
+		- Delta check utilisation (target: ≥90% of results checked)
+
+		Returns structured scorecard with pass/fail per criterion and evidence summary.
+		"""
+		_VALID_STANDARDS = {"CAP", "CLIA", "ISO_15189", "SANAS"}
+		assert standard in _VALID_STANDARDS, f"unsupported standard: {standard}"
+
+		qc_runs = sorted(
+			[q for (tid, _), q in self._qc_runs.items() if tid == tenant_id],
+			key=lambda q: q.created_at,
+		)
+		critical_values = [n for (tid, _), n in self._critical_values.items() if tid == tenant_id]
+		specimens = [s for (tid, _), s in self._specimens.items() if tid == tenant_id]
+		proficiency = [p for (tid, _), p in self._proficiency_tests.items() if tid == tenant_id]
+		delta_checks = [d for (tid, _), d in self._delta_checks.items() if tid == tenant_id]
+		orders = [o for (tid, _), o in self._orders.items() if tid == tenant_id]
+		results = [r for (tid, _), r in self._results.items() if tid == tenant_id if r.result_status == "final"]
+
+		# QC frequency gaps
+		by_instrument: dict[str, list[Any]] = {}
+		for qr in qc_runs:
+			by_instrument.setdefault(qr.instrument_id, []).append(qr.created_at)
+		max_gap_hours = 0.0
+		for times in by_instrument.values():
+			if len(times) > 1:
+				for i in range(1, len(times)):
+					gap = (times[i] - times[i - 1]).total_seconds() / 3600.0
+					if gap > max_gap_hours:
+						max_gap_hours = gap
+		qc_freq_pass = max_gap_hours <= 8.0 or len(qc_runs) == 0
+
+		# Critical value SLA
+		sla_count = 0
+		sla_total = len(critical_values)
+		for n in critical_values:
+			if n.acknowledged_at and n.created_at:
+				lag = (n.acknowledged_at - n.created_at).total_seconds() / 60.0
+				if lag <= 60.0:
+					sla_count += 1
+		sla_compliance = round(sla_count / max(sla_total, 1) * 100, 1)
+		sla_pass = sla_compliance >= 95.0 or sla_total == 0
+
+		# Specimen rejection rate
+		rejected = sum(1 for s in specimens if s.status == "rejected")
+		rejection_rate = round(rejected / max(len(specimens), 1) * 100, 2)
+		rejection_pass = rejection_rate <= 2.0
+
+		# Proficiency testing participation
+		satisfactory = sum(1 for p in proficiency if p.get("satisfactory", False))
+		pt_score = round(satisfactory / max(len(proficiency), 1) * 100, 1)
+		pt_pass = pt_score >= 80.0 or len(proficiency) == 0
+
+		# STAT TAT 90th percentile
+		stat_tats: list[float] = []
+		for r in results:
+			order = next((o for o in orders if o.id == r.order_id and o.collection_priority == "stat"), None)
+			if order:
+				try:
+					tat = (r.created_at - order.ordered_at).total_seconds() / 60.0
+					if tat >= 0:
+						stat_tats.append(tat)
+				except (AttributeError, TypeError) as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+		stat_tats.sort()
+		p90_stat = stat_tats[int(len(stat_tats) * 0.9)] if stat_tats else None
+		stat_tat_pass = (p90_stat is None) or (p90_stat <= 60.0)
+
+		# Delta check utilisation
+		results_count = len(results)
+		delta_utilisation = round(len(delta_checks) / max(results_count, 1) * 100, 1)
+		delta_pass = delta_utilisation >= 90.0 or results_count == 0
+
+		overall_pass = all([qc_freq_pass, sla_pass, rejection_pass, pt_pass, stat_tat_pass, delta_pass])
+		scorecard_id = uuid7str()
+		scorecard: dict[str, Any] = {
+			"id": scorecard_id,
+			"tenant_id": tenant_id,
+			"period": period,
+			"standard": standard,
+			"generated_at": datetime.utcnow().isoformat(),
+			"overall": "PASS" if overall_pass else "FAIL",
+			"criteria": {
+				"qc_frequency": {
+					"pass": qc_freq_pass,
+					"target": "≤8h between QC runs",
+					"actual_max_gap_hours": round(max_gap_hours, 1),
+				},
+				"critical_value_sla": {
+					"pass": sla_pass,
+					"target": "≥95% notifications within 60 min",
+					"actual_compliance_pct": sla_compliance,
+				},
+				"specimen_rejection_rate": {
+					"pass": rejection_pass,
+					"target": "≤2% rejection rate",
+					"actual_rejection_pct": rejection_rate,
+				},
+				"proficiency_testing": {
+					"pass": pt_pass,
+					"target": "≥80% satisfactory EQA scores",
+					"actual_satisfactory_pct": pt_score,
+				},
+				"stat_tat_p90": {
+					"pass": stat_tat_pass,
+					"target": "≤60 min STAT TAT 90th percentile",
+					"actual_p90_minutes": p90_stat,
+				},
+				"delta_check_utilisation": {
+					"pass": delta_pass,
+					"target": "≥90% of results delta-checked",
+					"actual_utilisation_pct": delta_utilisation,
+				},
+			},
+		}
+		self._audit(tenant_id, "compliance_scorecard_generated", scorecard_id)
+		_log_op("generate_compliance_scorecard", tenant_id, scorecard_id)
+		return scorecard
+
+	async def route_specimen(
+		self,
+		tenant_id: str,
+		specimen_id: str,
+		test_code: str,
+	) -> dict[str, Any]:
+		"""Select the optimal instrument for a specimen+test using weighted routing.
+
+		Routing algorithm:
+		1. Filter instruments by: test_code in test_categories, status == online.
+		2. Score by: weight (configured) / current queue depth.
+		3. Select highest-scoring available instrument.
+		4. If all instruments are on QC hold or offline, return routing_failed=True.
+
+		Routing decision is published to audit log and the selected instrument's
+		queue depth counter is incremented.  Returns routing decision record.
+		"""
+		assert bool(specimen_id), "specimen_id required"
+		assert bool(test_code), "test_code required"
+
+		if not hasattr(self, "_routing_config"):
+			self._routing_config: dict[str, list[dict[str, Any]]] = {}
+		if not hasattr(self, "_instrument_queue_depth"):
+			self._instrument_queue_depth: dict[tuple[str, str], int] = {}
+
+		spec = self._specimens.get((tenant_id, specimen_id))
+		if spec is None:
+			raise KeyError(f"specimen {specimen_id} not found")
+
+		# Get routing weights for test_code
+		routing_key = f"{tenant_id}:{test_code}"
+		weights = self._routing_config.get(routing_key, [])
+
+		instruments = [i for (tid, _), i in self._instruments.items() if tid == tenant_id]
+		eligible = [
+			i for i in instruments
+			if i.status not in {"qc_hold", "offline", "maintenance"}
+			and (not i.test_categories or test_code in i.test_categories)
+		]
+
+		if not eligible:
+			return {
+				"specimen_id": specimen_id,
+				"test_code": test_code,
+				"routing_failed": True,
+				"reason": "no_eligible_instruments",
+				"routed_at": datetime.utcnow().isoformat(),
+			}
+
+		# Score candidates
+		weight_map = {w["instrument_id"]: w.get("weight", 1.0) for w in weights}
+		max_queue_map = {w["instrument_id"]: w.get("max_queue", 100) for w in weights}
+
+		def _score(inst: InstrumentResponse) -> float:
+			w = weight_map.get(inst.id, 1.0)
+			q = self._instrument_queue_depth.get((tenant_id, inst.id), 0)
+			max_q = max_queue_map.get(inst.id, 100)
+			if q >= max_q:
+				return -1.0
+			return w / (q + 1)
+
+		selected = max(eligible, key=_score)
+
+		# Increment queue counter
+		current_depth = self._instrument_queue_depth.get((tenant_id, selected.id), 0)
+		self._instrument_queue_depth[(tenant_id, selected.id)] = current_depth + 1
+
+		routing_id = uuid7str()
+		record: dict[str, Any] = {
+			"id": routing_id,
+			"tenant_id": tenant_id,
+			"specimen_id": specimen_id,
+			"test_code": test_code,
+			"selected_instrument_id": selected.id,
+			"selected_instrument_name": selected.name,
+			"routing_failed": False,
+			"eligible_count": len(eligible),
+			"queue_depth_after": current_depth + 1,
+			"routed_at": datetime.utcnow().isoformat(),
+		}
+		self._audit(tenant_id, "specimen_routed", routing_id)
+		_log_op("route_specimen", tenant_id, routing_id)
+		return record
+
+	async def configure_routing_weights(
+		self,
+		tenant_id: str,
+		test_code: str,
+		weights: list[dict[str, Any]],
+	) -> dict[str, Any]:
+		"""Configure per-instrument routing weights for a test code.
+
+		Each weight entry: {instrument_id: str, weight: float, max_queue: int}
+		Higher weight → more likely to be selected when queue depths are equal.
+		max_queue limits the instrument's concurrent workload before fallback.
+		"""
+		if not hasattr(self, "_routing_config"):
+			self._routing_config = {}
+		key = f"{tenant_id}:{test_code}"
+		self._routing_config[key] = weights
+		config_id = uuid7str()
+		self._audit(tenant_id, "routing_weights_configured", config_id)
+		return {"id": config_id, "tenant_id": tenant_id, "test_code": test_code, "weights": weights}
+
+	async def record_patient_consent(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		test_categories: list[str],
+		consented_by: str,
+		expiry_date: datetime | None = None,
+		consent_method: str = "written",
+	) -> dict[str, Any]:
+		"""Record a patient's consent for release of sensitive test categories.
+
+		Consent gates release of results in CONSENT_GATED_CATEGORIES:
+		genetics | hiv | substance_abuse | reproductive | mental_health
+
+		consent_method: written | verbal | electronic | implicit
+		Consent records are time-limited; expired consents are treated as absent.
+		Returns the consent record ID for reference in result release workflows.
+		"""
+		_VALID_METHODS = {"written", "verbal", "electronic", "implicit"}
+		assert consent_method in _VALID_METHODS, f"invalid consent_method: {consent_method}"
+		assert bool(patient_id), "patient_id required"
+		assert bool(consented_by), "consented_by required"
+		assert test_categories, "test_categories must not be empty"
+
+		if not hasattr(self, "_consent_records"):
+			self._consent_records: dict[tuple[str, str, str], dict[str, Any]] = {}
+
+		now = datetime.utcnow()
+		consent_id = uuid7str()
+		for cat in test_categories:
+			record: dict[str, Any] = {
+				"id": consent_id,
+				"tenant_id": tenant_id,
+				"patient_id": patient_id,
+				"test_category": cat,
+				"consented_by": consented_by,
+				"consent_method": consent_method,
+				"consented_at": now.isoformat(),
+				"expiry_date": expiry_date.isoformat() if expiry_date else None,
+				"active": True,
+			}
+			self._consent_records[(tenant_id, patient_id, cat)] = record
+
+		self._audit(tenant_id, "patient_consent_recorded", consent_id)
+		logger.info("lab.consent_recorded patient=%s categories=%s tenant=%s", patient_id, test_categories, tenant_id)
+		return {
+			"id": consent_id,
+			"tenant_id": tenant_id,
+			"patient_id": patient_id,
+			"test_categories": test_categories,
+			"consented_at": now.isoformat(),
+			"expiry_date": expiry_date.isoformat() if expiry_date else None,
+		}
+
+	async def check_consent(
+		self,
+		tenant_id: str,
+		patient_id: str,
+		test_category: str,
+	) -> dict[str, Any]:
+		"""Check whether valid consent exists for releasing a sensitive test result.
+
+		Returns {has_consent: bool, consent_id: str | None, expiry_date: str | None}.
+		Expired consent is treated as absent.
+		"""
+		_CONSENT_GATED_CATEGORIES = {"genetics", "hiv", "substance_abuse", "reproductive", "mental_health"}
+
+		if test_category not in _CONSENT_GATED_CATEGORIES:
+			return {"has_consent": True, "consent_id": None, "reason": "category_not_consent_gated"}
+
+		if not hasattr(self, "_consent_records"):
+			return {"has_consent": False, "consent_id": None, "reason": "no_consent_records"}
+
+		record = self._consent_records.get((tenant_id, patient_id, test_category))
+		if record is None:
+			return {"has_consent": False, "consent_id": None, "reason": "no_consent_on_record"}
+
+		if record.get("expiry_date"):
+			try:
+				expiry = datetime.fromisoformat(record["expiry_date"])
+				if datetime.utcnow() > expiry:
+					return {"has_consent": False, "consent_id": record["id"], "reason": "consent_expired"}
+			except ValueError as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		return {
+			"has_consent": True,
+			"consent_id": record["id"],
+			"expiry_date": record.get("expiry_date"),
+			"reason": "valid_consent_on_record",
+		}
+
+	async def get_audit_events(
+		self,
+		tenant_id: str,
+		event_type: str | None = None,
+		limit: int = 100,
+	) -> list[dict[str, Any]]:
+		"""Return recent audit events for a tenant, optionally filtered by event type.
+
+		Events are returned in reverse-chronological order (most recent first).
+		limit: maximum number of events to return (max 1000).
+		"""
+		limit = min(limit, 1000)
+		events = [e for e in self._audit_events if e.get("tenant_id") == tenant_id]
+		if event_type:
+			events = [e for e in events if e.get("event") == event_type]
+		return sorted(events, key=lambda e: e.get("timestamp", ""), reverse=True)[:limit]
+
+	async def verify_audit_chain(self, tenant_id: str) -> dict[str, Any]:
+		"""Verify cryptographic integrity of the audit event chain for a tenant.
+
+		Each event's hash is recomputed from its content fields.
+		Returns {valid: bool, entries_verified: int, first_break_at: int | None}.
+
+		Note: hash chaining is only active if events were written via _audit_with_hash.
+		Legacy events (no hash field) are counted but not verified.
+		"""
+		import hashlib
+
+		events = [e for e in self._audit_events if e.get("tenant_id") == tenant_id]
+		if not events:
+			return {"valid": True, "entries_verified": 0, "first_break_at": None, "legacy_events": 0}
+
+		verified = 0
+		legacy = 0
+		first_break: int | None = None
+
+		prev_hash = ""
+		for idx, event in enumerate(events):
+			stored_hash = event.get("chain_hash")
+			if stored_hash is None:
+				legacy += 1
+				continue
+			payload = f"{prev_hash}{event.get('tenant_id','')}{event.get('event','')}{event.get('entity_id','')}{event.get('timestamp','')}"
+			computed = hashlib.sha256(payload.encode()).hexdigest()
+			if computed != stored_hash:
+				if first_break is None:
+					first_break = idx
+			else:
+				verified += 1
+			prev_hash = stored_hash
+
+		return {
+			"valid": first_break is None,
+			"entries_verified": verified,
+			"first_break_at": first_break,
+			"legacy_events": legacy,
+			"total_events": len(events),
+		}
+
+	async def assess_specimen_viability(
+		self,
+		tenant_id: str,
+		specimen_id: str,
+		test_codes: list[str],
+	) -> dict[str, Any]:
+		"""Estimate specimen viability for the requested test codes based on elapsed time,
+		collection method, and transport conditions recorded in the custody chain.
+
+		Uses CLSI EP25-based stability windows per analyte type:
+		  potassium (whole_blood, RT): 1h | glucose (serum, RT): 4h | CBC: 24h
+		  coagulation (citrate, RT): 4h | general_chemistry (serum, 4°C): 72h
+
+		Returns:
+		  viability_score (0–100), risk_analytes (those near/past stability window),
+		  recommended_action (process_immediately | acceptable | reject).
+		"""
+		_STABILITY_HOURS: dict[str, float] = {
+			"K": 1.0, "Na": 8.0, "Glucose": 4.0, "Hb": 24.0, "WBC": 24.0,
+			"PT": 4.0, "APTT": 4.0, "INR": 4.0, "Creatinine": 72.0,
+			"default": 24.0,
+		}
+
+		spec = self._specimens.get((tenant_id, specimen_id))
+		if spec is None:
+			raise KeyError(f"specimen {specimen_id} not found")
+
+		chain = self._custody_chain.get((tenant_id, specimen_id), [])
+		now = datetime.utcnow()
+		elapsed_hours = (now - spec.collected_at).total_seconds() / 3600.0
+
+		# Temperature multiplier from custody chain — refrigerated extends stability
+		temp_multiplier = 1.0
+		for event in chain:
+			cond = event.get("transport_condition", "ambient")
+			if cond == "refrigerated":
+				temp_multiplier = 2.5
+			elif cond == "frozen":
+				temp_multiplier = 10.0
+			elif cond == "dry_ice":
+				temp_multiplier = 20.0
+
+		risk_analytes: list[str] = []
+		scores: list[float] = []
+		for tc in test_codes:
+			stability = _STABILITY_HOURS.get(tc, _STABILITY_HOURS["default"]) * temp_multiplier
+			remaining_pct = max(0.0, (stability - elapsed_hours) / stability * 100.0)
+			scores.append(remaining_pct)
+			if remaining_pct < 20.0:
+				risk_analytes.append(tc)
+
+		viability_score = round(sum(scores) / max(len(scores), 1), 1) if scores else 100.0
+
+		if viability_score < 10.0:
+			recommended_action = "reject"
+		elif viability_score < 40.0:
+			recommended_action = "process_immediately"
+		else:
+			recommended_action = "acceptable"
+
+		return {
+			"specimen_id": specimen_id,
+			"tenant_id": tenant_id,
+			"elapsed_hours": round(elapsed_hours, 2),
+			"viability_score": viability_score,
+			"risk_analytes": risk_analytes,
+			"recommended_action": recommended_action,
+			"test_codes_assessed": test_codes,
+			"assessed_at": now.isoformat(),
+		}
+

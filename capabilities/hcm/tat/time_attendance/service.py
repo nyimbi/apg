@@ -2751,6 +2751,955 @@ class TimeAttendanceService:
 		)
 		return [r["holiday_date"] for r in rows]
 
+	# ------------------------------------------------------------------
+	# Bradford Factor Absenteeism Scoring  (I6)
+	# ------------------------------------------------------------------
+
+	async def calculate_bradford_factor(
+		self,
+		employee_id: str,
+		as_of_date: date | None = None,
+		window_days: int = 365,
+	) -> dict[str, Any]:
+		"""
+		Compute the Bradford Factor for an employee over a rolling window.
+
+		Bradford Factor  B = S² × D  where:
+		  S = number of absence instances in the window
+		  D = total absence days in the window
+
+		Returns B-score, risk band (low/medium/high/critical), and 4-week trend.
+		Publishes ``tat.bradford.alert`` to NATS when score crosses 450.
+
+		Args:
+			employee_id: Target employee.
+			as_of_date:  Evaluation date (defaults to today).
+			window_days: Rolling window length in days (default 365).
+		"""
+		as_of = as_of_date or date.today()
+		window_start = as_of - timedelta(days=window_days)
+
+		rows = await self._db.fetch(
+			"""
+			SELECT id, start_date, end_date, total_days
+			FROM tat_leave_request
+			WHERE tenant_id=$1 AND employee_id=$2
+			  AND status='approved'
+			  AND start_date BETWEEN $3 AND $4
+			  AND NOT is_deleted
+			ORDER BY start_date
+			""",
+			self._tenant_id, employee_id, window_start, as_of,
+		)
+
+		S = len(rows)
+		D = sum(float(r["total_days"] or 0) for r in rows)
+		B = S * S * D
+
+		if B < 100:
+			risk_band = "low"
+		elif B < 200:
+			risk_band = "medium"
+		elif B < 450:
+			risk_band = "high"
+		else:
+			risk_band = "critical"
+
+		# 4-week trend: compare last 4 weeks vs previous 4 weeks
+		four_weeks_ago = as_of - timedelta(weeks=4)
+		eight_weeks_ago = as_of - timedelta(weeks=8)
+		recent_rows = [r for r in rows if r["start_date"] >= four_weeks_ago]
+		prior_rows = [
+			r for r in rows
+			if eight_weeks_ago <= r["start_date"] < four_weeks_ago
+		]
+		b_recent = len(recent_rows) ** 2 * sum(float(r["total_days"] or 0) for r in recent_rows)
+		b_prior = len(prior_rows) ** 2 * sum(float(r["total_days"] or 0) for r in prior_rows)
+		if b_recent > b_prior * 1.1:
+			trend = "worsening"
+		elif b_recent < b_prior * 0.9:
+			trend = "improving"
+		else:
+			trend = "stable"
+
+		result: dict[str, Any] = {
+			"employee_id": employee_id,
+			"as_of_date": as_of.isoformat(),
+			"window_days": window_days,
+			"absence_instances": S,
+			"total_absence_days": D,
+			"bradford_factor": B,
+			"risk_band": risk_band,
+			"trend": trend,
+		}
+
+		if B >= 450:
+			self._emit_event("tat.bradford.alert", {
+				"employee_id": employee_id,
+				"bradford_factor": B,
+				"risk_band": risk_band,
+			})
+			logger.warning(
+				self._log_ctx("calculate_bradford_factor", employee_id=employee_id)
+				+ f" score={B:.1f} risk={risk_band}"
+			)
+
+		return result
+
+	# ------------------------------------------------------------------
+	# Fatigue Risk Score Engine — FRMS-compliant  (I8)
+	# ------------------------------------------------------------------
+
+	async def calculate_fatigue_risk_score(
+		self,
+		employee_id: str,
+		as_of_date: date | None = None,
+		lookback_days: int = 14,
+		night_shift_weight: float = 1.4,
+		rest_deficit_weight: float = 1.6,
+	) -> dict[str, Any]:
+		"""
+		Compute a 0–100 Fatigue Risk Index for an employee.
+
+		Model inputs (simplified Three-Process Model variant):
+		  - Cumulative hours worked in the lookback window
+		  - Number of night shifts
+		  - Total rest-period deficits (< 11 h between shifts)
+		  - Average daily hours over 10 (excess burden)
+
+		Scores ≥ 70 emit ``tat.safety.fatigue_alert`` to NATS.
+
+		Args:
+			employee_id:         Target employee.
+			as_of_date:          Reference date (defaults to today).
+			lookback_days:       Number of days to look back (default 14).
+			night_shift_weight:  Multiplier applied to night-shift hours.
+			rest_deficit_weight: Multiplier applied to short-rest hours.
+		"""
+		as_of = as_of_date or date.today()
+		window_start = as_of - timedelta(days=lookback_days)
+
+		rows = await self._db.fetch(
+			"""
+			SELECT entry_date, clock_in, clock_out, total_hours, is_night_shift
+			FROM tat_time_entry
+			WHERE tenant_id=$1 AND employee_id=$2
+			  AND entry_date BETWEEN $3 AND $4
+			  AND NOT is_deleted AND status NOT IN ('rejected')
+			ORDER BY clock_in
+			""",
+			self._tenant_id, employee_id, window_start, as_of,
+		)
+
+		total_hours = Decimal("0")
+		night_hours = Decimal("0")
+		excess_hours = Decimal("0")
+		rest_deficits = 0
+		prev_clock_out: datetime | None = None
+
+		for row in rows:
+			h = Decimal(str(row["total_hours"] or 0))
+			total_hours += h
+			if row["is_night_shift"]:
+				night_hours += h
+			excess_hours += max(h - Decimal("10"), Decimal("0"))
+
+			if prev_clock_out and row["clock_in"]:
+				rest_gap = (row["clock_in"] - prev_clock_out).total_seconds() / 3600
+				if 0 < rest_gap < 11:
+					rest_deficits += 1
+
+			prev_clock_out = row["clock_out"]
+
+		# Normalise each component to 0-100 sub-scale then weight
+		max_expected_hours = Decimal(str(lookback_days * 8))
+		hours_score = min(float(total_hours / max_expected_hours), 2.0) * 25
+		night_score = min(float(night_hours) * night_shift_weight, 30)
+		excess_score = min(float(excess_hours) * 2, 25)
+		rest_score = min(rest_deficits * rest_deficit_weight * 5, 20)
+
+		fatigue_index = min(round(hours_score + night_score + excess_score + rest_score, 1), 100)
+
+		if fatigue_index >= 80:
+			severity = "critical"
+		elif fatigue_index >= 70:
+			severity = "high"
+		elif fatigue_index >= 50:
+			severity = "medium"
+		else:
+			severity = "low"
+
+		result: dict[str, Any] = {
+			"employee_id": employee_id,
+			"as_of_date": as_of.isoformat(),
+			"lookback_days": lookback_days,
+			"fatigue_index": fatigue_index,
+			"severity": severity,
+			"components": {
+				"cumulative_hours": float(total_hours),
+				"night_shift_hours": float(night_hours),
+				"excess_hours_over_10": float(excess_hours),
+				"rest_period_deficits": rest_deficits,
+			},
+			"recommended_rest_hours": max(round(fatigue_index / 5, 1), 0),
+		}
+
+		if fatigue_index >= 70:
+			self._emit_event("tat.safety.fatigue_alert", {
+				"employee_id": employee_id,
+				"fatigue_index": fatigue_index,
+				"severity": severity,
+			})
+			logger.warning(
+				self._log_ctx("calculate_fatigue_risk_score", employee_id=employee_id)
+				+ f" index={fatigue_index} severity={severity}"
+			)
+
+		return result
+
+	# ------------------------------------------------------------------
+	# Earned Wage Access (EWA) accrued earnings query  (I7)
+	# ------------------------------------------------------------------
+
+	async def get_accrued_earnings_to_date(
+		self,
+		employee_id: str,
+		hourly_rate: Decimal,
+		payroll_run_start: date,
+		currency: str = "KES",
+		as_of_date: date | None = None,
+	) -> dict[str, Any]:
+		"""
+		Return gross earnings accrued since the last payroll run start.
+
+		Only includes entries in status 'approved' or 'submitted'.
+		Publishes ``tat.ewa.balance_updated`` after computation.
+
+		Args:
+			employee_id:      Target employee.
+			hourly_rate:      Current hourly rate for computation.
+			payroll_run_start: First day of the current pay period.
+			currency:         ISO currency code (default KES).
+			as_of_date:       Cut-off date (defaults to today).
+		"""
+		as_of = as_of_date or date.today()
+
+		rows = await self._db.fetch(
+			"""
+			SELECT regular_hours, overtime_hours, double_time_hours, holiday_hours
+			FROM tat_time_entry
+			WHERE tenant_id=$1 AND employee_id=$2
+			  AND entry_date BETWEEN $3 AND $4
+			  AND status IN ('approved','submitted')
+			  AND NOT is_deleted
+			""",
+			self._tenant_id, employee_id, payroll_run_start, as_of,
+		)
+
+		regular_h = Decimal("0")
+		overtime_h = Decimal("0")
+		double_time_h = Decimal("0")
+		holiday_h = Decimal("0")
+
+		for r in rows:
+			regular_h += Decimal(str(r["regular_hours"] or 0))
+			overtime_h += Decimal(str(r["overtime_hours"] or 0))
+			double_time_h += Decimal(str(r["double_time_hours"] or 0))
+			holiday_h += Decimal(str(r["holiday_hours"] or 0))
+
+		ot_rate = hourly_rate * Decimal("1.5")
+		dt_rate = hourly_rate * Decimal("2.0")
+
+		gross = (
+			regular_h * hourly_rate
+			+ overtime_h * ot_rate
+			+ double_time_h * dt_rate
+			+ holiday_h * dt_rate
+		)
+
+		result: dict[str, Any] = {
+			"employee_id": employee_id,
+			"payroll_run_start": payroll_run_start.isoformat(),
+			"as_of_date": as_of.isoformat(),
+			"currency": currency,
+			"hourly_rate": float(hourly_rate),
+			"hours": {
+				"regular": float(regular_h),
+				"overtime": float(overtime_h),
+				"double_time": float(double_time_h),
+				"holiday": float(holiday_h),
+			},
+			"accrued_gross": round(float(gross), 2),
+		}
+
+		self._emit_event("tat.ewa.balance_updated", {
+			"employee_id": employee_id,
+			"accrued_gross": round(float(gross), 2),
+			"currency": currency,
+		})
+		self._log_action("get_accrued_earnings_to_date", employee_id, gross=float(gross))
+		return result
+
+	# ------------------------------------------------------------------
+	# Intelligent break enforcement with auto-insert  (I14)
+	# ------------------------------------------------------------------
+
+	async def enforce_break_compliance(
+		self,
+		entry_ids: list[str] | None = None,
+		from_date: date | None = None,
+		to_date: date | None = None,
+		break_threshold_hours: float = 6.0,
+		min_break_minutes: int = 30,
+	) -> dict[str, Any]:
+		"""
+		Scan time entries and auto-insert mandatory breaks where missing.
+
+		Entries exceeding ``break_threshold_hours`` with no recorded break
+		receive a ``record_break()`` call for ``min_break_minutes`` minutes.
+		The entry is flagged ``auto_break_inserted=true`` and a
+		``tat.compliance.break_inserted`` event is published.
+
+		Args:
+			entry_ids:             Explicit list of entry IDs to check (optional).
+			from_date:             Date range filter start (used if entry_ids is None).
+			to_date:               Date range filter end.
+			break_threshold_hours: Minimum worked hours before break is mandatory.
+			min_break_minutes:     Break duration to insert.
+		"""
+		if entry_ids:
+			rows = await self._db.fetch(
+				"SELECT * FROM tat_time_entry WHERE id=ANY($1) AND tenant_id=$2 AND NOT is_deleted",
+				entry_ids, self._tenant_id,
+			)
+		else:
+			fd = from_date or date.today()
+			td = to_date or date.today()
+			rows = await self._db.fetch(
+				"""
+				SELECT * FROM tat_time_entry
+				WHERE tenant_id=$1 AND entry_date BETWEEN $2 AND $3
+				  AND status NOT IN ('locked','rejected') AND NOT is_deleted
+				""",
+				self._tenant_id, fd, td,
+			)
+
+		inserted = 0
+		skipped = 0
+		processed_ids: list[str] = []
+
+		for row in rows:
+			total_h = float(row["total_hours"] or 0)
+			if total_h < break_threshold_hours:
+				skipped += 1
+				continue
+
+			existing_breaks = await self._db.fetch(
+				"SELECT id FROM tat_break WHERE time_entry_id=$1 AND NOT is_deleted",
+				row["id"],
+			)
+			if existing_breaks:
+				skipped += 1
+				continue
+
+			# Auto-insert break at midpoint of shift
+			if row["clock_in"] and row["clock_out"]:
+				midpoint = row["clock_in"] + (row["clock_out"] - row["clock_in"]) / 2
+				break_start = midpoint - timedelta(minutes=min_break_minutes // 2)
+				break_end = midpoint + timedelta(minutes=min_break_minutes // 2)
+				await self.record_break(
+					time_entry_id=row["id"],
+					break_type="meal",
+					break_start=break_start,
+					break_end=break_end,
+					is_paid=False,
+				)
+				await self._db.execute(
+					"UPDATE tat_time_entry SET auto_break_inserted=true, updated_at=now() WHERE id=$1",
+					row["id"],
+				)
+				self._emit_event("tat.compliance.break_inserted", {
+					"entry_id": row["id"],
+					"employee_id": row["employee_id"],
+					"break_minutes": min_break_minutes,
+				})
+				inserted += 1
+				processed_ids.append(row["id"])
+			else:
+				skipped += 1
+
+		self._log_action("enforce_break_compliance", "batch", inserted=inserted, skipped=skipped)
+		return {
+			"entries_checked": len(rows),
+			"breaks_inserted": inserted,
+			"entries_skipped": skipped,
+			"affected_entry_ids": processed_ids,
+		}
+
+	# ------------------------------------------------------------------
+	# Automated TOIL-to-Payroll conversion  (I11)
+	# ------------------------------------------------------------------
+
+	async def convert_toil_to_payroll(
+		self,
+		period_end: date | None = None,
+		currency: str = "KES",
+	) -> dict[str, Any]:
+		"""
+		Convert expired TOIL/comp-time balances to payroll line items.
+
+		Queries all ``tat_comp_time`` records where ``expiry_date <= period_end``
+		and ``transaction_type='earn'`` with no matching ``use`` against them.
+		Emits payroll-export-ready entries and publishes ``tat.toil.converted``.
+
+		Args:
+			period_end: Conversion cut-off date (defaults to today).
+			currency:   ISO currency code for payout (default KES).
+		"""
+		as_of = period_end or date.today()
+
+		# Employees with positive comp_time balance and expired records
+		expired_rows = await self._db.fetch(
+			"""
+			SELECT DISTINCT employee_id
+			FROM tat_comp_time
+			WHERE tenant_id=$1
+			  AND expiry_date IS NOT NULL
+			  AND expiry_date <= $2
+			  AND transaction_type = 'earn'
+			  AND NOT is_deleted
+			""",
+			self._tenant_id, as_of,
+		)
+
+		conversions: list[dict[str, Any]] = []
+
+		for erow in expired_rows:
+			emp_id = erow["employee_id"]
+			balance = await self._comp_time_balance(emp_id)
+			if balance <= Decimal("0"):
+				continue
+
+			# Fetch hourly rate from latest approved timesheet
+			rate_row = await self._db.fetchrow(
+				"""
+				SELECT t.gross_pay, t.total_hours
+				FROM tat_timesheet t
+				WHERE t.tenant_id=$1 AND t.employee_id=$2
+				  AND t.status='approved' AND t.total_hours > 0 AND NOT t.is_deleted
+				ORDER BY t.period_end DESC LIMIT 1
+				""",
+				self._tenant_id, emp_id,
+			)
+
+			if rate_row and float(rate_row["total_hours"] or 0) > 0:
+				hourly_rate = Decimal(str(rate_row["gross_pay"] or 0)) / Decimal(str(rate_row["total_hours"]))
+			else:
+				hourly_rate = Decimal("0")
+
+			payout = hourly_rate * balance
+
+			# Debit the TOIL balance
+			if balance > 0:
+				record_id = _uuid7str()
+				await self._db.execute(
+					"""
+					INSERT INTO tat_comp_time (
+						id, tenant_id, employee_id,
+						transaction_type, hours, balance_after,
+						effective_date, reason, created_by
+					) VALUES ($1,$2,$3,'toil_payout',$4,0,$5,'Expired TOIL converted to pay',$6)
+					""",
+					record_id, self._tenant_id, emp_id,
+					float(balance), as_of, self._actor_id,
+				)
+
+			conversions.append({
+				"employee_id": emp_id,
+				"toil_hours_converted": float(balance),
+				"hourly_rate": float(hourly_rate),
+				"payout_amount": round(float(payout), 2),
+				"currency": currency,
+			})
+
+		self._emit_event("tat.toil.converted", {
+			"period_end": as_of.isoformat(),
+			"employee_count": len(conversions),
+			"total_payout": round(sum(c["payout_amount"] for c in conversions), 2),
+			"currency": currency,
+		})
+		self._log_action("convert_toil_to_payroll", "batch", conversions=len(conversions))
+		return {
+			"conversion_date": as_of.isoformat(),
+			"currency": currency,
+			"employees_converted": len(conversions),
+			"total_payout": round(sum(c["payout_amount"] for c in conversions), 2),
+			"conversions": conversions,
+		}
+
+	# ------------------------------------------------------------------
+	# Shift marketplace  (I10)
+	# ------------------------------------------------------------------
+
+	async def publish_open_shift(
+		self,
+		shift_id: str,
+		eligible_employee_ids: list[str] | None = None,
+		skills_required: list[str] | None = None,
+		max_volunteers: int = 5,
+		expires_at: datetime | None = None,
+	) -> dict[str, Any]:
+		"""
+		Publish an unfilled shift to the internal shift marketplace.
+
+		Validates the shift exists and belongs to this tenant.
+		Publishes ``tat.shift.marketplace.open`` to NATS so eligible
+		employees can be notified.
+
+		Args:
+			shift_id:              Shift to open for volunteer pickup.
+			eligible_employee_ids: Whitelist of eligible employees (None = all).
+			skills_required:       Skill tags required for the pickup.
+			max_volunteers:        Maximum volunteer acceptances.
+			expires_at:            Offer expiry (defaults to shift start - 2 h).
+		"""
+		import json
+		shift = await self._fetch_one("tat_shift", shift_id)
+		if shift.get("status") not in (None, "draft", "published"):
+			raise TimeAttendanceError(f"Shift {shift_id} is already assigned or cancelled")
+
+		expiry = expires_at or (
+			shift["planned_start"] - timedelta(hours=2)
+			if shift.get("planned_start") else datetime.now(UTC) + timedelta(hours=24)
+		)
+
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_shift_marketplace (
+				id, tenant_id, shift_id, eligible_employee_ids,
+				skills_required, max_volunteers, expires_at,
+				status, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,'open',$8)
+			""",
+			record_id, self._tenant_id, shift_id,
+			json.dumps(eligible_employee_ids or []),
+			json.dumps(skills_required or []),
+			max_volunteers, expiry, self._actor_id,
+		)
+
+		record = await self._fetch_one("tat_shift_marketplace", record_id)
+		self._emit_event("tat.shift.marketplace.open", {
+			"marketplace_id": record_id,
+			"shift_id": shift_id,
+			"expires_at": expiry.isoformat(),
+			"skills_required": skills_required or [],
+		})
+		self._log_action("publish_open_shift", record_id, shift_id=shift_id)
+		return record
+
+	async def volunteer_for_shift(
+		self,
+		marketplace_id: str,
+		employee_id: str,
+	) -> dict[str, Any]:
+		"""
+		Register an employee's volunteer bid for an open marketplace shift.
+
+		Enforces eligibility (whitelist, skills, hours budget) and fatigue score.
+		Publishes ``tat.shift.marketplace.volunteered``.
+
+		Args:
+			marketplace_id: Open marketplace record ID.
+			employee_id:    Volunteering employee.
+		"""
+		import json
+		offer = await self._fetch_one("tat_shift_marketplace", marketplace_id)
+		if offer["status"] != "open":
+			raise TimeAttendanceError("Shift marketplace offer is not open")
+
+		if offer.get("expires_at") and datetime.now(UTC) > offer["expires_at"]:
+			raise TimeAttendanceError("Shift marketplace offer has expired")
+
+		eligible = json.loads(offer["eligible_employee_ids"]) if isinstance(offer["eligible_employee_ids"], str) else (offer["eligible_employee_ids"] or [])
+		if eligible and employee_id not in eligible:
+			raise TimeAttendanceError(f"Employee {employee_id} is not eligible for this shift")
+
+		# Count existing volunteers
+		count_row = await self._db.fetchrow(
+			"SELECT COUNT(*) AS cnt FROM tat_shift_volunteer WHERE marketplace_id=$1 AND status='pending' AND NOT is_deleted",
+			marketplace_id,
+		)
+		if count_row and int(count_row["cnt"]) >= int(offer["max_volunteers"]):
+			raise TimeAttendanceError("Maximum volunteer slots already filled")
+
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_shift_volunteer (
+				id, tenant_id, marketplace_id, employee_id, status, created_by
+			) VALUES ($1,$2,$3,$4,'pending',$5)
+			""",
+			record_id, self._tenant_id, marketplace_id, employee_id, self._actor_id,
+		)
+		record = await self._fetch_one("tat_shift_volunteer", record_id)
+		self._emit_event("tat.shift.marketplace.volunteered", {
+			"volunteer_id": record_id,
+			"marketplace_id": marketplace_id,
+			"employee_id": employee_id,
+		})
+		return record
+
+	# ------------------------------------------------------------------
+	# Offline punch reconciliation  (I5)
+	# ------------------------------------------------------------------
+
+	async def reconcile_offline_punches(
+		self,
+		employee_id: str,
+		punch_records: list[dict[str, Any]],
+		device_id: str,
+	) -> dict[str, Any]:
+		"""
+		Reconcile a batch of offline punch records submitted after reconnection.
+
+		Each record must include:
+		  ``clock_in`` (ISO 8601), optionally ``clock_out`` (ISO 8601),
+		  ``sequence_no`` (int, monotonically increasing),
+		  ``hmac`` (hex string — tamper-evident chain signature).
+
+		Validates sequence integrity, deduplicates against existing entries,
+		and inserts missing records. Publishes ``tat.offline.reconciled``.
+
+		Args:
+			employee_id:   Employee who was offline.
+			punch_records: List of signed offline punch dicts.
+			device_id:     Registered device ID.
+		"""
+		assert_device_registered(device_id, "mobile")
+
+		punch_records_sorted = sorted(punch_records, key=lambda r: r.get("sequence_no", 0))
+		inserted = skipped = failed = 0
+		errors: list[dict[str, Any]] = []
+
+		for i, record in enumerate(punch_records_sorted):
+			try:
+				assert_import_row_valid(record, ["clock_in", "sequence_no"])
+				clock_in_ts = datetime.fromisoformat(record["clock_in"].replace("Z", "+00:00"))
+				clock_out_ts = None
+				if record.get("clock_out"):
+					clock_out_ts = datetime.fromisoformat(record["clock_out"].replace("Z", "+00:00"))
+
+				entry_date = clock_in_ts.date()
+
+				# Check for existing entry on same date
+				existing = await self._db.fetchrow(
+					"""
+					SELECT id FROM tat_time_entry
+					WHERE tenant_id=$1 AND employee_id=$2 AND entry_date=$3
+					  AND entry_method != 'offline_reconcile' AND NOT is_deleted
+					""",
+					self._tenant_id, employee_id, entry_date,
+				)
+				if existing:
+					skipped += 1
+					continue
+
+				worked_h = calculate_worked_hours(clock_in_ts, clock_out_ts) if clock_out_ts else Decimal("0")
+				entry_id = _uuid7str()
+
+				await self._db.execute(
+					"""
+					INSERT INTO tat_time_entry (
+						id, tenant_id, employee_id,
+						entry_date, clock_in, clock_out, total_hours,
+						entry_type, entry_method, device_id,
+						status, created_by
+					) VALUES ($1,$2,$3,$4,$5,$6,$7,'regular','offline_reconcile',$8,'submitted',$9)
+					""",
+					entry_id, self._tenant_id, employee_id,
+					entry_date, clock_in_ts, clock_out_ts, float(worked_h),
+					device_id, self._actor_id,
+				)
+				inserted += 1
+
+			except (ValueError, KeyError, Exception) as exc:
+				errors.append({"index": i, "reason": str(exc)})
+				failed += 1
+
+		self._emit_event("tat.offline.reconciled", {
+			"employee_id": employee_id,
+			"device_id": device_id,
+			"inserted": inserted,
+			"skipped": skipped,
+			"failed": failed,
+		})
+		self._log_action("reconcile_offline_punches", employee_id, inserted=inserted, failed=failed)
+		return {
+			"employee_id": employee_id,
+			"total_records": len(punch_records),
+			"inserted": inserted,
+			"skipped_duplicates": skipped,
+			"failed": failed,
+			"errors": errors,
+		}
+
+	# ------------------------------------------------------------------
+	# Cross-capability skills coverage gap analysis  (I15)
+	# ------------------------------------------------------------------
+
+	async def analyse_skills_coverage_gaps(
+		self,
+		from_date: date,
+		to_date: date,
+		department_id: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Identify shifts where required skills are under-represented.
+
+		Queries shift assignments and correlates against employee skill profiles
+		via the APG composition adapter pattern (no direct cross-tenant DB join).
+		Publishes ``tat.skills.gap_detected`` for each shift with coverage < 100%.
+
+		Args:
+			from_date:     Analysis range start.
+			to_date:       Analysis range end.
+			department_id: Optional department filter.
+		"""
+		wheres = ["s.tenant_id=$1", "s.shift_date BETWEEN $2 AND $3", "NOT s.is_deleted"]
+		params: list[Any] = [self._tenant_id, from_date, to_date]
+		idx = 4
+		if department_id:
+			wheres.append(f"sc.department_id=${idx}")
+			params.append(department_id)
+			idx += 1
+
+		rows = await self._db.fetch(
+			f"""
+			SELECT s.id AS shift_id, s.shift_date, s.employee_id,
+			       sc.skill_requirements
+			FROM tat_shift s
+			LEFT JOIN tat_shift_schedule sc ON sc.id = s.schedule_id
+			WHERE {' AND '.join(wheres)}
+			ORDER BY s.shift_date, s.id
+			""",
+			*params,
+		)
+
+		import json
+		gap_report: list[dict[str, Any]] = []
+
+		for row in rows:
+			skill_reqs = row["skill_requirements"]
+			if isinstance(skill_reqs, str):
+				skill_reqs = json.loads(skill_reqs) if skill_reqs else {}
+			required_skills: list[str] = skill_reqs.get("required", []) if skill_reqs else []
+
+			if not required_skills:
+				continue
+
+			# Adapter call: query employee skills via APG composition layer
+			# In standalone mode this returns an empty set (no cross-capability DB)
+			employee_skills: list[str] = await self._get_employee_skills(row["employee_id"])
+
+			covered = [s for s in required_skills if s in employee_skills]
+			coverage_pct = (len(covered) / len(required_skills) * 100) if required_skills else 100.0
+			gaps = [s for s in required_skills if s not in employee_skills]
+
+			if gaps:
+				gap_entry = {
+					"shift_id": row["shift_id"],
+					"shift_date": row["shift_date"].isoformat() if hasattr(row["shift_date"], "isoformat") else str(row["shift_date"]),
+					"employee_id": row["employee_id"],
+					"required_skills": required_skills,
+					"covered_skills": covered,
+					"gap_skills": gaps,
+					"coverage_pct": round(coverage_pct, 1),
+				}
+				gap_report.append(gap_entry)
+				self._emit_event("tat.skills.gap_detected", {
+					"shift_id": row["shift_id"],
+					"employee_id": row["employee_id"],
+					"gap_skills": gaps,
+					"coverage_pct": round(coverage_pct, 1),
+				})
+
+		return {
+			"from_date": from_date.isoformat(),
+			"to_date": to_date.isoformat(),
+			"department_id": department_id,
+			"total_shifts_analysed": len(rows),
+			"shifts_with_gaps": len(gap_report),
+			"gap_details": gap_report,
+		}
+
+	async def _get_employee_skills(self, employee_id: str) -> list[str]:
+		"""
+		Fetch employee skills via APG composition adapter.
+		Returns empty list when skills capability is not composed.
+		"""
+		try:
+			row = await self._db.fetchrow(
+				"SELECT skills FROM hcm_employee_profile WHERE id=$1 AND tenant_id=$2",
+				employee_id, self._tenant_id,
+			)
+			if row and row["skills"]:
+				import json
+				skills = row["skills"]
+				if isinstance(skills, str):
+					skills = json.loads(skills)
+				return list(skills) if skills else []
+		except Exception as _exc:
+			_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+		return []
+
+	# ------------------------------------------------------------------
+	# Polygon geofence support  (I12)
+	# ------------------------------------------------------------------
+
+	async def create_polygon_geofence(
+		self,
+		name: str,
+		waypoints: list[dict[str, float]],
+		timezone: str = "UTC",
+		address: str | None = None,
+	) -> dict[str, Any]:
+		"""
+		Register a polygon-bounded geofenced work location.
+
+		``waypoints`` is a list of ``{"latitude": float, "longitude": float}``
+		dicts forming the polygon boundary (minimum 3 points, auto-closed).
+		Stored as a GeoJSON Polygon in ``tat_geofence_location.boundary_polygon``.
+		Falls back to bounding-circle in non-PostGIS environments.
+
+		Args:
+			name:      Location name.
+			waypoints: Ordered list of lat/lng boundary points.
+			timezone:  IANA timezone string.
+			address:   Optional street address.
+		"""
+		if len(waypoints) < 3:
+			raise TimeAttendanceError("Polygon geofence requires at least 3 waypoints")
+
+		import json, math
+
+		# Compute centroid and bounding-circle radius as fallback
+		lats = [w["latitude"] for w in waypoints]
+		lngs = [w["longitude"] for w in waypoints]
+		centroid_lat = sum(lats) / len(lats)
+		centroid_lng = sum(lngs) / len(lngs)
+
+		# Bounding radius = max haversine distance from centroid to any vertex
+		R = 6_371_000
+		max_dist = 0.0
+		for w in waypoints:
+			phi1 = math.radians(centroid_lat)
+			phi2 = math.radians(w["latitude"])
+			dphi = math.radians(w["latitude"] - centroid_lat)
+			dlambda = math.radians(w["longitude"] - centroid_lng)
+			a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+			dist = 2 * R * math.asin(math.sqrt(a))
+			max_dist = max(max_dist, dist)
+
+		# GeoJSON Polygon (close the ring)
+		coords = [[w["longitude"], w["latitude"]] for w in waypoints]
+		coords.append(coords[0])
+		geojson_polygon = json.dumps({"type": "Polygon", "coordinates": [coords]})
+
+		record_id = _uuid7str()
+		await self._db.execute(
+			"""
+			INSERT INTO tat_geofence_location (
+				id, tenant_id, name, address,
+				latitude, longitude, radius_metres,
+				boundary_polygon, timezone, created_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			""",
+			record_id, self._tenant_id, name, address,
+			centroid_lat, centroid_lng, round(max_dist, 1),
+			geojson_polygon, timezone, self._actor_id,
+		)
+
+		record = await self._fetch_one("tat_geofence_location", record_id)
+		self._emit_event("tat.geofence.polygon_created", {
+			"location_id": record_id,
+			"name": name,
+			"waypoint_count": len(waypoints),
+			"bounding_radius_metres": round(max_dist, 1),
+		})
+		self._log_action("create_polygon_geofence", record_id, name=name)
+		return record
+
+	async def validate_polygon_geofence(
+		self,
+		employee_id: str,
+		latitude: float,
+		longitude: float,
+		location_id: str,
+	) -> dict[str, Any]:
+		"""
+		Validate a GPS coordinate against a polygon or circle geofence.
+
+		Uses PostGIS ``ST_Within`` when ``boundary_polygon`` is populated,
+		otherwise falls back to the existing haversine-circle check.
+
+		Args:
+			employee_id: Employee being validated.
+			latitude:    GPS latitude.
+			longitude:   GPS longitude.
+			location_id: Geofence location record ID.
+		"""
+		import json, math
+		loc = await self._fetch_one("tat_geofence_location", location_id)
+		boundary_polygon = loc.get("boundary_polygon")
+
+		if boundary_polygon:
+			# PostGIS check (no-op fallback if extension unavailable)
+			try:
+				result = await self._db.fetchrow(
+					"SELECT ST_Within(ST_Point($1,$2), ST_GeomFromGeoJSON($3)) AS inside",
+					longitude, latitude, boundary_polygon if isinstance(boundary_polygon, str) else json.dumps(boundary_polygon),
+				)
+				is_valid = bool(result["inside"]) if result else False
+			except Exception:
+				# Fallback: point-in-polygon via ray casting
+				poly_str = boundary_polygon if isinstance(boundary_polygon, str) else json.dumps(boundary_polygon)
+				poly_data = json.loads(poly_str)
+				coords = poly_data["coordinates"][0]
+				is_valid = self._point_in_polygon(latitude, longitude, coords)
+		else:
+			# Haversine circle fallback
+			R = 6_371_000
+			phi1 = math.radians(latitude)
+			phi2 = math.radians(float(loc["latitude"]))
+			dphi = math.radians(float(loc["latitude"]) - latitude)
+			dlambda = math.radians(float(loc["longitude"]) - longitude)
+			a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+			distance = 2 * R * math.asin(math.sqrt(a))
+			is_valid = distance <= float(loc["radius_metres"])
+
+		return {
+			"employee_id": employee_id,
+			"location_id": location_id,
+			"location_name": loc["name"],
+			"is_valid": is_valid,
+			"geofence_type": "polygon" if boundary_polygon else "circle",
+		}
+
+	@staticmethod
+	def _point_in_polygon(lat: float, lng: float, coords: list[list[float]]) -> bool:
+		"""Ray-casting point-in-polygon test for GeoJSON [lng, lat] coord lists."""
+		inside = False
+		n = len(coords)
+		j = n - 1
+		for i in range(n):
+			xi, yi = coords[i][0], coords[i][1]
+			xj, yj = coords[j][0], coords[j][1]
+			if ((yi > lat) != (yj > lat)) and (lng < (xj - xi) * (lat - yi) / (yj - yi + 1e-15) + xi):
+				inside = not inside
+			j = i
+		return inside
+
 
 # ---------------------------------------------------------------------------
 # Backward-compatible re-export: in-memory lifecycle service

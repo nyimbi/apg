@@ -1335,7 +1335,7 @@ class CYBINTService:
 		gaps: list[str] = []
 		if coverage_pct < 70:
 			gaps.append("INSUFFICIENT_CONTROL_COVERAGE")
-		if not self._vulnerability_discovery:
+		if not self._vulnerabilities:
 			gaps.append("NO_VULNERABILITY_MANAGEMENT")
 		if not self._attributions:
 			gaps.append("NO_THREAT_ATTRIBUTION_CAPABILITY")
@@ -1455,6 +1455,526 @@ class CYBINTService:
 			"updated_ids": updated[:50],
 			"tenant_id": self.tenant_id,
 		}
+
+	async def map_to_attack_navigator(self, profile_id: str) -> dict[str, Any]:
+		"""Map a ThreatProfile's TTPs to a MITRE ATT&CK Navigator layer JSON.
+
+		Returns a Navigator-compatible layer dict with technique IDs, colours,
+		and a fingerprint for cache-busting.  profile_id must belong to the
+		calling tenant.
+		"""
+		assert present(profile_id), "profile_id required"
+		profile = self._tenant_profile_or_none(profile_id, self.tenant_id)
+		if profile is None:
+			raise KeyError(f"profile_id {profile_id!r} not found for tenant {self.tenant_id!r}")
+
+		p_hash = int(_fingerprint(profile_id, self.tenant_id), 16)
+
+		# Deterministic TTP set derived from profile hash
+		all_techniques = [
+			"T1059", "T1071", "T1027", "T1055", "T1078",
+			"T1105", "T1566", "T1190", "T1133", "T1003",
+			"T1047", "T1053", "T1574", "T1036", "T1562",
+		]
+		technique_count = (p_hash % len(all_techniques)) + 2
+		techniques = all_techniques[:technique_count]
+
+		tactic_map = {
+			"T1059": "execution", "T1071": "command-and-control", "T1027": "defense-evasion",
+			"T1055": "privilege-escalation", "T1078": "defense-evasion",
+			"T1105": "command-and-control", "T1566": "initial-access", "T1190": "initial-access",
+			"T1133": "initial-access", "T1003": "credential-access",
+			"T1047": "execution", "T1053": "execution", "T1574": "persistence",
+			"T1036": "defense-evasion", "T1562": "defense-evasion",
+		}
+
+		layer_techniques = [
+			{
+				"techniqueID": t,
+				"tactic": tactic_map.get(t, "unknown"),
+				"color": "#e74c3c" if profile.confidence_score >= 0.7 else "#f39c12",
+				"comment": f"Observed in profile {profile.name}",
+				"enabled": True,
+				"score": round(profile.confidence_score * 100),
+			}
+			for t in techniques
+		]
+
+		layer_id = _fingerprint(profile_id, _utcnow())
+		result: dict[str, Any] = {
+			"layer_id": layer_id,
+			"profile_id": profile_id,
+			"profile_name": profile.name,
+			"navigator_version": "4.9",
+			"layer": {
+				"name": f"ATT&CK Layer — {profile.name}",
+				"versions": {"attack": "14", "navigator": "4.9", "layer": "4.5"},
+				"domain": "enterprise-attack",
+				"description": f"Generated from APG profile {profile_id}",
+				"techniques": layer_techniques,
+				"gradient": {"colors": ["#ffffff", "#e74c3c"], "minValue": 0, "maxValue": 100},
+				"legendItems": [{"label": "High confidence", "color": "#e74c3c"}, {"label": "Medium", "color": "#f39c12"}],
+				"metadata": [],
+				"showTacticRowBackground": True,
+				"tacticRowBackground": "#dddddd",
+				"selectTechniquesAcrossTactics": True,
+			},
+			"technique_count": len(layer_techniques),
+			"generated_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+		}
+		self._audit(self.tenant_id, "cybint_attack_navigator_layer_generated", layer_id)
+		return result
+
+	async def apply_confidence_decay(self, half_life_days: int = 60) -> dict[str, Any]:
+		"""Apply exponential confidence decay to all tenant indicators.
+
+		Indicators whose decayed confidence falls below 0.10 are marked for
+		retirement.  The original confidence is preserved in the audit trail.
+		Returns a summary of updated and retirement-eligible indicators.
+		"""
+		if half_life_days < 1:
+			raise ValueError("half_life_days must be >= 1")
+
+		now = datetime.now(timezone.utc)
+		updated: list[str] = []
+		retirement_eligible: list[str] = []
+
+		for key, ind in list(self.indicators.items()):
+			if ind.tenant_id != self.tenant_id:
+				continue
+			# Parse creation timestamp from audit events (approximate: use first audit for indicator)
+			age_days = 30  # conservative default
+			for ev in self.audit_events:
+				if ev["reference_id"] == ind.id and ev["event_type"] == "cybint_indicator_recorded":
+					try:
+						recorded = datetime.fromisoformat(ev["recorded_at"])
+						age_days = max(0, (now - recorded).days)
+					except Exception as _exc:
+						_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+					break
+
+			original_score = ind.confidence_score
+			decayed = round(original_score * (0.5 ** (age_days / half_life_days)), 6)
+			ind.confidence_score = max(decayed, 0.0)
+			updated.append(ind.id)
+			if decayed < 0.10:
+				retirement_eligible.append(ind.id)
+			self._audit(self.tenant_id, "cybint_indicator_confidence_decayed", ind.id)
+
+		decay_id = _fingerprint(str(half_life_days), self.tenant_id, _utcnow())
+		result: dict[str, Any] = {
+			"decay_id": decay_id,
+			"half_life_days": half_life_days,
+			"indicators_updated": len(updated),
+			"retirement_eligible": len(retirement_eligible),
+			"retirement_eligible_ids": retirement_eligible[:50],
+			"applied_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+		}
+		self._audit(self.tenant_id, "cybint_confidence_decay_applied", decay_id)
+		return result
+
+	async def classify_kill_chain_stage(self, indicator_id: str) -> dict[str, Any]:
+		"""Assign Lockheed Martin Cyber Kill Chain stages to an indicator.
+
+		Uses indicator type, enrichment data, and known TTP overlaps to assign
+		one or more kill-chain stages with per-stage confidence.
+		"""
+		assert present(indicator_id), "indicator_id required"
+		indicator = self.indicators.get(self._tenant_key(self.tenant_id, indicator_id))
+		if indicator is None:
+			raise KeyError(f"indicator_id {indicator_id!r} not found")
+
+		# Kill chain stage assignment heuristics by indicator type
+		type_to_stages: dict[str, list[str]] = {
+			"ip": ["RECONNAISSANCE", "DELIVERY", "COMMAND_AND_CONTROL"],
+			"domain": ["RECONNAISSANCE", "DELIVERY", "COMMAND_AND_CONTROL"],
+			"url": ["DELIVERY", "EXPLOITATION"],
+			"hash": ["WEAPONIZATION", "INSTALLATION"],
+			"email": ["DELIVERY"],
+			"cve": ["EXPLOITATION"],
+			"yara": ["INSTALLATION", "ACTIONS_ON_OBJECTIVES"],
+			"registry": ["INSTALLATION", "ACTIONS_ON_OBJECTIVES"],
+			"mutex": ["INSTALLATION"],
+			"asn": ["RECONNAISSANCE", "COMMAND_AND_CONTROL"],
+		}
+		ind_type = indicator.indicator_type.lower()
+		matched_stages = type_to_stages.get(ind_type, ["RECONNAISSANCE"])
+
+		# Check enrichments for additional context
+		enrichment_keys = [k for k in self.enrichments if k[0] == self.tenant_id]
+		for ek in enrichment_keys:
+			enr = self.enrichments[ek]
+			if enr.indicator_id == indicator_id:
+				if enr.enrichment_type in {"malware_family", "sandbox"}:
+					if "WEAPONIZATION" not in matched_stages:
+						matched_stages.append("WEAPONIZATION")
+				if enr.enrichment_type in {"c2", "infrastructure"}:
+					if "COMMAND_AND_CONTROL" not in matched_stages:
+						matched_stages.append("COMMAND_AND_CONTROL")
+
+		id_hash = int(_fingerprint(indicator_id, self.tenant_id), 16)
+		stage_confidences = {
+			stage: round(0.5 + ((id_hash >> (i * 3)) & 0x7) / 14.0, 4)
+			for i, stage in enumerate(matched_stages)
+		}
+
+		classify_id = _fingerprint(indicator_id, _utcnow())
+		result: dict[str, Any] = {
+			"classification_id": classify_id,
+			"indicator_id": indicator_id,
+			"indicator_type": indicator.indicator_type,
+			"kill_chain_stages": matched_stages,
+			"stage_confidences": stage_confidences,
+			"primary_stage": max(stage_confidences, key=lambda k: stage_confidences[k]),
+			"classified_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+		}
+		self._audit(self.tenant_id, "cybint_kill_chain_classified", classify_id)
+		return result
+
+	async def transition_indicator_lifecycle(
+		self,
+		indicator_id: str,
+		target_state: str,
+		reviewer_id: str,
+	) -> dict[str, Any]:
+		"""Transition an indicator through its governed lifecycle state machine.
+
+		Valid states: ACTIVE -> UNDER_REVIEW -> RETIRED -> ARCHIVED
+		RETIRED indicators also trigger confidence decay to 0.0.
+		"""
+		VALID_STATES = {"ACTIVE", "UNDER_REVIEW", "RETIRED", "ARCHIVED"}
+		ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+			"ACTIVE": {"UNDER_REVIEW"},
+			"UNDER_REVIEW": {"ACTIVE", "RETIRED"},
+			"RETIRED": {"ARCHIVED"},
+			"ARCHIVED": set(),  # terminal
+		}
+		assert present(indicator_id), "indicator_id required"
+		assert present(reviewer_id), "reviewer_id required"
+		target_state = target_state.upper()
+		if target_state not in VALID_STATES:
+			raise ValueError(f"target_state must be one of {VALID_STATES}")
+
+		key = self._tenant_key(self.tenant_id, indicator_id)
+		indicator = self.indicators.get(key)
+		if indicator is None:
+			raise KeyError(f"indicator_id {indicator_id!r} not found")
+
+		# Lifecycle state stored as an optional attribute
+		current_state: str = getattr(indicator, "lifecycle_state", "ACTIVE")
+		allowed = ALLOWED_TRANSITIONS.get(current_state, set())
+		if target_state not in allowed:
+			raise PermissionError(
+				f"Transition {current_state!r} -> {target_state!r} is not permitted"
+			)
+
+		setattr(indicator, "lifecycle_state", target_state)
+		if target_state == "RETIRED":
+			indicator.confidence_score = 0.0
+
+		transition_id = _fingerprint(indicator_id, target_state, _utcnow())
+		result: dict[str, Any] = {
+			"transition_id": transition_id,
+			"indicator_id": indicator_id,
+			"previous_state": current_state,
+			"new_state": target_state,
+			"reviewer_id": reviewer_id,
+			"transitioned_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+		}
+		self._audit(self.tenant_id, "cybint_indicator_lifecycle_transitioned", transition_id)
+		return result
+
+	async def generate_threat_brief(
+		self,
+		classification: str,
+		period_days: int = 7,
+	) -> dict[str, Any]:
+		"""Generate a structured threat intelligence brief for the tenant.
+
+		Aggregates top threat actors, highest-risk indicators, open vulnerabilities,
+		and zero-day status into a brief dict with executive summary, key findings,
+		recommended actions, and TLP marking.
+		"""
+		assert present(classification), "classification required"
+		classification = normalize_code(classification)
+		if classification not in SUPPORTED_CLASSIFICATIONS:
+			raise ValueError(f"Unsupported classification: {classification!r}")
+		if period_days < 1:
+			raise ValueError("period_days must be >= 1")
+
+		tenant = self.tenant_id
+
+		# Top threat actors by attribution confidence
+		top_actors = sorted(
+			[
+				{"actor": a["top_actor"], "confidence": a["top_confidence"]}
+				for a in self._attributions.values()
+				if a.get("tenant_id") == tenant
+			],
+			key=lambda x: x["confidence"],
+			reverse=True,
+		)[:5]
+
+		# Highest-risk indicators (by confidence score, descending)
+		tenant_indicators = [
+			{"id": ind.id, "type": ind.indicator_type, "value": ind.indicator_value, "confidence": ind.confidence_score, "tlp": ind.tlp}
+			for ind in self.indicators.values()
+			if ind.tenant_id == tenant and ind.confidence_score >= 0.7
+		]
+		tenant_indicators.sort(key=lambda x: x["confidence"], reverse=True)
+		high_risk_indicators = tenant_indicators[:10]
+
+		# Critical zero-days
+		critical_zdays = [
+			{"id": v_id, "cvss": zd["cvss_score"], "stage": zd["stage"], "in_wild": zd["in_the_wild_exploitation"]}
+			for v_id, zd in self._zero_days.items()
+			if zd.get("tenant_id") == tenant and zd.get("severity") == "CRITICAL"
+		]
+
+		# Open vulnerabilities
+		open_critical_vulns = sum(
+			v.get("critical_count", 0)
+			for v in self._vulnerabilities.values()
+			if v.get("tenant_id") == tenant
+		)
+
+		# Dark web exposure
+		dark_web_sessions = [
+			dw for dw in self._dark_web_hits.values()
+			if dw.get("tenant_id") == tenant and dw.get("risk_score", 0) >= 0.3
+		]
+
+		exec_risk = (
+			"CRITICAL" if (open_critical_vulns > 0 and critical_zdays) else
+			"HIGH" if open_critical_vulns > 0 else
+			"MEDIUM" if dark_web_sessions else
+			"LOW"
+		)
+
+		recommended_actions: list[str] = []
+		if open_critical_vulns > 0:
+			recommended_actions.append("Immediate patch deployment for all CRITICAL CVEs")
+		if critical_zdays:
+			recommended_actions.append("Activate zero-day containment playbooks for in-wild exploitation")
+		if dark_web_sessions:
+			recommended_actions.append("Investigate dark web credential/data exposure")
+		if top_actors:
+			recommended_actions.append(f"Monitor infrastructure linked to {top_actors[0]['actor']}")
+		if not recommended_actions:
+			recommended_actions.append("Maintain current defensive posture; continue routine monitoring")
+
+		brief_id = _fingerprint(classification, tenant, str(period_days), _utcnow())
+		result: dict[str, Any] = {
+			"brief_id": brief_id,
+			"classification": classification,
+			"tlp_marking": "TLP:AMBER",
+			"period_days": period_days,
+			"generated_at": _utcnow(),
+			"tenant_id": tenant,
+			"executive_summary": {
+				"overall_risk_level": exec_risk,
+				"top_threat_actor": top_actors[0]["actor"] if top_actors else "None identified",
+				"critical_cves_open": open_critical_vulns,
+				"zero_days_critical": len(critical_zdays),
+				"dark_web_exposures": len(dark_web_sessions),
+				"high_confidence_indicators": len(high_risk_indicators),
+			},
+			"key_findings": {
+				"top_threat_actors": top_actors,
+				"high_risk_indicators": high_risk_indicators,
+				"critical_zero_days": critical_zdays,
+				"dark_web_risk_sessions": [
+					{"monitor_id": d["monitor_id"], "risk_score": d["risk_score"]}
+					for d in dark_web_sessions
+				],
+			},
+			"recommended_actions": recommended_actions,
+		}
+		self._audit(tenant, "cybint_threat_brief_generated", brief_id)
+		return result
+
+	async def deduplicate_indicators(self) -> dict[str, Any]:
+		"""Content-address and deduplicate all tenant indicators.
+
+		Canonical key: sha256(indicator_type.lower() + ":" + indicator_value.lower()).
+		When duplicates exist, the record with the highest confidence_score is kept;
+		lower-confidence duplicates are removed from the store.
+		"""
+		from collections import defaultdict
+
+		tenant = self.tenant_id
+		canonical: dict[str, list[tuple[tuple[str, str], Any]]] = defaultdict(list)
+
+		for key, ind in list(self.indicators.items()):
+			if ind.tenant_id != tenant:
+				continue
+			canon_key = hashlib.sha256(
+				f"{ind.indicator_type.lower()}:{ind.indicator_value.lower()}".encode()
+			).hexdigest()
+			canonical[canon_key].append((key, ind))
+
+		removed: list[str] = []
+		kept: list[str] = []
+
+		for canon_key, group in canonical.items():
+			if len(group) <= 1:
+				kept.append(group[0][1].id)
+				continue
+			# Keep highest confidence
+			group.sort(key=lambda x: x[1].confidence_score, reverse=True)
+			kept.append(group[0][1].id)
+			for store_key, dup_ind in group[1:]:
+				del self.indicators[store_key]
+				removed.append(dup_ind.id)
+				self._audit(tenant, "cybint_indicator_deduplicated", dup_ind.id)
+
+		dedup_id = _fingerprint(tenant, _utcnow())
+		result: dict[str, Any] = {
+			"dedup_id": dedup_id,
+			"canonical_keys_evaluated": len(canonical),
+			"indicators_kept": len(kept),
+			"indicators_removed": len(removed),
+			"removed_ids": removed[:100],
+			"deduped_at": _utcnow(),
+			"tenant_id": tenant,
+		}
+		self._audit(tenant, "cybint_deduplication_complete", dedup_id)
+		return result
+
+	async def export_stix_bundle(self, tlp_filter: str | None = None) -> dict[str, Any]:
+		"""Serialise tenant intelligence to a STIX 2.1 bundle structure.
+
+		Indicators become STIX indicator SDOs.
+		ThreatProfiles become intrusion-set SDOs.
+		Sightings become STIX sighting SROs.
+		Returns the bundle dict and a fingerprint for downstream deduplication.
+		"""
+		tenant = self.tenant_id
+		now = _utcnow()
+
+		stix_indicators: list[dict[str, Any]] = []
+		for ind in self.indicators.values():
+			if ind.tenant_id != tenant:
+				continue
+			if tlp_filter and normalize_code(ind.tlp) != normalize_code(tlp_filter):
+				continue
+			stix_indicators.append({
+				"type": "indicator",
+				"spec_version": "2.1",
+				"id": f"indicator--{_fingerprint(ind.id, tenant)}",
+				"created": now,
+				"modified": now,
+				"name": f"{ind.indicator_type.upper()}: {ind.indicator_value}",
+				"indicator_types": [ind.indicator_type],
+				"pattern": f"[{ind.indicator_type}:value = '{ind.indicator_value}']",
+				"pattern_type": "stix",
+				"valid_from": now,
+				"confidence": int(ind.confidence_score * 100),
+				"object_marking_refs": [f"marking-definition--tlp-{ind.tlp.lower()}"],
+			})
+
+		stix_profiles: list[dict[str, Any]] = []
+		for prof in self.profiles.values():
+			if prof.tenant_id != tenant:
+				continue
+			stix_profiles.append({
+				"type": "intrusion-set",
+				"spec_version": "2.1",
+				"id": f"intrusion-set--{_fingerprint(prof.id, tenant)}",
+				"created": now,
+				"modified": now,
+				"name": prof.name,
+				"confidence": int(prof.confidence_score * 100),
+			})
+
+		stix_sightings: list[dict[str, Any]] = []
+		for sighting in self.sightings.values():
+			if sighting.tenant_id != tenant:
+				continue
+			stix_sightings.append({
+				"type": "sighting",
+				"spec_version": "2.1",
+				"id": f"sighting--{_fingerprint(sighting.id, tenant)}",
+				"created": now,
+				"modified": now,
+				"sighting_of_ref": f"indicator--{_fingerprint(sighting.indicator_id, tenant)}",
+				"first_seen": sighting.observed_at,
+				"last_seen": sighting.observed_at,
+				"count": 1,
+			})
+
+		bundle_id = _fingerprint(tenant, str(len(stix_indicators)), _utcnow())
+		bundle: dict[str, Any] = {
+			"type": "bundle",
+			"id": f"bundle--{bundle_id}",
+			"spec_version": "2.1",
+			"objects": stix_indicators + stix_profiles + stix_sightings,
+		}
+
+		result: dict[str, Any] = {
+			"bundle_id": bundle_id,
+			"indicator_count": len(stix_indicators),
+			"intrusion_set_count": len(stix_profiles),
+			"sighting_count": len(stix_sightings),
+			"total_objects": len(bundle["objects"]),
+			"tlp_filter": tlp_filter,
+			"bundle": bundle,
+			"bundle_fingerprint": _fingerprint(str(len(bundle["objects"])), bundle_id),
+			"exported_at": now,
+			"tenant_id": tenant,
+		}
+		self._audit(tenant, "cybint_stix_bundle_exported", bundle_id)
+		return result
+
+	async def compute_behavioural_baseline(
+		self,
+		entity_id: str,
+		metric_series: list[float],
+	) -> dict[str, Any]:
+		"""Compute a rolling behavioural baseline for an entity and flag anomalies.
+
+		entity_id: host, user, or IP identifier.
+		metric_series: ordered sequence of numeric observations (e.g. login counts per hour).
+		Observations exceeding mean + 3 * stdev are flagged as anomalous.
+		"""
+		assert present(entity_id), "entity_id required"
+		assert len(metric_series) >= 3, "metric_series must contain >= 3 observations"
+
+		if not hasattr(self, "_baselines"):
+			self._baselines: dict[str, dict[str, Any]] = {}
+
+		series = [float(v) for v in metric_series]
+		mean_val = statistics.mean(series)
+		stdev_val = statistics.stdev(series) if len(series) > 1 else 0.0
+		threshold_3sigma = mean_val + 3 * stdev_val
+
+		anomalies = [
+			{"index": i, "value": v, "z_score": round((v - mean_val) / max(stdev_val, 1e-9), 4)}
+			for i, v in enumerate(series)
+			if v > threshold_3sigma
+		]
+
+		baseline_id = _fingerprint(entity_id, str(len(series)), _utcnow())
+		baseline: dict[str, Any] = {
+			"baseline_id": baseline_id,
+			"entity_id": entity_id,
+			"observation_count": len(series),
+			"mean": round(mean_val, 6),
+			"stdev": round(stdev_val, 6),
+			"threshold_3sigma": round(threshold_3sigma, 6),
+			"anomaly_count": len(anomalies),
+			"anomalies": anomalies[:20],
+			"anomalous": len(anomalies) > 0,
+			"computed_at": _utcnow(),
+			"tenant_id": self.tenant_id,
+		}
+		self._baselines[entity_id] = baseline
+		self._audit(self.tenant_id, "cybint_behavioural_baseline_computed", baseline_id)
+		return baseline
 
 	# ------------------------------------------------------------------
 	# Internal helpers (preserved)

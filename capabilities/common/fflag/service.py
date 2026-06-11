@@ -4,9 +4,11 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import math
+import random
 from copy import deepcopy
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Literal
 from uuid import uuid4
 
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string
@@ -32,6 +34,16 @@ class FeatureFlagService:
 		self.assignments: dict[str, dict[str, Any]] = {}  # user experiment assignments
 		self.overrides: dict[str, dict[str, Any]] = {}  # per-user flag overrides
 		self._audit_events: list[dict[str, Any]] = []
+		# I10 — named targeting segments, keyed "tenant:segment_id"
+		self.segments: dict[str, dict[str, Any]] = {}
+		# I8 — sticky assignment cache, keyed "tenant:flag_key:user_id"
+		self.sticky_assignments: dict[str, dict[str, Any]] = {}
+		# I4 — bandit Beta-distribution state, keyed "tenant:exp_id:variant_key"
+		self.bandit_state: dict[str, dict[str, float]] = {}
+		# I15 — cross-tenant flag templates, keyed by template name
+		self.templates: dict[str, dict[str, Any]] = {}
+		# I11 — pending change-request records, keyed by request id
+		self.change_requests: dict[str, dict[str, Any]] = {}
 
 	def _tenant(self, tenant_id: str | None = None) -> str:
 		value = tenant_id or self.tenant_id
@@ -579,3 +591,711 @@ class FeatureFlagService:
 			"winner": exp.get("winner"),
 			"generated_at": self._now(),
 		}
+
+	# ── I10: Named Segments ───────────────────────────────────────
+
+	async def create_segment(
+		self,
+		tenant_id: str,
+		segment_id: str,
+		name: str,
+		conditions: list[dict[str, Any]],
+		description: str = "",
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Create a reusable targeting segment (named set of conditions).
+
+		Flags reference segments via targeting_rules entries with
+		``{"type": "segment", "segment_id": "<id>"}``.  Decouples cohort
+		definition from flag configuration — change once, affects all flags.
+		"""
+		tenant = self._tenant(tenant_id)
+		guard_non_empty_string(segment_id, "segment_id")
+		guard_non_empty_string(name, "name")
+		sk = f"{tenant}:{segment_id}"
+		if sk in self.segments:
+			raise ValueError(f"segment already exists: {segment_id}")
+		record: dict[str, Any] = {
+			"id": self._id("seg"),
+			"tenant_id": tenant,
+			"segment_id": segment_id,
+			"name": name,
+			"description": description,
+			"conditions": list(deepcopy(conditions)),
+			"created_at": self._now(),
+			"updated_at": None,
+		}
+		self.segments[sk] = record
+		self._emit(tenant, "segment_created", segment_id, after=record, actor=actor)
+		_log.info("segment created: %s tenant=%s conditions=%d", segment_id, tenant, len(conditions))
+		return deepcopy(record)
+
+	async def get_segment(self, tenant_id: str, segment_id: str) -> dict[str, Any]:
+		"""Fetch a segment by id."""
+		tenant = self._tenant(tenant_id)
+		record = self.segments.get(f"{tenant}:{segment_id}")
+		if not record:
+			raise KeyError(f"segment not found: {segment_id}")
+		return deepcopy(record)
+
+	async def list_segments(self, tenant_id: str) -> list[dict[str, Any]]:
+		"""List all segments for a tenant."""
+		tenant = self._tenant(tenant_id)
+		prefix = f"{tenant}:"
+		return [deepcopy(r) for k, r in self.segments.items() if k.startswith(prefix)]
+
+	async def delete_segment(self, tenant_id: str, segment_id: str, actor: str = "system") -> dict[str, Any]:
+		"""Delete a targeting segment."""
+		tenant = self._tenant(tenant_id)
+		sk = f"{tenant}:{segment_id}"
+		record = self.segments.get(sk)
+		if not record:
+			raise KeyError(f"segment not found: {segment_id}")
+		del self.segments[sk]
+		self._emit(tenant, "segment_deleted", segment_id, before=record, actor=actor)
+		return deepcopy(record)
+
+	# ── I8: Sticky Assignments ────────────────────────────────────
+
+	async def evaluate_flag_sticky(
+		self,
+		tenant_id: str,
+		key: str,
+		user_id: str,
+		user_attributes: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Evaluate a flag with sticky bucketing.
+
+		Once a user receives a result for a sticky flag the assignment is
+		persisted.  Subsequent calls — even after rollout percentage changes —
+		return the stored result.  Critical for multi-step user journeys where
+		mid-funnel variant flips destroy experiment validity.
+		"""
+		tenant = self._tenant(tenant_id)
+		sticky_key = f"{tenant}:{key}:{user_id}"
+		stored = self.sticky_assignments.get(sticky_key)
+		if stored is not None:
+			return {**deepcopy(stored), "reason": "sticky_assignment"}
+
+		result = await self.evaluate_flag(tenant_id, key, user_id, user_attributes)
+		# Only persist if the flag is actually enabled (don't lock users out permanently)
+		if result["enabled"]:
+			self.sticky_assignments[sticky_key] = deepcopy(result)
+		return result
+
+	async def clear_sticky_assignment(
+		self,
+		tenant_id: str,
+		key: str,
+		user_id: str,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Clear a sticky assignment, allowing re-evaluation on next call."""
+		tenant = self._tenant(tenant_id)
+		sticky_key = f"{tenant}:{key}:{user_id}"
+		record = self.sticky_assignments.get(sticky_key)
+		if not record:
+			raise KeyError(f"sticky assignment not found: {key}/{user_id}")
+		del self.sticky_assignments[sticky_key]
+		self._emit(tenant, "sticky_assignment_cleared", key,
+				   before=record, actor=actor)
+		return deepcopy(record)
+
+	# ── I4: Multi-Armed Bandit Experiments ────────────────────────
+
+	async def record_bandit_outcome(
+		self,
+		tenant_id: str,
+		experiment_id: str,
+		user_id: str,
+		variant_key: str,
+		converted: bool,
+	) -> dict[str, Any]:
+		"""Record a conversion outcome for Thompson Sampling bandit experiment.
+
+		Updates Beta distribution parameters for the variant:
+		  - conversion  → alpha += 1
+		  - no-convert  → beta  += 1
+
+		The updated posterior drives future variant allocation toward winners,
+		converging 3–5× faster than fixed A/B splits.
+		"""
+		tenant = self._tenant(tenant_id)
+		exp = self.experiments.get(experiment_id)
+		if not exp or exp["tenant_id"] != tenant:
+			raise KeyError(f"experiment not found: {experiment_id}")
+
+		state_key = f"{tenant}:{experiment_id}:{variant_key}"
+		state = self.bandit_state.setdefault(state_key, {"alpha": 1.0, "beta": 1.0})
+		if converted:
+			state["alpha"] += 1.0
+		else:
+			state["beta"] += 1.0
+
+		outcome: dict[str, Any] = {
+			"experiment_id": experiment_id,
+			"variant_key": variant_key,
+			"user_id": user_id,
+			"converted": converted,
+			"alpha": state["alpha"],
+			"beta": state["beta"],
+			"recorded_at": self._now(),
+		}
+		self._emit(tenant, "bandit_outcome_recorded", exp["flag_key"],
+				   after=outcome, actor="system")
+		_log.debug("bandit outcome: exp=%s variant=%s converted=%s α=%.1f β=%.1f",
+				   experiment_id, variant_key, converted, state["alpha"], state["beta"])
+		return outcome
+
+	async def get_bandit_state(self, tenant_id: str, experiment_id: str) -> dict[str, Any]:
+		"""Return current Beta distribution parameters for all variants in a bandit experiment."""
+		tenant = self._tenant(tenant_id)
+		exp = self.experiments.get(experiment_id)
+		if not exp or exp["tenant_id"] != tenant:
+			raise KeyError(f"experiment not found: {experiment_id}")
+
+		variant_states: dict[str, dict[str, float]] = {}
+		for v in exp["variants"]:
+			sk = f"{tenant}:{experiment_id}:{v['key']}"
+			state = self.bandit_state.get(sk, {"alpha": 1.0, "beta": 1.0})
+			alpha, beta_val = state["alpha"], state["beta"]
+			mean = alpha / (alpha + beta_val)
+			variant_states[v["key"]] = {
+				"alpha": alpha,
+				"beta": beta_val,
+				"mean_conversion_rate": round(mean, 4),
+				"observations": int(alpha + beta_val - 2),  # subtract Beta(1,1) prior
+			}
+
+		return {
+			"experiment_id": experiment_id,
+			"flag_key": exp["flag_key"],
+			"variant_states": variant_states,
+			"generated_at": self._now(),
+		}
+
+	# ── I7: Statistical Significance ─────────────────────────────
+
+	async def compute_experiment_significance(
+		self,
+		tenant_id: str,
+		experiment_id: str,
+		conversions: dict[str, int],
+		totals: dict[str, int],
+		significance_level: float = 0.05,
+	) -> dict[str, Any]:
+		"""Compute two-proportion Z-test between experiment variants.
+
+		Args:
+			conversions: {variant_key: conversion_count}
+			totals:       {variant_key: total_impressions}
+			significance_level: alpha threshold (default 0.05)
+
+		Returns dict with p_value, significant, confidence_intervals,
+		and minimum required sample size for 80% power.
+		"""
+		tenant = self._tenant(tenant_id)
+		exp = self.experiments.get(experiment_id)
+		if not exp or exp["tenant_id"] != tenant:
+			raise KeyError(f"experiment not found: {experiment_id}")
+
+		variant_keys = list(conversions.keys())
+		if len(variant_keys) < 2:
+			raise ValueError("need at least 2 variants with conversion data")
+
+		# Two-proportion Z-test: control vs first treatment
+		ctrl_key = variant_keys[0]
+		treat_key = variant_keys[1]
+		n1 = totals.get(ctrl_key, 0)
+		n2 = totals.get(treat_key, 0)
+		c1 = conversions.get(ctrl_key, 0)
+		c2 = conversions.get(treat_key, 0)
+
+		if n1 == 0 or n2 == 0:
+			return {"experiment_id": experiment_id, "significant": False,
+					"p_value": 1.0, "error": "insufficient data", "generated_at": self._now()}
+
+		p1 = c1 / n1
+		p2 = c2 / n2
+		p_pool = (c1 + c2) / (n1 + n2)
+
+		se = math.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
+		z_stat = (p2 - p1) / se if se > 0 else 0.0
+
+		# Approximate two-tailed p-value via complementary error function
+		p_value = 2 * (1 - _normal_cdf(abs(z_stat)))
+		significant = p_value < significance_level
+
+		# 95% confidence interval for difference
+		z_95 = 1.96
+		diff = p2 - p1
+		se_diff = math.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2) if (n1 > 0 and n2 > 0) else 0.0
+		ci_lower = round(diff - z_95 * se_diff, 4)
+		ci_upper = round(diff + z_95 * se_diff, 4)
+
+		# Power analysis: minimum n per arm (80% power, two-tailed)
+		z_alpha = 1.96
+		z_beta = 0.842  # 80% power
+		p_bar = (p1 + p2) / 2
+		if p_bar > 0 and p_bar < 1 and abs(diff) > 0:
+			required_n = int(math.ceil(
+				((z_alpha + z_beta) ** 2 * 2 * p_bar * (1 - p_bar)) / (diff ** 2)
+			))
+		else:
+			required_n = -1
+
+		return {
+			"experiment_id": experiment_id,
+			"control_variant": ctrl_key,
+			"treatment_variant": treat_key,
+			"z_statistic": round(z_stat, 4),
+			"p_value": round(p_value, 4),
+			"significant": significant,
+			"significance_level": significance_level,
+			"conversion_rates": {ctrl_key: round(p1, 4), treat_key: round(p2, 4)},
+			"relative_lift": round((p2 - p1) / p1, 4) if p1 > 0 else None,
+			"confidence_interval_95": {"lower": ci_lower, "upper": ci_upper},
+			"required_sample_size_per_arm": required_n,
+			"generated_at": self._now(),
+		}
+
+	# ── I13: Flag Import / Export ─────────────────────────────────
+
+	async def export_flags(self, tenant_id: str) -> dict[str, Any]:
+		"""Serialise all flags, segments, and experiments for a tenant.
+
+		The returned envelope is version-stamped and suitable for GitOps
+		storage — commit to VCS, diff in PRs, import into other envs.
+		"""
+		tenant = self._tenant(tenant_id)
+		prefix = f"{tenant}:"
+
+		flags = [deepcopy(r) for k, r in self.flags.items() if k.startswith(prefix)]
+		segments = [deepcopy(r) for k, r in self.segments.items() if k.startswith(prefix)]
+		experiments = [deepcopy(e) for e in self.experiments.values() if e["tenant_id"] == tenant]
+
+		return {
+			"schema_version": "1.0",
+			"tenant_id": tenant,
+			"exported_at": self._now(),
+			"counts": {
+				"flags": len(flags),
+				"segments": len(segments),
+				"experiments": len(experiments),
+			},
+			"flags": flags,
+			"segments": segments,
+			"experiments": experiments,
+		}
+
+	async def import_flags(
+		self,
+		tenant_id: str,
+		data: dict[str, Any],
+		mode: Literal["merge", "overwrite", "dry_run"] = "merge",
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Import flags from an export envelope.
+
+		Modes:
+		  merge     — create missing flags, skip existing (non-destructive)
+		  overwrite — replace all flags for the tenant
+		  dry_run   — validate and report diff without applying changes
+		"""
+		tenant = self._tenant(tenant_id)
+		if data.get("schema_version") != "1.0":
+			raise ValueError("unsupported export schema_version")
+
+		incoming_flags: list[dict[str, Any]] = data.get("flags", [])
+		prefix = f"{tenant}:"
+		existing_keys = {r["key"] for k, r in self.flags.items() if k.startswith(prefix)}
+		incoming_keys = {f["key"] for f in incoming_flags}
+
+		added: list[str] = []
+		skipped: list[str] = []
+		replaced: list[str] = []
+
+		if mode == "dry_run":
+			for f in incoming_flags:
+				if f["key"] in existing_keys:
+					skipped.append(f["key"])
+				else:
+					added.append(f["key"])
+			return {
+				"dry_run": True,
+				"mode": mode,
+				"would_add": added,
+				"would_skip": skipped,
+				"tenant_id": tenant,
+			}
+
+		if mode == "overwrite":
+			# Remove all existing flags for this tenant
+			for k in list(self.flags.keys()):
+				if k.startswith(prefix):
+					del self.flags[k]
+
+		for f in incoming_flags:
+			fk = self._flag_key(tenant, f["key"])
+			if mode == "merge" and fk in self.flags:
+				skipped.append(f["key"])
+				continue
+			record = deepcopy(f)
+			record["tenant_id"] = tenant
+			record["imported_at"] = self._now()
+			self.flags[fk] = record
+			if f["key"] in existing_keys and mode == "overwrite":
+				replaced.append(f["key"])
+			else:
+				added.append(f["key"])
+			self._emit(tenant, "flag_imported", f["key"], after=record, actor=actor)
+
+		_log.info("import_flags: tenant=%s mode=%s added=%d skipped=%d replaced=%d",
+				  tenant, mode, len(added), len(skipped), len(replaced))
+		return {
+			"mode": mode,
+			"tenant_id": tenant,
+			"added": added,
+			"skipped": skipped,
+			"replaced": replaced,
+			"imported_at": self._now(),
+		}
+
+	# ── I15: Cross-Tenant Flag Templates ─────────────────────────
+
+	async def create_template(
+		self,
+		name: str,
+		flag_spec: dict[str, Any],
+		description: str = "",
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Create a tenant-agnostic flag blueprint.
+
+		Templates let platform teams push a standard flag configuration to any
+		number of tenants without N individual API calls.  Provenance is tracked
+		via ``template_source`` on each instantiated flag.
+		"""
+		guard_non_empty_string(name, "name")
+		if name in self.templates:
+			raise ValueError(f"template already exists: {name}")
+		record: dict[str, Any] = {
+			"name": name,
+			"description": description,
+			"flag_spec": deepcopy(flag_spec),
+			"created_at": self._now(),
+			"updated_at": None,
+		}
+		self.templates[name] = record
+		_log.info("template created: %s", name)
+		return deepcopy(record)
+
+	async def instantiate_template(
+		self,
+		tenant_id: str,
+		template_name: str,
+		overrides: dict[str, Any] | None = None,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Instantiate a flag template for a specific tenant.
+
+		The resulting flag has ``template_source`` set so future
+		``apply_template_update`` calls can find all derived instances.
+		"""
+		tenant = self._tenant(tenant_id)
+		tmpl = self.templates.get(template_name)
+		if not tmpl:
+			raise KeyError(f"template not found: {template_name}")
+		spec: dict[str, Any] = deepcopy(tmpl["flag_spec"])
+		if overrides:
+			spec.update(overrides)
+		spec["template_source"] = template_name
+		guard_non_empty_string(spec.get("key", ""), "key")
+		result = await self.create_flag(tenant_id=tenant_id, actor=actor, **{
+			k: v for k, v in spec.items() if k not in ("tenant_id", "id", "created_at", "updated_at")
+		})
+		_log.info("template instantiated: %s -> tenant=%s flag=%s", template_name, tenant, result["key"])
+		return result
+
+	async def apply_template_update(
+		self,
+		template_name: str,
+		field_updates: dict[str, Any],
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Push field updates to all flags derived from a template.
+
+		Only updates fields present in ``field_updates``; per-tenant overrides
+		on other fields are preserved.  Emits ``template_update_applied`` per
+		affected flag.
+		"""
+		tmpl = self.templates.get(template_name)
+		if not tmpl:
+			raise KeyError(f"template not found: {template_name}")
+		# Update the template spec itself
+		tmpl["flag_spec"].update(field_updates)
+		tmpl["updated_at"] = self._now()
+
+		affected: list[str] = []
+		for fk, record in self.flags.items():
+			if record.get("template_source") == template_name:
+				tenant = record["tenant_id"]
+				before = deepcopy(record)
+				for field, value in field_updates.items():
+					if field in ("key", "id", "tenant_id", "created_at"):
+						continue
+					record[field] = value
+				record["updated_at"] = self._now()
+				self._emit(tenant, "template_update_applied", record["key"],
+						   before=before, after=deepcopy(record), actor=actor)
+				affected.append(fk)
+
+		_log.info("template_update applied: %s affected=%d fields=%s",
+				  template_name, len(affected), list(field_updates.keys()))
+		return {
+			"template_name": template_name,
+			"fields_updated": list(field_updates.keys()),
+			"affected_flags": len(affected),
+			"applied_at": self._now(),
+		}
+
+	# ── I11: Change-Request Approval Workflow ─────────────────────
+
+	async def request_flag_change(
+		self,
+		tenant_id: str,
+		key: str,
+		proposed_changes: dict[str, Any],
+		requestor: str,
+		reason: str = "",
+	) -> dict[str, Any]:
+		"""Submit a flag change for approval.
+
+		When a flag has ``requires_approval: True`` (set via update_flag),
+		callers should use this method instead of update_flag directly.
+		Returns a ChangeRequest record that must be approved before the
+		mutation is applied.
+		"""
+		tenant = self._tenant(tenant_id)
+		fk = self._flag_key(tenant, key)
+		if fk not in self.flags:
+			raise KeyError(f"flag not found: {key}")
+		req_id = self._id("cr")
+		record: dict[str, Any] = {
+			"id": req_id,
+			"tenant_id": tenant,
+			"flag_key": key,
+			"proposed_changes": deepcopy(proposed_changes),
+			"requestor": requestor,
+			"reason": reason,
+			"status": "pending",
+			"created_at": self._now(),
+			"resolved_at": None,
+			"resolved_by": None,
+		}
+		self.change_requests[req_id] = record
+		self._emit(tenant, "change_request_created", key, after=record, actor=requestor)
+		_log.info("change_request created: %s flag=%s requestor=%s", req_id, key, requestor)
+		return deepcopy(record)
+
+	async def approve_change_request(
+		self,
+		tenant_id: str,
+		request_id: str,
+		approver: str,
+	) -> dict[str, Any]:
+		"""Approve a pending flag change request and apply the mutation."""
+		tenant = self._tenant(tenant_id)
+		req = self.change_requests.get(request_id)
+		if not req or req["tenant_id"] != tenant:
+			raise KeyError(f"change_request not found: {request_id}")
+		if req["status"] != "pending":
+			raise ValueError(f"change_request is not pending: {req['status']}")
+
+		# Apply the proposed changes
+		updated_flag = await self.update_flag(
+			tenant_id, req["flag_key"], actor=approver, **req["proposed_changes"]
+		)
+		req["status"] = "approved"
+		req["resolved_at"] = self._now()
+		req["resolved_by"] = approver
+		self._emit(tenant, "change_request_approved", req["flag_key"],
+				   after={"request_id": request_id, "approver": approver}, actor=approver)
+		return {"change_request": deepcopy(req), "updated_flag": updated_flag}
+
+	async def reject_change_request(
+		self,
+		tenant_id: str,
+		request_id: str,
+		rejector: str,
+		rejection_reason: str = "",
+	) -> dict[str, Any]:
+		"""Reject a pending flag change request without applying any mutation."""
+		tenant = self._tenant(tenant_id)
+		req = self.change_requests.get(request_id)
+		if not req or req["tenant_id"] != tenant:
+			raise KeyError(f"change_request not found: {request_id}")
+		if req["status"] != "pending":
+			raise ValueError(f"change_request is not pending: {req['status']}")
+		req["status"] = "rejected"
+		req["resolved_at"] = self._now()
+		req["resolved_by"] = rejector
+		req["rejection_reason"] = rejection_reason
+		self._emit(tenant, "change_request_rejected", req["flag_key"],
+				   after={"request_id": request_id, "rejector": rejector}, actor=rejector)
+		return deepcopy(req)
+
+	# ── I12: Evaluation Telemetry / OTel-Compatible Events ────────
+
+	async def evaluate_flag_with_telemetry(
+		self,
+		tenant_id: str,
+		key: str,
+		user_id: str,
+		user_attributes: dict[str, Any] | None = None,
+		trace_context: dict[str, str] | None = None,
+		sample_rate: float = 1.0,
+	) -> dict[str, Any]:
+		"""Evaluate a flag and emit a structured telemetry event.
+
+		The telemetry event is OpenTelemetry-compatible — it carries trace_id
+		and span_id from the caller's trace context so downstream collectors
+		can correlate flag decisions with distributed traces.
+
+		``sample_rate`` (0.0–1.0) controls what fraction of evaluations emit
+		telemetry — use 0.01 for high-frequency flags to cap data volume by 99%.
+		"""
+		result = await self.evaluate_flag(tenant_id, key, user_id, user_attributes)
+
+		if sample_rate > 0 and random.random() < sample_rate:
+			event: dict[str, Any] = {
+				"event_type": "flag_evaluation",
+				"tenant_id": tenant_id,
+				"flag_key": key,
+				"user_id": user_id,
+				"enabled": result["enabled"],
+				"variant": result["variant"],
+				"reason": result["reason"],
+				"targeting_matched": result["targeting_matched"],
+				"sampled": True,
+				"evaluated_at": self._now(),
+			}
+			if trace_context:
+				event["trace_id"] = trace_context.get("trace_id")
+				event["span_id"] = trace_context.get("span_id")
+			# Publish to NATS telemetry subject when adapter is available
+			try:
+				from capabilities.common.fflag.domain.adapters import get_audit_adapter
+				adapter = get_audit_adapter()
+				if adapter and hasattr(adapter, "publish"):
+					await asyncio.get_event_loop().run_in_executor(
+						None, adapter.publish, f"fflag.telemetry.{tenant_id}", event
+					)
+			except Exception as exc:
+				_log.debug("telemetry publish skipped: %s", exc)
+			result["_telemetry_emitted"] = True
+
+		return result
+
+	# ── I9: Gradual Rollout Ramp Plans ────────────────────────────
+
+	async def set_ramp_plan(
+		self,
+		tenant_id: str,
+		key: str,
+		steps: list[dict[str, Any]],
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Attach a gradual rollout ramp plan to a flag.
+
+		Each step: ``{"percentage": float, "after_minutes": int}`` or
+		``{"percentage": float, "at_time": "<ISO8601>"}``.
+
+		The scheduler (driven externally by a NATS tick on
+		``fflag.scheduler.tick``) calls ``advance_ramp`` to apply due steps.
+		"""
+		tenant = self._tenant(tenant_id)
+		fk = self._flag_key(tenant, key)
+		record = self.flags.get(fk)
+		if not record:
+			raise KeyError(f"flag not found: {key}")
+		before = deepcopy(record)
+		record["ramp_plan"] = deepcopy(steps)
+		record["ramp_step_index"] = 0
+		record["ramp_active"] = True
+		record["updated_at"] = self._now()
+		self._emit(tenant, "ramp_plan_set", key, before=before, after=deepcopy(record), actor=actor)
+		_log.info("ramp_plan set: flag=%s steps=%d", key, len(steps))
+		return deepcopy(record)
+
+	async def advance_ramp(
+		self,
+		tenant_id: str,
+		key: str,
+		actor: str = "system",
+	) -> dict[str, Any]:
+		"""Advance a flag to its next ramp step if the step's dwell time has elapsed.
+
+		Returns the flag record.  Idempotent if no step is due.
+		"""
+		tenant = self._tenant(tenant_id)
+		fk = self._flag_key(tenant, key)
+		record = self.flags.get(fk)
+		if not record:
+			raise KeyError(f"flag not found: {key}")
+		plan: list[dict[str, Any]] = record.get("ramp_plan", [])
+		idx: int = record.get("ramp_step_index", 0)
+		if not record.get("ramp_active") or idx >= len(plan):
+			return deepcopy(record)
+
+		step = plan[idx]
+		now_ts = datetime.now(timezone.utc)
+
+		# Determine if this step is due
+		due = False
+		if "at_time" in step:
+			try:
+				step_time = datetime.fromisoformat(step["at_time"])
+				if step_time.tzinfo is None:
+					step_time = step_time.replace(tzinfo=timezone.utc)
+				due = now_ts >= step_time
+			except ValueError:
+				_log.warning("ramp step has invalid at_time: %s", step["at_time"])
+		elif "after_minutes" in step:
+			# Use ramp plan set time as baseline
+			plan_set_at_str = record.get("updated_at", record.get("created_at", self._now()))
+			try:
+				plan_set_at = datetime.fromisoformat(plan_set_at_str.rstrip("Z"))
+				plan_set_at = plan_set_at.replace(tzinfo=timezone.utc)
+				due = (now_ts - plan_set_at).total_seconds() >= step["after_minutes"] * 60
+			except Exception:
+				due = False
+
+		if due:
+			before = deepcopy(record)
+			record["rollout_percentage"] = float(step["percentage"])
+			record["ramp_step_index"] = idx + 1
+			if record["ramp_step_index"] >= len(plan):
+				record["ramp_active"] = False
+			record["updated_at"] = self._now()
+			self._emit(tenant, "ramp_step_applied", key, before=before,
+					   after=deepcopy(record), actor=actor)
+			_log.info("ramp step applied: flag=%s step=%d pct=%.1f%%",
+					  key, idx, step["percentage"])
+
+		return deepcopy(record)
+
+
+# ── Module-level helpers ──────────────────────────────────────────────────────
+
+def _normal_cdf(z: float) -> float:
+	"""Approximate standard normal CDF using Abramowitz & Stegun series (error < 7.5e-8)."""
+	if z < 0:
+		return 1.0 - _normal_cdf(-z)
+	t = 1.0 / (1.0 + 0.2316419 * z)
+	poly = t * (0.319381530
+				+ t * (-0.356563782
+					   + t * (1.781477937
+							  + t * (-1.821255978
+									 + t * 1.330274429))))
+	return 1.0 - (1.0 / math.sqrt(2 * math.pi)) * math.exp(-0.5 * z * z) * poly

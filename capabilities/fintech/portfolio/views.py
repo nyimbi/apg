@@ -12,9 +12,9 @@ except ImportError:  # pragma: no cover
 	from service import PortfolioManagementService  # type: ignore
 
 
-def dashboard_model(service: PortfolioManagementService, tenant_id: str) -> dict[str, Any]:
+async def dashboard_model(service: PortfolioManagementService, tenant_id: str) -> dict[str, Any]:
 	contract = get_capability_contract(tenant_id)
-	summary = service.dashboard_summary(tenant_id)
+	summary = await service.dashboard_summary()
 	return {
 		"title": "Portfolio Management",
 		"tenant_id": tenant_id,

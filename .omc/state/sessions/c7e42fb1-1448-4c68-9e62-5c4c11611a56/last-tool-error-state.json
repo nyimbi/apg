@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd /Users/nyimbiodero/src/pjs/apg/capabilities/crm/adv && python -c \\\"from service import AdvancedCRMService; print('OK')\\\" 2>&1\",\"description\":\"Syntax-check service.py by importing it\"}",
-  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/Users/nyimbiodero/src/pjs/apg/capabilities/crm/adv/service.py\", line 8, in <module>\n    from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache\nModuleNotFoundError: No module named 'capabilities'",
-  "timestamp": "2026-06-11T16:25:40.380Z",
+  "tool_input_preview": "{\"command\":\"python -c \\\"\\nimport asyncio, sys, types\\n\\n# Build a proper package hierarchy so sub-imports resolve\\nfor name in ['capabilities', 'capabilities.common', 'capabilities.common.dcat',\\n    ...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 14, in <module>\nModuleNotFoundError: No module named 'capabilities.common.dcat.cat.service'; 'capabilities.common.dcat.cat' is not a package",
+  "timestamp": "2026-06-11T16:44:57.761Z",
   "retry_count": 3
 }
