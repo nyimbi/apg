@@ -49,6 +49,7 @@ FORBIDDEN_STREAMING_RUNTIME_TERMS = (
 STREAMING_TERM_EXCLUDED_PREFIXES = (
 	"tmp/",
 	"uploads/",
+	".omc/",  # OMC internal state files (may contain commit messages referencing external systems)
 )
 STREAMING_TERM_EXCLUDED_SUFFIXES = (
 	"/tests/",
