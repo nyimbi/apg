@@ -10,7 +10,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "uv run pytest tests/test_repository_hygiene.py::test_apg_streaming_runtime_stays_bytewax_native tests/test_repository_hygiene.py::test_cli_hygiene_audit_emits_json_contract -q --tb=short 2>&1 | tail -5",
+    "testCommand": "./.venv/bin/pytest -q capabilities/common/recs/tests/test_package_contract.py 2>&1",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}

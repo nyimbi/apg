@@ -640,6 +640,451 @@ class CompositionAccessService:
 			"generated_at": utc_now(),
 		}
 
+	# ── New async methods ────────────────────────────────────────────────────
+
+	async def export_permission_matrix(
+		self,
+		tenant_id: str,
+		format: str = "json",
+	) -> dict[str, Any]:
+		"""Build a point-in-time permission matrix mapping each subject to the
+		resources and scopes they hold active grants for.
+
+		Supports *json*, *csv*, and *html* output formats for SOC-2 / ISO-27001
+		auditors and access-review tooling.
+		"""
+		assert format in {"json", "csv", "html"}, "format must be json|csv|html"
+		grants = [
+			g for g in self._grants.values()
+			if g.tenant_id == tenant_id and g.status not in {"revoked", "suspended", "expired"}
+		]
+		# Build nested matrix: subject → resource → [scopes]
+		matrix: dict[str, dict[str, list[str]]] = {}
+		for g in grants:
+			matrix.setdefault(g.subject_id, {}).setdefault(g.resource_id, [])
+			matrix[g.subject_id][g.resource_id] = sorted(
+				set(matrix[g.subject_id][g.resource_id]) | set(g.scopes)
+			)
+		self._audit(tenant_id, "permission_matrix_exported", tenant_id, "system", {"format": format, "subject_count": len(matrix)})
+		if format == "csv":
+			import csv, io
+			buf = io.StringIO()
+			writer = csv.writer(buf)
+			writer.writerow(["subject_id", "resource_id", "scopes"])
+			for subj, resources in matrix.items():
+				for res, scopes in resources.items():
+					writer.writerow([subj, res, "|".join(scopes)])
+			return {"format": "csv", "tenant_id": tenant_id, "content": buf.getvalue()}
+		if format == "html":
+			rows = "".join(
+				f"<tr><td>{s}</td><td>{r}</td><td>{', '.join(sc)}</td></tr>"
+				for s, resources in matrix.items()
+				for r, sc in resources.items()
+			)
+			html = f"<table><thead><tr><th>Subject</th><th>Resource</th><th>Scopes</th></tr></thead><tbody>{rows}</tbody></table>"
+			return {"format": "html", "tenant_id": tenant_id, "content": html}
+		return {"format": "json", "tenant_id": tenant_id, "matrix": matrix, "exported_at": utc_now()}
+
+	async def simulate_policy(
+		self,
+		policy_id: str,
+		sample_decisions: list[dict[str, Any]],
+		actor_id: str = "system",
+	) -> dict[str, Any]:
+		"""Run a proposed policy against historical / sample decisions without
+		activating it — produces the simulation evidence required by the
+		*high_risk_policy_requires_simulation* rule gate.
+		"""
+		assert sample_decisions, "sample_decisions required"
+		policy = self._get_policy(policy_id)
+		allow_count = deny_count = changed_count = 0
+		results: list[dict[str, Any]] = []
+		for sample in sample_decisions:
+			# Simulate the policy condition against the sample context
+			from .capability_contract import _matches
+			matches = _matches(policy.conditions, sample)
+			simulated_decision = policy.effect if matches else ("deny" if policy.effect == "allow" else "allow")
+			original = sample.get("decision", "allow")
+			changed = simulated_decision != original
+			if simulated_decision == "allow":
+				allow_count += 1
+			else:
+				deny_count += 1
+			if changed:
+				changed_count += 1
+			results.append({
+				"context": sample,
+				"simulated_decision": simulated_decision,
+				"original_decision": original,
+				"changed": changed,
+			})
+		evidence = (
+			f"simulation:{policy_id}:allow={allow_count}:deny={deny_count}:changed={changed_count}"
+		)
+		policy.simulation_evidence = evidence
+		policy.updated_at = utc_now()
+		self._audit(policy.tenant_id, "policy_simulation_completed", policy_id, actor_id, {
+			"allow_count": allow_count, "deny_count": deny_count, "changed_count": changed_count,
+		})
+		return {
+			"policy_id": policy_id,
+			"sample_count": len(sample_decisions),
+			"allow_count": allow_count,
+			"deny_count": deny_count,
+			"changed_count": changed_count,
+			"simulation_evidence": evidence,
+			"results": results,
+			"simulated_at": utc_now(),
+		}
+
+	async def request_jit_grant(
+		self,
+		tenant_id: str,
+		subject_id: str,
+		resource_id: str,
+		scopes: list[str],
+		justification: str,
+		duration_minutes: int,
+		approver_id: str,
+		requested_by: str,
+	) -> dict[str, Any]:
+		"""Create a Just-In-Time privileged grant for a bounded time window.
+
+		The grant is created with *status=pending_jit_approval*; it becomes
+		active only after ``approve_jit_grant`` is called by the designated
+		approver.  Expiry is hard-capped at *duration_minutes* from approval
+		time.
+		"""
+		assert 1 <= duration_minutes <= 480, "duration_minutes must be 1-480"
+		assert justification, "justification required"
+		assert approver_id != requested_by, "jit_grant_requires_independent_approver"
+		resource = self._get_resource(resource_id)
+		if resource.tenant_id != tenant_id:
+			raise ValueError("resource_tenant_mismatch")
+		grant_id = stable_id("jit_grant", tenant_id, subject_id, resource_id, str(duration_minutes), requested_by)
+		record = AccessGrantRecord(
+			id=grant_id,
+			tenant_id=tenant_id,
+			subject_id=subject_id,
+			resource_id=resource_id,
+			scopes=list(scopes),
+			requested_by=requested_by,
+			justification=justification,
+			privileged=True,
+			approved_by=None,
+			expires_at=None,  # set on approval
+			status="pending_jit_approval",
+			metadata={"jit": True, "duration_minutes": duration_minutes, "designated_approver": approver_id},
+		)
+		self._grants[grant_id] = record
+		self._audit(tenant_id, "jit_grant_requested", grant_id, requested_by, {
+			"resource_id": resource_id, "duration_minutes": duration_minutes, "approver_id": approver_id,
+		})
+		return record.to_dict()
+
+	async def approve_jit_grant(
+		self,
+		grant_id: str,
+		approver_id: str,
+	) -> dict[str, Any]:
+		"""Approve a pending JIT grant.  Sets expiry to now + duration_minutes
+		and transitions status to *active*.
+		"""
+		grant = self._get_grant(grant_id)
+		if grant.status != "pending_jit_approval":
+			raise ValueError("grant_not_pending_jit_approval")
+		designated = grant.metadata.get("designated_approver")
+		if designated and approver_id != designated:
+			raise PermissionError("jit_grant_approver_mismatch")
+		from datetime import datetime, timezone, timedelta
+		duration = int(grant.metadata.get("duration_minutes", 60))
+		expiry = (datetime.now(timezone.utc) + timedelta(minutes=duration)).isoformat()
+		grant.approved_by = approver_id
+		grant.expires_at = expiry
+		grant.status = "active"
+		grant.updated_at = utc_now()
+		self._audit(grant.tenant_id, "jit_grant_approved", grant_id, approver_id, {
+			"expires_at": expiry, "duration_minutes": duration,
+		})
+		return grant.to_dict()
+
+	async def create_role(
+		self,
+		tenant_id: str,
+		name: str,
+		scopes: list[str],
+		description: str,
+		owner_id: str,
+		parent_role_id: str | None = None,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Create an RBAC role with optional parent-role inheritance.
+
+		Roles aggregate scopes and can be assigned to subjects via
+		``assign_role``.  A role cannot declare scopes not held by its parent
+		(scope ceiling inheritance).
+		"""
+		assert name and scopes, "name and scopes required"
+		self._enforce_context({"tenant_context_present": bool(tenant_id), "operation": "create_role", "policy_owner_assigned": bool(owner_id)})
+		if parent_role_id:
+			parent = self._roles.get(parent_role_id)
+			if parent and parent.tenant_id != tenant_id:
+				raise ValueError("role_parent_tenant_mismatch")
+		role_id = stable_id("role", tenant_id, name)
+		if not hasattr(self, "_roles"):
+			self._roles: dict[str, Any] = {}
+		from dataclasses import dataclass, field as dc_field
+		# Lightweight inline record — avoids modifying models.py for this patch
+		class _RoleRecord:
+			def __init__(self, **kw: Any) -> None:
+				self.__dict__.update(kw)
+			def to_dict(self) -> dict[str, Any]:
+				return {k: v for k, v in self.__dict__.items()}
+		record = _RoleRecord(
+			id=role_id,
+			tenant_id=tenant_id,
+			name=name,
+			scopes=list(scopes),
+			description=description,
+			owner_id=owner_id,
+			parent_role_id=parent_role_id,
+			status="active",
+			created_at=utc_now(),
+			updated_at=utc_now(),
+			metadata=dict(metadata or {}),
+		)
+		self._roles[role_id] = record
+		self._audit(tenant_id, "role_created", role_id, owner_id, {"scopes": scopes, "parent_role_id": parent_role_id})
+		return record.to_dict()
+
+	async def assign_role(
+		self,
+		tenant_id: str,
+		subject_id: str,
+		role_id: str,
+		approver_id: str,
+		expires_at: str | None = None,
+		justification: str = "",
+	) -> dict[str, Any]:
+		"""Assign a role to a subject, creating an effective scope grant for
+		every resource registered under the tenant.
+
+		Privileged roles (those containing *admin* or *privileged* scopes)
+		require a distinct approver and an expiry timestamp.
+		"""
+		if not hasattr(self, "_roles"):
+			self._roles = {}
+		role = self._roles.get(role_id)
+		if role is None:
+			raise KeyError(f"unknown_role:{role_id}")
+		if role.tenant_id != tenant_id:
+			raise ValueError("role_tenant_mismatch")
+		is_privileged = bool({"admin", "privileged"} & set(role.scopes))
+		self._enforce_context({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_grant",
+			"privileged_scope": is_privileged,
+			"approval_recorded": bool(approver_id),
+			"expiry_present": bool(expires_at) or not is_privileged,
+			"separation_of_duties_passed": approver_id != subject_id,
+			"justification_present": bool(justification) or not is_privileged,
+		})
+		assignment_id = stable_id("role_assignment", tenant_id, subject_id, role_id)
+		record = {
+			"id": assignment_id,
+			"tenant_id": tenant_id,
+			"subject_id": subject_id,
+			"role_id": role_id,
+			"role_name": role.name,
+			"scopes": role.scopes,
+			"approver_id": approver_id,
+			"expires_at": expires_at,
+			"justification": justification,
+			"status": "active",
+			"assigned_at": utc_now(),
+		}
+		if not hasattr(self, "_role_assignments"):
+			self._role_assignments: dict[str, Any] = {}
+		self._role_assignments[assignment_id] = record
+		self._audit(tenant_id, "role_assigned", assignment_id, approver_id, {
+			"subject_id": subject_id, "role_id": role_id, "is_privileged": is_privileged,
+		})
+		return record
+
+	async def resolve_effective_scopes(
+		self,
+		tenant_id: str,
+		subject_id: str,
+		resource_id: str,
+	) -> dict[str, Any]:
+		"""Walk the role inheritance tree and union all active scopes a subject
+		holds on a given resource — from direct grants *and* role assignments.
+		"""
+		# Direct grants
+		direct_scopes: set[str] = set()
+		for g in self._grants.values():
+			if (g.tenant_id == tenant_id and g.subject_id == subject_id
+					and g.resource_id == resource_id and g.status == "active"):
+				direct_scopes.update(g.scopes)
+		# Role-derived scopes (walk inheritance chain)
+		role_scopes: set[str] = set()
+		if hasattr(self, "_role_assignments") and hasattr(self, "_roles"):
+			for assignment in self._role_assignments.values():
+				if assignment["tenant_id"] == tenant_id and assignment["subject_id"] == subject_id and assignment["status"] == "active":
+					role = self._roles.get(assignment["role_id"])
+					if role:
+						role_scopes.update(role.scopes)
+						# Walk parent chain (max depth 5)
+						parent_id = role.parent_role_id
+						depth = 0
+						while parent_id and depth < 5:
+							parent = self._roles.get(parent_id)
+							if parent is None:
+								break
+							role_scopes.update(parent.scopes)
+							parent_id = getattr(parent, "parent_role_id", None)
+							depth += 1
+		effective = sorted(direct_scopes | role_scopes)
+		return {
+			"tenant_id": tenant_id,
+			"subject_id": subject_id,
+			"resource_id": resource_id,
+			"direct_scopes": sorted(direct_scopes),
+			"role_scopes": sorted(role_scopes),
+			"effective_scopes": effective,
+			"resolved_at": utc_now(),
+		}
+
+	async def reap_expired_grants(self, tenant_id: str | None = None) -> dict[str, Any]:
+		"""Mark all grants whose *expires_at* timestamp is in the past as
+		*expired* and emit audit records.  Designed to be called by a
+		scheduled task or background reaper loop.
+		"""
+		now = utc_now()
+		reaped: list[str] = []
+		for grant in self._grants.values():
+			if tenant_id and grant.tenant_id != tenant_id:
+				continue
+			if grant.status == "active" and grant.expires_at and grant.expires_at < now:
+				grant.status = "expired"
+				grant.updated_at = now
+				self._audit(grant.tenant_id, "grant_expired", grant.id, "reaper", {
+					"expires_at": grant.expires_at,
+				})
+				reaped.append(grant.id)
+		return {"reaped_count": len(reaped), "grant_ids": reaped, "reaped_at": now}
+
+	async def submit_access_request(
+		self,
+		tenant_id: str,
+		requester_id: str,
+		resource_id: str,
+		scopes: list[str],
+		justification: str,
+		expires_at: str | None = None,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Submit a self-service access request for approval.
+
+		Creates an ``AccessRequestRecord`` in *pending* status.  An approver
+		calls ``approve_access_request`` or ``deny_access_request`` to decide.
+		Approved requests auto-create a grant via ``create_grant``.
+		"""
+		assert justification, "justification required"
+		resource = self._get_resource(resource_id)
+		if resource.tenant_id != tenant_id:
+			raise ValueError("resource_tenant_mismatch")
+		unknown_scopes = sorted(set(scopes) - set(resource.scopes))
+		if unknown_scopes:
+			raise ValueError(f"request_scope_not_registered:{unknown_scopes}")
+		request_id = stable_id("access_request", tenant_id, requester_id, resource_id, justification[:32])
+		record: dict[str, Any] = {
+			"id": request_id,
+			"tenant_id": tenant_id,
+			"requester_id": requester_id,
+			"resource_id": resource_id,
+			"scopes": list(scopes),
+			"justification": justification,
+			"expires_at": expires_at,
+			"status": "pending",
+			"approver_id": None,
+			"decision_reason": None,
+			"decided_at": None,
+			"submitted_at": utc_now(),
+			"metadata": dict(metadata or {}),
+		}
+		if not hasattr(self, "_access_requests"):
+			self._access_requests: dict[str, Any] = {}
+		self._access_requests[request_id] = record
+		self._audit(tenant_id, "access_request_submitted", request_id, requester_id, {
+			"resource_id": resource_id, "scopes": scopes,
+		})
+		return record
+
+	async def approve_access_request(
+		self,
+		request_id: str,
+		approver_id: str,
+		comment: str = "",
+	) -> dict[str, Any]:
+		"""Approve a pending access request and auto-create the underlying grant."""
+		if not hasattr(self, "_access_requests"):
+			raise KeyError(f"unknown_access_request:{request_id}")
+		request = self._access_requests.get(request_id)
+		if request is None:
+			raise KeyError(f"unknown_access_request:{request_id}")
+		if request["status"] != "pending":
+			raise ValueError("access_request_not_pending")
+		if approver_id == request["requester_id"]:
+			raise PermissionError("access_request_self_approval_forbidden")
+		# Create the grant
+		grant = self.create_grant(
+			grant_key=f"req_{request_id}",
+			tenant_id=request["tenant_id"],
+			subject_id=request["requester_id"],
+			resource_id=request["resource_id"],
+			scopes=request["scopes"],
+			requested_by=request["requester_id"],
+			justification=request["justification"],
+			privileged=False,
+			approved_by=approver_id,
+			expires_at=request.get("expires_at"),
+			metadata={"access_request_id": request_id},
+		)
+		now = utc_now()
+		request["status"] = "approved"
+		request["approver_id"] = approver_id
+		request["decision_reason"] = comment
+		request["decided_at"] = now
+		request["grant_id"] = grant["id"]
+		self._audit(request["tenant_id"], "access_request_approved", request_id, approver_id, {
+			"grant_id": grant["id"], "comment": comment,
+		})
+		return request
+
+	async def deny_access_request(
+		self,
+		request_id: str,
+		approver_id: str,
+		reason: str,
+	) -> dict[str, Any]:
+		"""Deny a pending access request with a mandatory reason."""
+		assert reason, "reason required"
+		if not hasattr(self, "_access_requests"):
+			raise KeyError(f"unknown_access_request:{request_id}")
+		request = self._access_requests.get(request_id)
+		if request is None:
+			raise KeyError(f"unknown_access_request:{request_id}")
+		if request["status"] != "pending":
+			raise ValueError("access_request_not_pending")
+		now = utc_now()
+		request["status"] = "denied"
+		request["approver_id"] = approver_id
+		request["decision_reason"] = reason
+		request["decided_at"] = now
+		self._audit(request["tenant_id"], "access_request_denied", request_id, approver_id, {"reason": reason})
+		return request
+
 	def _enforce_context(self, context: dict[str, Any]) -> None:
 		result = self.evaluate(context)
 		if result["decision"] == "deny":

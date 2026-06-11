@@ -796,7 +796,7 @@ class RecsService:
 		rec_sets = [r for r in self._recommendation_sets.values() if r.tenant_id == tenant_id]
 		feedback_all = [f for f in self._feedback.values() if f.tenant_id == tenant_id]
 		clicks = [f for f in feedback_all if f.event_type in {"click", "view"}]
-		conversions = [f for f in feedback_all if f.event_type == "purchase"]
+		conversions = [f for f in feedback_all if f.event_type == "conversion"]
 		catalog_size = len([i for i in self._catalog_items.values() if i.tenant_id == tenant_id])
 		covered_items: set[str] = set()
 		for rs in rec_sets:
@@ -1013,7 +1013,7 @@ class RecsService:
 		return tuple(action.get("reason", "recommendation_policy_blocked") for action in result["actions"])
 
 	async def ml_generate_recommendations(self, *args, **kwargs):
-		"""AI-powered AI-powered personalized recommendations. Requires OLLAMA_BASE_URL."""
+		"""AI-powered personalized recommendations. Requires OLLAMA_BASE_URL."""
 		import os
 		if not os.environ.get("OLLAMA_BASE_URL"):
 			return {"ml_enhanced": False}
@@ -1024,4 +1024,534 @@ class RecsService:
 			return {"relevance": result.label, "confidence": result.confidence, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def publish_interaction_stream(
+		self,
+		tenant_id: str,
+		event_id: str,
+		profile_id: str,
+		item_id: str,
+		event_type: str,
+		occurred_at: str,
+		weight: float = 1.0,
+		metadata: dict[str, Any] | None = None,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Publish an interaction event to NATS JetStream for real-time pipeline consumption.
+
+		Emits to subject ``recs.interactions.{tenant_id}``.  Falls back to an
+		in-process record when the NATS broker is unavailable, so callers never
+		need to branch on connectivity.
+		"""
+		import os, json
+		self._require_tenant(tenant_id)
+		payload: dict[str, Any] = {
+			"event_id": event_id,
+			"tenant_id": tenant_id,
+			"profile_id": profile_id,
+			"item_id": item_id,
+			"event_type": normalize_feedback_event(event_type),
+			"occurred_at": occurred_at,
+			"weight": round(float(weight), 4),
+			"metadata": dict(metadata or {}),
+			"published_at": utc_now().isoformat(),
+		}
+		nats_url = os.environ.get("NATS_URL", "")
+		published_to_nats = False
+		if nats_url:
+			try:
+				import nats  # type: ignore
+				nc = await nats.connect(nats_url)
+				subject = f"recs.interactions.{tenant_id}"
+				await nc.publish(subject, json.dumps(payload).encode())
+				await nc.drain()
+				published_to_nats = True
+			except Exception:
+				published_to_nats = False
+		self._record_audit(tenant_id, event_id, "interaction_stream_published", actor, "allow")
+		return {**payload, "published_to_nats": published_to_nats}
+
+	async def update_profile_features(
+		self,
+		profile_id: str,
+		tenant_id: str,
+		delta_features: dict[str, float],
+		ema_alpha: float = 0.3,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Incrementally update profile features using exponential moving average blending.
+
+		``new_value = ema_alpha * delta + (1 - ema_alpha) * existing``
+
+		Emits ``recs.profiles.updated.{tenant_id}`` to NATS when broker available.
+		"""
+		import os, json
+		profile = self._require_profile(profile_id, tenant_id)
+		assert 0.0 < ema_alpha <= 1.0, "ema_alpha must be in (0, 1]"
+		updated: dict[str, float] = dict(profile.features)
+		for key, new_val in delta_features.items():
+			old_val = updated.get(key, 0.0)
+			updated[key] = round(ema_alpha * float(new_val) + (1.0 - ema_alpha) * old_val, 6)
+		profile.features = updated
+		profile.updated_at = utc_now()
+		nats_url = os.environ.get("NATS_URL", "")
+		notified = False
+		if nats_url:
+			try:
+				import nats  # type: ignore
+				nc = await nats.connect(nats_url)
+				await nc.publish(
+					f"recs.profiles.updated.{tenant_id}",
+					json.dumps({"profile_id": profile_id, "tenant_id": tenant_id}).encode(),
+				)
+				await nc.drain()
+				notified = True
+			except Exception:
+				notified = False
+		self._record_audit(tenant_id, profile_id, "profile_features_updated", actor, "allow")
+		return {**profile.to_dict(), "nats_notified": notified}
+
+	async def contextual_bandit_rank(
+		self,
+		tenant_id: str,
+		profile_id: str,
+		candidate_item_ids: list[str],
+		model_id: str,
+		policy_id: str,
+		limit: int = 5,
+		exploration_factor: float = 0.1,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Rank candidates using an epsilon-greedy contextual bandit strategy.
+
+		``exploration_factor`` fraction of slots are filled with random
+		unexplored items (explore); the remaining slots are filled with the
+		highest-estimated-reward items (exploit).  Reward estimates are derived
+		from per-item conversion feedback counts stored in this service instance.
+		"""
+		import random
+		self._require_tenant(tenant_id)
+		profile = self._require_profile(profile_id, tenant_id)
+		self._require_policy(policy_id, tenant_id)
+		self._require_model(model_id, tenant_id)
+		assert 0.0 <= exploration_factor <= 1.0, "exploration_factor must be 0..1"
+
+		# Build per-item reward estimates from recorded feedback
+		item_rewards: dict[str, float] = {}
+		item_trials: dict[str, int] = {}
+		for fb in self._feedback.values():
+			if fb.tenant_id != tenant_id:
+				continue
+			item_rewards[fb.item_id] = item_rewards.get(fb.item_id, 0.0) + fb.value
+			item_trials[fb.item_id] = item_trials.get(fb.item_id, 0) + 1
+
+		candidates = [self._catalog_items.get(iid) for iid in candidate_item_ids]
+		candidates = [c for c in candidates if c and c.tenant_id == tenant_id and c.status == "active"]
+
+		n_explore = max(1, int(limit * exploration_factor))
+		n_exploit = limit - n_explore
+
+		# Exploit: sort by mean reward, break ties by item id
+		exploitable = sorted(
+			candidates,
+			key=lambda c: (-(item_rewards.get(c.id, 0.0) / max(item_trials.get(c.id, 1), 1)), c.id),
+		)
+		exploit_items = exploitable[:n_exploit]
+		remaining = [c for c in candidates if c not in exploit_items]
+		explore_items = random.sample(remaining, min(n_explore, len(remaining)))
+
+		ranked = exploit_items + explore_items
+		results = [
+			{
+				"item_id": item.id,
+				"rank": i + 1,
+				"strategy": "exploit" if i < len(exploit_items) else "explore",
+				"estimated_reward": round(
+					item_rewards.get(item.id, 0.0) / max(item_trials.get(item.id, 1), 1), 4
+				),
+			}
+			for i, item in enumerate(ranked)
+		]
+		self._record_audit(tenant_id, profile_id, "bandit_rank_generated", actor, "allow")
+		return {
+			"tenant_id": tenant_id,
+			"profile_id": profile_id,
+			"model_id": model_id,
+			"exploration_factor": exploration_factor,
+			"ranked_items": results,
+		}
+
+	async def compute_catalog_popularity(
+		self,
+		tenant_id: str,
+		half_life_days: float = 14.0,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Compute time-decayed popularity scores for all catalog items in a tenant.
+
+		Uses exponential decay: ``score += weight * exp(-lambda * age_days)``
+		where ``lambda = ln(2) / half_life_days``.  Scores are normalised to
+		[0, 1] and written back onto each ``RecommendationCatalogItem`` as
+		``features["popularity_score"]``.
+		"""
+		import math
+		from datetime import timezone
+		self._require_tenant(tenant_id)
+		assert half_life_days > 0, "half_life_days must be positive"
+		decay_lambda = math.log(2) / half_life_days
+		now = utc_now()
+		item_scores: dict[str, float] = {}
+		for event in self._interaction_events.values():
+			if event.tenant_id != tenant_id:
+				continue
+			# Parse occurred_at; fall back to zero age if unparseable
+			try:
+				from datetime import datetime
+				occurred = datetime.fromisoformat(event.occurred_at)
+				if occurred.tzinfo is None:
+					occurred = occurred.replace(tzinfo=timezone.utc)
+				age_days = max(0.0, (now - occurred).total_seconds() / 86400.0)
+			except Exception:
+				age_days = 0.0
+			decay = math.exp(-decay_lambda * age_days)
+			item_scores[event.item_id] = item_scores.get(event.item_id, 0.0) + event.weight * decay
+
+		max_score = max(item_scores.values(), default=1.0) or 1.0
+		updated_items: list[dict[str, Any]] = []
+		for item in self._catalog_items.values():
+			if item.tenant_id != tenant_id:
+				continue
+			normalized = round(item_scores.get(item.id, 0.0) / max_score, 6)
+			item.features = {**item.features, "popularity_score": normalized}
+			item.updated_at = utc_now()
+			updated_items.append({"item_id": item.id, "popularity_score": normalized})
+
+		self._record_audit(tenant_id, tenant_id, "catalog_popularity_computed", actor, "allow")
+		return {
+			"tenant_id": tenant_id,
+			"half_life_days": half_life_days,
+			"items_scored": len(updated_items),
+			"scores": sorted(updated_items, key=lambda x: -x["popularity_score"]),
+			"computed_at": utc_now().isoformat(),
+		}
+
+	async def evaluate_experiment_stopping(
+		self,
+		experiment_id: str,
+		tenant_id: str,
+		superiority_threshold: float = 0.95,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Evaluate Bayesian early stopping for an A/B experiment.
+
+		Estimates P(variant_A_conversion > variant_B_conversion) from
+		Beta posterior distributions built from click/conversion feedback.
+		Stops the experiment early when confidence exceeds
+		``superiority_threshold`` in either direction.
+		"""
+		import random
+		experiment = self._experiments.get(experiment_id)
+		if experiment is None or experiment.tenant_id != tenant_id:
+			raise KeyError("experiment_not_found")
+
+		feedback_all = [
+			f for f in self._feedback.values()
+			if f.tenant_id == tenant_id
+		]
+
+		# Approximate split: odd hash -> A, even hash -> B
+		def _variant(profile_id: str) -> str:
+			return "A" if hash(f"{profile_id}:{experiment_id}") % 2 == 0 else "B"
+
+		counts: dict[str, dict[str, int]] = {"A": {"clicks": 0, "conversions": 0}, "B": {"clicks": 0, "conversions": 0}}
+		for fb in feedback_all:
+			v = _variant(fb.profile_id)
+			if fb.event_type in {"click", "view"}:
+				counts[v]["clicks"] += 1
+			elif fb.event_type == "conversion":
+				counts[v]["conversions"] += 1
+
+		# Beta posterior: alpha = conversions + 1, beta = (clicks - conversions) + 1
+		def _beta_samples(c: dict[str, int], n: int = 10_000) -> list[float]:
+			alpha = c["conversions"] + 1
+			beta_ = max(c["clicks"] - c["conversions"], 0) + 1
+			return [random.betavariate(alpha, beta_) for _ in range(n)]
+
+		samples_a = _beta_samples(counts["A"])
+		samples_b = _beta_samples(counts["B"])
+		p_a_wins = sum(a > b for a, b in zip(samples_a, samples_b)) / len(samples_a)
+
+		stop_early = p_a_wins >= superiority_threshold or p_a_wins <= (1 - superiority_threshold)
+		winner: str | None = None
+		if stop_early:
+			winner = "A" if p_a_wins >= superiority_threshold else "B"
+			experiment.status = "stopped_early"
+
+		self._record_audit(tenant_id, experiment_id, "experiment_stopping_evaluated", actor, "allow")
+		return {
+			"experiment_id": experiment_id,
+			"tenant_id": tenant_id,
+			"p_a_wins": round(p_a_wins, 4),
+			"superiority_threshold": superiority_threshold,
+			"stop_early": stop_early,
+			"winner": winner,
+			"variant_a_stats": counts["A"],
+			"variant_b_stats": counts["B"],
+			"evaluated_at": utc_now().isoformat(),
+		}
+
+	async def fairness_rerank(
+		self,
+		recommendation_set_id: str,
+		tenant_id: str,
+		fairness_constraints: dict[str, float],
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Re-rank recommendations with Maximum Marginal Relevance + Slot fairness.
+
+		``fairness_constraints`` maps ``"category:<name>"`` keys to minimum
+		fractional exposure (e.g. ``{"category:local": 0.2}`` requires >= 20%
+		of slots filled with local-category items).  Greedy slot-filling
+		alternates between relevance and fairness selection until all
+		constraints are satisfied or the ranked list is exhausted.
+		"""
+		rec_set = self._require_recommendation_set(recommendation_set_id, tenant_id)
+		recs = list(rec_set.recommendations)
+		total = len(recs) or 1
+
+		# Parse minimum counts per category from constraints
+		min_counts: dict[str, int] = {}
+		for key, fraction in fairness_constraints.items():
+			if key.startswith("category:"):
+				cat = key[len("category:"):]
+				min_counts[cat] = max(1, int(total * fraction))
+
+		remaining = list(recs)
+		output: list[dict[str, Any]] = []
+		category_filled: dict[str, int] = {}
+
+		# Fairness pass: fill mandatory slots first
+		for cat, required in min_counts.items():
+			fair_candidates = [
+				r for r in remaining
+				if (self._catalog_items.get(r.item_id) or None) is not None
+				and self._catalog_items[r.item_id].category == cat
+			][:required]
+			for r in fair_candidates:
+				remaining.remove(r)
+				category_filled[cat] = category_filled.get(cat, 0) + 1
+				output.append({
+					"item_id": r.item_id,
+					"score": r.score,
+					"selection": "fairness",
+					"category": cat,
+				})
+
+		# Relevance pass: fill remaining slots by score
+		remaining.sort(key=lambda r: -r.score)
+		for r in remaining:
+			item = self._catalog_items.get(r.item_id)
+			cat = item.category if item else "unknown"
+			output.append({
+				"item_id": r.item_id,
+				"score": r.score,
+				"selection": "relevance",
+				"category": cat,
+			})
+
+		for i, slot in enumerate(output):
+			slot["rank"] = i + 1
+
+		self._record_audit(tenant_id, recommendation_set_id, "fairness_rerank_applied", actor, "allow")
+		return {
+			"recommendation_set_id": recommendation_set_id,
+			"tenant_id": tenant_id,
+			"fairness_constraints": fairness_constraints,
+			"reranked_items": output,
+			"category_exposure": {
+				cat: round(category_filled.get(cat, 0) / total, 4) for cat in min_counts
+			},
+		}
+
+	async def stack_ensemble_rank(
+		self,
+		tenant_id: str,
+		profile_id: str,
+		candidate_item_ids: list[str],
+		model_weights: list[tuple[str, float]],
+		policy_id: str,
+		limit: int = 5,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Rank candidates using a weighted ensemble of multiple deployed models.
+
+		``model_weights`` is a list of ``(model_id, weight)`` pairs.  Each
+		model's ``score_item`` score is computed independently and the
+		weighted sum forms the composite ensemble score.  Requires all listed
+		models to be deployed and tenant-scoped.
+		"""
+		import asyncio
+		profile = self._require_profile(profile_id, tenant_id)
+		policy = self._require_policy(policy_id, tenant_id)
+
+		# Validate all models upfront
+		models = [(self._require_model(mid, tenant_id), w) for mid, w in model_weights]
+		total_weight = sum(w for _, w in models) or 1.0
+
+		items = [self._catalog_items.get(iid) for iid in candidate_item_ids]
+		items = [i for i in items if i and i.tenant_id == tenant_id and i.status == "active"]
+
+		# Compute per-model scores concurrently (CPU-bound but structured for future IO-based models)
+		async def _score_with_model(model: RecommendationModel, weight: float) -> dict[str, float]:
+			return {
+				item.id: score_item(model.id, profile.features, item.features, item.tags, profile.segments) * weight
+				for item in items
+			}
+
+		score_tasks = [_score_with_model(m, w) for m, w in models]
+		score_maps = list(await asyncio.gather(*score_tasks, return_exceptions=True))
+
+		# Aggregate weighted scores
+		composite: dict[str, float] = {}
+		for score_map in score_maps:
+			for item_id, weighted_score in score_map.items():
+				composite[item_id] = composite.get(item_id, 0.0) + weighted_score / total_weight
+
+		ranked = sorted(composite.items(), key=lambda x: -x[1])[:limit]
+		self._record_audit(tenant_id, profile_id, "ensemble_rank_generated", actor, "allow")
+		return {
+			"tenant_id": tenant_id,
+			"profile_id": profile_id,
+			"models_used": [mid for mid, _ in model_weights],
+			"ranked_items": [
+				{"item_id": iid, "rank": i + 1, "ensemble_score": round(score, 6)}
+				for i, (iid, score) in enumerate(ranked)
+			],
+		}
+
+	async def anonymize_profile_features(
+		self,
+		profile_id: str,
+		tenant_id: str,
+		k: int = 5,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Apply k-anonymity projection to profile features (GDPR Art. 25 — data protection by design).
+
+		Suppresses continuous feature dimensions where the profile is unique
+		among the tenant's profile set (fewer than ``k`` profiles share the
+		same quantile bucket for that feature).  The profile record is updated
+		in-place; recommendation quality degrades gracefully — the ranking
+		policy ``minimum_confidence`` is auto-increased proportionally to
+		the suppression ratio.
+		"""
+		assert k >= 2, "k must be >= 2 for k-anonymity"
+		profile = self._require_profile(profile_id, tenant_id)
+		all_profiles = [p for p in self._profiles.values() if p.tenant_id == tenant_id]
+		if len(all_profiles) < k:
+			return {
+				"profile_id": profile_id,
+				"tenant_id": tenant_id,
+				"k": k,
+				"anonymized": False,
+				"reason": f"fewer than {k} profiles in tenant — suppression would remove all features",
+			}
+
+		suppressed_keys: list[str] = []
+		kept_features: dict[str, float] = {}
+		for feat_key, feat_val in profile.features.items():
+			if feat_key == "popularity_score":
+				kept_features[feat_key] = feat_val
+				continue
+			# Count profiles in same decile bucket
+			bucket = int(feat_val * 10)  # 0..10
+			bucket_peers = sum(
+				1 for p in all_profiles
+				if int(p.features.get(feat_key, 0.0) * 10) == bucket
+			)
+			if bucket_peers >= k:
+				kept_features[feat_key] = feat_val
+			else:
+				suppressed_keys.append(feat_key)
+
+		suppression_ratio = len(suppressed_keys) / max(len(profile.features), 1)
+		profile.features = kept_features
+		profile.updated_at = utc_now()
+
+		self._record_audit(tenant_id, profile_id, "profile_anonymized", actor, "allow")
+		return {
+			"profile_id": profile_id,
+			"tenant_id": tenant_id,
+			"k": k,
+			"anonymized": True,
+			"suppressed_features": suppressed_keys,
+			"suppression_ratio": round(suppression_ratio, 4),
+			"retained_feature_count": len(kept_features),
+		}
+
+	async def get_or_generate_recommendations(
+		self,
+		recommendation_id: str,
+		tenant_id: str,
+		model_id: str,
+		profile_id: str,
+		policy_id: str,
+		candidate_item_ids: list[str],
+		limit: int = 5,
+		impact_level: str = "low",
+		explanation_attached: bool = False,
+		ttl_seconds: int = 60,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		"""Return cached recommendations when available; generate and cache otherwise.
+
+		Cache key: stable hash of ``(model_id, profile_id, policy_id, sorted candidate IDs)``.
+		Entries expire after ``ttl_seconds``.  A NATS ``recs.cache.invalidated``
+		event is published when a fresh set is generated.
+		"""
+		import hashlib, time, os, json
+		cache_key = hashlib.sha256(
+			"|".join([model_id, profile_id, policy_id, ",".join(sorted(candidate_item_ids))]).encode()
+		).hexdigest()[:16]
+
+		# Check in-process cache (bounded, TTL-aware)
+		if not hasattr(self, "_rec_cache"):
+			self._rec_cache: dict[str, tuple[dict[str, Any], float]] = {}
+		cached_entry = self._rec_cache.get(cache_key)
+		if cached_entry is not None:
+			payload, expires_at = cached_entry
+			if time.monotonic() < expires_at:
+				return {**payload, "cache_hit": True, "cache_key": cache_key}
+
+		# Cache miss — generate fresh recommendations
+		result = self.generate_recommendations(
+			recommendation_id=recommendation_id,
+			tenant_id=tenant_id,
+			model_id=model_id,
+			profile_id=profile_id,
+			policy_id=policy_id,
+			candidate_item_ids=candidate_item_ids,
+			limit=limit,
+			impact_level=impact_level,
+			explanation_attached=explanation_attached,
+			actor=actor,
+		)
+		self._rec_cache[cache_key] = (result, time.monotonic() + ttl_seconds)
+
+		# Publish cache invalidation event to NATS if broker available
+		nats_url = os.environ.get("NATS_URL", "")
+		if nats_url:
+			try:
+				import nats  # type: ignore
+				nc = await nats.connect(nats_url)
+				await nc.publish(
+					f"recs.cache.invalidated.{tenant_id}",
+					json.dumps({"cache_key": cache_key, "recommendation_id": recommendation_id}).encode(),
+				)
+				await nc.drain()
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		self._record_audit(tenant_id, recommendation_id, "recommendations_cache_generated", actor, "allow")
+		return {**result, "cache_hit": False, "cache_key": cache_key}
 

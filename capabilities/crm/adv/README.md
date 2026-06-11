@@ -140,9 +140,36 @@ REST API prefix: `/crm-adv/api/v1`
 
 **Enums**: `RecordStatus` (active/inactive/archived/deleted), `ContactType`, `AccountType`, `LeadSource` (10 variants), `LeadStatus` (7 stages), `OpportunityStage` (7 stages), `ActivityType` (9 types), `ActivityStatus`, `Priority`
 
+## New Capabilities (v1.1)
+
+### AI Sales Copilot
+`async copilot_query(prompt, context_ids, tenant_id)` — Natural-language interface to CRM data. Assembles an account/opportunity/activity context bundle and routes the query to a local Ollama model. Tokens stream to NATS subject `crm.adv.copilot.{tenant_id}`. Falls back to rule-based stub when `OLLAMA_BASE_URL` is unset.
+
+### 360-Degree Customer View
+`async get_360_view(account_id, tenant_id)` — Returns a single aggregated view of account, contacts, open/closed opportunities, activity timeline, journey touchpoints, health index, churn probability, and an AI-generated account summary.
+
+### Next-Best-Action Engine
+`async next_best_action(entity_id, entity_type, tenant_id)` — Returns ranked action recommendations (`nurture_email`, `schedule_demo`, `exec_sponsor_call`, etc.) for any lead, opportunity, or account. Ollama-backed with heuristic fallback.
+
+### Proactive Deal Risk Assessment
+`async compute_deal_risk(opportunity_id, tenant_id)` — Composite 0–1 risk score based on inactivity days, close-date proximity, and win probability. Publishes `deal_at_risk` to NATS when score >= 0.65.
+`async run_deal_risk_scan(tenant_id, risk_threshold)` — Batch scan of all open opportunities; returns ranked at-risk list. Schedule via APG cron every 6 hours.
+
+### Conversation Intelligence
+`async analyze_call_transcript(activity_id, transcript, tenant_id)` — Extracts action items, competitor mentions, objections, topics, sentiment score, and talk-time ratio from call transcripts. Uses local Whisper + Ollama with keyword-heuristic fallback.
+
+### Multi-Touch Attribution
+`async compute_multi_touch_attribution(opportunity_id, model_type, tenant_id)` — Allocates deal credit across touchpoints. Models: `first_touch`, `last_touch`, `linear`, `time_decay`, `data_driven` (Shapley approximation via Ollama).
+
+### Account-Based Marketing Target List
+`async build_abm_target_list(icp_definition, limit, tenant_id)` — Scores all tenant accounts against an ICP definition (industry, ARR range, employee count, segment, geography) and returns a ranked target list.
+
+### ARR Waterfall
+`async arr_waterfall(period, tenant_id)` — Computes new ARR, expansion ARR, churn ARR, and net ARR for a period from win/loss event history. Accurate monthly revenue waterfall without external BI tools.
+
 ## Streaming Events
 
-Events emitted to the `apg.crm.adv.lifecycle` stream via Bytewax. Stream key: `tenant_id`.
+Events emitted to the `apg.crm.adv.lifecycle` stream via Bytewax+NATS. Stream key: `tenant_id`.
 
 | Event | Trigger |
 |-------|---------|
@@ -155,6 +182,13 @@ Events emitted to the `apg.crm.adv.lifecycle` stream via Bytewax. Stream key: `t
 | `campaign_launched` | A consent- and audience-verified campaign transitions to active |
 | `forecast_recorded` | An evidence-backed forecast with confidence in [0, 1] is recorded |
 | `crm_agent_registered` | A CRM agent with an approved runtime and role is registered |
+| `deal_at_risk` | Deal risk scan detects composite risk score >= threshold (default 0.65) |
+| `call_analyzed` | A call transcript is processed and structured intelligence extracted |
+| `attribution_computed` | Multi-touch attribution is computed for an opportunity |
+| `nba_generated` | Next-best-action recommendations produced for an entity |
+| `360_view_generated` | A 360-degree account view is assembled |
+| `abm_list_built` | An ABM target list is scored and ranked |
+| `copilot_queried` | A copilot query is processed |
 
 **Lifecycle states**: `draft` -> `active` -> `qualified` -> `assigned` -> `open` -> `won` / `lost` -> `archived`
 

@@ -1,14 +1,29 @@
-# API Service Mesh
+# API Gateway — composition_gateway
+
+© 2025 Datacraft. Author: Nyimbi Odero <nyimbi@gmail.com>
 
 ## Overview
 
-The API Service Mesh provides service discovery, intelligent routing, traffic management, TLS certificate lifecycle, and policy enforcement for all services exposed within the APG composition layer. It acts as the single ingress and inter-service control plane, ensuring that every public route is protected by a policy, a rate limiter, a circuit breaker, and a valid TLS certificate before traffic is allowed.
+The API Gateway provides service discovery, intelligent routing, traffic management, TLS certificate lifecycle, and policy enforcement for all services exposed within the APG composition layer. It acts as the single ingress and inter-service control plane, ensuring that every public route is protected by a policy, a rate limiter, a circuit breaker, and a valid TLS certificate before traffic is allowed.
 
-The business value is a unified governance surface for API exposure: teams register services once and the mesh handles health checking, load balancing, canary deployments, and certificate rotation. All mesh state changes are emitted to the Bytewax event stream, giving operations teams a complete, replayable audit trail of every routing and policy change.
+All mesh state changes are emitted to the Bytewax+NATS event stream (`apg.composition.gateway.lifecycle`), giving operations teams a complete, replayable audit trail of every routing and policy change.
 
 ## Capability ID
 
-`composition_gateway`  Version: see `package_manifest.json`
+`composition_gateway`  — Version: see `package_manifest.json`
+
+## New Features (2026)
+
+| Feature | Method | Description |
+|---------|--------|-------------|
+| Dark traffic shadowing | `shadow_request()` | Copy live traffic to a shadow service via NATS without affecting primary response; returns divergence report |
+| Predictive auto-scaling signals | `emit_scaling_signals()` | Pre-aggregate EW-forecasted scaling events to `apg.gateway.autoscale.<service_id>` for Bytewax consumption |
+| JSON Schema payload validation | `validate_request_payload()` | Validate inbound payloads against JSON Schema (draft-2020-12); return full violation list |
+| Adaptive timeout budgeting | `compute_request_budget()` | Compute remaining time budget from `X-Request-Deadline` header; prevent zombie work |
+| Deadline propagation | `propagate_deadline()` | Inject `X-Request-Deadline` into upstream calls so the budget cascades through the entire call chain |
+| API deprecation management | `deprecate_route()` | Schedule deprecation + sunset dates; auto-inject `Deprecation`/`Sunset` headers; return 410 after sunset |
+| Deprecation header injection | `get_deprecation_headers()` | Compute headers to inject per-response for deprecated routes; return 410 sentinel when past sunset |
+| Locality-aware load balancing | `check_locality_affinity()` | Score endpoints by zone/region affinity (zone_penalty × p50_latency / weight); return sorted list |
 
 ## Provides
 
@@ -16,11 +31,14 @@ The business value is a unified governance surface for API exposure: teams regis
 |---------|-------------|
 | service_mesh_registry | Register services with endpoints, health checks, and capability bindings |
 | gateway_route_lifecycle | Create, approve, and manage routing rules with match conditions |
-| traffic_management | Canary splits, weighted routing, rate limiting, and circuit breakers |
+| traffic_management | Canary splits, weighted routing, shadow traffic, rate limiting, and circuit breakers |
 | gateway_policy_enforcement | Attach and enforce traffic, security, and rate-limit policies per route |
 | certificate_lifecycle | Register, store (via secret reference), and manage TLS certificates |
 | mesh_health_observability | Continuous health checks, distributed traces, topology mapping, and metrics |
 | gateway_agents | AI agent workbench for mesh architecture and traffic review |
+| api_deprecation | Deprecation scheduling, Sunset header injection, and HTTP 410 enforcement |
+| payload_validation | Per-route JSON Schema validation with full violation reporting |
+| locality_load_balancing | Zone/region-aware endpoint scoring for latency-optimal routing |
 
 ## Requires
 
@@ -28,10 +46,10 @@ The business value is a unified governance surface for API exposure: teams regis
 |------------|---------|
 | auth | Authenticate operators managing mesh configuration |
 | audl | Persist immutable mesh change audit records |
-| ntfy | Send route approval and health degradation notifications |
+| ntfy | Send route approval, health degradation, and sunset warning notifications |
 | registry | Register this capability in the global catalog |
 | composition_access | Enforce policy on all gateway write operations |
-| composition_events | Receive and emit mesh lifecycle events via Bytewax |
+| composition_events | Receive and emit mesh lifecycle events via Bytewax+NATS |
 
 ## Configuration Reference
 
@@ -48,7 +66,11 @@ The business value is a unified governance surface for API exposure: teams regis
 | security.tls_required_for_public | bool | true | Public routes require TLS |
 | security.secret_reference_required | bool | true | Certificate private keys must use vault references |
 | gateway_agents.max_autonomous_scope | string | "recommend_and_validate" | Ceiling on autonomous agent actions |
-| observability.event_stream | string | "apg.composition.gateway.lifecycle" | Bytewax stream name |
+| observability.event_stream | string | "apg.composition.gateway.lifecycle" | NATS/Bytewax stream name |
+| shadow.nats_subject_prefix | string | "apg.gateway.shadow" | NATS subject prefix for shadow traffic |
+| autoscale.nats_subject_prefix | string | "apg.gateway.autoscale" | NATS subject prefix for scaling signals |
+| timeout.min_upstream_ms | int | 50 | Minimum remaining budget before short-circuiting |
+| deprecation.warning_days | list[int] | [30, 7, 1] | Days before sunset to emit deprecation warnings |
 
 ## API Routes
 
@@ -62,6 +84,8 @@ The business value is a unified governance surface for API exposure: teams regis
 | certificates | /composition-gateway/certificates | GET/POST | composition_gateway:admin | Security |
 | agents | /composition-gateway/agents | GET/POST | composition_gateway:admin | Automation |
 | settings | /composition-gateway/settings | GET/PUT | composition_gateway:admin | Administration |
+| shadow | /composition-gateway/shadow | POST | composition_gateway:operate | Traffic Testing |
+| deprecation | /composition-gateway/routes/{id}/deprecate | POST | composition_gateway:admin | Lifecycle |
 
 REST API prefix: `/composition-gateway/api/v1`
 
@@ -88,14 +112,16 @@ REST API prefix: `/composition-gateway/api/v1`
 | gateway_agent_runtime_supported | register_gateway_agent with unsupported runtime | deny |
 | gateway_agent_role_supported | register_gateway_agent with unsupported role | deny |
 | privileged_agent_gateway_action_requires_human_approval | agent proposes privileged action without human approval | deny |
+| deprecated_route_returns_sunset_headers | route has deprecation_status=deprecated | inject Deprecation/Sunset headers |
+| sunset_route_returns_410 | route has sunset_at in the past | return HTTP 410 Gone |
 
 ## Data Models
 
 | Model | Key Fields |
 |-------|-----------|
 | SMService | service_id, service_name, service_version, namespace, status, health_status, endpoints, tenant_id |
-| SMEndpoint | endpoint_id, service_id, host, port, protocol, path, weight, tls_enabled, certificate_id, health_check_path |
-| SMRoute | route_id, route_name, service_id, match_type, match_value, destination_services, timeout_ms, retry_attempts, priority |
+| SMEndpoint | endpoint_id, service_id, host, port, protocol, path, weight, tls_enabled, certificate_id, health_check_path, zone, region |
+| SMRoute | route_id, route_name, service_id, match_type, match_value, destination_services, timeout_ms, retry_attempts, priority, deprecated_at, sunset_at, migration_guide_url |
 | SMLoadBalancer | load_balancer_id, algorithm, session_affinity, circuit_breaker_enabled, failure_threshold, max_connections |
 | SMPolicy | policy_id, policy_name, policy_type, route_id, configuration, rate_limit_requests, rate_limit_window_seconds |
 | SMCertificate | certificate_id, certificate_name, common_name, not_before, not_after, status, auto_renew, renewal_days_before |
@@ -107,13 +133,13 @@ REST API prefix: `/composition-gateway/api/v1`
 | SMTopology | topology_id, source_service_id, target_service_id, relationship_type, avg_response_time_ms |
 | SMAlert | alert_id, condition, severity, is_active, notification_channels, trigger_count |
 
-AI-powered models also present: `SMNaturalLanguagePolicy`, `SMIntelligentTopology`, `SMAutonomousMeshDecision`, `SMPredictiveAlert`, `SMCollaborativeSession`.
+AI-powered models: `SMNaturalLanguagePolicy`, `SMIntelligentTopology`, `SMAutonomousMeshDecision`, `SMPredictiveAlert`, `SMCollaborativeSession`.
 
 Pydantic API models: `ServiceConfig`, `EndpointConfig`, `RouteConfig`, `LoadBalancerConfig`, `PolicyConfig`.
 
 ## Streaming Events
 
-Events emitted to the composition event stream via Bytewax (`apg.composition.gateway.lifecycle`).
+Events emitted to the composition event stream via Bytewax+NATS (`apg.composition.gateway.lifecycle`).
 
 | Event | Trigger |
 |-------|---------|
@@ -124,26 +150,37 @@ Events emitted to the composition event stream via Bytewax (`apg.composition.gat
 | certificate_registered | TLS certificate registered with vault reference |
 | health_recorded | Health check result recorded |
 | gateway_agent_registered | New gateway agent registered |
+| shadow_request_completed | Shadow traffic divergence report ready |
+| scaling_signal_emitted | Predictive auto-scaling signal computed |
+| payload_validation_failed | Request payload failed JSON Schema validation |
+| route_deprecated | Route marked deprecated with sunset date |
+| route_sunset | Route past its sunset date (HTTP 410 active) |
 
-Stream states: `draft → active → healthy → degraded → canary → blocked → retired`
+Stream states: `draft → active → healthy → degraded → canary → blocked → retired → sunset`
 
 ## Edge Cases Handled
 
-- Public routes are blocked at creation if TLS, policy, and approval are not all present simultaneously; partial compliance is not accepted, preventing routes from going live in an insecure intermediate state.
+- Public routes are blocked at creation if TLS, policy, and approval are not all present simultaneously; partial compliance is not accepted.
 - Canary traffic shifts that lack evidence produce `require_review` rather than `deny`, preserving the ability to execute emergency traffic shifts with an explicit human review record.
-- Certificate private keys must reference a vault secret rather than being stored in `private_key_pem`; the model column exists for completeness but the `certificate_requires_secret_reference` rule enforces the vault path at registration time.
-- `SMService.metadata` is exposed as a Python property over the underlying `metadata_json` column to avoid collision with SQLAlchemy's reserved `metadata` attribute; direct column access uses `metadata_json`.
-- Circuit breakers are required at policy-attachment time for public services, not at service registration time, because the same service may be exposed through both internal and public routes with different policies.
-- The `SMIntelligentTopology` and `SMAutonomousMeshDecision` models capture AI-generated predictions and autonomous self-healing decisions for audit and rollback purposes.
+- Certificate private keys must reference a vault secret rather than being stored in `private_key_pem`; the `certificate_requires_secret_reference` rule enforces this at registration time.
+- `SMService.metadata` is exposed as a Python property over the underlying `metadata_json` column to avoid collision with SQLAlchemy's reserved `metadata` attribute.
+- Circuit breakers are required at policy-attachment time for public services, not at service registration time, because the same service may be exposed through both internal and public routes.
+- Shadow requests use a 5-second hard timeout and never block the primary response path.
+- Deadline propagation uses `time.time()` (wall clock) for the deadline epoch and `time.monotonic()` for elapsed measurement to avoid clock-skew errors.
+- When `compute_request_budget()` returns `should_short_circuit: true`, the caller must return HTTP 504 before forwarding to prevent zombie work.
+- `get_deprecation_headers()` returns the `X-Gateway-Gone: 410` sentinel as a dict key rather than raising an exception, so callers can inspect it before deciding whether to forward the request.
+- Locality-aware load balancing falls back to `zone_penalty=3.0` (cross-region cost) when endpoint zone/region metadata is absent.
 
 ## Composability
 
 - **Upstream**: `composition_access` (policy enforcement on all writes), `composition_events` (receives mesh lifecycle events), `auth` (operator identity)
 - **Downstream**: All domain capabilities that expose HTTP APIs register their services here; the mesh handles routing, rate limiting, and TLS termination for their endpoints
-- **Peer**: `audl` (long-term route and policy change audit), `ntfy` (health degradation and approval notifications), `composition_config` (reads route timeout and rate-limit config values)
+- **Peer**: `audl` (long-term route and policy change audit), `ntfy` (health degradation, approval, and sunset warning notifications), `composition_config` (reads route timeout and rate-limit config values)
+- **Streaming**: Bytewax+NATS (`apg.composition.gateway.lifecycle`) for all lifecycle events; NATS subjects `apg.gateway.shadow.*` for shadow traffic, `apg.gateway.autoscale.*` for scaling signals
 
 ## Development Notes
 
 - `SMService`, `SMEndpoint`, `SMPolicy`, `SMMetrics`, `SMAlert`, `SMTopology`, `SMConfiguration`, `SMCertificate`, `SMSecurityPolicy`, and `SMRateLimiter` all have their `metadata` attribute patched as a property at module load time via the `_get_model_metadata` / `_set_model_metadata` pattern; avoid adding a mapped `metadata` column to any new models in this module.
 - The `SMLoadBalancer` model is not directly bound to a route; it is associated with a service. Apply circuit breaker and health check settings at the load balancer level, not per-endpoint.
-- Key files: `capability_contract.py` (executable contract and rule engine), `models.py` (SQLAlchemy + Pydantic models), `service.py` (lifecycle operations), `api.py` (API helpers), `views.py` (UI model helpers).
+- Key files: `capability_contract.py` (executable contract and rule engine), `models.py` (SQLAlchemy + Pydantic models), `service.py` (lifecycle operations + 8 new async methods), `api.py` (API helpers), `views.py` (UI model helpers).
+- `WORLD_CLASS_IMPROVEMENTS.md` documents 15 architectural improvements with competitor references.

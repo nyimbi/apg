@@ -3662,7 +3662,7 @@ class AccountsPayableService:
 				],
 			}
 
-		results = await asyncio.gather(*[_run_scenario(s) for s in scenarios])
+		results = list(await asyncio.gather(*[_run_scenario(s) for s in scenarios], return_exceptions=True))
 
 		baseline = results[0]
 		comparison: list[dict[str, Any]] = []
@@ -3916,8 +3916,8 @@ class AccountsPayableService:
 				d = date.fromisoformat(p.get("scheduled_date", _today())[:10])
 				if d.weekday() >= 5:
 					weekend_pmts += 1
-			except Exception:
-				pass
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 		fraud_score = round(max(0, 100 - (weekend_pmts / total_pmts) * 100))
 		controls.append({"control": "payment_fraud_indicators", "score": fraud_score, "weight": 10})
 		if fraud_score < 90:

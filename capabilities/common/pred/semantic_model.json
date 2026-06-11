@@ -1414,7 +1414,26 @@
       "streaming": {
         "broker_core_dependency_allowed": false,
         "engine": "bytewax",
+        "events": [
+          "model_registered",
+          "model_trained",
+          "model_evaluated",
+          "model_deployed",
+          "prediction_completed",
+          "forecast_generated",
+          "feature_computed",
+          "drift_detected",
+          "retraining_scheduled",
+          "batch_prediction_processed",
+          "agent_registered"
+        ],
+        "guardrails": [
+          "pred_batch_requires_bytewax",
+          "pred_privileged_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
         "lifecycle_stream": "pred.lifecycle",
+        "processor": "bytewax",
         "required_operations": [
           "model_batch",
           "feature_set_batch",
@@ -1426,16 +1445,7 @@
           "prediction_agent_batch"
         ],
         "required_processor": "bytewax",
-        "topics": [
-          "pred.models",
-          "pred.features",
-          "pred.forecasts",
-          "pred.scores",
-          "pred.scenarios",
-          "pred.drift",
-          "pred.explainability",
-          "pred.agents"
-        ],
+        "stream": "apg.pred.lifecycle",
         "watermark": "event_time"
       },
       "theme": {
@@ -1858,7 +1868,26 @@
       "streaming": {
         "broker_core_dependency_allowed": false,
         "engine": "bytewax",
+        "events": [
+          "model_registered",
+          "model_trained",
+          "model_evaluated",
+          "model_deployed",
+          "prediction_completed",
+          "forecast_generated",
+          "feature_computed",
+          "drift_detected",
+          "retraining_scheduled",
+          "batch_prediction_processed",
+          "agent_registered"
+        ],
+        "guardrails": [
+          "pred_batch_requires_bytewax",
+          "pred_privileged_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
         "lifecycle_stream": "pred.lifecycle",
+        "processor": "bytewax",
         "required_operations": [
           "model_batch",
           "feature_set_batch",
@@ -1870,16 +1899,7 @@
           "prediction_agent_batch"
         ],
         "required_processor": "bytewax",
-        "topics": [
-          "pred.models",
-          "pred.features",
-          "pred.forecasts",
-          "pred.scores",
-          "pred.scenarios",
-          "pred.drift",
-          "pred.explainability",
-          "pred.agents"
-        ],
+        "stream": "apg.pred.lifecycle",
         "watermark": "event_time"
       }
     }

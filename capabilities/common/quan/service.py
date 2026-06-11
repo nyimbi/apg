@@ -1,6 +1,7 @@
 """Service layer for executable Quantum Computing operations — expanded implementation."""
 
 from __future__ import annotations
+from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 import hashlib
 import math
@@ -1461,7 +1462,7 @@ class QuantumComputingService:
 					job_id=item.get("job_id"),
 				)
 
-		return list(await asyncio.gather(*(_submit_one(j) for j in jobs)))
+		return list(await asyncio.gather(*(_submit_one(j) for j in jobs), return_exceptions=True))
 
 	async def async_vqe_solve(
 		self,

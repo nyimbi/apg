@@ -1546,7 +1546,7 @@ class PoseService:
 					return {"frame_id": fid, "status": "error", "error": str(exc)}
 
 		tasks = [_process_one(f) for f in frames]
-		frame_results = list(await _asyncio.gather(*tasks))
+		frame_results = list(await _asyncio.gather(*tasks, return_exceptions=True))
 		elapsed_ms = round((_time.monotonic() - t0) * 1000, 1)
 		success_count = sum(1 for r in frame_results if r["status"] == "ok")
 		failure_count = len(frame_results) - success_count

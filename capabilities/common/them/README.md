@@ -11,17 +11,24 @@ auditable publication workflows.
 
 ## What THEM Provides
 
-- Tenant-scoped theme registry.
+- Tenant-scoped theme registry with parent-child inheritance graph.
 - Governed token versioning for color, typography, spacing, density, and
   component tokens.
+- Semantic token aliases (`{color.brand.blue.500}`) with recursive resolution.
 - Brand guideline evidence and fallback theme mapping.
 - Licensed and approved brand asset records.
-- Preview evidence for APG surfaces and viewport sizes.
+- Preview evidence for APG surfaces and viewport sizes, including responsive
+  multi-breakpoint generation.
+- Multi-surface WCAG contrast matrix (all foreground/background pairs).
 - Contrast validation and approval gates before publication.
-- Large-rollout review guardrails.
+- Large-rollout review guardrails with canary cohort strategy.
+- Immutable point-in-time theme snapshots for compliance time-travel.
+- Multi-dimension governance scorecard (token freshness, a11y, licensing,
+  publication governance, brand coverage).
 - First-class THEM agents for Codex, Claude Code, OpenCode, and Pi based review
   lanes.
 - Bytewax lifecycle stream metadata.
+- NATS JetStream delivery for async publish and token-update events.
 - Dashboard, console, token editor, asset manager, preview, agent, policy, and
   settings view models.
 
@@ -77,6 +84,159 @@ publication = service.publish_theme(
 )
 
 print(publication["status"])
+```
+
+## Async Methods
+
+All lifecycle operations have async counterparts with optional NATS JetStream
+integration.
+
+```python
+import asyncio
+
+async def main():
+    service = ThemService()
+
+    # Async publish with NATS delivery
+    result = await service.async_publish_theme(
+        tenant_id="tenant-a",
+        theme_id=theme_id,
+        published_by="release-manager",
+        approval_ref="approval://1",
+        nats_client=nats_client,  # optional; omit for in-process only
+    )
+
+    # Async token update
+    await service.async_update_tokens(
+        tenant_id="tenant-a",
+        theme_id=theme_id,
+        group="color",
+        tokens={"color.primary": "#0052CC"},
+        updated_by="designer",
+        nats_client=nats_client,
+    )
+
+asyncio.run(main())
+```
+
+## Token Diff and Rollback
+
+```python
+async def inspect():
+    # See what changed between token versions
+    diff = await service.token_diff(
+        tenant_id="tenant-a",
+        theme_id=theme_id,
+        from_version=1,
+        to_version=3,
+    )
+    print(diff["changed"])  # {"color.primary": {"old": "#aaa", "new": "#0052CC"}}
+
+    # Roll a group back to a previous version
+    await service.token_rollback(
+        tenant_id="tenant-a",
+        theme_id=theme_id,
+        group="color",
+        target_version=1,
+        rolled_back_by="design-lead",
+    )
+```
+
+## Semantic Token Aliases
+
+```python
+service.update_tokens(
+    tenant_id="tenant-a",
+    theme_id=theme_id,
+    group="semantic",
+    tokens={
+        "color.action.primary": "{color.brand.blue.500}",
+        "color.brand.blue.500": "#0052CC",
+    },
+    updated_by="designer",
+)
+
+# Resolves {color.brand.blue.500} -> #0052CC
+resolved = await service.resolve_aliases(tenant_id="tenant-a", theme_id=theme_id)
+print(resolved["resolved_tokens"]["color.action.primary"])  # "#0052CC"
+```
+
+## Theme Inheritance Graph
+
+```python
+parent = service.create_theme(...)
+child = service.theme_inherit(
+    tenant_id="tenant-a",
+    parent_theme_id=parent["id"],
+    child_name="Operations Dark",
+    overrides={"color.background": "#1a1a2e"},
+)
+
+# Resolve fully merged token set with provenance
+graph = await service.resolve_token_graph(
+    tenant_id="tenant-a",
+    theme_id=child["id"],
+)
+print(graph["provenance"]["color.primary"])  # parent theme id
+```
+
+## Multi-Surface Contrast Matrix
+
+```python
+matrix = await service.contrast_matrix(
+    tenant_id="tenant-a",
+    theme_id=theme_id,
+    wcag_level="AA",
+)
+print(f"{matrix['pass_rate_pct']}% of pairs pass WCAG AA")
+for fail in matrix["failures"]:
+    print(f"{fail['fg_token']} on {fail['bg_token']}: {fail['ratio']}:1")
+```
+
+## Theme Snapshots
+
+```python
+# Capture immutable snapshot for compliance
+snap = await service.snapshot_theme(
+    tenant_id="tenant-a",
+    theme_id=theme_id,
+    label="pre-v2-release",
+    snapshotted_by="release-manager",
+)
+
+# Restore from snapshot (adds new token versions; history preserved)
+await service.restore_theme_snapshot(
+    tenant_id="tenant-a",
+    snapshot_id=snap["id"],
+    restored_by="release-manager",
+)
+```
+
+## Canary Rollout
+
+```python
+result = await service.canary_rollout(
+    tenant_id="platform",
+    theme_id=theme_id,
+    target_tenant_ids=["t1", "t2", ..., "t1000"],
+    cohort_size=50,
+    halt_on_violation_rate=0.05,  # halt if >5% WCAG violations
+    applied_by="platform-ops",
+    nats_client=nats_client,  # publishes progress to apg.them.rollout.<tenant_id>
+)
+print(result["applied_count"], result["halted"])
+```
+
+## Governance Scorecard
+
+```python
+scorecard = await service.governance_scorecard(
+    tenant_id="tenant-a",
+    period_days=30,
+)
+print(scorecard["grade"])          # "A", "B", ..., "F"
+print(scorecard["overall_score"])  # 0-100
+print(scorecard["dimensions"])     # per-dimension breakdown
 ```
 
 ## THEM Agents
@@ -177,13 +337,22 @@ THEM enforces:
 - policies: `/them/policies`
 - settings: `/them/settings`
 
-## Bytewax Stream
+## Bytewax / NATS Stream
 
-THEM publishes lifecycle metadata for Bytewax:
+THEM publishes lifecycle metadata via NATS for Bytewax consumption:
 
 - processor: `bytewax`
 - stream: `apg.them.lifecycle`
 - key: `tenant_id`
+
+NATS subjects:
+
+| Subject | Trigger |
+|---------|---------|
+| `apg.them.theme_published.<tenant_id>` | Theme published (async) |
+| `apg.them.tokens_updated.<tenant_id>` | Tokens updated (async) |
+| `apg.them.rollout.<tenant_id>` | Canary rollout progress |
+| `apg.them.lifecycle` | All lifecycle events (Bytewax) |
 
 Events:
 
@@ -193,14 +362,18 @@ Events:
 - `theme_preview_created`
 - `theme_published`
 - `them_agent_registered`
+- `token_rollback`
+- `theme_snapshot_created`
+- `theme_snapshot_restored`
+- `governance_scorecard_computed`
 
 ## Adapter Boundaries
 
 The in-package service stores records in memory so generated applications,
 tests, and publish-plan probes can execute without external infrastructure.
 Production systems should attach identity providers, audit sinks, asset stores,
-preview renderers, accessibility engines, rollout orchestrators, and Bytewax
-workers through APG adapters.
+preview renderers, accessibility engines, rollout orchestrators, NATS clients,
+and Bytewax workers through APG adapters.
 
 ## Verification
 

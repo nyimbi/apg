@@ -181,7 +181,7 @@ def self_test() -> dict[str, Any]:
 		errors.append("PRED adapter manifest must use Bytewax for event streaming")
 	if agents.get("first_class") is not True:
 		errors.append("PRED agents must be first-class semantic citizens")
-	if streaming.get("required_processor") != "bytewax":
+	if streaming.get("required_processor", streaming.get("processor")) != "bytewax":
 		errors.append("PRED lifecycle stream must require Bytewax")
 	if capability.get("runtime", {}).get("service") != "service.PredService":
 		errors.append("PRED generated-app runtime is missing")

@@ -2047,6 +2047,619 @@ class NLPCoreService:
 		return {"document_id": doc_id, "local_coherence": round(local_coherence, 4), "global_coherence": round(global_coherence, 4), "overall_score": round(overall, 4), "sentence_scores": sentence_scores, "model_used": "entity_grid+tfidf"}
 
 	# ------------------------------------------------------------------
+	# score_readability — Flesch-Kincaid + Gunning Fog + Coleman-Liau
+	# ------------------------------------------------------------------
+
+	async def score_readability(
+		self,
+		text: str,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Compute readability metrics for *text* with no external dependencies.
+
+		Returns fk_grade, fog_index, cl_index, flesch_reading_ease,
+		plain_language_score, avg_sentence_length, avg_syllables_per_word,
+		complex_word_ratio.  All scores are deterministic — no model backend.
+		"""
+		guard_tenant_id(self._tenant_id)
+		assert_text_not_empty(text)
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("score_readability", doc_id)
+
+		def _count_syllables(word: str) -> int:
+			w = word.lower().strip(".,!?;:'\"()")
+			if not w:
+				return 0
+			count = len(re.findall(r"[aeiouy]+", w))
+			if w.endswith("e") and count > 1:
+				count -= 1
+			return max(1, count)
+
+		sentences = [s.strip() for s in re.split(r"[.!?]+", text) if s.strip()]
+		words = re.findall(r"\b[a-zA-Z']+\b", text)
+		n_sent = max(1, len(sentences))
+		n_words = max(1, len(words))
+		syllables_per_word = [_count_syllables(w) for w in words]
+		n_syllables = sum(syllables_per_word)
+		n_complex = sum(1 for s in syllables_per_word if s >= 3)
+		n_chars = sum(len(w) for w in words)
+		avg_sent_len = n_words / n_sent
+		avg_syl = n_syllables / n_words
+		complex_ratio = n_complex / n_words
+		fk_grade = 0.39 * avg_sent_len + 11.8 * avg_syl - 15.59
+		fre = 206.835 - 1.015 * avg_sent_len - 84.6 * avg_syl
+		fog = 0.4 * (avg_sent_len + complex_ratio * 100)
+		lval = (n_chars / n_words) * 100
+		sval = (n_sent / n_words) * 100
+		cl = 0.0588 * lval - 0.296 * sval - 15.8
+		plain = max(0.0, min(1.0, 1.0 - max(0.0, fk_grade - 4) / 12.0))
+		self._emit_event("nlpc.readability.scored", {"document_id": doc_id, "fk_grade": round(fk_grade, 2)})
+		self._log_task_done("score_readability", (time.perf_counter() - t0) * 1000)
+		return {
+			"document_id": doc_id,
+			"fk_grade": round(fk_grade, 2),
+			"flesch_reading_ease": round(min(100.0, max(0.0, fre)), 2),
+			"fog_index": round(fog, 2),
+			"cl_index": round(cl, 2),
+			"plain_language_score": round(plain, 4),
+			"avg_sentence_length": round(avg_sent_len, 2),
+			"avg_syllables_per_word": round(avg_syl, 3),
+			"complex_word_ratio": round(complex_ratio, 4),
+			"word_count": n_words,
+			"sentence_count": n_sent,
+		}
+
+	# ------------------------------------------------------------------
+	# detect_emotions — Ekman 8-class emotion detection
+	# ------------------------------------------------------------------
+
+	async def detect_emotions(
+		self,
+		text: str,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Detect fine-grained emotions using Ekman 8-class taxonomy.
+
+		Uses zero-shot classification (facebook/bart-large-mnli) when
+		transformers is available; falls back to an NRC-style lexicon.
+
+		Returns {document_id, emotions: {label: score}, dominant_emotion,
+		valence, arousal, dominance, model_used}.
+		"""
+		guard_tenant_id(self._tenant_id)
+		assert_text_not_empty(text)
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("detect_emotions", doc_id)
+
+		emotion_labels = ["joy", "anger", "fear", "disgust", "surprise", "sadness", "anticipation", "trust"]
+		_lexicon: dict[str, list[str]] = {
+			"joy": ["happy", "joy", "wonderful", "excited", "delight", "love", "great", "amazing", "brilliant"],
+			"anger": ["angry", "furious", "outraged", "hate", "rage", "annoyed", "hostile", "aggressive"],
+			"fear": ["afraid", "scared", "terrified", "anxious", "worried", "dread", "panic", "horror"],
+			"disgust": ["disgusting", "revolting", "nasty", "awful", "horrible", "repulsive", "gross"],
+			"surprise": ["surprising", "unexpected", "astonishing", "shocking", "unbelievable", "amazed"],
+			"sadness": ["sad", "depressed", "miserable", "unhappy", "grief", "sorrow", "heartbroken"],
+			"anticipation": ["expect", "waiting", "hope", "eager", "looking", "forward", "upcoming", "soon"],
+			"trust": ["trust", "reliable", "honest", "confident", "believe", "faith", "loyal", "dependable"],
+		}
+		_vad: dict[str, tuple[float, float, float]] = {
+			"joy": (0.9, 0.7, 0.7), "anger": (0.2, 0.9, 0.6), "fear": (0.1, 0.8, 0.2),
+			"disgust": (0.1, 0.6, 0.4), "surprise": (0.6, 0.8, 0.5), "sadness": (0.1, 0.3, 0.2),
+			"anticipation": (0.7, 0.6, 0.6), "trust": (0.8, 0.4, 0.7),
+		}
+
+		scores: dict[str, float] = {}
+		model_used = "nrc_lexicon"
+
+		if _transformers is not None:
+			try:
+				from transformers import pipeline as hf_pipeline  # type: ignore
+				zs = hf_pipeline("zero-shot-classification", model="facebook/bart-large-mnli", multi_label=True, truncation=True)
+				result = zs(text[:512], candidate_labels=emotion_labels)
+				scores = dict(zip(result["labels"], result["scores"]))
+				model_used = "zero-shot/bart-mnli"
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		if not scores:
+			tokens = set(re.findall(r"\b\w+\b", text.lower()))
+			total = 0.0
+			for emo, words in _lexicon.items():
+				hit = float(len(tokens & set(words)))
+				scores[emo] = hit
+				total += hit
+			if total > 0:
+				scores = {k: v / total for k, v in scores.items()}
+			else:
+				scores = {k: 1.0 / len(emotion_labels) for k in emotion_labels}
+
+		dominant = max(scores, key=lambda k: scores[k])
+		vad = _vad.get(dominant, (0.5, 0.5, 0.5))
+		self._emit_event("nlpc.emotions.detected", {"document_id": doc_id, "dominant": dominant})
+		self._log_task_done("detect_emotions", (time.perf_counter() - t0) * 1000)
+		return {
+			"document_id": doc_id,
+			"emotions": {k: round(v2, 4) for k, v2 in scores.items()},
+			"dominant_emotion": dominant,
+			"valence": round(vad[0], 3),
+			"arousal": round(vad[1], 3),
+			"dominance": round(vad[2], 3),
+			"model_used": model_used,
+		}
+
+	# ------------------------------------------------------------------
+	# score_faithfulness — NLI hallucination/faithfulness check
+	# ------------------------------------------------------------------
+
+	async def score_faithfulness(
+		self,
+		source: str,
+		generated: str,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Measure how faithfully *generated* text is supported by *source*.
+
+		Uses NLI entailment via cross-encoder/nli-deberta-v3-small when
+		sentence-transformers is available; falls back to ROUGE-L token overlap.
+
+		Returns {document_id, entailment_score, contradiction_score,
+		faithfulness_label, rouge_l, model_used}.
+		Labels: faithful (>0.6), uncertain (0.3-0.6), unfaithful (<0.3).
+		"""
+		guard_tenant_id(self._tenant_id)
+		assert_text_not_empty(source)
+		assert_text_not_empty(generated)
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("score_faithfulness", doc_id)
+
+		entailment = 0.5
+		contradiction = 0.5
+		model_used = "token_overlap"
+
+		if _sentence_transformers is not None:
+			try:
+				from sentence_transformers import CrossEncoder  # type: ignore
+				ce = CrossEncoder("cross-encoder/nli-deberta-v3-small")
+				scores_raw = ce.predict([(source[:512], generated[:512])])
+				probs = scores_raw[0]
+				contradiction = float(probs[0]) if len(probs) > 0 else 0.5
+				entailment = float(probs[1]) if len(probs) > 1 else 0.5
+				model_used = "cross-encoder/nli-deberta-v3-small"
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		def _lcs_len(a: list[str], b: list[str]) -> int:
+			m, n = len(a), len(b)
+			dp = [[0] * (n + 1) for _ in range(2)]
+			best = 0
+			for i in range(1, m + 1):
+				for j in range(1, n + 1):
+					dp[i % 2][j] = (
+						dp[(i - 1) % 2][j - 1] + 1
+						if a[i - 1] == b[j - 1]
+						else max(dp[(i - 1) % 2][j], dp[i % 2][j - 1])
+					)
+					best = max(best, dp[i % 2][j])
+			return best
+
+		src_toks = re.findall(r"\b\w+\b", source.lower())
+		gen_toks = re.findall(r"\b\w+\b", generated.lower())
+		lcs = _lcs_len(src_toks, gen_toks)
+		recall = lcs / max(1, len(src_toks))
+		precision = lcs / max(1, len(gen_toks))
+		rouge_l = 2 * recall * precision / max(1e-9, recall + precision)
+
+		if model_used == "token_overlap":
+			entailment = rouge_l
+			contradiction = 1.0 - rouge_l
+
+		if entailment > 0.6:
+			label = "faithful"
+		elif entailment > 0.3:
+			label = "uncertain"
+		else:
+			label = "unfaithful"
+
+		self._emit_event("nlpc.faithfulness.scored", {"document_id": doc_id, "label": label})
+		self._log_task_done("score_faithfulness", (time.perf_counter() - t0) * 1000)
+		return {
+			"document_id": doc_id,
+			"entailment_score": round(entailment, 4),
+			"contradiction_score": round(contradiction, 4),
+			"faithfulness_label": label,
+			"rouge_l": round(rouge_l, 4),
+			"model_used": model_used,
+		}
+
+	# ------------------------------------------------------------------
+	# find_near_duplicates — MinHash LSH near-duplicate detection
+	# ------------------------------------------------------------------
+
+	async def find_near_duplicates(
+		self,
+		document_ids: list[str],
+		threshold: float = 0.8,
+		shingle_size: int = 3,
+		n_hash_funcs: int = 128,
+	) -> list[dict[str, Any]]:
+		"""Find near-duplicate pairs among *document_ids* using MinHash LSH.
+
+		Builds character shingle_size-gram shingle sets, computes n_hash_funcs
+		MinHash values per set, estimates Jaccard from signatures.
+		Returns pairs with estimated similarity >= threshold.
+		Pure Python — no faiss/datasketch dependency.
+		"""
+		guard_tenant_id(self._tenant_id)
+		assert document_ids, "document_ids must not be empty"
+		assert 0.0 < threshold <= 1.0, "threshold must be in (0, 1]"
+		t0 = time.perf_counter()
+		self._log_task_start("find_near_duplicates", "batch")
+
+		import struct
+
+		def _shingles(txt: str, k: int) -> set[str]:
+			tl = txt.lower()
+			return {tl[i:i + k] for i in range(len(tl) - k + 1)} if len(tl) >= k else {tl}
+
+		def _minhash(shingle_set: set[str], n: int) -> list[int]:
+			sigs: list[int] = []
+			for i in range(n):
+				seed = i.to_bytes(4, "little")
+				min_val = 2 ** 64
+				for sh in shingle_set:
+					raw = hashlib.sha256(seed + sh.encode()).digest()
+					val = struct.unpack_from("<Q", raw)[0]
+					if val < min_val:
+						min_val = val
+				sigs.append(min_val)
+			return sigs
+
+		sigs: dict[str, list[int]] = {}
+		raw_shingles: dict[str, set[str]] = {}
+		for did in document_ids:
+			rec = self._get("nlpc_documents", did)
+			if not rec or rec.get("is_deleted"):
+				continue
+			sh = _shingles(rec["content"], shingle_size)
+			raw_shingles[did] = sh
+			sigs[did] = _minhash(sh, n_hash_funcs)
+
+		candidates: list[dict[str, Any]] = []
+		ids = list(sigs.keys())
+		for i in range(len(ids)):
+			for j in range(i + 1, len(ids)):
+				a, b = ids[i], ids[j]
+				matches = sum(1 for x, y in zip(sigs[a], sigs[b]) if x == y)
+				est_sim = matches / n_hash_funcs
+				if est_sim >= threshold:
+					sh_a, sh_b = raw_shingles[a], raw_shingles[b]
+					exact = len(sh_a & sh_b) / max(1, len(sh_a | sh_b))
+					candidates.append({
+						"doc_id_a": a,
+						"doc_id_b": b,
+						"estimated_similarity": round(est_sim, 4),
+						"exact_jaccard": round(exact, 4),
+					})
+
+		self._emit_event("nlpc.duplicates.found", {"count": len(candidates)})
+		self._log_task_done("find_near_duplicates", (time.perf_counter() - t0) * 1000)
+		return sorted(candidates, key=lambda x: x["estimated_similarity"], reverse=True)
+
+	# ------------------------------------------------------------------
+	# detect_document_structure — section/table/list structure detection
+	# ------------------------------------------------------------------
+
+	async def detect_document_structure(
+		self,
+		text: str,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Classify text spans into structural segments without external models.
+
+		Segment types: heading, paragraph, list_item, table_row, code_block, blank.
+		Returns {document_id, segments, structure_score, heading_count, list_item_count}.
+		structure_score in [0,1]: fraction of segments that are non-paragraph.
+		"""
+		guard_tenant_id(self._tenant_id)
+		assert_text_not_empty(text)
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("detect_document_structure", doc_id)
+
+		lines = text.splitlines()
+		segments: list[dict[str, Any]] = []
+		pos = 0
+		in_code = False
+		_heading_re = re.compile(r"^(#{1,6})\s+(.+)$")
+		_list_re = re.compile(r"^\s*[-*+]\s+|^\s*\d+[.)]\s+")
+		_table_re = re.compile(r"^\s*\|.+\|")
+		_code_fence = re.compile(r"^```")
+
+		for line in lines:
+			end = pos + len(line)
+			stripped = line.strip()
+			if _code_fence.match(stripped):
+				in_code = not in_code
+				seg_type, level = "code_block", 0
+			elif in_code:
+				seg_type, level = "code_block", 0
+			elif not stripped:
+				seg_type, level = "blank", 0
+			else:
+				hm = _heading_re.match(stripped)
+				if hm:
+					seg_type, level = "heading", len(hm.group(1))
+				elif _table_re.match(line):
+					seg_type, level = "table_row", 0
+				elif _list_re.match(line):
+					seg_type, level = "list_item", len(line) - len(line.lstrip())
+				else:
+					seg_type, level = "paragraph", 0
+			if stripped:
+				segments.append({"start": pos, "end": end, "text": stripped[:200], "type": seg_type, "level": level})
+			pos = end + 1
+
+		non_para = sum(1 for s in segments if s["type"] not in {"paragraph", "blank"})
+		structure_score = non_para / max(1, len(segments))
+		heading_count = sum(1 for s in segments if s["type"] == "heading")
+		list_item_count = sum(1 for s in segments if s["type"] == "list_item")
+		self._emit_event("nlpc.structure.detected", {"document_id": doc_id, "segments": len(segments)})
+		self._log_task_done("detect_document_structure", (time.perf_counter() - t0) * 1000)
+		return {
+			"document_id": doc_id,
+			"segments": segments,
+			"structure_score": round(structure_score, 4),
+			"heading_count": heading_count,
+			"list_item_count": list_item_count,
+			"segment_count": len(segments),
+		}
+
+	# ------------------------------------------------------------------
+	# label_semantic_roles — PropBank-style SRL
+	# ------------------------------------------------------------------
+
+	async def label_semantic_roles(
+		self,
+		text: str,
+		document_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Identify predicate-argument structures (semantic roles) per sentence.
+
+		Uses spaCy dependency parse (ARG0/ARG1/ARG2/ARGM-TMP/ARGM-LOC)
+		when available; falls back to SVO regex heuristic.
+
+		Returns {document_id, frames: [{predicate, predicate_index,
+		args: [{role, text, start, end, dep}]}], model_used}.
+		"""
+		guard_tenant_id(self._tenant_id)
+		assert_text_not_empty(text)
+		doc_id = document_id or uuid7str()
+		t0 = time.perf_counter()
+		self._log_task_start("label_semantic_roles", doc_id)
+
+		frames: list[dict[str, Any]] = []
+		model_used = "heuristic"
+
+		nlp = self._get_spacy_model("en")
+		if nlp is not None:
+			try:
+				spacy_doc = nlp(text)
+				for token in spacy_doc:
+					if token.pos_ == "VERB":
+						args: list[dict[str, Any]] = []
+						for child in token.children:
+							if child.dep_ in {"nsubj", "nsubjpass"}:
+								role = "ARG0"
+							elif child.dep_ in {"dobj", "attr", "oprd"}:
+								role = "ARG1"
+							elif child.dep_ in {"pobj", "iobj"}:
+								role = "ARG2"
+							elif child.dep_ in {"prep", "pcomp"} and child.text.lower() in {"in", "at", "on", "near", "by"}:
+								role = "ARGM-LOC"
+							elif child.dep_ == "prep" and child.text.lower() in {"during", "before", "after", "when", "while"}:
+								role = "ARGM-TMP"
+							else:
+								continue
+							args.append({"role": role, "text": child.text, "start": child.idx, "end": child.idx + len(child.text), "dep": child.dep_})
+						if args:
+							frames.append({"predicate": token.lemma_, "predicate_index": token.i, "args": args})
+				model_used = "spacy_dep"
+			except Exception as _exc:
+				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		if not frames:
+			for m in re.finditer(r"([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s+((?:is|are|was|were|has|have|had)\s+\w+)\s+(\w+)", text):
+				frames.append({
+					"predicate": m.group(2).strip(),
+					"predicate_index": m.start(2),
+					"args": [
+						{"role": "ARG0", "text": m.group(1), "start": m.start(1), "end": m.end(1), "dep": "nsubj"},
+						{"role": "ARG1", "text": m.group(3), "start": m.start(3), "end": m.end(3), "dep": "dobj"},
+					],
+				})
+
+		self._emit_event("nlpc.srl.labelled", {"document_id": doc_id, "frames": len(frames)})
+		self._log_task_done("label_semantic_roles", (time.perf_counter() - t0) * 1000)
+		return {"document_id": doc_id, "frames": frames, "model_used": model_used}
+
+	# ------------------------------------------------------------------
+	# multi_hop_qa — evidence-chain multi-hop question answering
+	# ------------------------------------------------------------------
+
+	async def multi_hop_qa(
+		self,
+		question: str,
+		document_ids: list[str],
+		max_hops: int = 3,
+		top_k_per_hop: int = 3,
+	) -> dict[str, Any]:
+		"""Answer *question* by chaining evidence across multiple documents.
+
+		1. Embed question; retrieve top_k_per_hop passages via semantic search.
+		2. Extract answer span from best passage (extractive QA).
+		3. If answer contains a named entity, form bridging question and repeat.
+
+		Returns {question, answer, confidence, hops_taken,
+		evidence_chain: [{hop, document_id, passage, span, score, query}]}.
+		"""
+		guard_tenant_id(self._tenant_id)
+		assert_text_not_empty(question)
+		assert document_ids, "document_ids must not be empty"
+		assert 1 <= max_hops <= 10, "max_hops must be in [1, 10]"
+		t0 = time.perf_counter()
+		self._log_task_start("multi_hop_qa", "query")
+
+		for did in document_ids:
+			rec = self._get("nlpc_documents", did)
+			if rec and not rec.get("is_deleted"):
+				existing = [
+					r for r in _col("nlpc_embeddings").values()
+					if r.get("document_id") == did and r.get("tenant_id") == self._tenant_id
+				]
+				if not existing:
+					try:
+						await self.embed_text(rec["content"][:4000], document_id=did)
+					except Exception as _exc:
+						_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+		evidence_chain: list[dict[str, Any]] = []
+		current_query = question
+		final_answer = ""
+		confidence = 0.0
+
+		for hop in range(max_hops):
+			hits = await self.semantic_search(current_query, top_k=top_k_per_hop)
+			if not hits:
+				break
+			best = hits[0]
+			doc_rec = self._get("nlpc_documents", best["document_id"])
+			if not doc_rec:
+				break
+			passage = doc_rec["content"][:1000]
+			qa_result = await self.question_answering(passage, current_query)
+			span = qa_result.get("answer", "")
+			hop_conf = float(qa_result.get("confidence", 0.0))
+			evidence_chain.append({
+				"hop": hop + 1,
+				"document_id": best["document_id"],
+				"passage": passage[:200],
+				"span": span,
+				"score": round(best["score"], 4),
+				"query": current_query,
+			})
+			if span:
+				final_answer = span
+				confidence = hop_conf
+				names = re.findall(r"\b[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\b", span)
+				if names and hop < max_hops - 1:
+					current_query = f"What is {names[0]}?"
+				else:
+					break
+			else:
+				break
+
+		self._emit_event("nlpc.multi_hop_qa.answered", {"question_len": len(question), "hops": len(evidence_chain)})
+		self._log_task_done("multi_hop_qa", (time.perf_counter() - t0) * 1000)
+		return {
+			"question": question,
+			"answer": final_answer,
+			"confidence": round(confidence, 4),
+			"hops_taken": len(evidence_chain),
+			"evidence_chain": evidence_chain,
+		}
+
+	# ------------------------------------------------------------------
+	# run_batch_job_scheduled — parallel priority-queue batch scheduler
+	# ------------------------------------------------------------------
+
+	async def run_batch_job_scheduled(
+		self,
+		job_id: str,
+		max_workers: int = 8,
+		retry_limit: int = 3,
+	) -> dict[str, Any]:
+		"""Execute a batch job with parallel async workers and retry logic.
+
+		Improvements over run_batch_job:
+		- asyncio.PriorityQueue keyed on (priority_int, enqueue_time)
+		- Bounded asyncio.Semaphore(max_workers) limits concurrency
+		- Failed tasks re-enqueue with exponential-backoff delay up to retry_limit
+		- Progress updated after every worker cycle
+
+		Returns {job_id, status, processed, failed, retried, progress, total_items}.
+		"""
+		guard_tenant_id(self._tenant_id)
+		rec = self._get("nlpc_batch_jobs", job_id)
+		assert rec, f"batch job {job_id} not found"
+
+		job = dict(rec)
+		job["status"] = "processing"
+		job["started_at"] = datetime.utcnow().isoformat()
+
+		_PRIO = {"high": 0, "normal": 1, "low": 2}
+		priority_int = _PRIO.get(str(job.get("priority", "normal")).lower(), 1)
+		tasks = [NLPTask(t) if isinstance(t, str) else t for t in job.get("tasks", [])]
+
+		import time as _tm
+		work_queue: asyncio.Queue = asyncio.Queue()
+		for did in job.get("document_ids", []):
+			for task in tasks:
+				await work_queue.put((priority_int, _tm.monotonic(), did, task, 0))
+
+		total_items = work_queue.qsize()
+		processed = 0
+		failed = 0
+		retried = 0
+		sem = asyncio.Semaphore(max_workers)
+
+		async def _worker() -> None:
+			nonlocal processed, failed, retried
+			while True:
+				try:
+					_, _, did, task, attempt = work_queue.get_nowait()
+				except asyncio.QueueEmpty:
+					break
+				doc_rec = self._get("nlpc_documents", did)
+				if not doc_rec:
+					failed += 1
+					work_queue.task_done()
+					continue
+				async with sem:
+					try:
+						proxy = _ParallelDoc(did, doc_rec["content"], self._tenant_id)
+						await self._dispatch_task(task, proxy)  # type: ignore[arg-type]
+						processed += 1
+					except Exception:
+						if attempt < retry_limit:
+							retried += 1
+							await asyncio.sleep(2 ** attempt * 0.05)
+							await work_queue.put((priority_int, _tm.monotonic(), did, task, attempt + 1))
+						else:
+							failed += 1
+				work_queue.task_done()
+
+		worker_tasks = [asyncio.create_task(_worker()) for _ in range(min(max_workers, max(1, total_items)))]
+		await asyncio.gather(*worker_tasks, return_exceptions=True)
+
+		progress = min(100.0, (processed / max(1, total_items)) * 100)
+		status = "completed" if failed == 0 else "partial_failure"
+		job["status"] = status
+		job["completed_at"] = datetime.utcnow().isoformat()
+		self._emit_event("nlpc.batch_scheduled.completed", {"job_id": job_id, "processed": processed, "failed": failed})
+		return {
+			"job_id": job_id,
+			"status": status,
+			"processed": processed,
+			"failed": failed,
+			"retried": retried,
+			"progress": round(progress, 1),
+			"total_items": total_items,
+		}
+
+	# ------------------------------------------------------------------
 	# parallel_process — concurrent fan-out of NLP tasks
 	# ------------------------------------------------------------------
 

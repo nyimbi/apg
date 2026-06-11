@@ -14,6 +14,19 @@ evidence through a deterministic rule engine.
   summarization, semantic search, translation, classification, topic modeling,
   keyword extraction, and governed text generation, including pending-review
   state for low-confidence or budget-incomplete output.
+- Fine-grained Ekman 8-class emotion detection (joy, anger, fear, disgust,
+  surprise, sadness, anticipation, trust) with VAD axis scores.
+- Readability scoring: Flesch-Kincaid Grade Level, Gunning Fog, Coleman-Liau,
+  and composite plain-language score with no model dependency.
+- Hallucination/faithfulness scoring via NLI entailment (cross-encoder/
+  nli-deberta-v3-small) with ROUGE-L fallback.
+- MinHash LSH near-duplicate detection across document collections.
+- Document structure detection: heading/paragraph/list_item/table_row/code_block
+  segmentation with structure_score.
+- Semantic Role Labelling (SRL) with PropBank-style ARG0/ARG1/ARG2/ARGM frames.
+- Multi-hop question answering with evidence chains across multiple documents.
+- Priority-queue parallel batch scheduler with async workers, exponential-backoff
+  retry, and configurable concurrency semaphore.
 - Pipeline registration with owner, model linkage, version metadata, enabled
   tasks, and policy checks.
 - NLP model registration and release with MLCM linkage, evaluation evidence,

@@ -8,7 +8,7 @@ Use SHDN when an application needs safe start, drain, shutdown, restart, recover
 
 - Tenant-scoped lifecycle target registry.
 - Shutdown plan builder with rollback, restart sequence, maintenance window, and approval gates.
-- Drain tracking with active-session and queue-depth evidence.
+- Drain tracking with active-session, queue-depth evidence, and real-time progress updates.
 - Backup snapshot and restore-test evidence.
 - Shutdown execution with health, snapshot, actor, approval, force-review, and Bytewax stream gates.
 - Recovery records with incident/change evidence and post-shutdown health checks.
@@ -16,67 +16,165 @@ Use SHDN when an application needs safe start, drain, shutdown, restart, recover
 - APG Python UI view models for dashboard, services, plans, executions, approvals, recovery, agents, policy, audit, and settings.
 - Visual theme tokens for lifecycle-control screens.
 - Bytewax stream metadata for lifecycle events.
+- NATS-ready event publishing subjects for real-time fan-out.
+- Dependency-ordered shutdown sequencing (topological sort).
+- Shutdown disruption budgets (PDB equivalent).
+- Immutable audit chain with SHA-256 Merkle anchoring.
+- Canary shutdown validation before fleet-wide operations.
+- OS signal handler binding records (SIGTERM/SIGINT).
+- Capability adapter binding for hlth, moni, bkup, audl, envm composition.
 
 ## Core Runtime
 
 ```python
 from capabilities.common.shdn import ShdnService
+import asyncio
 
 service = ShdnService()
 
 target = service.register_service(
-	tenant_id="tenant-a",
-	target_id="billing-api",
-	target_type="service",
-	owner="platform-owner",
-	environment="production",
-	dependencies=["payments-db", "invoice-queue"],
-	criticality="critical",
+    tenant_id="tenant-a",
+    target_id="billing-api",
+    target_type="service",
+    owner="platform-owner",
+    environment="production",
+    dependencies=["payments-db", "invoice-queue"],
+    criticality="critical",
 )
 
 plan = service.create_shutdown_plan(
-	tenant_id="tenant-a",
-	name="Billing maintenance",
-	owner="platform-owner",
-	target_ids=[target["id"]],
-	reason="Patch database driver",
-	rollback_plan_ref="runbook://rollback/billing",
-	restart_sequence=["payments-db", "invoice-queue", "billing-api"],
-	approved_by="ops-director",
-	maintenance_window_ref="window://mw-2026-05-30",
+    tenant_id="tenant-a",
+    name="Billing maintenance",
+    owner="platform-owner",
+    target_ids=[target["id"]],
+    reason="Patch database driver",
+    rollback_plan_ref="runbook://rollback/billing",
+    restart_sequence=["payments-db", "invoice-queue", "billing-api"],
+    approved_by="ops-director",
+    maintenance_window_ref="window://mw-2026-05-30",
 )
 
 service.start_drain(
-	tenant_id="tenant-a",
-	plan_id=plan["id"],
-	target_id=target["id"],
-	active_sessions=0,
-	queue_depth=0,
+    tenant_id="tenant-a",
+    plan_id=plan["id"],
+    target_id=target["id"],
+    active_sessions=0,
+    queue_depth=0,
 )
 
 service.record_backup_snapshot(
-	tenant_id="tenant-a",
-	plan_id=plan["id"],
-	target_id=target["id"],
-	evidence_ref="backup://billing-api/1",
-	restore_test_ref="restore-test://billing-api/1",
+    tenant_id="tenant-a",
+    plan_id=plan["id"],
+    target_id=target["id"],
+    evidence_ref="backup://billing-api/1",
+    restore_test_ref="restore-test://billing-api/1",
 )
 
 service.execute_shutdown(
-	tenant_id="tenant-a",
-	plan_id=plan["id"],
-	target_id=target["id"],
-	actor="operator-1",
-	health_gate_ref="health://billing-api/pre",
+    tenant_id="tenant-a",
+    plan_id=plan["id"],
+    target_id=target["id"],
+    actor="operator-1",
+    health_gate_ref="health://billing-api/pre",
 )
 
 service.record_recovery(
-	tenant_id="tenant-a",
-	plan_id=plan["id"],
-	target_id=target["id"],
-	actor="operator-1",
-	evidence_ref="change://123",
-	post_shutdown_health_check_ref="health://billing-api/post",
+    tenant_id="tenant-a",
+    plan_id=plan["id"],
+    target_id=target["id"],
+    actor="operator-1",
+    evidence_ref="change://123",
+    post_shutdown_health_check_ref="health://billing-api/post",
+)
+```
+
+## Advanced Async Methods
+
+### Real-Time Drain Progress
+
+```python
+drain = service.start_drain(...)
+# tick updates as sessions complete
+progress = await service.update_drain_progress(
+    tenant_id="tenant-a",
+    drain_id=drain["id"],
+    active_sessions=12,
+    queue_depth=3,
+    actor="drain-agent",
+)
+# transitions to quiesced automatically when both reach zero
+```
+
+### Dependency-Ordered Shutdown
+
+```python
+order = await service.compute_shutdown_order(
+    tenant_id="tenant-a",
+    plan_id=plan["id"],
+)
+# order["order"] lists target IDs leaf-first (safest drain order)
+# order["cycles"] is non-empty if a cyclic dependency is detected
+```
+
+### Shutdown Disruption Budget
+
+```python
+await service.set_shutdown_budget(
+    tenant_id="tenant-a",
+    target_id=target["id"],
+    actor="platform-ops",
+    max_simultaneous_shutdowns=1,
+    window_seconds=300,
+)
+```
+
+### OS Signal Handlers
+
+```python
+handlers = await service.install_signal_handlers(
+    tenant_id="tenant-a",
+    target_id=target["id"],
+    actor="platform-ops",
+    signals=["SIGTERM", "SIGINT"],
+)
+# handler_sequence: ["service_drain", "graceful_shutdown"]
+```
+
+### Canary Shutdown Validation
+
+```python
+canary = await service.canary_shutdown_test(
+    tenant_id="tenant-a",
+    target_id=target["id"],
+    canary_instance_ref="instance://billing-api/pod-0",
+    actor="operator-1",
+    validation_ref="test://canary-drain-2026-06-11",
+)
+assert canary["canary_passed"]
+```
+
+### Immutable Audit Chain
+
+```python
+anchor = await service.anchor_audit_chain(tenant_id="tenant-a", actor="auditor")
+# later — verify no records were tampered with
+result = await service.verify_audit_chain(
+    tenant_id="tenant-a",
+    anchor_id=anchor["id"],
+    actor="auditor",
+)
+assert result["valid"]
+```
+
+### Capability Adapter Binding
+
+```python
+await service.bind_capability_adapter(
+    tenant_id="tenant-a",
+    capability_id="hlth",
+    adapter_ref="adapter://hlth-probe/v1",
+    actor="platform-ops",
+    adapter_config={"probe_timeout_seconds": 5},
 )
 ```
 
@@ -86,19 +184,19 @@ SHDN treats lifecycle agents as governed composition elements.
 
 ```python
 agent = service.register_shdn_agent(
-	tenant_id="tenant-a",
-	name="Shutdown reviewer",
-	runtime="codex",
-	role="shutdown_reviewer",
-	scope="review critical shutdown gates before execution",
-	owner="platform-owner",
+    tenant_id="tenant-a",
+    name="Shutdown reviewer",
+    runtime="codex",
+    role="shutdown_reviewer",
+    scope="review critical shutdown gates before execution",
+    owner="platform-owner",
 )
 
 decision = service.validate_agent_lifecycle_action(
-	tenant_id="tenant-a",
-	agent_id=agent["id"],
-	target_criticality="critical",
-	human_approval_recorded=False,
+    tenant_id="tenant-a",
+    agent_id=agent["id"],
+    target_criticality="critical",
+    human_approval_recorded=False,
 )
 
 assert decision["decision"] == "deny"
@@ -155,25 +253,34 @@ These models are framework-neutral so APG generated Python applications can comp
 
 ## Event Stream
 
-SHDN publishes lifecycle metadata for Bytewax:
+SHDN publishes lifecycle metadata for Bytewax / NATS:
 
 - processor: `bytewax`
 - stream: `apg.shdn.lifecycle`
 - key: `tenant_id`
+- NATS subjects: `apg.shdn.<event_type>.<tenant_id>`
 
 Events:
 
 - `target_registered`
 - `plan_created`
 - `drain_started`
+- `drain_progress_updated`
 - `snapshot_recorded`
 - `shutdown_executed`
 - `recovery_recorded`
 - `shdn_agent_registered`
+- `signal_handlers_installed`
+- `shutdown_order_computed`
+- `shutdown_budget_set`
+- `audit_chain_anchored`
+- `audit_chain_verified`
+- `canary_shutdown_tested`
+- `capability_bound`
 
 ## Adapter Boundaries
 
-The package does not directly call live deployment systems, backup engines, schedulers, service meshes, health probes, ticketing tools, or audit sinks. Add those integrations as adapters around the stable service methods and stream metadata.
+The package does not directly call live deployment systems, backup engines, schedulers, service meshes, health probes, ticketing tools, or audit sinks. Add those integrations as adapters around the stable service methods and stream metadata. Use `bind_capability_adapter()` to record live adapter wiring for composability tracing.
 
 ## Verification
 

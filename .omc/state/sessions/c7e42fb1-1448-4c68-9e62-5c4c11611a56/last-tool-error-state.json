@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"python3 - << 'ENDSCRIPT'\\nimport ast, re\\n\\npath = '/Users/nyimbiodero/src/pjs/apg/capabilities/common/nlpc/service.py'\\n\\nnew_methods = r\\\"\\\"\\\"\\t# ----------------------------------------...",
-  "error": "Exit code 1\n  File \"<stdin>\", line 15\n    Compute readability metrics for *text* with no external dependencies.\nIndentationError: unexpected indent",
-  "timestamp": "2026-06-11T16:16:53.881Z",
-  "retry_count": 2
+  "tool_input_preview": "{\"command\":\"cd /Users/nyimbiodero/src/pjs/apg/capabilities/crm/adv && python -c \\\"from service import AdvancedCRMService; print('OK')\\\" 2>&1\",\"description\":\"Syntax-check service.py by importing it\"}",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/Users/nyimbiodero/src/pjs/apg/capabilities/crm/adv/service.py\", line 8, in <module>\n    from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache\nModuleNotFoundError: No module named 'capabilities'",
+  "timestamp": "2026-06-11T16:25:40.380Z",
+  "retry_count": 3
 }

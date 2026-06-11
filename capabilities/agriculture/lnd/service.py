@@ -1164,8 +1164,8 @@ class LandManagementService:
 					currency = record.get("currency", "KES")
 					if currency == "KES" and val >= _MULTISIG_THRESHOLD_KES:
 						requires_multisig = True
-				except Exception:
-					pass
+				except Exception as _exc:
+					_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
 
 			if transfer_id not in self._transfer_signatures:
 				self._transfer_signatures[transfer_id] = []

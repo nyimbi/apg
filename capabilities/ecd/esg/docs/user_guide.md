@@ -1,7 +1,7 @@
 # APG Sustainability & ESG Management - User Guide
 
-**Version:** 1.0.0  
-**Last Updated:** January 2025  
+**Version:** 2.2.0  
+**Last Updated:** June 2026  
 **Target Audience:** ESG Managers, Sustainability Officers, Executives, Stakeholders
 
 ---
@@ -19,7 +19,10 @@
 9. [AI-Powered Features](#ai-powered-features)
 10. [Mobile Access](#mobile-access)
 11. [Advanced Features](#advanced-features)
-12. [Troubleshooting](#troubleshooting)
+12. [Carbon Accounting & Budget Management](#carbon-accounting--budget-management)
+13. [Regulatory Compliance Tools](#regulatory-compliance-tools)
+14. [Financial ESG Integration](#financial-esg-integration)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -38,11 +41,13 @@ The APG Sustainability & ESG Management capability is a governed platform that d
 
 ### Governed Differentiators
 
-1. **measurable Faster Implementation** - Deploy in days, not months
-2. **AI-First Approach** - Built-in sustainability intelligence
-3. **Real-Time Processing** - Live data with <100ms latency
+1. **Faster Implementation** - Deploy in days, not months
+2. **AI-First Approach** - Built-in sustainability intelligence using locally-hosted Ollama models
+3. **Real-Time Processing** - Live data via Bytewax + NATS with sub-second propagation
 4. **Stakeholder-Centric** - Governed transparency platform
 5. **APG Integration** - Seamless ecosystem connectivity
+6. **Regulatory Depth** - Inline SBTi, CSRD ESRS, SFDR, and ISO 14064-3 engines
+7. **Engineering-Grade Carbon** - ISO 14067 PCF, EU DPP, BNG statutory metric, EXIOBASE MRIO
 
 ---
 
@@ -880,11 +885,193 @@ The Executive Dashboard provides a high-level view of your organization's ESG pe
 
 ---
 
-## Conclusion
+## Carbon Accounting & Budget Management
 
-The APG Sustainability & ESG Management capability represents a governed approach to ESG management, delivering measurable superior performance through AI-powered intelligence, real-time monitoring, and comprehensive stakeholder engagement. This user guide provides the foundation for maximizing your ESG impact and achieving sustainability excellence.
+### Science-Based Target Validation (SBTi)
 
-For additional support and resources, please contact your APG account manager or visit the APG support portal.
+The `sbti_validate_target` method validates proposed GHG reduction targets against the SBTi 1.5°C pathway using IPCC AR6 Annex III sector decarbonisation trajectories.
+
+**How to use:**
+1. Navigate to ESG Management → Targets
+2. After setting a GHG reduction target, select "Validate against SBTi"
+3. Select scope (scope1_2, scope3, all_scopes) and sector
+4. Review the alignment decision, gap percentage, and required reduction
+
+**Key outputs:**
+- `aligned` (bool): Whether the target meets SBTi 1.5°C
+- `required_reduction_pct_1_5c`: Minimum reduction required
+- `gap_pct`: Additional reduction needed to achieve alignment
+- `pathway_ref`: IPCC AR6 reference used
+
+**Sectors supported:** power, industry, transport, buildings, agriculture, finance, ict, retail
+
+---
+
+### Carbon Budget Ledger
+
+Track cumulative emissions against a science-aligned carbon budget. Unlike annual targets, the budget ledger tells you how much of your finite allowance has been consumed and when it will run out at current trajectory.
+
+**Setup:**
+1. Go to Carbon Accounting → Carbon Budget
+2. Define budget start and end years (typically 2020–2050)
+3. Enter total budget in tCO2e (from SBTi or internal model)
+4. The ledger auto-aggregates all recorded Scope 1+2+3 KPIs
+
+**Key outputs:**
+- `consumed_tco2e` / `remaining_tco2e`
+- `projected_exhaustion_year`: Year budget runs out at current run rate
+- `trajectory`: `on_track`, `at_risk`, or `critical`
+
+---
+
+### Internal Carbon Price (ICP) Allocation
+
+Allocate a shadow carbon price across cost centres to drive decarbonisation incentives at the business unit level.
+
+**Configuration:**
+- `price_per_tco2e_usd`: Set the shadow price (typical range: $25–$150/tCO2e)
+- `allocation_basis`: Choose headcount, floor_area, or revenue as the weight
+- `cost_centres`: Provide a list of cost centres with their basis values
+
+**Output example:**
+```json
+{
+  "total_tco2e_allocated": 12500.0,
+  "total_carbon_charge_usd": 1875000.0,
+  "allocations": [
+    {"cost_centre_id": "ops", "allocated_tco2e": 6250.0, "carbon_charge_usd": 937500.0}
+  ]
+}
+```
+
+---
+
+### ISO 14067 Product Carbon Footprint (PCF)
+
+Calculate per-product carbon footprint suitable for EU Digital Product Passport compliance (required from 2026).
+
+**Required inputs:**
+- `bom`: Bill of materials — each entry needs `material`, `mass_kg`, `emission_factor_kgco2e_per_kg`
+- `process_emissions`: Dict of manufacturing/transport processes and their kgCO2e
+
+**Output includes:**
+- `total_pcf_kgco2e`: Full cradle-to-gate footprint
+- `hotspots`: Top 3 emission contributors
+- `dpp_payload`: GS1-compatible JSON for DPP embedding
+- `methodology`: ISO_14067:2018
+
+**Allocation methods:** mass (default), economic, system_expansion
+
+---
+
+### EXIOBASE Spend-Based Scope 3
+
+For organisations without supplier-level emission data, the spend-based approach applies EXIOBASE 3.8 MRIO emission intensities to procurement spend by category.
+
+**Input format:**
+```python
+spend_data = [
+    {"category": "ict_services", "spend_usd": 500000},
+    {"category": "transport", "spend_usd": 200000},
+    {"category": "agriculture", "spend_usd": 150000},
+]
+await svc.scope3_spend_based("entity-1", spend_data, 2025)
+```
+
+Automatically records the result as a `ghg_scope3_spend_based` KPI.
+
+---
+
+### Biodiversity Net Gain (BNG)
+
+Calculate statutory BNG units per Defra BNG Metric 4.0 (required for UK development projects under the Environment Act 2021).
+
+**Habitat unit formula:** `area_ha × distinctiveness × condition × strategic_significance`
+
+**Key parameters per habitat entry:**
+- `distinctiveness`: 0–8 (Defra scale; e.g., 8 = ancient woodland, 2 = improved grassland)
+- `condition`: 0–3 (poor, moderate, good, very good)
+- `strategic_significance`: multiplier 0.9–1.15
+
+**Key outputs:**
+- `net_gain_pct`: BNG achieved
+- `statutory_10pct_met`: Whether the 10% mandatory threshold is reached
+- `deficit_units`: Units still needed if threshold not met
+
+---
+
+## Regulatory Compliance Tools
+
+### CSRD ESRS Gap Analysis
+
+The `csrd_esrs_gap_analysis` method cross-references a completed materiality assessment against all CSRD ESRS disclosure requirements (E1–E5, S1–S4, G1).
+
+**Workflow:**
+1. Complete a materiality assessment (`esg_materiality_assessment`)
+2. Run gap analysis with the `assessment_id`
+3. Review `gaps` list — each entry shows the ESRS topic and missing disclosures
+4. Use `remediation_priority` to focus effort on the lowest-coverage topics first
+
+**Output structure:**
+```json
+{
+  "readiness_pct": 67.5,
+  "gap_count": 4,
+  "gaps": [
+    {"esrs_topic": "E4_biodiversity", "missing_disclosures": ["land_use", "species_affected"], "coverage_pct": 33.0}
+  ],
+  "remediation_priority": ["E4_biodiversity", "S2_value_chain_workers"]
+}
+```
+
+---
+
+### Continuous GHG Assurance (ISO 14064-3)
+
+Every GHG measurement can be subject to inline assurance checks aligned to ISO 14064-3, replacing the traditional once-a-year third-party audit with continuous monitoring.
+
+**Checks performed:**
+1. **Period completeness** — are expected KPIs present for the period?
+2. **Mathematical consistency** — are all values non-negative and finite?
+3. **Source chain** — does the measurement have evidence or a review record?
+4. **Emission factor currency** — are verified KPIs present?
+
+**Assurance levels assigned:**
+- `reasonable` — all tests pass (100% pass rate)
+- `limited` — 75–99% pass rate
+- `insufficient` — below 75%
+
+Results are published to `apg.ecd.esg.assurance.<tenant_id>` NATS subject for downstream audit systems.
+
+---
+
+## Financial ESG Integration
+
+### SFDR PAI Aggregation
+
+For SFDR Article 8 and Article 9 funds, the `sfdr_pai_aggregate` method computes weighted Principal Adverse Impact indicators across all portfolio holdings.
+
+**Input:** Portfolio holdings list with `entity_id` and `portfolio_weight_pct` per holding.
+
+**Coverage:** 15 mandatory PAI indicators from SFDR RTS Annex I Table 1, including:
+- GHG Scope 1/2/3 (tCO2e)
+- Carbon footprint and GHG intensity
+- Fossil fuel exposure, non-renewable energy
+- Biodiversity sensitive area flag
+- Hazardous waste
+- UNGC/OECD violations
+- Gender pay gap, board gender diversity
+- Controversial weapons exposure
+
+**Output includes `annex_i_ready`**: true when 10+ mandatory indicators are covered.
+
+---
+
+### Conclusion
+
+The APG Sustainability & ESG Management capability (v2.2.0) provides engineering-grade carbon accounting, inline regulatory compliance engines, and financial ESG integration alongside its core lifecycle management. The async method surface enables direct integration into data pipelines, workflow engines, and Bytewax stream processors without any polling overhead.
+
+For additional support, contact your APG account manager or visit the APG support portal.
 
 ---
 

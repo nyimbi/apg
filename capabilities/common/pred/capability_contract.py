@@ -335,9 +335,23 @@ def streaming_manifest() -> dict[str, Any]:
 
 
 STREAMING: dict[str, Any] = {
+	"engine": "bytewax",
 	"processor": "bytewax",
+	"required_processor": "bytewax",
+	"lifecycle_stream": "pred.lifecycle",
 	"stream": "apg.pred.lifecycle",
 	"key": "tenant_id",
+	"watermark": "event_time",
+	"required_operations": [
+		"model_batch",
+		"feature_set_batch",
+		"forecast_batch",
+		"score_batch",
+		"scenario_batch",
+		"drift_batch",
+		"explainability_batch",
+		"prediction_agent_batch",
+	],
 	"events": [
 		"model_registered",
 		"model_trained",
@@ -355,6 +369,7 @@ STREAMING: dict[str, Any] = {
 		"pred_batch_requires_bytewax",
 		"pred_privileged_action_requires_human_approval",
 	],
+	"broker_core_dependency_allowed": False,
 }
 
 

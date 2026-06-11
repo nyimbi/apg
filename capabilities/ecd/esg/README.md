@@ -6,9 +6,11 @@ The Sustainability and ESG Management capability provides end-to-end lifecycle m
 
 The capability is designed for multi-tenant deployment and is dependency-light at import time. Authorisation, audit, notifications, workflows, document storage, carbon data feeds, supplier master data, regulatory content, and the event bus all attach through APG composition adapters. This means the ESG core can be tested and run in isolation, and downstream consumers receive a stable contract regardless of which adapter implementations are wired in.
 
+Version 2.2.0 adds eight world-class async methods covering SBTi target validation, EU Digital Product Passport PCF calculation, carbon budget ledger accounting, Biodiversity Net Gain (BNG) per Defra statutory metric, internal carbon price allocation, CSRD ESRS gap analysis, SFDR PAI aggregation, continuous GHG assurance (ISO 14064-3), and EXIOBASE spend-based Scope 3 calculation.
+
 ## Capability ID
 
-`ecd_esg`  Version: 2.1.0
+`ecd_esg`  Version: 2.2.0
 
 ## Provides
 
@@ -27,6 +29,15 @@ The capability is designed for multi-tenant deployment and is dependency-light a
 | esg_engagement_lifecycle | Record stakeholder engagements with sentiment analysis and negative-engagement owner escalation |
 | esg_dashboard_service | Aggregate cross-domain ESG health metrics for real-time dashboard consumption |
 | esg_agents | Register and run Codex, Claude Code, OpenCode, and Pi review agents scoped to inspect-prepare-and-recommend with mandatory human approval |
+| sbti_validation | Validate reduction targets against SBTi 1.5°C pathway using IPCC AR6 sector trajectories |
+| product_carbon_footprint | Calculate per-SKU PCF per ISO 14067, producing EU DPP-compatible output |
+| carbon_budget_ledger | Track cumulative emissions drawdown against a finite science-aligned carbon budget |
+| biodiversity_net_gain | Calculate statutory BNG units per Defra metric (UK Environment Act 2021) |
+| internal_carbon_price | Allocate shadow carbon price charges across cost centres by headcount/floor-area/revenue |
+| csrd_esrs_gap_analysis | Cross-reference materiality assessment against ESRS E1-E5, S1-S4, G1 disclosure requirements |
+| sfdr_pai_aggregate | Produce weighted SFDR Annex I PAI indicator table across portfolio holdings |
+| continuous_assurance | Run ISO 14064-3 completeness, consistency, and source-chain tests on every measurement |
+| scope3_spend_based | Calculate Scope 3 emissions via EXIOBASE 3.8 MRIO spend-based approach |
 
 ## Requires
 
@@ -175,7 +186,7 @@ The capability is designed for multi-tenant deployment and is dependency-light a
 
 ## Streaming Events
 
-Events emitted to the `apg.ecd.esg.lifecycle` event stream via Bytewax. Delivery guarantee: at-least-once. Ordering key: `tenant_id`.
+Events emitted to the `apg.ecd.esg.lifecycle` event stream via Bytewax/NATS. Delivery guarantee: at-least-once. Ordering key: `tenant_id`.
 
 | Event | Trigger |
 |-------|---------|
@@ -191,6 +202,13 @@ Events emitted to the `apg.ecd.esg.lifecycle` event stream via Bytewax. Delivery
 | esg_stakeholder_registered | Stakeholder registered with consent recorded |
 | esg_engagement_recorded | Stakeholder engagement interaction logged |
 | esg_agent_registered | ESG AI agent enrolled in the agent roster |
+| sbti_target_validated | SBTi 1.5°C pathway validation completed for a reduction target |
+| product_carbon_footprint_calculated | ISO 14067 PCF calculation completed; DPP payload ready |
+| bng_calculated | Biodiversity Net Gain units computed per Defra BNG Metric 4.0 |
+| carbon_offset_retired | Carbon offset retirement recorded against a registry |
+| continuous_assurance_completed | ISO 14064-3 assurance check result published to tenant NATS subject |
+
+NATS subjects used for assurance push: `apg.ecd.esg.assurance.<tenant_id>`
 
 ## Edge Cases Handled
 
