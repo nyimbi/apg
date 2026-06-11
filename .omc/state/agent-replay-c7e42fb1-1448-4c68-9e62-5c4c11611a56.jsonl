@@ -776,3 +776,5 @@
 {"t":0,"agent":"a3633f1","agent_type":"code-review-expert","event":"agent_stop","success":true,"duration_ms":184568}
 {"t":0,"agent":"aa7477f","agent_type":"code-review-expert","event":"agent_stop","success":true,"duration_ms":327248}
 {"t":0,"agent":"ac48b78","agent_type":"code-review-expert","event":"agent_stop","success":true,"duration_ms":357578}
+{"t":0,"agent":"a30ba75","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a9e75b4","agent_type":"unknown","event":"agent_stop","success":true}

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-06-11T07:15:54.589Z",
+  "updatedAt": "2026-06-11T09:21:02.886Z",
   "missions": [
     {
       "id": "session:c7e42fb1-1448-4c68-9e62-5c4c11611a56:none",
@@ -7,7 +7,7 @@
       "name": "none",
       "objective": "Session mission",
       "createdAt": "2026-06-10T06:16:25.596Z",
-      "updatedAt": "2026-06-11T07:15:54.589Z",
+      "updatedAt": "2026-06-11T09:21:02.886Z",
       "status": "running",
       "workerCount": 57,
       "taskCounts": {
@@ -27,7 +27,7 @@
           "currentStep": null,
           "latestUpdate": "completed",
           "completedSummary": null,
-          "updatedAt": "2026-06-11T06:55:03.546Z"
+          "updatedAt": "2026-06-11T09:21:02.886Z"
         },
         {
           "name": "workflow-subagent:ad0bbcf",
@@ -662,6 +662,22 @@
           "agent": "code-review-expert:ac48b78",
           "detail": "completed",
           "sourceKey": "session-stop:ac48b78bfa641e53c"
+        },
+        {
+          "id": "session-stop:a30ba750c2207f3f3:2026-06-11T09:15:31.905Z",
+          "at": "2026-06-11T09:15:31.905Z",
+          "kind": "completion",
+          "agent": "Explore:aba6084",
+          "detail": "completed",
+          "sourceKey": "session-stop:a30ba750c2207f3f3"
+        },
+        {
+          "id": "session-stop:a9e75b41366bd5dce:2026-06-11T09:21:02.886Z",
+          "at": "2026-06-11T09:21:02.886Z",
+          "kind": "completion",
+          "agent": "Explore:aba6084",
+          "detail": "completed",
+          "sourceKey": "session-stop:a9e75b41366bd5dce"
         }
       ]
     }
