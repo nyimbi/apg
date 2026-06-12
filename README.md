@@ -240,3 +240,90 @@ apg/
 ## License
 
 Proprietary — © 2025 Datacraft · [nyimbi@gmail.com](mailto:nyimbi@gmail.com)
+
+---
+
+## Running Generated Applications
+
+### Compile
+
+```bash
+apg compile myapp.apg --output ./out/myapp
+```
+
+Generated output in `./out/myapp/` is a **self-contained Python package** — zero dependencies, stdlib only:
+
+```
+app.py              ← main entry point
+smoke_test.py       ← contract test runner
+requirements.txt    ← empty by default (no pip install needed)
+Dockerfile          ← container deployment
+.env.example        ← environment variable reference
+semantic_model.json ← APG semantic model
+```
+
+### Run
+
+```bash
+cd out/myapp
+python app.py                           # starts on http://127.0.0.1:8080
+python app.py --host 0.0.0.0 --port 3000
+APG_HOST=0.0.0.0 APG_PORT=3000 python app.py   # env vars
+docker build -t myapp . && docker run -p 8080:8080 myapp
+```
+
+### Verify
+
+```bash
+python app.py --self-test       # validates contracts, routes, component manifest
+python app.py --validate        # contract validation (exit 0/1)
+python app.py --describe        # application JSON description
+python app.py --semantic-model  # full APG semantic model
+python smoke_test.py            # importable contract test runner
+```
+
+### Core endpoints (always present)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health` | Runtime health + validation summary |
+| `GET /component.json` | Composable component manifest |
+| `GET /semantic-model.json` | Full APG semantic model |
+| `GET /openapi.json` | OpenAPI 3.1 spec |
+| `GET /self-test` | Smoke test results |
+| `GET /applications` | Application manifest |
+| `GET /capabilities` | Capability registry |
+| `GET /entities` | Entity schemas |
+| `GET /workflows` | Workflow definitions |
+| `GET /agents` | AI agent definitions |
+| `GET /ui` | Generated HTML application console |
+
+### UI routes
+
+```
+http://127.0.0.1:8080/ui                     # application index
+http://127.0.0.1:8080/ui/entities/<Name>     # entity CRUD screen
+http://127.0.0.1:8080/ui/capabilities/<name> # capability console
+http://127.0.0.1:8080/ui/agents/<name>       # AI agent workbench
+```
+
+### Configuration
+
+| Env var | Default | Purpose |
+|---------|---------|---------|
+| `APG_HOST` | `127.0.0.1` | Bind host |
+| `APG_PORT` | `8080` | Bind port |
+| `APG_DATA_FILE` | _(in-memory)_ | JSON persistence path |
+| `APG_API_KEY` | _(none)_ | Require `Authorization: Bearer <key>` on mutations |
+| `APG_DEBUG` | `0` | Set to `1` for HTTP request logging |
+
+### Capability packages
+
+Each compiled capability also ships as a standalone Python package:
+
+```bash
+pip install apg-fintech-gateway
+apg-fintech-gateway --port 8080
+# or
+python -m capabilities.fintech.gateway.app --port 8080
+```
