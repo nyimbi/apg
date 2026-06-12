@@ -158,3 +158,27 @@ Full-featured LIS capability providing lab order management, specimen tracking w
 ## Composability Notes
 
 Orders originate from `healthcare_emr` encounters. Results feed back into EMR as FHIR R4 DiagnosticReport resources via `export_fhir_diagnostic_report`. Critical values trigger `ntfy` notifications that also appear in `healthcare_cli` clinical alerts. Quality indicators in `healthcare_ana` consume aggregated result data. Accreditation scorecard exports integrate with `healthcare_qms` quality management system. Consent records reference `healthcare_consent` capability for cross-capability consent propagation.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Predictive TAT Alerting via NATS + Bayesian Estimation** [Real-time analytics / streaming]
+- **I2. Continuous Delta-Check History with Configurable Per-Analyte Thresholds** [Clinical safety]
+- **I3. FHIR R4 DiagnosticReport Serialisation** [Interoperability]
+- **I4. Automated Westgard EWMA / CUSUM Statistical Process Control** [Quality management]
+- **I5. Specimen Viability Scoring with Real-Time Degradation Modelling** [Pre-analytical quality]
+- **I6. Auto-Reflex Test Ordering Engine** [Workflow automation]
+- **I7. HL7 v2 Bidirectional LIS Interface (ORM/ORU Full Cycle)** [LIS integration]
+- **I8. Regulatory Reporting Pack (CAP/CLIA/ISO 15189 Compliance Scorecard)** [Regulatory compliance]
+- **I9. NATS-backed Real-Time Critical Value Escalation Ladder** [Patient safety / alerting]
+- **I10. Genomic and Molecular Test Result Support (VCF/HGVS Notation)** [Precision medicine]
+- **I11. Instrument Predictive Maintenance via Anomaly Detection** [Operations / uptime]
+- **I12. Audit-Trail Immutability via Append-Only Event Log with Cryptographic Hashing** [Security / compliance]
+- **I13. Multi-Laboratory Network Specimen Routing and Load Balancing** [Operations / scalability]
+- **I14. Patient Report Portal with SMART on FHIR Launch** [Patient engagement]
+- **I15. Consent-Gated Result Release for Genetic and Sensitive Tests** [Privacy / compliance]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

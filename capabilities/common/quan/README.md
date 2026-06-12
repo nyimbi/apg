@@ -52,11 +52,35 @@ adapters in the executable contract and are bound by the host application.
 - UI route, API, view-model, theme, semantic-model, package-manifest, and
   release-report evidence.
 
+## World-Class Enhancements (v2.0)
+
+These 15 improvements address correctness gaps, missing algorithm coverage,
+and production operational requirements identified against IBM Qiskit Runtime,
+Google Cirq, PennyLane, Amazon Braket, and Quantinuum H-Series.
+
+| # | Title | Category | Impact |
+|---|-------|----------|--------|
+| I1 | **Full Async Service Layer** | Architecture | All public methods are non-blocking; `async_*` variants use `asyncio.gather` for concurrent QPU calls. Sync shim via `asyncio.run` for legacy callers. |
+| I2 | **Decimal-Precision Cost Accounting** | Correctness/Finance | Cost fields use `Decimal` with `ROUND_HALF_EVEN` quantized to 6 dp. Eliminates float rounding errors at high shot counts. Serialised as `str` in JSON. |
+| I3 | **Statevector Simulator with Complex Amplitudes** | Correctness/Simulation | `statevector_simulate` backed by numpy complex128 amplitude array. Gate set: H, X, Y, Z, S, T, CX, CCX, RZ, RX, RY, SWAP. Capped at 20 qubits. |
+| I4 | **Parametric Circuit Binding** | Feature/VQE-QAOA | `GateInstruction(name, qubits, params)` structure. `circuit_bind_parameters` returns a bound copy without mutating the original — required for VQE/QAOA gradient loops. |
+| I5 | **Circuit Transpilation with Backend Topology** | Feature/Compilation | `circuit_transpile` performs gate decomposition to native set, SWAP insertion via coupling map, and gate cancellation. Returns physical depth, SWAP count, fidelity penalty. |
+| I6 | **Noise Model Registry** | Feature/Fidelity | `noise_model_register` / `noise_model_apply`. Types: depolarising, thermal_relaxation, readout_error, crosstalk. Kraus operator noise injection into measurement counts. |
+| I7 | **Grover's Search Oracle Interface** | Feature/Algorithms | `grover_search` computes optimal iteration count `floor(π/4 × √(N/k))`, success probability, gate count, and speedup ratio. Completes the VQE/QAOA/Grover near-term triad. |
+| I8 | **Windowed Quota Enforcement** | Correctness/Multi-tenancy | `QuotaLedger` enforces `max_jobs_per_day` via 24-hour sliding windows. `quota_usage` returns consumed/limit/window_reset_at. Burst allowances and grace quotas supported. |
+| I9 | **Quantum Volume Benchmarking** | Quality/Observability | `quantum_volume_benchmark` generates random QV circuits, computes heavy output probability, and checks the 2/3 threshold. Stores history for regression tracking. |
+| I10 | **Circuit Composition Algebra** | Feature/DX | `circuit_compose` concatenates two circuits with qubit offset. `circuit_inverse` computes the dagger. Parent provenance tracked in circuit metadata. |
+| I11 | **Hybrid Workflow Orchestration** | Architecture/Composability | `HybridWorkflow` model with steps, parameter history, and convergence state. Methods: `workflow_create`, `workflow_step`, `workflow_advance`, `workflow_result`. Pause/resume supported. |
+| I12 | **Circuit Serialisation and OpenQASM Import/Export** | Feature/Interoperability | `circuit_export` supports `openqasm2`, `openqasm3`, `json_schema`, `qiskit_dict`. `circuit_import` parses, validates, and creates a circuit record. Round-trip fidelity verified. |
+| I13 | **Quantum Entropy Accounting and QRNG Audit Trail** | Security/Compliance | `quantum_random` emits signed entropy manifests. `entropy_manifest_verify` and `entropy_consumer_register` support FIPS 140-3 / NIST SP 800-90B audit requirements. |
+| I14 | **Quantum Machine Learning Primitives** | Feature/Domain Expansion | `quantum_kernel_matrix` computes n×n kernel matrix via quantum state inner products. `variational_classifier_train` uses parameter-shift gradient estimation with loss history. |
+| I15 | **Real-Time Fidelity Drift Detection** | Observability/Operations | `fidelity_snapshot_record` + `fidelity_drift_detect` use EMA + linear regression slope over configurable time windows. Emits `FIDELITY_DRIFT_ALERT` audit event on threshold breach. |
+
 ## Main Files
 
 - `SPECIFICATION.md` defines the normative capability behavior.
 - `PLAN.md` records the implementation packet plan.
-- `WORLD_CLASS_IMPROVEMENTS.md` documents 15 prioritised enhancement paths.
+- `WORLD_CLASS_IMPROVEMENTS.md` documents all 15 prioritised enhancement paths with competitor references.
 - `capability_contract.py` is the executable source of configuration, rules,
   routes, theme, adapters, provides/requires, and Bytewax stream metadata.
 - `models.py` defines tenant-scoped backends, circuits, quotas, jobs, results,
@@ -67,8 +91,7 @@ adapters in the executable contract and are bound by the host application.
 - `service.py` implements the runtime facade with 50+ methods.
 - `api.py` exposes package-safe helper functions.
 - `views.py` exposes UI view models.
-- `test_capability_contract.py` proves lifecycle behavior and generated
-  evidence.
+- `test_capability_contract.py` proves lifecycle behavior and generated evidence.
 
 ## Basic Usage
 
@@ -114,7 +137,12 @@ job = service.submit_job(
 result = service.complete_job("result-001", "tenant-demo", job["id"])
 ```
 
-## Async Batch Execution
+## New Methods
+
+### Async Batch Execution
+
+Submit multiple jobs concurrently. Uses `asyncio.Semaphore` to bound
+in-flight submissions. Results are returned in input order.
 
 ```python
 import asyncio
@@ -134,7 +162,10 @@ results = asyncio.run(
 )
 ```
 
-## Grover's Search
+### Grover's Search
+
+Computes optimal iteration count `floor(π/4 × √(N/k))` and returns success
+probability, gate count estimate, and quadratic speedup ratio.
 
 ```python
 result = service.grover_search(
@@ -146,9 +177,13 @@ result = service.grover_search(
 )
 print(result["optimal_iterations"])    # 12
 print(result["quantum_speedup_ratio"]) # 10.67x vs brute force
+print(result["success_probability"])   # 0.961
 ```
 
-## Noise Modelling
+### Noise Model Registry
+
+Register a device-calibrated noise model and apply it to a result to predict
+NISQ device performance before committing QPU budget.
 
 ```python
 noise_model = service.noise_model_register(
@@ -162,12 +197,17 @@ noisy = service.noise_model_apply(
     noise_model_id=noise_model["noise_model_id"],
     tenant_id="tenant-demo",
 )
+print(noisy["fidelity_loss_estimate"])  # 0.002
+print(noisy["noisy_confidence"])        # degraded confidence value
 ```
 
-## Fidelity Drift Detection
+### Fidelity Drift Detection
+
+Record periodic calibration snapshots and detect EMA-slope degradation.
+Emits `FIDELITY_DRIFT_ALERT` audit event automatically on threshold breach.
 
 ```python
-# Record calibration snapshots periodically
+# Record calibration snapshots periodically (e.g. every 15 minutes)
 service.fidelity_snapshot_record(
     backend_id="qpu-01", tenant_id="tenant-demo",
     gate_fidelity=0.998, readout_fidelity=0.995,
@@ -180,9 +220,13 @@ alert = service.fidelity_drift_detect(
 )
 if alert["drift_detected"]:
     print(alert["recommendation"])  # "halt_jobs_and_recalibrate"
+print(alert["ema_slope_per_snapshot"])  # negative value indicates drift
 ```
 
-## Decimal-Precision Cost Estimation
+### Decimal-Precision Cost Estimation
+
+Replaces `quantum_cost_estimate`. All monetary values returned as 6 dp
+strings — safe for JSON serialisation and downstream accounting.
 
 ```python
 cost = service.quantum_cost_estimate_decimal(
@@ -192,16 +236,59 @@ cost = service.quantum_cost_estimate_decimal(
     shot_count=1_000_000,
 )
 print(cost["estimated_cost"])  # "0.100000"  (string, 6 dp, no float error)
+print(cost["precision"])       # "decimal_6dp"
 ```
 
-## Circuit Metrics
+### Circuit Complexity Metrics
+
+Compute structural metrics without running the circuit — used for backend
+selection and QPU readiness assessment.
 
 ```python
 metrics = service.circuit_metrics(circuit_id="bell-v1", tenant_id="tenant-demo")
-print(metrics["two_qubit_fraction"])   # 0.5
+print(metrics["two_qubit_fraction"])      # 0.5
 print(metrics["circuit_depth_estimate"])  # 2
-print(metrics["complexity_tier"])     # "high"
+print(metrics["t_gate_count"])            # 0
+print(metrics["mw_entanglement_proxy"])   # 1.0
+print(metrics["complexity_tier"])         # "high"
 ```
+
+## API Reference
+
+| Method | Description |
+|--------|-------------|
+| `register_backend` | Register a QPU or simulator backend |
+| `attach_quota_policy` | Set shot, job, and cost limits per backend |
+| `create_circuit` / `circuit_define` | Define a circuit with gates and metadata |
+| `submit_job` / `job_submit_qpu` | Submit a job to a registered backend |
+| `job_simulate` | Submit to an auto-registered local simulator |
+| `complete_job` / `job_result` | Capture or retrieve measurement results |
+| `quantum_error_mitigation` / `error_mitigate` | Apply ZNE, PEC, CDR, or symmetry verification |
+| `variational_quantum_eigensolver` / `vqe_solve` | Run VQE ground-state energy estimation |
+| `quantum_approximate_optimisation` / `qaoa_solve` | Run QAOA for combinatorial optimisation |
+| `quantum_key_distribution` / `qkd_session` | Simulate QKD (BB84, E91, B92, SARG04) |
+| `post_quantum_encryption` / `pqc_encrypt` | Apply Kyber, Dilithium, Falcon, SPHINCS+, NTRU |
+| `quantum_simulation` | Trotter-step simulation of physical Hamiltonians |
+| `grover_search` | Grover's algorithm with optimal iteration count |
+| `noise_model_register` | Register depolarising/thermal/readout/crosstalk noise |
+| `noise_model_apply` | Inject noise into a result for NISQ benchmarking |
+| `fidelity_snapshot_record` | Record T1/T2/gate/readout calibration data |
+| `fidelity_drift_detect` | EMA-slope drift detection with auto audit alert |
+| `circuit_metrics` | Gate counts, depth, T-gates, Meyer-Wallach entanglement |
+| `circuit_optimise` | Depth/gate-count reduction at levels 0–3 |
+| `quantum_cost_estimate_decimal` | Decimal-precision cost with 6 dp monetary precision |
+| `quantum_random` | QRNG-inspired RNG with entropy audit trail |
+| `backend_status` | Queue depth, availability, calibration age |
+| `async_submit_quantum_job` | Non-blocking job submission |
+| `async_batch_submit_jobs` | Concurrent multi-job submission with semaphore |
+| `async_vqe_solve` | Non-blocking VQE |
+| `async_qaoa_solve` | Non-blocking QAOA |
+| `async_quantum_simulation` | Non-blocking Hamiltonian simulation |
+| `async_quantum_analytics` | Non-blocking analytics aggregation |
+| `quantum_analytics` | Aggregate stats: jobs, VQE, QAOA, QKD, PQ, simulation |
+| `dashboard_summary` | Tenant-scoped operational dashboard snapshot |
+| `register_quan_agent` | Register AI quantum agent with disclosure guardrails |
+| `create_experiment` | Group circuits, jobs, and hypothesis into an experiment |
 
 ## AI Quantum Agents
 

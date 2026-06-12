@@ -266,3 +266,25 @@ participants = await svc.get_session_participants(tenant_id="acme", dashboard_id
 - `rpt` can reference published dashboards as report attachments
 - `mqeb` receives session presence events for co-editor awareness
 - Template library accelerates `sbi` portal provisioning with pre-built blueprints
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Dashboard Management — World-Class Improvement Catalogue
+- **I2.** Improvement 1 — Parameterised Collaboration Cursors (Presence Awareness)
+- **I3.** Improvement 2 — AI-Assisted Layout Optimisation
+- **I4.** Improvement 3 — Cross-Dashboard Drill-Through with Breadcrumb Context
+- **I5.** Improvement 4 — Semantic Color-Blind-Safe Palette Enforcement
+- **I6.** Improvement 5 — Snapshot Diff & Change Detection
+- **I7.** Improvement 6 — Widget Data Caching with Stale-While-Revalidate
+- **I8.** Improvement 7 — Dashboard Versioning and Rollback
+- **I9.** Improvement 8 — Row-Level Security Filter Injection
+- **I10.** Improvement 9 — Dashboard Revenue Attribution (Decimal-Precise Financials)
+- **I11.** Improvement 10 — Adaptive Refresh Scheduling (Backpressure-Aware)
+- **I12.** Improvement 11 — Dashboard Subscription and Digest Delivery
+- **I13.** Improvement 12 — Widget Annotation and Commentary Layer
+- **I14.** Improvement 13 — Dashboard Template Library and Instant Provisioning
+- **I15.** Improvement 14 — Anomaly Flagging on KPI Widgets
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

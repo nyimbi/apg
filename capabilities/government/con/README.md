@@ -82,3 +82,25 @@ End-to-end public procurement process covering tender management, bid evaluation
 
 ## Composability Notes
 Composes with `government_bud` (contract awards create budget commitments), `government_per` (construction contracts require building permits), `government_cas` (procurement complaints create cases), and `intel` (tender pattern analysis for anti-corruption intelligence).
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: Government Contracts & Procurement (government_con)
+- **I2.** Overview
+- **I3.** Full Async Service Layer
+- **I4.** Persistent PostgreSQL-Backed Repository
+- **I5.** Structured Audit Trail with Immutable Event Store
+- **I6.** AI-Powered Bid Collusion Detection
+- **I7.** Real-Time PPDA Notification Gateway
+- **I8.** Conflict-of-Interest Declaration Workflow
+- **I9.** Multi-Criteria Weighted Scoring Engine
+- **I10.** Contract Expiry & Renewal Alert Engine
+- **I11.** Vendor Due-Diligence & Sanctions Screening
+- **I12.** E-Procurement Portal Integration (IFMIS/G2B)
+- **I13.** Procurement Plan vs. Actuals Variance Reporting
+- **I14.** Digital Contract Signing with e-Signature
+- **I15.** Anti-Corruption Pattern Intelligence Feed
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

@@ -99,6 +99,61 @@ Project Planning & Scheduling (pps) manages the full project schedule lifecycle:
 | `schedule_variance_trend(project_id, lookback_days)` | SPI trend with deterioration detection |
 | `critical_chain_buffers(project_id, buffer_pct)` | CCPM project + feeding buffers with fever zones |
 
+## World-Class Enhancements (v2.0)
+
+1. **Monte Carlo Schedule Risk Simulation** — Full probabilistic engine: sample PERT/triangular distributions per task, return P50/P80/P90 completion dates.
+2. **Earned Value Management (EVM)** — PV/EV/AC tracking rolled up to project level; SPI, CPI, EAC, TCPI, and S-curves.
+3. **PERT Three-Point Estimation Engine** — `optimistic_days`/`most_likely_days`/`pessimistic_days` fields on `Task`; variance propagated along the critical path.
+4. **Calendar-Aware Date Arithmetic** — Replace raw `timedelta` with a working-calendar engine: weekends, public holidays, resource non-working days all honoured in ES/EF/LS/LF.
+5. **Resource-Constrained Critical Path (RCCP)** — CPM network pass respects resource availability; tasks compete via minimum-slack priority rule.
+6. **Persistent PostgreSQL-Backed Store** — `asyncpg`/SQLAlchemy 2.0 repository behind `AbstractScheduleRepository`; in-memory impl retained for unit tests.
+7. **Earned Schedule (ES) Metrics** — SPI(t)-based schedule variance in time units; IEAC(t) forecast-to-complete.
+8. **Critical Chain Project Management (CCPM)** — Feeding and project buffers with green/yellow/red fever-chart consumption zones.
+9. **Schedule Variance Trend Analysis** — Daily SPI/float snapshots; `schedule_variance_trend` detects deteriorating trajectories early.
+10. **Automated Schedule Quality Score** — DCMA 14-point health check as a service: dangling logic, oversized tasks, missing resources; returns 0–100 with itemised findings.
+11. **Multi-Baseline Variance Reporting** — Task-level start/finish slip, duration change, float erosion vs. any stored baseline; supports baseline vs. current vs. replan.
+12. **Dependency Impact Propagation** — Record an actual finish; receive a ripple-impact report of all affected successors, slip days, and critical-path membership.
+13. **AI-Assisted Task Duration Estimation** — `estimate_task_duration` calls a local Ollama LLM, returns duration suggestions with confidence scores and analogous historical references.
+14. **Schedule Import/Export (MPP/XER/iCal)** — Parse MS Project XML and Primavera P6 XER; export to iCal `VTODO` components with `RELATED-TO` dependency encoding.
+15. **Real-Time WebSocket Schedule Updates** — `subscribe_schedule_updates(project_id)` async generator yields live change events (task updates, new deps, CP recalc) to Gantt front-ends.
+
+## New Methods
+
+### `monte_carlo_simulation` — Probabilistic delivery date
+
+```python
+result = await svc.monte_carlo_simulation(
+    project_id="proj-abc",
+    simulations=10_000,
+)
+# result["p50_date"], result["p80_date"], result["p90_date"]
+# result["completion_histogram"]  — {date_str: frequency}
+```
+
+### `dependency_impact_propagation` — Slip ripple analysis
+
+```python
+impact = await svc.dependency_impact_propagation(
+    project_id="proj-abc",
+    task_id="task-123",
+    slip_days=5,
+)
+# impact["affected_tasks"]  — list of {task_id, name, new_finish, on_critical_path}
+# impact["project_slip_days"]
+```
+
+### `schedule_variance_trend` — Detect deteriorating schedule health
+
+```python
+trend = await svc.schedule_variance_trend(
+    project_id="proj-abc",
+    lookback_days=30,
+)
+# trend["snapshots"]     — [{date, spi, total_float, pct_complete}]
+# trend["deteriorating"] — True if SPI slope < 0 over lookback window
+# trend["latest_spi"]
+```
+
 ## Streaming Events
 - `project_created`, `project_updated`, `wbs_element_added`, `task_status_changed`
 - `dependency_linked`, `critical_path_recalculated`, `resource_levelling_completed`

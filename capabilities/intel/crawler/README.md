@@ -181,3 +181,24 @@ Focused verification for this package:
 ./.venv/bin/python capabilities/intel/crawler/app.py
 ```
 
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: Web Intelligence Crawler (intel_crawler)
+- **I2.** Adaptive Rate Limiter with Token Bucket + Jitter
+- **I3.** robots.txt / crawl-delay Enforcement Layer
+- **I4.** Content Diffing and Change Detection
+- **I5.** Dark Web / Tor Proxy Routing
+- **I6.** Social Media Streaming Ingest (RSS + API Adapters)
+- **I7.** Multilingual Content Detection and Language-Aware Chunking
+- **I8.** Structured Data Extraction (JSON-LD, Microdata, OpenGraph)
+- **I9.** Privacy-Preserving PII Scrubber
+- **I10.** Confidence-Scored Source Reputation Index
+- **I11.** Resumable Crawl Checkpointing
+- **I12.** Async Batch Extraction Pipeline with Back-Pressure
+- **I13.** Cross-Source Entity Deduplication (Record Linkage)
+- **I14.** LLM-Assisted Extraction Verification (Hallucination Guard)
+- **I15.** Webhook and Outbound Notification Bus
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

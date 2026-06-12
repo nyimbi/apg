@@ -151,3 +151,67 @@ Provides end-to-end loyalty programme management for retail tenants: member enro
 | `list_rewards_for_member()` | Tier-gated and segment-gated reward catalogue |
 | `withdraw_consent()` | GDPR consent withdrawal with freeze and deletion scheduling |
 | `export_member_data()` | GDPR DSAR — full member data export |
+
+---
+
+## World-Class Enhancements (v2.0)
+
+1. **Gamified Streak & Challenge Engine** — time-boxed micro-challenges with streak targets, bonus multipliers, and badge unlocks to drive purchase frequency
+2. **Dynamic Points Pricing (Yield Management)** — `PointsPricingEngine` adjusts redemption rates in real-time based on liability float, demand pressure, and inventory levels
+3. **Fraud Detection — Velocity & Graph Anomaly Rules** — inline velocity gates on earn/redeem plus async graph scan for synthetic member rings
+4. **Referral & Social Earn** — unique referral codes with two-level tree, configurable bonuses, and leaderboard surface
+5. **Omnichannel Earn Deduplication** — receipt-hash idempotency index prevents double-crediting across POS, online, mobile, and e-receipt channels
+6. **Coalition Real-Time Point Conversion API** — `CoalitionExchangeEngine` with bidirectional transfer, per-partner rates, settlement batching, and reconciliation ledger
+7. **Predictive Churn Intervention** — scheduler-driven win-back offers triggered by RFM recency threshold with acceptance-rate tracking
+8. **Tier Downgrade Grace Period Enforcement** — `tier_downgrade_check` with rolling-window qualification, `downgrade_scheduled_at` timestamp, and notification on execution
+9. **Points Float & Liability Reporting** — actuarial breakage model with Monte Carlo scenario, segmented by tier and CLV, exportable for finance systems
+10. **Batch Earn via Event Stream (Bytewax / Kafka)** — async generator batch processing with partial-failure model and `batch_earn_completed` stream event
+11. **Member Merge & Duplicate Detection** — fuzzy-match duplicate candidates, balance/transaction retargeting, immutable audit on merge
+12. **Tiered Reward Gating** — `min_tier_name` and `allowed_segments` on rewards; `list_rewards_for_member` enforces eligibility at catalogue and redemption
+13. **Campaign ROI Measurement** — `record_campaign_attribution` links transactions to campaigns; `get_campaign_roi` computes incremental revenue vs. points cost
+14. **Privacy & Consent Lifecycle Management** — `ConsentRecord` model with version/timestamp/IP, `withdraw_consent` freeze + deletion scheduling, GDPR DSAR export
+15. **Real-Time Personalisation via Contextual Bandits** — epsilon-greedy bandit over `[tier, clv_segment, recency_days, balance_ratio]` replaces static offer rules; falls back when `min_trials` not met
+
+---
+
+## New Methods
+
+### `batch_earn_points` — High-volume POS reconciliation
+
+```python
+result = await svc.batch_earn_points(
+    earn_records=[
+        {"customer_id": "mbr_001", "transaction_id": "pos_txn_9001", "spend_amount": 250.0},
+        {"customer_id": "mbr_002", "transaction_id": "pos_txn_9002", "spend_amount": 85.50, "bonus_multiplier": 2.0},
+    ],
+    programme_id="prog_abc",
+    idempotency_key="eod-batch-2026-06-12",
+)
+# result["succeeded"], result["failed"], result["total_points_issued"], result["errors"]
+```
+
+Partial failures are collected in `errors`; successes are committed individually — no large rollbacks on a single bad record.
+
+### `merge_members` — Deduplicate member accounts
+
+```python
+result = await svc.merge_members(
+    tenant_id="tenant_x",
+    primary_member_id="mbr_001",
+    secondary_member_id="mbr_007",   # duplicate enrolled via app
+    merged_by="ops@retailer.com",
+)
+# secondary status → "merged"; primary balance += transferred_points; all transactions retargeted
+```
+
+Use `find_duplicate_candidates(tenant_id, programme_id)` first to surface fuzzy-matched pairs before merging.
+
+### `get_campaign_roi` — Measure incremental revenue vs. points cost
+
+```python
+roi = await svc.get_campaign_roi(tenant_id="tenant_x", campaign_id="camp_spring25")
+# roi["gross_roi"]  → 1.42  (142% return)
+# roi["incremental_revenue"], roi["points_cost_currency"], roi["attributed_transactions"]
+```
+
+Call `record_campaign_attribution(tenant_id, campaign_id, member_id, transaction_id, incremental_revenue)` on each qualifying earn to feed this report.

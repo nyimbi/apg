@@ -248,3 +248,25 @@ SCRP denies or requires review when:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/scrp --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/scrp --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** SCRP — World-Class Improvement Plan
+- **I2.** Overview
+- **I3.** Improvement 1 — Full Async Service Layer
+- **I4.** Improvement 2 — Persistent Storage via AsyncPG
+- **I5.** Improvement 3 — Real HTTP Fetching via HTTPX Async Client
+- **I6.** Improvement 4 — Playwright-Backed JS Rendering
+- **I7.** Improvement 5 — Real robots.txt Parsing
+- **I8.** Improvement 6 — Distributed Rate Limiting via Redis
+- **I9.** Improvement 7 — Screen Capture & OCR Pipeline
+- **I10.** Improvement 8 — RPA Action Execution
+- **I11.** Improvement 9 — Structured LLM Extraction via Ollama
+- **I12.** Improvement 10 — Incremental Cursor State Management
+- **I13.** Improvement 11 — Webhook Delivery for Pipeline Handoffs
+- **I14.** Improvement 12 — Content Diff & Change Alerting
+- **I15.** Improvement 13 — Data Quality Scoring
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

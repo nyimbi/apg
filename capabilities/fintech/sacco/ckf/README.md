@@ -55,3 +55,27 @@ generate_schedule → upload_check_off_file → reconcile_check_off → post_che
 ## Capability ID
 
 `fintech_sacco_ckf`
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Bulk Reconciliation Across All Employers in Parallel** [Enhancement]
+- **I2. Demand Notice Generation with Audit Trail** [Enhancement]
+- **I3. Partial Remittance Acceptance with Pro-Rata Allocation** [Enhancement]
+- **I4. Automated Arrears Ageing Report** [Enhancement]
+- **I5. Check-off Agreement Expiry Tracking and Renewal Workflow** [Enhancement]
+- **I6. Multi-Currency Support with FX Rate Pinning** [Enhancement]
+- **I7. Schedule Version Control and Amendment Log** [Enhancement]
+- **I8. Member Deduction Cap Enforcement (Salary Protection)** [Enhancement]
+- **I9. Automated Reconciliation Discrepancy Alerting** [Enhancement]
+- **I10. Employer Payment History Scoring** [Enhancement]
+- **I11. GL Account Configurability per Tenant** [Enhancement]
+- **I12. Salary Change Propagation with Effective Date** [Enhancement]
+- **I13. Bulk Member Upload via CSV/Dict Batch** [Enhancement]
+- **I14. Period Rollover with Carry-Forward Logic** [Enhancement]
+- **I15. Audit Trail with Immutable Event Log** [Enhancement]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

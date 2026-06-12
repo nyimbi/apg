@@ -246,3 +246,27 @@ NATS subjects used for assurance push: `apg.ecd.esg.assurance.<tenant_id>`
 ./.venv/bin/pytest -q capabilities/ecd/esg/tests/test_package_contract.py
 ./.venv/bin/apg capabilities publish-plan capabilities/ecd/esg --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real-Time Scope 3 Value-Chain Emission Tracing via NATS** [Streaming Architecture]
+- **I2. Science-Based Target Validation Engine (SBTi Protocol)** [Domain Intelligence]
+- **I3. Digital Product Passport (DPP) Carbon Footprint Embedding** [Engineering Design Integration]
+- **I4. Parametric Insurance Trigger for Physical Climate Risk** [Risk Finance Integration]
+- **I5. CSRD ESRS Double Materiality Automated Gap Analysis** [Regulatory Compliance]
+- **I6. Embedded LLM Sustainability Narrative Generator (Local Ollama)** [AI / Reporting]
+- **I7. Carbon Budget Accounting with Remaining Budget Drawdown** [Carbon Accounting]
+- **I8. Biodiversity Net Gain Calculator (BNG Units per UK/TNFD)** [Nature & Biodiversity]
+- **I9. NATS-Driven Real-Time Regulatory Alert Subscription** [Regulatory Intelligence / Streaming]
+- **I10. Automated Internal Carbon Pricing (ICP) Allocation Engine** [Carbon Economics]
+- **I11. Supply Chain Forced Labour Risk Screening (UFLPA / LkSG)** [Social Compliance / Supply Chain]
+- **I12. Scope 3 Category Mapping via Spend-Based MRIO Model** [Carbon Accounting]
+- **I13. ESG-Linked KPI Vesting Schedule Validator (Exec Compensation)** [Governance]
+- **I14. Portfolio-Level SFDR PAI Indicator Aggregation** [Financial Regulation / Reporting]
+- **I15. Continuous Assurance Stream for GHG Verification (ISO 14064-3)** [Data Integrity / Assurance]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

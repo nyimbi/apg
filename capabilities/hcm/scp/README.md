@@ -102,3 +102,25 @@ Capability for talent management and succession planning: talent pools, readines
 | `bulk_create_readiness_assessments(assessments)` | Atomic-ish batch import with per-record success/failure |
 | `get_retention_risk_alerts(...)` | Stale ready_now, low depth score, and unassessed star alerts |
 | `role_risk_registry()` | Composite risk-scored and sorted registry of critical roles |
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Succession Planning (hcm_scp) — World-Class Improvements
+- **I2.** Development Plan Generation
+- **I3.** Flight Risk Scoring
+- **I4.** Succession Depth Scoring per Role
+- **I5.** Competency Gap Heatmap
+- **I6.** Nine-Box Movement Tracking
+- **I7.** Bench Strength Index
+- **I8.** Scenario Simulation ("What-If")
+- **I9.** Retention Risk Alerts
+- **I10.** Successor Diversity Metrics
+- **I11.** Automated Readiness Recalculation
+- **I12.** Cross-Pool Visibility (Dual-Pool Members)
+- **I13.** Succession Plan Expiry & Review Cadence
+- **I14.** Role Risk Registry Integration
+- **I15.** Batch Assessment Import
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

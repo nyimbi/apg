@@ -294,3 +294,25 @@ records = api.list_records("apis", "tenant-a")
 ./.venv/bin/apg capabilities publish-plan capabilities/int/api --json
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/int/api --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** int_api — World-Class Improvement Roadmap
+- **I2.** Circuit Breaker per Upstream
+- **I3.** Distributed Rate-Limit Counters (Redis-Backed)
+- **I4.** API Key Rotation with Zero-Downtime Overlap
+- **I5.** OpenAPI Spec Validation and Diff on Registration
+- **I6.** Canary Traffic Splitting with Automatic Promotion
+- **I7.** Structured Audit Log with Immutable Append Semantics
+- **I8.** Webhook Retry with Exponential Back-off and Dead-Letter Queue
+- **I9.** Per-Tenant Configuration Overrides at Runtime
+- **I10.** SLA Budget Tracking with Burn-Rate Alerts
+- **I11.** Schema Registry Integration for Event-Driven APIs
+- **I12.** Cost Attribution per Consumer
+- **I13.** Dependency Graph and Impact Analysis
+- **I14.** Versioned API Snapshots and Rollback
+- **I15.** Adaptive Rate-Limit Tuning from Usage Patterns
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

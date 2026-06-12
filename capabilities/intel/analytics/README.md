@@ -203,3 +203,27 @@ Cross-capability eventing targets NATS JetStream subjects:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/intel/analytics --json
 ./.venv/bin/apg capabilities lifecycle-audit --root capabilities/intel/analytics --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real-Time Stream Analytics via NATS JetStream** [Streaming Architecture]
+- **I2. Graph-Native Betweenness and PageRank Centrality** [Graph Analytics]
+- **I3. Explainable Anomaly Attribution** [Explainability / XAI]
+- **I4. Temporal Forecasting with Holt-Winters Smoothing** [Predictive Analytics]
+- **I5. Multi-Tenant Privacy-Preserving Differential Statistics** [Privacy Engineering]
+- **I6. Semantic Entity Disambiguation and Merging** [Data Quality / Entity Resolution]
+- **I7. Causal Graph Construction from Temporal Co-occurrence** [Causal Inference]
+- **I8. Automated Insight Narrative Generation via Local LLM (Ollama)** [Natural Language Generation]
+- **I9. Confidence-Weighted Ensemble Scoring** [Model Governance]
+- **I10. Network Community Detection (Louvain-Approximation)** [Graph Analytics]
+- **I11. Provenance Chain Validation and Evidence Integrity Checking** [Governance / Chain of Custody]
+- **I12. Adaptive Sigma Threshold via Rolling Baseline** [Anomaly Detection]
+- **I13. Cross-Capability Event Bus Integration (NATS Pub/Sub)** [System Integration / Composability]
+- **I14. Risk Score Aggregation with Bayesian Updating** [Risk Analytics]
+- **I15. Automated Dataset Lineage Graph Traversal** [Data Lineage / Governance]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

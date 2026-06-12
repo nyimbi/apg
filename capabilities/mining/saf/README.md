@@ -148,3 +148,25 @@ Manages mine safety operations including incident reporting and investigation, h
 - `get_area_risk_heatmap()` output feeds `mining_mon` real-time dashboard spatial overlay
 - `get_leading_indicators()` feeds management review dashboards and ISO 45001 monitoring programmes
 - Bowtie analyses link to `mining_cor` critical control monitoring schedules
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Mine Safety & Compliance — World-Class Improvements
+- **I2.** Bowtie Risk Analysis Engine
+- **I3.** Automated LTIFR / TRIFR Trend Anomaly Detection
+- **I4.** Permit-to-Work Conflict Detection
+- **I5.** ISO 45001 Compliance Gap Assessment
+- **I6.** Hierarchical Controls Effectiveness Scoring (HIRAC)
+- **I7.** Stop-Work Authority (SWA) Analytics and Reporting
+- **I8.** Isolation and Lockout/Tagout (LOTO) Register
+- **I9.** Training Competency Gate on PTW Issuance
+- **I10.** Real-Time Area Risk Heat Map Data
+- **I11.** Leading Indicator Dashboard Feed
+- **I12.** Incident Causal Factor Classification (Tripod Beta / ICAM)
+- **I13.** Automated Regulatory Submission Deadline Tracking
+- **I14.** Fatigue Risk Management Integration
+- **I15.** Chemical and Dust Exposure Registry
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

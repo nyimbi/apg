@@ -26,3 +26,25 @@ IRA/NAICOM/FSA returns, Solvency II reporting, statistical returns, market condu
 | POST | /api/insurance/reg/calendar | Add deadline |
 | GET | /api/insurance/reg/summary | Regulatory summary |
 | GET | /api/insurance/reg/audit | Audit trail |
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Insurance Regulatory Reporting — World-Class Improvements
+- **I2.** XBRL/iXBRL Taxonomy-Aware Export
+- **I3.** AI-Powered Anomaly Detection on Return Data
+- **I4.** Predictive Deadline Risk Scoring
+- **I5.** Automated SCR/MCR Stress Testing
+- **I6.** Multi-Regulator Cross-Validation
+- **I7.** Regulatory Change Notification Feed
+- **I8.** Bulk Return Batch Processing
+- **I9.** Immutable Audit Trail with Hash Chaining
+- **I10.** Return Comparison and Version Diffing
+- **I11.** Regulatory Levy and Tax Calculator
+- **I12.** Submission Receipt and Acknowledgement Tracking
+- **I13.** Peer Benchmarking Dashboard Data
+- **I14.** Regulatory Correspondence Management
+- **I15.** Multi-Currency Conversion for Cross-Border Returns
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

@@ -101,3 +101,25 @@ Closing a matter with open tasks raises `ValueError`.
 | Inactivity > 30 days | 10 |
 
 Risk levels: **low** (0–29) / **medium** (30–59) / **high** (60–79) / **critical** (80+)
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** leg_mat — World-Class Improvement Plan
+- **I2.** AI-Driven Conflict of Interest Detection
+- **I3.** Statute of Limitations Calendar Engine
+- **I4.** Multi-Level Budget Tracking with Burn Rate Forecasting
+- **I5.** Court Filing Deadline Calculator with Rules Engine
+- **I6.** Matter Lifecycle State Machine with Guards
+- **I7.** Attorney Capacity Planning & Load Balancing
+- **I8.** Document Checklist Templates per Matter Type
+- **I9.** Privilege Log Generation
+- **I10.** Smart Deadline Chaining (Trigger → Derived)
+- **I11.** Matter Spend Analytics with Invoice Reconciliation
+- **I12.** Integrated Court Date Sync (iCal / CalDAV Export)
+- **I13.** Risk Scoring per Matter
+- **I14.** Secure Client Portal Activity Feed
+- **I15.** Bulk Matter Import / Migration
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

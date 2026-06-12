@@ -143,3 +143,26 @@ Battery-conscious CONS checks:
 ./.venv/bin/apg capabilities publish-plan capabilities/common/cons --json
 ```
 
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Cryptographic Consent Receipt Standard (ISO/IEC 29184)** [Compliance & Trust]
+- **I2. Consent Propagation Bus (Event-Driven Downstream Sync)** [Architecture & Integration]
+- **I3. Async-Native Service (Full asyncio Rewrite)** [Performance & Scalability]
+- **I4. Versioned Consent Lineage Graph** [Auditability & Compliance]
+- **I5. Granular Consent Expiry with Auto-Renewal Prompts** [Compliance Operations]
+- **I6. Preference Centre as First-Class Tenant-Branded Widget** [UX & Product]
+- **I7. Cross-Regulation Rule Engine (GDPR / POPIA / CCPA / LGPD)** [Compliance & Multi-Jurisdiction]
+- **I8. Consent Proof Ledger with Merkle-Tree Tamper Evidence** [Auditability & Legal Defence]
+- **I9. Consent Score and Privacy Health Dashboard** [Analytics & Observability]
+- **I10. Data Minimisation Enforcement at Capture** [Privacy by Design]
+- **I11. Automated DSAR Workflow with SLA Escalation** [Operations & Compliance]
+- **I12. Consent Fatigue Detection and Optimisation** [UX & Conversion]
+- **I13. Decentralised Identity and Self-Sovereign Consent (DID/VC)** [Future-Proofing & Standards]
+- **I14. Real-Time Consent Signal API (GPC / TCF 2.2 / IAB)** [Standards Compliance & Ad-Tech Integration]
+- **I15. AI Consent Explainability and Algorithmic Transparency Notices** [AI Governance & Emerging Regulation]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

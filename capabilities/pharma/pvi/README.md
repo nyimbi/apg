@@ -104,3 +104,25 @@ Manages the complete pharmacovigilance lifecycle from adverse event intake throu
 
 ## Composability Notes
 Receives adverse event signals from `pharma_ctr` for clinical trial SAEs. Feeds signal data to `pharma_rec` for post-market surveillance reports. PSUR submissions link to `pharma_reg` product registration lifecycle. Integrates with `nlpc` for automated narrative drafting assistance. RMP safety concern updates emit `rmp_update_required` to `pharma_reg`.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Pharmacovigilance Intelligence — World-Class Improvements
+- **I2.** Full Async Service Layer
+- **I3.** Persistent PostgreSQL Store with Alembic Migrations
+- **I4.** Structured Timeline Compliance Engine
+- **I5.** MedDRA Hierarchy Traversal and Validation
+- **I6.** Statistical Disproportionality Suite (ROR + PRR + EBGM)
+- **I7.** ICH E2B(R3) XML Serialiser and Validator
+- **I8.** Automated Literature Screening Scheduler
+- **I9.** Benefit-Risk Assessment Structured Framework
+- **I10.** Aggregate Reporting (DSUR / SUSAR Line Listings)
+- **I11.** Multi-Tenant RBAC with PV Role Hierarchy
+- **I12.** Case Deduplication via Phonetic and Semantic Matching
+- **I13.** Streaming Event Bus Integration (Bytewax / Kafka)
+- **I14.** PSUR Submission Deadline Tracker with EMA EURD List
+- **I15.** AI-Assisted Narrative Generation via Local LLM
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

@@ -170,3 +170,71 @@ Network operations centre capability providing fault management with alarm corre
 
 ## Composability Notes
 Feeds alarm and performance data to `telecom_ana` (analytics) and `telecom_per` (KPI management). Config changes consume resource data from `telecom_inv`. SLA breach events and penalty credit notes target `telecom_bil` (billing). PIR reports feed `comp` (regulatory SLA reporting). NE health scores drive the `telecom_net` topology view component.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+1. **Adaptive Alarm Suppression** — ML-scored suppression pipeline; auto-waives approval below 0.85 confidence threshold for low-impact categories.
+2. **Topology-Aware Alarm Propagation Graph** — nx.DiGraph built at startup; every alarm returns blast-radius propagation report.
+3. **Automated MTTR Tracking & SLA Clock** — Rolling-window MTTR per NE/category/shift with P50/P95/P99 percentiles; pauses during maintenance windows.
+4. **Cross-Domain Alarm Correlation** — Bipartite graph matching identifies causal ancestors across core/metro/access/IMS domains.
+5. **Predictive Fault Detection** — Sliding-window ARIMA/Isolation Forest anomaly detector generates pre-fault advisories 15–30 min before threshold breach.
+6. **Configuration Drift Detection** — Post-change snapshot diff against approved baseline; unauthorised diffs auto-raise `configuration_error` alarm.
+7. **NOC Workload Balancing Advisor** — Alarm volume analysis by shift/day-of-week produces staffing headcount and escalation risk recommendations.
+8. **SLA Penalty Calculation & Credit Advice** — Breach duration × tier penalty schedule yields credit note draft forwarded to `telecom_bil`.
+9. **Event Replay & Audit Corridor** — Append-only event store with replay API to reconstruct any NE or fault state at any past timestamp.
+10. **NE Health Scoring (Composite KPI)** — 0–100 score from alarm severity, performance breaches, config churn, and SLA compliance; colour-coded for topology.
+11. **Firmware Vulnerability Advisory** — Offline CVE database query after firmware scheduling; appends known CVEs to upgrade record.
+12. **Automated PIR Report Generation** — On ticket resolution, collates alarm timeline, RCA, MTTR, SLA impact, and corrective actions into structured PIR document.
+13. **Capacity Threshold Trending & Forecast** — Linear regression over last N readings; returns days-to-breach per metric per NE.
+14. **Multi-Tenant SLA Benchmarking** — Admin-scoped percentile ranking of SLA compliance across all tenants for MSP use-cases.
+15. **Intelligent Escalation Routing** — Dynamic on-call schedule lookup (via `schd`); auto-escalates to secondary if primary unresponsive within N minutes.
+
+---
+
+## New Methods
+
+### `ne_health_score` — Composite NE health for topology view
+
+```python
+result = await svc.ne_health_score(ne_id="NE-CORE-01", tenant_id="acme")
+# result: {"ne_id": "NE-CORE-01", "score": 74, "status": "amber",
+#          "alarm_penalty": 13, "perf_penalty": 8, "config_penalty": 5}
+```
+
+Score is 100 minus weighted penalties (critical alarm = −20, major = −10). Use `status` (`green`/`amber`/`red`) to drive topology view colouring without client-side logic.
+
+---
+
+### `capacity_trend_forecast` — Days-to-breach forecasting
+
+```python
+result = await svc.capacity_trend_forecast(
+    ne_id="NE-ACCESS-07",
+    metric="cpu_utilization",
+    tenant_id="acme",
+    window=20,          # use last 20 readings for trend fit
+)
+# result: {"ne_id": "NE-ACCESS-07", "metric": "cpu_utilization",
+#          "days_to_breach": 12.4, "trend_slope": 0.8, "current_value": 78.2}
+# days_to_breach is None when trend is flat or improving
+```
+
+Call this on a schedule (daily via `schd`) per NE × metric to populate a capacity planning dashboard. A `None` return means no action needed.
+
+---
+
+### `cross_domain_correlation` — Multi-domain incident detection
+
+```python
+result = await svc.cross_domain_correlation(
+    alarm_ids=["alm-001", "alm-002", "alm-003", "alm-004"],
+    tenant_id="acme",
+)
+# result: {"correlated": True, "domains_affected": ["core", "metro"],
+#          "root_domain": "core", "alarm_count": 4,
+#          "cross_domain_events": [...]}
+```
+
+Pass all active alarm IDs from a suspected incident. When `correlated=True`, `root_domain` indicates where to focus RCA. Pipe the output into `root_cause_analysis` or `generate_pir` directly.

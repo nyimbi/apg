@@ -2,9 +2,9 @@
 
 ## Overview
 
-Workflow Orchestration provides the runtime engine for defining, validating, releasing, and executing multi-step business processes within the APG composition layer. It supports automated tasks, human task assignments, approval workflows, cross-capability integration tasks, transactional compensation, SLA escalation, and event-triggered execution — all coordinated through Bytewax.
+Workflow Orchestration provides the runtime engine for defining, validating, releasing, and executing multi-step business processes within the APG composition layer. It supports automated tasks, human task assignments, approval workflows, cross-capability integration tasks, transactional compensation, SLA escalation, event-triggered execution, distributed tracing, cost attribution, anomaly detection, and execution snapshotting — all coordinated through Bytewax.
 
-The business value is a governed, auditable process layer that connects APG capabilities into end-to-end business workflows. Release governance (validation evidence, dry-run, rollback plan) prevents untested workflows from reaching production. Human task coordination and SLA escalation ensure that human-in-the-loop steps don't silently stall. Compensation steps on transactional workflows provide rollback safety when multi-step operations fail partway through.
+The business value is a governed, auditable process layer that connects APG capabilities into end-to-end business workflows. Release governance (validation evidence, dry-run, rollback plan) prevents untested workflows from reaching production. Human task coordination and SLA escalation ensure that human-in-the-loop steps do not silently stall. Compensation steps on transactional workflows provide rollback safety when multi-step operations fail partway through.
 
 ## Capability ID
 
@@ -21,6 +21,12 @@ The business value is a governed, auditable process layer that connects APG capa
 | workflow_release_governance | Validation evidence, dry-run, rollback plan, and approval for production release |
 | workflow_rule_enforcement | Deterministic rule engine enforcing all definition and execution guardrails |
 | workflow_agents | AI agent workbench for workflow architecture, BPML review, and compliance review |
+| execution_snapshotting | Point-in-time state capture and recovery for long-running workflow instances |
+| sla_breach_detection | Background SLA timer with proactive warning and breach escalation |
+| anomaly_detection | Rolling z-score analysis flagging statistical outliers in execution durations |
+| cost_attribution | Per-execution and per-tenant cost-weight ledger for FinOps reporting |
+| distributed_tracing | Waterfall trace reconstruction from audit events with W3C trace context propagation |
+| execution_quotas | Per-tenant concurrency and throughput rate limits with backpressure hints |
 
 ## Requires
 
@@ -32,6 +38,47 @@ The business value is a governed, auditable process layer that connects APG capa
 | registry | Register this capability in the global catalog |
 | composition_events | Coordinate execution lifecycle events via Bytewax |
 | composition_config | Read environment-specific workflow configuration values |
+
+## Quick Start
+
+```python
+from capabilities.composition.orchestration.service import WorkflowOrchestrationService
+
+svc = WorkflowOrchestrationService()
+
+# Define a workflow
+defn = svc.define_workflow(
+    tenant_id="acme",
+    name="invoice-approval",
+    version="1.0.0",
+    owner="finance-team",
+    tasks=[
+        {"id": "review", "name": "Review Invoice", "task_type": "human",
+         "assigned_role": "finance", "sla": {"hours": 24},
+         "escalation": [{"level": 1, "notify": "finance-manager"}]},
+        {"id": "approve", "name": "Approve Payment", "task_type": "approval",
+         "approval_policy": {"required_approvals": 1}, "dependencies": ["review"]},
+    ],
+)
+
+# Release to production
+release = svc.release_workflow(
+    tenant_id="acme",
+    workflow_definition_id=defn["id"],
+    release_notes="Initial release",
+    dry_run_result={"passed": True},
+    validation_evidence={"test_coverage": 0.9},
+    rollback_plan="revert to previous version",
+)
+
+# Start an execution
+execution = svc.start_execution(
+    tenant_id="acme",
+    release_id=release["id"],
+    input_data={"invoice_id": "INV-001"},
+    idempotency_key="inv-001-run-1",
+)
+```
 
 ## Configuration Reference
 
@@ -64,6 +111,7 @@ The business value is a governed, auditable process layer that connects APG capa
 | rules | /composition-orchestration/rules | GET | composition_orchestration:govern | Governance |
 | agents | /composition-orchestration/agents | GET/POST | composition_orchestration:admin | Automation |
 | settings | /composition-orchestration/settings | GET/PUT | composition_orchestration:admin | Administration |
+| stream | /composition-orchestration/api/v1/stream | GET | composition_orchestration:view | Streaming |
 
 REST API prefix: `/composition-orchestration/api/v1`
 
@@ -112,31 +160,94 @@ REST API prefix: `/composition-orchestration/api/v1`
 Supported task types: `automated`, `human`, `approval`, `notification`, `integration`, `conditional`, `parallel`, `subprocess`, `timer`, `script`.
 Supported trigger types: `manual`, `scheduled`, `event`, `api`, `webhook`, `condition`, `file`, `email`.
 
-## New Features (v2)
+## New Methods
 
 ### Execution Snapshotting and Recovery
 
-`snapshot_execution` serialises the full runtime state (execution record, instance variables, signal queue, compensation log, suspension record) to a durable record. `restore_from_snapshot` re-hydrates a previous snapshot into the live stores — enabling point-in-time recovery for long-running workflows without reprocessing completed steps.
+```python
+# Snapshot running execution state to durable storage
+snap = await svc.snapshot_execution(tenant_id="acme", execution_id="exec-001")
+# snap["snapshot_id"] -> "snapshot:exec-001_2025-..."
 
-### SLA Breach Detection and Monitoring
+# Recover after process restart — no reprocessing of completed steps
+restored = await svc.restore_from_snapshot(tenant_id="acme", snapshot_id=snap["snapshot_id"])
+```
 
-`check_sla_breaches(tenant_id)` scans all active task assignments for overdue deadlines, emitting `sla_warning` events at 80% elapsed time and `sla_breached` events when deadlines have passed. `get_sla_status(tenant_id)` returns a triage view partitioned into `healthy`, `at_risk`, and `breached` buckets for the operations dashboard.
+### SLA Breach Detection
+
+```python
+# Scan all active assignments; emits sla_warning at 80% elapsed, sla_breached when overdue
+report = await svc.check_sla_breaches(tenant_id="acme")
+# report["breached"] -> list of task assignments past deadline
+# report["at_risk"]  -> list approaching deadline
+
+status = await svc.get_sla_status(tenant_id="acme")
+# status["healthy"] / ["at_risk"] / ["breached"] buckets for ops dashboard
+```
 
 ### AI-Assisted Anomaly Detection
 
-`record_execution_duration` maintains a rolling 100-sample window of completion times per workflow. `detect_anomalies(tenant_id)` applies z-score analysis (threshold: 3σ) across workflows with 10+ samples, emitting `workflow_execution_anomaly` events for statistical outliers. Integrates with `ntfy` for on-call alerting.
+```python
+# Record duration after each completed execution (also called automatically)
+await svc.record_execution_duration(tenant_id="acme", workflow_id="wf-001", duration_seconds=127.4)
+
+# Detect statistical outliers — flags executions >3σ from rolling mean (min 10 samples)
+result = await svc.detect_anomalies(tenant_id="acme")
+# result["anomalies"] -> list of {workflow_id, z_score, duration_seconds, execution_id}
+# Emits workflow_execution_anomaly events; ntfy integration alerts on-call operators
+```
 
 ### Cost Attribution and FinOps
 
-`get_execution_cost` returns accumulated cost-weight for a specific execution. `get_tenant_cost_report` aggregates consumption by workflow ID across a period, giving FinOps teams a ranked cost breakdown without requiring an external billing tool.
+```python
+# Per-execution accumulated cost-weight
+cost = await svc.get_execution_cost(tenant_id="acme", execution_id="exec-001")
+# cost["accumulated_cost"] -> 14.25, cost["pct_complete"] -> 60.0
+
+# Tenant-wide ranked breakdown for billing period
+report = await svc.get_tenant_cost_report(tenant_id="acme", period="monthly")
+# report["cost_by_workflow"] -> sorted list of {workflow_definition_id, cost}
+```
 
 ### Distributed Tracing
 
-`get_execution_trace` reconstructs a waterfall trace from audit events, annotating each span with elapsed milliseconds since execution start. Execution records accept an optional `trace_context` dict (W3C `traceparent`/`tracestate`) that is propagated to cross-capability task invocations, enabling end-to-end distributed traces across APG services.
+```python
+# Reconstruct waterfall trace from audit events; returns spans with elapsed_ms
+trace = await svc.get_execution_trace(tenant_id="acme", execution_id="exec-001")
+# trace["spans"] -> [{event, elapsed_ms, payload, created_at}, ...]
+# trace["trace_context"] -> W3C traceparent/tracestate propagated to cross-capability tasks
+```
 
 ### Multi-Tenant Execution Quotas
 
-`set_tenant_quota(tenant_id, max_concurrent, max_starts_per_minute)` configures concurrency and throughput limits per tenant. `get_quota_status(tenant_id)` returns real-time usage against configured limits. The `start_execution` path will enforce these limits in the next release, raising `QuotaExceededError` with a `retry_after` hint when either limit is breached.
+```python
+# Configure limits (0 = unlimited)
+await svc.set_tenant_quota(tenant_id="acme", max_concurrent=50, max_starts_per_minute=20, admin_id="ops")
+
+# Real-time usage — useful for client-side backpressure before hitting QuotaExceededError
+status = await svc.get_quota_status(tenant_id="acme")
+# status["current_concurrent"] -> 12, status["starts_this_minute"] -> 4
+```
+
+## World-Class Enhancements (v2.0)
+
+| # | Enhancement | Category | Description |
+|---|-------------|----------|-------------|
+| 1 | Distributed Saga Coordinator | Reliability | Persist saga steps to PostgreSQL outbox before execution; background coordinator replays compensation idempotently across restarts. Exposes `begin_saga`, `commit_saga_step`, `abort_saga`. |
+| 2 | Blue/Green Version Routing | Release Engineering | Bind in-flight instances to the definition version that started them; `promote_release` atomically swaps the active slot. `get_version_routing_table` returns slot-to-definition mapping and in-flight counts. |
+| 3 | Idempotent Deduplication Store | Correctness | Fast-path dedup check in `start_execution` before any DAG evaluation. Returns the cached execution record on key match. `purge_idempotency_keys` manages TTL. |
+| 4 | Dynamic Retry Budget with Jitter | Resilience | `TaskRetryBudget` model with exponential backoff and full jitter. `complete_task` honours retryable errors; `get_retry_status` returns current attempt count and next scheduled retry. |
+| 5 | DAG Diff and Migration Validator | DevOps | `diff_workflow_versions` computes added/removed/reordered tasks. `validate_migration_safety` checks all in-flight instances against a target version before `promote_release`. |
+| 6 | Real-time SSE Event Streaming | Observability | `subscribe_execution_events` returns an `asyncio.Queue` fed by every `_emit` call. Flask view at `/api/v1/stream` delivers chunked SSE frames with 15-second keepalive heartbeats. |
+| 7 | Cost Attribution and Budget Guardrails | FinOps | `cost_weight` per task; per-execution and per-tenant cost ledger. `set_execution_budget` raises `BudgetExceededError` when accumulated cost exceeds the configured ceiling. |
+| 8 | Parallel Fan-Out / Fan-In | Execution Semantics | `ParallelGate` task type with `all`, `any`, and `quorum` join policies. `get_gate_status` returns completed/failed branch counts and quorum result. |
+| 9 | Deterministic Replay Engine | Auditability | Monotonic sequence numbers per execution. `replay_execution(up_to_sequence)` reconstructs exact state from event history for forensics and deterministic unit testing. |
+| 10 | SLA Breach Detection | Operations | Background SLA timers; `check_sla_breaches` emits `sla_warning` at 80% elapsed and `sla_breached` on expiry. Integrates with `ntfy` escalation chains. |
+| 11 | Workflow Template Marketplace | Developer Experience | `submit_template` validates ≥80% test coverage. `certify_template` requires operator role. `search_templates` full-text search over certified templates. `instantiate_template` substitutes parameters into a certified DAG. |
+| 12 | Execution Checkpoint Snapshotting | Durability | `snapshot_execution` serialises full runtime state to a durable record. `restore_from_snapshot` re-hydrates without reprocessing. Auto-snapshot every N completed tasks (default 5). |
+| 13 | Multi-Tenant Rate Limiting | Multi-tenancy | Token-bucket quotas per tenant. `start_execution` enforces concurrency and starts-per-minute; raises `QuotaExceededError` with `retry_after`. `get_quota_status` exposes real-time usage. |
+| 14 | Distributed Tracing Integration | Observability | W3C `traceparent`/`tracestate` propagated through execution records and cross-capability task payloads. `get_execution_trace` reconstructs a per-execution waterfall with elapsed milliseconds. |
+| 15 | AI-Assisted Anomaly Detection | AIOps | Rolling 100-sample duration window per workflow. `detect_anomalies` applies 3σ z-score; emits `workflow_execution_anomaly` events and alerts via `ntfy`. `get_anomaly_report` returns history and z-scores. |
 
 ## Streaming Events
 
@@ -152,27 +263,40 @@ Events emitted to the composition event stream via Bytewax (`apg.composition.orc
 | workflow_execution_completed | All terminal states reached |
 | workflow_task_assigned | Human task assigned to user, role, or group |
 | workflow_agent_registered | New workflow automation agent registered |
+| execution_snapshotted | Execution state persisted to snapshot store |
+| execution_restored | Execution state re-hydrated from snapshot |
+| sla_warning | Task assignment at 80% of SLA elapsed time |
+| sla_breached | Task assignment past SLA deadline |
+| workflow_execution_anomaly | Execution duration flagged as statistical outlier (>3σ) |
+| tenant_quota_set | Execution quota configured for a tenant |
 
 Stream states: `draft → validated → released → running → waiting → completed → failed → retired`
 
 ## Edge Cases Handled
 
-- Transactional workflows must declare compensation steps at definition time (`compensation_required_for_transaction`); this cannot be added after release, ensuring that rollback paths are reviewed before the workflow handles real data.
-- Retry policies on tasks require explicit upper bounds (`retry_policy_requires_limit`); unbounded retries are blocked to prevent a stuck task from occupying execution resources indefinitely.
+- Transactional workflows must declare compensation steps at definition time (`compensation_required_for_transaction`); this cannot be added after release, ensuring rollback paths are reviewed before the workflow handles real data.
+- Retry policies on tasks require explicit upper bounds (`retry_policy_requires_limit`); unbounded retries are blocked to prevent stuck tasks occupying execution resources indefinitely.
 - SLA-bound tasks that lack escalation rules produce `require_review` rather than `deny`, allowing SLA monitoring without mandatory escalation in environments where silent expiry is acceptable.
-- Cross-capability tasks must reference a capability contract by ID; this creates a resolvable dependency that the registry can validate, preventing workflows from referencing capabilities that have been deprecated or retired.
-- The `Workflow.validate_tasks` field validator checks that all dependency IDs reference task IDs within the same workflow definition, catching dangling references at model construction time before any persistence occurs.
-- `WorkflowInstance.audit_trail` is a list of dicts embedded in the instance record; for compliance-level retention, these are also forwarded to `audl` via `WorkflowAuditLog` records with `security_classification` and `retention_policy` fields.
+- Cross-capability tasks must reference a capability contract by ID; this creates a resolvable dependency that the registry can validate, preventing workflows from referencing deprecated or retired capabilities.
+- `Workflow.validate_tasks` checks that all dependency IDs reference task IDs within the same definition, catching dangling references at model construction time before any persistence occurs.
+- `WorkflowInstance.audit_trail` is forwarded to `audl` via `WorkflowAuditLog` records with `security_classification` and `retention_policy` fields for compliance-level retention.
+- `detect_anomalies` requires a minimum of 10 samples per workflow before flagging outliers, preventing false positives during ramp-up.
+- `restore_from_snapshot` validates tenant ownership before re-hydrating, preventing cross-tenant state injection.
 
 ## Composability
 
 - **Upstream**: `composition_events` (execution lifecycle coordination via Bytewax), `composition_config` (reads workflow timeout and SLA config), `composition_access` (policy enforcement on writes)
 - **Downstream**: Domain capabilities invoked as cross-capability task handlers; `composition_gateway` routes external API triggers to execution start endpoints
-- **Peer**: `audl` (receives `WorkflowAuditLog` records), `ntfy` (sends task assignments, SLA breach alerts, escalation notifications), `composition_registry` (workflow templates publishable to marketplace)
+- **Peer**: `audl` (receives `WorkflowAuditLog` records), `ntfy` (sends task assignments, SLA breach alerts, anomaly notifications, escalation chains), `composition_registry` (workflow templates publishable to marketplace)
 
 ## Development Notes
 
 - `WorkflowTemplate`, `TaskDefinition`, `WorkflowTrigger`, `Workflow`, `WorkflowInstance`, `TaskExecution`, `WorkflowConnector`, and `WorkflowAuditLog` are all Pydantic v2 models, not SQLAlchemy models; persistence is handled in `service.py`.
 - The `validate_cron_expression` function accepts both 5-part and 6-part (with seconds) cron expressions.
 - `assert_workflow_valid`, `assert_instance_active`, and `assert_task_executable` are runtime assertion helpers for use inside service methods; they are not guard decorators.
+- All new v2.0 async methods use lazy `hasattr` initialisation for their in-memory stores (`_snapshots`, `_cost_ledger`, `_execution_timings`, `_execution_quotas`) — safe to call on a freshly constructed `WorkflowOrchestrationService` without any setup.
 - Key files: `capability_contract.py` (executable contract and rule engine), `models.py` (Pydantic models and enums), `service.py` (lifecycle operations), `api.py` (API helpers), `views.py` (UI model helpers).
+
+---
+
+© 2025 Datacraft — www.datacraft.co.ke

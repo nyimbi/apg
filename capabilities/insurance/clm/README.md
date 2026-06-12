@@ -90,3 +90,27 @@ stp = await svc.evaluate_stp_eligibility(
 if stp["eligible"]:
     print("Auto-approved:", stp["auto_approved_amount"])
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. AI-Powered Predictive Reserve Adequacy Scoring** [AI/ML]
+- **I2. Real-Time Multi-Factor Fraud Network Graph** [AI/ML]
+- **I3. Automated STP (Straight-Through Processing) for Low-Complexity Claims** [Feature]
+- **I4. Litigation Management with Matter Lifecycle Tracking** [Feature]
+- **I5. Automated Regulatory Compliance & Statutory Reporting Engine** [Compliance]
+- **I6. Dynamic Excess & Deductible Management** [Feature]
+- **I7. Document Intelligence — OCR & Evidence Classification** [AI/ML]
+- **I8. Claims Velocity & Frequency Anomaly Detection** [Security]
+- **I9. Multi-Channel FNOL — WhatsApp, USSD, Email, API** [Integration]
+- **I10. Intelligent Reserve Adequacy Warnings & Escalation** [Feature]
+- **I11. Claimant Self-Service Portal & Status Push Notifications** [UX]
+- **I12. Subrogation Recovery Optimisation with Third-Party Liability Scoring** [Feature]
+- **I13. Multi-Currency Claims with Real-Time FX Settlement** [Feature]
+- **I14. Claims Triage & Complexity Scoring at FNOL** [AI/ML]
+- **I15. Actuarial IBNR Estimation with Development Triangle Export** [Compliance]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

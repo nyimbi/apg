@@ -199,3 +199,25 @@ The Remote Workforce (RWF) capability provides a complete remote and hybrid work
 - `ntfy` dispatches alerts for open incidents and overdue compliance checks
 - `nlpc` enables semantic search over work policy content
 - All events feed `mqeb` for downstream analytics in `moni` dashboards
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements — Remote Workforce (mob_rwf)
+- **I2.** Summary
+- **I3.** Offline-First Sync Queue with Conflict Resolution
+- **I4.** Geofence-Aware Task Assignment
+- **I5.** Dynamic Route Optimisation (TSP via Nearest-Neighbour + 2-opt)
+- **I6.** Task Dependency Graph with Critical-Path Scheduling
+- **I7.** Role-Based Field Certifications and Skill Matching
+- **I8.** Incident Escalation Engine with SLA Timers
+- **I9.** Attendance and Shift Check-In / Check-Out
+- **I10.** Push Notification Fanout with Priority Routing
+- **I11.** Configurable Compliance Check Cadence per Check Type
+- **I12.** Equipment Lifecycle Tracking (Maintenance, Depreciation, Loss)
+- **I13.** Tenant-Scoped Rate Limiting and Quota Enforcement
+- **I14.** Structured Audit Log Export (SIEM Integration)
+- **I15.** Bulk Operation API with Partial-Failure Semantics
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

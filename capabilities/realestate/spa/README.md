@@ -116,7 +116,58 @@ Comprehensive workplace and space management: versioned floor plans, space alloc
 - Energy intensity data feeds `esg` sustainability reporting capability
 - Zone analytics compose with `org` organisational hierarchy for budget attribution
 
+## World-Class Enhancements (v2.0)
+
+1. **Real-Time Occupancy Stream** — SSE/WebSocket push channel via Redis Streams; replaces polling for sub-second floor-level awareness.
+2. **CAD/BIM Layer Extraction** — `parse_floor_plan` calls LibreCAD/IfcOpenShell headless to auto-register rooms from DWG/DXF/IFC/Revit uploads.
+3. **ML Utilisation Forecasting** — `forecast_utilisation(space_id, horizon_days)` via local Chronos/Prophet GGUF; returns confidence-interval occupancy curves.
+4. **Zone / Neighbourhood Grouping** — `Zone` model with GeoJSON boundary; `get_zone_analytics` aggregates utilisation and density across member spaces.
+5. **Hot-Desk Demand Forecasting & Auto-Release** — `forecast_hot_desk_demand` combines booking history + calendar events; auto-releases ghost reservations.
+6. **Space Request & Approval Workflow** — `submit/approve/reject_space_request` with business justification, headcount forecast, and `wflo`-backed SLA tracking.
+7. **Digital Twin Synchronisation** — `sync_digital_twin(building_id)` exports space graph as IFC-annotated JSON to a twin registry for BMS/energy/emergency consumers.
+8. **Energy & Sustainability Correlation** — `calculate_energy_per_occupant` joins occupancy with meter data to compute kWh/person/day; flags zero-occupancy waste zones.
+9. **Atomic Allocation with Conflict Resolution** — `allocate_space_atomic` uses `SELECT … FOR UPDATE SKIP LOCKED` with 3-retry back-off; eliminates double-allocations under concurrent writes.
+10. **Lease-Linked Expiry & Renewal Alerts** — `check_allocation_expiries(tenant_id, lookahead_days)` emits `AllocationExpiryEvent` via `ntfy`; recovers ~8% portfolio area annually.
+11. **Multi-Tenancy Sub-Let Tracking** — `create/terminate_sublease_arrangement` with licensor/licensee, agreed rate, and chargeback pass-through mode.
+12. **Portfolio Benchmarking** — `benchmark_against_portfolio` returns percentile ranks for sqm/person, utilisation rate, booking adherence, and chargeback yield.
+13. **Accessibility & Compliance Tagging** — `accessibility_features` list on spaces; `find_accessible_spaces` filters by required features for PSED audit evidence.
+14. **Predictive Maintenance Trigger** — `detect_overuse_events` flags overcrowding (> 110% capacity); publishes `OveruseEvent` to `mqeb` for FM cleaning/HVAC scheduling.
+15. **Immutable Allocation History** — Append-only `AllocationHistoryEntry` log with SHA-256 state hash chain; `get_allocation_history` satisfies FRC/RICS/SOX audit requirements.
+
+## New Methods
+
+### `forecast_utilisation` — ML-driven occupancy forecast
+```python
+svc = SpacePlanningService(db)
+forecast = await svc.forecast_utilisation(
+    space_id="space-uuid",
+    horizon_days=14,
+    tenant_id="tenant-uuid",
+)
+# Returns: {"space_id": ..., "forecast": [{"date": "2026-06-13", "predicted_occupancy": 0.72, "confidence_low": 0.61, "confidence_high": 0.83}, ...]}
+```
+
+### `check_allocation_expiries` — Expiry lookahead with urgency tiers
+```python
+expiries = await svc.check_allocation_expiries(
+    tenant_id="tenant-uuid",
+    lookahead_days=30,
+)
+# Returns: {"expiring_soon": [...], "urgent": [...], "total_count": 12}
+# urgent = expiring within 7 days; triggers ntfy alerts automatically
+```
+
+### `get_zone_analytics` — Aggregate utilisation across a neighbourhood
+```python
+analytics = await svc.get_zone_analytics(
+    zone_spaces=["space-1", "space-2", "space-3"],
+    tenant_id="tenant-uuid",
+    from_date=date(2026, 5, 1),
+    to_date=date(2026, 5, 31),
+)
+# Returns: {"total_area_sqm": 1250, "avg_utilisation_pct": 67.4, "peak_headcount": 94,
+#           "density_band": "standard", "spaces": [...per-space breakdown...]}
+```
+
 ## World-Class Improvement Roadmap
-See `WORLD_CLASS_IMPROVEMENTS.md` for 15 prioritised enhancements covering real-time
-occupancy streaming, BIM layer extraction, ML utilisation forecasting, digital twin
-sync, and RICS-compliant immutable audit history.
+See `WORLD_CLASS_IMPROVEMENTS.md` for full design rationale on all 15 enhancements.

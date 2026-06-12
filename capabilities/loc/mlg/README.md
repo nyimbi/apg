@@ -151,3 +151,25 @@ Multi-Language & Localisation (MLG) manages translation workflows, locale config
 - Coverage matrix feeds directly into `moni` dashboards — no client aggregation required
 - `sla_violations_report` integrates with `ntfy` to alert managers when review SLA is breached
 - `sync_locale_baseline` is the mechanism for platform-wide locale governance across tenants
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** loc_mlg — 15 World-Class Improvements
+- **I2.** Translation Memory with Fuzzy Matching
+- **I3.** Namespace-Scoped Translation Versioning with Conflict Detection
+- **I4.** Automated RTL Layout Validation
+- **I5.** Locale-Aware Number and Date Formatting Engine
+- **I6.** Translation Coverage Heatmap Aggregation
+- **I7.** Glossary-Enforced Translation Validation
+- **I8.** Locale Inheritance / Overrides
+- **I9.** Batch Translation Status Transition
+- **I10.** Webhook / Event Sink Registration
+- **I11.** Translator Workload and SLA Tracking
+- **I12.** Context-Aware Machine Translation Prompting
+- **I13.** Translation Rollback
+- **I14.** Locale-Specific Plural Rule Engine
+- **I15.** AI-Assisted Translation Review Scoring
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

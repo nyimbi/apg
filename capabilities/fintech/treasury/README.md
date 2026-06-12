@@ -221,3 +221,27 @@ python -c "from capability_contract import get_capability_contract; print('OK')"
 
 Proprietary — © 2025 Datacraft
 Author: Nyimbi Odero <nyimbi@gmail.com>
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real-Time Intraday Cash Position via NATS Event Sourcing** [Architecture / Cash Management]
+- **I2. Monte Carlo VaR Engine for FX Hedge Portfolio** [Risk Analytics]
+- **I3. ALCO Committee Decision Workflow with Four-Eyes Approval Chain** [Governance]
+- **I4. Dynamic Liquidity Coverage Ratio (LCR) Calculator with HQLA Buffer Tracking** [Regulatory Compliance]
+- **I5. Yield Curve Construction and Interest Rate Sensitivity (DV01/BPV) Engine** [Market Risk]
+- **I6. Automated Nostro Reconciliation with Matching Engine** [Operations / Settlement]
+- **I7. FX Options Pricing (Black-Scholes / Garman-Kohlhagen) with Greeks** [Derivatives Pricing]
+- **I8. Cash Flow at Risk (CFaR) with AR/AP Schedule Integration** [Liquidity Risk]
+- **I9. Multi-Entity Cash Pooling with Overlay Structure and In-Pool Interest Allocation** [Cash Management]
+- **I10. Transfer Pricing Arm's-Length Rate Engine with Comparable Uncontrolled Price (CUP) Method** [Tax / Compliance]
+- **I11. Real-Time FX Position Limit Breach Detection via NATS Streaming** [Risk Controls]
+- **I12. Net Stable Funding Ratio (NSFR) Calculator with Asset/Liability Maturity Ladder** [Regulatory Compliance]
+- **I13. Cross-Currency Basis Swap Pricing and Hedge Accounting Documentation Generator** [Derivatives / Accounting]
+- **I14. Treasury Workstation AI Co-Pilot (Ollama-Backed Deal Recommendation Engine)** [AI-Augmented Treasury]
+- **I15. Automated SWIFT gpi Tracker Integration with Payment Certainty Dashboard** [Payments / Operations]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

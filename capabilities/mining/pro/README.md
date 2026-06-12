@@ -155,3 +155,27 @@ New in v1.1: real-time truck dispatch, blast vibration compliance monitoring, bl
 - Equipment availability report cross-references `mining_eqp` for maintenance categories
 - SIC variance alerts consumed by supervisor dashboards via `moni`
 - Explosives reconciliation feeds compliance reporting to `audl`
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real-Time Truck Dispatch Optimisation** [Operational Intelligence]
+- **I2. Blast Vibration Compliance Monitoring** [Safety & Regulatory]
+- **I3. Block Model Grade Reconciliation** [Ore Value Chain]
+- **I4. Equipment Utilisation and Availability Dashboarding** [Asset Management]
+- **I5. NATS-Based Real-Time Production Event Streaming** [Integration / Streaming Architecture]
+- **I6. Automated Mine Call Factor (MCF) Calculation** [Metallurgical Accounting]
+- **I7. Short-Interval Control (SIC) Feedback Loop** [Production Optimisation]
+- **I8. Geofenced Face Status Management** [Spatial Operations]
+- **I9. Explosives Consumption Reconciliation** [Compliance & Cost Control]
+- **I10. Automated Delay Pareto and Root-Cause Classification** [Continuous Improvement]
+- **I11. Integrated Production Forecast (Monte Carlo)** [Planning Intelligence]
+- **I12. Multi-Level Schedule Lock and Freeze Protocol** [Change Management / Governance]
+- **I13. Automated Shift Handover Package** [Operational Continuity]
+- **I14. Environmental Compliance: Dust and Water Discharge Tracking** [ESG / Regulatory]
+- **I15. AI-Assisted Blast Design Optimisation** [Advanced Analytics / AI]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

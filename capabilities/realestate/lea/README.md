@@ -110,6 +110,62 @@ Includes advanced analytics: full amortisation schedules, multi-year rent escala
 - Reclassification requires auditor approval to prevent silent balance sheet changes
 - Expiry pipeline sorts by days_remaining ascending for urgency
 
+## World-Class Enhancements (v2.0)
+
+1. **Persistent DB Adapter** — `PostgresLeaseStore` via SQLAlchemy async ORM; `LeaseStoreProtocol` interface decouples persistence
+2. **Event Sourcing** — Domain events (`LeaseCreated`, `LeaseAmended`, etc.) with full audit replay; IFRS 16 disclosure history
+3. **Rent Escalation Projections** — `project_rent_escalation_schedule` multi-year table with CPI forecasts and stepped schedules
+4. **Dilapidation Provisions** — `calculate_dilapidation_provision` covering pre-lease, interim, and terminal schedules (IFRS 37)
+5. **ERV Benchmarking** — `benchmark_against_erv` over/under-rented status, reversion potential, and time-to-reversion
+6. **Full Amortisation Schedule** — `full_amortisation_schedule` every period to expiry; quarterly/annual summarisation; CSV/JSON export
+7. **Covenant Monitoring** — `record_covenant` / `test_covenant_compliance` for rent cover, DSCR, net worth thresholds
+8. **LLM Lease Abstraction** — `extract_lease_abstract_llm` via local Ollama (Llama 3/Mistral); maps JSON output to `LeaseAbstractionCreate`
+9. **Multi-Currency FX Translation** — `translate_portfolio_to_reporting_currency` with functional and presentation currency columns
+10. **Abstraction Quality Scoring** — `score_abstraction_quality` 0–100 score with per-field gap analysis
+11. **Break Option Modelling** — `model_break_option_cost` NPV break vs. stay matrix with penalty, dilaps, fit-out write-off, relocation
+12. **KPI Dashboard** — `lease_kpi_dashboard` vacancy rate, OCR, WAULT, reversion yield, void liability with time-series trends
+13. **Holding-Over Detection** — `detect_holding_over` transitions overdue leases, records uplift rent, emits notification events
+14. **Data Integrity Validation** — `validate_lease_data_integrity` cross-record checks: review dates, IFRS 16 reconciliation, sublease term bounds
+15. **Discount Rate Sensitivity** — `discount_rate_sensitivity` liability matrix per 100bps; breakeven rate for operating vs. finance flip
+
+## New Methods
+
+### `full_amortisation_schedule`
+```python
+schedule = await svc.full_amortisation_schedule(
+    lease_id="lease-uuid",
+    summarise_by="quarterly",  # "monthly" | "quarterly" | "annual"
+    tenant_id="tenant-uuid",
+)
+# Returns: {"lease_id": ..., "periods": [{"period": 1, "opening_balance": ...,
+#   "interest": ..., "principal": ..., "payment": ..., "closing_balance": ...}, ...],
+#   "summary": {"total_payments": ..., "total_interest": ..., "total_principal": ...}}
+```
+
+### `detect_holding_over`
+```python
+results = await svc.detect_holding_over(
+    as_of_date=date(2026, 6, 1),
+    uplift_pct=Decimal("0.10"),  # 10% above passing rent
+    tenant_id="tenant-uuid",
+)
+# Returns: list of leases transitioned to holding_over status with new_rent,
+# holding_over_since, and notification event IDs
+```
+
+### `discount_rate_sensitivity`
+```python
+matrix = await svc.discount_rate_sensitivity(
+    lease_id="lease-uuid",
+    rate_min=Decimal("0.03"),
+    rate_max=Decimal("0.09"),
+    step=Decimal("0.005"),
+    tenant_id="tenant-uuid",
+)
+# Returns: {"rates": [...], "liabilities": [...], "rou_assets": [...],
+#   "delta_per_100bps": ..., "breakeven_rate": ...}
+```
+
 ## New Methods (v2 additions)
 
 | Method | Description |

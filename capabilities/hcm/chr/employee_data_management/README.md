@@ -159,3 +159,25 @@ Production deployments should bind these concerns through adapters:
 ./.venv/bin/apg capabilities publish-plan capabilities/hcm/chr/employee_data_management --json
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/hcm/chr/employee_data_management --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements — chr_employee_data_management
+- **I2.** Async-First Service Layer
+- **I3.** Pydantic v2 Input/Output Models
+- **I4.** Pluggable Persistence Adapter
+- **I5.** Event-Driven Audit Bus
+- **I6.** Structured Observability (OpenTelemetry)
+- **I7.** Row-Level Multi-Tenancy Enforcement
+- **I8.** GDPR / Data-Residency Controls
+- **I9.** Position Vacancy Tracking
+- **I10.** Leave Balance Engine
+- **I11.** Onboarding Workflow Orchestration
+- **I12.** Payroll Run Aggregation
+- **I13.** Org Chart Flattened Search
+- **I14.** Headcount Budget vs. Actual
+- **I15.** Contract Expiry Alerting
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

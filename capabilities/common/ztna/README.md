@@ -18,7 +18,7 @@ streams remain APG adapter boundaries.
   quarantine state.
 - Protected resource registration with access level, sensitivity, policy
   attachment, and network segment metadata.
-- Deterministic zero-trust access decisions.
+- Deterministic zero-trust access decisions with matched-rule traces.
 - MFA and independent review guardrails for privileged access.
 - High-risk access review and session reauthentication.
 - Tenant isolation for all identity, device, resource, request, session, and
@@ -33,8 +33,9 @@ streams remain APG adapter boundaries.
 - Contract-derived semantic model, package manifest, release report, and
   publish-plan support.
 - **Async-native methods** for identity registration, access requests, session
-  management, policy evaluation, and compliance snapshots — enabling safe use
-  in async adapters and concurrent broker fan-out patterns.
+  management, policy evaluation, posture telemetry ingestion, bulk session
+  reevaluation, and compliance snapshots — enabling safe use in async adapters
+  and concurrent broker fan-out patterns.
 
 ## Main Files
 
@@ -129,8 +130,7 @@ batch = service.validate_ztna_lifecycle_batch(
 ### Async Usage
 
 All async methods are safe to use in `asyncio`-based adapters, FastAPI
-handlers, or concurrent broker fan-outs. They delegate to the corresponding
-sync methods and hold no additional locks.
+handlers, or concurrent broker fan-outs.
 
 ```python
 import asyncio
@@ -270,6 +270,159 @@ The contract exposes these route names:
 `views.py` returns data-only models for these screens. The generated UI should
 render the provided theme tokens and component names instead of hard-coding
 colors or layout assumptions.
+
+## World-Class Enhancements (v2.0)
+
+Fifteen improvements that elevate this capability from a functional prototype to
+a production-grade zero-trust broker:
+
+1. **Async-native service layer** — All service methods converted to `async`
+   with `asyncio.Lock` per entity map, eliminating blocking I/O contention for
+   concurrent policy decisions.
+
+2. **Policy-as-code engine (REGO / CEL)** — Structured evaluator accepts REGO
+   (OPA) or CEL expressions per rule with hot-reload, enabling ABAC,
+   time-windowed access, and geo-fencing without redeployment.
+
+3. **Persistent storage adapter interface** — `ZtnaStorageAdapter` protocol
+   with `MemoryAdapter`, `PostgresAdapter` (SQLAlchemy async), and
+   `RedisAdapter`. Zero-change swap at deploy time.
+
+4. **Continuous posture telemetry pipeline** — Streaming channel (Bytewax /
+   Kafka) continuously updates `trust_score` and auto-triggers session
+   reevaluation when score drops below tenant-configured thresholds.
+
+5. **Risk-adaptive ML scoring** — Pluggable `RiskScoringAdapter` delegates to
+   a local Ollama model, ONNX ensemble, or rules engine for calibrated
+   probability estimates instead of heuristic linear sums.
+
+6. **JIT privileged access vaults** — Time-boxed credentials (TOTP seeds,
+   ephemeral API keys, SSH certificates via Vault/SPIFFE) issued on approval,
+   auto-expired on session close or TTL. Eliminates standing privileged access.
+
+7. **Cryptographic device attestation (TPM / SPIFFE / SVID)** —
+   `DeviceAttestationAdapter` validates TPM 2.0 quotes and SPIFFE X.509 SVIDs
+   against tenant CA; `attested` and `trust_score` update only on verified
+   evidence.
+
+8. **Micro-segmentation graph engine** — Directed graph of allowed lateral
+   paths between segments; segment-to-segment firewall rules; deny-by-default
+   enforced unless an explicit path policy exists.
+
+9. **OIDC / SAML identity federation** — `FederationAdapter` validates JWTs
+   and assertions from Entra, Okta, and PingFederate; maps groups/roles claims
+   to ZTNA identity attributes via tenant-specific claim rules.
+
+10. **Distributed CloudEvents audit trail** — Append-only `CloudEvent`-formatted
+    records with `traceparent` and hash-linked tamper evidence written to
+    PostgreSQL, OpenSearch, or S3.
+
+11. **Zero-trust session proxy with mTLS** — Identity-aware reverse proxy
+    terminates mTLS client certificates (SVID-validated), attaches signed
+    `X-ZTNA-Session` headers, and enforces per-session rate limits with
+    automatic TCP teardown on risk breach.
+
+12. **Behavioral analytics and insider threat detection** — Per-identity
+    baseline profiles (access hours, resource sets, session durations) via
+    EWMS; flags impossible travel, off-hours privileged access, and abnormal
+    data volumes as risk signals.
+
+13. **Self-service access request portal** — Flask-AppBuilder blueprint for
+    resource discovery, business-justified access requests, approval status
+    tracking, and mobile-friendly approver review queue with contextual risk
+    details.
+
+14. **Tenant Zero Trust maturity scoring** — `ztna_maturity_score` evaluates a
+    tenant against the CISA ZT Maturity Model tiers (Traditional → Advanced →
+    Optimal) across five pillars (Identity, Devices, Networks, Applications,
+    Data) with per-pillar remediation recommendations.
+
+15. **Adversarial integration test harness** — Scenario-driven YAML fixtures
+    covering privilege escalation, cross-tenant leaks, session hijack replays,
+    posture downgrade attacks, and concurrent approval races with injected
+    clocks and full matched-rule trace assertions.
+
+## New Methods
+
+The eight async methods added to `ZtnaService` in v2.0:
+
+### `async_evaluate_policy` — stateless policy dry-run
+
+```python
+decision = await service.async_evaluate_policy(
+	identity_id=identity["id"],
+	resource_id=resource["id"],
+	action="read",
+)
+# {"allowed": True, "decision": "allow", "matched_rules": [...], "deny_reasons": []}
+```
+
+Resolves identity and resource, runs the full rule engine, and returns an
+enriched decision payload without mutating any session state. Use this in
+authorization middleware or policy audit tools.
+
+### `async_bulk_reevaluate_sessions` — fan-out reevaluation
+
+```python
+results = await service.async_bulk_reevaluate_sessions(
+	tenant_id="tenant-a",
+	risk_score=0.6,        # applies to all active sessions
+	actor_id="risk-engine",
+)
+# list of per-session reevaluation dicts; uses asyncio.gather internally
+```
+
+Fan-out across all active sessions for a tenant in one call. Called immediately
+after a tenant-level policy change or identity revocation.
+
+### `async_update_device_posture` — continuous telemetry ingestion
+
+```python
+updated = await service.async_update_device_posture(
+	device_id=device["id"],
+	trust_score=0.72,
+	posture_present=True,
+	compliant=True,
+	attested=True,
+	actor_id="uem-connector",
+)
+```
+
+Designed to be called from a streaming posture telemetry consumer (Bytewax,
+Kafka worker). Updates `trust_score` in-place and emits an audit event; pair
+with `async_bulk_reevaluate_sessions` to close the posture-to-access-decision
+loop.
+
+### `async_compliance_snapshot` — SIEM export
+
+```python
+snapshot = await service.async_compliance_snapshot(
+	tenant_id="tenant-a",
+	actor_id="compliance-job",
+)
+# {
+#   "tenant_id": "tenant-a",
+#   "generated_at": "...",
+#   "summary": {"active_session_count": 3, ...},
+#   "posture": {"total": 5, "compliant": 4, "avg_trust": 0.91, "by_status": {...}}
+# }
+```
+
+Aggregates identity verification, device posture, resource policy coverage,
+session counts, and review backlog into one dict. Poll this on a schedule to
+feed audit dashboards or SIEM pipelines.
+
+### `async_close_session` — event-driven lifecycle
+
+```python
+closed = await service.async_close_session(
+	session_id=session["id"],
+	actor_id="session-gc",
+)
+```
+
+For use in event-driven session lifecycle handlers (e.g. JIT vault expiry
+callbacks, TCP teardown hooks from the session proxy).
 
 ## Focused Verification
 

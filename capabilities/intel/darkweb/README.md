@@ -62,3 +62,25 @@ Use focused verification during battery-constrained development:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/intel/darkweb --json
 ./.venv/bin/apg capabilities lifecycle-audit --root capabilities/intel/darkweb --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Dark Web Intelligence — World-Class Improvements
+- **I2.** Streaming Intelligence Pipeline (Bytewax integration)
+- **I3.** Graph-Based Threat Actor Attribution
+- **I4.** Onion Address Active Probing with Tor Circuit Rotation
+- **I5.** Automated Credential Deduplication via k-Anonymity
+- **I6.** MITRE ATT&CK TTP Enrichment
+- **I7.** Cryptocurrency Transaction Monitoring
+- **I8.** LLM-Assisted Threat Summarisation
+- **I9.** Automated STIX 2.1 Export
+- **I10.** Confidence Score Bayesian Updating
+- **I11.** Parallel Onion Network Crawl Scheduler
+- **I12.** Brand Impersonation Detection
+- **I13.** Geopolitical Risk Context Layer
+- **I14.** Time-Series Anomaly Detection on Monitor Metrics
+- **I15.** Secure Evidence Chain of Custody
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

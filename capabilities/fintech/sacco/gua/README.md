@@ -67,3 +67,27 @@ uv run pytest -vxs capabilities/fintech/sacco/gua/tests/
 ```
 
 © 2025 Datacraft — Nyimbi Odero
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Partial Guarantee Release on Loan Repayment Progress** [Enhancement]
+- **I2. Multi-Guarantor Pool with Proportional Liability Splitting** [Enhancement]
+- **I3. Guarantor Consent Deadline with Automated Expiry** [Enhancement]
+- **I4. Blackout Period After Guarantee Call** [Enhancement]
+- **I5. Cross-SACCO Exposure Aggregation via Federated Query** [Enhancement]
+- **I6. Savings-Lien Ledger with Per-Loan Traceability** [Enhancement]
+- **I7. Risk-Tiered Early Warning Notification Cascade** [Enhancement]
+- **I8. Guarantee Fee Revenue Recognition** [Enhancement]
+- **I9. Automated Guarantor Score (GScore)** [Enhancement]
+- **I10. Guarantee Insurance Integration** [Enhancement]
+- **I11. Dispute and Objection Workflow** [Enhancement]
+- **I12. Dormancy Detection and Forced Substitution Trigger** [Enhancement]
+- **I13. Bulk Guarantee Release Endpoint with Loan-Pool Support** [Enhancement]
+- **I14. Consent Re-confirmation on Material Loan Modification** [Enhancement]
+- **I15. Guarantee Obligation Inheritance on Member Death/Incapacitation** [Enhancement]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

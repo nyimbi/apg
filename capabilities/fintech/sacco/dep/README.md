@@ -26,3 +26,27 @@ Savings products, deposit taking, withdrawal processing, minimum balances, and i
 | GET | /api/fintech/sacco/dep/interest/postings | List interest postings |
 | GET | /api/fintech/sacco/dep/summary | Portfolio summary |
 | GET | /api/fintech/sacco/dep/audit | Audit events |
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Tiered Interest Rate Engine** [Enhancement]
+- **I2. Goal-Based Savings Targets** [Enhancement]
+- **I3. Standing Order / Recurring Deposit Scheduling** [Enhancement]
+- **I4. Fixed Deposit Maturity Processing** [Enhancement]
+- **I5. Dividend / Interest Capitalisation** [Enhancement]
+- **I6. Withdrawal Notice Period Enforcement** [Enhancement]
+- **I7. Dormancy Scoring & Automated Classification** [Enhancement]
+- **I8. Deposit Limit & Velocity Controls** [Enhancement]
+- **I9. Inter-Account Transfer** [Enhancement]
+- **I10. Projected Balance & Interest Calculator** [Enhancement]
+- **I11. Regulatory Reporting — SASRA SF01 Export** [Enhancement]
+- **I12. Multi-Currency Savings Support** [Enhancement]
+- **I13. Savings Group / Chama Account Support** [Enhancement]
+- **I14. Penalty & Charge Engine** [Enhancement]
+- **I15. Real-Time Balance Notification Hooks** [Enhancement]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

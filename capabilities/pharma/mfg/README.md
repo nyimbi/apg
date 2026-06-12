@@ -120,3 +120,25 @@ Manages pharmaceutical manufacturing operations from batch record creation throu
 
 ## Composability Notes
 Released batches feed `pharma_dis` for dispatch. Deviation records integrate with `pharma_qms` CAPA workflow. Equipment qualification references are cited in `pharma_qms` validation lifecycle. Batch genealogy data supports `pharma_dis` recall management. SPC data feeds `pharma_qms` continuous process verification (CPV) programme.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Pharmaceutical Manufacturing — World-Class Improvements
+- **I2.** Async-First Service Layer
+- **I3.** Process Order / Work-In-Progress (WIP) Scheduling
+- **I4.** Electronic Batch Record (EBR) Step Execution Engine
+- **I5.** Cleaning Validation with Residue Limit Calculation
+- **I6.** Environmental Monitoring Integration
+- **I7.** CAPA (Corrective and Preventive Action) Lifecycle
+- **I8.** Material Genealogy / Batch Traceability Graph
+- **I9.** Statistical Process Control (SPC) Charts
+- **I10.** Serialisation / Track-and-Trace Support
+- **I11.** Change Control Management
+- **I12.** Out-of-Specification (OOS) / Out-of-Trend (OOT) Investigation Workflow
+- **I13.** Calibration Management
+- **I14.** Batch Disposition Workflow (Quarantine → Released / Rejected)
+- **I15.** Multi-Site / Contract Manufacturing Organisation (CMO) Support
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

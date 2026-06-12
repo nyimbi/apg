@@ -106,3 +106,25 @@ python -c "from capability_contract import get_capability_contract; print('OK')"
 
 Proprietary — © 2025 Datacraft  
 Author: Nyimbi Odero <nyimbi@gmail.com>
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Risk & Security Assessment (grc_rsa) — World-Class Improvements
+- **I2.** Overview
+- **I3.** Improvement 1: Full CVSS v3.1 / v4.0 Scoring Engine
+- **I4.** Improvement 2: Penetration Testing Engagement Lifecycle
+- **I5.** Improvement 3: Vulnerability Lifecycle Management with CVE Correlation
+- **I6.** Improvement 4: Threat Intelligence Integration
+- **I7.** Improvement 5: Attack Surface Management & Asset Inventory Link
+- **I8.** Improvement 6: Third-Party / Vendor Risk Assessment
+- **I9.** Improvement 7: Regulatory Compliance Overlay
+- **I10.** Improvement 8: Automated Risk Quantification (Monte Carlo / FAIR)
+- **I11.** Improvement 9: AI-Driven Risk Narrative and Remediation Playbooks
+- **I12.** Improvement 10: Real-Time Risk Posture Streaming (SSE / WebSocket)
+- **I13.** Improvement 11: Risk Acceptance Workflow with Time-Bounded Expiry
+- **I14.** Improvement 12: Comprehensive Audit Trail with Immutable Ledger
+- **I15.** Improvement 13: Risk Aggregation and Portfolio View
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

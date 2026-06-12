@@ -138,3 +138,25 @@ The Asset Tracking capability provides real-time GPS tracking for vehicles, trai
 
 ## Composability Notes
 Provides live position data to `transport_dis` for dispatch tracking. Vehicle IDs reference `transport_fle` registry. Container tracking integrates with `transport_car` for cargo custody chain. Cold chain compliance summaries feed `comp` for certificate generation. Journey leg data feeds `transport_ord` for delivery SLA monitoring.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Asset Tracking — World Class Improvements
+- **I2.** Streaming Telemetry Ingest Pipeline
+- **I3.** Predictive Route Deviation Detection
+- **I4.** Multi-Leg Journey Analytics
+- **I5.** Dwell Time & Detention Tracking
+- **I6.** Harsh Event Detection (Acceleration / Braking)
+- **I7.** Multi-Standard Cold Chain Certificate Generation
+- **I8.** Real-Time Geofence Dwell Analytics
+- **I9.** Asset Clustering for Map Density Control
+- **I10.** Offline Telemetry Buffer & Replay
+- **I11.** Fleet-Wide Utilisation Benchmarking
+- **I12.** Alert Suppression & Deduplication
+- **I13.** Anomaly-Based Tamper Detection
+- **I14.** Audit Log Streaming to Immutable Store
+- **I15.** Multi-Tenant Isolation via Row-Level Security
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

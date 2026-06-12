@@ -141,3 +141,27 @@ All bucketing uses `MD5(seed:user_id)` mapped to 0.0–100.0.  The same user
 always receives the same flag result for an unchanged flag configuration.
 Sticky bucketing persists the first positive result so rollout percentage
 changes do not flip existing participants.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Scheduled Flag Lifecycle (Temporal Triggers)** [Automation]
+- **I2. NATS-Backed Real-Time Flag Change Propagation** [Distribution / Consistency]
+- **I3. SDK-Style Cached Evaluation with Stale-While-Revalidate** [Performance]
+- **I4. Multi-Armed Bandit Experiment Assignment** [Experimentation Science]
+- **I5. Flag Dependency Graph with Circular-Dependency Detection** [Correctness / Safety]
+- **I6. Contextual Attribute Schema Validation** [Data Integrity]
+- **I7. Statistical Significance Calculator for Experiments** [Experimentation Science]
+- **I8. Flag Stickiness Groups (Cohort Stability)** [UX Consistency]
+- **I9. Gradual Rollout Schedules (Ramp Plans)** [Risk Management]
+- **I10. Flag Segments (Reusable Targeting Cohorts)** [DX / Maintainability]
+- **I11. Flag Change Approval Workflows** [Governance / Compliance]
+- **I12. Evaluation Context Propagation (OpenTelemetry-Compatible)** [Observability]
+- **I13. Tenant Flag Import/Export (Portable Configurations)** [Operations]
+- **I14. Dynamic Sampling Rate Control** [Performance / Cost]
+- **I15. Cross-Tenant Flag Templates** [Platform / Multi-Tenancy]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

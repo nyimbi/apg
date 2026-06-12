@@ -160,3 +160,69 @@ End-to-end tenancy lifecycle: application, referencing, right-to-rent checks, de
 - `receipt_issued`
 - `chase_scheduled`, `chase_step_sent`
 - `compliance_check_completed`, `compliance_failed`
+
+## World-Class Enhancements (v2.0)
+
+1. **Persistent SQL Store via AsyncPG** — swap in-memory dict for AsyncPG connection pool; zero service-layer refactor required.
+2. **Rent-Increase Workflow** — `propose_rent_increase()` enforces statutory notice period and blocks application until `effective_date`.
+3. **Move-In / Move-Out Inspection Workflow** — structured condition grading with photo evidence IDs; dispute-proof deposit deductions.
+4. **Automated Arrears Chasing Schedule** — `schedule_arrears_chase()` fires multi-step sequences via `schd` capability; no manual follow-up.
+5. **Multi-Currency Rent Collection with FX Conversion** — pluggable `FXProvider` converts to base currency; records `currency_gain_loss` per payment.
+6. **Rent Receipt Generation (PDF)** — `generate_rent_receipt()` produces `REC-YYYY-NNNN` sequential receipts; meets legal requirements.
+7. **Vacancy Tracking and Void Analysis** — `record_void_period()` and `get_void_report()` surface `void_rate_pct` in analytics.
+8. **Statement of Account per Tenancy** — `get_tenancy_statement()` returns chronological ledger with opening/closing balance and days-in-arrears.
+9. **Guarantor Management** — structured `GuarantorCreate/Response` models with `guarantee_limit`, expiry, and `call_on_guarantor()` linked to arrears escalation.
+10. **Lease Break Clause Tracking** — `BreakClause` sub-model with `exercise_break_clause()` validating conditions and transitioning tenancy to `vacating`.
+11. **Concurrent Modification Guard (Optimistic Locking)** — `updated_at` version check on all mutations; raises `ConflictError` on stale-write.
+12. **Partial Payment Allocation (FIFO)** — `allocate_payment()` clears oldest arrears first; produces per-period `AllocationResult`.
+13. **Regulatory Compliance Checklist Engine** — `run_compliance_check()` returns per-item pass/fail for gas cert, EICR, EPC, fire safety, deposit protection.
+14. **Webhook / Event Bus Emission** — injected `EventEmitter` adapter calls `await self._emit(event_type, payload)` post-mutation; wires to `mqeb` in production.
+15. **Rent Roll Versioned Snapshots** — `snapshot_rent_roll()` and `compare_rent_rolls()` provide month-end reconciliation and auditor evidence packs.
+
+## New Methods
+
+### `get_tenancy_statement()` — unified ledger for self-service portal
+
+```python
+statement = await svc.get_tenancy_statement(
+    tenancy_id="ten-001",
+    tenant_id="t-acme",
+    from_date=date(2025, 1, 1),
+    to_date=date(2025, 6, 30),
+)
+# Returns: opening_balance, list of {date, type, amount, running_balance},
+#          closing_balance, days_in_arrears
+print(statement["closing_balance"], statement["days_in_arrears"])
+```
+
+### `schedule_arrears_chase()` — automated multi-step collection
+
+```python
+chase = await svc.schedule_arrears_chase(
+    arrears_id="arr-042",
+    chase_sequence=[
+        {"days_after": 3,  "method": "sms"},
+        {"days_after": 7,  "method": "email"},
+        {"days_after": 14, "method": "letter"},
+        {"days_after": 30, "method": "phone"},
+    ],
+    tenant_id="t-acme",
+)
+# Enqueues steps via `schd`; fires `chase_scheduled` event.
+# chase["steps_scheduled"] == 4
+```
+
+### `compare_rent_rolls()` — month-end reconciliation diff
+
+```python
+snap_march = await svc.snapshot_rent_roll(tenant_id="t-acme", snapshot_date=date(2025, 3, 31))
+snap_april = await svc.snapshot_rent_roll(tenant_id="t-acme", snapshot_date=date(2025, 4, 30))
+
+diff = await svc.compare_rent_rolls(
+    id_a=snap_march["snapshot_id"],
+    id_b=snap_april["snapshot_id"],
+    tenant_id="t-acme",
+)
+# diff keys: "added", "removed", "changed" — each a list of tenancy diffs
+print(f"+{len(diff['added'])} tenancies, -{len(diff['removed'])}, ~{len(diff['changed'])} changed")
+```

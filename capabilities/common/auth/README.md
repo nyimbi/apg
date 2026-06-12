@@ -248,3 +248,25 @@ Focused checks for this package:
 Full repository suites, live web adapters, live identity providers, production
 cryptographic engines, biometric capture, behavioral models, rendered browser
 UI, live Bytewax workers, and load tests are separate integration concerns.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** AUTH - World Class Improvement Opportunities
+- **I2.** Persistent Token Refresh with Sliding Expiry Windows
+- **I3.** Attribute-Based Access Control (ABAC) Policy Engine
+- **I4.** OpenID Connect Discovery and JWKS Endpoint Support
+- **I5.** Step-Up Authentication with Challenge Orchestration
+- **I6.** Delegated Authorization (Impersonation + Constrained Delegation)
+- **I7.** Real-Time Threat Intelligence Feed Integration
+- **I8.** WebAuthn / Passkey Registration and Verification
+- **I9.** Session Binding and Anomaly Detection
+- **I10.** Tenant-Scoped Password Policy Engine
+- **I11.** Cross-Tenant Identity Federation and Trust Anchors
+- **I12.** Service Account Key Rotation Automation
+- **I13.** Differential Privacy Budget Metering with Epsilon Accounting
+- **I14.** Distributed Rate Limiting and Brute Force Protection
+- **I15.** Audit Log Streaming and SIEM Integration
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

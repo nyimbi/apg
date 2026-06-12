@@ -291,3 +291,25 @@ Focused checks for this package:
 Full repository suites, live storage providers, schedulers, orchestration
 engines, rendered browser UI, live Bytewax workers, and load tests are separate
 integration concerns.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** BKUP World-Class Improvements
+- **I2.** Immutable Snapshot Ledger with Merkle Chain
+- **I3.** Multi-Region Replication with Quorum Tracking
+- **I4.** Deduplication & Compression Savings Tracking
+- **I5.** Backup Cost Estimation with Decimal Precision
+- **I6.** SLA Breach Alerting with Configurable Thresholds
+- **I7.** Backup Simulation / Dry-Run Mode
+- **I8.** Snapshot Lifecycle State Machine with Explicit Transitions
+- **I9.** Chunked Snapshot Transfer with Resume Support
+- **I10.** Cross-Tenant Backup Delegation
+- **I11.** Automated Recovery Time Objective Calibration
+- **I12.** Backup Anomaly Detection
+- **I13.** Backup Policy as Code (BPaC) Export/Import
+- **I14.** WORM (Write-Once Read-Many) Snapshot Locking
+- **I15.** Parallel Backup Execution with Concurrency Limits
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

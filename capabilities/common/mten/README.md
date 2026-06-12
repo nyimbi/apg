@@ -736,3 +736,25 @@ for tenant in all_tenants:
 ---
 
 **Next Steps**: After implementing the Multi-Tenancy capability, proceed with [Authentication & RBAC (`auth`)](../auth/README.md) as defined in the development order plan.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Multi-Tenancy (mten) — World-Class Improvements
+- **I2.** Hierarchical Tenant Trees (Sub-Tenants)
+- **I3.** Quota Ledger with Real-Time Enforcement
+- **I4.** Policy-as-Code Engine (OPA/Rego Bridge)
+- **I5.** Tenant Namespace Namespacing at the Database Layer
+- **I6.** Graceful Tier Downgrade with Usage Conflict Resolution
+- **I7.** Cross-Tenant Data Masking and Tokenisation
+- **I8.** Event-Driven Tenant Lifecycle Webhooks
+- **I9.** Tenant-Scoped Secret Management
+- **I10.** Tenant Activity Fingerprinting and Behaviour Baselining
+- **I11.** Immutable Tenant Configuration Snapshots
+- **I12.** SLA-Aware Provisioning with Circuit Breaker
+- **I13.** Cost Attribution and Showback / Chargeback Reports
+- **I14.** Zero-Downtime Live Tenant Migration with State Sync
+- **I15.** Tenant-Scoped Rate Limiting with Token Bucket and Burst Control
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

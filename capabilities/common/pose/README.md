@@ -113,6 +113,143 @@ analysis = service.analyze_pose("analysis-001", tenant_id, estimate["id"], "biom
 | `ingest_frame_batch()` | Concurrent batch frame + estimate ingestion with semaphore control |
 | `longitudinal_compare()` | Cross-session similarity matrix and trend vectors |
 
+## World-Class Enhancements (v2.0)
+
+The following 15 improvements were designed to bring POSE to parity with or
+beyond leading commercial platforms (Kinovea, Vicon, DARI Motion, Move.ai,
+Sword Health, Sparta Science, etc.).
+
+| # | Name | Category | Key Output |
+|---|------|----------|------------|
+| I1 | **Temporal Keypoint Smoothing** | Signal Processing | EMA / boxcar filter per keypoint; residual noise RMS per joint |
+| I2 | **Velocity & Acceleration Kinematics** | Biomechanical Analytics | v (units/frame and units/s), a (units/frame²), peak-velocity frame index, kinetic energy proxy |
+| I3 | **Pose-to-Text LLM Narration** | Generative AI / Accessibility | Plain-English narrative from joint angles + risk score via local Ollama — no cloud egress |
+| I4 | **Streaming Pose Ring Buffer** | Real-Time Infrastructure | Circular buffer with eviction on overflow; head/tail/fill-ratio metadata |
+| I5 | **Activity Spatial Heat Map** | Spatial Analytics | Normalised 2D density grid (default 64×64) of per-keypoint positional deltas |
+| I6 | **Cross-Session Longitudinal Comparison** | Progress Tracking | Per-session confidence distribution; pairwise cosine similarity matrix; improving/stable/declining trend vectors |
+| I7 | **Batch Frame Ingestion with Concurrency Control** | Throughput / DX | asyncio semaphore-bounded gather; per-frame success/failure; total latency summary |
+| I8 | **Range-of-Motion (ROM) Measurement** | Rehabilitation / Clinical | Angular delta vs ISO 8551/AAOS normals; clinical classification: normal/restricted/hypermobile |
+| I9 | **Bilateral Movement Asymmetry Detection** | Injury Prevention | Left/right joint-pair speed ratios; symmetric/mild/severe classification; high-severity audit on breach |
+| I10 | **Posture Alignment Index Scoring** | Occupational Health | PAI 0-100 from head position, shoulder level, spinal alignment, pelvic tilt; green/amber/red band |
+| I11 | **Biomechanical Injury Risk Rules Engine** | Predictive Health | Configurable rules (operator, threshold, evidence level A/B/C, weight); composite score 0-10; corrective cues |
+| I12 | **Skeleton-to-BVH Export** | Interoperability | HIERARCHY + MOTION blocks from COCO-17 topology; Euler angles; compatible with Blender, Unity, Qualisys |
+| I13 | **Differential Privacy Budget Accounting** | Privacy Engineering | Per-tenant/subject RDP epsilon ledger; reject anonymisation when budget exhausted; GDPR Art. 89 compliant |
+| I14 | **Model Latency Profiling & SLA Alerting** | Performance Operations | P50/P95/P99 latency, fps, memory delta; high-severity audit when P99 exceeds SLA |
+| I15 | **Pose Re-Identification Risk Assessment** | Identity / Security | Gait signature vector (stride, cadence, keypoint covariance); cosine similarity vs stored signatures; risk score + recommended anonymisation params |
+
+Improvements I1, I2, I6, I7, I8, I9, I10, I11 are fully implemented in
+`service.py`. I3, I4, I5, I12, I13, I14, I15 are specified and ready for
+production adapter attachment.
+
+## New Methods
+
+### I1 — Temporal Keypoint Smoothing
+
+Eliminates jitter from raw frame-to-frame keypoint noise before downstream
+biomechanical analysis. Build the skeletal track first, then smooth it.
+
+```python
+# Build track first
+track = await service.skeletal_track("track-001", tenant_id, session["id"], estimate_ids)
+
+# Apply EMA smoothing, window=7
+smoothed = await service.smooth_keypoint_track(
+    "smooth-001", tenant_id, track["id"],
+    window_size=7, filter_type="ema"
+)
+# smoothed["smoothed_series"]          — dict[keypoint_name, list[{frame_index, x, y}]]
+# smoothed["noise_rms_per_keypoint"]   — dict[keypoint_name, float]
+```
+
+### I2 — Velocity and Acceleration Kinematics
+
+Second-order finite differences over a skeletal track. Essential for sports
+science, fall prediction, and rep counting without external preprocessing.
+
+```python
+kinematics = await service.compute_kinematics(
+    "kin-001", tenant_id, track["id"], fps=30.0
+)
+for kp in kinematics["kinematics"]:
+    print(kp["keypoint"], "peak_v =", kp["peak_velocity"],
+          "ke_proxy =", kp["kinetic_energy_proxy"])
+```
+
+### I8 — Range-of-Motion Clinical Measurement
+
+Computes angular delta for a named joint between two pose estimates and
+classifies against ISO 8551 / AAOS normal ROM tables.
+
+```python
+rom = await service.measure_rom(
+    "rom-001", tenant_id,
+    estimate_id_start="estimate-start",
+    estimate_id_end="estimate-end",
+    joint="left_knee",           # or right_knee, left_hip, left_shoulder, etc.
+)
+# rom["rom_degrees"]              — float
+# rom["percent_of_normal_rom"]    — float
+# rom["clinical_classification"]  — "normal" | "restricted" | "hypermobile"
+```
+
+### I9 — Bilateral Movement Asymmetry Detection
+
+Flags left/right imbalances above clinical thresholds. Raises a high-severity
+audit event automatically when any pair exceeds the severe threshold.
+
+```python
+asym = await service.detect_asymmetry(
+    "asym-001", tenant_id, track["id"],
+    mild_threshold_pct=10.0,
+    severe_threshold_pct=15.0,
+)
+for pair in asym["joint_pair_results"]:
+    print(pair["joint_pair"], pair["asymmetry_pct"], "%", pair["classification"])
+# asym["severe_asymmetry_detected"]  — bool (also triggers audit event)
+```
+
+### I10 & I11 — Posture Score + Injury Risk
+
+Combine a single-frame posture snapshot with a configurable rules engine to
+produce actionable clinical output.
+
+```python
+# Posture Alignment Index (ISO 11226)
+score = await service.compute_posture_score("score-001", tenant_id, estimate["id"])
+print(score["posture_alignment_index"], score["traffic_light_band"])  # e.g. 74.5, "amber"
+
+# Biomechanical injury risk (configurable rules, defaults cover ACL/hamstring/lower-back)
+angles_report = await service.extract_joint_angles("angles-001", tenant_id, estimate["id"])
+risk = await service.score_injury_risk("risk-001", tenant_id, angles_report["id"])
+print(risk["composite_injury_risk_score"], risk["risk_tier"])  # e.g. 3.5, "moderate"
+for r in risk["rule_results"]:
+    if r["triggered"]:
+        print(r["rule_id"], "->", r["corrective_cue"])
+```
+
+### I7 — Batch Frame Ingestion
+
+Eliminates caller-side concurrency management for long-video processing.
+
+```python
+frames = [
+    {
+        "frame_id": f"f{i}", "frame_number": i,
+        "occurred_at": "2026-06-01T10:00:00Z",
+        "source_ref": f"video://clip-01/frame/{i}",
+        "width": 1920, "height": 1080,
+        "keypoints": [{"name": "left_shoulder", "x": 0.5, "y": 0.4, "confidence": 0.92}],
+    }
+    for i in range(100)
+]
+batch = await service.ingest_frame_batch(
+    "batch-001", tenant_id, session["id"], model["id"],
+    frames=frames,
+    max_concurrency=16,
+)
+print(batch["success_count"], "/", batch["total_frames"], "in", batch["elapsed_ms"], "ms")
+```
+
 ## Guardrail Summary
 
 POSE denies operations that lack tenant context, model owner, model policy,

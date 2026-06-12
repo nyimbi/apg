@@ -82,3 +82,27 @@ The Report Builder capability (bia_rpt) provides parameterised report authoring,
 - Report scheduling driven by schd capability
 - bia_dsh published dashboards can be embedded as report attachments
 - wflo can gate report publication with multi-step review
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Parameterised Report Templates with Semantic Variables** [Authoring]
+- **I2. Incremental / Streaming Report Generation** [Performance]
+- **I3. Monetary Column Precision with Decimal Arithmetic** [Data Integrity]
+- **I4. Report Bursting — Per-Recipient Parameter Injection** [Distribution]
+- **I5. Semantic Caching of Report Runs** [Performance]
+- **I6. Column-Level Data Masking and PII Redaction** [Governance]
+- **I7. Automated Anomaly Flagging in Report Outputs** [Intelligence]
+- **I8. Cross-Report Diff — Version-to-Version Comparison** [Auditability]
+- **I9. Natural Language Report Builder (Ollama-backed)** [Intelligence]
+- **I10. Subscription Self-Service Portal with Preference Centre** [Distribution]
+- **I11. Report Output Watermarking and Digital Signature** [Governance]
+- **I12. Report Data Lineage Graph (Column-to-Source Tracing)** [Governance]
+- **I13. Multi-Tenant Report Marketplace** [Composability]
+- **I14. Adaptive Report Caching with Staleness Budget** [Performance]
+- **I15. Scheduled Report Health Monitoring with SLA Alerting** [Reliability]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

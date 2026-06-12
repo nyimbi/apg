@@ -163,3 +163,25 @@ Cold-chain temperature checks are enforced at receiving. Unapproved inventory ad
 
 ## Composability Notes
 Interfaces with `transport_car` for cargo receipt against bookings. Outbound pick-pack feeds `transport_dis` for dispatch planning. WMS integration syncs with external SAP EWM or Manhattan Associates systems. Dock door appointments integrate with `transport_sch` scheduling. Cold-chain breaches and near-expiry alerts feed `intel_aler`. Multi-DC transfers cross-wire two `transport_war` instances. Equipment maintenance events feed the `maint` capability.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Warehouse & Distribution — World-Class Improvements
+- **I2.** Cold Chain Telemetry Integration
+- **I3.** Wave-Based Pick Optimisation
+- **I4.** ASN-Driven Auto-Receiving
+- **I5.** Real-Time Space Utilisation Heatmap Data
+- **I6.** Carrier-Integrated Manifesting
+- **I7.** Reverse Logistics Disposition Workflow
+- **I8.** Labour Demand Forecasting
+- **I9.** Bonded Warehouse Customs Tracking
+- **I10.** Multi-DC Transfer Orders
+- **I11.** Batch Expiry / FEFO Picking
+- **I12.** Automated Putaway Rule Engine
+- **I13.** Carrier Performance Scorecarding
+- **I14.** IoT Equipment Telemetry (Forklift/AGV)
+- **I15.** Hazmat Segregation Enforcement
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

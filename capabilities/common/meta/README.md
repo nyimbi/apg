@@ -45,6 +45,28 @@ Bytewax event streams behind the same contract.
   lineage, quality, certification, glossary, and catalog-agent streams.
 - Generated-application UI routes, view models, theme tokens, and adapter
   metadata.
+- Async-first batch registration with `asyncio.gather`-safe fan-out (v2.0).
+- Schema registry with version history, compatibility modes, and fingerprint
+  deduplication (v2.0).
+- Column-level lineage capture for GDPR right-to-erasure scope calculations
+  (v2.0).
+- Pluggable policy engine with priority-ordered rule evaluation (v2.0).
+- CloudEvents-compatible append-only audit log with point-in-time replay (v2.0).
+- Data contract validation with SLO terms and automated violation detection
+  (v2.0).
+- Typed quality dimensions engine with ISO/IEC 25012-aligned composite scoring
+  (v2.0).
+- Semantic business glossary with term relationship graph (v2.0).
+- Sensitivity-aware masking profiles propagated via lineage (v2.0).
+- Federated catalog search across tenant boundaries subject to sharing
+  agreements (v2.0).
+- Automated freshness monitoring with SLA-driven audit events (v2.0).
+- OpenTelemetry observability middleware with zero overhead when OTLP endpoint
+  is absent (v2.0).
+- Duplicate detection on `(tenant_id, business_key, source_system)` with
+  configurable merge strategies (v2.0).
+- Compliance report generator for GDPR, HIPAA, and PCI DSS controls (v2.0).
+- LLM-assisted metadata enrichment via locally hosted Ollama models (v2.0).
 
 ## Core Lifecycle
 
@@ -89,7 +111,7 @@ blocking denials.
 Denied non-Bytewax lifecycle batches are persisted as `denied` records before
 `PermissionError` is raised, giving operators durable evidence for remediation.
 
-## Quick Use
+## Quick Start
 
 ```python
 from capabilities.common.meta.service import MetaService
@@ -156,6 +178,190 @@ batch = service.validate_meta_lifecycle_batch(
 
 assert agent.runtime == "codex"
 assert batch.status == "accepted"
+```
+
+## Core API
+
+| Method | Returns | Purpose |
+|---|---|---|
+| `register_asset(...)` | `MetaAssetRecord` | Register a new metadata asset with guardrail evaluation |
+| `schedule_discovery(...)` | `MetaDiscoveryJobRecord` | Schedule approved connector discovery |
+| `record_discovery_result(...)` | `MetaDiscoveryJobRecord` | Record discovered asset IDs against a job |
+| `classify_asset(...)` | `MetaClassificationRecord` | Classify sensitivity with confidence and steward routing |
+| `review_classification(...)` | `MetaClassificationRecord` | Record steward review decision with notes |
+| `capture_lineage(...)` | `MetaLineageRecord` | Capture asset-to-asset lineage edge |
+| `assess_quality(...)` | `MetaQualityRecord` | Record quality score and dimension breakdown |
+| `request_certification(...)` | `MetaCertificationRecord` | Gate certification on lineage, quality, and freshness |
+| `publish_asset(...)` | `MetaAssetRecord` | Evaluate publication guardrails |
+| `register_glossary_term(...)` | `MetaGlossaryTermRecord` | Register business term with owner |
+| `retire_asset(...)` | `MetaAssetRecord` | Gate retirement on impact analysis |
+| `register_catalog_agent(...)` | `MetaCatalogAgentRecord` | Register AI/agent contributor with role guardrails |
+| `validate_meta_lifecycle_batch(...)` | `MetaLifecycleBatchRecord` | Enforce Bytewax-only lifecycle mutations |
+| `list_records(...)` | `list[dict]` | Enumerate records by type for a tenant |
+| `list_pending_reviews(...)` | `list[dict]` | Return all records awaiting steward review |
+| `dashboard_summary(...)` | `dict` | Aggregate counts for dashboard rendering |
+| `describe(...)` | `dict` | Return capability contract for a tenant |
+| `create_record(...)` | `dict` | Low-level keyed record creation |
+
+## World-Class Enhancements (v2.0)
+
+These 15 improvements have been specified and are being implemented incrementally.
+Each section links the design rationale to the relevant extension point in `service.py`.
+
+1. **Async-First Service Layer** — `async def batch_register_assets(assets)` using
+   `asyncio.gather` fan-out; CPU-bound rule evaluation off-loaded to thread pool.
+   Sync API surface unchanged.
+
+2. **Schema Registry with Version History** — `register_schema_version(asset_id, schema_json,
+   format, compatibility_mode)` stores Avro/JSON Schema/Protobuf payloads with fingerprint
+   deduplication. `get_schema_evolution(asset_id)` returns full version history with diffs and
+   compatibility verdicts.
+
+3. **Column-Level Lineage Capture** — `MetaColumnLineageRecord` with `source_column`,
+   `target_column`, `transformation_expr`, and `lineage_type`. `capture_column_lineage(...)`
+   enforces parent asset lineage before accepting column edges. `get_column_impact(asset_id,
+   column_name)` traverses downstream column graph; essential for GDPR erasure scope
+   calculations.
+
+4. **Pluggable Policy Engine** — `PolicyRegistry.register(rule_id, fn, priority)` with
+   `@policy_rule` decorator. Policies receive a typed `PolicyContext` dataclass. Dry-run mode
+   returns matched rules and projected decision without side effects.
+
+5. **Event-Sourced Audit Log** — CloudEvents 1.0-compatible append-only log persisted to
+   PostgreSQL insert-only table. `replay_state(asset_id, at: datetime)` rebuilds asset record
+   from audit log for regulatory time-travel queries.
+
+6. **Data Contract Validation** — `MetaDataContractRecord` captures SLO terms (freshness SLA,
+   row-count bounds, schema commitments). `evaluate_contract(asset_id)` detects violations on
+   each quality assessment and emits `ContractViolationEvent`.
+
+7. **Metadata Quality Dimensions Engine** — Typed `QualityDimensions` Pydantic model
+   (completeness, accuracy, consistency, validity, uniqueness, timeliness, lineage_coverage,
+   classification_coverage) with ISO/IEC 25012-aligned default weights. `trend_quality(asset_id,
+   window_days)` returns per-dimension moving averages.
+
+8. **Semantic Business Glossary with Term Relationships** — `link_glossary_terms(source_term_id,
+   target_term_id, relationship_type)` supporting `IS_A`, `RELATED_TO`, `SYNONYM_OF`,
+   `ABBREVIATION_OF`, and `DEPRECATED_BY` edges. `expand_term(term_id)` returns transitive
+   synonym closure for search expansion.
+
+9. **Sensitivity-Aware Data Masking Profiles** — `MetaMaskingProfileRecord` attaching strategies
+   (NULLIFY, TOKENIZE, HASH, MASK, GENERALIZE, SUPPRESS) to classification labels.
+   `get_masking_profile_for_asset(asset_id)` resolves effective strategy by walking the
+   classification chain; propagates automatically to downstream lineage copies.
+
+10. **Federated Catalog Search** — `MetaSharingAgreementRecord` governs inter-tenant sharing.
+    `federated_search(query, requesting_tenant, target_tenants)` issues parallel searches and
+    filters results through the sharing agreement registry.
+
+11. **Automated Freshness Monitoring** — `register_freshness_sla(asset_id, max_age_hours,
+    severity)` stores SLA. `async run_freshness_sweep(tenant_id)` downgrades quality scores for
+    stale assets and emits `freshness.violated` audit events, moving violated assets to
+    `pending_review`.
+
+12. **OpenTelemetry Observability Middleware** — `@traced_operation(span_name)` decorator creates
+    spans with tenant_id and asset_id attributes, exports to OTLP-compatible backends
+    (Jaeger, Grafana Tempo). `MetricsRecorder` tracks latency histograms and error counters.
+    Zero overhead when `OTEL_EXPORTER_OTLP_ENDPOINT` is unset.
+
+13. **Replication-Aware Duplicate Detection** — Pre-registration check on `(tenant_id,
+    business_key, source_system)`. Configurable merge strategies: FAIL, MERGE_LATEST,
+    DEDUPLICATE_LINEAGE. `MERGE_LATEST` updates mutable fields and links the new registration
+    as a provenance event.
+
+14. **Compliance Report Generator** — `generate_compliance_report(tenant_id, regulation, as_of)`
+    maps GDPR Articles 13-30, HIPAA § 164.514, and PCI DSS Requirement 3 controls to asset
+    evidence, certification status, and lineage coverage. `ComplianceMapper` registry is
+    extensible by regulation code.
+
+15. **LLM-Assisted Metadata Enrichment** — `enrich_asset_metadata(asset_id, enrichment_type)`
+    calls a locally hosted Ollama model (configured via `OLLAMA_BASE_URL`) to generate
+    descriptions, suggest glossary links, propose tags, and draft quality rules. Every
+    LLM-generated suggestion requires `contribution_disclosed=True`, carries a `catalog_agent`
+    provenance record, and passes a human review gate before being applied.
+
+## New Methods
+
+### Async batch registration
+
+```python
+import asyncio
+from capabilities.common.meta.service import MetaService
+
+service = MetaService()
+
+# Register multiple assets concurrently — fan-out is asyncio.gather-safe
+assets = await service.batch_register_assets([
+    {"tenant_id": "tenant-a", "asset_id": "db.orders", "asset_type": "table",
+     "name": "orders", "business_key": "warehouse.public.orders",
+     "source_system": "warehouse", "owner": "ops-team"},
+    {"tenant_id": "tenant-a", "asset_id": "db.customers", "asset_type": "table",
+     "name": "customers", "business_key": "warehouse.public.customers",
+     "source_system": "warehouse", "owner": "ops-team"},
+])
+```
+
+### Schema version registration and evolution
+
+```python
+# Register a schema version with backward compatibility enforcement
+version = service.register_schema_version(
+    asset_id="db.orders",
+    schema_json='{"type":"record","fields":[{"name":"id","type":"int"}]}',
+    format="avro",
+    compatibility_mode="BACKWARD",
+)
+
+# Retrieve full version history with diffs and compatibility verdicts
+history = service.get_schema_evolution(asset_id="db.orders")
+# [{"version": 1, "fingerprint": "...", "compatibility": "BACKWARD", "diff": [...]}]
+```
+
+### Column-level lineage capture
+
+```python
+# Capture a column-level derivation with transformation evidence
+col_edge = service.capture_column_lineage(
+    tenant_id="tenant-a",
+    source_asset_id="db.orders",
+    source_column="customer_email",
+    target_asset_id="mart.order_summary",
+    target_column="masked_email",
+    transformation_expr="SHA256(customer_email)",
+    lineage_type="derived",
+)
+
+# Downstream impact analysis at column level (e.g., GDPR erasure scope)
+impact = service.get_column_impact(
+    asset_id="db.orders",
+    column_name="customer_email",
+)
+```
+
+### Compliance report generation
+
+```python
+# Generate a GDPR compliance report as of a specific date
+report = service.generate_compliance_report(
+    tenant_id="tenant-a",
+    regulation="GDPR",
+    as_of="2026-01-01T00:00:00Z",
+)
+# report["controls"]["Article_30"]["status"] == "compliant"
+# report["controls"]["Article_17"]["evidence"]["lineage_coverage"] == 0.94
+```
+
+### LLM-assisted metadata enrichment
+
+```python
+# Enrich asset description using locally hosted Ollama (no data leaves the cluster)
+suggestion = service.enrich_asset_metadata(
+    asset_id="db.customers",
+    enrichment_type="description",  # or "tags", "glossary_links", "quality_rules", "sensitivity_hints"
+)
+# suggestion.status == "pending_review"   — human gate required before application
+# suggestion.confidence == 0.87
+# suggestion.provenance["catalog_agent_id"] == "ollama-enrichment-agent"
 ```
 
 ## Generated UI Surfaces
@@ -242,6 +448,10 @@ META evaluates deterministic rules before lifecycle decisions. Key guardrails:
 - Privileged catalog-agent roles require human approval evidence or pending
   review.
 - Lifecycle batch processing must use Bytewax.
+- Data contracts are evaluated on every quality assessment; violations emit
+  audit events and move assets to `pending_review`.
+- LLM-enrichment suggestions require `contribution_disclosed=True` and a
+  human approval gate before being applied to the asset record.
 
 ## Adapter Boundaries
 
@@ -255,6 +465,8 @@ This packet defines the executable control plane. Production adapters may supply
 - Bytewax lifecycle streams for metadata and catalog-agent events.
 - APG audit, auth, MDM, ETL, connector, monitoring, and notification
   integration.
+- OTLP trace/metric export (when `OTEL_EXPORTER_OTLP_ENDPOINT` is set).
+- Ollama LLM enrichment (when `OLLAMA_BASE_URL` is set).
 
 Adapters must not bypass `capability_contract.py` decisions.
 

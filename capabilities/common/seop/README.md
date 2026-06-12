@@ -176,3 +176,25 @@ Battery-conscious package verification:
 ```
 
 Run broader repository checks only when battery and time allow.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** SEOP — World-Class Improvement Proposals
+- **I2.** Full async surface
+- **I3.** Persistent backing store via async SQLAlchemy
+- **I4.** Structured event publishing via CloudEvents
+- **I5.** MITRE ATT&CK enrichment pipeline
+- **I6.** Correlation engine for multi-signal detections
+- **I7.** Risk-scored incident prioritisation
+- **I8.** Automated playbook selection
+- **I9.** SLA tracking and breach alerting
+- **I10.** Threat-intel feed deduplication and expiry
+- **I11.** Compliance control mapping service
+- **I12.** Analyst workload balancing
+- **I13.** Detection quality metrics and false-positive feedback loop
+- **I14.** Automated evidence collection harness
+- **I15.** Zero-trust posture continuous monitoring
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

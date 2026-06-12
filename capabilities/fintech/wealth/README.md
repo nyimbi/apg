@@ -129,3 +129,25 @@ Events emitted to the fintech event stream via Bytewax.
 - Wealth Management uses `fin_rpt` for regulatory reporting (MiFID II suitability reports, performance reports) — these are distinct from the internal performance records stored in the capability
 - The `rebalance_allocation_total` rule requires exact 100% equality; the service layer should normalize allocations before setting the `allocation_totals_100` flag to avoid floating-point rounding failures
 - `switch` order side covers switching between funds within the same portfolio — it is semantically different from a sell+buy pair; it enables in-specie transfers without cash settlement
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Wealth Management — World-Class Improvements
+- **I2.** Monte Carlo Goal-Probability Engine
+- **I3.** Real-Time Portfolio Valuation via Market-Data Adapter
+- **I4.** Multi-Currency FX Exposure Reporting
+- **I5.** Proper Risk Metrics: VaR, CVaR, Max Drawdown
+- **I6.** Estate Planning Module
+- **I7.** Charitable Giving / Philanthropy Advisory
+- **I8.** Liquidity Waterfall Analysis
+- **I9.** Alternative Investments Tracking (PE, VC, Real Assets)
+- **I10.** Automated Regulatory Report Generation (CMA, IRS FATCA, CRS)
+- **I11.** Conflict-of-Interest Detection and Advisor Suitability Firewall
+- **I12.** Goal-Based Contribution Optimiser
+- **I13.** Comprehensive KPI Dashboard with Trend Analytics
+- **I14.** Persistent Event Sourcing / Audit Replay
+- **I15.** Client Portal Data API (GraphQL / REST Aggregation Layer)
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

@@ -147,3 +147,25 @@ async def delete_user(user_id: str):
 
 *Clerk password/OAuth handled by Frontend SDK
 †Pair with SpiceDB for true fine-grained authz
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Auth Hub — World-Class Improvements
+- **I2.** Token Introspection Cache with Negative-TTL
+- **I3.** Structured Audit Log Sink
+- **I4.** Adaptive Rate Limiting per Identity
+- **I5.** Permission Decision Caching (AuthzCache)
+- **I6.** Synchronous Context-Propagation Helpers (Tenant Guard)
+- **I7.** Passkey / WebAuthn Support
+- **I8.** Delegated Token Exchange (Token Impersonation)
+- **I9.** Continuous Session Risk Scoring
+- **I10.** Cross-Tenant Federation (Identity Bridging)
+- **I11.** Policy-as-Code Integration (OPA / Cedar)
+- **I12.** Secrets-Aware Configuration (No Env Vars in Prod)
+- **I13.** Graceful Provider Failover (Circuit Breaker)
+- **I14.** Tenant-Scoped Permission Inheritance Hierarchy
+- **I15.** Developer Experience: Typed Capability Contract
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

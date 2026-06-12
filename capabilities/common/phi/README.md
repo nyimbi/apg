@@ -121,3 +121,25 @@ async for clean_row in svc.redact_stream(source(), batch_size=100):
 ## License
 
 © 2025 Datacraft | nyimbi@gmail.com | www.datacraft.co.ke
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** PHI Classifier — 15 World-Class Improvements
+- **I2.** Probabilistic Confidence Scoring (Multi-Signal Bayesian)
+- **I3.** NLP-Backed Free-Text PHI Extraction (NER via Ollama)
+- **I4.** Streaming Redaction Pipeline
+- **I5.** Structured Audit Ledger (Append-Only Event Store)
+- **I6.** Field-Level Encryption (Format-Preserving AES-FF3)
+- **I7.** Differential Privacy Noise Injection
+- **I8.** De-identification Quality Metrics (Re-identification Risk Score)
+- **I9.** FHIR R4 Resource PHI Extractor
+- **I10.** Schema-Aware Column Classifier (SQL/Parquet/Arrow)
+- **I11.** Redaction Policy DSL
+- **I12.** Provenance-Preserving Reversible Pseudonymisation
+- **I13.** Cross-Tenant PHI Linkage Detection
+- **I14.** HIPAA Minimum-Necessary OPA Policy Export
+- **I15.** Real-Time PHI Velocity Alerting
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

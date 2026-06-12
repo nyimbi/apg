@@ -158,3 +158,27 @@ behind the AICR adapter boundary.
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/anom --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/anom --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Adaptive Percentile Baselines with Welford Online Updates** [Statistical Rigor]
+- **I2. Ensemble Scoring: Z-Score + IQR + Modified Z (Median Absolute Deviation)** [Detection Quality]
+- **I3. Exponentially Weighted Moving Average (EWMA) Control Charts** [Drift Detection]
+- **I4. Financial-Grade Monetary Anomaly Detection with Decimal Arithmetic** [Domain Safety]
+- **I5. Tenant-Isolated Baseline Versioning with Rollback** [Governance / Compliance]
+- **I6. Multi-Tenant Signal Aggregation and Cross-Tenant Noise Floor** [Scalability / Multi-Tenancy]
+- **I7. Streaming Micro-Batch Windowed Aggregation (Tumbling + Sliding Windows)** [Streaming Performance]
+- **I8. Explainable Anomaly Attribution with SHAP-Style Feature Contributions** [Explainability / AI Governance]
+- **I9. Adaptive Alert Suppression with Backoff and Reinstatement** [Alert Quality / Operations]
+- **I10. Contextual Seasonality-Aware Scoring (Hour-of-Day, Day-of-Week)** [False Positive Reduction]
+- **I11. Causal Graph Anomaly Propagation (Root Cause Isolation)** [Root Cause Analysis]
+- **I12. Live Model Retraining Triggers via Feedback Loop** [Model Lifecycle / MLOps]
+- **I13. Anomaly Signal Deduplication with Similarity Hashing** [Noise Reduction / Operational Excellence]
+- **I14. Probabilistic Anomaly Scoring with Bayesian Posterior Updates** [Statistical Sophistication]
+- **I15. Federated Anomaly Baseline Sharing Across APG Tenant Groups** [Platform Composability]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

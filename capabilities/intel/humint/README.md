@@ -162,3 +162,25 @@ communications, payment handling, physical security, identity protection
 infrastructure, partner case systems, storage backends, GraphRAG projections,
 dissemination delivery, and durable Bytewax topology execution stay behind
 adapters.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** HUMINT Capability – World-Class Improvements
+- **I2.** Persistent Store Integration via Async SQLAlchemy
+- **I3.** Event-Sourced Audit Trail via Bytewax
+- **I4.** Source Network Graph via GraphRAG / NetworkX
+- **I5.** Temporal Credibility Decay Model
+- **I6.** Multi-Factor Source Vetting with Configurable Thresholds
+- **I7.** Automated Deconfliction with Cross-Tenant Awareness
+- **I8.** LLM-Powered Debriefing Summarisation via
+- **I9.** Encrypted Source Identity Vault
+- **I10.** Probabilistic False-Flag Scoring with Bayesian Updates
+- **I11.** Real-Time Source Welfare Monitoring with Alert Thresholds
+- **I12.** Classification Boundary Enforcement at API Layer
+- **I13.** Semantic Search over Intel Collections via RAG
+- **I14.** Automated Collection Requirements Prioritisation with Gap Feedback Loop
+- **I15.** Handler–Source Assignment Optimisation
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

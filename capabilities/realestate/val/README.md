@@ -92,6 +92,70 @@ Full-cycle property valuation: comparable sales database, DCF model builder with
 - Mass appraisal runs return a results list even in simulation mode
 - Yield calculation handles zero purchase price via explicit ValueError
 
+## World-Class Enhancements (v2.0)
+
+1. **Hedonic Regression** — OLS model on property attributes (area, age, location, bedrooms, condition) vs comparable transactions; returns R², coefficients, prediction interval (IAAO Std 6).
+2. **AVM with Confidence Bands** — IDW spatial weighting + time-decay adjustments; returns `value_low/central/high` and `confidence` tier for downstream gating (Basel III).
+3. **IRR via Newton-Raphson Bisection** — `_compute_irr` bisection solver 0–100%, 1 bp convergence; populates `irr` on `DcfModelResponse` (RICS VPS 4).
+4. **DCF Sensitivity Grid** — sweeps `discount_rate` and `exit_yield` ±150 bps in 50 bp steps; 2-D capital value grid with ±1σ recommended range.
+5. **Residual Land Value** — GDV − build costs − finance − developer profit − transaction costs = residual land value (RICS VPS 12).
+6. **Reinstatement Cost Assessment** — BCIS elemental rates per property type/region; per-element breakdown with professional fees and debris removal for insurance sum insured.
+7. **Comparable Adjustment Matrix** — paired sales grid: time, size, condition (RICS 1–3), location adjustments; returns adjusted price, narrative, and `reliability_score` 0–100.
+8. **Portfolio Variance Report** — like-for-like capital growth with acquisition/disposal split; IFRS 13 / IAS 40 disclosure format.
+9. **HABU Analysis** — ranks 3–5 alternative uses by NPV; attaches `valuation_uncertainty` flag when uses are within ±20% (RICS VPS 3).
+10. **Market Rent Review Modelling** — upwards-only, upwards/downwards, CPI-linked, and fixed-step clauses; returns revised rent, uplift %, next review date, and IFRS 16 trigger.
+11. **Structured Report Generation** — JSON/PDF report with comparable evidence table, sensitivity analysis, RICS Red Book disclaimer, valuer signature, and immutable hash.
+12. **Bulk Comparable Import** — batch ingest with fuzzy dedup on (address, date, price ±2%, ±30 days); returns `inserted/skipped_duplicate/validation_errors`.
+13. **Equivalent Yield Calculator** — term/reversion dual-rate annuity IRR; returns NIY, equivalent yield, reversionary yield, and running yield in one call.
+14. **Revaluation Trigger Detector** — scans roll for age, active planning permissions, >10% rent change, and IFRS reporting date proximity; returns prioritised list with urgency scores.
+15. **Market Data Integration Adapter** — `MarketDataAdapter` ABC with pluggable connectors (HMLR, MSCI/IPD, CoStar); normalises to `ComparableCreate` and calls `bulk_import_comparables()`.
+
+## New Methods
+
+### `run_avm` — Confidence-graded automated valuation
+
+```python
+result = await svc.run_avm(
+    tenant_id="t1",
+    property_id="prop_123",
+    floor_area_sqm=Decimal("120"),
+    location_lat=Decimal("-1.286"),
+    location_lng=Decimal("36.817"),
+    bedrooms=3,
+    property_type="residential",
+)
+# result.value_central, result.value_low, result.value_high
+# result.confidence  -> "very_high" | "high" | "medium" | "low"
+# result.comparables_used -> int
+```
+
+### `dcf_sensitivity_analysis` — Investment committee stress-test grid
+
+```python
+grid = await svc.dcf_sensitivity_analysis(
+    tenant_id="t1",
+    valuation_id="val_456",
+    base_discount_rate=Decimal("0.08"),
+    base_exit_yield=Decimal("0.055"),
+    annual_rent=Decimal("120000"),
+    holding_period_years=10,
+)
+# grid.capital_value_grid  -> dict keyed by (discount_rate, exit_yield) -> Decimal
+# grid.recommended_range_low, grid.recommended_range_high -> ±1σ bounds
+```
+
+### `detect_revaluation_triggers` — Automated revaluation queue
+
+```python
+triggers = await svc.detect_revaluation_triggers(
+    tenant_id="t1",
+    max_age_months=24,
+    ifrs_reporting_days_ahead=30,
+)
+# triggers -> list[RevaluationTrigger]
+# each: .property_id, .trigger_reason, .urgency_score (0-100), .last_valuation_date
+```
+
 ## New in This Release
 
 | Method | Description |

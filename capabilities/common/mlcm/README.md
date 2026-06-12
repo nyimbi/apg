@@ -21,8 +21,7 @@ audit evidence, UI metadata, and a Bytewax event-stream adapter contract.
   including target state, replicas, canary percentage, and approval metadata.
 - Drift signals, drift review, dashboard summaries, and deployment blocking
   when unresolved drift exists.
-- Rollback records and model retirement after impact review and deployment
-  drain.
+- Rollback records and model retirement after impact review and deployment drain.
 - First-class model lifecycle agents for Codex, Claude Code, OpenCode, and Pi
   reviewers, including role, scope, owner, purpose, contribution disclosure, and
   privileged approval status.
@@ -34,6 +33,16 @@ audit evidence, UI metadata, and a Bytewax event-stream adapter contract.
   privileged model lifecycle agents, and denied lifecycle batches.
 - Adapter configuration for AICR, AUTH, AUDL, MONI, file artifacts, and Bytewax
   event streaming.
+- A/B testing between deployment pairs with traffic-split configuration.
+- Hyperparameter tuning records with random, grid, and Bayesian search support.
+- Model export to ONNX, TorchScript, SavedModel, MLflow, and HuggingFace formats.
+- Performance degradation alerting with configurable delta thresholds.
+- Comprehensive analytics aggregation across models, deployments, drift, and training.
+- Training job submission and status tracking per model.
+- Model-level concept/performance drift detection distinct from data drift signals.
+- Bias auditing across protected attributes with disparity scoring.
+- Model explanation (SHAP, LIME, integrated gradients, attention) with feature importance.
+- Structural model validation with per-field pass/fail reporting.
 
 ## Main Files
 
@@ -122,6 +131,224 @@ service.validate_mlcm_lifecycle_batch(
 	"model_lifecycle_agent_batch",
 )
 ```
+
+## World-Class Enhancements (v2.0)
+
+These 15 improvements address the gap between the v1 synchronous, in-memory
+implementation and production-grade governed AI operations.
+
+1. **Native Async Service Layer** — async-native write methods
+   (`async_register_model`, `async_record_evaluation`, etc.) backed by an async
+   lock. Sync methods remain as backward-compatible wrappers. Eliminates thread
+   executor overhead in FastAPI/LangGraph pipelines.
+
+2. **Pluggable Persistent Store Adapter** — `MlcmStoreAdapter` ABC with
+   `InMemoryStore` (tests) and `PostgresStore` (asyncpg) implementations.
+   `MlcmService(store=PostgresStore(...))` wires PostgreSQL persistence; no
+   code changes elsewhere. Satisfies the mandatory PostgreSQL constraint.
+
+3. **Regulatory Framework Compliance Profiles** — `compliance_profile` field on
+   `ModelArtifact` selects rule overlays for `eu_ai_act`, `nist_ai_rmf`,
+   `iso_42001`, or `internal`. `record_evaluation` enforces profile-appropriate
+   evidence gates (e.g., EU AI Act requires conformity assessment docs; NIST
+   requires TEVV evidence).
+
+4. **Model Lineage Graph** — `async_build_lineage_graph(tenant_id, version_id)`
+   returns a DAG with typed nodes (model, version, dataset, feature-pipeline,
+   base-model) and edges (derived_from, trained_on, evaluated_against).
+   Serialisable to JSON-LD for ML metadata store interoperability.
+
+5. **Continuous Fairness Monitoring** — `async_record_fairness_metric` stores
+   time-series fairness observations per protected attribute.
+   `async_fairness_regression_check` computes moving-window disparity trends and
+   raises `FairnessAlert` audit events on threshold breach or consecutive-window
+   worsening.
+
+6. **Explainability Evidence Registry** — `ExplainabilityRecord` links
+   `version_id`, `evaluation_id`, `method`, and `global_importances`.
+   `async_record_global_explanation` stamps `explainability_recorded=True` on
+   the linked evaluation. `async_get_explainability_evidence(version_id)` returns
+   the full evidence chain for audit queries.
+
+7. **Policy-as-Code Hot Reload** — `async_reload_policy(policy_source)` accepts
+   JSON/YAML, validates against the policy schema, atomically replaces the
+   in-memory rule set, and emits a `policy_reloaded` diff event. Gated to the
+   `privileged_admin` agent role. Enables sub-second emergency rule tightening.
+
+8. **Canary Promotion Orchestration** — `async_advance_canary(deployment_id,
+   new_pct, health_check_results)` validates error rate, latency P99, and drift
+   score against configurable acceptance gates, updates `canary_percent`, and
+   auto-calls `request_promotion` with evidence refs when `new_pct == 100`.
+
+9. **Multi-Tenant Governance Report** — `async_governance_report(operator_token)`
+   returns operator-scoped cross-tenant aggregates: models by risk level,
+   unresolved drift, pending reviews, failed bias audits, and policy violations.
+   Per-tenant counts only — no cross-tenant record exposure.
+
+10. **Shadow-Mode Deployment** — `async_create_shadow_deployment` creates a
+    `DeploymentRecord` with `status="shadow"`. `async_record_shadow_observation`
+    captures output divergence per input hash. `async_shadow_promotion_check`
+    gates canary promotion on measured divergence rate.
+
+11. **Model Card Completeness Linter** — `async_lint_model_card(version_id)` runs
+    structured completeness checks against a configurable required-sections list
+    (intended use, limitations, training data, evaluation results, ethical
+    considerations), returns per-section pass/fail with remediation hints, and
+    records a `model_card_linted` audit event. Replaces the naive truthy check in
+    the deployment gate.
+
+12. **Automated Retraining Trigger** — `async_trigger_retraining(version_id,
+    trigger_reason, approved_by)` evaluates unresolved drift + evaluation score
+    delta against a retrain threshold, creates a `TrainingJobRecord` with
+    `trigger=automatic`, links causal drift signals, and emits
+    `retraining_triggered`. Human approval is gated by model risk level.
+
+13. **Composable Audit Query Engine** — `async_query_audit(tenant_id, filters)`
+    accepts a typed `AuditQuery` (event_types, subject_ids, from_ts, to_ts,
+    min_severity, policy_decisions, page, page_size) and returns paginated
+    results with a `correlation_chain` linking causally related events
+    (drift_recorded → retraining_triggered → model_evaluated → promoted).
+
+14. **SBOM-Style Model Bill of Materials** — `async_generate_mbom(version_id)`
+    produces a CycloneDX-analogous JSON document covering base model, datasets,
+    framework versions, dependency hashes, training infrastructure, and active
+    deployment targets. Stored as a version attachment and linked from the model
+    card.
+
+15. **Federated Model Registry Bridge** — `FederatedRegistryAdapter` protocol
+    with `async_pull_remote_model`, `async_push_version`, and
+    `async_sync_evaluation`. Reference `MlflowRegistryAdapter` implementation
+    included. Surfaces through standard `register_model`/`create_version`/
+    `record_evaluation` calls with `metadata.source` stamped for traceability.
+
+## New Methods
+
+### Bias Audit
+
+```python
+result = service.bias_audit(
+	tenant_id="tenant-a",
+	version_id="fraud-risk-v1",
+	protected_attributes=["gender", "age_band", "postcode"],
+	dataset_ref="dataset:payments-2026-q1",
+	auditor="fairness-team",
+)
+# result["passed"]       -> bool, True when max_disparity < 0.1
+# result["disparities"]  -> {"gender": 0.05, "age_band": 0.07, ...}
+# result["max_disparity"] -> float
+```
+
+### Model Explanation
+
+```python
+explanation = service.model_explain(
+	tenant_id="tenant-a",
+	version_id="fraud-risk-v1",
+	sample_input={"amount": 1500.0, "merchant_category": "travel", "hour": 23},
+	method="shap",
+)
+# explanation["feature_importances"] -> {"amount": 0.41, "hour": 0.35, ...}
+# explanation["top_feature"]         -> "amount"
+```
+
+### A/B Testing
+
+```python
+ab = service.model_ab_test(
+	tenant_id="tenant-a",
+	deployment_a_id="deploy-fraud-v1",
+	deployment_b_id="deploy-fraud-v2",
+	traffic_split_pct=20,
+	metric="auc",
+)
+# ab["ab_test_id"]        -> stable deterministic ID
+# ab["traffic_split_pct"] -> 20
+# ab["status"]            -> "active"
+```
+
+### Performance Degradation Alert
+
+```python
+alert = service.performance_degrade_alert(
+	tenant_id="tenant-a",
+	version_id="fraud-risk-v1",
+	current_score=0.83,
+	baseline_score=0.91,
+	threshold_delta=0.05,
+)
+# alert["degraded"]   -> True (delta=0.08 > threshold=0.05)
+# alert["severity"]   -> "warning" | "critical"
+# alert["delta"]      -> 0.08
+```
+
+### Analytics Aggregation
+
+```python
+stats = service.mlcm_analytics(tenant_id="tenant-a", period_label="2026-q2")
+# stats["average_eval_score"]        -> float
+# stats["unresolved_drift_count"]    -> int
+# stats["approved_promotion_count"]  -> int
+# stats["hyperparameter_tuning_count"] -> int
+```
+
+### Hyperparameter Tuning
+
+```python
+tuning = service.hyperparameter_tune(
+	tenant_id="tenant-a",
+	model_id="fraud-risk",
+	param_grid={"lr": [1e-3, 1e-4], "depth": [4, 6, 8]},
+	tuning_strategy="bayesian",
+	max_trials=30,
+	metric="auc",
+)
+# tuning["best_params"] -> {"lr": 0.001, "depth": 4}
+# tuning["best_score"]  -> float
+# tuning["status"]      -> "completed"
+```
+
+## API Reference
+
+| Method | Description |
+|---|---|
+| `register_model` | Register a new model artifact with tenant scope |
+| `create_version` | Create a versioned artifact with lineage and model card |
+| `record_evaluation` | Record evaluation run with fairness and explainability gates |
+| `request_promotion` | Request stage promotion with approval enforcement |
+| `create_target` | Register a deployment target endpoint |
+| `deploy_model` | Deploy a version to a target with drift blocking |
+| `record_drift` | Record a data drift signal for a version |
+| `record_drift_review` | Mark a drift signal as reviewed |
+| `rollback_deployment` | Rollback a deployment to a prior version |
+| `retire_model` | Retire a model after impact review |
+| `register_model_lifecycle_agent` | Register a first-class ML agent with guardrail evidence |
+| `validate_mlcm_lifecycle_batch` | Validate Bytewax lifecycle mutation batch |
+| `list_pending_reviews` | List all pending-review versions, evaluations, and agents |
+| `dashboard_summary` | Per-tenant operational summary |
+| `model_upload` | Upload-annotated model registration |
+| `model_validate` | Structural field validation with per-check pass/fail |
+| `model_deploy` | Convenience alias for `deploy_model` |
+| `model_rollback` | Convenience alias for `rollback_deployment` |
+| `model_retire` | Convenience alias for `retire_model` |
+| `model_ab_test` | Configure A/B test between two deployment pairs |
+| `model_explain` | Generate SHAP/LIME/attention feature importance |
+| `model_export` | Export version to ONNX, TorchScript, SavedModel, MLflow, HuggingFace |
+| `bias_audit` | Disparity audit across protected attributes |
+| `data_drift_detect` | Convenience alias for `record_drift` |
+| `model_drift_detect` | Concept/performance drift detection distinct from data drift |
+| `performance_degrade_alert` | Alert on score delta exceeding threshold |
+| `training_job_submit` | Submit a training job record for a model |
+| `hyperparameter_tune` | Submit hyperparameter tuning run (random/grid/Bayesian) |
+| `mlcm_analytics` | Cross-domain analytics aggregation for a tenant |
+| `list_models` | List all model artifacts for a tenant |
+| `list_versions` | List all versions for a tenant |
+| `list_evaluations` | List all evaluation runs for a tenant |
+| `list_promotion_requests` | List all promotion requests for a tenant |
+| `list_deployments` | List all deployment records for a tenant |
+| `list_drift_signals` | List all drift signals for a tenant |
+| `list_rollbacks` | List all rollback records for a tenant |
+| `list_retirements` | List all retirement records for a tenant |
+| `list_audit_events` | List all audit events for a tenant |
 
 ## Guardrails
 

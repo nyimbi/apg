@@ -220,3 +220,27 @@ Events emitted to the `apg.crm.adv.lifecycle` stream via Bytewax+NATS. Stream ke
 - **`uuid_extensions` shim needed**: `models.py` imports `from uuid_extensions import uuid7str`. The `uuid_extensions` package is not on PyPI; replace with the project-local shim wrapping `uuid6.uuid7`. See root `CLAUDE.md` for the canonical shim location.
 - **Supported agent runtimes**: `codex`, `claude_code`, `opencode`, `pi`. Adding a new runtime requires updating `SUPPORTED_CRM_AGENT_RUNTIMES` in `capability_contract.py` and redeploying the contract; the rule `crm_agent_runtime_supported` reads from this list at evaluation time.
 - **Theme tokens**: The `crm_adv_control` theme uses compact density. UI components map entity types to specific visual primitives (score-lanes for leads, stage-board for pipeline, forecast-grid for analytics) — override these in `THEME["components"]` per tenant as needed.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Conversational AI Sales Copilot** [AI/Automation]
+- **I2. Real-Time Deal Velocity Scoring with NATS-Backed Streaming** [Streaming Analytics]
+- **I3. CPQ — AI-Assisted Product Configuration Engine** [CPQ / Revenue Operations]
+- **I4. 360-Degree Customer View with Graph Relationship Traversal** [Customer Intelligence]
+- **I5. Predictive Next-Best-Action Engine** [AI/Recommendation]
+- **I6. Revenue Intelligence with NATS Event Sourcing** [Revenue Operations]
+- **I7. Automated Customer Journey Orchestration** [Marketing Automation / Journey Management]
+- **I8. Intelligent Account-Based Marketing (ABM) Targeting** [Marketing Intelligence]
+- **I9. Conversation Intelligence and Call Analytics** [Sales Effectiveness]
+- **I10. Dynamic Pricing Intelligence** [CPQ / Pricing]
+- **I11. Multi-Touch Attribution Modelling** [Marketing Analytics]
+- **I12. Sales Territory Optimisation via AI** [Territory Management]
+- **I13. Proactive Deal Risk Alerting via NATS** [Pipeline Risk Management]
+- **I14. Automated Onboarding and Success Playbooks** [Customer Success]
+- **I15. Federated CRM Data Mesh with Privacy-Preserving Sync** [Data Architecture / Privacy]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

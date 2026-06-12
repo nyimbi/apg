@@ -598,3 +598,27 @@ debug_events = await service.query_audit_logs(debug_filter)
 ---
 
 **Next Steps**: After implementing the Audit Logging capability, proceed with [Multi-Tenancy (`mten`)](../mten/README.md) as defined in the development order plan.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Merkle-Tree Chain Hash with Batch Root Proofs** [Integrity / Cryptography]
+- **I2. Immutable PostgreSQL Append-Only Partition with Row-Level Security** [Storage / Multi-Tenancy]
+- **I3. Structured Log Budget with Backpressure Signalling** [Reliability / Flow Control]
+- **I4. Monetary Amount Auditing with Decimal Precision** [Fintech / Correctness]
+- **I5. Tenant-Scoped Saved Queries with Scheduled Re-Execution** [Compliance / Automation]
+- **I6. Cryptographically-Signed Evidence Packages (PKCS#7 / JWS)** [Legal / Non-Repudiation]
+- **I7. Behavioral Baseline + Statistical Anomaly Scoring** [Security / ML]
+- **I8. Cross-Capability Event Correlation via NATS JetStream** [Integration / Event-Driven]
+- **I9. Differential Privacy for Aggregate Compliance Reports** [Privacy / Analytics]
+- **I10. Webhook-Based Real-Time Alert Dispatch** [Alerting / Integration]
+- **I11. Immutable Cold Storage Tiering to S3-Compatible Object Store** [Cost / Compliance]
+- **I12. OpenTelemetry Trace Context Propagation** [Observability / Distributed Tracing]
+- **I13. Read-Model Projection Cache with TTL Invalidation** [Performance / CQRS]
+- **I14. Structured Audit Policy-as-Code with Rego / CEL Evaluation** [Governance / Policy]
+- **I15. Time-Locked Legal Hold with Court-Order Workflow** [Legal / Compliance]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

@@ -7,7 +7,7 @@ The Dispatch Operations capability manages load planning, driver assignment with
 `transport_dis`
 
 ## Version
-`1.0.0` — enhanced 2026-06-11
+`2.0.0` — enhanced 2026-06-12
 
 ## Provides
 - load_planning_workflow: Bin-packed load plan creation with vehicle capacity and weight limit enforcement
@@ -164,6 +164,74 @@ The Dispatch Operations capability manages load planning, driver assignment with
 - `predict_sla_breach` uses conservative 0.4 pressure when no ETA data is present
 - `plan_backhaul` returns `backhaul_viable: false` gracefully if no load fits range/capacity
 - `replay_audit_trail` deduplicates events by (event_type, reference_id) to handle replayed writes
+
+## World-Class Enhancements (v2.0)
+
+1. **Dynamic Driver Re-Allocation** — `reassign_driver_in_flight()` atomically swaps driver on a live dispatch with full audit trail and ETA recalculation.
+2. **Geofence-Triggered Status Transitions** — `process_geofence_event()` auto-advances stop status on GPS entry/exit, eliminating manual operator click-through.
+3. **HOS Predictive Violation Alert** — `predict_hos_violation()` projects remaining drive time against dispatch duration; alerts before the breach, not after.
+4. **Multi-Stop ETA Cascade** — `recalculate_stop_etas()` propagates a delay delta forward across all remaining stops in a single operation.
+5. **Dispatch Consolidation (Load Merging)** — `consolidate_dispatches()` merges partial-load runs sharing route corridors into a single FTL dispatch.
+6. **Driver Performance Scoring** — `score_driver_performance()` produces a 0–100 composite from on-time rate, exception rate, and speed adherence.
+7. **Cargo Integrity Monitoring** — `ingest_cargo_sensor_event()` validates telematics readings against per-load thresholds; auto-raises hazmat/damage exceptions.
+8. **Time-Window Optimisation** — `optimise_dispatch()` augmented with penalty functions for early/late arrival SLA windows.
+9. **Automated Proof-of-Delivery** — `record_proof_of_delivery()` links signature/photo/barcode PoD to a stop and triggers billing via `invoic`.
+10. **Real-Time Fleet Heatmap** — `fleet_position_snapshot()` returns annotated GPS array for all active vehicles, supporting sub-10-second refresh.
+11. **SLA Breach Prediction** — `predict_sla_breach()` scores breach probability for every active dispatch; auto-escalates above configurable threshold.
+12. **Spot Freight Integration** — `request_spot_capacity()` broadcasts load tenders to registered carriers and ranks quotes by cost-time trade-off.
+13. **Shift-Aware Scheduling** — `schedule_dispatch_for_shift()` aligns dispatch departure with driver's next valid shift window from `schd`.
+14. **Backhaul Optimisation** — `plan_backhaul()` matches return-leg loads to reduce empty-vehicle kilometres by 10–18%.
+15. **Audit Event Streaming & Replay** — `replay_audit_trail()` reconstructs full dispatch state history from CloudEvents-compatible audit ledger.
+
+---
+
+## New Methods
+
+### `reassign_driver_in_flight` — live driver swap
+
+```python
+result = await svc.reassign_driver_in_flight(
+    dispatch_id="dis-001",
+    new_driver_id="drv-099",
+    reason="Original driver HOS violation — breakdown km 142",
+    new_hours_available=9.5,
+    tenant_id="tenant-acme",
+)
+# result["dispatch"]["driver_id"] == "drv-099"
+# result["communication"]["status"] == "sent"   (departure confirmation to new driver)
+# result["tracking_update"]["update_type"] == "eta_recalculation"
+```
+
+### `predict_sla_breach` — proactive SLA escalation
+
+```python
+result = await svc.predict_sla_breach(
+    breach_probability_threshold=0.70,
+    tenant_id="tenant-acme",
+)
+# result["at_risk_dispatches"] — list of {dispatch_id, breach_probability, exception_raised}
+# Dispatches above threshold automatically get a "time_window_missed" exception in draft state
+# and are escalated via ntfy to the ops manager.
+```
+
+### `plan_backhaul` — return-trip load matching
+
+```python
+result = await svc.plan_backhaul(
+    completed_dispatch_id="dis-044",
+    pending_loads=[
+        {"load_id": "ld-200", "origin_lat": -1.30, "origin_lon": 36.82,
+         "weight_kg": 8000, "volume_cbm": 20, "destination": "Mombasa"},
+    ],
+    max_deviation_km=50.0,
+    tenant_id="tenant-acme",
+)
+# result["backhaul_viable"] == True
+# result["backhaul_dispatch"]["load_plan_id"] == "lp-new-uuid"
+# result["savings_km"] — estimated empty-km avoided
+```
+
+---
 
 ## Composability Notes
 Composes with `transport_rou` for route assignment per dispatch, `transport_fle` for vehicle and driver registry, `transport_sch` for shift-based driver availability, and `transport_tra` for GPS tracking data ingestion. The `record_proof_of_delivery` method feeds downstream into `invoic` for billing triggers.

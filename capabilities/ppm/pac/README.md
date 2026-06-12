@@ -166,3 +166,66 @@ Project Accounting (pac) provides complete financial tracking for projects: cost
 - Downstream consumers can subscribe to `apg.ppm.pac.lifecycle` via Bytewax
 - `reconcile_with_external_ledger` integrates with ERP adapters (SAP, Xero, Sage)
 - `create_intercompany_recharge` pairs with `ppm_pac` instances across entity tenants
+
+## World-Class Enhancements (v2.0)
+
+1. **Real EVM with configurable progress sources** — `percent_complete` param replaces magic-constant PV/EV; derives PV from time-phased spend curve supplied by ppm_pbl.
+2. **Persistent store abstraction via repository pattern** — `ProjectAccountingRepository` protocol with `InMemoryRepo` and `PostgresRepo`; service becomes stateless and horizontally scalable.
+3. **Strict Pydantic v2 input validation** — All method boundaries use `model_validate`-able input models with `AfterValidator` constraints; free OpenAPI schema generation.
+4. **Idempotent operations via upsert semantics** — `upsert_account` returns `(record, created: bool)`; idempotency key on cost transactions eliminates at-least-once double-counting.
+5. **Cash flow forecasting from cost commitments** — `cash_flow_forecast` projects monthly inflow/outflow from open POs, remaining labour budget, and milestone invoice schedules.
+6. **Multi-currency with live rate conversion** — `convert_to_base` via pluggable `ExchangeRateProvider`; all aggregations normalise to base currency before summing.
+7. **Budget utilisation alerts with configurable thresholds** — `check_budget_thresholds(warn_pct, critical_pct)` emits structured `BudgetAlert` events as a post-write side effect on every cost recording.
+8. **Proper `ProjectAccount` model with `account_id` field** — Fixes `account.budget` AttributeError that silently returned `budget: 0.0` on all `budget_vs_actual` calls.
+9. **Period-aware revenue recognition with IFRS 15 / ASC 606 controls** — `PeriodCalendar` blocks recognition in closed periods; `reopen_period` requires two-approver sign-off.
+10. **Earned value trend history and forecasting** — `ev_trend_analysis` returns time-series CPI/SPI with trend direction (improving/degrading/stable) and forecast-at-completion confidence band.
+11. **Cost accruals for period-end close** — `post_accrual` creates time-bounded GRNI/labour accrual entries that auto-reverse in the next period with tracked status.
+12. **Intercompany cost recharging** — `create_intercompany_recharge` posts matched debit/credit entries across tenant-scoped accounts with transfer pricing markup and audit trail.
+13. **Automated variance root-cause classification** — `classify_variance` categorises overruns as scope_creep / rate_variance / volume_variance / timing_variance / true_overrun with supporting evidence.
+14. **Three-point cost estimation (PERT) for EAC** — `three_point_eac(optimistic_cpi, pessimistic_cpi)` returns `{p50, p80, p90, expected, std_dev}` risk-adjusted forecasts.
+15. **Reconciliation engine for external ledger sync** — `reconcile_with_external_ledger` matches ERP line items by period/cost_code/amount within tolerance; emits `reconciliation_complete` audit event.
+
+## New Methods
+
+### `cash_flow_forecast` — Period-by-period cash projection
+
+```python
+svc = ProjectAccountingService(tenant_id="acme", actor_id="controller")
+
+# After account and POs exist
+forecast = await svc.cash_flow_forecast(project_id="proj-001", periods=6)
+# Returns list of {period, inflow, outflow, net, cumulative}
+for row in forecast["periods"]:
+    print(f"{row['period']}: net={row['net']:,.0f}, cumulative={row['cumulative']:,.0f}")
+```
+
+### `ev_trend_analysis` — CPI/SPI trend across stored snapshots
+
+```python
+# Capture several EV snapshots across periods first
+await svc.earned_value_analysis("proj-001", "2026-Q1")
+await svc.earned_value_analysis("proj-001", "2026-Q2")
+
+trend = await svc.ev_trend_analysis(project_id="proj-001", periods=4)
+# trend["cpi_trend"] -> "degrading" | "improving" | "stable"
+# trend["eac_p80"] -> risk-adjusted EAC at 80th percentile
+print(f"CPI trend: {trend['cpi_trend']}, EAC P80: {trend['eac_p80']:,.0f}")
+```
+
+### `reconcile_with_external_ledger` — ERP ledger reconciliation
+
+```python
+# external_entries from Xero/SAP export
+external = [
+    {"period": "2026-05", "cost_code": "LABOR", "amount": 45000.00},
+    {"period": "2026-05", "cost_code": "MATERIALS", "amount": 12500.00},
+]
+
+result = await svc.reconcile_with_external_ledger(
+    project_id="proj-001",
+    external_entries=external,
+    tolerance_pct=0.5,
+)
+# result keys: matched, unmatched_internal, unmatched_external, total_variance
+print(f"Matched: {len(result['matched'])}, variance: {result['total_variance']:,.2f}")
+```

@@ -255,3 +255,25 @@ instances, tasks, approvals, exceptions, WFA agents, and audit events.
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/ckm/wfa --json
 ./.venv/bin/apg capabilities publish-plan capabilities/ckm/wfa --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: Workflow Automation (ckm_wfa)
+- **I2.** Temporal-Backed Durable Execution
+- **I3.** Streaming SLA Breach Detection via Bytewax
+- **I4.** BPMN 2.0 Schema Validation at Deploy Time
+- **I5.** Optimistic Concurrency Control on Task State Transitions
+- **I6.** Sub-Process and Call Activity Support
+- **I7.** Financial Transaction Integrity with Decimal and Two-Phase Commit
+- **I8.** Compensation Transactions (BPMN Compensation Events)
+- **I9.** AI-Assisted Bottleneck Detection with Causal Inference
+- **I10.** Multi-Tenancy Enforcement at the Database Query Layer
+- **I11.** Event-Driven Process Triggering via CloudEvents
+- **I12.** Process Version Migration with Activity Mapping
+- **I13.** Declarative Business Rules via DMN Decision Tables
+- **I14.** Parallel Approval Chains with Quorum and Veto
+- **I15.** Process Heat Map and Conformance Checking
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

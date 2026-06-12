@@ -103,3 +103,25 @@ Provides population health analytics, clinical outcomes measurement, readmission
 
 ## Composability Notes
 Composes naturally with `healthcare_emr` (patient records for cohort membership), `healthcare_lab` (lab result metrics), `healthcare_pha` (medication adherence metrics), and `healthcare_cli` (care plan adherence). Quality indicators feed directly into `healthcare_reg` for regulatory submissions.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Clinical Analytics — World-Class Improvement Plan
+- **I2.** Federated Cohort Computation with Privacy-Preserving Aggregation
+- **I3.** Streaming Real-Time Metric Ingestion via CDC
+- **I4.** Causal Inference for Intervention Effectiveness
+- **I5.** Adaptive Readmission Model with Concept Drift Detection
+- **I6.** Multi-Level Benchmarking with Percentile Ranking
+- **I7.** FHIR R4 Bidirectional Synchronisation
+- **I8.** Explainable AI (XAI) Prediction Outputs
+- **I9.** Automated HEDIS Measure Calculation
+- **I10.** Longitudinal Patient Timeline Reconstruction
+- **I11.** Anomaly Detection for Sentinel Events
+- **I12.** Population Stratification by Social Determinants of Health (SDOH)
+- **I13.** Automated Root-Cause Analysis for Below-Target QIs
+- **I14.** Encrypted Audit Trail with Tamper Evidence
+- **I15.** Multi-Horizon LOS Prediction Ensemble
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

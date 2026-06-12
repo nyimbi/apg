@@ -151,6 +151,67 @@ SIM and device data feeds `telecom_pro` for provisioning workflows.
 Segmentation output drives campaign targeting in `telecom_ana`.
 Dunning workflow emits events consumed by `telecom_bil`.
 
+## World-Class Enhancements (v2.0)
+
+All 15 improvements from `WORLD_CLASS_IMPROVEMENTS.md` — 9 implemented, 6 targeted:
+
+| # | Enhancement | Status |
+|---|-------------|--------|
+| 1 | **Customer 360 Unified Profile** — single-call assembly of all sub-entities | Implemented |
+| 2 | **SIM Swap with Fraud Safeguard** — 30-day cooling-off + auto fraud_report case | Implemented |
+| 3 | **SLA Breach Monitoring** — scans open cases, emits per-breach audit events | Implemented |
+| 4 | **Number Portability Request Workflow** — portability_request case + 5-day SLA | Targeted |
+| 5 | **Bulk Customer Import with Idempotency** — MSISDN dedup + dry_run mode | Implemented |
+| 6 | **Churn Probability Scoring Pipeline** — deterministic 0.0–1.0 score, 5 features | Implemented |
+| 7 | **GDPR / POPIA Right-to-Erasure** — PII pseudonymisation + 30-day compliance case | Implemented |
+| 8 | **Automated Dunning Workflow** — 4-step dunning (reminder → deactivation) | Implemented |
+| 9 | **Case Escalation Engine** — tier chain with 4-hour SLA reset | Implemented |
+| 10 | **Customer Segmentation API** — paginated criteria-based filtering for campaigns | Implemented |
+| 11 | **Idempotent Event Deduplication** — minute-bucket event_id dedup gate | Targeted |
+| 12 | **Structured Pydantic v2 Responses** — typed response models in views.py | Targeted |
+| 13 | **Async Database Persistence** — asyncpg pool replacing in-memory dicts | Targeted |
+| 14 | **OpenTelemetry Tracing** — span per public method with customer_id attributes | Targeted |
+| 15 | **Tenant-Scoped Rate Limiting** — sliding-window quota enforcement (Redis/BoundedCache) | Targeted |
+
+## New Methods
+
+Three high-impact async methods from v2.0:
+
+### `get_customer_360` — Eliminate N+1 fan-out
+```python
+svc = TelecomCustomerService()
+profile = await svc.get_customer_360("cust-001", tenant_id="acme")
+# Returns: customer, kyc_documents, active_plans, sims, devices,
+#          open_cases, recent_lifecycle_events (last 10), latest_nps,
+#          latest_churn_intervention — all in one call.
+print(profile["customer"]["kyc_status"])
+print(len(profile["open_cases"]))
+```
+
+### `score_churn_risk` — Deterministic churn scoring
+```python
+result = await svc.score_churn_risk("cust-001", tenant_id="acme")
+# Returns: churn_risk_score (0.0–1.0), risk_level (low/medium/high),
+#          feature breakdown (complaints, NPS, plan age, SIM swaps, plan type)
+# Side-effect: emits churn_risk_flagged lifecycle event when score >= 0.65
+if result["threshold_breached"]:
+    await svc.churn_risk_intervention("cust-001", "discount_offer", tenant_id="acme")
+```
+
+### `bulk_import_customers` — Idempotent batch onboarding
+```python
+records = [
+    {"customer_type": "individual", "msisdn": "+254711000001", "name": "Alice K.", "created_by": "crm"},
+    {"customer_type": "individual", "msisdn": "+254711000002", "name": "Bob M.", "created_by": "crm"},
+]
+# Dry-run first to validate without side effects
+dry = await svc.bulk_import_customers(records, tenant_id="acme", dry_run=True)
+print(dry["created"], dry["skipped"], dry["failed"])  # 2 0 0
+# Commit
+result = await svc.bulk_import_customers(records, tenant_id="acme")
+# Per-record: created | skipped (duplicate MSISDN) | failed (validation error)
+```
+
 ## Further Reading
 - `service.py` — Business logic implementation
 - `models.py` — Data models

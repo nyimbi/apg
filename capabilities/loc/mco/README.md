@@ -166,3 +166,25 @@ Multi-Country Operations (MCO) provides country entity management, local regulat
 - `fin` statutory reporting can pull report data from MCO's statutory report records
 - `grc` compliance modules consume MCO compliance mapping status as evidence
 - MCO emits all lifecycle events to the `apg.loc.mco.lifecycle` bytewax stream for downstream consumers
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: loc_mco (Multi-Country Operations)
+- **I2.** Improvement 1 — Replace in-memory dicts with async PostgreSQL store
+- **I3.** Improvement 2 — Fix broken attribute references in 7 "new" methods
+- **I4.** Improvement 3 — Multi-tenancy via constructor injection, not per-call enforcemen
+- **I5.** Improvement 4 — Async batch operations for bulk entity and country onboarding
+- **I6.** Improvement 5 — Compliance deadline alerting via
+- **I7.** Improvement 6 — Entity hierarchy traversal (parent → subsidiary graph)
+- **I8.** Improvement 7 — Idempotent transaction submission (deduplication key)
+- **I9.** Improvement 8 — Structured transfer pricing risk scoring
+- **I10.** Improvement 9 — Statutory report overdue escalation workflow
+- **I11.** Improvement 10 — Currency-normalised intercompany exposure summary
+- **I12.** Improvement 11 — Event sourcing for compliance mapping state machine
+- **I13.** Improvement 12 — Typed capability contract enforcement via Pydantic
+- **I14.** Improvement 13 — Consolidation elimination entries for intercompany transactions
+- **I15.** Improvement 14 — Paginated list operations with cursor-based pagination
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

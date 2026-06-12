@@ -188,3 +188,25 @@ Use the package checks when changing this capability:
 ./.venv/bin/apg capabilities publish-plan capabilities/grc/rcm --json
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/grc/rcm --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements — grc_rcm
+- **I2.** Continuous Control Monitoring (CCM)
+- **I3.** Quantitative Risk Scoring (FAIR-aligned)
+- **I4.** Regulatory Change Intelligence Feed
+- **I5.** Three-Lines-of-Defense Workflow Engine
+- **I6.** Natural Language Obligation Parsing
+- **I7.** Control Testing Automation Harness
+- **I8.** Risk Appetite Statement as Executable Policy
+- **I9.** Issue Ageing and SLA Breach Detection
+- **I10.** Audit Evidence Chain of Custody
+- **I11.** Predictive Risk Velocity
+- **I12.** Cross-Capability Risk Propagation Graph
+- **I13.** Compliance Posture Benchmarking
+- **I14.** Exception Lifecycle Management with Auto-Expiry
+- **I15.** Policy-as-Code Version Control
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

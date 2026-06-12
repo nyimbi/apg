@@ -153,3 +153,25 @@ Focused verification for this package:
 ```
 
 Deferred live-system work includes durable stores, live financial adapters, business-intelligence providers, durable Bytewax deployment, rendered browser UI, and performance testing.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: Budgeting & Forecasting (bfc_budgeting_forecasting)
+- **I2.** Continuous Rolling Forecast with Bayesian Updating
+- **I3.** Hierarchical Budget Rollup with Elimination
+- **I4.** Zero-Based Budgeting (ZBB) Justification Engine
+- **I5.** Driver-Based P&L Simulation with Monte Carlo
+- **I6.** Automated Anomaly Detection on Variance Reports
+- **I7.** Continuous Forecast Accuracy Tracking (MAPE Ledger)
+- **I8.** Approval Chain Escalation with SLA Timers
+- **I9.** Multi-Currency Budget with FX Rate Management
+- **I10.** Capital Expenditure (CapEx) vs OpEx Split Tracking
+- **I11.** Budget Version Control with Diff and Merge
+- **I12.** AI-Assisted Budget Commentary Generation
+- **I13.** Integrated Headcount Planning Module
+- **I14.** Cash Flow Forecast from Budget Lines
+- **I15.** Benchmark Comparison Against Industry Peers
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

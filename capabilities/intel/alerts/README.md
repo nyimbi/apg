@@ -76,3 +76,24 @@ implementation audit, lifecycle audit, global implementation audit, strict
 package-artifact audit, stale-marker scan, disallowed messaging scan, and
 `git diff --check`.
 
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Intelligence Alerts — World-Class Improvement Opportunities
+- **I2.** Async-First Architecture
+- **I3.** Persistent Storage Backend via Repository Pattern
+- **I4.** Event-Driven Side Effects via CloudEvents / Bytewax
+- **I5.** Threshold-Based Auto-Escalation Rules Engine
+- **I6.** ML-Powered Anomaly Scoring for Signals
+- **I7.** Deduplication Window Using Probabilistic Data Structures
+- **I8.** RBAC-Aware Tenant Isolation at the Service Layer
+- **I9.** Structured Alert Playbooks with Runbook Automation
+- **I10.** Streaming Aggregation with Tumbling Windows
+- **I11.** Webhook / Push Notification Dispatcher
+- **I12.** Full-Text and Faceted Search over Alerts
+- **I13.** Immutable Audit Log with Cryptographic Integrity
+- **I14.** Graph-Based Alert Causality Inference
+- **I15.** Zero-Trust Signal Provenance Verification
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

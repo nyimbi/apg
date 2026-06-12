@@ -102,3 +102,25 @@ Full-featured pharmacy management capability covering drug formulary management,
 
 ## Composability Notes
 Formulary data feeds back to `healthcare_emr` for prescription validation and allergy-drug interaction warnings. Dispense events flow to `healthcare_ana` for medication adherence metrics. Controlled substance logs are consumed by `healthcare_reg` for DEA regulatory reporting.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Pharmacy Management — World-Class Improvement Plan
+- **I2.** Overview
+- **I3.** Real-Time Drug Interaction Engine with CDS Hooks
+- **I4.** Allergy Cross-Check at Dispense
+- **I5.** Barcode / 2D Scan Verification at Point of Dispense
+- **I6.** Medication Adherence Scoring & Refill Prediction
+- **I7.** Dose Range Checking with Weight/Age/Renal Adjustment
+- **I8.** Drug Recall Management with Active Lot Quarantine
+- **I9.** Automated Perpetual Inventory with Bin-Level Tracking
+- **I10.** Medication Label Generation with ISMP Safe-Label Formatting
+- **I11.** Step-Therapy Pathway Engine
+- **I12.** Pharmacovigilance / Adverse Drug Event Reporting
+- **I13.** Compounding Pharmacy Workflow
+- **I14.** Concurrent Event Sourcing Architecture
+- **I15.** Insurance Claims Integration (NCPDP D.0 / Reject Codes)
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

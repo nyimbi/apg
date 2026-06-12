@@ -132,3 +132,25 @@ Manages the complete clinical trial lifecycle from protocol development through 
 
 ## Composability Notes
 Safety data flows from `pharma_ctr` to `pharma_pvi` for post-market safety surveillance. Protocol amendments link to `pharma_qms` change control. Regulatory submissions feed `pharma_reg` approval tracking. IMP forecasts integrate with `pharma_mfg` supply chain scheduling.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Clinical Trials Management — World-Class Improvements
+- **I2.** Adaptive Trial Design Engine
+- **I3.** eCTD-Structured Regulatory Submission Assembly
+- **I4.** Real-Time Safety Signal Detection via BCPNN
+- **I5.** CTMS ↔ EDC Bidirectional Sync
+- **I6.** AI-Assisted Protocol Deviation Triage
+- **I7.** Stratified Patient Matching for Screen Failure Analysis
+- **I8.** TMF Completeness Automation via Document Intelligence
+- **I9.** Site Performance Predictive Scoring
+- **I10.** Automated SUSAR Narratives via NLP
+- **I11.** Protocol Amendment Impact Analysis
+- **I12.** Continuous Audit Trail Streaming to SIEM
+- **I13.** Blinded Sample Size Re-estimation
+- **I14.** Supply Chain IMP Forecasting
+- **I15.** GCP Inspection Readiness Scoring
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

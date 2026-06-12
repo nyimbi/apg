@@ -149,3 +149,25 @@ to MLCM, AUTH, CACH, KNGR, GRPH, META, MONI, and durable Bytewax topologies.
 Generated applications compose RAGN through its semantic model, UI manifest,
 agent manifest, streaming manifest, API helpers, service runtime, rule engine,
 and theme contract.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** RAGN World-Class Improvements
+- **I2.** Adaptive Chunking with Semantic Boundaries
+- **I3.** Hierarchical Index (Parent-Child Chunks)
+- **I4.** Real Cross-Encoder Re-Ranking
+- **I5.** Hypothetical Document Embeddings (HyDE)
+- **I6.** Late-Interaction ColBERT Embeddings
+- **I7.** Persistent Disk-Backed Vector Index (hnswlib / Milvus Lite)
+- **I8.** Streaming Response Generation
+- **I9.** RAG Fusion Multi-Query Retrieval
+- **I10.** Answer Attribution Heat-Map
+- **I11.** Continuous RAGAS-Style Auto-Evaluation
+- **I12.** Knowledge Graph Triple Extraction
+- **I13.** Incremental Re-Indexing via Change Data Capture
+- **I14.** Role-Scoped Retrieval Filters
+- **I15.** Offline-First Bulk Ingestion Pipeline
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

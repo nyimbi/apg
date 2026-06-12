@@ -195,3 +195,25 @@ use grc_pol;
 
 Proprietary — © 2025 Datacraft
 Author: Nyimbi Odero <nyimbi@gmail.com>
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Policy Management — World-Class Improvement Roadmap
+- **I2.** Hierarchical Policy Inheritance
+- **I3.** AI-Assisted Policy Drafting (Ollama)
+- **I4.** Structured Two-Stage Approval Workflow
+- **I5.** Immutable Audit Log with Cryptographic Chaining
+- **I6.** Regulatory Framework Registry as First-Class Entity
+- **I7.** Policy Obligation Extraction and Tracking
+- **I8.** Conflict Detection Between Policies
+- **I9.** Attestation Campaigns with SLA Enforcement
+- **I10.** Policy Delta Reports for Revisions
+- **I11.** Risk-Linked Policy Effectiveness Scoring
+- **I12.** Automated Review Scheduling with Calendar Integration
+- **I13.** Policy Template Versioning and Inheritance
+- **I14.** Bulk Import/Export with Format Normalisation
+- **I15.** Cross-Capability Composability Hooks
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

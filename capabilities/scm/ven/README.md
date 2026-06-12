@@ -222,3 +222,25 @@ web framework or APG composition layer.
 ./.venv/bin/apg capabilities publish-plan capabilities/scm/ven --json
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/scm/ven --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements — scm_ven (Vendor Management)
+- **I2.** Async-First Service Layer
+- **I3.** PostgreSQL Persistence via SQLAlchemy Async
+- **I4.** Structured Event Emission via CloudEvents + Bytewax
+- **I5.** Vendor Health Score — Composite KPI
+- **I6.** Contract Lifecycle Alerts (Expiry + Auto-Renew)
+- **I7.** Spend Concentration Risk Detection
+- **I8.** Bulk Onboarding via Async Batch API
+- **I9.** Compliance Expiry Monitoring
+- **I10.** Vendor Diversity and ESG Tracking
+- **I11.** Vendor Segmentation Engine
+- **I12.** SLA Breach Detection and Escalation
+- **I13.** Vendor Reinstatement Workflow
+- **I14.** Multi-Vendor Comparison Report
+- **I15.** Immutable Audit Log with Tamper Evidence
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

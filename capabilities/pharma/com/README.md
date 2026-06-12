@@ -127,3 +127,25 @@ Includes a pharmacovigilance (PV) layer covering Individual Case Safety Report (
 
 ## Composability Notes
 Composes with `pharma_rec` for Sunshine Act reporting obligations. Feeds spend data to `grc` for compliance reporting. Territory data feeds `pharma_com` forecasting into `pharma_sup` demand planning. ICSR signals route to `pvi` capability. CAPAs route to `qms` for quality lifecycle management. Triage scores feed `intel` dashboard for real-time PV monitoring.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: pharma_com — Commercial Operations
+- **I2.** True Async Service Layer
+- **I3.** PostgreSQL-Backed Persistence via Async SQLAlchemy
+- **I4.** Event Streaming via Bytewax / Kafka
+- **I5.** Pharmacovigilance Signal Detection
+- **I6.** Regulatory Submission Workflow (E2B R3 / CIOMS)
+- **I7.** Adverse Event Report (ICSR) Lifecycle
+- **I8.** MedDRA Terminology Integration
+- **I9.** Sunshine Act / Open Payments Reporting Pipeline
+- **I10.** Risk-Based Signal Prioritisation (Triage Score)
+- **I11.** Multi-Level Approval Chain with Deadlines
+- **I12.** Sample Cold-Chain Integrity Tracking
+- **I13.** CAPA (Corrective and Preventive Action) Integration
+- **I14.** Physician Prescription Trend Analytics (Rx Lift)
+- **I15.** Duplicate Detection and Deduplication Engine
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

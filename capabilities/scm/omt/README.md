@@ -61,15 +61,81 @@ draft → confirmed → allocated → picking → packed → shipped ───�
 All transitions are validated against the formal `TRANSITIONS` adjacency map in `service.py`.
 Invalid transitions raise `ValueError`.
 
-## Key New Capabilities (v1.1)
+## World-Class Enhancements (v2.0)
 
-- **Idempotent order creation** — pass `idempotency_key` to prevent duplicate orders on retry.
-- **Date-bucketed ATP horizon** — supply/demand events projected forward; `check_atp_by_date` answers "will stock be available by date X?"
-- **Priority order queue** — `get_order_queue` scores orders by `revenue × priority × customer_tier` for warehouse pick sequencing.
-- **Order routing** — `route_order` assigns lines to warehouses using `consolidate` or `fastest` policy.
-- **Delivery window negotiation** — `get_available_delivery_windows` filters candidate dates against warehouse calendar + ATP.
-- **SLA breach detection** — `detect_sla_breaches` scans all active orders; supports auto-escalation notifications.
-- **Re-promising engine** — `re_promise_breached_orders` revokes stale promises and issues system re-promises.
-- **RMA / reverse logistics** — full create → approve → receive lifecycle for returns.
-- **Bounded bulk operations** — `_bounded_gather` caps concurrency at 10 (configurable) to protect downstream systems.
-- **Causal audit trail** — every audit event carries `causation_id` and `correlation_id` for end-to-end trace reconstruction.
+1. **Order Line-Level Status Tracking** — each line transitions independently (`allocated`, `backordered`, `picked`, `packed`, `shipped`, `cancelled`) enabling partial-fulfilment workflows.
+2. **Partial Fulfilment & Overship Guard** — `shipped_quantity` accumulator per line; rejects requests exceeding ordered quantity; auto-promotes order to `partially_shipped`.
+3. **ATP Horizon Simulation** — date-bucketed ATP built from supply/demand events; `check_atp_by_date` answers "will stock be available by date X?" (capable-to-promise foundation).
+4. **Dynamic Re-promising Engine** — scans active promises against revised ATP profile, flags/revokes stale promises, triggers customer notification pipeline automatically.
+5. **Order Scoring & Priority Lanes** — composite score (`revenue × priority_weight × customer_tier_weight`); `get_order_queue` returns a priority-sorted warehouse pick list.
+6. **Rule-Based Order Routing** — `route_order` assigns lines to warehouses via `consolidate` or `fastest` policy; integrates with `scm_wms` via event bus.
+7. **Idempotency Keys on Order Creation** — `idempotency_key` field on `create_order`; LRU cache with configurable TTL (default 24 h) prevents duplicate orders on retry.
+8. **Configurable Order State-Machine** — formal `TRANSITIONS` adjacency map + single `_assert_transition` guard; state machine is auditable from code alone.
+9. **Bulk Operations with Concurrency Cap** — `_bounded_gather` semaphore limits concurrency to 10 (configurable); applied to all bulk mutation methods.
+10. **Carrier Integration Adapter Interface** — `CarrierAdapter` protocol with `fetch_tracking_events`; `sync_shipment_tracking` polls shipped orders and updates status automatically.
+11. **Tax & Duty Calculation Hook** — `TaxEngine` protocol invoked in `confirm_order`; swappable implementations (Avalara, TaxJar, flat-rate) via dependency injection.
+12. **Customer Return & Reverse Logistics (RMA)** — full `create_rma` → `approve_rma` → `receive_return` lifecycle; links to origin order, captures condition codes, triggers WMS inventory adjustments.
+13. **Delivery Window Negotiation** — `get_available_delivery_windows` reads warehouse calendars and ATP horizon to return feasible date/time windows for customer selection.
+14. **SLA Breach Detection & Escalation** — `detect_sla_breaches` emits `sla_breach_detected` audit events and queues account-manager escalation notifications; integrates with APScheduler/Celery beat.
+15. **Event-Sourced Audit Trail with Causality Chain** — every audit event carries `causation_id` (triggering event) and `correlation_id` (root workflow) for full causal trace reconstruction.
+
+## New Methods
+
+### `update_atp_horizon` — Build a rolling ATP profile
+
+Projects supply and demand events forward to produce a date-bucketed ATP profile.
+Use this before calling `check_atp_by_date` to enable capable-to-promise logic.
+
+```python
+svc = OrderManagementService(tenant_id="acme")
+
+await svc.update_atp_horizon(
+    sku="SKU-001",
+    opening_stock=100.0,
+    supply_events=[
+        {"date": "2026-06-15", "quantity": 500},
+        {"date": "2026-06-30", "quantity": 300},
+    ],
+    demand_events=[
+        {"date": "2026-06-10", "quantity": 120},
+        {"date": "2026-06-20", "quantity": 200},
+    ],
+    warehouse_id="WH-NBI",
+)
+
+result = await svc.check_atp_by_date(
+    sku="SKU-001",
+    requested_quantity=250,
+    requested_date="2026-06-25",
+    warehouse_id="WH-NBI",
+)
+# result["available"] → True/False, result["atp_at_date"] → float
+```
+
+### `detect_sla_breaches` — Scan for overdue orders and escalate
+
+Finds all active orders past their promised delivery date. Pass `escalate=True`
+to fire email notifications to the account manager in the same call.
+
+```python
+summary = await svc.detect_sla_breaches(
+    tenant_id="acme",
+    escalate=True,
+    escalation_recipient="ops@acme.com",
+)
+# summary["total_breached"] → int
+# summary["breached_orders"] → list of {order_id, order_number, promised_delivery_date, current_status}
+```
+
+### `get_order_queue` — Priority-scored warehouse pick list
+
+Returns confirmed orders sorted by `revenue × priority_weight × customer_tier_weight`.
+Feed directly to the warehouse pick system to maximise value delivery.
+
+```python
+await svc.set_customer_tier(customer_id="CUST-42", tier="strategic")
+
+queue = await svc.get_order_queue(tenant_id="acme", status_filter="confirmed")
+# queue[0] → highest-score order dict, includes "_score" field
+# Typical use: pass queue[:20] to the warehouse picking API each shift
+```

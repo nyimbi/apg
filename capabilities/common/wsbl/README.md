@@ -32,7 +32,7 @@ where multiple editors can collaborate in real time on the same site or page.
 - Dashboard, site, page, editor, component, publishing, analytics, agent,
   policy, and settings view models.
 
-**WebSocket Broker (async)**
+**WebSocket Broker (async, v2.0)**
 
 - Tenant-scoped WebSocket connection registry with transport metadata.
 - Heartbeat tracking and idle-connection pruning.
@@ -45,6 +45,11 @@ where multiple editors can collaborate in real time on the same site or page.
 - Exclusive component locks with TTL and connection-scoped ownership.
 - In-context section annotations visible to all room members.
 - Channel-level access control integrated with the WSBL policy engine.
+- Pluggable pub/sub backend (`InMemoryBrokerBackend` / `RedisBrokerBackend`).
+- Structured telemetry events emitted to `apg.wsbl.realtime`.
+- Typed discriminated-union message bus with Pydantic v2 ingress validation.
+- Optimistic locking on page sections (`expected_version`) with `ConflictError`.
+- Per-tenant rate limiting via token-bucket middleware hook.
 
 ## Quick Start
 
@@ -85,6 +90,64 @@ page = service.add_page_section(
     content={"headline": "Welcome"},
     actor_id="editor-1",
 )
+```
+
+## WebSocket Broker: Quick Start
+
+```python
+import asyncio
+from capabilities.common.wsbl import WsblService
+
+service = WsblService()
+
+async def demo():
+    # Connect two editors
+    await service.async_connect("tenant-a", "conn-1", "editor-1")
+    await service.async_connect("tenant-a", "conn-2", "editor-2")
+
+    # Open a collaboration room for the site
+    site = service.create_site("blog", "tenant-a", "Blog", "editor-1")
+    room = await service.async_room_create(
+        "tenant-a", "room-blog", site["id"], "editor-1", room_type="collaboration"
+    )
+    await service.async_room_join("tenant-a", "room-blog", "conn-1", "editor-1")
+    await service.async_room_join("tenant-a", "room-blog", "conn-2", "editor-2")
+
+    # Publish presence
+    await service.async_presence_update(
+        "tenant-a", "conn-1", "editor-1", intent="editing"
+    )
+
+    # Broadcast a content-change event
+    receipt = await service.async_broadcast(
+        "tenant-a", "room-blog",
+        message={"type": "section_update", "section_id": "s1"},
+        actor_id="editor-1",
+        exclude_connection_ids=["conn-1"],
+    )
+    assert receipt["delivered"] == 1
+
+    # Start a collaborative session
+    page = service.create_page(site["id"], "home", "Home", "tenant-a")
+    session = await service.async_session_start(
+        "tenant-a", "conn-1", site["id"], page["id"], "editor-1"
+    )
+
+    # Lock a component while editing
+    comp = service.create_component("hero", "tenant-a", "Hero", reviewed=True, reviewed_by="r1")
+    await service.async_lock_component("tenant-a", comp["id"], "conn-1", "editor-1")
+
+    # Annotate a section
+    annot = await service.async_annotate_section(
+        "tenant-a", page["id"], "section-1", "reviewer-1", "Needs stronger CTA"
+    )
+
+    # Clean up
+    await service.async_unlock_component("tenant-a", comp["id"], "conn-1", "editor-1")
+    await service.async_session_end("tenant-a", session["id"], "editor-1")
+    await service.async_room_close("tenant-a", "room-blog", "editor-1")
+
+asyncio.run(demo())
 ```
 
 ## Publishing
@@ -171,6 +234,134 @@ decision = service.validate_batch_publish(
 )
 
 assert decision["decision"] == "allow"
+```
+
+## World-Class Enhancements (v2.0)
+
+The following 15 improvements were applied to the broker layer to support
+production-grade multi-user editing:
+
+1. **Async-first method signatures** — entire public surface converted to
+   `async def`; sync wrappers provided only for CLI/test shims.
+2. **WebSocket connection registry** — `async_connect` / `async_disconnect`
+   maintain a live `(tenant_id, connection_id)` registry with transport
+   metadata and heartbeat timestamps.
+3. **Room management subsystem** — `async_room_create/join/leave/close` scope
+   channels to `(tenant_id, site_id)`; membership is append-logged for audit.
+4. **Presence protocol** — `async_presence_update` / `async_presence_snapshot`
+   carry cursor position, active page/component, and intent; TTL-expiring,
+   delivered on room join and on heartbeat.
+5. **Typed message bus** — discriminated-union hierarchy
+   (`EditMessage`, `PresenceMessage`, `SystemMessage`, `AuditMessage`)
+   validated with Pydantic v2 on ingress; malformed frames rejected before
+   business logic.
+6. **Optimistic locking on page sections** — `expected_version` parameter on
+   `add_page_section`; raises `ConflictError` on version mismatch, eliminating
+   silent last-write-wins.
+7. **Targeted room broadcast** — `async_broadcast` fans out with
+   `exclude_connection_ids` sender-echo suppression; returns
+   `{delivered, failed, sent_at}` delivery receipt.
+8. **Rate-limiting middleware hook** — `async_check_rate_limit` uses a
+   `BoundedCache`-backed token bucket; configurable per-tenant burst and
+   sustained rates; raises `RateLimitError` before business logic.
+9. **Collaborative session lifecycle** — `async_session_start` /
+   `async_session_end` / `async_reap_stale_sessions`; emit audit events;
+   presence data never left orphaned on abnormal disconnect.
+10. **Pub/sub adapter interface** — `AbstractBrokerBackend` protocol;
+    `InMemoryBrokerBackend` (default) and `RedisBrokerBackend` stub; injected
+    via constructor for zero-touch production swap.
+11. **Component lock / unlock** — `async_lock_component` / `async_unlock_component`
+    give connections exclusive edit rights with TTL auto-expiry; contention
+    raises `ComponentLockedError`.
+12. **WebSocket heartbeat and liveness probe** — `async_heartbeat` refreshes
+    last-seen; `async_prune_dead_connections` evicts idle connections and emits
+    `connection_reaped` audit events.
+13. **Channel-scoped access control** — `async_authorize_channel` evaluates
+    capability rules via the existing `evaluate()` engine before admitting a
+    connection; tenant-scoped RBAC at the transport layer.
+14. **Structured telemetry events** — `async_emit_telemetry` serialises a
+    `TelemetryEvent` (latency buckets, room occupancy, message rates, error
+    codes) to the `apg.wsbl.realtime` Bytewax stream.
+15. **Collaborative annotation layer** — `async_annotate_section` /
+    `async_list_annotations` attach `(section_id, actor_id, text, resolved)`
+    records; all room members receive `annotation_added` / `annotation_resolved`
+    events in real time; persisted in the audit log.
+
+## New Methods
+
+### async_broadcast — fan-out with delivery receipt
+
+```python
+receipt = await service.async_broadcast(
+    tenant_id="tenant-a",
+    room_id="room-blog",
+    message={"type": "section_update", "section_id": "s1", "content": {...}},
+    actor_id="editor-1",
+    exclude_connection_ids=["conn-1"],   # suppress echo to sender
+)
+# {"delivered": 2, "failed": [], "sent_at": "2026-06-12T..."}
+```
+
+### async_lock_component / async_unlock_component — exclusive edit locks
+
+```python
+lock = await service.async_lock_component(
+    tenant_id="tenant-a",
+    component_id=comp["id"],
+    connection_id="conn-1",
+    actor_id="editor-1",
+    lock_ttl_seconds=60,
+)
+# Other connections receive component_locked presence event; edit attempts
+# raise ComponentLockedError until unlock or TTL expiry.
+
+await service.async_unlock_component("tenant-a", comp["id"], "conn-1", "editor-1")
+```
+
+### async_annotate_section — in-context review feedback
+
+```python
+annotation = await service.async_annotate_section(
+    tenant_id="tenant-a",
+    page_id=page["id"],
+    section_id="hero-section",
+    actor_id="reviewer-1",
+    text="CTA copy needs stronger verb — 'Get started' not 'Learn more'",
+)
+
+open_annotations = await service.async_list_annotations(
+    tenant_id="tenant-a",
+    page_id=page["id"],
+    include_resolved=False,
+)
+```
+
+### async_prune_dead_connections — connection registry hygiene
+
+```python
+# Called by a background worker every 30 seconds.
+reaped = await service.async_prune_dead_connections(
+    tenant_id="tenant-a",
+    max_idle_seconds=30,
+)
+# Returns list of evicted connection IDs; emits connection_reaped audit events.
+```
+
+### async_authorize_channel — transport-layer RBAC
+
+```python
+try:
+    result = await service.async_authorize_channel(
+        tenant_id="tenant-a",
+        connection_id="conn-1",
+        channel="room-blog",
+        required_perm="edit",
+        actor_id="editor-1",
+    )
+    # result["decision"] == "allow"
+except PermissionError as exc:
+    # channel_access_denied — reject the WebSocket frame before business logic
+    ...
 ```
 
 ## Deterministic Rules
@@ -291,64 +482,6 @@ Events (WebSocket broker — stream `apg.wsbl.realtime`):
 - `ws_channel_authorized`
 - `ws_channel_denied`
 
-## WebSocket Broker: Quick Start
-
-```python
-import asyncio
-from capabilities.common.wsbl import WsblService
-
-service = WsblService()
-
-async def demo():
-    # Connect two editors
-    await service.async_connect("tenant-a", "conn-1", "editor-1")
-    await service.async_connect("tenant-a", "conn-2", "editor-2")
-
-    # Open a collaboration room for the site
-    site = service.create_site("blog", "tenant-a", "Blog", "editor-1")
-    room = await service.async_room_create(
-        "tenant-a", "room-blog", site["id"], "editor-1", room_type="collaboration"
-    )
-    await service.async_room_join("tenant-a", "room-blog", "conn-1", "editor-1")
-    await service.async_room_join("tenant-a", "room-blog", "conn-2", "editor-2")
-
-    # Publish presence
-    await service.async_presence_update(
-        "tenant-a", "conn-1", "editor-1", intent="editing"
-    )
-
-    # Broadcast a content-change event
-    receipt = await service.async_broadcast(
-        "tenant-a", "room-blog",
-        message={"type": "section_update", "section_id": "s1"},
-        actor_id="editor-1",
-        exclude_connection_ids=["conn-1"],
-    )
-    assert receipt["delivered"] == 1
-
-    # Start a collaborative session
-    page = service.create_page(site["id"], "home", "Home", "tenant-a")
-    session = await service.async_session_start(
-        "tenant-a", "conn-1", site["id"], page["id"], "editor-1"
-    )
-
-    # Lock a component while editing
-    comp = service.create_component("hero", "tenant-a", "Hero", reviewed=True, reviewed_by="r1")
-    await service.async_lock_component("tenant-a", comp["id"], "conn-1", "editor-1")
-
-    # Annotate a section
-    annot = await service.async_annotate_section(
-        "tenant-a", page["id"], "section-1", "reviewer-1", "Needs stronger CTA"
-    )
-
-    # Clean up
-    await service.async_unlock_component("tenant-a", comp["id"], "conn-1", "editor-1")
-    await service.async_session_end("tenant-a", session["id"], "editor-1")
-    await service.async_room_close("tenant-a", "room-blog", "editor-1")
-
-asyncio.run(demo())
-```
-
 ## Adapter Boundaries
 
 The in-package service stores records in memory so generated applications,
@@ -357,7 +490,7 @@ Production systems should attach visual editors, asset stores, preview
 renderers, accessibility scanners, consent platforms, analytics collectors, CDN
 or static-host deployment, search/sitemap systems, audit sinks, Bytewax
 workers, and a real WebSocket transport (e.g. Redis pub/sub via
-``RedisBrokerBackend``) through APG adapters.
+`RedisBrokerBackend`) through APG adapters.
 
 ## Verification
 

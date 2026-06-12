@@ -45,6 +45,60 @@ REGY is intentionally split into two layers:
   settings, plus registry-agent roster and lifecycle-batch monitor surfaces.
 - Contract-derived semantic model, package manifest, and release evidence.
 
+## World-Class Enhancements (v2.0)
+
+1. **Persistent Storage Adapter** — async `get/put/delete/scan` contract backed by PostgreSQL, Redis, or etcd; in-memory shim for tests.
+2. **Event Sourcing** — every mutation appends an immutable event log enabling audit reconstruction, replay, and time-travel queries.
+3. **TTL Lease Expiry** — background coroutine marks crashed instances `STOPPED` and emits `lease_expired` when heartbeat TTL passes.
+4. **Structured Health Probes** — concurrent HTTP/TCP probes via `aiohttp`/`asyncio.open_connection` against each instance's configured `health_checks`.
+5. **Dependency-Graph Impact Analysis** — full BFS/DFS traversal of `dependencies` + reverse `dependents` lookup for cascade-impact reports.
+6. **Circuit-Breaker Enforcement** — `discover_services` filters `OPEN`/`FORCED_OPEN` instances; new `instance_select` records metrics at selection.
+7. **LRU-TTL Discovery Cache** — bounded `cachetools.TTLCache` replaces unbounded dict; mutations do targeted key eviction instead of full `clear()`.
+8. **Async Pub/Sub Notifications** — `asyncio.Queue`-backed bus delivers filtered change streams to subscribers without polling.
+9. **Semver Constraint Enforcement** — evaluates `version_constraints` ranges (e.g. `>=1.2.0,<2.0.0`) against registered versions at discovery time.
+10. **Geographic Routing** — region-scoring function ranks instances by `metadata['region']` proximity for `GEOGRAPHIC` load-balance strategy.
+11. **Federated Conflict Detection** — reconciliation step surfaces `FEDERATED_CONFLICT` events for version drift and schema divergence across tenants.
+12. **Prometheus / OTLP Metrics Export** — counters and gauges emitted as OTLP spans and Prometheus metrics via `MonitoringService` adapter.
+13. **Bulk Health Ingestion** — `bulk_update_health` accepts batched payloads, applies them transactionally, emits one reconciled event per changed service.
+14. **Policy-Driven Discovery ACL** — `authorization_policies` wired through `AuthService` adapter with fast allow-list cache for namespace/tag-level restrictions.
+15. **Automated Stale-Service GC** — configurable background coroutine deregisters ephemeral/test services past retention threshold, honouring impact-review guardrail.
+
+## New Methods
+
+Three high-impact async methods added in `service.py`:
+
+### `capability_search` — find services by capability tag
+
+```python
+svc = RegistryService(tenant_id="tenant-a")
+await svc.initialize()
+
+# Find all services advertising "payments" in production
+hits = await svc.capability_search(capability="payments", environment="production")
+# [{"id": "...", "name": "payments-api", "namespace": "finance", "environment": "production"}]
+```
+
+### `federation_registry` — ingest a remote tenant's catalog
+
+```python
+remote_svcs = [{"name": "fx-rates", "service_type": "rest_api", "environment": "production"}]
+
+result = await svc.federation_registry(
+    remote_tenant_id="tenant-b",
+    remote_services=remote_svcs,
+    federated_by="federation-agent",
+)
+# {"remote_tenant_id": "tenant-b", "federated_count": 1, "federated_ids": ["..."]}
+# Services appear under namespace "federated:tenant-b" with tags ["federated", "remote_tenant:tenant-b"]
+```
+
+### `dependency_graph` — inspect a service's declared dependencies
+
+```python
+result = await svc.dependency_graph(service_id="orders")
+# {"service_id": "orders", "service_name": "orders-api", "dependencies": ["payments", "inventory"]}
+```
+
 ## Important Files
 
 - `SPECIFICATION.md`: current REGY functional specification.

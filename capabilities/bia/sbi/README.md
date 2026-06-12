@@ -83,3 +83,27 @@ The Self-Service BI capability (bia_sbi) provides a drag-and-drop visual chart b
 - bia_dsh can consume SBI workspace charts as embedded widgets
 - Catalogue approvals integrate with wflo for multi-step governance
 - bia_rpt can use published SBI analytics as report data sources
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Semantic Layer with Reusable Metrics** [Data Modelling]
+- **I2. Incremental NLQ Feedback Loop with User Corrections** [AI / ML Quality]
+- **I3. Scheduled Report Snapshots with Email/Webhook Delivery** [Delivery & Distribution]
+- **I4. Row-Level Security (RLS) with Dynamic Filter Injection** [Governance & Security]
+- **I5. Collaborative Dashboard Builder with Real-Time Presence** [Collaboration]
+- **I6. Embedded Analytics with Signed JWT Tokens** [Distribution / Integration]
+- **I7. AI-Powered Anomaly Alerts with Configurable Thresholds** [Proactive Intelligence]
+- **I8. Version-Controlled Report Lineage with Diff View** [Governance / Auditability]
+- **I9. Parameterised Templates with Variable Injection** [Productivity]
+- **I10. Monetary Precision with Decimal Arithmetic Throughout** [Correctness / Financial Compliance]
+- **I11. Data Freshness SLA Monitoring with Staleness Badges** [Trust & Transparency]
+- **I12. Cross-Dataset Join Builder (Visual Join Designer)** [Data Modelling / Builder]
+- **I13. Collaborative Data Stories with Narrative Blocks** [Communication / Presentation]
+- **I14. Multi-Tenant Usage Quotas with Cost Attribution** [Operations / FinOps]
+- **I15. Smart Chart Recommendations with Explainability** [AI / UX]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

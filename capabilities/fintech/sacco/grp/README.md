@@ -45,3 +45,27 @@ Common in Kenya, Tanzania, and Uganda. The group is collectively responsible for
 ## Authentication
 
 Pass `X-Tenant-ID` header on every request.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Interest-Bearing Group Loans with Amortisation Schedule** [Enhancement]
+- **I2. Loan-to-Savings Ratio Enforcement** [Enhancement]
+- **I3. Penalty Accrual for Late Repayments** [Enhancement]
+- **I4. Group Dividend / Interest-on-Savings Distribution** [Enhancement]
+- **I5. Emergency / Welfare Loan Sub-Facility** [Enhancement]
+- **I6. Meeting Attendance & Quorum Tracking** [Enhancement]
+- **I7. SMS/WhatsApp Contribution Reminders (Event Emission)** [Enhancement]
+- **I8. Group Credit Score Export for Individual Member Loans** [Enhancement]
+- **I9. Merry-Go-Round Cycle Reset & Multi-Cycle Tracking** [Enhancement]
+- **I10. Group Loan Restructuring** [Enhancement]
+- **I11. Bulk Group Loan Write-Off** [Enhancement]
+- **I12. Contribution Projection & Savings Target Tracking** [Enhancement]
+- **I13. Multi-Tier Guarantor System** [Enhancement]
+- **I14. Automated Group Performance Benchmarking** [Enhancement]
+- **I15. Audit Trail Export with Tamper-Evidence Hash Chain** [Enhancement]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

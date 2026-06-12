@@ -154,3 +154,25 @@ Focused verification covers Python compilation, app self-test, manifest JSON val
 package tests, APG inspect, APG publish-plan, package implementation audit, lifecycle audit,
 global implementation audit, strict package-artifact audit, stale-marker scan, disallowed
 messaging scan, and `git diff --check`.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Predictive Intelligence — World-Class Improvement Catalogue
+- **I2.** Bayesian Belief Network Integration
+- **I3.** Temporal Anomaly Detection via CUSUM / EWMA
+- **I4.** Ensemble Model Voting
+- **I5.** Counterfactual Scenario Engine
+- **I6.** Causal Graph Inference (do-calculus)
+- **I7.** Federated Learning Aggregation
+- **I8.** Explainability Report (SHAP-style Attribution)
+- **I9.** Red Team Adversarial Stress Testing
+- **I10.** Knowledge Graph Event Linkage
+- **I11.** Adaptive Re-training Triggers
+- **I12.** Structured Prediction Confidence Intervals
+- **I13.** Streaming Event Bus Integration (Bytewax)
+- **I14.** Graph-of-Thought Reasoning Chain
+- **I15.** Multi-Horizon Ensemble Forecast
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

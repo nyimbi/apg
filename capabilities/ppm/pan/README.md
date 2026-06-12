@@ -177,6 +177,74 @@ Projects registered in `_project_registry` support the following optional fields
 - `sync_to_intel_domain` bridges portfolio RAG status into **intel** threat signal pipeline
 - `rag_escalation_check` outputs notification payloads consumable by **ntfy** capability
 
+## World-Class Enhancements (v2.0)
+
+Fifteen improvements landed in `service.py`. Each addresses a specific gap in the v1 baseline:
+
+1. **Earned Value Management** — `earned_value_metrics`: SPI, CPI, EAC, TCPI, SV, CV per project + portfolio aggregate.
+2. **Monte Carlo Risk Simulation** — `monte_carlo_risk_simulation`: P50/P80/P90 cost-and-schedule outcomes from triangular distributions over N iterations.
+3. **Benefits Realisation Forecast** — `benefits_realisation_forecast`: logistic S-curve fit to actuals with confidence bands and "benefits at risk" flag.
+4. **Strategic Bubble Chart** — `portfolio_bubble_chart`: normalised multi-axis bubble chart (any risk/return/alignment/FTE metric on x, y, size).
+5. **Delivery Velocity Trending** — `delivery_velocity_trend`: rolling completion rate with linear-regression slope and consecutive-decline alert.
+6. **Cross-Portfolio Dependency Map** — `cross_portfolio_dependency_map`: directed dependency graph with critical-path segments spanning portfolio boundaries.
+7. **Three Horizons Balance Score** — `portfolio_balance_score`: H1/H2/H3 investment split vs. configurable targets with rebalancing recommendations.
+8. **Resource Bottleneck Detector** — `resource_bottleneck_detector`: role-level over-allocation severity = (demand/supply) × impact_weight, top-N ranked.
+9. **Portfolio Value at Risk** — `portfolio_value_at_risk`: Cholesky-correlated VaR at configurable confidence level with diversification benefit.
+10. **RAG Escalation Engine** — `rag_escalation_check`: rule-driven RED escalation with ntfy-ready payloads and consecutive-snapshot threshold.
+11. **Benchmark Gap Analysis** — `benchmark_gap_analysis`: tornado-ranked gap analysis across multiple benchmark types (industry, peer, historical, target, best-in-class).
+12. **Scenario Sensitivity Analysis** — `scenario_sensitivity_analysis`: OAT sensitivity with tornado chart output ranked by magnitude.
+13. **Portfolio Lifecycle Tracker** — `advance_portfolio_lifecycle` / `portfolio_lifecycle_advance`: governed stage transitions with full audit history and approval gates.
+14. **AI Narrative Generator** — `generate_portfolio_narrative`: Ollama-backed executive prose (llama3.1:8b) with style param; graceful fallback when Ollama is absent.
+15. **Intel Domain Bridge** — `sync_to_intel_domain`: pushes RAG + EVM + top risks into the intel threat pipeline via duck-typed `ingest_portfolio_signal`.
+
+## New Methods
+
+### `earned_value_metrics` — EVM per project and portfolio
+
+```python
+svc = PortfolioAnalyticsService(tenant_id="acme", actor_id="pmo")
+svc._project_registry["p-001"] = {
+    "portfolio_id": "port-A",
+    "planned_value": 500_000,
+    "earned_value": 420_000,
+    "actual_cost": 390_000,
+    "budget_at_completion": 1_000_000,
+}
+result = await svc.earned_value_metrics("port-A", as_of_date="2026-06-01")
+# result["portfolio"]["spi"] -> 0.84  (schedule 16% behind)
+# result["portfolio"]["cpi"] -> 1.08  (cost 8% under)
+# result["portfolio"]["eac"] -> 925_925  (revised estimate at completion)
+```
+
+### `delivery_velocity_trend` — rolling throughput with decline alert
+
+```python
+# Projects need completed_date set to appear in velocity windows
+svc._project_registry["p-002"]["completed_date"] = "2026-05-10"
+svc._project_registry["p-003"]["completed_date"] = "2026-05-28"
+
+trend = await svc.delivery_velocity_trend("port-A", window_weeks=4)
+# trend["slope"]            -> float (positive = improving)
+# trend["declining"]        -> bool  (True if ≥2 consecutive windows dropped)
+# trend["windows"]          -> list of {period, completions}
+```
+
+### `generate_portfolio_narrative` — Ollama-powered executive summary
+
+```python
+import os
+os.environ["OLLAMA_BASE_URL"] = "http://localhost:11434"
+
+narrative = await svc.generate_portfolio_narrative(
+    portfolio_id="port-A",
+    period="Q2-2026",
+    style="risk-focused",   # "formal" | "concise" | "risk-focused"
+)
+# narrative["text"]  -> 3-paragraph board-pack prose
+# narrative["model"] -> "llama3.1:8b"
+# narrative["fallback"] -> False (True when Ollama unreachable)
+```
+
 ## See Also
 - `WORLD_CLASS_IMPROVEMENTS.md` — 15 detailed improvement specifications
 - `service.py` — Full implementation

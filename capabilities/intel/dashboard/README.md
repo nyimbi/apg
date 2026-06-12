@@ -75,3 +75,24 @@ implementation audit, lifecycle audit, global implementation audit, strict
 package-artifact audit, stale-marker scan, disallowed messaging scan, and
 `git diff --check`.
 
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: Intelligence Dashboard
+- **I2.** Real-Time Streaming Threat Feed (Bytewax/Kafka Integration)
+- **I3.** Confidence Score Time-Series Tracking
+- **I4.** Cross-Domain Correlation Engine
+- **I5.** Automated Classification Downgrade/Upgrade Workflow
+- **I6.** Analyst Collaboration Threads (Persistent Notes)
+- **I7.** ML-Powered Anomaly Detection on Metric Confidence
+- **I8.** Dashboard Health Score (Composite KPI)
+- **I9.** Role-Based View Rendering Pipeline
+- **I10.** Scheduled Executive Briefing Delivery
+- **I11.** Dashboard Version History (Snapshot/Rollback)
+- **I12.** Geo-Spatial Threat Heatmap Feed
+- **I13.** Federated Multi-Tenant Aggregation
+- **I14.** Data Provenance Graph (Full Lineage)
+- **I15.** Predictive Metric Staleness Alerts
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

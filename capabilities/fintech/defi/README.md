@@ -174,3 +174,27 @@ Events emitted via Bytewax+NATS to the fintech event stream.
 - `real_yield_dashboard` uses observed swap volumes to estimate fee revenue; inject real on-chain data for production accuracy
 - `backtest_yield_strategy` uses `random.gauss` for APY noise — seed with a fixed value in tests for determinism
 - Streaming platform: Bytewax+NATS. Do not substitute NATS JetStream or Spark Streaming.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real-Time Liquidation Engine with NATS Event Streaming** [Risk Management]
+- **I2. Concentrated Liquidity Range Management (Uniswap V3-style)** [AMM / Liquidity]
+- **I3. MEV-Resistant Batch Swap Routing** [Trade Execution]
+- **I4. Cross-Chain Bridge Position Tracking** [Portfolio / Multi-Chain]
+- **I5. Automated Yield Strategy Routing with APY Normalisation** [Yield Optimisation]
+- **I6. On-Chain Governance Simulation and Impact Analysis** [Governance]
+- **I7. Impermanent Loss Hedging via Options Integration** [Risk Hedging]
+- **I8. Collateral Substitution and Debt Swap** [Lending / Capital Efficiency]
+- **I9. Protocol Health Oracle with Anomaly Detection** [Risk Intelligence]
+- **I10. Staking Derivatives and Liquid Staking Optimiser** [Staking / Liquid Staking]
+- **I11. Tax Event Ledger and Cost-Basis Tracking** [Compliance / Reporting]
+- **I12. Strategy Backtesting Engine** [Analytics / Strategy]
+- **I13. Multi-Sig Approval Workflow with Time-Locks** [Governance / Security]
+- **I14. Real-Yield Dashboard (Revenue vs. Emissions Decomposition)** [Analytics / Transparency]
+- **I15. NATS-Driven Price Oracle with Circuit Breaker** [Infrastructure / Oracle]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

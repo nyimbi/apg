@@ -57,3 +57,25 @@ MRP-II, safety stock optimisation, replenishment rules, capacity planning, suppl
 | **Inventory Analytics** | | |
 | POST | /api/scm/spl/analytics/inventory-turnover | Turnover and DOH analysis |
 | GET | /api/scm/spl/analytics/dashboard | Planning KPI dashboard |
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Supply Planning (scm_spl) — World-Class Improvement Roadmap
+- **I2.** Probabilistic Demand Forecasting with Prediction Intervals
+- **I3.** Dynamic Safety Stock with Demand Sensing
+- **I4.** Multi-Echelon Inventory Optimisation (MEIO)
+- **I5.** Supplier Lead-Time Variability Tracking
+- **I6.** Economic Order Quantity (EOQ) and Total Cost Optimisation
+- **I7.** Constrained MRP with Capacity Feedback Loop
+- **I8.** Vendor-Managed Inventory (VMI) and Collaborative Replenishment
+- **I9.** ABC-XYZ Segmentation Engine
+- **I10.** Perishability and Shelf-Life Constraints
+- **I11.** Scenario Planner and What-If Simulation
+- **I12.** Rolling Wave Planning with Frozen Zone Enforcement
+- **I13.** Forecast Bias Detection and Auto-Correction
+- **I14.** Supply Chain Risk Scoring
+- **I15.** Planned Order Firm-and-Release Workflow
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

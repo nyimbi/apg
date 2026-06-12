@@ -1,7 +1,7 @@
 # Mobile Banking
 
 ## Overview
-Mobile Banking provides the customer-facing mobile channel layer: banking program governance, customer enrollment, trusted device binding with attestation, authentication factor registration (passcode, biometric, OTP, device binding, hardware key), account and wallet linking, mobile payment initiation, bill payment, airtime purchase, service request intake, notification preference management, mobile fraud event recording, QR payments, transaction velocity enforcement, standing orders, FX conversion, payment dispute management, spend analytics, SIM-swap detection, outbound webhooks, privacy-preserving balance proofs, KYC refresh, and loan disbursement. It surfaces neobanking, payments, cards, lending, BNPL, and agency services through iOS, Android, web, USSD, and SMS interfaces.
+Mobile Banking (`fintech_mobile`) provides the customer-facing mobile channel layer: banking program governance, customer enrollment, trusted device binding with attestation, authentication factor registration (passcode, biometric, OTP, device binding, hardware key), account and wallet linking, mobile payment initiation, bill payment, airtime purchase, service request intake, notification preference management, mobile fraud event recording, QR payments, transaction velocity enforcement, standing orders, FX conversion, payment dispute management, spend analytics, SIM-swap detection, outbound webhooks, privacy-preserving balance proofs, KYC refresh, and loan disbursement. Surfaces neobanking, payments, cards, lending, BNPL, and agency services through iOS, Android, web, USSD, and SMS interfaces.
 
 Payment currency must match the linked account's currency. High-value payments require human approval. Devices require attestation before they can be used as a trusted payment device. All mobile banking events stream to `apg.fintech.mobile.lifecycle` via Bytewax.
 
@@ -34,6 +34,139 @@ Payment currency must match the linked account's currency. High-value payments r
 | balance_threshold_proof | Privacy-preserving signed balance proofs without raw balance disclosure |
 | kyc_refresh_workflow | Periodic KYC re-verification with CBK tier-based refresh cycles |
 | loan_disbursement | Idempotent loan disbursement to nominated mobile account |
+| biometric_step_up_auth | Cryptographic challenge re-authentication at high-value transaction time |
+| device_risk_scoring | Runtime device risk re-evaluation using behavioural signals |
+| offline_ussd_queue | Serialise USSD intents for replay on connectivity restoration |
+| push_delivery_receipts | FCM/APNs delivery confirmation with retry and channel-fallback logic |
+
+## Quick Start
+
+```python
+from apg_fintech_mobile.service import MobileBankingService
+
+svc = MobileBankingService(tenant_id="datacraft", db_url="postgresql+asyncpg://...")
+
+# Enroll a customer
+customer = await svc.mobile_onboarding(
+    msisdn="+254712345678",
+    national_id="12345678",
+    name="Jane Doe",
+    kyc_reference="kyc-001",
+)
+
+# Initiate a peer transfer
+payment = await svc.funds_transfer(
+    from_account="acc-001",
+    to_account="acc-002",
+    amount=5000.0,
+    reference="school-fees",
+)
+
+# Generate a QR payment (90 s TTL)
+qr = await svc.generate_qr_payment(
+    account_id="acc-001",
+    amount=1500.0,
+    reference="coffee-shop-001",
+)
+
+# Check transaction velocity before a high-frequency action
+velocity = await svc.check_velocity(
+    customer_id="cust-001",
+    amount=10000.0,
+)
+if not velocity["allowed"]:
+    raise ValueError("Velocity limit reached")
+```
+
+## World-Class Enhancements (v2.0)
+
+1. **QR Code Payments** — HMAC-signed, short-lived (90 s) QR payloads for contactless POS and P2P payments. Replay-proof via expiry + signature gate.
+2. **Biometric Step-Up Auth** — `step_up_auth()` issues a cryptographic challenge at transaction time. Supports FIDO2/WebAuthn and local biometric attestations.
+3. **Transaction Velocity Checks** — Sliding-window counters (`check_velocity`) enforce per-customer count and volume limits. Plugs into `initiate_payment` and `funds_transfer` as a pre-flight gate.
+4. **Scheduled / Standing Orders** — `create_standing_order()` supports daily/weekly/monthly recurrence. `process_due_standing_orders()` runs idempotently via Bytewax with `last_executed_at` guard.
+5. **Multi-Currency FX Conversion** — `fx_conversion_quote()` returns a rate-locked quote; `accept_fx_quote()` executes it. Pluggable rate provider via `_fx_rate_provider` adapter.
+6. **Device Risk Scoring** — `score_device_risk()` evaluates `{location, typing_cadence, app_version, rooted_flag, vpn_detected}` at runtime and updates the device's `risk_tier` dynamically.
+7. **Offline USSD Queue** — `queue_ussd_transaction()` serialises user intent before network-bound ops; `drain_ussd_queue()` replays on reconnect with idempotency keys. Covers rural GPRS gaps.
+8. **KYC Refresh Workflow** — `kyc_refresh()` diffs and records changed fields; `kyc_expiry_check()` returns days-to-expiry per CBK tier cycle (Tier 1: annual, Tier 2: biennial).
+9. **Push Delivery Receipts** — `record_push_delivery_receipt()` captures FCM/APNs outcomes. `get_push_delivery_stats()` enables retry logic and SMS channel fallback on push failure.
+10. **Loan Disbursement** — `disburse_loan()` validates approval, executes `funds_transfer`, and is fully idempotent — re-calling returns the existing disbursement record without double-credit.
+11. **Payment Dispute Management** — `raise_payment_dispute()` creates a typed dispute with `sla_deadline` and `escalation_tier`. `resolve_dispute()` closes and issues credit. Fulfils CBK consumer protection requirements.
+12. **SIM Swap Detection** — `detect_sim_swap()` queries a carrier adapter and auto-locks the account + records a `critical` fraud event requiring human approval for recovery.
+13. **Spend Analytics** — `spend_analytics()` buckets transactions into 8 categories (food, transport, utilities, airtime, transfers, loan repayments, savings, other), returning `top_merchants` and `savings_rate`.
+14. **Webhook Event Subscriptions** — `register_webhook()` stores HMAC-SHA256-signed subscriptions; `dispatch_webhook()` fans out to all matching subscribers with 3-retry exponential backoff.
+15. **Zero-Knowledge Balance Proof** — `prove_balance_threshold()` returns `{threshold_met: bool, signature}` without exposing the raw balance. Upgradeable to ZK-SNARK via adapter interface.
+
+## New Methods
+
+### QR Payment Generation and Scan
+
+```python
+# Generate — 90-second default TTL, configurable up to 600 s
+qr = await svc.generate_qr_payment(account_id="acc-merchant-01", amount=250.0, reference="order-9988")
+# {"qr_id": "qr-a1b2c3d4", "payload": "...", "signature": "...", "expires_at": "...", ...}
+
+# Scan and execute from payer side — returns declined dict on expiry, never raises
+result = await svc.scan_qr_payment(qr_payload=qr["payload"], payer_account_id="acc-cust-07")
+# {"status": "completed", "qr_id": "...", "payment_method": "qr", ...}
+```
+
+### Transaction Velocity Gate
+
+```python
+# Pre-flight check before any high-frequency operation
+v = await svc.check_velocity(
+    customer_id="cust-001",
+    amount=20_000.0,
+    window_seconds=3600,
+    max_count=10,
+    max_volume=500_000.0,
+)
+# {"allowed": True, "current_count": 3, "current_volume": 45000.0, "remaining_capacity": 455000.0}
+```
+
+### FX Conversion Quote and Execution
+
+```python
+# Get a rate-locked quote (30-second TTL by default)
+quote = await svc.fx_conversion_quote(from_currency="KES", to_currency="USD", amount=10_000.0)
+# {"quote_id": "fxq-abc123", "rate": 131.25, "converted_amount": 74.05, "expires_at": "...", ...}
+
+# Accept before TTL expires — idempotent on double-call
+conversion = await svc.accept_fx_quote(quote_id=quote["quote_id"], account_id="acc-001")
+# {"conversion_id": "fx-fxq-abc123-...", "deducted": 10000.0, "status": "completed", ...}
+```
+
+### Standing Order Creation
+
+```python
+# Monthly salary standing order
+order = await svc.create_standing_order(
+    account_id="acc-payroll-01",
+    to_account="acc-emp-jane",
+    amount=85_000.0,
+    frequency="monthly",
+    start_date="2026-07-01",
+    end_date="2027-06-30",
+)
+# {"order_id": "so-...", "status": "active", "next_execution": "2026-07-01", ...}
+
+# Process all due orders (called by Bytewax scheduler)
+result = await svc.process_due_standing_orders()
+# {"processed": 12, "skipped": 3, "failed": 0, "executed_at": "..."}
+```
+
+### Privacy-Preserving Balance Proof
+
+```python
+# Prove balance >= 50,000 KES to a lender without revealing the actual balance
+proof = await svc.prove_balance_threshold(
+    account_id="acc-001",
+    threshold=50_000.0,
+    verifier_id="lender-sacco-ke",
+)
+# {"account_id_hash": "...", "threshold_met": True, "verifier_id": "lender-sacco-ke",
+#  "signed_at": "...", "signature": "...", "threshold": 50000.0}
+```
 
 ## Requires
 | Capability | Purpose |

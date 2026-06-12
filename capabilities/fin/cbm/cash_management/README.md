@@ -191,3 +191,25 @@ Focused package verification:
 ./.venv/bin/apg capabilities publish-plan capabilities/fin/cbm/cash_management --json
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/fin/cbm/cash_management --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Cash Management — World-Class Improvement Catalogue
+- **I2.** Probabilistic Cash Flow Forecasting with Confidence Intervals
+- **I3.** Real-Time Bank Feed via Open Banking / ISO 20022
+- **I4.** Multi-Currency Netting Engine
+- **I5.** Liquidity Coverage Ratio (LCR) and Net Stable Funding Ratio (NSFR)
+- **I6.** Automated Payment Factory with Priority Queuing
+- **I7.** Cash Flow Categorisation via NLP / Pattern Matching
+- **I8.** Concentration Risk Monitoring
+- **I9.** Automated Bank Reconciliation with Fuzzy Matching
+- **I10.** Treasury Investment Optimisation
+- **I11.** Working Capital Cycle Analytics
+- **I12.** Cash Flow Anomaly Detection
+- **I13.** Notional Cash Pooling with Interest Optimisation
+- **I14.** SWIFT gpi Payment Tracking Integration
+- **I15.** Multi-Entity Consolidated Treasury Dashboard
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

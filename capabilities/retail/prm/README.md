@@ -183,3 +183,70 @@ Provides complete promotion lifecycle management: authoring 12 promotion types w
 - **retail_loy** loyalty_multiplier campaign type modifies earn rate; fatigue score gates campaign delivery
 - **retail_sin** shopper journey stages can trigger campaign activation
 - **intel_moni** subscribes to `prm.budget.exhaustion_imminent` for ops alerting
+
+---
+
+## World-Class Enhancements (v2.0)
+
+1. **Real-Time Dynamic Pricing Engine** — demand-sensing price adjustment within pre-approved corridors using sell-through velocity and time-to-expiry signals
+2. **Multi-Buy / Bundle Offer Types** — `BundleOffer` and `MultiBuyOffer` models with per-line discount breakdowns at basket apply time
+3. **Promotion Canary / A-B Testing Framework** — deterministic bucket assignment (hash mod 100) with `control`/`treatment` variant tracking on effectiveness records
+4. **Promotion Fatigue Detection** — rolling 30-day exposure counter per customer with configurable `max_customer_exposures_per_month` gate
+5. **Cascade Markdown Automation** — `advance_markdown_cascade` auto-progresses markdown tiers on schedule via the `schd` capability
+6. **Promotion ROI Attribution Pipeline** — `compute_promotion_roi` aggregates incremental revenue with counterfactual baseline and writes `PrmEffectivenessResponse` automatically
+7. **Budget Burn Rate Alerting** — `check_budget_burn_rate` returns `on_track | accelerating | exhaustion_imminent` and fires `ntfy` events at 95% utilisation
+8. **Competitor Price Parity Monitoring** — ingest external prices, compute gap analysis, and get margin-safe competitive markdown suggestions per SKU
+9. **Approval Workflow SLA Tracking** — `list_overdue_approvals` detects promotions in `pending_review` beyond `sla_hours` and escalates via `wflo`/`ntfy`
+10. **Personalised Coupon Generation at Scale** — `bulk_issue_coupons` generates up to 50,000 unique codes in a single async call with CSV export URL
+11. **Promotion Conflict Pre-flight Validator** — `preflight_promotion_plan` returns a conflict matrix before any promotion is activated, preventing impossible stacking combinations
+12. **Tenant Analytics Benchmarking** — percentile rank for redemption rate, discount depth, and ROI against anonymised cross-tenant peer stats
+13. **Promotion Lifecycle Event Bus** — structured CloudEvents published via `mqeb` on `retail_prm.promotion.{activated|expired|budget_exhausted|margin_breach}` topics
+14. **Margin-Aware Promotion Simulation** — `simulate_promotion_impact` projects ROI, margin headroom, and break-even redemption count before activation
+15. **Immutable Audit Trail via Append-Only Ledger** — field-level `_audit_ledger` with `get_promotion_audit_trail` persisted to PostgreSQL `prm_audit_log` via the `audl` capability
+
+---
+
+## New Methods
+
+### `compute_dynamic_price` — demand-adjusted pricing
+
+```python
+result = await svc.compute_dynamic_price(
+    sku="SKU-001",
+    base_price=100.0,
+    channel="online",
+    sell_through_rate=0.85,   # 85% of stock sold
+    days_to_expiry=5,         # perishable urgency
+)
+# result["adjusted_price"]  — clamped to 60% floor
+# result["markdown_pct"]    — e.g. 12.5
+# result["signal"]          — "high_sell_through" | "expiry_urgency" | etc.
+```
+
+### `simulate_promotion_impact` — pre-activation margin modelling
+
+```python
+simulation = await svc.simulate_promotion_impact(
+    promotion_id="prm-uuid",
+    expected_redemptions=2500,
+    avg_basket_value=45.00,
+)
+# simulation["projected_roi"]          — e.g. 2.3 (230%)
+# simulation["margin_floor_headroom"]  — pct points above floor
+# simulation["break_even_redemptions"] — minimum redemptions to be ROI-positive
+# simulation["confidence_interval"]    — [low, high] based on historical data
+```
+
+### `bulk_issue_coupons` — mass personalised coupon issuance
+
+```python
+summary = await svc.bulk_issue_coupons(
+    customer_ids=["c-001", "c-002", ...],  # up to 50,000
+    promotion_id="prm-uuid",
+    expiry=datetime(2026, 12, 31),
+    code_prefix="VIP-",
+)
+# summary["issued_count"]       — codes successfully created
+# summary["duplicate_skipped"]  — collision retries exhausted
+# summary["export_url"]         — signed URL to CSV of all codes
+```

@@ -190,3 +190,25 @@ No live external connections by default. Production adapters:
 ./.venv/bin/apg capabilities publish-plan capabilities/grc/doc --json
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/grc/doc --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Document Control (grc_doc) — World-Class Improvements
+- **I2.** Async-First Service Layer
+- **I3.** Persistent Document Store via asyncpg + PostgreSQL
+- **I4.** Structured Pydantic v2 Event Payloads
+- **I5.** Approval Workflow Engine with Multi-Stage Support
+- **I6.** Digital Signature Verification
+- **I7.** Attribute-Based Encryption for Restricted Content
+- **I8.** Full-Text Search via Tantivy / Meilisearch Adapter
+- **I9.** Document Lineage Graph
+- **I10.** Legal-Hold Notification and Escalation
+- **I11.** Retention-Class Enforcement with Automated Disposition Queue
+- **I12.** OCR + NLP Pipeline Integration (Ollama-backed)
+- **I13.** Watermarking and Redaction Engine
+- **I14.** Webhook and Push Notification Outbox
+- **I15.** Row-Level Tenant Isolation via PostgreSQL RLS
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

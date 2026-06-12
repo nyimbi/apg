@@ -152,3 +152,25 @@ Manages ore processing plant operations including plant feed tracking, process c
 - Shift met reports are distributed via `ntfy` to shift supervisors and metallurgists
 - Reconciliation data feeds ESG Scope 1/2 emissions calculations in `mining_env`
 - Reconciliation data feeds ESG Scope 1/2 emissions calculations in `mining_env`
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Ore Processing (mining_ore) — World-Class Improvement Catalogue
+- **I2.** Real-time Grind Circuit Optimisation (SAG/Ball Mill)
+- **I3.** Automated Metallurgical Balance Closure Verification
+- **I4.** Online Assay Integration via OPC-UA / MQTT
+- **I5.** Multi-Element Grade Control Blending Optimiser
+- **I6.** Predictive Reagent Dosage via Statistical Process Control
+- **I7.** Concentrate Filter Cake Quality Tracking
+- **I8.** Tailings Thickener Performance Management
+- **I9.** Carbon-in-Leach (CIL) Loading Profile Management
+- **I10.** Elution and Electrowinning Efficiency Tracking
+- **I11.** Ore Hardness and Bond Work Index (BWI) Tracking
+- **I12.** Water Balance and Recycled Water Quality Tracking
+- **I13.** Automated Shift Metallurgical Report Generation
+- **I14.** Ore Type Classification and Geometallurgical Mapping
+- **I15.** Locked Cycle Flotation Test Results Repository
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

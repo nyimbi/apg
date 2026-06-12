@@ -45,3 +45,25 @@ await gl.post_journal_entry(
 | `GET /api/fin/gl/reports/profit-and-loss` | P&L |
 | `GET /api/fin/gl/reports/balance-sheet` | Balance sheet |
 | `GET /api/fin/gl/health` | Health check |
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** General Ledger — World-Class Improvements
+- **I2.** Accrual Reversal Scheduling
+- **I3.** Cash Flow Statement Generation
+- **I4.** Multi-Currency Revaluation with Gain/Loss Posting
+- **I5.** Segment / Dimension Reporting
+- **I6.** Intercompany Elimination Engine
+- **I7.** Straight-Line Depreciation Scheduler
+- **I8.** Budget vs Actual Variance Analysis
+- **I9.** Period Locking with Hard/Soft Lock Distinction
+- **I10.** Aging Analysis for Receivables and Payables
+- **I11.** Audit Log with Tamper-Evidence Chaining
+- **I12.** Recurring Journal Entry Templates
+- **I13.** Interbank Reconciliation Statement
+- **I14.** Deferred Revenue / Prepaid Expense Amortisation
+- **I15.** Comparative Period Financial Statements
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

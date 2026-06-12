@@ -143,3 +143,25 @@ The Mobile Device Management (MDM) capability provides an enterprise-grade devic
 - Emits events to `mqeb` consumed by `moni` for fleet health dashboards
 - Alert generation feeds `ntfy` for push/email/sms escalation
 - `audl` receives every state-changing operation for compliance audit trails
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Mobile Device Management — World-Class Improvements
+- **I2.** Persistent Storage Backend
+- **I3.** Streaming Event Bus Integration
+- **I4.** Differential Compliance Engine
+- **I5.** Device Health Score
+- **I6.** Bulk Enrolment with CSV Import
+- **I7.** Certificate Lifecycle Management
+- **I8.** Geofencing and Location Policy Enforcement
+- **I9.** Application Inventory and Vulnerability Scanning
+- **I10.** Policy Inheritance and Group Targeting
+- **I11.** Wipe Cancellation and Rollback Window
+- **I12.** RBAC Permission Enforcement at Service Layer
+- **I13.** Idempotent Operations via Request IDs
+- **I14.** Scheduled Compliance Re-evaluation
+- **I15.** MDM Protocol Adapters (Apple MDM / Android Enterprise)
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

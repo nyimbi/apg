@@ -6,23 +6,24 @@ sources, governing metrics/logs/traces, managing SLOs, routing alerts,
 correlating incidents, approving remediation, composing monitoring AI agents,
 validating Bytewax lifecycle batches, and publishing UI/theme metadata.
 
-The current packet can be composed without starting OpenTelemetry collectors,
-metrics databases, log stores, trace stores, notification systems, or incident
-management tools. Those systems are runtime adapters that must honor MONI
-guardrail decisions.
+The capability operates without requiring OpenTelemetry collectors, metrics
+databases, log stores, trace stores, notification systems, or incident management
+tools at composition time. Those systems are runtime adapters that must honor
+MONI guardrail decisions.
 
 ## What MONI Provides
 
-- Tenant-aware telemetry source registration.
-- Deterministic governance for signal ingestion, PII logs, trace metadata,
+- Tenant-aware telemetry source registration with per-source signal type controls.
+- Deterministic guardrail evaluation for signal ingestion, PII logs, trace metadata,
   cardinality exceptions, alert routes, incident ownership, retention, and
   remediation approval.
-- Metric, log, and trace signal records with decision evidence.
-- SLO records and alert/incident lifecycle records.
+- Metric, log, and trace signal records with full decision evidence.
+- SLO records with threshold and window governance.
+- Alert and incident lifecycle records with auto-incident creation for critical alerts.
 - Remediation request and approval workflows with independent reviewer evidence.
 - First-class monitoring-agent registration for Codex, Claude Code, opencode,
   Pi, and future runtime adapters.
-- Durable review evidence across review-required signals, remediation requests,
+- Durable review evidence across all review-required signals, remediation requests,
   privileged monitoring agents, denied lifecycle batches, alerts, incidents,
   and audit events.
 - Pending-review queue composition for generated observability consoles.
@@ -31,13 +32,18 @@ guardrail decisions.
 - Generated-application view models for dashboards and operations screens.
 - Theme tokens and component metadata for signal consoles.
 - Contract-derived semantic-model and release evidence for APG publish tooling.
+- Anomaly detection with configurable baseline learning and z-score thresholding.
+- Multi-dimensional performance analytics with pattern extraction and recommendations.
+- Predictive resource usage forecasting.
+- Composite health scoring per tenant with alert-weighted severity model.
 
 ## Key Files
 
 - `SPECIFICATION.md` - full functional and guardrail specification.
 - `PLAN.md` - implementation plan and deferred runtime work.
+- `WORLD_CLASS_IMPROVEMENTS.md` - 15 high-impact improvements targeting v2.0.
 - `capability_contract.py` - configuration, rule engine, UI routes, and theme.
-- `service.py` - existing async monitoring runtime plus `MoniService` control plane.
+- `service.py` - async monitoring runtime (`MonitoringService`) plus `MoniService` control plane.
 - `api.py` - direct helper functions for generated APG applications.
 - `view_models.py` - generated-application UI model builders.
 - `app.py` - APG package entrypoint and semantic model.
@@ -188,6 +194,187 @@ agents = monitoring_agent_roster_model(SERVICE, tenant_id="tenant-a")
 lifecycle = lifecycle_batch_model(SERVICE, tenant_id="tenant-a")
 ```
 
+## New Methods
+
+### `MonitoringService.detect_anomalies` — ML-based anomaly detection
+
+Queries historical metrics and returns anomalous data points for a given metric
+over a configurable lookback window. Baselines accumulate on every ingested
+`MonitoringMetric` using `_update_metric_baseline`; anomaly detection uses z-score
+comparison against the rolling mean/std.
+
+```python
+service = await create_monitoring_service()
+
+anomalies = await service.detect_anomalies(
+    metric_name="orders.request.latency_ms",
+    tenant_id="tenant-a",
+    lookback_hours=24,
+)
+# Returns: [{"timestamp": ..., "value": ..., "z_score": ..., "severity": ...}, ...]
+```
+
+### `MonitoringService.predict_resource_usage` — forecasting
+
+Generates `forecast_hours`-ahead resource usage predictions from historical
+data using the service's internal ML models.
+
+```python
+prediction = await service.predict_resource_usage(
+    resource_type="cpu",
+    tenant_id="tenant-a",
+    forecast_hours=6,
+)
+# prediction["predicted_values"], prediction["confidence_interval"], prediction["trend"]
+```
+
+### `MonitoringService.analyze_performance` — performance analytics
+
+Returns performance scores, extracted hourly/daily seasonal patterns, and
+optimization recommendations for a named service over a configurable window.
+
+```python
+report = await service.analyze_performance(
+    service_name="orders",
+    tenant_id="tenant-a",
+    analysis_hours=24,
+)
+# report["performance_scores"], report["patterns"], report["recommendations"]
+```
+
+### `MoniService.dashboard_summary` — operator overview
+
+Returns a flat dict of tenant-scoped counts suitable for rendering an
+observability overview screen. Zero runtime dependencies.
+
+```python
+from capabilities.common.moni.service import MoniService
+
+svc = MoniService(tenant_id="tenant-a")
+# ... register sources, ingest signals, create alerts ...
+summary = svc.dashboard_summary("tenant-a")
+# {
+#   "source_count": 2,
+#   "signal_count": 14,
+#   "open_alert_count": 1,
+#   "pending_remediation_count": 1,
+#   "pending_review_count": 3,
+#   "audit_event_count": 22,
+#   ...
+# }
+```
+
+### `MoniService.list_pending_reviews` — operator review queue
+
+Returns all records awaiting human or operator review across signals, alerts,
+incidents, remediation requests, monitoring agents, and lifecycle batches.
+Compose directly into a generated console.
+
+```python
+pending = svc.list_pending_reviews("tenant-a")
+for item in pending:
+    print(item["status"], item.get("policy_decision"), item.get("review_reasons"))
+```
+
+## API Reference
+
+| Function | Returns | Notes |
+|---|---|---|
+| `register_source` | `SignalSourceRecord` | Must precede signal ingestion for a source_id |
+| `ingest_signal` | `SignalRecord` | Governs metric/log/trace; denies PII without redaction |
+| `create_slo` | `SloRecord` | Requires positive threshold and window_minutes |
+| `create_alert` | `AlertRecord` | Auto-opens `IncidentRecord` for critical severity |
+| `create_incident` | `IncidentRecord` | Correlation record; attach alert_ids on creation |
+| `request_remediation` | `RemediationRequestRecord` | Requires existing incident in same tenant |
+| `decide_remediation` | `RemediationRequestRecord` | Reviewer must differ from requester |
+| `register_monitoring_agent` | `MonitoringAgentRecord` | Privileged roles require human_approval_required=True |
+| `validate_monitoring_lifecycle_batch` | `MonitoringLifecycleBatchRecord` | Raises PermissionError for non-Bytewax streams |
+| `list_records` | `list[dict]` | Filtered by tenant_id; accepts optional record_type |
+| `dashboard_summary` | `dict` | Flat count summary for generated dashboards |
+| `list_pending_reviews` | `list[dict]` | Cross-collection review queue for operator consoles |
+
+## World-Class Enhancements (v2.0)
+
+The following 15 improvements are planned for v2.0, documented in full in
+`WORLD_CLASS_IMPROVEMENTS.md`. Each item maps to a specific gap in the current
+implementation.
+
+1. **Distributed Tracing Context Propagation** — W3C `traceparent`/`tracestate`
+   propagation across tenant boundaries; DAG of spans with flame-chart latency
+   breakdowns. Closes the gap between MONI as a governance store and a
+   first-class tracing backend.
+
+2. **Adaptive Anomaly Detection with Concept Drift Handling** — Replace the
+   rolling-deque mean/std baseline with EWMA statistics and CUSUM-based drift
+   detection. Auto-resets baselines after confirmed regime changes to eliminate
+   chronic alert fatigue post-deployment.
+
+3. **SLO Burn Rate Alerting with Error Budget Tracking** — Implement Google
+   SRE multi-window burn rate model (`burn_rate_1h`, `burn_rate_6h`,
+   `error_budget_remaining_percent`) on `SloRecord`. Emit
+   `slo.burn_rate_critical` when fast and slow windows both breach.
+
+4. **On-Call Schedule Integration and Escalation Routing** — Tenant-scoped
+   rotation schedules (primary, secondary, manager) with override windows.
+   Compute current on-call at alert creation; auto-escalate after configurable
+   acknowledgement windows with full audit trail.
+
+5. **Cardinality Budget Enforcement per Tenant** — Per-tenant
+   `max_series_per_tenant` budget with active series counting per metric name.
+   Reject ingestion that would breach the budget; surface utilization in
+   `dashboard_summary`.
+
+6. **Metric Rollup and Downsampling Pipeline** — Rollup tiers
+   (1m → 5m → 1h → 1d) with configurable aggregation functions including
+   p50/p95/p99. `query_metrics` selects the appropriate resolution tier by
+   requested time range. Extends effective retention ~100x.
+
+7. **Multi-Dimensional Metric Correlation Engine** — Pearson and Spearman
+   cross-correlation across configurable lag windows, segmented by tenant
+   service topology. Surfaces top correlated metrics at incident creation to
+   accelerate root-cause analysis.
+
+8. **Structured Runbook Execution with Step Tracking** — Ordered runbook steps
+   with preconditions, postcondition checks, rollback steps, and per-step
+   `RunbookStepRecord` with stdout/stderr capture. Approval gates at step
+   boundaries for production environments.
+
+9. **Real-Time WebSocket Push for Dashboard Updates** — Per-connected-session
+   asyncio `Queue` publishing delta updates when metrics or alert states change.
+   Eliminates polling overhead; delivers sub-second dashboard freshness during
+   active incidents.
+
+10. **Composite Health Scoring with Weighted Signals** — Four golden signals
+    model (latency, traffic, errors, saturation) with configurable weights per
+    tenant service tier. Replaces the current alert-count subtraction heuristic
+    in `_calculate_tenant_health_score`.
+
+11. **Metric Pipeline Backpressure and Rejection Feedback** — Explicit
+    high-water mark with `MONI_BACKPRESSURE` status on rejection. Rejection
+    counters surfaced as first-class metrics. Eliminates silent data loss during
+    ingestion spikes.
+
+12. **Per-Tenant Retention Policy Enforcement** — Activate the existing
+    `DataRetentionPolicy` model in the cleanup control plane. Per-tenant TTL
+    overrides in `_cleanup_old_metrics`; emit `data.purged` audit events;
+    expose retention budget in `dashboard_summary`.
+
+13. **Chaos Injection Hooks for Resilience Testing** — `chaos_enabled` config
+    flag (default `False`) that enables synthetic latency injection, simulated
+    alert delivery failures, and artificial anomaly signals. Essential for
+    continuous resilience validation without waiting for production incidents.
+
+14. **OpenTelemetry Semantic Convention Validation** — Configurable convention
+    registry validates signal names against OTel canonical forms. Emits
+    `signal.convention_violation` audit events; provides a migration helper
+    suggesting canonical alternatives.
+
+15. **AI-Assisted Alert Triage with Explanation Generation** — Structured
+    `triage_context` block appended to `AlertRecord` at creation time,
+    incorporating correlated metrics, recent deployment events, and historical
+    resolution patterns. When an Ollama model is available, generates ranked
+    natural-language root-cause explanations (honors APG local-AI strategy).
+
 ## Adapter Boundary
 
 Production adapters should:
@@ -207,8 +394,6 @@ Production adapters should:
    storage, generated UIs, and runtime telemetry adapters.
 
 ## Verification
-
-Focused verification for this packet should use:
 
 ```bash
 ./.venv/bin/python -m py_compile \

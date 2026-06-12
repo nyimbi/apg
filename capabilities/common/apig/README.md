@@ -177,3 +177,27 @@ decisions before side effects.
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/apig --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/apig --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Monetary Precision for Billing & Quota Monetisation** [Correctness / Finance]
+- **I2. Multi-Tier Token-Bucket Rate Limiting with Redis Lua Atomicity** [Performance / Correctness]
+- **I3. mTLS Client Certificate Validation at the Edge** [Security]
+- **I4. Semantic API Versioning with Backward-Compatibility Scoring** [API Lifecycle]
+- **I5. Distributed Tracing Context Propagation (W3C Trace Context)** [Observability]
+- **I6. Adaptive Circuit Breaker with Half-Open Probe Window** [Resilience]
+- **I7. API Key Rotation with Zero-Downtime Dual-Active Window** [Security / Operations]
+- **I8. Request Body Schema Validation Against OpenAPI Spec** [Data Quality / Security]
+- **I9. Geographic Traffic Routing and Geo-Blocking** [Compliance / Performance]
+- **I10. WebSocket and Server-Sent Events (SSE) Proxying** [Protocol Support]
+- **I11. Policy-as-Code with OPA/Rego Integration** [Governance / Security]
+- **I12. Response Caching with Content-Addressed Storage and ETags** [Performance]
+- **I13. Canary Release Automation with Statistical Traffic Analysis** [Deployment Safety]
+- **I14. GraphQL Gateway with Query Depth and Complexity Limiting** [Protocol Support / Security]
+- **I15. Tenant Billing Dashboard with Decimal-Precise Usage Aggregation** [Monetisation / Multi-Tenancy]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

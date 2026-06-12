@@ -128,3 +128,27 @@ All events are published to `apg.pharma.qms.lifecycle` unless otherwise noted.
 
 ## Composability Notes
 Change control integrates with `pharma_reg` for variations requiring regulatory submission. Deviations from `pharma_mfg` feed into QMS CAPA workflow. Audit findings from `pharma_rec` inspections link to QMS CAPA. Validation records from `pharma_mfg` equipment qualification are referenced here. Batch risk scores integrate with `pharma_lims` for analytical data and `pharma_mfg` for equipment qualification status. Inspection readiness scores feed `pharma_mgmt` management review dashboards.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. AI-Powered Batch Release Decision Engine** [Intelligent Automation]
+- **I2. Real-Time OOS/OOT Investigation Workflow** [Regulatory Compliance]
+- **I3. Intelligent Trend Analysis and SPC Integration** [Proactive Quality]
+- **I4. Electronic Batch Record (EBR) Integration and Release** [GxP Data Integrity]
+- **I5. Configurable Multi-Level Electronic Signature Workflows** [Regulatory Compliance (21 CFR Part 11 / Annex 11)]
+- **I6. Regulatory Submission Change Impact Tracker** [Regulatory Affairs Integration]
+- **I7. NATS-Driven QMS Event Mesh with Bytewax Stream Processing** [Architecture / Observability]
+- **I8. Automated GMP Training Record Verification** [Personnel Compliance]
+- **I9. Intelligent CAPA Effectiveness Prediction** [AI / Predictive Quality]
+- **I10. Batch-Level Quality Risk Scoring Dashboard** [Analytics]
+- **I11. Cross-Capability Deviation Clustering and Pattern Detection** [Intelligence / Analytics]
+- **I12. Supplier Quality Risk Profiling with Automatic Requalification Triggers** [Supply Chain Quality]
+- **I13. Regulatory Inspection Readiness Scorecard** [Audit Readiness]
+- **I14. Version-Controlled Change Package with Linked Evidence** [Data Integrity / Traceability]
+- **I15. Automated Periodic Review and Revalidation Scheduling via NATS** [Lifecycle Management]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

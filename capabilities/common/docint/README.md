@@ -77,3 +77,27 @@ Document processing events are published to NATS subjects:
 - `docint.process.{tenant_id}` — processing queue
 - `docint.audit.{tenant_id}` — immutable audit stream
 - `docint.review_required` — human review escalations
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Multi-Modal Vision-Language Model OCR** [Core Pipeline]
+- **I2. Layout-Aware Table and Column Extraction** [Extraction Quality]
+- **I3. Confidence-Weighted Human-in-the-Loop Escalation** [Quality Assurance]
+- **I4. NATS-Backed Async Document Processing Queue** [Scalability]
+- **I5. Document Deduplication and Change Detection** [Efficiency]
+- **I6. Structured Confidence Scores Per Field** [Extraction Quality]
+- **I7. Contract Clause Classification and Risk Scoring** [Contract Intelligence]
+- **I8. Multi-Language and Script Support** [Internationalization]
+- **I9. KYC/AML Watchlist Cross-Referencing** [Compliance]
+- **I10. Document Lineage and Audit Trail with NATS Publishing** [Compliance / Observability]
+- **I11. Signature and Stamp Detection** [Document Authentication]
+- **I12. Incremental Re-Extraction with Field Locking** [Workflow]
+- **I13. Bank Statement Transaction Normalization** [Financial Intelligence]
+- **I14. Document Quality Assessment Pre-Processing** [Pipeline Reliability]
+- **I15. Semantic Search Across Extracted Document Content** [Retrieval / Intelligence]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

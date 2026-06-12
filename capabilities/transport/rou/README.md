@@ -170,3 +170,25 @@ are synchronised with `transport_sch` schedules.  Traffic feeds integrate with
 delivery ETAs back to `transport_del`.  Carbon budget results feed `intel_esg` for
 scope-3 emissions reporting.  Fleet utilisation signals feed `transport_flt` for
 vehicle rebalancing.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Route Optimisation — World-Class Improvement Roadmap
+- **I2.** OR-Tools VRP Solver Integration
+- **I3.** Real-Time Traffic Adapter Pool
+- **I4.** Multi-Depot VRP Support
+- **I5.** Stochastic ETA with Confidence Intervals
+- **I6.** Carbon Budget Constraint Engine
+- **I7.** Driver Fatigue & HOS Compliance
+- **I8.** Predictive Load Balancing Across Fleet
+- **I9.** Turn-Restriction & Road-Attribute Graph
+- **I10.** Priority Delivery Escalation
+- **I11.** Persistent Route History & Replay
+- **I12.** Fleet Utilisation Optimisation
+- **I13.** Live Map Streaming via Server-Sent Events
+- **I14.** LLM-Powered Natural Language Route Briefing
+- **I15.** Geospatial Clustering for Batch Optimisation
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

@@ -95,15 +95,85 @@ Provides comprehensive telecom security management covering fraud detection (WAN
 | `multi_jurisdiction_compliance_matrix()` | Per-jurisdiction compliance matrix (KE/TZ/UG/ZA/EU/US) |
 | `subscriber_anomaly_detection()` | Z-score behavioral anomaly detection across 5 subscriber metrics |
 
-## World-Class Improvement Roadmap
-See `WORLD_CLASS_IMPROVEMENTS.md` for 15 prioritised enhancements including:
-- ML-driven fraud scoring via local Ollama models
-- Real-time Bytewax streaming fraud pipeline
-- GSMA FS.11 compliant SS7 firewall
-- STIX/TAXII threat intelligence federation
-- CALEA/ETSI LI delivery functions (DF2/DF3)
-- Cryptographic evidence chains for fraud cases
-- Automated red team regression framework
+## World-Class Enhancements (v2.0)
+
+Full details in `WORLD_CLASS_IMPROVEMENTS.md`.
+
+1. **ML Fraud Scoring** — local Ollama model replaces threshold heuristics for CDR/SS7/SIM swap scoring
+2. **Bytewax Streaming Pipeline** — persistent dataflow replacing in-memory lists; sub-second fraud decisions at CDR rate
+3. **GSMA FS.11 SS7 Firewall** — full Category 1/2/3 MAP/TCAP enforcement with per-PLMN whitelist/blacklist
+4. **Diameter Edge Agent (DEA)** — S6a/S6d/S13 proxy with Origin-Realm validation and HSS enumeration detection
+5. **SUPI/SUCI Audit Trail** — per-3GPP TS 33.501 SUPI exposure logging with purpose-limitation enforcement
+6. **SIM Box Graph Detection** — NetworkX/pgvector call-graph clustering for coordinated SIM box blocking
+7. **Zero-Trust NE Access Control** — declarative per-NE/per-PLMN MAP opcode allowlist; policy violations logged
+8. **Cryptographic Evidence Chain** — SHA-256 + HMAC linked-list evidence chain admissible in ETSI LI proceedings
+9. **Automated LI Lifecycle** — asyncio TaskGroup scheduler for warrant expiry enforcement and pre-expiry ntfy alerts
+10. **STIX/TAXII Federation** — STIX 2.1 PostgreSQL JSONB store with TAXII 2.1 endpoint and TLP-aware sharing
+11. **CALEA/ETSI LI DF2/DF3** — HI2/HI3 delivery function with S/MIME key exchange and delivery receipts
+12. **Subscriber Anomaly Baselines** — rolling 30-day P50/P90 baselines; z-score >3σ flags; Bytewax incremental updates
+13. **Multi-Jurisdiction Compliance** — `SecJurisdictionPolicy` table covering KE/TZ/UG/ZA/EU/US with per-jurisdiction matrix
+14. **Red Team Regression Framework** — `SecRedTeamScenario` replaying GSMA CVD vectors; pass/fail stored for regression detection
+15. **Unified Security Posture Score** — 0–100 tenant score aggregating all signals; daily trend tracking; alerts on >10pt drop in 24h
+
+## New Methods
+
+### `evaluate_fraud_risk_score` — multi-signal fraud scoring per MSISDN
+
+```python
+svc = TelecomSecService()
+result = await svc.evaluate_fraud_risk_score(
+    msisdn="+254700000001",
+    features={
+        "calls_per_hour": 45,
+        "sms_per_hour": 120,
+        "geo_anomaly_score": 0.82,
+        "is_roaming": True,
+        "recent_fraud_flag": False,
+        "account_age_days": 14,
+    },
+    tenant_id="safaricom",
+)
+# result["risk_score"]        -> 0.0–1.0 composite score
+# result["auto_block"]        -> True if score >= 0.85
+# result["recommended_action"] -> "block" | "flag" | "monitor" | "pass"
+# result["signals"]           -> per-signal breakdown dict
+```
+
+### `generate_security_posture_score` — unified 0–100 tenant posture score
+
+```python
+posture = await svc.generate_security_posture_score(tenant_id="safaricom")
+# posture["score"]      -> 0–100 int
+# posture["grade"]      -> "A" | "B" | "C" | "D" | "F"
+# posture["dimensions"] -> {"incidents": int, "signaling": int, "fraud": int, "compliance": int}
+# posture["summary"]    -> human-readable assessment string
+```
+
+### `subscriber_anomaly_detection` — z-score behavioral anomaly detection
+
+```python
+anomaly = await svc.subscriber_anomaly_detection(
+    msisdn="+254700000002",
+    current_metrics={
+        "call_volume": 320,
+        "data_usage_mb": 4800,
+        "sms_count": 15,
+        "roaming_duration_min": 0,
+        "international_call_ratio": 0.95,
+    },
+    baseline_metrics={
+        "call_volume":             {"mean": 40.0,  "std": 12.0},
+        "data_usage_mb":           {"mean": 500.0, "std": 150.0},
+        "sms_count":               {"mean": 20.0,  "std": 8.0},
+        "roaming_duration_min":    {"mean": 0.0,   "std": 5.0},
+        "international_call_ratio":{"mean": 0.05,  "std": 0.04},
+    },
+    tenant_id="safaricom",
+)
+# anomaly["is_anomalous"]     -> True
+# anomaly["flagged_dimensions"] -> ["call_volume", "international_call_ratio"]
+# anomaly["z_scores"]         -> per-metric z-score dict
+```
 
 ## Composability Notes
 Feeds fraud signals to telecom_ana (fraud analytics). Consumes network events from telecom_net for SS7/Diameter correlation. Lawful intercept integrates with comp for regulatory reporting chains. Threat intel composes with grph for adversary network mapping.

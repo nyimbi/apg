@@ -125,3 +125,59 @@ Provides unified commerce orchestration across all retail touchpoints: channel r
 - **wflo** receives high-fraud-score orders for manual review via `fraud_screen_order`
 - **moni** receives channel health degradation alerts from circuit-breaker thresholds
 - **nlpc** augments `search_catalogue` with NLP query expansion when wired
+
+## World-Class Enhancements (v2.0)
+
+1. **Distributed Inventory Reservation with TTL and Saga Pattern** — `ReservationLedger` assigns UUID/expiry/saga-ID; background sweep releases expired reservations atomically.
+2. **Real-Time Cross-Channel Inventory Broadcast via SSE** — `upsert_inventory` / `reserve_inventory` publish delta events; `/inventory/stream` endpoint delivers sub-second stock updates.
+3. **Multi-Touch Attribution Engine** — Configurable linear, time-decay, and data-driven attribution models; stores full attribution vectors for channel ROI reporting.
+4. **Predictive BOPIS Slot Management** — `SlotGrid` per `(store_id, date, hour)` enforces pick capacity and returns `estimated_ready_by` windows on BOPIS creation.
+5. **Order Splitting and Partial Fulfilment** — `split_allowed=True` materialises child shipment records; `list_shipments` and `mark_shipment_shipped` track per-item status.
+6. **Loyalty Points Composability Hook** — `earn_loyalty_points` / `burn_loyalty_points` call out to `retail_loy` via capability adapter; emits `loyalty_earned` / `loyalty_burned` events.
+7. **Fraud Scoring Integration with Inline Decisioning** — `fraud_screen_order` assembles feature vector, scores against configurable threshold (`RETAIL_OMC_FRAUD_THRESHOLD`), auto-holds high-risk orders.
+8. **Dynamic Shipping Rate Calculation** — `calculate_shipping` evaluates carrier rate tables by weight, zone, and fulfilment mode; returns ranked options with ETA and price.
+9. **Cart Merge on Authentication** — `merge_carts` supports `keep_authenticated`, `keep_guest`, and `union` strategies; emits `cart_merged` journey event.
+10. **Promotion and Coupon Engine with Stacking Rules** — `apply_promotions` resolves from `retail_prm`, validates exclusive/additive/best-deal stacking, applies line-item discount records.
+11. **Inventory Aggregation and Safety Stock Automation** — `compute_safety_stock` calculates reorder point from demand σ and lead time; `list_low_stock_alerts` triggers purchase order workflows.
+12. **Structured Audit Trail with Event Sourcing** — `_emit_audit_event` appends CloudEvent-structured records; `query_audit_log` enables forensic investigation and state replay.
+13. **Channel Health Monitoring and Circuit Breaker** — `get_channel_health` tracks p95 latency and error rates; circuit breaker auto-disables degraded channels and alerts `moni`.
+14. **Catalogue Search with Faceted Filtering and BM25 Relevance** — `search_catalogue` supports full-text query, facet aggregation, and NLP query expansion via `nlpc`.
+15. **RMA Workflow with Condition Grading** — `process_rma` grades returned items (`new`/`refurbished`/`damaged`/`scrap`), routes to restock/refurb/write-off, and computes grade-adjusted refund.
+
+## New Methods
+
+### `fraud_screen_order` — inline fraud decisioning
+
+```python
+result = await svc.fraud_screen_order(order_id="ord_abc123")
+# result["fraud_score"]        → 0.82
+# result["fraud_check_passed"] → False  (score >= threshold)
+# result["signals"]            → {"high_value": True, "velocity_spike": True, ...}
+# High-risk orders are auto-held; threshold configurable via RETAIL_OMC_FRAUD_THRESHOLD
+```
+
+### `merge_carts` — guest-to-authenticated cart merge on login
+
+```python
+merged = await svc.merge_carts(
+    tenant_id="tenant_01",
+    guest_cart_id="cart_guest_xyz",
+    authenticated_cart_id="cart_auth_abc",
+    strategy="union",          # sums quantities for duplicate SKUs
+)
+# merged.items contains the reconciled line items
+# source guest cart is invalidated automatically
+```
+
+### `process_rma` — physical return processing with condition grading
+
+```python
+result = await svc.process_rma(
+    return_id="ret_789",
+    received_items=[{"sku": "SKU-001", "qty": 2}, {"sku": "SKU-002", "qty": 1}],
+    condition_grades={"SKU-001": "refurbished", "SKU-002": "scrap"},
+)
+# result["actual_refund"]    → grade-adjusted refund amount (0.7× for refurbished, 0× for scrap)
+# result["dispositions"]     → {"SKU-001": "refurbishment_queue", "SKU-002": "write_off"}
+# Inventory adjusted; rma_processed CloudEvent emitted
+```

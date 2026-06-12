@@ -133,3 +133,25 @@ The Timetabling capability provides constraint-based timetable generation and ma
 - **ntfy**: Substitution assignments and timetable publications broadcast via `ntfy` to affected teachers and students.
 - **wflo**: Publication approval and constraint removal approval workflows execute in `wflo`.
 - **mqeb** / bytewax: All conflict and publication events published to `apg.education.ttbl.lifecycle` for dashboards and downstream analytics.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Timetabling — World-Class Improvement Opportunities
+- **I2.** Genetic Algorithm with Local-Search Hybrid
+- **I3.** Soft-Constraint Weighted Scoring Engine
+- **I4.** Teacher Availability Matrix with Preferred-Period Encoding
+- **I5.** Exam Timetable Clash-Free Guarantor with Student-Group Intersection Graph
+- **I6.** Multi-Objective Pareto Dashboard
+- **I7.** Real-Time Conflict Heat-Map Stream
+- **I8.** Substitution Recommendation Engine (Availability + Qualification Scoring)
+- **I9.** Academic Calendar-Aware Generation Window Enforcement
+- **I10.** Room Allocation Fairness Auditor
+- **I11.** Batch Constraint Import via Structured CSV/JSON
+- **I12.** Timetable Diff and Change-Log View
+- **I13.** Constraint Sensitivity Analysis
+- **I14.** Student Load Balancing Validator
+- **I15.** Webhook / Notification Trigger Registry
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

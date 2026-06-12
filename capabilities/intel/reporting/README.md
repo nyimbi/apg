@@ -151,3 +151,25 @@ validation, package tests, APG inspect, APG publish-plan, package
 implementation audit, lifecycle audit, global implementation audit, strict
 package-artifact audit, stale-marker scan, disallowed messaging scan, and
 `git diff --check`.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements — Intelligence Reporting Capability
+- **I2.** Overview
+- **I3.** Event-Sourced Audit Trail with Tamper-Evidence
+- **I4.** Classification-Label Enforcement at Every Write Boundary
+- **I5.** Pluggable Persistence Backend (Repository Pattern)
+- **I6.** Report Versioning and Diff Engine
+- **I7.** Recipient Need-to-Know Validation Before Distribution
+- **I8.** Structured Key Intelligence Questions (KIQ) Lifecycle
+- **I9.** Source Reliability and Information Credibility (SRIC) Scoring
+- **I10.** Parallel Dissemination with Structured Failure Handling
+- **I11.** Redaction Engine for Downgraded Copies
+- **I12.** Machine-Readable Report Schema Registry
+- **I13.** Metrics Emission via OpenTelemetry
+- **I14.** Async Background Classification Review Scheduler
+- **I15.** Compartment and Codeword Management
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

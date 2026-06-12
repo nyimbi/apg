@@ -106,3 +106,25 @@ python -c "from capability_contract import get_capability_contract; print('OK')"
 
 Proprietary — © 2025 Datacraft  
 Author: Nyimbi Odero <nyimbi@gmail.com>
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Audit Management — World-Class Improvements
+- **I2.** AI-Driven Risk Scoring for Audit Universe Prioritisation
+- **I3.** Continuous Control Monitoring (CCM) Integration
+- **I4.** Structured Finding Root-Cause Taxonomy
+- **I5.** Remediation SLA Escalation Engine
+- **I6.** Sampling Engine with Statistical Confidence Intervals
+- **I7.** Dual-Approval Workpaper Sign-Off with Digital Signatures
+- **I8.** Benchmark Comparative Analytics Against Industry Peers
+- **I9.** Automated Regulatory Change Impact Assessment
+- **I10.** Heatmap-Ready Risk Matrix for Executive Dashboards
+- **I11.** Cross-Engagement Finding Correlation and Systemic Risk Detection
+- **I12.** Whistleblower Case Management with Chain-of-Custody Tracking
+- **I13.** Engagement Time-Budget Tracking with Earned-Value Analysis
+- **I14.** Integrated Control Testing Library with Test Steps
+- **I15.** Audit Report Version Control with Diff Tracking
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

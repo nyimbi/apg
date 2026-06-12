@@ -6,7 +6,7 @@ Digital Wallets provides the stored-value ledger layer: wallet lifecycle (consum
 Negative balances are architecturally blocked. Transfers between same-currency wallets only — cross-currency transfers are denied to enforce explicit FX routing. Large transfers require review. Hold releases cannot exceed the held balance. Both batch operations and individual events require Bytewax routing. Events stream to `apg.fintech.wallets.lifecycle` via Bytewax.
 
 ## Capability ID
-`fintech_wallets`  Version: 1.1.0
+`fintech_wallets`  Version: 2.0.0
 
 ## Provides
 | Service | Description |
@@ -114,3 +114,78 @@ Events emitted to the fintech event stream via Bytewax.
 - `escrow` and `treasury` wallet types are operational accounts, not customer accounts; they follow the same governance rules as consumer/merchant wallets
 - The `walt` dependency is a core wallet engine service (abbreviated as `walt` in the adapter map) — it handles atomic balance operations; the Digital Wallets capability wraps `walt` with APG governance and event streaming
 - Both batch and individual event operations require Bytewax routing — three separate guardrail rules: `wallet_batch`, `wallet_event`, and privileged agent actions
+
+---
+
+## World-Class Enhancements (v2.0)
+
+1. **Double-Entry Accounting** — Every debit paired with a matching credit on a contra account (`FLOAT-SUSPENSE`, `FX-GAIN`, `MERCHANT-PAYABLE`); eliminates phantom money and enables trial-balance generation.
+2. **Idempotency Store with TTL** — Redis-backed deduplication keyed by `(tenant_id, idempotency_key)` with 24-hour TTL; returns original response on replay instead of raising duplicate errors.
+3. **Event Sourcing / Immutable Ledger** — Balance derived by summing ledger entries (periodic snapshot for performance); no mutable balance fields; enables point-in-time reconstruction.
+4. **Multi-Leg FX with Rate Lock** — Lock rate for configurable TTL, debit source, credit target, post spread to FX income account; exposes `lock_fx_rate()`, `execute_locked_conversion()`, `expire_fx_lock()`.
+5. **Velocity Controls and Fraud Scoring** — Track TPS, distinct recipients/hour, geo-velocity; compute per-transaction fraud score; pluggable `FraudScorer` protocol integrating with `fintech_intel`.
+6. **Wallet Group / Sub-Wallet Hierarchy** — Parent treasury wallet with child sub-wallets sharing a pooled balance; individual limits drawn from parent pool; models fleet cards and corporate accounts.
+7. **Scheduled Payments / Standing Orders** — `schedule_payment()` with cron expression, idempotent retry runner; `list_scheduled_payments()`, `cancel_scheduled_payment()`, `pause_scheduled_payment()`.
+8. **Reconciliation Engine** — `reconcile_wallet()` accepts external provider statements, matches against ledger, outputs matched/unmatched sets, flags discrepancies as `RECON_BREAK` evidence records.
+9. **Wallet Access Control Lists** — Per-wallet ACLs with `grant_wallet_access()` / `revoke_wallet_access()`; permissions: `read`, `credit`, `debit`, `hold`, `admin`; enforced before capability-contract `_enforce()`.
+10. **Configurable Fee Engine** — Flat, percentage, tiered-volume, and interchange fee schedules; tenant- and instrument-scoped; fees auto-debited to `fee_income` wallet; `get_fee_estimate()` for pre-flight display.
+11. **Regulatory Reporting (CTR/STR)** — Auto-detect KES 1M / USD 10k thresholds and structuring patterns; generate draft CTR/STR evidence records and notify compliance team.
+12. **Wallet Snapshots for Point-in-Time Queries** — Persist EOD/EOM balance snapshots; `balance_at(wallet_id, timestamp)` reconstructs exact balance from nearest snapshot plus subsequent deltas.
+13. **Async Bulk Operations with Progress Tracking** — Micro-batch partitioning (100/batch), `asyncio.gather` concurrency, `get_bulk_job_status(job_id)` polling, configurable TPS back-pressure.
+14. **Cryptographic Receipt Generation** — HMAC-SHA256 per transaction using `keym`-managed tenant signing key; `verify_receipt(receipt_hash, transaction_id)` for customer-facing authenticity proof.
+15. **Real-Time Balance Streaming (WebSocket/SSE)** — `subscribe_wallet_balance(wallet_id)` async generator yielding delta events on `apg.fintech.wallets.balance_updates`; eliminates polling, enables POS terminal integration.
+
+---
+
+## New Methods
+
+### `wallet_to_wallet_transfer` — P2P transfer with spend-limit enforcement
+
+```python
+svc = DigitalWalletsService(tenant_id="acme")
+
+result = await svc.wallet_to_wallet_transfer(
+    from_wallet="w-cust-001-kes-a1b2c3",
+    to_wallet="w-cust-002-kes-d4e5f6",
+    amount="5000.00",
+)
+# result: {status: "posted", transfer_id: "ww-...", amount: "5000.00", currency: "KES", ...}
+```
+
+Enforces freeze state on both wallets, daily spend limit on the source, and posts matching ledger entries. Raises `PermissionError` on limit breach or frozen wallet.
+
+---
+
+### `currency_conversion_in_wallet` — In-wallet FX conversion
+
+```python
+result = await svc.currency_conversion_in_wallet(
+    wallet_id="w-cust-001-usd-a1b2c3",
+    from_ccy="USD",
+    to_ccy="KES",
+    amount="100.00",
+)
+# result: {status: "converted", converted_amount: "12850.00", spread_amount: "195.00",
+#          fx_rate: "131.12", net_converted: "12850.00", ...}
+```
+
+Applies a 1.5% FX spread, debits source wallet, and records both the gross and net converted amounts in the ledger. Target wallet must be opened separately before crediting.
+
+---
+
+### `wallet_statement` — Paginated account statement with running balance
+
+```python
+from datetime import datetime
+
+statement = await svc.wallet_statement(
+    wallet_id="w-cust-001-kes-a1b2c3",
+    start_date=datetime(2026, 1, 1),
+    end_date=datetime(2026, 3, 31),
+    limit=50,
+)
+# result: {wallet_id: "...", currency: "KES", opening_balance: "10000.00",
+#          closing_balance: "87350.00", transactions: [...], total_credits: "...", total_debits: "..."}
+```
+
+Returns chronological ledger entries with running balance, aggregated credit/debit totals, and opening/closing balances for the requested period. Suitable for customer-facing statements and regulatory reporting.

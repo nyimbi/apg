@@ -110,3 +110,25 @@ Manages pharmaceutical distribution operations including cold chain monitoring, 
 
 ## Composability Notes
 Receives released batches from `pharma_mfg` for dispatch. Recall data feeds `pharma_rec` post-market surveillance. Serialisation events integrate with national verification systems (EMVS, DSCSA Hub). GDP deviations link to `pharma_qms` CAPA workflow. IoT telemetry ingestion integrates with cold-chain logger vendors (Elpro, Sensitech, DeltaTrak) via MQTT/REST webhooks.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Pharmaceutical Distribution — World Class Improvements
+- **I2.** Async-First Service Architecture
+- **I3.** Repository Pattern with Async PostgreSQL Backend
+- **I4.** Cryptographic Serialisation Verification (DSCSA 2023 / EU FMD)
+- **I5.** Real-Time IoT Cold Chain Telemetry Ingestion
+- **I6.** Mean Kinetic Temperature (MKT) Calculation Engine
+- **I7.** Multi-Tier Recall Propagation Engine
+- **I8.** Returns Disposition Automation with Regulatory Quarantine Workflow
+- **I9.** Blockchain-Anchored Track-and-Trace Ledger
+- **I10.** GDP Risk Scoring and Predictive Compliance Dashboard
+- **I11.** Cross-Border Import/Export Permit Automation
+- **I12.** Demand-Driven Distribution Planning
+- **I13.** Serialisation Aggregation Hierarchy Validation
+- **I14.** Automated WDA Renewal Workflow
+- **I15.** Event-Driven Architecture with Domain Events
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

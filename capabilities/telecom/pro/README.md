@@ -133,3 +133,75 @@ Every transition requires a justification string and is audit-logged.
 
 ## Composability Notes
 Product catalogue feeds telecom_ord (order validation against active products). Bundle decomposition generates multiple service orders routed through the provisioning workflow engine. Price records feed telecom_bil (charge code generation). Activation confirmation triggers telecom_cus (lifecycle event). Receives provisioning tasks from telecom_ord. Reserves resources from telecom_inv (IPAM, circuit). Pushes configuration to NEs tracked in telecom_inv.
+
+## World-Class Enhancements (v2.0)
+
+1. **TMF620 Product Catalogue** — `ProProduct` model with category, status, characteristics, and version; governed release pipelines replace magic strings.
+2. **Bundle Management Engine** — `ProBundle` with ordered components, pricing tiers, eligibility rules, and incompatibility guards; bridges catalogue to provisioning.
+3. **Effective-Dated Price List** — `ProPrice` with charge type, tiered rate tables, and temporal queries ("price of X on date Y").
+4. **Product Lifecycle State Machine** — enforced `draft→review→approved→active→deprecated→retired` with audited, justified transitions.
+5. **Faceted Catalogue Search** — `search_catalogue` with category/status/price/keyword filters, pagination, and facet counts in a single call.
+6. **Offer Eligibility Engine** — `evaluate_offer_eligibility` checks segment, geography, existing services, and credit class; returns disqualifiers and alternatives.
+7. **Promotional Campaign Management** — `ProPromotion` with idempotent, audit-logged discount application; supports percentage, fixed, and free-month types.
+8. **SLA Tier Catalogue** — `ProSlaTier` capturing availability, MTTR, provisioning SLA, and support tier; stamps SLA on each workflow at order time.
+9. **Catalogue Versioning and Audit** — immutable version records per `(product_id, version)`; `diff_product_versions` for change history and rollback.
+10. **Product Dependency Graph** — `build_product_dependency_graph` emits a JSON-LD DAG of capabilities, resources, and sub-products for impact analysis.
+11. **TMF620 Import/Export** — `export_catalogue` / `import_catalogue` support `tmf620_json`, CSV, and XLSX with atomic transactional apply and conflict detection.
+12. **Bulk Price Update with Approval Gate** — `bulk_update_prices` validates all items before applying; atomic rollback on any failure.
+13. **Rules-Based Product Recommendation Engine** — `recommend_products` ranks eligible products via affinity rules without ML infrastructure dependency.
+14. **Regulatory Compliance Tagging** — `regulatory_tags` per product; `get_compliance_report` flags missing CAK/jurisdiction tags across portfolio.
+15. **Catalogue Health Dashboard** — `catalogue_health_dashboard` returns active/draft/deprecated counts, price coverage, SLA distribution, expiring promotions, and a 0–100 completeness score in O(n).
+
+## New Methods
+
+### `create_product` — register a TMF620-aligned product
+
+```python
+product = await svc.create_product(
+    product_id="FTTX-100",
+    name="Fibre 100 Mbps Home",
+    category="broadband",
+    characteristics={"speed_mbps": 100, "technology": "FTTH"},
+    tenant_id="ke-nairobi",
+    status="draft",
+)
+# Advance through lifecycle (each step requires a justification)
+await svc.update_product_status("FTTX-100", "review", "QA sign-off received", tenant_id="ke-nairobi")
+await svc.update_product_status("FTTX-100", "active", "Approved by product board", tenant_id="ke-nairobi")
+```
+
+### `search_catalogue` — faceted product discovery
+
+```python
+results = await svc.search_catalogue(
+    tenant_id="ke-nairobi",
+    category="broadband",
+    status="active",
+    keyword="fibre",
+    min_price=500.0,
+    max_price=5000.0,
+    offset=0,
+    limit=20,
+)
+# results["facets"] carries {"category": {...}, "status": {...}}
+# for rendering filter chips without extra roundtrips
+active_products = results["results"]
+facets = results["facets"]
+```
+
+### `catalogue_health_dashboard` — at-a-glance catalogue KPIs
+
+```python
+health = await svc.catalogue_health_dashboard(tenant_id="ke-nairobi")
+# {
+#   "active_products": 42,
+#   "draft_products": 7,
+#   "deprecated_products": 3,
+#   "price_coverage_pct": 88.1,
+#   "promotions_expiring_soon": 2,
+#   "completeness_score": 79,   # 0-100
+#   ...
+# }
+if health["completeness_score"] < 80:
+    alert("Catalogue completeness below threshold")
+```

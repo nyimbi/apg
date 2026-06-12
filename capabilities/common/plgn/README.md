@@ -19,12 +19,24 @@ application.
 - Permission review records for approved scopes, denied scopes, sensitive
   permissions, and secret-access decisions.
 - Sandbox policy records for network, filesystem, secret, and tool allowlist
-  constraints.
-- Marketplace listing workflow with curation, publisher verification, and
-  tenant install policy.
+  constraints; extended with CPU/memory quotas and syscall allowlists.
+- Marketplace listing workflow with curation, publisher verification,
+  semantic search, and tenant install policy.
 - Release, installation, and enablement lifecycle guarded by policy evidence.
 - First-class AI plugin agents with runtime, role, scope, registration, and
   contribution-disclosure guardrails.
+- Async-first public API: every method has a native `async` counterpart.
+- Concurrent fan-out event dispatch with per-handler timeout isolation.
+- Semaphore-bounded parallel health checks and bulk installs.
+- Dependency resolution with conflict detection (PubGrub solver hook).
+- Cryptographic signature verification pipeline with trust-level output.
+- Supply-chain CVE risk scoring with configurable threshold policies.
+- Capability-token (PASETO/Macaroon) permission model for offline sandbox checks.
+- Hot-reload with zero-downtime plugin swap and automatic rollback.
+- Policy-as-code governance via OPA/Cedar with per-tenant versioned documents.
+- Federated registry with trust tiers for multi-deployment ecosystems.
+- W3C trace propagation for distributed plugin execution telemetry.
+- SemVer compatibility matrix with install-blocking on hard incompatibilities.
 - UI route, API, view-model, theme, semantic-model, package-manifest, and
   release-report evidence.
 
@@ -38,11 +50,10 @@ application.
   listings, releases, installations, audit events, and agents.
 - `plugin_runtime.py` contains deterministic IDs, release-channel and install
   policy normalization, scope helpers, and release-readiness checks.
-- `service.py` implements the runtime facade.
+- `service.py` implements the runtime facade (`PluginExtensionService` / `PlgnService`).
 - `api.py` exposes package-safe helper functions.
 - `views.py` exposes UI view models.
-- `test_capability_contract.py` proves lifecycle behavior and generated
-  evidence.
+- `test_capability_contract.py` proves lifecycle behavior and generated evidence.
 
 ## Basic Usage
 
@@ -95,9 +106,8 @@ agent = service.register_plgn_agent(
 )
 ```
 
-Supported runtimes are `codex`, `claude_code`, `opencode`, and `pi`.
-Supported roles cover marketplace, manifest, permission, sandbox, release, and
-compatibility review.
+Supported runtimes: `codex`, `claude_code`, `opencode`, `pi`.  
+Supported roles: marketplace, manifest, permission, sandbox, release, and compatibility review.
 
 ## Composition
 
@@ -179,12 +189,112 @@ asyncio.run(main())
 | `async_search_marketplace` | Paginated search; hook for full-text/vector index |
 | `async_audit_query` | Filtered, sorted audit event retrieval |
 
+## New Methods
+
+### Concurrent fan-out event dispatch
+
+```python
+# Register hooks first
+svc.hook_register(
+    tenant_id="t1", event_name="order.created",
+    plugin_id="notifier-ext", handler="notifier.on_order_created", priority=10,
+)
+
+# Fire — all handlers run concurrently; each is independently time-boxed
+report = await svc.async_hook_fire(
+    tenant_id="t1", event_name="order.created",
+    payload={"order_id": "ord-123"}, handler_timeout_ms=800,
+)
+# report["dispatched"] lists per-handler status: "dispatched" | "timeout" | "error"
+```
+
+### Semaphore-bounded bulk install
+
+```python
+result = await svc.async_bulk_install(
+    plugin_ids=["ext-a", "ext-b", "ext-c"],
+    tenant_id="t1",
+    concurrency=3,
+    stop_on_first_error=True,   # cancels remaining on first failure
+)
+# result keys: installed, failed, cancelled, outcomes
+```
+
+### Sandboxed execution with wall-clock timeout
+
+```python
+try:
+    exec_record = await svc.async_sandboxed_execution(
+        plugin_id="risk-scorer", method="score",
+        parameters={"customer_id": "cust-42"},
+        tenant_id="t1", timeout_ms=3000,
+    )
+except asyncio.TimeoutError:
+    # sandbox worker did not respond within 3 s
+    ...
+```
+
+### Audit query with filtering
+
+```python
+# Retrieve the last 50 install events for a tenant, newest-first
+events = await svc.async_audit_query(
+    tenant_id="t1",
+    event_type="plugin_installed",
+    since="2026-01-01T00:00:00+00:00",
+    limit=50,
+)
+```
+
+### Marketplace billing (Decimal-accurate)
+
+```python
+bill = await svc.async_plugin_marketplace_billing(
+    tenant_id="t1", plugin_id="risk-scorer",
+    quantity=5, unit_price="4.99", currency="USD",
+    billed_by="billing-service",
+)
+# bill["total_amount"] == "24.95" — no floating-point drift
+```
+
+## World-Class Enhancements (v2.0)
+
+All 15 improvements are designed around production requirements for a
+multi-tenant extension system. Each has a corresponding hook point in the
+async API.
+
+| # | Improvement | Category | Summary |
+|---|---|---|---|
+| I1 | Async-First Architecture | Architecture | Native `async def` for every public method; `asyncio.TaskGroup` for structured concurrency with automatic cancellation propagation. |
+| I2 | Structured Async Event Bus | Eventing | `async_hook_fire` with `asyncio.gather` + per-handler `asyncio.wait_for`; `EventBusMiddleware` protocol; `DeadLetterQueue`; structured `DispatchReport`. |
+| I3 | Cryptographic Signature Pipeline | Security | Multi-step async pipeline: fetch artifact hash, verify ECDSA-P256/Ed25519, OCSP/CRL revocation, write immutable audit record; `trust_level` replaces boolean flag. |
+| I4 | Supply-Chain CVE Risk Scoring | Security | `async_supply_chain_scan` calling OSV.dev/Grype; composite score 0–100; tenant-configurable threshold policies gate registration (warn/block/quarantine). |
+| I5 | Versioned Config Schema & Migration | Developer Experience | `PluginConfigSchema` with append-only `SchemaRevision` log; JSON Schema Draft 2020-12 validation; breaking changes require explicit migration annotations. |
+| I6 | Capability-Token Permission Model | Security | PASETO v4 local tokens with resource, actions, expiry, delegation depth; offline sandbox verification; `async_grant/revoke/list_capability_tokens`. |
+| I7 | Hot-Reload Zero-Downtime Swap | Operational Excellence | `async_hot_reload_plugin`: shadow slot, semaphore quiesce, atomic entry-point swap, migration fn, automatic rollback on first failure within `grace_window_ms`. |
+| I8 | Hierarchical Sandbox Profiles | Security | Extended `SandboxPolicy` with `cpu_millicores`, `memory_mb`, `syscall_allowlist`, `inter_plugin_calls`; time-limited permission escalation with automatic expiry. |
+| I9 | Marketplace Semantic Search | Marketplace | `async_recommend_plugins` scoring by BM25 popularity, health ratio, capability compatibility, and cosine similarity via pgvector/Meilisearch adapter. |
+| I10 | PubGrub Dependency Solver | Developer Experience | `async_solve_dependencies` via `resolvelib`; returns `SolveResult{install_order, locked_versions, explanation_tree}`; cached by constraint hash. |
+| I11 | Multi-Stage Release Pipeline | Release Engineering | `ReleasePipeline` stages: draft→sign→scan→review→approve→publish→notify; each idempotent and resumable; `async_advance_release_stage` with human-gate webhooks. |
+| I12 | Plugin Telemetry W3C Trace | Observability | `async_traced_execution` propagates `traceparent`/`tracestate` into sandbox workers; `async_plugin_slo_report` returns `{p50,p95,p99,error_rate}`; OTEL adapter. |
+| I13 | Cross-Version Compatibility Matrix | Reliability | `CompatibilityMatrix` per tenant; `async_check_compatibility` evaluates PEP 440/SemVer constraints; blocks install on `compatible=False`; queryable artifact. |
+| I14 | Federated Plugin Registry | Ecosystem | `RemoteRegistry` with trust tiers `trusted/verified/community`; `async_sync_remote_registry` pulls/reconciles manifests; `async_publish_to_registry` pushes signed manifests. |
+| I15 | Policy-as-Code Governance | Governance | `PolicyDocument` model (OPA/Cedar engine); `async_evaluate_policy` delegates to configured engine; `async_update_policy` appends `PolicyRevision` with diff and full audit trail. |
+
 ## Verification
 
-Focused verification for this packet:
-
 ```bash
-./.venv/bin/python -m py_compile capabilities/common/plgn/__init__.py capabilities/common/plgn/capability_contract.py capabilities/common/plgn/models.py capabilities/common/plgn/plugin_runtime.py capabilities/common/plgn/service.py capabilities/common/plgn/api.py capabilities/common/plgn/views.py capabilities/common/plgn/app.py capabilities/common/plgn/test_capability_contract.py
+./.venv/bin/python -m py_compile \
+    capabilities/common/plgn/__init__.py \
+    capabilities/common/plgn/capability_contract.py \
+    capabilities/common/plgn/models.py \
+    capabilities/common/plgn/plugin_runtime.py \
+    capabilities/common/plgn/service.py \
+    capabilities/common/plgn/api.py \
+    capabilities/common/plgn/views.py \
+    capabilities/common/plgn/app.py \
+    capabilities/common/plgn/test_capability_contract.py
+
 ./.venv/bin/pytest -q capabilities/common/plgn/test_capability_contract.py
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/plgn --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/plgn --json

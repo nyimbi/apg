@@ -80,3 +80,25 @@ Citizen case intake, assignment, workflow routing, SLA tracking, escalation, and
 
 ## Composability Notes
 Composes with `government_csr` (portal applications escalate to case management), `government_lic` (licence complaints create cases), `government_law` (case outcomes may trigger prosecution referrals), and `intel` (case pattern analytics for policy intelligence).
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Case Management — World-Class Improvements
+- **I2.** Real Async Throughout
+- **I3.** Persistent PostgreSQL Backing Store
+- **I4.** Proper SLA met / breached Computation
+- **I5.** Event-Driven Architecture via Message Bus
+- **I6.** Inter-Agency Routing Engine
+- **I7.** ML-Assisted Auto-Triage
+- **I8.** Duplicate Case Detection
+- **I9.** Structured Case Lifecycle State Machine
+- **I10.** Full-Text Case Search with PostgreSQL
+- **I11.** Citizen-Facing Case Portal JWT Claims
+- **I12.** SLA Breach Auto-Escalation
+- **I13.** Immutable Audit Log to append-only table
+- **I14.** Batch Processing via Bytewax Stream
+- **I15.** Case Age Accurate Computation
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

@@ -172,3 +172,25 @@ are denied by the rule engine.
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/intel/surveillance --json
 ./.venv/bin/apg capabilities lifecycle-audit --root capabilities/intel/surveillance --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements — intel_surveillance
+- **I2.** Persistent Storage via Async SQLAlchemy
+- **I3.** Authoritative Authority Expiry Enforcement
+- **I4.** Structured Event Streaming via Bytewax Producer
+- **I5.** Pydantic v2 Request/Response Models for Every Public Method
+- **I6.** RBAC Permission Check on Every Entry Point
+- **I7.** Distributed Caching for
+- **I8.** Physical Surveillance Coordination Module
+- **I9.** Target Profile Builder
+- **I10.** Time-Series Location History with Trajectory Analysis
+- **I11.** Media Evidence Chain-of-Custody
+- **I12.** Automated Legal Authority Renewal Workflow
+- **I13.** Multi-Tenant Isolation Hardening
+- **I14.** Sensor Calibration Scheduler
+- **I15.** Async Batch Observation Ingestion with Deduplication
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

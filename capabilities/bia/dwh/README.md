@@ -88,3 +88,27 @@ The Data Warehouse capability (bia_dwh) provides dimensional modelling with star
 - bia_rpt uses warehouse views as report datasources
 - comp can attach data retention and residency policies to tables
 - schd drives scheduled ETL job execution with retry logic
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Column-Level Encryption with Key Rotation** [Security & Compliance]
+- **I2. Materialized View Lifecycle Management** [Query Performance]
+- **I3. Cost Attribution and Slot Budgeting per Tenant** [FinOps / Multi-tenancy]
+- **I4. Automated Data Vault 2.0 Hub/Link/Satellite Generation** [Schema Design Automation]
+- **I5. Real-Time CDC (Change Data Capture) Pipeline Management** [Data Ingestion]
+- **I6. Adaptive Partitioning with Automatic Partition Pruning Statistics** [Query Optimisation]
+- **I7. SCD Type 4 and Type 6 (Hybrid) Support** [Dimensional Modelling]
+- **I8. Query Cost Estimation Before Execution** [Query Governance]
+- **I9. Semantic Layer with Metric Definitions** [Business Intelligence]
+- **I10. Automated Index Recommendation and Management** [Query Optimisation]
+- **I11. Data Freshness SLA Monitoring with Breach Alerting** [Observability]
+- **I12. Cross-Table Row-Level Security Policies** [Security & Governance]
+- **I13. Time-Travel and Point-in-Time Query Support** [Auditability & Recovery]
+- **I14. Automated Slowly Changing Dimension (SCD) Backfill Engine** [Historical Data Management]
+- **I15. Intelligent ETL Job Dependency Graph with Topological Scheduling** [ETL Orchestration]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

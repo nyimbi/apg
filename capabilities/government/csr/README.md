@@ -80,3 +80,25 @@ Self-service citizen portal supporting application submission, status tracking, 
 
 ## Composability Notes
 Composes with `government_cas` (complex applications escalate to case management), `government_lic` (licence applications use CSR portal as intake), `government_bud` (collected fees credit government revenue accounts), and `government_tax` (portal payments may include tax obligations).
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Citizen Services Portal — World-Class Improvements
+- **I2.** Async-Native Service Layer
+- **I3.** Persistent Storage with PostgreSQL + Alembic Migrations
+- **I4.** Event-Driven Architecture via Domain Events
+- **I5.** Idempotency Keys and Duplicate Submission Prevention
+- **I6.** Structured SLA Tracking and Breach Alerting
+- **I7.** Role-Based Access Control (RBAC) with Fine-Grained Permissions
+- **I8.** AI-Powered Application Pre-Screening
+- **I9.** Multi-Factor OTP Authentication with TOTP Support
+- **I10.** Offline-First USSD / SMS Interface
+- **I11.** Document OCR and Auto-Population
+- **I12.** Payment Reconciliation and Revenue Dashboard
+- **I13.** Service Catalogue Versioning and Deprecation
+- **I14.** Citizen Profile and History Aggregation
+- **I15.** Webhook / Push Notification Integration
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

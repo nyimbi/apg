@@ -281,3 +281,25 @@ Focused verification for this packet should use:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/chat --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/chat --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Chat Capability — World-Class Improvements
+- **I2.** Semantic RAG Message Retrieval
+- **I3.** Conversation Summarisation via Local LLM
+- **I4.** Structured Tool-Calling Agent Dispatch
+- **I5.** Per-Message Token Cost Accounting
+- **I6.** Real-Time Sentiment and Toxicity Guardrails
+- **I7.** Retention Policy Enforcement Engine
+- **I8.** End-to-End Encrypted Direct Messages
+- **I9.** Adaptive Rate Limiting with Tenant Quotas
+- **I10.** Multi-Modal Attachment Intelligence
+- **I11.** Conversation Graph and Knowledge Extraction
+- **I12.** Workspace-Wide Cross-Room Search with Faceting
+- **I13.** Composable Notification Routing
+- **I14.** Federated Room Guest Access with Expiry
+- **I15.** Intelligent Thread Auto-Routing
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

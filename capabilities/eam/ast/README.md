@@ -192,3 +192,25 @@ Describes how this capability integrates with others:
 - `EALocation.get_distance_to()` uses the Haversine formula and returns kilometres; it is a convenience method for field dispatch routing, not a geospatial index substitute.
 - `EAPerformanceRecord.calculate_oee()` divides the product of three percentage values by 10,000 (not 100) to account for each factor already being in percent form; this is intentional and matches the ISO 22400 OEE definition.
 - Theme token `eam_ast_control` uses a steel-blue primary (`#28536B`) with a high-contrast accent red (`#C44536`) to distinguish critical-asset indicators from general UI chrome.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** 10 High-Impact Improvements for World-Class EAM Solution
+- **I2.** Executive Summary
+- **I3.** Autonomous Maintenance Orchestration with AI Decision Trees
+- **I4.** Current State
+- **I5.** Proposed Enhancement
+- **I6.** Temporal Asset Intelligence with Time-Series Forecasting
+- **I7.** Current State
+- **I8.** Proposed Enhancement
+- **I9.** Immersive Mixed Reality Maintenance Guidance
+- **I10.** Current State
+- **I11.** Proposed Enhancement
+- **I12.** Quantum-Inspired Optimization for Resource Allocation
+- **I13.** Current State
+- **I14.** Proposed Enhancement
+- **I15.** Swarm Intelligence for Distributed Asset Monitoring
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

@@ -84,3 +84,62 @@ Manages pharmaceutical product registration across global regulatory regions inc
 
 ## Composability Notes
 Receives variation triggers from `pharma_rec` label changes and `pharma_qms` change control. Certificate expiry data feeds `pharma_dis` WDA management. Authority interaction records link to `pharma_rec` commitment tracking. Approval status gates `pharma_dis` product dispatch.
+
+## World-Class Enhancements (v2.0)
+
+1. **Async-First Service Layer** — All methods converted to `async def`; eliminates event-loop blocking in FastAPI/LangGraph/Bytewax contexts.
+2. **Persistent Storage via Async SQLAlchemy** — In-memory dicts replaced with PostgreSQL-backed async sessions; ACID guarantees and full-text search.
+3. **Strongly-Typed Variation Types** — `VariationType` `StrEnum` shared by models and service; single source of truth, fails at construction.
+4. **Structured Regulatory Calendar with Deadline Engine** — `DeadlineEngine` tracks authority-specific SLAs (EMA 210-day, FDA PDUFA 12-month, TFDA 90-day) with clock-pause events.
+5. **eCTD Structural Validation Beyond Flag** — `validate_ectd()` returns a structured `EctdValidationReport` with per-module ICH M8 findings and STF presence checks.
+6. **Multi-Tenant Isolation at Query Level** — Tenant scoping enforced at DB query layer; cross-tenant data never reaches application tier.
+7. **Regulatory Intelligence Feed Integration** — `ingest_regulatory_intelligence()` parses EMA/FDA/WHO feeds and matches against registered products by INN/brand name.
+8. **PSUR / PBRER Lifecycle Tracking** — `PsurSchedule` model tracks data-lock dates, submission due dates, and assessment outcomes; surfaced in renewal alerts.
+9. **Dossier Version Control with Diff Tracking** — `DossierRevision` model captures `parent_version_id`, `changed_modules`, and full lineage from sequence 0.
+10. **Automated Gap Analysis Against Region-Specific Requirements** — `gap_analysis(dossier_id, target_region)` compares modules against ACTD/ANVISA/ICH region matrix with remediation actions.
+11. **Parallel Multi-Region Submission Orchestration** — `bulk_submit_registrations` uses `asyncio.gather` with `return_exceptions=True`; per-region failure isolation.
+12. **Condition-of-Approval Obligation Tracker** — `PostApprovalObligation` model with `due_date` and `status`; overdue obligations surface in dashboard and emit events.
+13. **Rollback / Saga Support for Multi-Step Workflows** — `SagaCoordinator` records pre-state and compensates on exception across submit→query→response→approval flow.
+14. **Role-Based Permission Granularity in `_enforce`** — Typed `EnforceContext` Pydantic models per operation; omitted security checks become type errors.
+15. **Structured Audit Log with Retention Policy and Replay** — Immutable `AuditEvent` model persisted to append-only table; supports 7-year replay for EU GMP Annex 11 inspections.
+
+## New Methods
+
+### `bulk_submit_registrations` — parallel multi-region submission
+
+```python
+results = await svc.bulk_submit_registrations(
+    tenant_id="acme",
+    registration_ids=["reg-ke", "reg-ug", "reg-tz", "reg-rw"],
+    submitted_by="jane.doe",
+)
+# Returns per-region success/failure dict; one region's failure does not block others
+for reg_id, outcome in results["results"].items():
+    print(reg_id, outcome["status"])
+```
+
+### `regulatory_compliance_report` — cross-registration GxP status
+
+```python
+report = await svc.regulatory_compliance_report(
+    tenant_id="acme",
+    standard="GxP",
+    include_variations=True,
+    include_renewals=True,
+)
+# report["compliance_score"], report["findings"], report["recommendations"]
+print(report["compliance_score"], report["total_registrations"])
+```
+
+### `post_market_surveillance` — aggregate post-approval obligations and PSUR status
+
+```python
+surveillance = await svc.post_market_surveillance(
+    tenant_id="acme",
+    product_ids=["prod-001", "prod-002"],
+    period_days=365,
+)
+# Surfaces overdue PSURs, unfulfilled conditions-of-approval, and variation outcomes
+for item in surveillance["overdue_obligations"]:
+    print(item["registration_id"], item["obligation_text"], item["due_date"])
+```

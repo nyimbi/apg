@@ -155,3 +155,25 @@ metric, agent, lifecycle, and governance view models to compose review queues.
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/aicr --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/aicr --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** AICR - World Class Improvement Roadmap
+- **I2.** Async-Native Governance Methods
+- **I3.** Decimal-Accurate Cost Ledger
+- **I4.** Streaming Inference via AsyncGenerator
+- **I5.** Policy Rule Hot-Reload Without Restart
+- **I6.** Multi-Tenant Cache with TTL Eviction
+- **I7.** Structured Observability via OpenTelemetry Spans
+- **I8.** Model Card Generation (Factsheet)
+- **I9.** Shadow Mode / Canary Inference Routing
+- **I10.** Prompt Injection Detection
+- **I11.** Async Background Model Health Probing
+- **I12.** Governance Decision Explainability
+- **I13.** Model Retirement with Impact Analysis
+- **I14.** Rate Limiting Per Tenant Per Model
+- **I15.** Semantic Versioning Enforcement for Models
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

@@ -241,3 +241,27 @@ Stream states: `draft → active → review_required → approved → denied →
 - The `max_autonomous_scope` for access agents is set to `"read_and_recommend"` — more conservative than other capabilities — because access-control mistakes have the broadest blast radius across the composition layer.
 - Key files: `capability_contract.py` (executable contract and rule engine), `models.py` (dataclass records), `service.py` (lifecycle operations), `api.py` (API helpers), `views.py` (UI model helpers), `app.py` (package self-test and semantic model).
 - See `WORLD_CLASS_IMPROVEMENTS.md` for the 15 prioritised enhancement tracks.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Continuous Grant Expiry Reaper** [Lifecycle Automation]
+- **I2. Attribute-Based Access Control (ABAC) Policy Engine** [Policy Richness]
+- **I3. Policy-as-Code Version Control** [Governance]
+- **I4. Just-In-Time (JIT) Privileged Access** [Zero-Trust]
+- **I5. Real-Time Risk Signal Aggregation via NATS** [Streaming / Zero-Trust]
+- **I6. Permission Matrix Snapshot Export** [Observability / Compliance]
+- **I7. Periodic Access Review Scheduler** [Governance / Compliance]
+- **I8. Circuit Breaker State Machine with NATS Event Propagation** [Resilience]
+- **I9. Delegated Authorization Chains** [Composability]
+- **I10. Behavioural Anomaly Scoring** [Intelligence / Zero-Trust]
+- **I11. Policy Simulation Sandbox** [Developer Experience]
+- **I12. Cross-Capability Authorization Middleware** [Composability]
+- **I13. Immutable Audit Log with NATS-Backed Off-Load** [Compliance / Durability]
+- **I14. Self-Service Access Request Portal API** [Developer Experience / Usability]
+- **I15. RBAC Permission Matrix with Role Inheritance** [Policy Richness / Composability]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

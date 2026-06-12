@@ -144,3 +144,27 @@ Full-featured telemedicine capability covering virtual consultation booking, vid
 
 ## Composability Notes
 Consultation notes flow to `healthcare_emr` as progress notes. Prescriptions transmit to `healthcare_pha` for formulary validation. Monitoring alerts feed into `healthcare_cli` CDS alerts. Billing records integrate with `healthcare_pmt` billing subsystem. Triage events compose with `healthcare_ed` for emergency department handoff. Care program milestones integrate with `healthcare_qual` for HEDIS quality scoring.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. AI-Powered Real-Time Clinical Decision Support During Video Consultations** [Clinical Intelligence]
+- **I2. Continuous Vital-Signs Inference from Video Feed (rPPG)** [Remote Monitoring]
+- **I3. NATS JetStream-Backed Real-Time Vital Alert Pipeline** [Streaming Architecture]
+- **I4. Structured SOAP Note Auto-Generation from Transcript** [Clinical Documentation]
+- **I5. Cross-State Telehealth Licensure Compliance Engine** [Regulatory Compliance]
+- **I6. Predictive No-Show & Cancellation Model** [Operational Intelligence]
+- **I7. Federated Patient Data Aggregation via FHIR R4** [Interoperability]
+- **I8. End-to-End Encrypted Asynchronous Messaging (Store-and-Forward)** [Async Communication]
+- **I9. Automated Insurance Pre-Authorization Workflow** [Revenue Cycle]
+- **I10. AI-Driven Patient Triage & Acuity Scoring at Intake** [Clinical Triage]
+- **I11. Multi-Language Real-Time Translation for Consultations** [Accessibility & Reach]
+- **I12. Smart Device Integration Hub (IoT Medical Devices)** [Remote Monitoring]
+- **I13. Longitudinal Chronic Disease Management Programs** [Care Management]
+- **I14. Session Quality of Experience (QoE) Analytics** [Platform Reliability]
+- **I15. Blockchain-Anchored Prescription Audit Trail** [Compliance & Anti-Fraud]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

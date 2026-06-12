@@ -1,23 +1,56 @@
 # Digital Neobanking
 
 ## Overview
-Digital Neobanking provides the core banking layer for digital-first banks: program governance, customer onboarding with full AML/KYC/fraud evidence chain, deposit account opening (current, savings, joint, business, youth, merchant), payment rail linking, transaction posting with risk reference, savings pot management, account statement generation, and customer service case handling. It is the account ledger that other capabilities — mobile, cards, lending, remittance — use as their underlying account infrastructure.
+Digital Neobanking provides the core banking layer for digital-first banks: program governance, customer onboarding with full AML/KYC/fraud evidence chain, deposit account opening (current, savings, joint, business, youth, merchant), payment rail linking, transaction posting with risk reference, savings pot management, virtual cards, peer transfers, bill splitting, cashback, spending analytics, budget enforcement, overdraft protection, chargeback lifecycle, multi-currency FX transfers, structured consent, balance attestations, and customer service case handling. It is the account ledger that other capabilities — mobile, cards, lending, remittance — use as their underlying account infrastructure.
 
-Transaction currency must match account currency. High-impact transactions require human approval. Initial account balances cannot be negative. All neobanking events stream to `apg.fintech.neobanking.lifecycle` via Bytewax.
+Transaction currency must match account currency; cross-currency moves go through `fx_convert_and_transfer`. High-impact transactions require human approval. Initial account balances cannot be negative. All neobanking events stream to `apg.fintech.neobanking.lifecycle` via Bytewax.
 
 ## Capability ID
-`fintech_neobanking`  Version: 1.1.0
+`fintech_neobanking`  Version: 2.0.0
+
+## Quick Start
+
+```python
+from capabilities.fintech.neobanking.service import NeobanksService
+
+svc = NeobanksService(tenant_id="acme", actor_id="ops-agent")
+
+# Register a bank program
+await svc.register_program("prog-1", "Acme Bank", "owner-1", "KE", "KES", "settle-001")
+
+# Onboard a customer
+await svc.onboard_customer("cust-1", "CUST-REF-001", "kyc-profile-42",
+                           "KE", "consent-001", "aml-001", "fraud-001")
+
+# Open an account and apply a feature bundle
+acct = await svc.open_account("cust-1", "savings", "KES", "prog-1")
+await svc.account_features_bundle(acct["id"], "standard")
+
+# Post a transaction
+await svc.post_transaction("tx-1", acct["id"], "deposit", 50000.0,
+                           "KES", "initial_deposit", "risk-ref-001")
+```
 
 ## Provides
 | Service | Description |
 |---------|-------------|
 | neobank_program_governance | Register bank programs with owner, settlement account, country, and currency |
 | digital_customer_onboarding | Onboard customers with KYC, AML, fraud, and consent evidence |
-| deposit_account_lifecycle | Open accounts with type, currency, program, and customer linkage |
+| deposit_account_lifecycle | Open, close, freeze, and bundle-upgrade accounts |
 | payment_rail_linking | Link bank transfer, card, wallet, mobile money, and internal transfer rails |
 | account_transaction_posting | Post transactions with type, amount, currency match, and risk reference |
-| savings_pot_workflow | Create and track named savings goals within accounts |
-| statement_workflow | Issue account statements with period specification |
+| virtual_card_management | Issue, freeze, unfreeze, and apply per-MCC controls to virtual cards |
+| peer_transfers_and_fx | Peer transfers, bill splitting, and multi-currency FX conversion |
+| savings_pot_workflow | Create, fund, and auto-sweep named savings goals within accounts |
+| spending_analytics_and_budgets | Analytics, category budgets with 75%/100% alerts, and subscription tracking |
+| cashback_calculation | Calculate and credit cashback based on feature bundle |
+| overdraft_protection | Configure tiered overdraft limits with daily interest accrual |
+| chargeback_lifecycle | Open disputes with provisional credit, resolve with upheld/rejected rulings |
+| statement_workflow | Issue single or bulk account statements |
+| consent_management | Record, revoke, and audit structured consent (Kenya DPA Article 30) |
+| balance_attestation | Generate HMAC-signed proof-of-funds for third-party verification |
+| customer_risk_scoring | Aggregate 0-100 risk scores from velocity, savings, overdraft, and freeze signals |
+| account_webhooks | Register HMAC-signed event webhooks per account with delivery logging |
 | customer_service_case_workflow | Open service cases with reason, reviewer, and evidence |
 | neobanking_agent_workflow | Register AI agents for account risk, payments review, and customer service |
 
@@ -28,15 +61,99 @@ Transaction currency must match account currency. High-impact transactions requi
 | audl | Audit trail |
 | ntfy | Customer and operations notifications |
 | nlpc | NLP processing |
-| keym | Key management |
+| keym | Key management (attestation signing) |
 | fintech_payments | Payment rail execution |
 | fintech_wallets | Wallet rail integration |
 | fintech_cards | Card rail and debit card linkage |
 | fintech_kyc | Customer identity verification |
 | fintech_aml | AML screening |
 | fintech_fraud | Fraud signal scoring |
+| fintech_fx | Exchange rates for cross-currency transfers |
 | fintech_lending | Loan account linkage |
 | fintech_remittance | Cross-border remittance integration |
+
+## World-Class Enhancements (v2.0)
+
+1. **Real-Time Fraud Signal Integration** — `post_transaction` hooks into `fintech_fraud`; every response includes a `fraud_signal` field gated on velocity, geo-anomaly, and device-fingerprint thresholds.
+
+2. **Multi-Currency FX Conversion** — `fx_convert_and_transfer()` applies mid-market rate + configurable spread, posts the FX fee as a separate transaction, and settles both legs atomically with `fx_rate`, `fx_fee`, and `original_currency` on the credit leg.
+
+3. **Savings Pot Auto-Sweep Rules** — `savings_pot_autosweep_rule()` attaches end-of-day, percentage-of-balance, or after-credit triggers to pots; `execute_autosweep_rules()` fires them and emits `savings_autosweep_executed` events.
+
+4. **Tiered Overdraft with Daily Interest Accrual** — `overdraft_interest_accrual()` computes overdrawn EOD balance, posts a `transfer_out` fee transaction daily (annual_rate/365 + flat daily fee), and tracks a running overdrawn balance ledger.
+
+5. **Programmable Virtual Cards with Per-MCC Controls** — `virtual_card_update_controls()` sets per-MCC allow/block lists, per-country filters, and time-of-day windows enforced at transaction posting.
+
+6. **Account-Level Event Webhooks** — `register_account_webhook()` stores URL + event filter + HMAC-SHA256 secret per account; includes delivery log and `replay_webhook()` for failed deliveries.
+
+7. **Intelligent Spending Budgets** — `set_spending_budget()` records category limits; `spending_budget_check()` returns remaining, burn rate, projected over-budget date, and fires `budget_75pct_warning` / `budget_exceeded` notifications (once per month per threshold).
+
+8. **Regulatory Reporting Pipeline** — `regulatory_report()` with pluggable CBK, RBA, and CMA jurisdiction templates; `submit_regulatory_report()` archives the report and records the acknowledgment reference.
+
+9. **Idempotency Keys** — All mutating operations accept an idempotency key; duplicates return the cached response with a 24-hour TTL, preventing double-charges in mobile retry scenarios.
+
+10. **Balance Attestation** — `generate_balance_attestation()` produces an HMAC-SHA256 signed JSON payload (tenant, account, balance, timestamp) valid until EOD; `verify_balance_attestation()` enables counterparty verification.
+
+11. **Chargeback Workflow** — `open_chargeback()` issues provisional credit immediately and tracks dispute status through `merchant_response`, `arbitration`, and `final_ruling`; `resolve_chargeback()` reverses credit atomically on rejection.
+
+12. **Customer Risk Score** — `compute_customer_risk_score()` aggregates velocity, overdraft utilisation, savings ratio, and freeze history into a 0-100 score (low/medium/high) that drives limit and alert thresholds.
+
+13. **Bulk Statement Generation** — `bulk_issue_statements()` generates statements for all active accounts in a date range in one call; backgrounds jobs auto-queue when `item_count > 500`.
+
+14. **Account Linking (Joint & Subsidiary)** — `link_accounts()` models parent/child and joint relationships; joint accounts require multi-party consent; freeze/close propagates to linked accounts.
+
+15. **Structured Consent Lifecycle** — `record_consent()` captures type (`account_opening`, `data_sharing`, `marketing`, `overdraft`, `biometric`), channel, and evidence hash; `revoke_consent()` and `list_consent_history()` satisfy Kenya Data Protection Act Article 30.
+
+## New Methods
+
+### FX Transfer
+```python
+result = await svc.fx_convert_and_transfer(
+    from_account="acct-kes", to_account="acct-usd",
+    amount=100_000.0, from_currency="KES", to_currency="USD",
+    fx_rate=130.5, fx_spread_pct=0.5, reference="school_fees_q1",
+)
+# result keys: transfer_id, original_amount, original_currency,
+#              converted_amount, target_currency, effective_rate, fx_fee
+```
+
+### Savings Auto-Sweep
+```python
+# Attach a rule: sweep 10% of balance to pot every end-of-day
+rule = await svc.savings_pot_autosweep_rule(
+    account_id="acct-1", pot_id="pot-holiday",
+    trigger="percentage_of_balance", value=10.0,
+)
+# Run all EOD rules for the tenant
+summary = await svc.execute_autosweep_rules(trigger="end_of_day")
+```
+
+### Spending Budget + Check
+```python
+await svc.set_spending_budget("acct-1", category="card_purchase", monthly_limit=20_000.0)
+status = await svc.spending_budget_check("acct-1", "card_purchase")
+# status keys: monthly_limit, spent_this_month, remaining,
+#              utilisation_pct, burn_rate_daily, days_until_over_budget
+```
+
+### Chargeback Lifecycle
+```python
+cb = await svc.open_chargeback(
+    case_id="case-42", customer_id="cust-1", account_id="acct-1",
+    disputed_transaction_id="tx-suspicious", reason="unauthorized",
+)
+# provisional credit posted immediately
+ruling = await svc.resolve_chargeback("case-42", ruling="upheld")
+```
+
+### Risk Score + Balance Attestation
+```python
+score = await svc.compute_customer_risk_score("cust-1")
+# score: {"risk_score": 22, "tier": "low", "signals": {...}}
+
+attest = await svc.generate_balance_attestation("acct-1", purpose="proof_of_funds")
+# attest: {"balance": 150000.0, "currency": "KES", "signature": "...", "expires_at": "..."}
+```
 
 ## Configuration Reference
 | Parameter | Type | Default | Description |
@@ -46,6 +163,9 @@ Transaction currency must match account currency. High-impact transactions requi
 | transactions.high_value_threshold | number | 100000 | Amount requiring approval |
 | rails.supported_rails | list | bank_transfer, card, wallet, mobile_money, internal_transfer | Payment rails |
 | service_cases.supported_reasons | list | account_access, card_issue, payment_dispute, kyc_review, fraud_review, fee_query, statement_query | Case reasons |
+| overdraft.default_rate_pa | number | 0.18 | Annual overdraft interest rate |
+| consent.supported_types | list | account_opening, data_sharing, marketing, overdraft, biometric | Consent types |
+| autosweep.supported_triggers | list | end_of_day, percentage_of_balance, after_credit | Autosweep triggers |
 
 ## API Routes
 | Name | Path | Method | Permission | Group |
@@ -99,18 +219,18 @@ Transaction currency must match account currency. High-impact transactions requi
 |-------|-----------|
 | BankProgram | id, name, owner_id, settlement_account, country, currency, status |
 | DigitalCustomer | id, customer_reference, kyc_profile_id, country, consent_reference, aml_reference, fraud_reference, status |
-| DepositAccount | id, program_id, customer_id, account_type, currency, balance, status |
+| DepositAccount | id, program_id, customer_id, account_type, currency, balance, overdraft_limit, feature_bundle, status |
 | PaymentRail | id, account_id, rail_type, provider_reference, wallet_or_card_reference, status |
-| AccountTransaction | id, account_id, transaction_type, amount, currency, risk_reference, status |
+| AccountTransaction | id, account_id, transaction_type, amount, currency, risk_reference, fx_rate, fx_fee, status |
 | SavingsPot | id, account_id, name, target_amount, current_amount, status |
 | AutosweepRule | id, account_id, pot_id, trigger, value, execution_count, last_executed_at |
 | AccountStatement | id, account_id, period_start, period_end, transaction_count |
 | ServiceCase | id, customer_id, account_id, reason, reviewer_id, evidence_references, status |
-| Chargeback | id, customer_id, account_id, disputed_transaction_id, disputed_amount, status, ruling |
+| Chargeback | id, customer_id, account_id, disputed_transaction_id, disputed_amount, provisional_credit_tx_id, status, ruling |
 | SpendingBudget | id, account_id, category, monthly_limit, status |
-| ConsentRecord | id, customer_id, consent_type, channel, evidence_hash, status, recorded_at |
-| BalanceAttestation | id, account_id, balance, currency, purpose, signature, issued_at, expires_at |
-| AccountWebhook | id, account_id, url, event_filter, delivery_count, last_delivery_at |
+| ConsentRecord | id, customer_id, consent_type, channel, evidence_hash, status, recorded_at, revoked_at |
+| BalanceAttestation | id, account_id, balance, currency, purpose, signature, algorithm, issued_at, expires_at |
+| AccountWebhook | id, account_id, url, event_filter, secret_hash, delivery_count, last_delivery_at |
 
 ## Streaming Events
 Events emitted to the fintech event stream via Bytewax.
@@ -125,8 +245,8 @@ Events emitted to the fintech event stream via Bytewax.
 | savings_pot_created | Savings pot created |
 | savings_autosweep_executed | Auto-sweep rule fired |
 | savings_goal_reached | Pot balance meets target |
-| budget_75pct_warning | Spending reaches 75 % of budget |
-| budget_exceeded | Spending exceeds 100 % of budget |
+| budget_75pct_warning | Spending reaches 75% of budget |
+| budget_exceeded | Spending exceeds 100% of budget |
 | statement_issued | Statement generated |
 | service_case_opened | Service case opened |
 | chargeback_opened | Dispute opened with provisional credit |
@@ -135,6 +255,10 @@ Events emitted to the fintech event stream via Bytewax.
 | consent_revoked | Consent withdrawn |
 | overdraft_interest_accrued | Daily overdraft fee posted |
 | neobanking_agent_registered | AI agent registered |
+| virtual_card_issued | Virtual card created |
+| peer_transfer_completed | Peer transfer settled |
+| balance_attestation_generated | Signed attestation issued |
+| customer_risk_score_computed | Risk score computed |
 
 ## Edge Cases Handled
 - Transaction currency must match account currency exactly — a KES transaction against a USD account is denied; currency conversion goes through `fx_convert_and_transfer` which posts a separate FX fee transaction
@@ -148,6 +272,7 @@ Events emitted to the fintech event stream via Bytewax.
 - Balance attestations are valid only until end-of-day of issuance; counterparties must re-request for the next day
 - Consent records are append-only; revocation sets status to 'revoked' with timestamp rather than deleting the record
 - Customer risk scores are advisory only — they do not gate transactions; callers may use scores to tighten limits independently
+- FX spread is applied against the mid-market rate; the spread amount is posted as a separate fee transaction on the debit leg for audit transparency
 
 ## Composability
 - **Upstream**: `fintech_kyc`, `fintech_aml`, and `fintech_fraud` provide the evidence chain required for customer onboarding; `fintech_payments` and `fintech_wallets` provide the payment rail execution; `fintech_fx` provides exchange rates for cross-currency transfers
@@ -160,4 +285,5 @@ Events emitted to the fintech event stream via Bytewax.
 - Statement period is caller-specified — the rule engine only checks that a period is present; the service layer handles period validation (start < end, reasonable range)
 - `high_impact` is a caller-computed flag; the service layer evaluates the transaction against the `high_value_threshold` and sets the flag before invoking the rule engine
 - Autosweep rules, webhooks, budgets, chargebacks, and consent records are stored in lazily-initialised `dict` attributes on the service instance; they persist in-memory and must be wired to the `store` adapter for durability
-- The `generate_balance_attestation` HMAC key is the `tenant_id`; in production, wire `keym` to use a tenant-specific signing key
+- The `generate_balance_attestation` HMAC key is `tenant_id`; in production, wire `keym` to use a tenant-specific signing key
+- `NeobanksService`, `DigitalNeobankingService`, and `NeobankingService` are all aliases for the same class

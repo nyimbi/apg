@@ -76,3 +76,25 @@ exchange execution, sanctions-screening engines, regulatory report submission,
 live bank feeds, case-management writes, storage backends, GraphRAG projections,
 dissemination delivery, and durable Bytewax topology execution stay behind
 adapters.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Financial Intelligence — World-Class Improvements
+- **I2.** Graph-Native Transaction Network Engine
+- **I3.** Real-Time Streaming Integration via Bytewax
+- **I4.** FATF / OFAC / UN Sanctions List Live Sync
+- **I5.** Beneficial Ownership Registry Integration (GLEIF/OpenOwnership)
+- **I6.** ML-Based Anomaly Detection with Isolation Forest
+- **I7.** Case Management State Machine
+- **I8.** Federated Multi-Tenant Intelligence Sharing
+- **I9.** Explainable Risk Scores with SHAP
+- **I10.** Crypto On-Chain Analytics via Chain-Agnostic API
+- **I11.** Temporal Pattern Detection (Periodicity & Seasonality)
+- **I12.** Immutable Audit Ledger via Append-Only PostgreSQL
+- **I13.** Regulatory Reporting Adapters (FINCEN CTR/SAR, goAML, FATF FUR)
+- **I14.** Differential Privacy for Analytics Exports
+- **I15.** Automated Typology Library Sync (FATF / EGMONT)
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

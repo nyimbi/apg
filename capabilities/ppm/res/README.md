@@ -98,3 +98,61 @@ Resource Management (res) manages the full resource lifecycle: pool registration
 - Cost rates feed **ppm_pac** labour cost transactions
 - Utilisation data feeds **ppm_pan** capacity heat maps
 - Leave records block **ppm_pps** allocations during absence periods
+
+## World-Class Enhancements (v2.0)
+
+1. **Skill Ontology Graph** — RDF-style skill inheritance (react isa frontend isa software_engineering); replaces fragile prefix fuzzy match
+2. **Continuous Utilisation Time-Series** — daily-granularity time-series store enabling rolling trends, anomaly detection, and burn-rate projection
+3. **CP-SAT Optimal Assignment** — OR-Tools constraint solver replaces greedy team_builder; optimises skill coverage, balance, cost, and leave avoidance simultaneously
+4. **Real-Time Over-Allocation Webhooks** — background monitor fires ntfy events at 80/95/100% thresholds without requiring an explicit check call
+5. **Evidence-Verified Skill Proficiency Pipeline** — async verification queue with claimed → verified state machine; prevents non-empty-string bypass
+6. **Multi-Currency Cost Normalisation** — CurrencyNormalisationService converts all rates to tenant base currency at time-of-record exchange rates
+7. **Leave Impact Propagation** — leave creation auto-computes impacted tasks, delay risk, and backfill cost; publishes leave_impact_computed for ppm_pps
+8. **Carbon / Sustainability Accounting** — carbon_kg_per_day on equipment/facility resources; feeds ESG dashboards and CSRD compliance reporting
+9. **Probabilistic Demand Forecasting** — Monte Carlo over historical variance and pipeline win rates; outputs P50/P80/P90 FTE bands instead of a point estimate
+10. **Skill Endorsement Social Graph** — peer endorsement model gated on expert proficiency; endorsement count and network centrality as additional signals
+11. **Allocation Marketplace (Internal Gig Board)** — bench resources (>30% idle) post availability; PMs browse and request; estimated 10-15% bench cost reduction
+12. **Bi-Temporal Cost Rate Versioning** — valid_time + transaction_time model; supports retroactive corrections without losing decision-time audit trail
+13. **Role-Based Capacity Pools** — allocations target role/grade pools (e.g. senior_engineer); engine resolves best available member at scheduling time
+14. **Automated Capacity Plan Generation** — generate_capacity_plan computes demand/supply from live data and applies hire/contract/redeploy/train closure strategies
+15. **RBAC Delegation Chains** — time-scoped delegation from resource manager to team lead; full chain validated at _enforce call time for SOX compliance
+
+## New Methods
+
+### `bulk_allocate_resources` — batch project staffing
+
+```python
+result = await svc.bulk_allocate_resources(
+    allocation_specs=[
+        {"resource_id": "r-001", "project_id": "p-42", "task_id": "t-7",
+         "start_date": "2026-07-01", "end_date": "2026-09-30",
+         "allocation_pct": 80, "evidence_reference": "sow-2026-42"},
+        {"resource_id": "r-002", "project_id": "p-42", "task_id": "t-8",
+         "start_date": "2026-07-01", "end_date": "2026-08-31",
+         "allocation_pct": 50},
+    ],
+    tenant_id="tenant-acme",
+)
+# {"created_count": 2, "error_count": 0, "allocations": [...], "errors": []}
+```
+
+### `team_builder` — skill-matched team assembly
+
+```python
+team = await svc.team_builder(
+    project_id="p-42",
+    required_skills=["python", "postgresql", "fastapi"],
+    team_size=3,
+    tenant_id="tenant-acme",
+)
+# {"team_id": "team-p-42-2026-06-12", "actual_size": 3,
+#  "skill_coverage": 3, "members": [...]}
+```
+
+### `demand_gap_analysis` — live capacity deficit check
+
+```python
+gap = await svc.demand_gap_analysis(tenant_id="tenant-acme")
+# {"total_demand_units": 42.5, "total_capacity_units": 38.0,
+#  "gap": 4.5, "status": "deficit", "computed_at": "2026-06-12"}
+```

@@ -148,3 +148,25 @@ Multi-Currency Management (MCY) provides full lifecycle management of currencies
 - `fin` general ledger consumes MCY-posted revaluation and translation journal entries
 - `grc` uses MCY's FX exposure data for treasury risk reporting
 - MCY emits all lifecycle events to `apg.loc.mcy.lifecycle` for downstream bytewax consumers
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: loc_mcy (Multi-Currency Management)
+- **I2.** Real-Time Rate Feed Ingestion Pipeline
+- **I3.** Volatility-Adjusted FX Risk Scoring
+- **I4.** Cross-Rate Triangulation Engine
+- **I5.** Bulk Rate Upload with Idempotency Keys
+- **I6.** IFRS 21 / ASC 830 Compliance Assertions
+- **I7.** Stale Rate Detection and Alerting
+- **I8.** Hedging Instrument Registry
+- **I9.** Period-Close Checklist Automation
+- **I10.** Decimal-Precise Arithmetic Throughout
+- **I11.** Multi-Entity Consolidation Roll-Up
+- **I12.** Rate History Versioning and Audit Trail
+- **I13.** Tenant-Scoped Rate Policy Engine
+- **I14.** Currency Pair Correlation Matrix
+- **I15.** Streaming Event Enrichment
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

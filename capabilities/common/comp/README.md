@@ -19,9 +19,19 @@ remain APG adapter boundaries.
 - Encrypted evidence records with immutable references and collector/source
   metadata.
 - Control assessments with freshness checks and independent tester review.
-- Finding opening, escalation, remediation, and resolution evidence.
+- Finding opening, escalation, remediation tracking, and resolution evidence.
 - Report preparation, independent approval, attestation, publication, and
   critical-finding blocking.
+- Gap assessment: identifies controls without recent effective assessments.
+- Risk integration: links external risk scores to compliance controls.
+- Policy enforcement recording with full audit trail.
+- Regulatory change alert ingestion and tracking.
+- Compliance training assignment with due-date tracking.
+- Audit scheduling for internal and external audits.
+- Framework-specific coverage helpers: ISO 27001 checklist, GDPR DPIA, SOC 2
+  evidence aggregation.
+- Obligation registration against frameworks with regulatory source tracking.
+- Control-to-assessment mapping for a full framework view.
 - First-class provider-neutral compliance agents for `codex`, `claude_code`,
   `opencode`, and `pi`.
 - Human-review guardrails for privileged agent roles such as report reviewers,
@@ -58,14 +68,15 @@ remain APG adapter boundaries.
 2. Create controls under that framework.
 3. Record encrypted immutable evidence for controls.
 4. Assess controls against evidence freshness and open findings.
-5. Open, escalate, and resolve findings.
-6. Prepare a report for a framework and period.
-7. Approve the report with an independent approver.
-8. Attest the approved report.
-9. Publish the report if approval, attestation, and critical-finding guardrails
-   pass.
-10. Register scoped AI agents for compliance review, automation, and stewarding.
-11. Validate batch lifecycle mutations through Bytewax before composing larger
+5. Open, escalate, track, and resolve findings.
+6. Run gap assessments to identify coverage holes.
+7. Prepare a report for a framework and period.
+8. Approve the report with an independent approver.
+9. Attest the approved report.
+10. Publish the report if approval, attestation, and critical-finding guardrails
+    pass.
+11. Register scoped AI agents for compliance review, automation, and stewarding.
+12. Validate batch lifecycle mutations through Bytewax before composing larger
     applications.
 
 ## Python Usage
@@ -217,6 +228,180 @@ The contract exposes these route names:
 `views.py` returns data-only models for generated UIs. The generated UI should
 render the provided theme tokens and component names instead of hard-coding
 colors or layout assumptions.
+
+## World-Class Enhancements (v2.0)
+
+The following 15 improvements define the production roadmap from the current
+in-memory reference implementation to a hardened GRC platform:
+
+1. **Async-First Service Layer** — Convert all methods to `async def` for
+   non-blocking I/O against PostgreSQL, audit sinks, and evidence repositories.
+
+2. **Persistent PostgreSQL Backend via SQLAlchemy Async** — Replace in-memory
+   dicts with async SQLAlchemy sessions, Alembic migrations, JSONB audit
+   payloads, and row-level tenant isolation via RLS policies.
+
+3. **Continuous Control Monitoring (CCM)** — Background task that
+   periodically re-evaluates evidence freshness, open findings, and
+   testing-frequency SLAs, emitting `control_degraded` events when coverage
+   slips below threshold.
+
+4. **Risk-Adjusted Control Prioritisation** — Scoring engine combining
+   likelihood × impact, control effectiveness, residual risk, and regulatory
+   weight to produce a prioritised remediation queue, integrated with the APG
+   `risk` capability.
+
+5. **Automated Evidence Collection via Adapters** — `evidence_collector`
+   adapter interface polling cloud config scanners, SIEM exports, identity
+   governance APIs, and CI/CD pipelines to auto-record fresh encrypted evidence.
+
+6. **Cross-Framework Control Mapping and Reuse** — `cross_framework_map`
+   operation detecting overlapping obligations across SOC 2, ISO 27001, GDPR,
+   NIST CSF, and PCI-DSS, reducing duplicated assessments and evidence
+   collection by up to 60%.
+
+7. **Machine-Readable Regulatory Change Feed Integration** — Connect to live
+   regulatory RSS/API feeds (EUR-Lex, US Federal Register, FCA, CBK) with
+   NLP-based impact classification that auto-triggers gap assessments on new
+   obligations.
+
+8. **Cryptographic Evidence Chain with Merkle Proofs** — Replace the current
+   SHA-256 dict digest with a Merkle tree where each leaf is
+   `H(evidence_id || collected_at || payload_hash)`, providing
+   tamper-evident provenance independently verifiable by auditors.
+
+9. **Multi-Party Attestation Workflows** — Route reports through N required
+   attestors (CFO, CISO, DPO, Board Audit Committee) with configurable quorum
+   thresholds, deadline enforcement, and escalation to the compliance steward.
+
+10. **AI-Assisted Finding Triage and Remediation Suggestions** — LLM agent
+    using `ComplianceAgentRecord` infrastructure to classify findings, suggest
+    remediation plans from a curated library, estimate effort, and auto-assign
+    owners.
+
+11. **Compliance Posture Score and Trend Analytics** — Time-series
+    `posture_score` model snapshotting coverage, open findings, overdue
+    assessments, and escalation counts daily, with regression alerting for
+    leadership.
+
+12. **Exception Management Lifecycle** — Full exception lifecycle (request,
+    risk-acceptance, approval, time-bound expiry, renewal, auto-reopening of
+    finding when exception lapses) to close the gap present in current UI
+    routes.
+
+13. **Immutable Audit Log Export and Regulator Submission Package** —
+    `export_audit_package` serialising the Merkle-chained audit log, evidence
+    references, attestations, and framework metadata into a signed ZIP artefact
+    (PGP or JWS) ready for regulator submission.
+
+14. **Fine-Grained RBAC and Separation-of-Duties Enforcement** — Full RBAC
+    layer integrated with APG `auth` enforcing SoD rules (finding opener ≠
+    resolver, evidence collector ≠ control assessor) at the service level.
+
+15. **Webhook and Event Bus Integration for Real-Time Notifications** —
+    Structured CloudEvents emitted to APG `ntfy` on compliance state changes,
+    enabling Slack/Teams/PagerDuty alerts, `wflo` workflow triggers, and
+    cross-capability reactions.
+
+## New Methods
+
+The following methods were added in v2.0 and cover the most common integration
+touch-points.
+
+### `gap_assess` — Identify untested controls
+
+Returns all controls in a framework that lack an effective assessment. Use this
+before report preparation to surface coverage holes.
+
+```python
+gaps = service.gap_assess("tenant-a", "fw-soc2")
+# {
+#   "framework_id": "fw-soc2",
+#   "tenant_id": "tenant-a",
+#   "total_controls": 12,
+#   "assessed_controls": 9,
+#   "gap_count": 3,
+#   "gaps": [...]
+# }
+```
+
+### `remediation_track` — Append progress notes to a finding
+
+Maintains a timestamped log inside `finding.remediation_plan`. Call repeatedly
+as work progresses; the full history is preserved.
+
+```python
+service.remediation_track(
+	"tenant-a",
+	"finding-001",
+	"Patched auth service; awaiting QA sign-off.",
+	"eng-lead",
+)
+```
+
+### `gdpr_dpia` — Record a Data Protection Impact Assessment
+
+Creates a DPIA record for a processing activity, linking data types and risk
+level. Emits an audit event automatically.
+
+```python
+dpia = service.gdpr_dpia(
+	"dpia-crm-ingest",
+	"tenant-a",
+	"CRM data ingest pipeline",
+	["email", "phone", "location"],
+	"high",
+	"dpo@company.com",
+)
+```
+
+### `regulatory_alert` — Ingest an incoming regulatory change
+
+Records a new regulatory alert with severity and optional effective date.
+Downstream logic can query `list_audit_events` filtered on
+`regulatory_alert_created` to drive gap assessments.
+
+```python
+alert = service.regulatory_alert(
+	"alert-cbk-2026-01",
+	"tenant-a",
+	"CBK Risk Management Guidelines 2026",
+	"New outsourcing risk requirements for tier-1 banks.",
+	"high",
+	effective_date=datetime(2026, 7, 1),
+)
+```
+
+### `risk_integrate` — Link an external risk score to a control
+
+Stores a normalised risk score (0.0–1.0) against a control, with full audit
+trail. Feeds the risk-adjusted prioritisation roadmap item.
+
+```python
+service.risk_integrate(
+	"tenant-a",
+	"risk-ext-007",
+	"ctrl-access-review",
+	risk_score=0.82,
+	risk_owner="ciso@company.com",
+)
+```
+
+### `audit_schedule` — Schedule an internal or external audit
+
+Records a forthcoming audit against a framework with auditor identity, scope,
+and date. Use alongside `list_audit_events` to build an audit calendar view.
+
+```python
+schedule = service.audit_schedule(
+	"sched-soc2-2026",
+	"tenant-a",
+	"fw-soc2",
+	audit_date=datetime(2026, 9, 15),
+	auditor="external-auditor-firm",
+	scope="CC6, CC7, CC9 trust service criteria",
+)
+```
 
 ## Focused Verification
 

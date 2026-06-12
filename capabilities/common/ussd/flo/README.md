@@ -159,3 +159,27 @@ abandonment detection and A/B anomaly alerting.
 ## Copyright
 
 © 2025 Datacraft — www.datacraft.co.ke
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Intent-Aware Conditional DSL** [Routing Engine]
+- **I2. Session Simulation & Dry-Run Engine** [Testing]
+- **I3. NATS-Based Real-Time Event Streaming** [Observability]
+- **I4. Automatic Dead-Path Pruning Advisor** [Flow Quality]
+- **I5. Multi-Variant A/B Testing (N-way Splits)** [Experimentation]
+- **I6. Pluggable Variable Interpolation with Template Functions** [Content Rendering]
+- **I7. Flow Diff and Merge** [Collaboration]
+- **I8. Accessibility & Screen-Budget Validator** [Compliance]
+- **I9. Flow Template Library** [Productivity]
+- **I10. Role-Based Edit Permissions per Flow** [Security]
+- **I11. USSD Session Replay from Logs** [Debugging]
+- **I12. Composite Flow (Sub-flow Inclusion)** [Composability]
+- **I13. Automated Translation Completeness Check** [i18n Quality]
+- **I14. Flow Performance Scoring** [Analytics]
+- **I15. Bulk Flow Migration Across Service Codes** [Operations]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

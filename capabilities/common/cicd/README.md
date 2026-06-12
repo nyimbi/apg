@@ -159,3 +159,27 @@ Battery-conscious CICD checks:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/cicd --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/cicd --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real DORA Metrics Engine with Timestamp-Based Computation** [Observability / Engineering Excellence]
+- **I2. Deployment Cost Tracking with Decimal Precision** [FinOps / Cost Governance]
+- **I3. Pipeline-as-Code Schema Validation** [Developer Experience / Correctness]
+- **I4. Approval Workflow with Multi-Party Sign-Off** [Governance / Compliance]
+- **I5. Flaky Test Detection and Quarantine** [Build Intelligence]
+- **I6. Environment Drift Detection** [Deployment Safety]
+- **I7. Parallel Stage Execution with DAG Scheduling** [Performance / Pipeline Speed]
+- **I8. Secret Rotation Integration with Vault** [Security / Zero-Trust]
+- **I9. Artifact Provenance with SLSA Level 3 Evidence** [Supply Chain Security]
+- **I10. Canary Analysis with Automated Pass/Fail Decision** [Progressive Delivery]
+- **I11. Build Cache Efficiency Reporting** [Developer Experience / Cost]
+- **I12. Policy-as-Code Gate Evaluation Engine** [Governance / Extensibility]
+- **I13. Multi-Tenant Pipeline Isolation Audit** [Security / Compliance]
+- **I14. Pipeline Performance Regression Detection** [Build Intelligence / SRE]
+- **I15. GitOps Reconciliation Loop with Desired-State Diff** [Deployment Automation / Reliability]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

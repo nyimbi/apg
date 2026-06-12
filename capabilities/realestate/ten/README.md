@@ -205,3 +205,82 @@ Full tenant lifecycle — prospect registration through onboarding (10-step work
 - Deposit records link to `realestate_lea` lease financial schedules
 - Arrears data feeds `realestate_acc` accounts receivable module
 - Guarantor records link to `realestate_lea` lease credit support schedules
+
+## World-Class Enhancements (v2.0)
+
+1. **Deposit Protection Lifecycle** — Full deposit lifecycle: scheme registration, interest accrual, dispute claims, automated return processing with statutory deadline enforcement.
+2. **Rent Arrears Escalation Ladder** — Per-period arrears tracking with 4-stage configurable ladder (reminder→notice→legal) and compliant notice document generation.
+3. **Tenancy Agreement Version Control** — Versioned agreement model with digital multi-party signing, clause diffs on renewal, and full amendment history.
+4. **Predictive Churn Scoring** — 0–1 churn probability from 5 weighted behavioural signals (satisfaction trend, communication recency, SLA rate, lease proximity, rent-to-market ratio).
+5. **Compliance Calendar** — Forward-looking statutory obligation schedule (gas safety, EICR, EPC, break windows) with automated pre-deadline reminders.
+6. **Bulk Communication Campaigns** — Cohort-targeted messaging with per-recipient template substitution, delivery tracking, unsubscribe handling, and carrier rate limiting.
+7. **SLA Analytics Dashboard Data** — Per-request-type SLA compliance metrics: response rate, P50/P95 resolution times, breach rate, compared against configured targets.
+8. **Tenant Document Vault with Expiry Tracking** — 9 document types with expiry dates, portfolio-wide expiring-documents query, and automated renewal reminders.
+9. **Guarantor Management** — Limited/unlimited guarantee registration with credit check reference, deed linkage, and arrears-coverage gap validation.
+10. **Move-In/Move-Out Inventory Integration** — Room-by-room condition records with meter readings and photo evidence; checkout diff auto-feeds deposit deduction claims.
+11. **Tenant Self-Service Portal Action Log** — Per-action activity feed with inactivity detection and re-engagement trigger for tenants silent beyond N days.
+12. **Subletting Detection and Control** — Consent registration with head-lease restriction tracking; anomaly detection flags short-let listings and utility account mismatches.
+13. **Rent-Free and Incentive Period Tracking** — Stepped rent, fit-out contributions, rent caps with per-day amortisation schedule for IFRS 16 straight-line recognition.
+14. **Relationship Health Score Composite** — 4-dimension composite score (Financial, Operational, Engagement, Compliance) driving Platinum/Gold/Silver/Standard tier classification.
+15. **Lease Break Clause Workflow** — Break clause registration, per-condition eligibility evaluation, and full checkout/legal-notice workflow for both landlord-break and tenant-break.
+
+## New Methods
+
+### `predict_churn_probability`
+
+Identify tenants most likely to vacate before lease expiry.
+
+```python
+result = await svc.predict_churn_probability(
+    tenant_entity_id="ten_abc123",
+    tenant_id="org_x",
+)
+# result: {
+#   "churn_probability": 0.74,
+#   "risk_level": "high",
+#   "contributing_factors": ["satisfaction_declining", "lease_expiry_within_60_days"],
+#   "recommended_actions": ["schedule_retention_call", "offer_renewal_incentive"],
+# }
+```
+
+### `compute_relationship_health_score`
+
+Get a composite tenant health score across four weighted dimensions for portfolio segmentation.
+
+```python
+score = await svc.compute_relationship_health_score(
+    tenant_entity_id="ten_abc123",
+    tenant_id="org_x",
+)
+# score: {
+#   "composite_score": 82.5,
+#   "tier": "Gold",
+#   "dimensions": {
+#     "financial_health": 90.0,
+#     "operational_health": 78.0,
+#     "engagement": 85.0,
+#     "compliance": 77.0,
+#   },
+# }
+```
+
+### `track_rent_arrears`
+
+Record a payment period and trigger the appropriate escalation stage automatically.
+
+```python
+arrears = await svc.track_rent_arrears(
+    tenant_entity_id="ten_abc123",
+    tenant_id="org_x",
+    period="2026-05",
+    amount_due=Decimal("1500.00"),
+    amount_paid=Decimal("0.00"),
+    due_date=date(2026, 5, 1),
+)
+# arrears: {
+#   "days_overdue": 31,
+#   "arrears_balance": "1500.00",
+#   "escalation_stage": "legal_referral",
+#   "notice_generated": True,
+# }
+```

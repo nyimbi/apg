@@ -1,7 +1,7 @@
 {
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"python -c \\\"\\nimport asyncio, sys, types\\n\\n# Build a proper package hierarchy so sub-imports resolve\\nfor name in ['capabilities', 'capabilities.common', 'capabilities.common.dcat',\\n    ...",
-  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 14, in <module>\nModuleNotFoundError: No module named 'capabilities.common.dcat.cat.service'; 'capabilities.common.dcat.cat' is not a package",
-  "timestamp": "2026-06-11T16:44:57.761Z",
-  "retry_count": 3
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"/Users/nyimbiodero/src/pjs/apg/capabilities/common/hlth/service.py\"}",
+  "error": "File content (261.1KB) exceeds maximum allowed size (256KB). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-06-12T02:38:02.882Z",
+  "retry_count": 1
 }

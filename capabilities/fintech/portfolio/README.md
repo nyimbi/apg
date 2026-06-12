@@ -1,16 +1,45 @@
 # Portfolio Management
 
 ## Overview
+
 Portfolio Management provides regulated investment book operations: portfolio book creation, holding ledger recording, allocation policy activation (totals must equal exactly 100%), valuation capture, benchmark assignment, risk exposure tracking, performance attribution, cash movement recording, corporate action processing, compliance breach recording, and governance reviews. It is the investment operations layer for discretionary, advisory, model, and execution-only portfolios.
 
-Version 3.0.0 adds Barra-style factor risk decomposition, liquidity risk scoring (days-to-liquidate), glide path management for target-date funds, specific-lot tax tracking with Kenya CGT calculation, pre-trade compliance checking, risk budget monitoring, transaction cost analysis (TCA), household/sleeve consolidated views, and DRIP (dividend reinvestment) automation.
+Version 3.0.0 adds Barra-style factor risk decomposition, liquidity risk scoring (days-to-liquidate), glide path management for target-date funds, specific-lot tax tracking with Kenya CGT calculation, pre-trade compliance checking, risk budget monitoring, transaction cost analysis (TCA), household/sleeve consolidated views, DRIP (dividend reinvestment) automation, real-time NAV streaming, multi-level attribution, composite benchmark construction, portfolio scoring, and NATS-backed event-sourced audit.
 
 Allocation policies must total exactly 100% before activation. Valuations require a source and valuation date. Performance attribution requires a benchmark. All portfolio lifecycle events stream to `apg.fintech.portfolio.lifecycle` via Bytewax. DRIP executions and risk budget breaches publish to NATS `apg.fintech.portfolio.*` subjects.
 
 ## Capability ID
+
 `fintech_portfolio`  Version: 3.0.0
 
+## Quick Start
+
+```python
+from apg_fintech_portfolio.service import PortfolioManagementService
+
+svc = PortfolioManagementService(tenant_id="acme", nats_url="nats://localhost:4222")
+
+# Create a portfolio book
+book = await svc.create_portfolio(
+    portfolio_id="pf-001",
+    owner_id="client-42",
+    name="Growth Fund",
+    portfolio_type="discretionary",
+    base_currency="KES",
+    investment_policy_reference="IPS-2025-001",
+)
+
+# Record a holding
+await svc.add_holding("pf-001", "SCOM.NSE", quantity=10_000, cost_minor=1_850_000, currency="KES")
+
+# Record a valuation and compute TWR
+await svc.portfolio_valuation("pf-001", market_value_minor=2_100_000, currency="KES",
+                               valuation_date="2025-12-31", source_reference="NAV-CALC-01")
+result = await svc.time_weighted_return("pf-001", start_date="2025-01-01", end_date="2025-12-31")
+```
+
 ## Provides
+
 | Service | Description |
 |---------|-------------|
 | portfolio_book_workflow | Create portfolio books with type, base currency, owner, and investment policy |
@@ -45,6 +74,7 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | portfolio_drip_workflow | Dividend reinvestment automation with fractional unit support |
 
 ## Requires
+
 | Capability | Purpose |
 |------------|---------|
 | auth | Authentication |
@@ -63,6 +93,7 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | fin_rpt | Financial reporting |
 
 ## Configuration Reference
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | portfolios.supported_types | list | discretionary, advisory, model, execution_only, treasury | Portfolio management styles |
@@ -72,6 +103,7 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | compliance.supported_severities | list | low, medium, high, critical | Breach severity levels |
 
 ## API Routes
+
 | Name | Path | Method | Permission | Group |
 |------|------|--------|------------|-------|
 | dashboard | /fintech-portfolio/dashboard | GET | fintech_portfolio:view | Overview |
@@ -106,8 +138,128 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | tca | /fintech-portfolio/tca | GET/POST | fintech_portfolio:performance | Performance |
 | household | /fintech-portfolio/household | GET/POST | fintech_portfolio:view | Reports |
 | drip | /fintech-portfolio/drip | GET/POST | fintech_portfolio:operations | Operations |
+| nav_stream | /fintech-portfolio/{id}/nav-stream | GET (SSE) | fintech_portfolio:view | Streaming |
+
+## World-Class Enhancements (v2.0)
+
+15 institutional-grade capabilities added in v3.0.0, benchmarked against Bloomberg PORT, MSCI RiskMetrics, BlackRock Aladdin, and Charles River IMS:
+
+| # | Enhancement | Category | Competitor Baseline |
+|---|-------------|----------|---------------------|
+| I1 | **Factor Risk Decomposition (Barra-style MCTR)** — per-holding marginal contribution to risk across equity_beta, duration_dv01, credit_spread_dv01, fx_delta, real_estate_beta; diversification ratio | Risk Analytics | MSCI RiskMetrics, Bloomberg PORT |
+| I2 | **Liquidity Risk Scoring with Days-to-Liquidate** — ADV-based bucket classification (liquid/semi-liquid/illiquid/locked); % AUM liquidatable within 1/5/10/30 days; CMA LCR-compliant | Risk Analytics | BlackRock Aladdin, MSCI Liquidity Risk |
+| I3 | **Automated Rebalancing Execution with Block Trading** — NATS JetStream order emission, PENDING_EXECUTION state tracking, fill reconciliation, portfolio allocation lock/unlock | Operations | Charles River IMS, SimCorp Dimension |
+| I4 | **Target-Date Glide Path Management** — GlidePath waypoints, automatic de-risking via `apply_glide_path`, schedule with days-to-next and de-risking velocity | Product/Strategy | Vanguard Target Retirement, BlackRock LifePath |
+| I5 | **Tax-Lot Tracking with Specific Identification** — FIFO/LIFO/highest-cost/specific-lot disposal, per-lot Kenya CGT (15%) calculation, holding period classification | Tax & Compliance | Advent Geneva, SS&C Eze Eclipse |
+| I6 | **Real-Time NAV Streaming via NATS + Bytewax** — async generator subscribing to `apg.market_data.prices.>`, NavTick emission, SSE endpoint at `/nav-stream` | Infrastructure | Bloomberg B-PIPE, Refinitiv Eikon |
+| I7 | **Multi-Portfolio Consolidated View (Household/Sleeve)** — total AUM, weighted allocation, blended ESG, Herfindahl concentration across all accounts for a beneficial owner | Client UX | Orion Portfolio Solutions, Addepar |
+| I8 | **Pre-Trade Compliance Checking** — prohibited instrument list, post-trade concentration (10% AUM limit), mandate type alignment; auto-records ComplianceBreach on violations | Compliance | Charles River Compliance, Bloomberg AIM |
+| I9 | **Transaction Cost Analysis (TCA)** — implementation shortfall per trade, VWAP slippage, Almgren-Chriss market impact, broker performance ranking; best-execution reporting | Performance | ITG/Virtu TCA, Bloomberg TCA |
+| I10 | **Multi-Level Attribution (Asset Class / Sector / Geography)** — BHB allocation, selection, and interaction effects at each level; waterfall decomposition tree | Performance Analytics | FactSet PA, Bloomberg PORT Multi-Level |
+| I11 | **Custom Composite Benchmark Construction** — constituent-weighted benchmark return from recorded index returns; active return vs composite; benchmark return decomposition | Performance | MSCI Custom Index Builder, FTSE Russell |
+| I12 | **Risk Budget Monitoring** — limit registration for tracking_error, var_95_pct_aum, max_drawdown, beta_max; utilisation % with ok/warning/breached status; NATS breach events | Risk/Governance | MSCI RiskMetrics, BlackRock Aladdin |
+| I13 | **Portfolio Scoring and Rating Engine** — composite 0-100 score across Sharpe, concentration, ESG, compliance, and fee efficiency; letter grade (A+ to D); trend delta | Analytics | Morningstar Portfolio Rating, Fitch |
+| I14 | **DRIP Automation** — per-instrument reinvestment policies (configurable %), automatic `add_holding` on dividend corporate actions, residual cash recording, fractional unit support | Operations | Computershare DRIP, FNZ Platform |
+| I15 | **NATS-Backed Persistent Audit Log with Event Sourcing** — JetStream durable publish on every audit event; `replay_audit_events` for point-in-time portfolio reconstruction; tamper-evident | Infrastructure | Kafka Event Sourcing, AWS EventBridge |
+
+## New Methods
+
+### 1. Factor Risk Decomposition
+
+```python
+# First record factor loadings per instrument
+await svc.record_factor_loadings("SCOM.NSE", {
+    "equity_beta": 1.15,
+    "duration_dv01": 0.0,
+    "credit_spread_dv01": 0.0,
+    "fx_delta": 0.3,
+    "real_estate_beta": 0.0,
+})
+
+result = await svc.factor_risk_decomposition("pf-001")
+# {
+#   "portfolio_volatility": 0.231,
+#   "diversification_ratio": 1.0,
+#   "factor_exposures": {"equity_beta": 0.892, "fx_delta": 0.142, ...},
+#   "mctr": [{"instrument_id": "SCOM.NSE", "weight": 0.65, "mctr": {...}}, ...]
+# }
+```
+
+### 2. Pre-Trade Compliance Check
+
+```python
+result = await svc.pre_trade_compliance_check("pf-001", proposed_trades=[
+    {"asset_id": "EQTY.NSE", "action": "buy", "quantity_minor": 500_000},
+    {"asset_id": "SANCTIONED-CO", "action": "buy", "quantity_minor": 100_000},
+])
+# {
+#   "all_passed": False,
+#   "total_violations": 1,
+#   "trade_results": [
+#     {"asset_id": "EQTY.NSE", "passed": True, "violations": []},
+#     {"asset_id": "SANCTIONED-CO", "passed": False,
+#      "violations": ["prohibited_instrument:sanctions_list"]},
+#   ]
+# }
+```
+
+### 3. Risk Budget Monitoring
+
+```python
+await svc.register_risk_budget("budget-01", "pf-001", limits={
+    "var_95_pct_aum": 0.05,       # 5% VaR limit
+    "max_drawdown": -0.15,         # 15% max drawdown
+    "tracking_error": 0.04,        # 4% TE vs benchmark
+    "beta_max": 1.2,
+}, warning_pct=0.80)
+
+status = await svc.monitor_risk_budget("pf-001")
+# {
+#   "any_breach": False,
+#   "metrics": [
+#     {"metric": "var_95_pct_aum", "current": 0.038, "limit": 0.05,
+#      "utilisation_pct": 76.0, "status": "warning"},
+#     ...
+#   ]
+# }
+```
+
+### 4. Household Consolidated View
+
+```python
+await svc.create_household("hh-001", client_id="client-42",
+                            portfolio_ids=["pf-001", "pf-002", "pf-003"])
+
+view = await svc.consolidated_portfolio_view(["pf-001", "pf-002", "pf-003"])
+# {
+#   "total_aum_minor": 45_000_000,
+#   "herfindahl_index": 0.08,
+#   "concentration_label": "low",
+#   "blended_esg_composite": 68.4,
+#   "allocation_breakdown": {"SCOM.NSE": 0.31, "KCB.NSE": 0.22, ...},
+#   "portfolios": [...]
+# }
+```
+
+### 5. DRIP Automation
+
+```python
+# Register policy: reinvest 100% of dividends for this instrument
+await svc.register_drip_policy("pf-001", "SCOM.NSE",
+                                reinvestment_pct=1.0, fractional_allowed=True)
+
+# When a dividend corporate action fires, DRIP executes automatically
+await svc.record_corporate_action(
+    action_id="ca-055", instrument_id="SCOM.NSE",
+    action_type="dividend", effective_date="2025-12-15",
+    evidence_reference="DIV-NOTICE-2025-Q4",
+    amount_minor=25_000, market_price_minor=185,
+)
+# Units reinvested = floor(25000 / 185) = 135 units added to pf-001 automatically
+```
 
 ## Business Rules
+
 | Rule | Condition | Effect |
 |------|-----------|--------|
 | portfolio_type_supported | Unsupported portfolio type | deny |
@@ -131,6 +283,7 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | drip_reinvestment_requires_market_price | DRIP process called with zero market price | deny |
 
 ## Data Models
+
 | Model | Key Fields |
 |-------|-----------|
 | PortfolioBook | id, owner_id, name, portfolio_type, base_currency, investment_policy_reference, status |
@@ -143,9 +296,14 @@ Allocation policies must total exactly 100% before activation. Valuations requir
 | PortfolioCash | id, portfolio_id, amount, currency, reference |
 | CorporateAction | id, instrument_reference, action_type, effective_date, evidence_reference |
 | ComplianceBreach | id, portfolio_id, severity, evidence_reference, status |
+| TaxLot | lot_id, holding_id, portfolio_id, instrument_id, purchase_date, quantity, cost_per_unit_minor, currency |
+| GlidePath | id, tenant_id, portfolio_id, target_date, waypoints |
+| DRIPPolicy | id, tenant_id, portfolio_id, instrument_id, reinvestment_pct, fractional_allowed |
 
 ## Streaming Events
+
 Events emitted to the fintech event stream via Bytewax and NATS.
+
 | Event | Trigger | Subject |
 |-------|---------|---------|
 | portfolio_book_created | Portfolio book created | apg.fintech.portfolio.lifecycle |
@@ -164,34 +322,40 @@ Events emitted to the fintech event stream via Bytewax and NATS.
 | drip_executed | DRIP reinvestment completed | apg.fintech.portfolio.lifecycle |
 | glide_path_applied | Glide path waypoint applied | apg.fintech.portfolio.lifecycle |
 | prohibited_instrument_registered | Prohibited instrument added | apg.fintech.portfolio.compliance |
+| nav_tick | Real-time NAV update per held instrument | apg.fintech.portfolio.nav (NATS SSE) |
+| audit_event | Every audit action (JetStream durable) | apg.fintech.portfolio.audit.{tenant_id} |
 
 ## Edge Cases Handled
-- Allocation totals must equal exactly 100% — rounding errors (e.g., 99.99%) are not tolerated; the `allocation_totals_100` flag must be set by the service layer after verifying exact equality
-- Valuations with zero market value are denied — a portfolio with zero market value is either empty or erroneously valued; the rule forces explicit handling rather than silent acceptance
-- Corporate actions apply to an instrument, not a portfolio — the same dividend or split can affect holdings across multiple portfolios; the action is recorded at the instrument level with an effective date
-- Risk exposure as-of-date is required to prevent stale exposure records being confused with current positions
-- Holdings can have fractional quantities (ETF fractional shares) but cannot be zero or negative — the `positive_quantity` rule enforces strict positivity
-- TWR requires at least two valuation records; fewer returns `insufficient_data` rather than a misleading 0.0
-- MWR (IRR) annualisation uses the actual calendar distance between start and end date to avoid compounding artifacts on sub-annual periods
-- Stress test scenarios without a matching instrument_id fall back to `equity` then `default` shock keys, ensuring portfolios with unmapped instruments are not silently excluded
-- Counterparty concentration is computed only against holdings with an `issuer_id` attribute; unattributed holdings are grouped under `unattributed` and excluded from the limit check
-- ESG score aggregation requires explicit `record_esg_rating` calls per instrument; unscored holdings are listed separately and do not dilute the weighted average
-- Portfolio cloning copies the allocation policy from the source but starts with zero holdings, preventing unintended position duplication across client books
-- Liquidity scoring classifies holdings without ADV metadata as `locked` (worst case) rather than silently excluding them from the score
-- Glide path waypoints must individually total 100% — partial-allocation waypoints are rejected at registration time, not at apply time
-- Tax lot disposal falls back to aggregate average-cost disposal when no lots have been explicitly recorded; `dispose_lots` is non-destructive against portfolios that predate lot tracking
-- Pre-trade compliance checks automatically record `ComplianceBreach` records for violations so every blocked trade has a durable audit record
-- DRIP process with a zero market price returns an error dict rather than raising — this prevents cascading failures during dividend processing when prices are temporarily unavailable
-- Risk budget monitoring computes `max_drawdown` using absolute value comparison so negative drawdown limits (e.g. -0.15) are handled correctly
-- Consolidated portfolio view excludes portfolios not found in this tenant's scope rather than raising — callers can safely pass a superset of IDs
+
+- Allocation totals must equal exactly 100% — rounding errors (e.g., 99.99%) are not tolerated
+- Valuations with zero market value are denied — forces explicit handling of empty portfolios
+- Corporate actions apply to an instrument, not a portfolio — the same dividend affects holdings across portfolios
+- Risk exposure as-of-date is required to prevent stale exposure records
+- Holdings can have fractional quantities (ETF fractional shares) but cannot be zero or negative
+- TWR requires at least two valuation records; fewer returns `insufficient_data`
+- MWR (IRR) annualisation uses actual calendar distance to avoid compounding artifacts
+- Stress test scenarios without a matching instrument_id fall back to `equity` then `default` shock keys
+- Counterparty concentration only applies to holdings with an `issuer_id`; others group under `unattributed`
+- ESG score aggregation skips unscored holdings rather than diluting the weighted average
+- Portfolio cloning copies allocation policy but starts with zero holdings
+- Liquidity scoring classifies holdings without ADV metadata as `locked` (worst case)
+- Glide path waypoints must individually total 100% — rejected at registration, not at apply time
+- Tax lot disposal falls back to aggregate average-cost when no lots have been explicitly recorded
+- Pre-trade compliance auto-records `ComplianceBreach` for every blocked trade
+- DRIP with zero market price returns an error dict rather than raising — prevents cascade during unavailable prices
+- Risk budget `max_drawdown` uses absolute value comparison so negative limits (e.g. -0.15) work correctly
+- Consolidated portfolio view skips portfolios outside the tenant's scope rather than raising
 
 ## Composability
+
 - **Upstream**: `fintech_wealth` provides client profile and mandate context; `fintech_robo` provides model portfolio templates; market data feeds are adapter boundaries referenced by ID
 - **Downstream**: `fintech_trading` consumes portfolio positions for order generation; `bia` and `fin_rpt` consume valuations, attribution, and risk data for reporting
 - **Peer**: Deployed alongside `fintech_wealth` (client-facing advisory layer) and `fintech_trading` (execution layer)
 
 ## Development Notes
-- `treasury` portfolio type is included alongside standard investment types — this supports corporate treasury portfolio management alongside client investment books
-- Performance attribution `contributions` is a free-form dict at the model level; the rule engine does not validate the attribution methodology — that is the responsibility of the analytics adapter
-- `market_data` is declared as an adapter in `DEFAULT_CONFIGURATION` but not in `REQUIRES` — it is a soft dependency accessed via the adapter reference at runtime
+
+- `treasury` portfolio type is included alongside standard investment types — supports corporate treasury management alongside client investment books
+- Performance attribution `contributions` is a free-form dict; attribution methodology validation is the responsibility of the analytics adapter
+- `market_data` is declared as an adapter in `DEFAULT_CONFIGURATION` but not in `REQUIRES` — soft dependency accessed via adapter reference at runtime
+- `nats_url` is optional in `PortfolioManagementService.__init__`; without it, NATS events are silently skipped and the audit log remains in-memory only
 - The `fintech_robo` dependency links robo advisory model portfolios to discretionary/model portfolio books, enabling automated rebalancing signals

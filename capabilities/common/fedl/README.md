@@ -1,5 +1,7 @@
 # APG FEDL - Federated Learning
 
+© 2025 Datacraft | Author: Nyimbi Odero
+
 FEDL is the APG capability for privacy-preserving collaborative model training.
 It lets generated applications create governed federations, attest participants,
 run approved training rounds, collect participant updates, apply poisoning
@@ -27,6 +29,13 @@ emit audit evidence without moving participant datasets into a central store.
   semantic package evidence.
 - Adapter configuration for AICR, MLCM, ENCR, MTEN, AUTH, AUDL, MONI, and
   Bytewax event streaming.
+- Async-first extended API: 18+ `async def` methods covering DP application,
+  secure aggregation, gradient compression, privacy accounting, client
+  selection, convergence checking, model personalisation, security auditing,
+  bulk registration, and federation export.
+- Per-round communication status tracking with per-participant receipt state.
+- Heterogeneous data schema registration per participant.
+- Service health endpoint for operational monitoring.
 
 ## Main Files
 
@@ -154,6 +163,185 @@ aggregation, privacy-budget, release, and federation-agent batches.
 Generated applications validate those batches with
 `validate_fedl_lifecycle_batch()` and inspect accepted or denied evidence
 through `list_lifecycle_batches()` or the `/fedl/lifecycle` route metadata.
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements close the gap between production FL systems and
+the current in-memory implementation. They are ordered by impact.
+
+1. **Async-First Core** — Migrate full service surface to `async def`; use
+   `asyncio.gather` for bulk ops. Thin sync shims kept only where FAB forces
+   synchronous dispatch.
+
+2. **Persistent Storage via Repository Pattern** — Abstract `FedlRepository`
+   protocol with pluggable backends: in-memory (tests), PostgreSQL via asyncpg/
+   SQLAlchemy 2 async, Redis (hot-path cache). Wired via dependency injection.
+
+3. **Real Differential Privacy Engine (Opacus / DP-SGD)** — Replace metadata-
+   only recording with actual L2-norm gradient clipping and Gaussian/Laplace
+   noise injection via Opacus or TF Privacy. Surface exact (ε, δ) per round.
+
+4. **Cryptographic Secure Aggregation (SecAgg+)** — Implement Google SecAgg+:
+   pairwise mask negotiation, Shamir secret sharing, XOR-masked upload, dropout-
+   resilient reconstruction. Fall back to Paillier HE for small cohorts.
+
+5. **Gradient Compression with Error Feedback** — Top-K sparsification,
+   random-K, and PowerSGD low-rank approximation. Per-participant error-feedback
+   buffers prevent compression bias accumulating across rounds.
+
+6. **Byzantine-Robust Aggregation Rules** — Pluggable aggregation: FedAvg,
+   Krum, Multi-Krum, Trimmed-Mean, Median, FLTrust. Selected at federation
+   creation via `aggregation_strategy`; rule-selection evidence emitted to audit.
+
+7. **Formal Privacy Accounting (Rényi DP / Moments Accountant)** — Replace
+   ε-sum with RDP composition via Google `dp-accounting`. Surface per-round
+   and cumulative (ε, δ)-DP certificates using the moments accountant.
+
+8. **Federated Model Lineage and Provenance Graph** — Provenance DAG per model
+   recording contributing participants, sample counts, DP parameters, aggregation
+   strategy, and cryptographic digest. Exportable as W3C PROV-N or JSON-LD.
+
+9. **Cross-Silo Communication Layer (gRPC / NATS)** — gRPC-based or NATS
+   JetStream transport with mutual TLS, per-participant topic isolation, MAC
+   update integrity, and retry/back-pressure. Service becomes true coordinator.
+
+10. **Adaptive Client Selection with Fairness Constraints** — Stratified
+    sampling balancing regional quotas, compute capacity, participation history
+    (anti-starvation), and data heterogeneity proxy. Fairness metrics in analytics.
+
+11. **Split Learning and Hybrid FL** — `split_learning_round` and
+    `hybrid_fl_round` methods. Hybrid FL combines split learning for resource-
+    constrained nodes with full FL for capable nodes. `learning_mode` on rounds.
+
+12. **Real-Time Convergence Monitoring with Early Stopping** — Track per-round
+    validation metrics from `model_evaluate`. EMA convergence curve with
+    configurable threshold; emit early-stopping signal and `convergence_timeline`.
+
+13. **Federated Model Distillation (FedDF / Ensemble)** — `model_distil` runs
+    federated distillation using a shared unlabelled dataset; ensemble participant
+    predictions into a compact student model with distillation provenance.
+
+14. **Compliance Export (GDPR Art. 22 / Kenya DPA Evidence Pack)** —
+    `compliance_export` generates a structured evidence pack: privacy notices,
+    consent refs, DP certificates, data-residency proofs, release approvals, and
+    audit chains. Output as JSON-LD or signed PDF via compliance adapter.
+
+15. **Federated Hyperparameter Optimisation (FedHPO)** — `hpo_round` has the
+    coordinator propose hyperparameter candidates via Bayesian optimisation;
+    participants evaluate locally and return metrics only; coordinator selects
+    next candidate. Integrates with Optuna or Ray Tune.
+
+## New Methods
+
+All extended methods are `async def`. Call them from an async context or via
+`asyncio.run(...)`.
+
+### `privacy_budget_track` — per-round DP accounting
+
+```python
+import asyncio
+
+budget = asyncio.run(service.privacy_budget_track("tenant-a", "fed-risk"))
+# {
+#   "federation_id": "fed-risk",
+#   "epsilon_limit": 6.0,
+#   "epsilon_spent": 2.0,
+#   "epsilon_remaining": 4.0,
+#   "utilisation_pct": 33.33,
+#   "per_round": [{"round_id": "round-001", "epsilon": 2.0, "status": "aggregated"}]
+# }
+```
+
+### `differential_privacy_apply` — Gaussian mechanism metadata
+
+```python
+dp = asyncio.run(service.differential_privacy_apply(
+	tenant_id="tenant-a",
+	round_id="round-001",
+	noise_multiplier=1.1,
+	clipping_norm=1.0,
+))
+# {"noise_multiplier": 1.1, "clipping_norm": 1.0, "updates_noised": 3,
+#  "effective_epsilon": 1.818182, "status": "applied"}
+```
+
+### `bulk_register_participants` — register a cohort atomically
+
+```python
+nodes = [
+	{"id": "node-4", "name": "Node 4", "region": "ke", "contract_ref": "c4", "attested": True},
+	{"id": "node-5", "name": "Node 5", "region": "za", "contract_ref": "c5", "attested": True},
+]
+records = asyncio.run(service.bulk_register_participants("tenant-a", "fed-risk", nodes))
+```
+
+### `fl_security_audit` — policy violation scan
+
+```python
+report = asyncio.run(service.fl_security_audit("audit-001", "tenant-a", "fed-risk"))
+# {
+#   "risk_level": "low",
+#   "findings": [],
+#   "finding_count": 0,
+#   "status": "completed"
+# }
+```
+
+### `communication_round` — per-participant receipt tracking
+
+```python
+status = asyncio.run(service.communication_round("tenant-a", "round-001"))
+# {
+#   "completion_pct": 100.0,
+#   "received_count": 3,
+#   "pending_count": 0,
+#   "receipt_status": {"node-1": "received", "node-2": "received", "node-3": "received"}
+# }
+```
+
+## Service API Reference
+
+| Method | Sync/Async | Description |
+|---|---|---|
+| `create_federation` | sync | Create a governed federation |
+| `register_participant` | sync | Attest and register a participant |
+| `start_round` | sync | Open an approved training round |
+| `submit_update` | sync | Accept a model update from a participant |
+| `aggregate_updates` | sync | Aggregate accepted updates, produce model version |
+| `release_model` | sync | Publish a federated model to MLCM |
+| `retire_federation` | sync | Retire a federation after impact review |
+| `register_federation_agent` | sync | Register a governance agent |
+| `validate_fedl_lifecycle_batch` | sync | Validate Bytewax lifecycle batches |
+| `list_federations` | sync | List federations for a tenant |
+| `list_participants` | sync | List participants for a tenant |
+| `list_rounds` | sync | List training rounds for a tenant |
+| `list_updates` | sync | List model updates for a tenant |
+| `list_aggregations` | sync | List aggregation results for a tenant |
+| `list_models` | sync | List federated models for a tenant |
+| `list_releases` | sync | List model releases for a tenant |
+| `list_federation_agents` | sync | List registered agents |
+| `list_lifecycle_batches` | sync | List Bytewax lifecycle batch records |
+| `list_audit_events` | sync | List all audit events for a tenant |
+| `dashboard_summary` | sync | Aggregate dashboard counters |
+| `privacy_budget_summary` | sync | Simple per-tenant ε summary |
+| `fl_round_start` | async | Async round start |
+| `client_model_aggregate` | async | Async client-side aggregation trigger |
+| `differential_privacy_apply` | async | Apply Gaussian DP to a round |
+| `secure_aggregation` | async | Run SecAgg protocol step |
+| `model_evaluate` | async | Evaluate model against a dataset |
+| `gradient_compress` | async | Apply gradient compression to updates |
+| `privacy_budget_track` | async | Detailed per-round privacy accounting |
+| `client_select` | async | Select participant subset for next round |
+| `model_version` | async | Full version history for a federation |
+| `fl_analytics` | async | Federated learning analytics |
+| `heterogeneous_data_handle` | async | Register per-participant schema transforms |
+| `communication_round` | async | Per-participant update receipt status |
+| `convergence_check` | async | Check convergence across completed rounds |
+| `model_personalise` | async | Fine-tune global model per participant |
+| `fl_security_audit` | async | Security policy violation scan |
+| `bulk_register_participants` | async | Register multiple participants at once |
+| `export_federation` | async | Full federation metadata snapshot export |
+| `health_check` | async | Service health and store statistics |
 
 ## Focused Verification
 

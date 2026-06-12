@@ -118,3 +118,68 @@ Central portfolio management and property marketing platform for all real estate
 - Owner distributions consume net rental income from `realestate_acc`
 - Lead conversion events feed `realestate_lea` to initiate lease drafting
 - Virtual tour dwell-time signals feed lead urgency scores for smarter agent prioritisation
+
+## World-Class Enhancements (v2.0)
+
+1. **AI-Powered Property Valuation Engine** — Ollama LLM (`llama3.2`) produces confidence-scored AVM outputs with supporting rationale from live comps data.
+2. **Virtual Tour Orchestration Pipeline** — Ingests 360°/video assets, AI-labels scenes via `llava`, generates interactive tour manifests, and feeds dwell-time to lead scoring.
+3. **Intelligent Lead Capture and Scoring** — ML urgency scores, deduplication, source attribution, agent auto-routing with SLA timers and score decay.
+4. **Dynamic Listing Publication Engine** — Multi-channel (website, portals, WhatsApp) listing composer with freshness TTLs and automatic unpublish on status change.
+5. **Geospatial Search and Radius Queries** — PostGIS-backed `search_properties_near(lat, lng, radius_km)`, isochrone filters, heatmap export.
+6. **Tenant Demand Forecasting** — Prophet/ARIMA time-series model forecasts occupancy for next 3/6/12 months with confidence bands.
+7. **Lease Expiry and Break-Clause Management** — `lease_expiry_pipeline` categorises active leases by urgency horizon and auto-fires `ntfy` alerts.
+8. **Service Charge Reconciliation with Actuals** — Variance analysis per budget line, over/under-recovery apportionment, and certified Section 20B statements.
+9. **Maintenance-Integrated CAPEX Tracking** — Links `realestate_mai` work orders to CAPEX ledger with depreciation schedules and capitalisation accounting.
+10. **Owner Portal with Document Data Room** — `PortalService` aggregates statements, KPIs, and certificates in a hard-logged document vault.
+11. **Bulk Listing Import and Validation Pipeline** — CSV/XLSX batch import with schema validation, local geocoding, fuzzy deduplication, and per-row error reports.
+12. **Market Comparables and Benchmarking API** — `get_market_comparables` returns ERV, passing rent, void incentives, and transaction yields for peer properties.
+13. **Automated Compliance Checklist Engine** — Per-property, per-jurisdiction checklist (EPC, fire, gas, legionella) with expiry tracking and letting block on critical failures.
+14. **Streaming Event Enrichment via CloudEvents** — All status changes published as typed `CloudEvent` payloads to `mqeb` with full correlation IDs for downstream fan-out.
+15. **Multi-Currency and FX Rate Integration** — `CurrencyService` fetches live FX rates, converts owner statements to reporting currency (KES/USD/GBP) per ISO 4217.
+
+## New Methods
+
+### `capture_lead` — Intake a prospect with source attribution and urgency scoring
+
+```python
+lead = await svc.capture_lead(
+    tenant_id="t1",
+    property_id="prop_abc",
+    unit_id="unit_01",
+    contact={"name": "Alice Kamau", "email": "alice@example.com", "phone": "+254700000001"},
+    source="virtual_tour",          # portal | referral | direct | virtual_tour
+    notes="Interested in 2BR unit, move-in next month",
+)
+# Returns dict with lead_id, urgency_score, assigned_agent, sla_due_at
+```
+
+### `publish_listing` — Compose and syndicate a listing to multiple channels
+
+```python
+listing = await svc.publish_listing(
+    tenant_id="t1",
+    property_id="prop_abc",
+    unit_id="unit_01",
+    headline="Spacious 2BR in Westlands — Available Now",
+    asking_rent=Decimal("85000"),
+    currency="KES",
+    channels=["website", "portal", "whatsapp"],
+    media_urls=["https://cdn.example.com/img1.jpg"],
+    freshness_days=30,              # auto-unpublishes after 30 days
+)
+# Returns dict with listing_id, published_at, channel_results, shareable_url
+```
+
+### `create_virtual_tour` — Register a 360°/video tour and link it to the active listing
+
+```python
+tour = await svc.create_virtual_tour(
+    tenant_id="t1",
+    property_id="prop_abc",
+    unit_id="unit_01",
+    media_type="360_images",        # 360_images | video_walkthrough
+    scene_urls=["https://cdn.example.com/tour/room1.jpg", "https://cdn.example.com/tour/room2.jpg"],
+    auto_label_scenes=True,         # invokes local llava vision model
+)
+# Returns dict with tour_id, shareable_url, listing_id (auto-linked), scene_labels
+```

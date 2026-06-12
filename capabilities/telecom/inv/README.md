@@ -133,3 +133,58 @@ Transitions not in this graph are rejected. Decommission always requires `approv
 
 ## Composability Notes
 Provides resource availability data to telecom_pro (provisioning resource reservation) and telecom_ord (order feasibility checking). Site coordinates feed geos for geographic network planning. Circuit data feeds telecom_net for topology-aware alarm correlation. Depreciation data feeds finance capability for asset accounting. Config snapshots feed telecom_sec for security compliance checks.
+
+## World-Class Enhancements (v2.0)
+
+1. **Persistent Storage** — async SQLAlchemy + PostgreSQL repository layer; alembic migrations
+2. **Depreciation Engine** — straight-line, declining-balance, and SYD schedules; full annual schedule output
+3. **Spare Parts Lifecycle** — receive/issue/return flows; auto-pool from decommissioned assets; low-stock alerts
+4. **Real IPAM** — `ipaddress` module subnet arithmetic; bitmap free-list; collision-safe host allocation
+5. **Structured Audit Trail** — `AuditEvent` Pydantic schema; tenant/actor/timestamp fields; streams to `audl`
+6. **Config Fingerprinting** — SHA-256 snapshot per NE; set-based line diff; drift events to `telecom_sec`
+7. **Network Graph Analytics** — BFS/Dijkstra shortest path; Tarjan articulation-point SPOF detection
+8. **Asset Lifecycle FSM** — explicit 8-state graph; illegal transitions rejected; `get_valid_next_statuses()`
+9. **Geographic Proximity Search** — Haversine `find_sites_within_radius()`; nearest spare depot lookup
+10. **Reconciliation Scheduling** — `ReconciliationSchedule` model; cron-driven; pluggable SNMP/Netconf/gNMI adapters
+11. **Tenant-Scoped Store** — `TenantScopedStore` wrapper; cross-tenant data leakage impossible by construction
+12. **Bulk Import Idempotency** — dry-run `validate_only` mode; asset_id as upsert key; per-row error reporting
+13. **Vendor EoL Cross-Reference** — `VendorAdvisoryAdapter`; `vendor_eol_sync()` auto-populates EoL records
+14. **Industry-Standard Export** — YANG/RFC 7951, OpenConfig JSON, and NetBox-compatible REST payload formats
+15. **Capacity Planning with Real Metrics** — `UtilisationAdapter` for SNMP/gNMI counters; local LSTM forecast via Ollama
+
+## New Methods
+
+### `calculate_depreciation` — Asset depreciation schedule
+
+```python
+svc = NetworkInventoryService()
+result = await svc.calculate_depreciation(
+    asset_id="asset-uuid",
+    tenant_id="acme",
+    method="declining_balance",   # straight_line | declining_balance | sum_of_years_digits
+    useful_life_years=7,
+    salvage_value=5000.0,
+)
+# result["schedule"] → list of {year, annual_depreciation, accumulated_depreciation, net_book_value}
+```
+
+### `find_sites_within_radius` — Haversine proximity search
+
+```python
+result = await svc.find_sites_within_radius(
+    lat=-1.2921,
+    lon=36.8219,
+    radius_km=50.0,
+    tenant_id="acme",
+)
+# result["sites"] → sorted by distance_km ascending; each entry includes site metadata + distance_km
+```
+
+### `network_graph_critical_paths` — Single point of failure detection
+
+```python
+result = await svc.network_graph_critical_paths(tenant_id="acme")
+# result["cut_vertices"] → list of NE IDs whose removal partitions the network
+# result["component_count"] → number of disconnected graph components
+# Feed into telecom_net for proactive resilience planning
+```

@@ -141,3 +141,25 @@ requesting those scopes are denied by the rule engine.
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/intel/monitoring --json
 ./.venv/bin/apg capabilities lifecycle-audit --root capabilities/intel/monitoring --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: Intel Monitoring Capability
+- **I2.** Adaptive Baseline Engine
+- **I3.** Multi-Tenant Watch Namespace Isolation
+- **I4.** Streaming Event Ingestion Pipeline
+- **I5.** Keyword Watch Versioning
+- **I6.** Alert Deduplication Registry
+- **I7.** Structured Suppression with Reinstatement
+- **I8.** Signal Enrichment Pipeline
+- **I9.** Cross-Tenant Federated Watch Sharing
+- **I10.** Watchlist-Driven Entity Monitoring
+- **I11.** Incident Playbook Integration
+- **I12.** Confidence Score Calibration
+- **I13.** Retention Policy Enforcement
+- **I14.** Real-Time Severity Heatmap
+- **I15.** Composite Health Score
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

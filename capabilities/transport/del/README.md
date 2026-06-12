@@ -179,3 +179,25 @@ Composes with:
 - `billing` — SLA penalty invoicing and insurance claim settlement
 - `ident` — Biometric KYC verification for high-value POD
 - `esg` — Carbon report ingestion for Scope 3 GHG disclosure
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Delivery Management — World-Class Improvement Backlog
+- **I2.** Real-Time GPS Breadcrumb Trail
+- **I3.** Dynamic Route Optimisation with Time-Window Constraints
+- **I4.** SLA Penalty Auto-Calculation and Invoice Generation
+- **I5.** Multi-Tenant Driver Marketplace with Capacity Auctions
+- **I6.** Immutable Audit Ledger via Append-Only Event Log
+- **I7.** Proof-of-Delivery Biometric Verification
+- **I8.** Predictive Failed-Delivery Scoring
+- **I9.** Contactless Locker & Smart-Lock Integration
+- **I10.** Carbon Footprint Tracking per Delivery
+- **I11.** Webhook / Event Push to External Systems
+- **I12.** Intelligent Rescheduling with Preferred-Time Learning
+- **I13.** Consolidated Multi-Parcel Delivery Manifest
+- **I14.** Delivery Insurance and Claims Management
+- **I15.** Driver Gamification and Incentive Engine
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

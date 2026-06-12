@@ -241,3 +241,27 @@ deploy_configuration(...)      # deploy to environment
 - Async methods are thin wrappers over synchronous service logic; they are provided to enable `asyncio.gather` fan-out in composition contexts without introducing thread-pool complexity.
 - Key files: `capability_contract.py` (executable contract and rule engine), `models.py` (dataclass records), `service.py` (lifecycle operations), `api.py` (API helpers), `views.py` (UI model helpers), `app.py` (package self-test).
 - `WORLD_CLASS_IMPROVEMENTS.md` documents 15 concrete improvement paths toward production-grade capability, each with implementation strategy and competitor reference.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Reactive Config Push via NATS JetStream** [Streaming Architecture]
+- **I2. Hierarchical Config Inheritance with Override Chains** [Configuration Model]
+- **I3. Zero-Downtime Schema Evolution with Migration Engine** [Schema Management]
+- **I4. Config-as-Code GitOps Round-Trip with bytewax Pipelines** [GitOps]
+- **I5. Probabilistic Config Canary with Automated Rollback** [Deployment Safety]
+- **I6. Immutable Audit Log with Cryptographic Chaining** [Compliance / Audit]
+- **I7. Declarative Config Policies via OPA (Open Policy Agent)** [Policy Engine]
+- **I8. Multi-Region Config Replication with CRDT Merge** [Distribution]
+- **I9. Semantic Config Search with Vector Embeddings** [Discoverability]
+- **I10. Differential Config Snapshots with Storage Compression** [Storage Efficiency]
+- **I11. Config Dependency Graph with Impact Analysis** [Change Management]
+- **I12. Hot-Reload Config Subscriptions for Long-Running Services** [Runtime Integration]
+- **I13. Config Encryption-at-Rest with Key Rotation** [Security]
+- **I14. Config Linting and Best-Practice Enforcement** [Developer Experience]
+- **I15. Time-Locked Config Scheduling with Audit TTL** [Operations]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

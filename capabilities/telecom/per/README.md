@@ -149,5 +149,69 @@ Capacity forecasts feed telecom_pro (resource reservation planning).
 Threshold configuration integrates with telecom_qos for QoS tuning.
 Performance intelligence feed publishes to apg.intel.per_feed for intel, telecom_ana, and telecom_bil.
 
+## World-Class Enhancements (v2.0)
+
+1. **Predictive Capacity Exhaustion** — ML linear regression on `PerCapacityRecord` history yields `days_to_100pct` estimate.
+2. **Anomaly Detection (Z-Score / IQR)** — `detect_kpi_anomalies` flags measurements beyond ±2σ with IQR pre-clipping.
+3. **Root-Cause Correlation Engine** — `correlate_degradation` computes pairwise Pearson correlation; pairs >0.85 flagged causal.
+4. **Alert Storm Suppression** — time-bucketed TTL suppression map; `group_alerts` clusters open alerts into incident records.
+5. **SLA Penalty Auto-Calculator** — `compute_sla_penalty` applies ITU-T G.826 / ETSI TS 102 250 tiered credit calculation.
+6. **Real-Time KPI Streaming Sink** — `stream_kpi_batch` publishes to `apg.telecom.per.kpi.raw` (Bytewax/Avro) with back-pressure.
+7. **Capacity Heatmap Data API** — `capacity_heatmap` returns a time×resource utilisation matrix (hourly/daily/weekly).
+8. **Adaptive Threshold Tuning** — `suggest_threshold_updates` derives p95/p99 recommendations as a diff against current thresholds.
+9. **End-to-End Service Quality Score** — `end_to_end_service_quality` combines radio + core + transport KPIs into 0–1000 MOS-like score.
+10. **Geo-Spatial Coverage Gap Analysis** — `coverage_gap_analysis` returns GeoJSON polygons for RSRP < −110 dBm areas.
+11. **Subscriber Impact Scoring** — `subscriber_impact_score` computes subscriber-minutes and assigns P1–P4 triage tier.
+12. **Regulatory Compliance Evidence Package** — `generate_compliance_evidence` bundles KPI/SLA/audit data into a SHA-256-signed manifest.
+13. **Capacity Forecasting for telecom_pro** — `forecast_capacity_need` fits Holt-Winters and publishes forecast vector to `apg.telecom.pro.capacity_reservation`.
+14. **Peer-Group Benchmarking with Statistical Tests** — `benchmarking` extended with two-sample t-test, p-value, and Cohen's d effect size.
+15. **Cross-Capability Performance Intelligence Feed** — `publish_performance_intelligence` consolidates degrading KPIs, SLA hotspots, and NPS signals to `apg.intel.per_feed`.
+
+## New Methods
+
+### `detect_kpi_anomalies` — statistical anomaly detection
+
+```python
+svc = TelecomPerformanceService()
+result = await svc.detect_kpi_anomalies(
+    kpi_name="packet_loss_pct",
+    lookback_days=30,
+    z_threshold=2.0,
+    tenant_id="acme",
+)
+# result["anomalies"] → list of {kpi_id, value, z_score, direction, recorded_at}
+# result["anomaly_count"] → int
+# result["mean"], result["std_dev"] → baseline stats
+```
+
+### `subscriber_impact_score` — P1–P4 triage for degradation events
+
+```python
+result = await svc.subscriber_impact_score(
+    event_id="evt-001",
+    affected_cells=["CELL-A1", "CELL-A2"],
+    affected_subscriber_count=8_000,
+    degradation_duration_minutes=15.0,
+    tenant_id="acme",
+)
+# score = 120,000 subscriber-minutes → priority_tier="P1"
+# result["recommended_action"] → "create_itsm_p1_incident"
+```
+
+### `publish_performance_intelligence` — cross-capability intelligence feed
+
+```python
+payload = await svc.publish_performance_intelligence(
+    period="2026-Q2",
+    tenant_id="acme",
+)
+# payload["stream_topic"] → "apg.intel.per_feed"
+# payload["top_degrading_kpis"]    → list[{kpi_id, kpi_name, status, value}]
+# payload["sla_breach_hotspots"]   → list[{compliance_id, sla_type, customer_id}]
+# payload["capacity_risk_nodes"]   → list[{record_id, resource, state, util_pct}]
+# payload["summary"]               → degrading/breach/capacity/detractor counts
+# consumed by: intel, telecom_ana, telecom_bil
+```
+
 ## Copyright
 © 2025 Datacraft — www.datacraft.co.ke

@@ -104,3 +104,27 @@ summaries = await ml.summarize_batch(["doc1 text...", "doc2 text..."], max_words
 ## License
 
 © 2025 Datacraft | nyimbi@gmail.com | www.datacraft.co.ke
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Fix Broken Batch Methods (Correctness Bug)** [Enhancement]
+- **I2. Concurrent Batch Execution via asyncio.gather** [Enhancement]
+- **I3. Response Cache with TTL (BoundedCache)** [Enhancement]
+- **I4. Retry with Exponential Back-off** [Enhancement]
+- **I5. Latency & Token Tracking (Real Inference Stats)** [Enhancement]
+- **I6. Multi-Label Classification** [Enhancement]
+- **I7. Named Entity Recognition (NER)** [Enhancement]
+- **I8. Zero-Shot Intent / Hypothesis Scoring** [Enhancement]
+- **I9. Anomaly / Outlier Scoring** [Enhancement]
+- **I10. Structured Chain-of-Thought Scoring** [Enhancement]
+- **I11. Topic Modelling / Keyword Extraction** [Enhancement]
+- **I12. Language Detection and Translation** [Enhancement]
+- **I13. Semantic Chunking for Long Documents** [Enhancement]
+- **I14. Embedding Batch API with Numpy-compatible Output** [Enhancement]
+- **I15. Model Router / Capability-Aware Dispatch** [Enhancement]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

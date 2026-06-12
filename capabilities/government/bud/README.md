@@ -188,3 +188,27 @@ When `OLLAMA_BASE_URL` is set, the following methods use locally hosted models (
 - `ml_budget_variance_predict()` — budget overspend risk
 - `detect_expenditure_anomalies()` — ML-assisted anomaly scoring
 - `stress_test_budget()` — scenario narrative generation (optional)
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. MTEF Rolling Three-Year Envelope Automation** [Planning Intelligence]
+- **I2. Programme-Based Budgeting (PBB) KPI Scorecard Engine** [Results-Based Accountability]
+- **I3. Real-Time Commitment Control via NATS Event Streaming** [Execution Control]
+- **I4. AI-Assisted Budget Ceiling Redistribution** [Predictive Reallocation]
+- **I5. Integrated Treasury Single Account (TSA) Reconciliation** [Cash & Liquidity Management]
+- **I6. Donor Funds Conditionality Compliance Tracker** [Aid & Grant Management]
+- **I7. Fiscal Risk Register & Contingent Liability Modelling** [Risk Management]
+- **I8. Budget Circular Automated Distribution & Compliance Scoring** [Budget Preparation]
+- **I9. IPSAS-Aligned Accrual Accounting Conversion** [Financial Reporting Standards]
+- **I10. Legislated Appropriation Compliance Guard** [Governance & Legality]
+- **I11. Arrears Management & Payment Prioritisation Engine** [Debt & Arrears Control]
+- **I12. Parliamentary Budget Submission Package Generator** [Legislative Relations]
+- **I13. Macro-Fiscal Scenario Stress Testing** [Fiscal Sustainability Analysis]
+- **I14. Inter-Government Fiscal Transfer (IGFT) Allocation Engine** [Devolution & Transfers]
+- **I15. Expenditure Anomaly Detection via Local ML** [Fraud & Waste Prevention]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

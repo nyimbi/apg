@@ -144,3 +144,25 @@ Focused package proof:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/schd --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/schd --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** SCHD — World-Class Improvements
+- **I2.** Async-Native Service Layer
+- **I3.** Persistent PostgreSQL Backend via SQLAlchemy 2 Async
+- **I4.** Cron Expression Parser with Next-N-Runs Preview
+- **I5.** Distributed Lock / Idempotency Guard
+- **I6.** Backpressure-Aware Dispatcher
+- **I7.** Tenant-Aware Rate Limiting
+- **I8.** Dependency-Graph Execution Engine
+- **I9.** SLA Alerting with Webhook / Notification Fanout
+- **I10.** Schedule Forecast & Capacity Planning API
+- **I11.** Run Metrics Streaming to Bytewax
+- **I12.** Pluggable Calendar Holiday Provider
+- **I13.** Structured JSON Logging with Correlation IDs
+- **I14.** OpenTelemetry Tracing Integration
+- **I15.** Capability Health Probe Endpoint
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

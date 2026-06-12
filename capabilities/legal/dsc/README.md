@@ -212,3 +212,27 @@ summary = await svc.matter_cost_summary(tenant_id="acme", matter_id="mat-002")
 | `leg_bil` — Legal Billing | `matter_cost_summary()` feeds matter billing reconciliation |
 | `intel_alerts` — Alerts | Overdue deadlines and unacknowledged holds trigger alerts |
 | `compliance_gdpr` — GDPR Compliance | `list_destruction_eligible()` feeds GDPR erasure workflows |
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. AI-Powered Privilege Auto-Detection** [AI/ML]
+- **I2. Custodian Hold Acknowledgement Workflow** [Compliance]
+- **I3. Near-Duplicate & Email-Thread Detection** [AI/ML]
+- **I4. Forensic Integrity Verification (Chain of Custody)** [Security]
+- **I5. Document Review Coding with Near-Dup Propagation** [Feature]
+- **I6. Redaction Engine with Audit Log** [Compliance]
+- **I7. FRCP Discovery Deadline Calendar** [Compliance]
+- **I8. Privilege Challenge & Dispute Tracker** [Feature]
+- **I9. Rolling Bates Numbering (Incremental Productions)** [Feature]
+- **I10. Document Family & Attachment Grouping** [Feature]
+- **I11. Data Retention & Destruction Policy Engine** [Compliance]
+- **I12. Matter-Level eDiscovery Cost Tracking (Decimal)** [Feature]
+- **I13. Semantic PII / Entity Extraction** [AI/ML]
+- **I14. Cross-Matter Document Deduplication & Coding Reuse** [Feature]
+- **I15. Time-Limited Secure Share Links for Production Sets** [Security]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

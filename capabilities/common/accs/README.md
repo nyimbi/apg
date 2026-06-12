@@ -169,3 +169,27 @@ Focused checks for this package:
 Full platform suites, live browser scanning, assistive-technology providers,
 captioning services, workflow systems, external AI CLIs, durable databases, and
 live Bytewax execution are intentionally separate integration checks.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real-Time WCAG Axe-Core Integration via Playwright** [Audit Engine]
+- **I2. WCAG 2.2 / ARIA 1.3 Rule Set as Structured Catalog** [Rule Engine]
+- **I3. Async Batch Audit Pipeline with Asyncio Task Groups** [Performance]
+- **I4. Finding Deduplication with Content-Addressed IDs** [Data Integrity]
+- **I5. Remediation SLA Enforcement with Decimal-Based Priority Scoring** [Remediation Workflow]
+- **I6. Tenant-Isolated Persistent Storage via PostgreSQL Adapter** [Storage / Multi-Tenancy]
+- **I7. OpenTelemetry Span Instrumentation on Every Audit Step** [Observability]
+- **I8. Machine-Readable VPAT / ACR Report Generator** [Compliance Reporting]
+- **I9. AI-Driven Remediation Suggestion Engine (Ollama)** [AI / Automation]
+- **I10. Keyboard Navigation Simulation with Focus-Trap Detection** [Assistive Technology Testing]
+- **I11. Color-Blind Simulation and Automated Palette Validation** [Visual Accessibility]
+- **I12. Structured Audit Evidence Package for Legal Defence** [Governance / Legal]
+- **I13. Real-Time Accessibility Score Stream via Server-Sent Events** [Real-Time UX]
+- **I14. Multi-Language / i18n Accessibility Validation** [Internationalisation]
+- **I15. Accessibility Debt Quantification with Financial Impact Scoring** [Business Intelligence]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

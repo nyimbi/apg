@@ -117,7 +117,61 @@ Full CAFM-grade maintenance management: asset register with lifecycle tracking, 
 - Portfolio benchmarking consumes `cost_per_sqm`, PPM, defect, and SLA metrics across properties
 - Escalation policies evaluated per scheduler tick via `process_escalations()`
 
-## New Service Methods (v1.1)
+## World-Class Enhancements (v2.0)
+
+1. **Predictive Maintenance via Condition Scoring** — Asset condition score (0–100) drives PPM frequency escalation and pre-raises predictive WOs before failure.
+2. **Real-Time SLA Countdown with Warning Tiers** — 75%/90%/100% elapsed emit distinct events; contractors notified before breach, not after.
+3. **Contractor Performance Scorecards** — Rolling 30/90/365-day FTFR and response hours from completed WOs; blocks underperforming contractors from assignment.
+4. **Budget Forecasting and Variance Tracking** — `MaintenanceBudget` per property/year tracks committed, actual, and remaining; approval gate fires when a single WO would exceed headroom.
+5. **Mobile-Optimised Work Order Check-In / Check-Out** — GPS-stamped arrival/departure; elapsed time becomes authoritative `actual_duration` for SLA and invoicing.
+6. **Warranty Claims Management** — `WarrantyClaim` model links asset defects to OEM; auto-prompts claim on in-warranty corrective WOs.
+7. **Spare Parts and Materials Inventory** — `SparePart` catalogue with `PartReservation` per WO; re-order points and lead times per property.
+8. **Statutory Compliance Certificate Register** — `StatutoryComplianceCertificate` with expiry tracking; auto-raises renewal inspection WO 60 days before expiry.
+9. **Multi-Site Portfolio Benchmarking** — Cross-property ranking by cost/sqm, PPM completion, defect density, and SLA breach rate with percentile positions.
+10. **Escalation Workflow Engine** — `EscalationPolicy` with configurable levels and delay minutes; `process_escalations()` advances unresolved P1s on each scheduler tick.
+11. **Digital Twin Asset Import (BIM/IFC)** — Bulk import from IFC/COBie; detects new, modified, and decommissioned assets on re-import.
+12. **Reactive Maintenance Pattern Detection** — Flags assets with >= N corrective WOs in D days; auto-raises a linked `major` defect.
+13. **Tenant/Occupier-Reported Issue Portal** — `OccupierReport` triage queue; FM reviews and dismisses, raises defect, or promotes to WO.
+14. **Net Zero Carbon Pathway Tracking** — `CarbonTarget` model with glide-path projection; `compute_carbon_trajectory()` compares actuals for ESG reporting.
+15. **Invoice Reconciliation and Payment Authorisation** — `ContractorInvoice` with three-way matching (PO ref, completion sign-off, amount within tolerance); auto-approves within tolerance, routes over-runs for approval.
+
+## New Methods
+
+### `compute_contractor_scorecard(contractor_id, tenant_id)`
+Calculates rolling first-time fix rate, average resolution hours, and SLA breach rate for a contractor. Use this before assignment decisions or contract renewal reviews.
+
+```python
+svc = MaiService(tenant_id="t1", actor_id="facilities_mgr")
+scorecard = await svc.compute_contractor_scorecard(
+    contractor_id="CTR-001",
+    tenant_id="t1",
+)
+# scorecard.first_time_fix_rate_30d -> 0.87
+# scorecard.avg_resolution_hours_90d -> 4.2
+# scorecard.sla_breach_rate_365d -> 0.03
+```
+
+### `process_escalations(tenant_id)`
+Advances all unresolved work orders through their configured escalation policy levels. Designed to run on every scheduler tick (e.g. every 5 minutes). Emits escalation events and notifies the roles defined at each level.
+
+```python
+svc = MaiService(tenant_id="t1", actor_id="system")
+result = await svc.process_escalations(tenant_id="t1")
+# result["escalated_count"] -> 3
+# result["levels_advanced"] -> [{"wo_id": "WO-000012", "new_level": 2}, ...]
+```
+
+### `benchmark_portfolio(tenant_id)`
+Ranks all properties in the portfolio by cost/sqm, PPM completion rate, open defect density, and SLA breach rate. Returns percentile positions per metric so facilities directors can identify outlier properties needing capital intervention.
+
+```python
+svc = MaiService(tenant_id="t1", actor_id="portfolio_director")
+report = await svc.benchmark_portfolio(tenant_id="t1")
+# report["rankings"][0] -> {"property_id": "PROP-05", "cost_per_sqm_percentile": 92, ...}
+# report["outliers"] -> properties at or below 10th percentile on any metric
+```
+
+## Service Methods (v1.1 + v2.0)
 
 | Method | Category | Description |
 |--------|----------|-------------|

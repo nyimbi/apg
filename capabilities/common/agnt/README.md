@@ -179,3 +179,27 @@ Focused checks for this package:
 Full platform suites, live provider CLIs, browser automation, shell execution,
 memory stores, durable databases, live Bytewax workers, and performance/load
 checks are separate integration concerns.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Durable Persistence Layer via PostgreSQL + SQLAlchemy Async** [Infrastructure]
+- **I2. Real LLM Runtime Dispatch via Ollama and OpenAI-Compatible APIs** [Execution]
+- **I3. Structured Decimal-Safe Cost Accounting** [Financial]
+- **I4. Streaming Token-Level Output via AsyncGenerator + Server-Sent Events** [UX / Execution]
+- **I5. Vector Memory with Embedding-Based Retrieval** [Memory]
+- **I6. Deterministic Handoff Graph Validation with Cycle Detection** [Correctness]
+- **I7. Budget Guardrail with Hard-Stop Enforcement** [Safety / Cost]
+- **I8. Distributed Session State via Redis-Compatible Backend** [Scalability]
+- **I9. Comprehensive OpenTelemetry Tracing** [Observability]
+- **I10. Agent Capability Negotiation and Skill Registry** [Composability]
+- **I11. Human-in-the-Loop Pause/Resume with Approval Inbox** [Governance]
+- **I12. Multi-Model Routing and Fallback Chain** [Resilience]
+- **I13. Fine-Grained RBAC for Agent Operations** [Security]
+- **I14. Execution Plan Diffing and Replay** [DevOps / Auditability]
+- **I15. Async Batch Import and Bulk Agent Registration** [Ergonomics / Throughput]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

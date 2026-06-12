@@ -131,3 +131,25 @@ Manages the full lifecycle of mineral exploration data from drill-hole collar lo
 - Expenditure data feeds `mining_fin` for exploration budget reporting
 - Desurveyed 3D collar paths exported to `mining_3d` for block model alignment
 - CP credential registry consumed by `wflo` for automated approval gating
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: Exploration Data Management (mining_exp)
+- **I2.** Summary
+- **I3.** 3D Downhole Survey Desurveying Engine
+- **I4.** Variogram Modelling and Geostatistical Input Preparation
+- **I5.** Composite Interval Calculator (Bench / Block Compositing)
+- **I6.** QAQC Performance Dashboard with Statistical Control Limits
+- **I7.** Bulk Density Assignment and Tonnes Calculation Audit
+- **I8.** Automated Domaining by Geology Code
+- **I9.** Drill Programme Optimisation (Target to Discovery Ratio)
+- **I10.** Geochemical Multi-Element Anomaly Scoring
+- **I11.** Reconciliation: Exploration vs. Mining Production
+- **I12.** Competent Person Credential Registry and Expiry Tracking
+- **I13.** Continuous Sampling Interval Gap Detection
+- **I14.** Spatial Constraint Polygon Enforcement (Licence Boundary Check)
+- **I15.** Drill Core Photography and Sample Tray Linkage
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

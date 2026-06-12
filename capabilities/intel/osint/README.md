@@ -78,3 +78,25 @@ Invalid operations raise `PermissionError` with rule reasons such as
 Live crawler execution, paid source APIs, social-platform access, search-index
 queries, GraphRAG projections, storage, source-term verification, release
 distribution, and durable Bytewax topology execution stay behind adapters.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Open Source Intelligence — World-Class Improvements
+- **I2.** Dark Web Crawl Pipeline
+- **I3.** Keyword-Driven Alert Subscription
+- **I4.** Cross-Source Pivot Search
+- **I5.** Intelligence Requirement Lifecycle (Async)
+- **I6.** Confidence Decay Engine
+- **I7.** Bulk Ingestion with Backpressure
+- **I8.** Entity Merge (Human-Confirmed)
+- **I9.** Threat Actor Profiling
+- **I10.** News Feed Parser & Dedup Pipeline
+- **I11.** STIX 2.1 Export
+- **I12.** Source Credibility Auto-Calibration
+- **I13.** Graph Centrality Analytics
+- **I14.** Temporal Pattern Detection
+- **I15.** Collection Task Retry with Exponential Back-off
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

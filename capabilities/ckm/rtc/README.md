@@ -240,3 +240,27 @@ audit events.
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/ckm/rtc --json
 ./.venv/bin/apg capabilities publish-plan capabilities/ckm/rtc --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. CRDT-Native Operational Transform Engine** [Core Algorithm]
+- **I2. Multi-Pod NATS JetStream Broadcast** [Infrastructure]
+- **I3. Presence Heartbeat via Redis Sorted Sets** [Performance]
+- **I4. End-to-End Encryption for Sensitive Sessions** [Security]
+- **I5. AI-Powered Real-Time Transcription with Speaker Diarization** [AI/ML]
+- **I6. Adaptive Bitrate Video with SFU Architecture** [Media]
+- **I7. Optimistic Concurrency with Version Vectors for Form Co-Edit** [Consistency]
+- **I8. Structured Decision Audit Trail with Cryptographic Chaining** [Governance]
+- **I9. Bandwidth-Aware Screen Share Quality Throttling** [Media Optimization]
+- **I10. Waiting Room with AI-Gated Admission** [Access Control]
+- **I11. Breakout Room Orchestration with Auto-Assignment** [Collaboration Structure]
+- **I12. Persistent Whiteboard with Vector Graphics Sync** [Collaboration Tools]
+- **I13. Tenant-Scoped Rate Limiting with Token Bucket** [Resource Governance]
+- **I14. Composable Collaboration Templates** [Developer Experience]
+- **I15. Real-Time Collaboration Quality Score (CQS)** [Observability]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

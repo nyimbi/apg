@@ -207,3 +207,27 @@ Bytewax pipelines consume these streams for real-time dashboards, risk scoring m
 ## Composability Notes
 
 EMR feeds patient history to `healthcare_ana` for cohort membership and outcomes measurement. Medication data flows to `healthcare_pha` for formulary and dispensing validation. Lab orders originate from encounters and feed back as FHIR DiagnosticReport resources. `healthcare_pmt` ADT events trigger encounter creation in EMR. Population health cohorts flow to `healthcare_pop` for outreach campaign management. PGx results are visible in `healthcare_gen` genomics capability.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real-Time Clinical Event Streaming via NATS** [Integration / Streaming]
+- **I2. Longitudinal Vital Trend Analysis with Statistical Anomaly Detection** [Clinical Decision Support]
+- **I3. SMART on FHIR OAuth2 App Launch Integration** [Interoperability / Security]
+- **I4. AI-Assisted Clinical Note Structuring via Local LLM (Ollama)** [AI / Clinical Productivity]
+- **I5. Predictive Readmission Risk Scoring (LACE+ Index)** [Population Health / Risk Stratification]
+- **I6. Charlson Comorbidity Index (CCI) Calculation** [Clinical Decision Support / Risk Adjustment]
+- **I7. Structured Medication Administration Record (eMAR) with Dose Tracking** [Patient Safety / Medication Management]
+- **I8. Sepsis Bundle Compliance Tracking (Sepsis-6/Hour-1)** [Quality / Patient Safety]
+- **I9. Genomics/Pharmacogenomics Integration Layer** [Precision Medicine]
+- **I10. Patient-Generated Health Data (PGHD) Ingestion** [Connected Health / Patient Engagement]
+- **I11. Audit Trail Immutability with Cryptographic Hash Chaining** [Compliance / Security]
+- **I12. Advance Directive and POLST/MOLST Management** [Patient Safety / End-of-Life Care]
+- **I13. Outpatient Population Health Cohort Builder** [Population Health / Analytics]
+- **I14. Multi-Factor Diagnostic Confidence Scoring** [Clinical Decision Support / AI]
+- **I15. Cross-Encounter Longitudinal Disease Trajectory Tracking** [Chronic Disease Management]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

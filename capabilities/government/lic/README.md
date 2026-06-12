@@ -202,3 +202,27 @@ Composes with:
 - `government_con` — contractor registration uses professional licence
 - `government_per` — building permits require valid contractor licence
 - `government_pay` — payment gateway integration for online fee collection
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Risk-Based Inspection Scheduling** [Enhancement]
+- **I2. Digital Licence Wallet (QR/NFC)** [Enhancement]
+- **I3. Predictive Expiry Engine** [Enhancement]
+- **I4. Automated Fee Schedule Versioning** [Enhancement]
+- **I5. Multi-Jurisdiction Reciprocity Graph** [Enhancement]
+- **I6. Inspection Checklist Engine** [Enhancement]
+- **I7. Appeal & Tribunal Workflow** [Enhancement]
+- **I8. Late-Fee Auto-Assessment** [Enhancement]
+- **I9. Parallel Document Verification** [Enhancement]
+- **I10. Condition-Based Licence Endorsements** [Enhancement]
+- **I11. Batch Application Processing via Event Stream** [Enhancement]
+- **I12. Service-Level Agreement Tracking** [Enhancement]
+- **I13. Offline-First Mobile Inspector App Support** [Enhancement]
+- **I14. Regulatory Change Impact Analysis** [Enhancement]
+- **I15. Composable Compliance Score Card** [Enhancement]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

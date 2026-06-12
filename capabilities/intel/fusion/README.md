@@ -62,3 +62,25 @@ Use focused verification during battery-constrained development:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/intel/fusion --json
 ./.venv/bin/apg capabilities lifecycle-audit --root capabilities/intel/fusion --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Intelligence Fusion — World-Class Improvements
+- **I2.** Probabilistic Fusion with Dempster-Shafer Theory
+- **I3.** Temporal Decay Model for Intelligence Staleness
+- **I4.** Structured Analytic Technique — Red Team / Devil's Advocate Automation
+- **I5.** Cross-Domain Semantic Deduplication
+- **I6.** Automated Assessment Quality Scoring Pipeline
+- **I7.** Intelligence Gap Tracking
+- **I8.** Streaming Event Replay and Audit Trail
+- **I9.** Multi-Hypothesis Conflict Resolution Protocol
+- **I10.** Source Reliability and Information Credibility (SRCC) Framework
+- **I11.** Product Versioning and Lineage Tracking
+- **I12.** Geospatial Fusion Support
+- **I13.** Confidence Decay on Challenge Events
+- **I14.** Batch Ingestion with Deconfliction
+- **I15.** Analyst Performance Metrics
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

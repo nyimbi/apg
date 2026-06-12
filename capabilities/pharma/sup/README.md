@@ -118,3 +118,25 @@ Manages the pharmaceutical supply chain from active ingredient sourcing through 
 
 ## Composability Notes
 Qualifies API suppliers for `pharma_mfg` material receipt. CMO records link to `pharma_mfg` batch genealogy. Demand forecasts feed `pharma_dis` inventory planning. Import licenses gate `pharma_dis` import shipments. Supply security data informs `pharma_rec` risk management plans.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Pharmaceutical Supply Chain — World-Class Improvements
+- **I2.** Serialisation & Track-and-Trace (GS1/DSCSA/FMD)
+- **I3.** Cold Chain Continuous Monitoring
+- **I4.** GDP Compliance Gate on Every Shipment
+- **I5.** Automated Recall Management (Class I/II/III)
+- **I6.** Supplier Performance Scorecard (KPI-Driven Re-qualification)
+- **I7.** Multi-Tier Supply Chain Visibility (n-Tier Mapping)
+- **I8.** Intelligent Demand Sensing with AI Uplift
+- **I9.** Regulatory Dossier Linkage (CTD Module 3 / DMF)
+- **I10.** Contract Price & Volume Commitment Enforcement
+- **I11.** Counterfeit Detection & Supply Chain Integrity
+- **I12.** Shortage Prediction (Proactive vs Reactive)
+- **I13.** Dual Sourcing Workflow Automation
+- **I14.** Audit Trail Cryptographic Integrity (ALCOA+)
+- **I15.** Batch Genealogy Integration with
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

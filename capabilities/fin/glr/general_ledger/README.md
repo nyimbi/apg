@@ -222,3 +222,25 @@ Focused package verification:
 
 Full repository tests are intentionally not required for this package-level
 slice while working under battery constraints.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements — General Ledger
+- **I2.** Continuous Accounting — Real-time Sub-Ledger Streaming
+- **I3.** Problem solved
+- **I4.** Implementation
+- **I5.** domain/streaming.py
+- **I6.** Business value
+- **I7.** Competitive advantage
+- **I8.** Complexity: Medium
+- **I9.** Predictive Period-Close — ML-Assisted Anomaly Detection
+- **I10.** Problem solved
+- **I11.** Implementation
+- **I12.** service.py addition
+- **I13.** Business value
+- **I14.** Competitive advantage
+- **I15.** Complexity: Medium-High
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

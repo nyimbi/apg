@@ -139,3 +139,27 @@ Incident command, resource mobilisation, multi-agency coordination, EOC manageme
 
 ## Composability Notes
 Composes with `government_law` (security incidents activate law enforcement dockets), `government_cas` (public emergency reports become cases), `government_bud` (emergency resource costs create budget commitments), `government_csr` (citizen alerts and relief applications), and `intel` (threat intelligence feeds incident severity assessment). Cross-capability events are published automatically via `async_publish_cross_capability_events()`.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real-Time Predictive Incident Escalation** [AI/ML Decision Support]
+- **I2. CAP-Compliant Public Alert Broadcasting** [Public Warning Standards]
+- **I3. GIS-Integrated Damage Assessment with Satellite Change Detection** [Geospatial Intelligence]
+- **I4. NATS-Backed Event Sourcing for Full Incident Timeline** [Data Architecture / Auditability]
+- **I5. Unified Resource Tracking with QR/RFID Position Updates** [Resource Management]
+- **I6. Inter-Jurisdictional Mutual Aid Workflow Automation** [Interoperability]
+- **I7. Predictive Resource Gap Analysis** [Logistics Intelligence]
+- **I8. AI-Assisted SITREP Generation** [Reporting Automation]
+- **I9. Volunteer Skill-Matching Engine** [Human Capital Management]
+- **I10. Automated Shelter Capacity Management** [Mass Care Logistics]
+- **I11. Multi-Modal Communication Resilience** [Communications / Redundancy]
+- **I12. Incident Command Post Digital Twin** [Situational Awareness]
+- **I13. Compliance-Driven After-Action Workflow** [Governance / Continuous Improvement]
+- **I14. Real-Time Casualty De-duplication and Family Reunification** [Life Safety / Data Quality]
+- **I15. NATS-Driven Cross-Capability Event Choreography** [Composability / Integration]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

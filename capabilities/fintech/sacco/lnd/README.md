@@ -31,3 +31,27 @@ Loan products, credit scoring, guarantor management, repayment schedules, arrear
 | GET | /api/fintech/sacco/lnd/crb | List CRB reports |
 | GET | /api/fintech/sacco/lnd/summary | Portfolio summary |
 | GET | /api/fintech/sacco/lnd/audit | Audit events |
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Dynamic Loan Restructuring** [Enhancement]
+- **I2. Penalty & Late-Fee Engine** [Enhancement]
+- **I3. Loan Top-Up (Enhancement)** [Enhancement]
+- **I4. Flat-Rate Interest Schedule** [Enhancement]
+- **I5. Savings-Linked Collateral Lock** [Enhancement]
+- **I6. Group/Solidarity Loan Support** [Enhancement]
+- **I7. Automated Repayment Allocation Waterfall** [Enhancement]
+- **I8. SASRA Regulatory Reporting** [Enhancement]
+- **I9. Loan Insurance Claim Processing** [Enhancement]
+- **I10. Bullet / Balloon Loan Schedules** [Enhancement]
+- **I11. Loan Officer Performance Dashboard** [Enhancement]
+- **I12. Early Repayment / Prepayment Penalty** [Enhancement]
+- **I13. Multi-Tier Approval Workflow** [Enhancement]
+- **I14. Rollover / Renewal Automation** [Enhancement]
+- **I15. Dynamic Provisioning Engine** [Enhancement]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

@@ -122,3 +122,25 @@ Version 2.0 adds world-class enhancements: real odometer-linked predictive alert
 
 ## Composability Notes
 Receives vehicle IDs from `transport_fle`. Maintenance schedules feed into `transport_sch` for planned downtime. Parts reorder notifications are routed through `ntfy`. Roadworthiness certificates are validated by `transport_dis` pre-dispatch. Warranty claims route through `wflo` for approval. Breakdown events can trigger `transport_dis` fleet reassignment.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Vehicle Maintenance — World-Class Improvement Plan
+- **I2.** Technician Skill Matching & Workload Balancing
+- **I3.** Real Odometer-Linked Service Due Dates
+- **I4.** Breakdown Event Pipeline with SLA Tracking
+- **I5.** Parts Reorder Automation with Minimum Stock Rules
+- **I6.** Digital Twin Vehicle State Machine
+- **I7.** Warranty Claim Auto-Filing Workflow
+- **I8.** Maintenance Cost Ledger with Actual Parts Pricing
+- **I9.** Multi-Vehicle Bulk Inspection Campaigns
+- **I10.** Predictive Failure Model Integration
+- **I11.** Labour Time Tracking with Technician Clock-In/Clock-Out
+- **I12.** Supplier Performance Scorecard
+- **I13.** Compliance Calendar with Automated Reminders
+- **I14.** Job Dependency Graph for Complex Repairs
+- **I15.** Fleet-Wide TCO (Total Cost of Ownership) Report
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

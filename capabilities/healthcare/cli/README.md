@@ -91,3 +91,25 @@ Clinical workflow orchestration capability providing care plan management, clini
 
 ## Composability Notes
 Care plans reference ICD-10 codes from `healthcare_emr` problem lists. CDS alerts consume lab results from `healthcare_lab` (critical values) and vital signs. Protocol activation events trigger workflow tasks that are tracked alongside `healthcare_pmt` ADT events.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements — Clinical Management (healthcare_cli)
+- **I2.** Early Warning Score (EWS) Engine
+- **I3.** FHIR R4 Resource Serialisation
+- **I4.** Admission-to-Discharge Acuity Timeline
+- **I5.** Constraint-Based Bed Management Integration
+- **I6.** Clinical Documentation Quality Scorer
+- **I7.** Protocol Deviation Detection and Auto-Alert
+- **I8.** Structured Consent Management
+- **I9.** Multi-Factor Risk Stratification
+- **I10.** Outcome Tracking and Readmission Prediction
+- **I11.** Clinical Task Escalation Engine
+- **I12.** Antimicrobial Stewardship Tracker
+- **I13.** Structured Adverse Event Reporting
+- **I14.** Pre-Operative Checklist Automation
+- **I15.** Care Bundle Compliance Dashboard
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

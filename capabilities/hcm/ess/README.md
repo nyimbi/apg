@@ -137,3 +137,25 @@ Capability for employee self-service operations: leave requests, payslip access,
 | `generate_statutory_report` | PAYE/NSSF/NHIF per-employee rows + grand totals for a pay period |
 | `upsert_notification_preferences` | Per-employee channel and event-type subscription settings |
 | `send_ess_notification` | Emit a structured notification event for downstream delivery |
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** ESS World-Class Improvements
+- **I2.** Leave Clash Detection
+- **I3.** Leave Accrual Engine
+- **I4.** Delegation / Acting-For Leave Handover
+- **I5.** Multi-Level Leave Approval Workflow
+- **I6.** Payslip Year-to-Date Aggregation
+- **I7.** Payslip PDF Generation
+- **I8.** Expense Claim Bulk Submit
+- **I9.** Expense Policy Engine
+- **I10.** Benefit Open-Enrollment Window
+- **I11.** Training Completion Certificate Store
+- **I12.** Bulk Leave Accrual Run
+- **I13.** Document Attachment Tracking
+- **I14.** Employee Self-Service Notifications
+- **I15.** Compliance / Statutory Reporting
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

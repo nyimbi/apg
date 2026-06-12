@@ -116,6 +116,67 @@ Provides anonymised in-store analytics: foot traffic counting with multi-sensor 
 - **retail_loy** CLV segments can enrich shopper journey attribution
 - Heatmaps and zone dwell data inform planogram and category placement decisions
 
+## World-Class Enhancements (v2.0)
+
+1. **Real-Time Anomaly Detection** — Async streaming z-score anomaly detection on foot-traffic counts; routes `SinTrafficAnomalyEvent` to `ntfy` within seconds.
+2. **AI Planogram Deviation Classifier** — Each deviation record carries `deviation_type`, `severity_score`, and `ai_confidence`; compliance score is a weighted sum, not a lookup.
+3. **Dwell-Time Cohort Segmentation** — `record_dwell_cohort()` captures histogram buckets (0–30s, 30–120s, 2–5m, 5m+) per zone; unlocks fixture design decisions.
+4. **Loss Prevention Incident Lifecycle** — `report_lp_incident()` / `escalate_lp_incident()` / `close_lp_incident()`; OOS + zero sensor activity auto-triggers LP suspicion.
+5. **Sensor Network Health Scoring** — `sensor_network_health()` returns overall 0–100 score, heartbeat age, uncovered zones; emits `sensor_network_degraded` via `moni`.
+6. **Peer-Group Benchmarking Engine** — `benchmark_peer_group()` selects format+region+sqm peers, returns percentile rank, gap-to-median, gap-to-top-quartile.
+7. **Shopper Journey Attribution Graph** — `stitch_shopper_journey()` builds directed path graph from `session_id`; surfaces drop-off rates at each zone transition.
+8. **Dynamic Reorder Point Calculation** — Newsvendor-model ROP (`μ_lead × d + Z_α × σ_d × √lead_time`) surfaced as `reorder_point` on `SinShelfAlertResponse`.
+9. **Multi-Store Promotional Lift Analysis** — `analyse_promo_lift()` computes traffic/conversion deltas vs. matched pre-period and holdout group; returns p-value + CI.
+10. **Temporal KPI Trend Detection** — `detect_kpi_trends()` fits linear regression, returns slope, R², direction, and weeks-to-breach estimate before threshold is crossed.
+11. **Occupancy Capacity Compliance** — `check_occupancy_compliance()` validates against `max_capacity × 0.85`; emits `capacity_limit_approaching` at 80% of legal limit.
+12. **Heatmap Temporal Diff** — `compute_heatmap_diff()` returns signed intensity delta grid normalised by total traffic; makes layout experiments measurable.
+13. **Staff Schedule Demand Forecasting** — `forecast_staffing_demand()` uses 4-week trailing DOW traffic averages and `traffic_to_staff_ratio` to produce a 2-week headcount schedule.
+14. **Multi-Sensor Fusion for Entry Counting** — `fuse_sensor_counts()` applies Kalman-style inverse-variance weighting across concurrent sensors; emits fused count with `confidence_interval`.
+15. **Privacy-Preserving Export (Differential Privacy)** — `export_records(privacy_budget=ε)` adds Laplace noise to counts/revenue before export; logs epsilon and sensitivity bounds.
+
+## New Methods
+
+### `benchmark_peer_group` — competitive KPI positioning
+
+```python
+result = await svc.benchmark_peer_group(
+    store_id="store-abc",
+    period="2026-05",
+    kpi_metric="conversion_rate",
+    min_peer_stores=5,
+)
+# result: {percentile_rank, gap_to_median, gap_to_top_quartile, peer_count}
+```
+
+Selects peers by `store_format`. Returns `error: insufficient_peer_stores` if fewer than `min_peer_stores` exist — business rule enforced at the service layer.
+
+### `detect_kpi_trends` — predictive degradation alerting
+
+```python
+trend = await svc.detect_kpi_trends(
+    store_id="store-abc",
+    kpi_metric="footfall",
+    n_periods=8,
+)
+# trend: {slope, r_squared, trend_direction, weeks_to_breach_threshold}
+# trend_direction: "improving" | "stable" | "degrading"
+```
+
+Fits OLS over the last `n_periods` KPI snapshots. When `trend_direction == "degrading"`, `weeks_to_breach_threshold` gives lead time for area manager intervention.
+
+### `forecast_staffing_demand` — demand-driven scheduling
+
+```python
+schedule = await svc.forecast_staffing_demand(
+    store_id="store-abc",
+    forecast_weeks=2,
+    traffic_to_staff_ratio=50.0,
+)
+# schedule["schedule"]["Mon"]: {avg_daily_traffic, recommended_headcount}
+```
+
+Aggregates 4 weeks of historical traffic by ISO weekday. `recommended_headcount = max(1, round(avg_traffic / traffic_to_staff_ratio))`. Replace the hardcoded `staff_count=8` anti-pattern with this.
+
 ## Key Service Methods
 
 ### Store & Zone Management

@@ -135,3 +135,72 @@ Insurance Claim:  filed → under_review → approved | rejected
 - **Carrier types**: air, sea, road, rail, multimodal, courier
 - **Document types**: commercial_invoice, packing_list, bill_of_lading, certificate_of_origin, customs_declaration, airway_bill
 - **Tracking events**: pickup, in_transit, customs_clearance, out_for_delivery, delivered, exception, returned
+
+---
+
+## World-Class Enhancements (v2.0)
+
+1. **Carrier Webhook Integration** — normalise DHL/FedEx/UPS push payloads to canonical tracking events with HMAC verification
+2. **VRP Route Optimisation** — OR-Tools solver with time windows, capacity constraints, CO2 estimate, and 6-hour plan cache
+3. **Freight Rate Benchmarking** — p10/p50/p90 lane rates from configurable rate-card store (Freightos/Xeneta adapters)
+4. **Shipment Consolidation Engine** — group by corridor + departure window; master bill of lading with parent-child relationships
+5. **Carbon Footprint Tracking** — GLEC v3 emission factors per mode; Scope 3 Cat 4/9 aggregation; GHG Protocol CSV export
+6. **Proof-of-Delivery Management** — object-storage-referenced POD with SHA-256 signature hash and pre-signed URL retrieval
+7. **SLA Breach Detection** — proactive at-risk / breached scan with carrier SLA penalty calculation and event emission
+8. **DG/HAZMAT Compliance** — IATA/IMDG classification, carrier capability check, DG manifest generation
+9. **Multi-Currency Normalisation** — ECB/Open Exchange Rates FX conversion with `fx_rate_used` audit trail and 1-hour cache
+10. **Carrier Scorecard & Tender** — on-time rate, CO2/tonne-km, cost/kg scoring; weighted tender ranking with audit trail
+11. **Customs Tariff & Duty Estimation** — WCO HS code validation; CIF + tariff + VAT breakdown; trade agreement support
+12. **Shipment Insurance Integration** — quote → bind → claim workflow keyed on declared value, route risk score, and commodity
+13. **CloudEvents Bus** — async `_publish` with CloudEvents v1.0 JSON; Redis Streams / Kafka / asyncio.Queue transports
+14. **Predictive ETA Engine** — gradient-boosted model on historical transit data with weather and port congestion signals
+15. **Distributed Tracing & Observability** — OpenTelemetry spans, W3C traceparent propagation, Prometheus metrics, Grafana dashboard
+
+---
+
+## New Methods
+
+### `calculate_shipment_co2` — Scope 3 emissions per shipment
+
+```python
+svc = LogisticsService()
+
+# book a road shipment first, then calculate emissions
+co2 = await svc.calculate_shipment_co2(
+    shipment_id="shp_abc123",
+    distance_km=850.0,          # omit to use route distance or 1000 km fallback
+    tenant_id="acme",
+)
+# co2["co2_kg"] => 8.16  (road: 0.096 kgCO2e/tonne-km, 100 kg, 850 km)
+# co2["framework"] => "GLEC v3"
+# co2["scope"]     => "scope_3"
+```
+
+### `check_sla_breaches` — proactive SLA monitoring
+
+```python
+report = await svc.check_sla_breaches(
+    at_risk_hours=4.0,   # flag shipments with ETA within this window
+    tenant_id="acme",
+)
+# report["breached"]  => list of overdue shipments with breach_hours
+# report["at_risk"]   => shipments approaching SLA limit
+# report["summary"]   => {"breached_count": 2, "at_risk_count": 5, "on_track_count": 41}
+# emits "sla_breach_detected" / "sla_at_risk" CloudEvents per shipment
+```
+
+### `attach_pod` — dispute-proof delivery confirmation
+
+```python
+pod = await svc.attach_pod(
+    shipment_id="shp_abc123",
+    document_url="https://storage.example.com/pods/shp_abc123.jpg?X-Amz-Signature=...",
+    captured_by="driver_007",
+    mime_type="image/jpeg",
+    signature_hash="e3b0c44298fc1c149afb...",  # SHA-256 of signature image
+    recipient_name="Jane Doe",
+    tenant_id="acme",
+)
+# pod["id"] persisted; shipment status auto-transitions in_transit → delivered
+# emits "pod_attached" CloudEvent
+```

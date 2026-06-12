@@ -145,3 +145,27 @@ result = await svc.verify_contract_signature(contract["id"])
 | **hos_inv** | AV asset inventory extends to general equipment tracked in inventory capability |
 | **intel_alerts** | Overdue payment milestones (`get_overdue_reminders`) can trigger alert workflows |
 | **intel_reporting** | `venue_utilisation_report` and `revenue_forecast` feed business intelligence dashboards |
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Dynamic Yield-Based Pricing Engine** [AI/ML]
+- **I2. Waitlist & Automatic Conflict-Resolution Queue** [Feature]
+- **I3. Partial-Day Time-Slot Conflict Detection** [Reliability]
+- **I4. Catering Actuals vs Estimate Variance Tracking** [Performance]
+- **I5. Dietary & Allergen Matrix Validation on BEO** [Compliance]
+- **I6. Digital Contract Signature with Tamper-Evidence Hash** [Security]
+- **I7. Automated Payment Timeline & Overdue Escalation** [UX]
+- **I8. Venue Capacity Matrix by Setup Style** [Feature]
+- **I9. Post-Event NPS & Satisfaction Score Capture** [UX]
+- **I10. Configurable Tiered Cancellation Fee Engine** [Compliance]
+- **I11. AV Equipment Inventory & Conflict Detection** [Feature]
+- **I12. Revenue Forecast — Contracted vs Pipeline Split** [Performance]
+- **I13. Catering Menu Template Library with Per-Head Costing** [Feature]
+- **I14. Cross-Capability Guest Room Block Request (PMS Link)** [Integration]
+- **I15. Venue Floor Plan Layout Store for Diagramming** [UX]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

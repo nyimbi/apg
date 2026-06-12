@@ -132,3 +132,81 @@ Provides the full property accounting stack: chart-of-accounts management, journ
 - Consumes lease data from `realestate_lea` for revenue schedules
 - CAM reconciliation integrates with `realestate_prm` for property-level costs
 - IFRS 16 schedules are referenced by `realestate_lea` for balance sheet reporting
+
+---
+
+## World-Class Enhancements (v2.0)
+
+1. **Waterfall CAM Allocation Engine** — Distribute CAM variance to leases by NLA, gross area, fixed %, or weighted occupancy days via `allocate_cam_to_leases()`.
+2. **IFRS 16 Lease Modification Handling** — Atomic remeasurement on rent review/extension/surrender with delta P&L journal via `remeasure_ifrs16_lease()`.
+3. **Rent-Free Period Amortisation** — Monthly straight-line amortisation of lease incentives with deferred incentive journal auto-generation via `amortise_lease_incentive()`.
+4. **Percentage-Rent (Turnover Rent) Recognition** — Natural and artificial breakpoint calculation posting variable component as a separate journal line via `recognise_percentage_rent()`.
+5. **Multi-Currency Revaluation and FX Gains/Losses** — IAS 21-compliant spot-rate revaluation of foreign-currency balances with unrealised FX P&L journals via `record_fx_revaluation()`.
+6. **Operating Expense Accruals with Auto-Reversal** — Accrual journals with `reversal_date` field; `schd`-integrated auto-reversal on period-start via `accrue_operating_expense()`.
+7. **Sinking Fund (Reserve Fund) Management** — Per-property reserve ledger with NLA-proportional tenant contributions and fund adequacy reporting via `create_sinking_fund()` / `record_sinking_fund_contribution()`.
+8. **Audit-Trail Immutable Ledger Integration** — Every write publishes a structured `AuditEvent` to `audl` with before/after JSON Patch diff, actor, and session context.
+9. **Budget vs. Actual Variance Reporting** — Line-level and total variance with configurable tolerance flagging consumable by `realestate_rep` via `budget_variance_report()`.
+10. **Withholding Tax (WHT) Compliance Workflow** — Full KRA WHT lifecycle: certificate generation, M-payment remittance scheduling, and iTax reconciliation via `generate_wht_certificate()` / `schedule_wht_remittance()` / `reconcile_wht_with_revenue_authority()`.
+11. **Property Disposal and Derecognition** — IAS 40/IFRS 5 disposal: gain/loss computation, asset derecognition, IFRS 16 schedule closure, composite disposal journal in one transaction via `record_property_disposal()`.
+12. **Service Charge Dispute and Credit Note Workflow** — Three-state dispute workflow (raised → under_review → resolved/rejected) with auto-reversal journals and `ntfy` notification via `raise_service_charge_dispute()` / `issue_credit_note()`.
+13. **Lease Incentive Liability (Lessor Perspective)** — Deferred income liability for landlord rent-free grants amortised to P&L over lease term via `schd`-scheduled journals via `record_lessor_lease_incentive()`.
+14. **Cash Flow Statement Preparation** — IAS 7-compliant operating/investing/financing classification using `ledger_type` with bank reconciliation and unclassified-account flagging via `prepare_cash_flow_statement()`.
+15. **Automated Period-End Checklist and Close Gating** — Structured pre-close checklist (journals, charges, CAM, WHT) gates `close_period()`; unblocked only by `force_close` + third approver via `get_period_close_checklist()`.
+
+---
+
+## New Methods
+
+### `allocate_cam_to_leases` — CAM variance distribution
+
+Most impactful for multi-tenant properties where CAM reconciliation variance must be pushed back to individual lease statements.
+
+```python
+result = await svc.allocate_cam_to_leases(
+    cam_id="cam_01j...",
+    tenant_id="t_01j...",
+    allocation_basis="nla",          # "nla" | "gross_area" | "fixed_pct" | "occupancy_days"
+    lease_nla_map={"lea_01": 450.0, "lea_02": 230.0, "lea_03": 320.0},
+)
+# result["allocations"] — per-lease credit/debit amounts
+# result["total_variance_allocated"] — must equal CAM variance
+# emits: cam_allocated_to_leases
+```
+
+### `remeasure_ifrs16_lease` — Lease modification remeasurement
+
+Handles mid-term rent reviews and extensions without reconstructing the entire schedule from scratch.
+
+```python
+result = await svc.remeasure_ifrs16_lease(
+    schedule_id="sch_01j...",
+    tenant_id="t_01j...",
+    modification_date="2026-07-01",
+    revised_monthly_payment=Decimal("185000"),
+    revised_discount_rate=Decimal("0.095"),
+    remaining_term_months=36,
+)
+# result["delta_liability"]   — new liability minus old (posted to P&L)
+# result["new_schedule"]      — appended amortisation segment
+# result["journal_id"]        — remeasurement gain/loss journal reference
+# emits: ifrs16_lease_remeasured
+```
+
+### `get_period_close_checklist` + `close_period` — Gated period close
+
+Inspect checklist before attempting close; `close_period` raises if any blocking item is incomplete.
+
+```python
+checklist = await svc.get_period_close_checklist(period_id="per_01j...", tenant_id="t_01j...")
+# checklist["items"] — list of {name, status, blocking}
+# checklist["checklist_complete"] — bool
+
+if checklist["checklist_complete"]:
+    closed = await svc.close_period(
+        period_id="per_01j...",
+        tenant_id="t_01j...",
+        closed_by="user_a",
+        second_approver="user_b",
+    )
+# Pass force_close=True + third_approver to override blocking items (escalated close)
+```

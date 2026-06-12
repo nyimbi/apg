@@ -135,3 +135,25 @@ The LMS capability provides full lifecycle management for online and blended lea
 - **ntfy**: Grade notifications and certificate issuance events routed through `ntfy`.
 - **wflo**: Course review/publish approval workflows execute via `wflo`.
 - **mqeb** / bytewax: All lifecycle events published to `apg.education.lms.lifecycle` stream for downstream analytics consumers.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Learning Management System — World-Class Improvement Proposals
+- **I2.** Adaptive Learning Engine
+- **I3.** Spaced Repetition & Retention Scheduler
+- **I4.** AI-Powered Auto-Grading with Rubric Enforcement
+- **I5.** Peer Review & 360-Degree Assessment
+- **I6.** Competency Mapping & Skills Taxonomy
+- **I7.** Live Cohort Sessions with Real-Time Collaboration
+- **I8.** Micro-Credential & Badge Ecosystem
+- **I9.** Advanced Analytics Dashboard with Cohort Comparison
+- **I10.** Accessibility & WCAG 2.2 Compliance Audit
+- **I11.** Proctoring & Academic Integrity Integration
+- **I12.** Offline & Mobile-First Content Sync
+- **I13.** Multi-Language Content & AI Translation Pipeline
+- **I14.** Social Learning & Discussion Forums
+- **I15.** Subscription & Monetisation Engine
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

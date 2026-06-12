@@ -144,3 +144,27 @@ rate billing, tenure formalisation, geospatial search, chain of title, and webho
 ## Formalisation Stage Lifecycle
 
 `community_consent` → `demarcation` → `survey` → `adjudication` → `registration` → `title_issued`
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Adjudication & Dispute Resolution Workflow** [Feature]
+- **I2. Encumbrance & Charge Registry** [Compliance]
+- **I3. Valuation Roll & Automated Rate Assessment** [Feature]
+- **I4. Spatial Overlap & Boundary Conflict Detection** [Feature]
+- **I5. Offline-First Mobile Sync Protocol** [UX]
+- **I6. Title Certificate PDF Generation** [Feature]
+- **I7. AI-Powered Parcel Description Extraction (OCR + NLP)** [AI/ML]
+- **I8. Land Use Change Detection via Satellite Imagery** [AI/ML]
+- **I9. Tenure Formalisation Workflow (Customary → Statutory)** [Compliance]
+- **I10. Parcel Subdivision & Amalgamation** [Feature]
+- **I11. Multi-Signature Approval Chains** [Security]
+- **I12. Land Tax & Rates Billing Integration** [Integration]
+- **I13. Geospatial Search by Coordinates** [Feature]
+- **I14. Ownership History & Chain of Title** [Compliance]
+- **I15. Webhook & Event Streaming for Third-Party Integration** [Integration]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

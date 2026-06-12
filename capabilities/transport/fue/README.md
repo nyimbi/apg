@@ -170,3 +170,25 @@ use transport_fue;
 - `views.py` — Flask-AppBuilder views
 - `WORLD_CLASS_IMPROVEMENTS.md` — 15 prioritised enhancement proposals
 - `docs/user_guide.md` — Step-by-step operator guide
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Fuel Management — World-Class Improvements
+- **I2.** Real-Time Fuel Price Feed Integration
+- **I3.** ML-Driven Anomaly Detection for Fraud
+- **I4.** Telematics Integration for Phantom Fill Prevention
+- **I5.** Predictive Reorder with Demand Forecasting
+- **I6.** Fuel Card Lifecycle Automation
+- **I7.** Multi-Currency Normalised Reporting
+- **I8.** Driver Behaviour Scoring (Eco-Driving Index)
+- **I9.** Bulk Contract Procurement Negotiation Support
+- **I10.** Scope 1/2/3 Emissions Attribution and Net-Zero Pathway
+- **I11.** Event-Sourced Audit Trail with Merkle Integrity
+- **I12.** Vendor-Agnostic Fleet Card API Gateway
+- **I13.** Geospatial Station Network and Route Fuel Planning
+- **I14.** Regulatory Compliance Engine (ADR, OIML, REACH)
+- **I15.** Zero-Trust Card PIN Management with HSM Integration
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

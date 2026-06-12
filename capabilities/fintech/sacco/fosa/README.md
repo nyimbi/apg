@@ -62,3 +62,27 @@ uv run pytest -vxs capabilities/fintech/sacco/fosa/tests/
 - **Dormancy threshold**: 6 months (configurable via `DORMANCY_MONTHS` constant).
 - **BOSA transfer approval**: transfers above KES 50,000 from BOSA require `approved_by`.
 - **Multi-tenancy**: all data is scoped to `tenant_id`; cross-tenant access raises `KeyError`.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real-Time Interest Accrual Engine** [Core Banking]
+- **I2. Cheque Lifecycle Management** [Payments]
+- **I3. RTGS / EFT Batch Payment Processing** [Payments]
+- **I4. Loan Repayment Auto-Deduction** [Collections]
+- **I5. Multi-Currency Accounts & FX Conversion** [International Banking]
+- **I6. Transaction Dispute & Chargeback Workflow** [Risk / Compliance]
+- **I7. KYC / AML Transaction Monitoring** [Compliance / AML]
+- **I8. Bulk Salary Processing (Payroll Credits)** [Corporate Banking]
+- **I9. Account Freeze / Unfreeze with Audit** [Governance]
+- **I10. Member Notification Dispatch** [Member Experience]
+- **I11. End-of-Day Teller Reconciliation & Variance Detection** [Operations]
+- **I12. Fixed Deposit Maturity & Rollover Management** [Deposit Products]
+- **I13. Peer-to-Peer Member Transfers** [Payments]
+- **I14. Regulatory Reporting (CBK Returns)** [Compliance]
+- **I15. Configurable Charge Schedules (Service Fee Engine)** [Revenue]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

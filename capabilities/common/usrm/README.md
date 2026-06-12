@@ -19,8 +19,17 @@ guardrails for onboarding, access, privacy, and offboarding.
 - Periodic access review evidence.
 - Deprovisioning with access revocation and evidence references.
 - Bulk lifecycle action review.
-- First-class USRM agents for Codex, Claude Code, OpenCode, and Pi based review
-  lanes.
+- Account lock/unlock with audit trail.
+- Admin impersonation sessions with reason and duration.
+- Permission grant/revoke (fine-grained, non-privileged roles).
+- User group creation and membership management.
+- Password reset and tenant-level password policy enforcement.
+- Session revocation (all-sessions, per-user).
+- User analytics (MFA adoption, activity aggregates).
+- User export (JSON, with optional profiles).
+- User merge (primary/secondary account consolidation).
+- Bulk user creation and bulk deactivation.
+- First-class USRM agents for Codex, Claude Code, OpenCode, and Pi review lanes.
 - Bytewax lifecycle stream metadata.
 - Dashboard, user directory, profile, lifecycle, access, privacy,
   deprovisioning, agent, policy, and settings view models.
@@ -160,6 +169,89 @@ decision = service.validate_batch_user_lifecycle(
 assert decision["decision"] == "allow"
 ```
 
+## New Methods
+
+### Account lock and unlock
+
+```python
+import asyncio
+
+await service.account_lock(
+    tenant_id="tenant-a",
+    user_id=user["id"],
+    reason="suspicious_login",
+    actor="security-admin",
+)
+
+await service.account_unlock(
+    tenant_id="tenant-a",
+    user_id=user["id"],
+    actor="security-admin",
+    justification="false positive confirmed",
+)
+```
+
+### Admin impersonation
+
+```python
+session = await service.impersonate(
+    tenant_id="tenant-a",
+    admin_id="admin-001",
+    target_user_id=user["id"],
+    reason="support-ticket-1234",
+    duration_minutes=15,
+)
+# session["session_id"] tracks the impersonation for audit
+```
+
+### Permission grant and revoke
+
+```python
+await service.permission_grant(
+    tenant_id="tenant-a",
+    user_id=user["id"],
+    permission="report:read",
+    scope="finance",
+    granted_by="access-owner",
+)
+
+await service.permission_revoke(
+    tenant_id="tenant-a",
+    user_id=user["id"],
+    permission="report:read",
+    revoked_by="access-owner",
+)
+```
+
+### Password reset and policy enforcement
+
+```python
+await service.password_reset(
+    tenant_id="tenant-a",
+    user_id=user["id"],
+    reset_token="tok-abc123",
+    new_password_hash="$2b$12$...",
+    actor="user",
+)
+
+policy = await service.password_policy_enforce(
+    tenant_id="tenant-a",
+    min_length=14,
+    require_uppercase=True,
+    require_symbols=True,
+    max_age_days=60,
+    actor="security-admin",
+)
+```
+
+### User analytics
+
+```python
+stats = await service.user_analytics(tenant_id="tenant-a", days=30)
+print(stats["mfa_adoption_rate"])   # float 0.0–1.0
+print(stats["privileged_users"])
+```
+
 ## Deterministic Rules
 
 USRM enforces:
@@ -175,6 +267,27 @@ USRM enforces:
 - review and Bytewax coordination for bulk lifecycle actions;
 - supported USRM-agent runtime and role;
 - human approval for privileged agent actions.
+
+## World-Class Enhancements (v2.0)
+
+Planned improvements ordered by implementation readiness and compliance impact.
+Items 1, 2, 3, 5, 6, and 12 form the MVP cluster for a production hardening sprint.
+
+1. **Persistent Storage via Repository Pattern** — `AbstractUsrmRepository` with `PostgresUsrmRepository` (SQLAlchemy async); `InMemoryUsrmRepository` for tests.
+2. **Avatar Upload Pipeline** — `upload_avatar(tenant_id, user_id, image_bytes, mime_type, actor)` via pluggable `AbstractBlobStore` (S3/MinIO/local).
+3. **Rich Activity Timeline** — `get_activity_timeline(...)` with cursor pagination, date-range and event-type filters, O(1) lookup via secondary index.
+4. **Versioned Preference Snapshots** — `PreferenceSnapshot` with `version`, `effective_from`, and typed `PreferenceKey` enum; point-in-time `get_preferences(user_id, at=...)`.
+5. **MFA Device Registry** — `MfaDeviceRecord` supporting `totp|webauthn|sms|email`; `enroll_mfa_device`, `revoke_mfa_device`, `list_mfa_devices`.
+6. **Self-Service Password Reset Tokens** — `ResetTokenRecord` with bcrypt-hashed, single-use, time-bound tokens; satisfies NIST SP 800-63B § 5.1.1.
+7. **Delegated Administration** — `DelegationRecord` with scoped, expiring delegations; `create_delegation`, `revoke_delegation`, `check_delegation`.
+8. **Attribute Schema Enforcement** — `TenantAttributeSchema` with per-field type, required, max-length, and regex rules enforced at `update_profile`.
+9. **Webhook Dispatch** — `WebhookSubscriptionRecord` with HMAC-SHA256 signed HTTP POST fanout after each audit event; 3-attempt exponential backoff.
+10. **Compliance Report Generation** — `generate_compliance_report(standard: "gdpr"|"soc2"|"iso27001", ...)` producing a structured `ComplianceReport`; JSON or signed PDF export.
+11. **Async-Native with Per-Record Locking** — All mutating methods converted to `async def` with per-`user_id` `asyncio.Lock` to eliminate race conditions under ASGI concurrency.
+12. **Session Management** — `UserSessionRecord` with `create_session`, `validate_session`, `revoke_session`, `revoke_all_sessions`; actual session state backing `session_revoke_all`.
+13. **IdP Sync** — `sync_from_idp(provider, idp_records)` with `external_id`-keyed upsert, group-to-role mapping via `IdpRoleMappingRecord`, and `SyncResult` counts.
+14. **Structured Audit Severity and SIEM Tagging** — Typed `severity: Literal["info","low","medium","high","critical"]`; `siem_category` and `mitre_tactic` fields on `UserAuditEventRecord`.
+15. **Rate Limiting and Abuse Detection** — Sliding-window `BoundedCache` rate limiter per `(tenant_id, actor, operation)`; `get_rate_limit_status` for observability; default 100 writes/min, 500 reads/min.
 
 ## API Helpers
 
@@ -226,6 +339,11 @@ Events:
 - `user_deprovisioned`
 - `bulk_suspend_users`
 - `usrm_agent_registered`
+- `account_locked`
+- `account_unlocked`
+- `impersonation_started`
+- `password_reset`
+- `user_merged`
 
 ## Adapter Boundaries
 

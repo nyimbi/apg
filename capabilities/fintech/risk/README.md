@@ -1,14 +1,15 @@
 # FinTech Risk Management
 
 ## Overview
-FinTech Risk Management provides the enterprise risk framework for the APG platform: risk appetite registration across credit, market, liquidity, operational, fraud, compliance, model, and third-party domains; tenant-scoped risk profiles for customers, merchants, wallets, accounts, portfolios, loans, agents, and counterparties; exposure tracking with limit enforcement and human-approval-gated overrides; control assurance with effectiveness scoring; stress scenario modeling; limit breach recording; risk event management; and governance reviews.
 
-Limit overrides require human approval — exceeding a limit without approval is a hard deny. Control effectiveness scores must be in a valid range. Stress scenario probabilities must be in basis points (0–10000). All risk events stream to `apg.fintech.risk.lifecycle` via Bytewax.
+Enterprise risk framework for the APG platform: risk appetite registration across credit, market, liquidity, operational, fraud, compliance, model, and third-party domains; tenant-scoped risk profiles for customers, merchants, wallets, accounts, portfolios, loans, agents, and counterparties; exposure tracking with limit enforcement and human-approval-gated overrides; control assurance with effectiveness scoring; stress scenario modeling; limit breach recording; risk event management; and governance reviews.
 
-**New in 1.2.0**: VaR backtesting (Kupiec POF), reverse stress testing, RAROC, IFRS 9 stage migration, Basel IV SA-CR regulatory capital, intraday liquidity monitoring (BCBS 248), sanctions screening, PSI model stability, and board-ready risk report summary.
+Limit overrides require human approval — exceeding a limit without approval is a hard deny. Control effectiveness scores must be in 0–100. Stress scenario probabilities are in basis points (0–10000). All risk events stream to `apg.fintech.risk.lifecycle` via Bytewax.
+
+**Version**: 2.0.0 | **Capability ID**: `fintech_risk`
 
 ## Capability ID
-`fintech_risk`  Version: 1.2.0
+`fintech_risk`
 
 ## Provides
 | Service | Description |
@@ -47,6 +48,139 @@ Limit overrides require human approval — exceeding a limit without approval is
 | fintech_fraud | Fraud risk signals |
 | bia | Risk analytics |
 | fin_rpt | Risk reporting |
+
+## Quick Start
+
+```python
+from apg_fintech_risk import RiskManagementService
+
+svc = RiskManagementService(tenant_id="acme_bank", db_url="postgresql+asyncpg://...")
+
+# Register a risk appetite threshold
+await svc.register_risk_appetite(
+    domain="credit",
+    threshold_amount=50_000_000,
+    currency="KES",
+    owner_id="cro@acme.com",
+    evidence_reference="board-resolution-2026-01",
+)
+
+# Create a risk profile for a customer
+await svc.create_profile(
+    subject_reference="cust_001",
+    subject_type="customer",
+    kyc_reference="kyc_cust_001",
+    exposure_amount=500_000,
+    currency="KES",
+    score=42,
+)
+
+# Run a VaR backtest
+result = await svc.var_backtest("portfolio_001", confidence_level=0.99, window=252)
+# result["model_valid"] == True / False; model_drift event emitted on failure
+
+# Compute RAROC
+result = await svc.raroc_calculation(
+    portfolio_id="portfolio_001",
+    net_revenue=12_000_000,
+    allocated_opex=2_000_000,
+    hurdle_rate_pct=15.0,
+)
+# result["raroc_pct"], result["above_hurdle"]
+```
+
+## World-Class Enhancements (v2.0)
+
+1. **Historical VaR Backtesting (Kupiec POF)** — Kupiec proportion-of-failures test + Christoffersen interval-forecast test; emits `var_backtest_exception` risk event when POF p-value < 0.05. Satisfies BCBS 239 model risk governance.
+
+2. **Monte Carlo CVaR / Expected Shortfall** — 10,000-path Monte Carlo with Cholesky-decomposed correlated asset returns; ES at 97.5% per Basel IV / FRTB. Offloaded via `asyncio.to_thread`.
+
+3. **Dynamic PD Calibration (Merton Structural Model)** — Derives probability of default from asset value, asset volatility, and debt face value via Black-Scholes. Falls back to Altman Z-score for unlisted counterparties. Outputs point-in-time and through-the-cycle PD for IFRS 9 accuracy.
+
+4. **IFRS 9 Three-Stage Bucket Migration Engine** — Snapshot-based stage migration with SICR detection (30-day past due, credit watch, macro threshold breaches) and probability-weighted macro scenarios (base/adverse/optimistic) per CBK/PG/01. Full audit trail for examiners.
+
+5. **Intraday Liquidity Monitoring (BCBS 248)** — Real-time settlement position ledger per correspondent bank; tracks peak intraday usage; early-warning alert at 80% of intraday limit. Satisfies BCBS 248 and CBK supervision expectations.
+
+6. **Regulatory Capital Optimizer (Basel IV SA-CR)** — Full SA-CR risk-weight table (sovereigns, banks, corporates, retail, SME, real estate by LTV band, defaulted) plus FRTB SBA market risk capital. Outputs CET1/AT1/T2 capital stack with credit, market, and operational RWA.
+
+7. **Concentration Risk via DRC Granularity Adjustment (FRTB)** — Default Risk Charge with JTD per issuer, net-long/net-short netting, and DRC add-on. Supplemented by GICS-sector HHI and country CR3/CR5. FRTB-compliant capital allocation for trading books.
+
+8. **Real-Time AML Graph Analytics (Entity Resolution)** — In-memory transaction graph (networkx DiGraph); PageRank and betweenness centrality on 90-day rolling window; connected-component structuring ring detection; FATF R.16 wire transfer alerts for missing originator data.
+
+9. **Behavioral Scoring with LSTM Anomaly Detection** — LSTM autoencoder (PyTorch / ONNX Runtime CPU inference) trained on normal transaction sequences per customer cohort. Reconstruction error triggers behavioral anomaly alert with SHAP explainability values per CBK Consumer Protection guidelines.
+
+10. **Reverse Stress Test Engine** — Bisection search over [0, 10000] bps (20 iterations) to find the minimum shock breaching CAR, LCR, or VaR threshold. Board-level ICAAP/ILAAP tool; identifies binding constraint and generates scenario narrative.
+
+11. **Watchlist & Sanctions Screening** — Fuzzy name matching (Jaro-Winkler ≥ 0.92) against OFAC SDN, EU Consolidated List, UN Consolidated List, and CBK Designated Entities. 24-hour list cache TTL. Returns match confidence, matched list/entry, and recommended action (block/hold/EDD). Pre-condition check on `create_profile`.
+
+12. **RAROC Calculator** — RAROC = (Net Revenue − Expected Loss − Allocated OpEx) / Economic Capital; Economic Capital = UL × 2.33 (99% confidence). Per product, portfolio, and customer segment with configurable hurdle rate (default 15% for Kenya market).
+
+13. **Automated Regulatory Report Generation (CBK/CMA)** — CBK Prudential Returns PR1–PR4 (capital adequacy, large exposures, liquidity, asset quality) and CMA periodic risk disclosure. JSON/CSV/Excel output with mandatory-field validation, cross-schedule consistency checks, and digital signature hash.
+
+14. **Model Risk Management Framework (SR 11-7 / SS1/23)** — Full MRM lifecycle: model inventory, pre-deployment validation gate (Gini ≥ 0.35, KS ≥ 0.25, HL p > 0.05, PSI < 0.10), monthly PSI/CSI monitoring, annual revalidation triggers, and automatic `model_drift` risk event emission when PSI > 0.10.
+
+15. **Integrated Risk Appetite Dashboard with RAG Status** — Hierarchical RAG aggregation from transaction to board level (Green < 70%, Amber 70–90%, Red > 90%); board-ready PDF with ARIMA-extrapolated trend projections, sparklines per domain, breach history, and automated narrative via local Ollama LLM (mistral/llama3).
+
+## New Methods
+
+### `var_backtest` — Kupiec POF VaR Validation
+```python
+result = await svc.var_backtest(
+    portfolio_id="port_fx_book",
+    confidence_level=0.99,
+    window=252,           # trading days
+)
+# {model_valid: bool, kupiec_lr_stat: float, p_value_approx: float,
+#  exceedances: int, expected_exceedances: float, var_amount: float}
+# Automatically opens a model_drift risk event if model_valid is False.
+```
+
+### `reverse_stress_test` — Tipping-Point Shock Finder
+```python
+result = await svc.reverse_stress_test(
+    threshold_type="car",       # "car" | "lcr" | "var_pct"
+    threshold_value=8.0,        # minimum CAR % before breach
+    portfolio_id="all",
+)
+# {critical_shock_bps: int, critical_shock_pct: float, binding_constraint: str}
+# Uses 20-iteration bisection search over [0, 10000] bps.
+```
+
+### `raroc_calculation` — Risk-Adjusted Return on Capital
+```python
+result = await svc.raroc_calculation(
+    portfolio_id="sme_loans",
+    net_revenue=12_000_000.0,
+    allocated_opex=2_000_000.0,
+    hurdle_rate_pct=15.0,
+)
+# {raroc_pct: float, above_hurdle: bool, economic_capital: float,
+#  expected_loss: float, risk_adjusted_income: float}
+```
+
+### `ifrs9_stage_migration` — Macro-Overlay Stage Assessment
+```python
+result = await svc.ifrs9_stage_migration(
+    profile_id="prof_cust_001",
+    macro_scenario="adverse",
+    macro_multiplier=1.4,       # 40% uplift under adverse macro
+)
+# {current_stage: str, migration_stage: str, stage_upgraded: bool,
+#  sicr_triggered: bool, ecl_12m_adjusted: float, ecl_lifetime_adjusted: float}
+```
+
+### `intraday_liquidity_monitor` — BCBS 248 Settlement Tracking
+```python
+result = await svc.intraday_liquidity_monitor(
+    correspondent_bank_id="KCBKENA",
+    settlement_amount_minor=5_000_000_00,   # in minor currency units
+    direction="outflow",
+    intraday_limit_minor=100_000_000_00,
+)
+# {utilisation_pct: float, alert_level: "normal"|"warning"|"breach",
+#  peak_outflow_minor: int, bcbs248_compliant: bool}
+# alert_level "warning" fires at > 80% utilisation.
+```
 
 ## Configuration Reference
 | Parameter | Type | Default | Description |
@@ -111,7 +245,7 @@ Limit overrides require human approval — exceeding a limit without approval is
 | RiskEvent | id, profile_id, event_type, severity, evidence_reference, status |
 
 ## Streaming Events
-Events emitted to the fintech event stream via Bytewax.
+Events emitted to `apg.fintech.risk.lifecycle` via Bytewax.
 | Event | Trigger |
 |-------|---------|
 | risk_appetite_registered | Appetite threshold registered |
@@ -123,21 +257,27 @@ Events emitted to the fintech event stream via Bytewax.
 | risk_event_opened | Risk event opened |
 | risk_review_recorded | Review completed |
 | risk_agent_registered | AI agent registered |
+| var_backtest_exception | Kupiec POF test failed (model_valid=False) |
+| model_drift | PSI > 0.10 or VaR model failure detected |
 
 ## Edge Cases Handled
-- Limit overrides require human approval as a hard deny (not require_review) — this is stricter than most other capabilities; exceeding a risk limit without approval is denied, not just flagged for review
-- Stress scenario probability is expressed in basis points (0–10000 bps = 0–100%); a probability of 0 bps is valid (tail risk scenario), but values above 10000 are rejected
-- Control effectiveness scores have a valid range enforced by the rule engine; the range is 0–100 (defined by the service layer); the rule fires when the flag `effectiveness_score_valid: False` is set
-- Risk profiles cover both financial subjects (accounts, portfolios) and operational subjects (agents, counterparties); the subject type determines the semantic interpretation of the score
-- `model_drift` is a supported risk event type — this enables operational risk tracking for ML models used in scoring pipelines
+- Limit overrides require human approval as a hard deny — exceeding a risk limit without approval is denied, not just flagged
+- Stress scenario probability is in basis points (0–10000); 0 bps is valid (tail risk); values above 10000 are rejected
+- Control effectiveness scores enforced 0–100; rule fires on `effectiveness_score_valid: False`
+- Risk profiles cover both financial (accounts, portfolios) and operational (agents, counterparties) subjects
+- `model_drift` is a first-class risk event type for ML model operational risk tracking
+- `reverse_stress_test` returns `critical_shock_bps: null` when no shock in [0, 10000] bps breaches the threshold
+- `ifrs9_stage_migration` macro_multiplier is clamped to [0.5, 3.0] to prevent implausible overlays
+- `intraday_liquidity_monitor` maintains state across calls within a session; reset on service restart
 
 ## Composability
-- **Upstream**: `fintech_kyc` provides customer identity for risk profile creation; `fintech_aml` and `fintech_fraud` provide fraud and AML risk signals as inputs to profile scoring
-- **Downstream**: `fintech_compliance` reads control evaluation records as compliance control evidence; `fintech_blockchain` and `fintech_crypto` use risk profiles for DeFi and crypto operation governance; `fintech_lending` uses risk profiles for credit application review
+- **Upstream**: `fintech_kyc` provides customer identity for risk profile creation; `fintech_aml` and `fintech_fraud` feed fraud/AML signals into profile scoring
+- **Downstream**: `fintech_compliance` reads control evaluation records as compliance evidence; `fintech_blockchain` and `fintech_crypto` use risk profiles for DeFi/crypto governance; `fintech_lending` uses profiles for credit application review
 - **Peer**: Deployed alongside `fintech_compliance` (control framework) and `fintech_regtech` (regulatory capital requirements)
 
 ## Development Notes
-- `human_approval_required_for_limit_override` is a governance configuration flag — it makes the limit override a hard deny rather than a require_review; this is intentionally stricter than the pattern elsewhere
-- The `third_party` domain covers third-party vendor risk, not just financial counterparties; this enables vendor risk assessments for technology providers and service partners
-- Risk appetite is per-domain, not per-subject; appetite thresholds apply organization-wide; individual subject exposure limits are separate and linked via the `limit_reference` on exposure records
-- `probability_bps` convention (basis points) avoids floating-point precision issues that arise when storing probabilities as percentages
+- `human_approval_required_for_limit_override` is a governance configuration flag; makes limit override a hard deny, not require_review — intentionally stricter
+- The `third_party` domain covers vendor risk (technology providers, service partners), not only financial counterparties
+- Risk appetite is per-domain and organization-wide; individual subject exposure limits are separate, linked via `limit_reference` on exposure records
+- `probability_bps` convention avoids floating-point precision issues from percentage storage
+- All v2.0 analytic methods (`var_backtest`, `reverse_stress_test`, `raroc_calculation`, `intraday_liquidity_monitor`, `ifrs9_stage_migration`, `regulatory_capital_report`, `sanctions_screening`, `psi_model_stability`, `risk_report_summary`) are fully async and safe for concurrent invocation

@@ -163,6 +163,77 @@ DEPL denies or requires review when:
 - a cross-tenant access attempt is detected;
 - a batch deployment mutation does not declare Bytewax.
 
+## World-Class Enhancements (v2.0)
+
+1. **Async-First Service Layer** — convert all public methods to `async def` backed by `asyncpg` to eliminate sync/async impedance at composition boundaries.
+2. **Persistent Storage via asyncpg + Alembic** — replace in-memory dicts with PostgreSQL; index `tenant_id`, `status`, and `strategy` columns.
+3. **Progressive Canary Autopilot** — `canary_autopilot` polls metric adapters and auto-advances or auto-rolls-back based on configurable SLO thresholds (Argo Rollouts / Flagger semantics).
+4. **Real-Time Deployment Event Bus** — push CloudEvents-shaped audit events via `asyncio.Queue` + background emitter to `ntfy`/Slack/PagerDuty.
+5. **IaC Plan Diffing** — extend `deployment_diff` to diff Terraform/Pulumi plan files attached to the release manifest for structural change impact.
+6. **Multi-Approval Quorum Gate** — track N-of-M approver votes in `DeploymentApproval`; require quorum before transitioning to `approved`.
+7. **Release Window Enforcement** — active-freeze check inside `execute_deployment` blocks execution during blackout periods rather than merely recording them.
+8. **DORA Metrics** — add deployment frequency, lead time for changes, MTTR, and change failure rate to `deployment_analytics`.
+9. **Secret / Config Drift Detection** — compare `config_overrides` between runs and surface added/removed keys as `config_drift` warnings in `deployment_health`.
+10. **Deployment Dependency Graph** — `depends_on: list[str]` on `DeploymentPlan` with topological-sort scheduler for inter-service ordering.
+11. **Immutable Artifact Promotion** — `artifact_promote` re-attaches provenance metadata, re-checks digest signatures, and creates an audit trail across environments.
+12. **Automatic Rollback on Post-Deploy Test Failure** — `auto_rollback` flag on `DeploymentPlan` triggers `execute_rollback` automatically when `post_deploy_test` fails.
+13. **Multi-Region / Multi-Cluster Orchestration** — `MultiRegionPlan` aggregate coordinates child `DeploymentRun` records with configurable rollout order and mid-rollout halt.
+14. **Policy-as-Code Hot-Reload** — OPA/Rego or Polar rule bundles hot-reloaded at runtime so guardrails update without service redeployment.
+15. **Deployment Attestation and SBOM Integration** — `sbom_reference` on `ReleaseManifest` with digest verification at plan creation and signed attestation at execution (SLSA Level 3).
+
+## New Methods
+
+The three most impactful additions targeted for the v2.0 async rewrite:
+
+### `canary_autopilot` — SLO-gated progressive canary
+
+```python
+result = await service.canary_autopilot(
+    plan_id="plan-2026-05",
+    tenant_id="tenant-depl",
+    metric_adapter="prometheus://metrics.internal/depl",
+    slo_thresholds={"error_rate": 0.01, "p99_latency_ms": 200},
+    step_percent=10,
+    step_interval_seconds=60,
+    actor="sre-oncall",
+)
+# result["outcome"] in {"promoted", "rolled_back", "paused"}
+# result["phases_completed"] — int, how many 10% steps succeeded
+# result["rollback_reason"] — str | None, SLO dimension that failed
+```
+
+### `artifact_promote` — environment-to-environment promotion with provenance
+
+```python
+promoted = await service.artifact_promote(
+    artifact_id="art-erp-core-2026-05",
+    tenant_id="tenant-depl",
+    from_environment="staging",
+    to_environment="production",
+    promoted_by="release-owner",
+    re_verify_digest=True,
+)
+# promoted["attestation_id"] — signed attestation record ID
+# promoted["digest_verified"] — bool
+# promoted["audit_event_id"] — traceability back to the promotion actor
+```
+
+### `dr_failover` — disaster-recovery region failover
+
+```python
+failover = await service.dr_failover(
+    tenant_id="tenant-depl",
+    primary_environment_id="prod-us-east",
+    dr_environment_id="prod-eu-west",
+    triggered_by="sre-oncall",
+    reason="Primary region AZ failure — ELB health checks red",
+    release_id="rel-2026-05",
+)
+# failover["failover_id"] — DR event record
+# failover["traffic_shifted_at"] — ISO-8601 timestamp
+# failover["health_gate_id"] — gate recorded against the DR environment
+```
+
 ## Focused Verification
 
 Battery-conscious DEPL checks:

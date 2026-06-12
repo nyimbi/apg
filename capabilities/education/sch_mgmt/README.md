@@ -130,3 +130,25 @@ The School Management capability provides end-to-end administration for educatio
 - **wflo**: Expulsion and fee-waiver approval workflows execute in `wflo`.
 - **comp**: GDPR/data protection compliance checks for student data handled by `comp`.
 - **mqeb** / bytewax: Admission and fee lifecycle events published to `apg.education.sch_mgmt.lifecycle`.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** School Management — World-Class Improvements
+- **I2.** Predictive Attendance Risk Scoring
+- **I3.** Bulk Grade Import and Grade-Book Management
+- **I4.** Parent/Guardian Self-Service Portal API
+- **I5.** Automated Fee Reminder Workflow
+- **I6.** Timetable / Class-Schedule Management
+- **I7.** Student Learning Outcomes / Competency Tracking
+- **I8.** Digital Consent Management
+- **I9.** Health and Medical Records Management
+- **I10.** Automated Report Card Generation with PDF Output
+- **I11.** Multi-Campus / Branch School Support
+- **I12.** Real-Time Notification Dispatch with Delivery Tracking
+- **I13.** Student Cohort and Progression Tracking
+- **I14.** Integration Hooks / Webhook Outbox
+- **I15.** AI-Powered Admission Scoring and Shortlisting
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

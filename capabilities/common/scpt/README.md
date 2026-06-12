@@ -153,3 +153,25 @@ Focused package proof:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/scpt --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/scpt --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements — Custom Scripting Engine (scpt)
+- **I2.** Async-Native Service Layer
+- **I3.** Script Versioning with Immutable History
+- **I4.** Script Cloning and Template Instantiation
+- **I5.** Execution Replay
+- **I6.** Composite Health Score
+- **I7.** Permission Diff on Script Update
+- **I8.** Cron Schedule Registry
+- **I9.** Runtime Variable Schema Validation
+- **I10.** Execution Quota Enforcement
+- **I11.** Structural AST Complexity Scoring
+- **I12.** Cross-Tenant Script Import (Governed)
+- **I13.** Execution Chain Orchestration
+- **I14.** Policy Simulation (Dry-Run Evaluate)
+- **I15.** Scripting Agent Activity Feed
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

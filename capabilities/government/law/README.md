@@ -82,3 +82,25 @@ Incident reporting with OB number generation, case docket management, evidence c
 
 ## Composability Notes
 Composes with `government_eme` (security incident response creates law enforcement dockets), `government_cas` (investigation outcomes feed case resolution), `government_con` (fraud procurement cases trigger docket opening), `government_bud` (embezzlement cases reference budget records), and `intel` (crime pattern analysis for resource allocation intelligence).
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Law Enforcement Capability — World-Class Improvements
+- **I2.** Async Service Layer
+- **I3.** PostgreSQL-Backed Persistence
+- **I4.** Cryptographic Evidence Integrity
+- **I5.** Immutable Append-Only Audit Trail via Event Sourcing
+- **I6.** Structured Domain Events with CloudEvents Envelope
+- **I7.** Chain-of-Custody Graph — Directed Acyclic Graph Model
+- **I8.** CIMS Integration Adapter
+- **I9.** Automated Docket SLA Monitoring
+- **I10.** Geospatial Crime Hotspot Analysis
+- **I11.** Digital Evidence Hash Verification on Transfer
+- **I12.** Warrant Lifecycle State Machine
+- **I13.** Victim / Complainant Case Portal (Read-Only Scoped Token)
+- **I14.** Bulk Evidence Import via Structured Manifest
+- **I15.** ML-Assisted Incident Classification
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

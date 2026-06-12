@@ -92,3 +92,25 @@ status = await svc.get_compliance_status()
 ## License
 
 (c) 2025 Datacraft | nyimbi@gmail.com | www.datacraft.co.ke
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: PCI DSS Vault Capability
+- **I2.** Replace XOR Cipher with AES-256-SIV (Deterministic AEAD)
+- **I3.** Key Hierarchy with HKDF + Per-Tenant Key Derivation
+- **I4.** Vault Transit Backend Abstraction
+- **I5.** Token Aliasing + Re-Tokenization Without PAN Re-Entry
+- **I6.** Token Metadata Enrichment: BIN Intelligence
+- **I7.** Token Expiry + Lifecycle Management
+- **I8.** Bulk Tokenization with Streaming + Backpressure
+- **I9.** OPA Policy Caching with TTL + Circuit Breaker
+- **I10.** Audit Log with Tamper-Evident Chaining
+- **I11.** Masked PAN Normalization + Display Tokenization
+- **I12.** Cryptographic Token Binding to Device/Session
+- **I13.** Prometheus Metrics + OpenTelemetry Traces
+- **I14.** Token Portability: Cross-Tenant Token Transfer Protocol
+- **I15.** FFX (Format-Preserving Encryption) as Token Generation Backend
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

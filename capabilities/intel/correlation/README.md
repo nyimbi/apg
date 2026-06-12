@@ -62,3 +62,25 @@ Use focused verification during battery-constrained development:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/intel/correlation --json
 ./.venv/bin/apg capabilities lifecycle-audit --root capabilities/intel/correlation --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: intel_correlation
+- **I2.** Streaming Correlation Pipeline (Bytewax Integration)
+- **I3.** Graph-Native Entity Resolution with NetworkX / igraph
+- **I4.** Jaccard + MinHash Approximate Similarity for Text References
+- **I5.** Temporal Pattern Mining with TFIDF-like Burst Detection
+- **I6.** Attribution Chain Tracking (Kill-Chain Mapping)
+- **I7.** Adaptive Confidence Decay (Staleness Weighting)
+- **I8.** Cross-Tenant Federated Correlation (Privacy-Preserving)
+- **I9.** Causal Bayesian Network Scoring
+- **I10.** Anomaly Detection on Correlation Score Distributions
+- **I11.** Rule Hot-Reload Without Service Restart
+- **I12.** Distributed Locking for Concurrent Cluster Merge
+- **I13.** Explainability Layer: Correlation Rationale Generation
+- **I14.** Pagination and Cursor-Based Result Streaming
+- **I15.** Persistent Storage Adapter (PostgreSQL via asyncpg)
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

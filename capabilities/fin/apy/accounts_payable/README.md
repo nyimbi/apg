@@ -331,3 +331,27 @@ Focused verification for this package:
 ```
 
 Deferred live-system work includes durable stores, live GL, cash-management, document, audit, notification, and authorization adapters, durable Bytewax deployment, rendered browser UI, and performance testing.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Peppol / UBL 2.1 E-Invoicing Ingest** [E-Invoicing Compliance]
+- **I2. IBAN / Bank Account Dual-Control Verification Workflow** [Fraud Prevention / Controls]
+- **I3. SWIFT ISO 20022 Pain.001 Payment File Generation** [Treasury / Bank Integration]
+- **I4. AI-Powered OCR Invoice Data Extraction** [Intelligent Automation]
+- **I5. Intelligent Payment Terms Optimisation Engine** [Working Capital Analytics]
+- **I6. Automated Withholding Tax Certificates (P9A / P9B)** [Tax Compliance]
+- **I7. Period-End Accruals Auto-Reversal Scheduling** [Accounting / Close Automation]
+- **I8. Supplier Onboarding Due Diligence (KYB) Workflow** [Supplier Risk / Compliance]
+- **I9. Multi-Currency FX Revaluation at Period End** [Financial Reporting]
+- **I10. Supplier Credit Limit Enforcement** [Risk Controls]
+- **I11. Comprehensive Audit Trail with Immutable Event Log** [Compliance / Governance]
+- **I12. Intelligent Exception Triage with Priority Scoring** [AP Operations / AI]
+- **I13. Cash Flow Sensitivity Analysis (What-If)** [Treasury / Analytics]
+- **I14. Dormant Supplier Deactivation Workflow** [Vendor Master Governance]
+- **I15. Real-Time AP Compliance Monitoring Dashboard** [Compliance / Controls]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

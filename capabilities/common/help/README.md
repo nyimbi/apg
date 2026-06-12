@@ -116,3 +116,25 @@ Focused verification for this packet should use:
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/help --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/help --json
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Help & Knowledge Base — World-Class Improvements
+- **I2.** Async-Native Service Layer
+- **I3.** Pluggable Vector Search Backend
+- **I4.** Ollama-Backed RAG Answer Generation
+- **I5.** Persistent Storage via SQLAlchemy + Alembic
+- **I6.** Event-Driven Audit Bus
+- **I7.** Structured Feedback Analytics Pipeline
+- **I8.** Article Freshness Scoring & Proactive Notifications
+- **I9.** Multi-Tenant RBAC with Attribute-Based Access Control
+- **I10.** Bulk Article Import with Validation Pipeline
+- **I11.** AI-Assisted Article Drafting
+- **I12.** Contextual Help Overlays (In-App Help)
+- **I13.** Semantic Duplicate Detection
+- **I14.** Article Lifecycle Webhooks
+- **I15.** Internationalization Quality Gates
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

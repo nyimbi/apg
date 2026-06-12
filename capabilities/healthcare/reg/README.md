@@ -157,3 +157,27 @@ Quality indicators from `healthcare_ana` feed into CMS IQR/OQR submission auto-p
 ## Streaming Platform
 
 Event streaming uses **NATS JetStream** + **Bytewax** for real-time compliance KPI aggregation. Subjects follow the pattern `apg.healthcare.reg.{event_category}.{tenant_id}`. Consumer groups allow multiple downstream capabilities to subscribe independently without coordination.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real-Time Compliance Event Streaming via NATS** [Architecture / Observability]
+- **I2. AI-Assisted ICD-10/CPT Code Suggestion** [Clinical Intelligence]
+- **I3. Automated HIPAA Security Rule Gap Analysis** [Compliance Automation]
+- **I4. Multi-Framework Compliance Matrix Tracker** [Governance]
+- **I5. Predictive License Expiry Risk Scoring** [Predictive Analytics]
+- **I6. Sentinel Event Root Cause Analysis Workflow Engine** [Patient Safety Workflow]
+- **I7. Regulatory Submission Auto-Population from Quality Data** [Data Integration]
+- **I8. Breach Notification Timeline Automation** [Incident Response]
+- **I9. Quality Reporting Benchmark Comparison** [Quality Intelligence]
+- **I10. Integrated Staff Competency & Training Matrix** [Workforce Compliance]
+- **I11. Device Adverse Event MDR Pipeline** [Medical Device Regulatory]
+- **I12. State-Specific Regulatory Rule Engine** [Compliance Intelligence]
+- **I13. NATS-Backed Real-Time Compliance Alert Bus** [Observability / Alerting]
+- **I14. Accreditation Survey Readiness Scorecard** [Accreditation Management]
+- **I15. Regulatory Intelligence Feed Integration** [Regulatory Monitoring]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

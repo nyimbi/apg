@@ -85,7 +85,7 @@ End-to-end service order management covering order capture, validation, decompos
 | `order_sla_monitoring()` | Breaching and at-risk order detection |
 | `bulk_order_import()` | CSV bulk import with per-row results |
 
-### World-Class Enhancements (v1.1)
+### World-Class Enhancements (v2.0)
 | Method | Description |
 |--------|-------------|
 | `validate_portability_eligibility()` | E.164 + operator + concurrent-port checks |
@@ -136,3 +136,67 @@ End-to-end service order management covering order capture, validation, decompos
 
 ## Composability Notes
 Triggers telecom_pro (provisioning workflows) on decomposition. Validates customer data against telecom_cus. Checks network resource availability against telecom_inv. Order completion triggers telecom_bil (charge setup) and telecom_cus (lifecycle event). Cost estimation integrates with telecom_bil tariff catalogue.
+
+## World-Class Enhancements (v2.0)
+
+1. **Idempotent Order Submission** — per-`(tenant_id, order_id)` idempotency key with configurable TTL; safe HTTP retry replay.
+2. **FSM Status Transitions** — explicit transition table raises `InvalidTransitionError` on illegal moves; `get_valid_transitions()` introspection.
+3. **Priority-Aware SLA Thresholds** — per-priority SLA lookup: emergency=1 h … low=72 h; independent breach/at-risk bands per order.
+4. **Task DAG Execution** — topological sort of `OrdTask.depends_on` references; parallel-safe groups run via `asyncio.gather`; cycle detection.
+5. **Structured Fallout Taxonomy** — `FalloutTaxonomy` registry maps `(error_code_prefix, domain)` → `(category, auto_retry_eligible, escalation_sla_minutes)`.
+6. **Event-Sourced Audit Trail** — CloudEvent-compliant records per state change; `replay_order(order_id, as_of)` rebuilds state from log.
+7. **Portability Regulatory Pre-Validation** — E.164 format, operator code registry, concurrent-port guard before committing request.
+8. **Async Webhook Callbacks** — HMAC-signed delivery via `httpx.AsyncClient` with exponential back-off; TMF622-aligned event contracts.
+9. **Multi-Tenant Data Isolation** — all list stores partitioned by `tenant_id`; `assert_tenant_isolation()` validates every store access.
+10. **Bulk Order Progress Streaming** — `stream_bulk_order_progress()` async generator yields `{processed, total, errors}` snapshots; SSE-ready.
+11. **Contract Lifecycle Management** — `confirm_contract_signature()`, `renew_contract()`, `expire_contracts()` cron hook; TMF651-aligned.
+12. **Order Jeopardy Prediction** — configurable scoring on age ratio, fallout count, retry count, task completion rate, priority weight.
+13. **Order Cost Estimation** — itemised `{product_id: {unit_price, quantity, subtotal}, total, currency}` from `telecom_bil` tariff catalogue.
+14. **Concurrent Order Deduplication Lock** — `asyncio.Lock` per `(tenant_id, order_id)`; Redis-backed in distributed deployments.
+15. **Structured Metrics Export** — per-method latency ring buffer; `export_metrics(format="prometheus")` emits duration histograms and order counters.
+
+## New Methods
+
+### `predict_order_jeopardy` — early warning before SLA breach
+
+```python
+svc = TelecomOrderManagementService()
+result = await svc.predict_order_jeopardy(
+    order_id="ord-abc123",
+    tenant_id="acme",
+    sla_hours=4.0,          # override default per priority
+)
+# {"risk_score": 0.83, "risk_band": "high", "recommended_action": "escalate", ...}
+if result["risk_band"] in {"high", "critical"}:
+    await notify_noc(order_id, result)
+```
+
+### `replay_order` — reconstruct order state at any point in time
+
+```python
+# Dispute resolution: what was the order state at contract signature time?
+snapshot = await svc.replay_order(
+    order_id="ord-abc123",
+    as_of="2026-05-30T14:00:00",
+    tenant_id="acme",
+)
+# {"event_count": 7, "events": [...], "as_of": "2026-05-30T14:00:00", ...}
+for event in snapshot["events"]:
+    print(event["event_type"], event["timestamp"])
+```
+
+### `validate_portability_eligibility` — gate submission before any side-effects
+
+```python
+report = await svc.validate_portability_eligibility(
+    msisdn="+254700123456",
+    donor_operator="SAFARICOM",
+    recipient_operator="AIRTEL",
+    tenant_id="acme",
+)
+# {"eligible": True, "checks": {"msisdn_e164_format": True, "no_concurrent_port": True, ...}}
+if not report["eligible"]:
+    failed = [k for k, v in report["checks"].items() if not v]
+    raise ValueError(f"Portability ineligible: {failed}")
+await svc.submit_portability_request(order_id=..., msisdn="+254700123456", ...)
+```

@@ -200,3 +200,27 @@ Published to NATS JetStream; subjects follow `con.<entity>.<action>` pattern.
 - Payment certificates integrate with `realestate_acc` AP posting workflow
 - NATS events consumed by `ntfy` for SMS/email alerts to site teams
 - PC certificate issuance triggers retention release workflow in `realestate_acc`
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Real-Time Defect Snagging with Photo AI Triage** [AI/Quality Assurance]
+- **I2. Critical-Path Schedule Engine with Float Monitoring** [Project Management]
+- **I3. Earned Value Management (EVM) Dashboard** [Cost Control / Analytics]
+- **I4. Automated NEC/JBCC/FIDIC Contract Clause Compliance Checker** [Legal / Compliance]
+- **I5. Subcontractor Work Package & Back-to-Back Contract Linking** [Supply Chain / Subcontracting]
+- **I6. Contractor Performance Scorecard with Weighted KPIs** [Contractor Management]
+- **I7. Payment Certificate Workflow with Cashflow Forecasting** [Financial Management]
+- **I8. Defect Liability Period (DLP) Tracker with Automated Closure** [Post-Completion / Quality]
+- **I9. NATS-Based Real-Time Event Stream for Construction Events** [Integration / Streaming]
+- **I10. Risk Register with Monte Carlo Schedule/Cost Simulation** [Risk Management]
+- **I11. BIM/IFC Document Integration with Drawing Register** [Document Management]
+- **I12. Delay Analysis Engine (As-Planned vs. As-Built)** [Claims Management]
+- **I13. Automated Quantity Surveying (QS) Cost Benchmarking** [Cost Management / AI]
+- **I14. Multi-Party Notice Management with Tracked Delivery** [Legal / Notices]
+- **I15. Snagging-to-Handover Digital Certificate Workflow** [Handover / Commissioning]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

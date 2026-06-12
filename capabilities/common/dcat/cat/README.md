@@ -134,3 +134,27 @@ Catalog mutation events are emitted to `_audit_events` (in-process) and optional
 published to NATS JetStream subject `dcat.cat.events.{tenant_id}.{event_type}` when
 a `NatsClient` is injected. Downstream capabilities (intel, compliance, lineage trackers)
 subscribe independently — no polling required.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Column-Level Lineage with Field Mapping** [Lineage depth]
+- **I2. Data Quality Score Embedding** [Quality governance]
+- **I3. NATS-Backed Real-Time Catalog Events** [Event streaming]
+- **I4. Semantic Search with Embeddings** [Discovery]
+- **I5. Data Contract Enforcement** [Governance / SLOs]
+- **I6. Automated PII Detection and Classification** [Privacy / compliance]
+- **I7. Faceted Catalog Discovery API** [Discovery / UX]
+- **I8. Popularity and Usage Tracking** [Discovery intelligence]
+- **I9. Multi-Tenant Catalog Federation** [Multi-tenancy / enterprise]
+- **I10. Dataset Deprecation Workflow** [Lifecycle management]
+- **I11. Schema Diff and Breaking Change Detection** [Schema governance]
+- **I12. Glossary Term Linkage to Dataset Columns** [Semantic layer]
+- **I13. RBAC-Aware Catalog Visibility** [Security / access control]
+- **I14. Catalog Health Scoring and Metadata Completeness** [Data governance maturity]
+- **I15. OpenMetadata / DCAT-AP Export** [Interoperability / open standards]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

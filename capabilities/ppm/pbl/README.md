@@ -109,3 +109,60 @@ Project Baseline Management (pbl) establishes and protects the scope, schedule, 
 - Receives schedule from **ppm_pps** for schedule baseline creation
 - EV snapshots feed **ppm_pan** portfolio performance dashboards
 - Change requests can trigger notifications via **ntfy** and workflow steps via **wflo**
+
+---
+
+## World-Class Enhancements (v2.0)
+
+1. **Integrated Baseline Review (IBR) Automation** — cross-validates scope/schedule/cost baselines with a scored IBR health index (0–100).
+2. **Rolling Wave Baseline Segments** — `set_rolling_wave_baseline()` tracks committed vs planning horizons; enables EVM on the committed segment.
+3. **Probabilistic Cost and Schedule Reserves** — `set_reserve_analysis()` stores management/contingency reserves and P80/P90 confidence bounds.
+4. **Time-Phased Budget Distribution (S-Curve)** — `set_time_phased_budget()` drives period-by-period PV; `take_ev_snapshot()` auto-resolves correct PV from the S-curve.
+5. **Retroactive Integrity Audit Trail** — structured `_audit_diff()` captures `{field, before, after}` diffs in a tamper-evident append-only log.
+6. **Baseline Lock Mechanism** — `lock_baseline()` / `unlock_baseline()` with explicit owner tracking; locked baselines reject all mutations.
+7. **Change Request Dependency Graph** — `link_change_requests()` + `get_cr_dependency_graph()` model blocks/depends_on/supersedes relationships as a DAG.
+8. **Earned Schedule (ES) Metrics** — `earned_schedule_metrics()` computes ES, SV(t), SPI(t), and IEAC(t); SPI(t) correctly converges to 1.0 at completion.
+9. **Multi-Baseline Portfolio View** — `portfolio_baseline_summary()` rolls up CPI, SPI, EAC, and risk tiers (red/amber/green) across all tenant projects.
+10. **Automated Variance Threshold Escalation** — `configure_variance_escalation()` triggers notifications and optional CR freeze on consecutive threshold breaches.
+11. **Baseline Freeze Periods** — `set_freeze_period()` blocks CR submissions during reporting lock windows; `emergency` priority CRs are exempt.
+12. **WBS-Linked Scope Baseline** — `set_scope_baseline()` now accepts `wbs_elements` with control accounts, enabling proper PMB construction.
+13. **Variance At Completion (VAC) Forecasting** — `forecast_completion()` returns EAC under three methods (typical/atypical/scheduled), VAC, and TCPI with recommended method.
+14. **Baseline Deviation Score (BDS)** — `baseline_deviation_scores()` computes a weighted 0–100 health score per project, ranked worst-first for dashboard KPIs.
+15. **Baseline Version History and Diff** — `get_baseline_version_history()` preserves full baseline snapshots; `diff_baseline_versions()` returns structured diffs between any two versions.
+
+---
+
+## New Methods
+
+### `integrated_baseline_review(project_id, tenant_id=None)`
+Cross-validates all three baseline types and returns a scored report.
+
+```python
+svc = ProjectBaselineService(tenant_id="acme")
+ibr = await svc.integrated_baseline_review(project_id="proj-001")
+# ibr["ibr_health_index"]  -> 85.0
+# ibr["dimensions"]["completeness"]["pass"]  -> True
+# ibr["dimensions"]["cost_integrity"]["pass"] -> True
+```
+
+### `forecast_completion(project_id, tenant_id=None)`
+Computes EAC under three methods, TCPI, and VAC from the latest EV snapshot.
+
+```python
+fc = await svc.forecast_completion(project_id="proj-001")
+# fc["eac_typical"]       -> 125000.00   (BAC / CPI)
+# fc["eac_atypical"]      -> 118000.00   (AC + remaining at planned rate)
+# fc["tcpi"]              -> 0.9412      (CPI needed to finish on budget)
+# fc["vac"]               -> -5000.00
+# fc["recommended_method"] -> "typical"
+```
+
+### `baseline_deviation_scores(tenant_id=None)`
+Ranks all active projects by composite BDS (0–100, lower is better) for portfolio triage.
+
+```python
+bds = await svc.baseline_deviation_scores()
+# bds["scores"][0]  -> {"project_id": "proj-007", "bds": 72.4, "tier": "red", ...}
+# bds["scores"][-1] -> {"project_id": "proj-002", "bds": 8.1,  "tier": "green", ...}
+# Wire directly to dashboard KPI tiles; sort by -bds for worst-first triage.
+```

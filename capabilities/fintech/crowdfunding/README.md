@@ -1,12 +1,23 @@
 # Crowdfunding Platform
 
 ## Overview
-Crowdfunding Platform manages the lifecycle of alternative finance campaigns: issuer due diligence, campaign publishing across equity, debt, reward, donation, and revenue-share structures, investor disclosure management, commitment recording, escrow funding, milestone tracking, payout authorization, investor updates, compliance alerts, and review workflows. It is designed for regulated crowdfunding operations where every campaign requires disclosure review before investors can commit.
+Crowdfunding Platform manages the full alternative-finance campaign lifecycle: issuer due diligence, campaign publishing across equity, debt, reward, donation, and revenue-share structures, investor disclosure management, commitment recording, escrow funding, milestone-gated payouts, equity allocation, investor reporting, regulatory limits, and campaign moderation.
 
 Investor commitments require KYC and explicit risk acknowledgement. Payouts are gated behind milestone evidence and human approval. All platform lifecycle events stream to `apg.fintech.crowdfunding.lifecycle` via Bytewax.
 
-## Capability ID
-`fintech_crowdfunding`  Version: 1.1.0
+**Capability ID**: `fintech_crowdfunding`  
+**Version**: 2.0.0
+
+## Features
+- Multi-type campaigns: equity, debt, reward, donation, revenue-share
+- CMA Kenya Crowdfunding Regulations 2022 compliance (KES 500K per-campaign limit, KES 3M annual platform limit)
+- KYC-gated issuer onboarding with beneficial owner evidence
+- Milestone-gated escrow disbursement with human approval
+- Pro-rata equity allocation and investor returns reporting
+- Campaign analytics: commitment size distribution, payout history, compliance alerts
+- Secondary market listing, investment certificates, bulk campaign approval
+- Bytewax streaming event bus for all lifecycle events
+- AI agent registration for disclosure review and escrow release automation
 
 ## Provides
 | Service | Description |
@@ -41,14 +52,43 @@ Investor commitments require KYC and explicit risk acknowledgement. Payouts are 
 | bia | Business intelligence and analytics |
 | fin_rpt | Financial reporting |
 
-## Configuration Reference
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| campaigns.supported_types | list | equity, debt, reward, donation, revenue_share | Campaign structures |
-| campaigns.supported_currencies | list | USD, KES, EUR, GBP, NGN, GHS, ZAR | Supported currencies |
-| commitments.supported_statuses | list | pledged, funded, cancelled, refunded | Commitment states |
-| disclosures.supported_types | list | offering_memo, risk_factors, financials, use_of_funds, issuer_update | Disclosure categories |
-| compliance.supported_severities | list | low, medium, high, critical | Alert severity levels |
+## Quick Start
+
+```python
+from capabilities.fintech.crowdfunding.service import CrowdfundingService
+
+svc = CrowdfundingService(tenant_id="acme", actor_id="admin")
+
+# Onboard an issuer
+issuer = await svc.onboard_issuer(
+    issuer_id="iss_001",
+    name="Acme Solar Ltd",
+    kyc_reference="kyc_ref_001",
+    beneficial_owner_reference="ubo_ref_001",
+    risk_rating_reference="risk_ref_001",
+)
+
+# Launch a campaign
+campaign = await svc.launch_campaign(
+    creator_id="iss_001",
+    title="Acme Solar Series A",
+    goal_amount=5_000_000.0,
+    currency="KES",
+    deadline="2026-12-31T23:59:00+03:00",
+    campaign_type="equity",
+)
+
+# Approve it
+await svc.campaign_moderation(campaign["id"], "approve", "disclosure review passed")
+
+# Record an investor contribution
+result = await svc.contribute(
+    contributor_id="inv_001",
+    campaign_id=campaign["id"],
+    amount=50_000.0,
+    payment_method="mpesa",
+)
+```
 
 ## API Routes
 | Name | Path | Method | Permission | Group |
@@ -96,7 +136,7 @@ Investor commitments require KYC and explicit risk acknowledgement. Payouts are 
 | ComplianceAlert | id, severity, evidence_reference, status |
 
 ## Streaming Events
-Events emitted to the fintech event stream via Bytewax.
+Events emitted to `apg.fintech.crowdfunding.lifecycle` via Bytewax.
 | Event | Trigger |
 |-------|---------|
 | issuer_onboarded | Issuer passes due diligence |
@@ -111,20 +151,87 @@ Events emitted to the fintech event stream via Bytewax.
 | crowdfunding_review_recorded | Governance review completed |
 | crowdfunding_agent_registered | AI agent registered |
 
+## New Methods
+
+### `campaign_analytics(campaign_id)`
+Full analytics for a campaign: commitment size distribution, payout history, compliance alert count.
+```python
+analytics = await svc.campaign_analytics("camp_001")
+# {total_raised_minor, avg_commitment_minor, commitment_size_distribution, compliance_alert_count, ...}
+```
+
+### `equity_share_allocation(campaign_id)`
+Pro-rata ownership table for equity/revenue-share campaigns based on funded commitments.
+```python
+alloc = await svc.equity_share_allocation("camp_001")
+# {"allocations": [{"investor_id": "inv_001", "ownership_pct": 12.5, "share_units": 1250.0}, ...]}
+```
+
+### `regulatory_limits_check(contributor_id, campaign_id, amount)`
+Validate a proposed contribution against CMA Kenya 2022 limits before accepting funds.
+```python
+check = await svc.regulatory_limits_check("inv_001", "camp_001", 400_000.0)
+# {"within_limits": True, "violations": [], "warnings": [...]}
+```
+
+### `cma_crowdfunding_return(period)`
+Generate a CMA Kenya periodic regulatory return covering all closed campaigns.
+```python
+report = await svc.cma_crowdfunding_return("2026-Q2")
+# {"report_type": "CMA_CROWDFUNDING_RETURN", "total_campaigns": 14, "total_raised_minor": ..., "status": "draft"}
+```
+
+### `investor_accreditation_check(investor_id, net_worth, annual_income)`
+Classify an investor as accredited/retail under CMA thresholds (KES 5M net worth or KES 1M income).
+```python
+acc = await svc.investor_accreditation_check("inv_001", net_worth=6_000_000.0, annual_income=800_000.0)
+# {"accredited": True, ...}
+```
+
+## World-Class Enhancements (v2.0)
+
+1. **Dynamic Tiered Fee Engine** — Configurable fee schedules by campaign type, volume tier, and issuer history; replaces the flat 3% hard-code.
+2. **Real-Time Funding Velocity & Momentum Scoring** — Sliding-window velocity (1h/6h/24h/7d) and a 0–100 momentum score; declining momentum triggers issuer alerts.
+3. **Investor Sentiment & Engagement Analytics** — Engagement signals (update reads, disclosure downloads, Q&A) aggregated into a per-campaign sentiment index correlated with conversion rates.
+4. **Automated Beneficial Ownership Graph** — Graph-based UBO resolution for multi-level corporate chains; detects circular ownership, undisclosed related parties, and PEPs at campaign launch.
+5. **Milestone Evidence Verification with AI-Assisted Review** — Structured evidence pipeline with completeness scoring and an AI reviewer agent that produces pass/fail recommendations with citations.
+6. **Cross-Campaign Investor Risk Aggregation** — Real-time portfolio-level exposure tracking; enforces per-campaign CMA limit and sector concentration limits (max 40% in one industry).
+7. **Smart Contract-Ready Escrow Integration** — Escrow adapter supporting both wallet-reference and EVM smart contract models; milestone completions trigger on-chain release events.
+8. **Sophisticated Investor Fast-Track Workflow** — Dedicated onboarding for accredited investors with higher limits (up to KES 50M) and pre-public "professional tranche" access.
+9. **Campaign A/B Testing Framework** — Statistically controlled variant testing across reward structures, equity percentages, and pitch narratives; auto-migrates investor pool to winning variant.
+10. **Regulatory Filing Automation Pipeline** — Fully automated CMA Kenya return: queries closed campaigns, computes mandatory tables, signs, and submits to the CMA API; human review only for exceptions.
+11. **Investor Communication Drip Workflow** — Milestone-triggered templated drip: pre-launch teasers, 25%/50%/75%/100% progress updates, completion and payout notifications; all delivery receipts logged.
+12. **Revenue-Share Distribution Engine** — Periodic pro-rata distribution engine for revenue-share campaigns; handles minimum thresholds, withheld tax, cumulative return caps, and escrow reconciliation.
+13. **Campaign Clone & Template Library** — Clone a past campaign or bootstrap from a sector-specific best-practice template; financial targets and dates reset, everything else carries forward.
+14. **Dispute Resolution & Investor Protection Workflow** — Structured investor dispute process (misrepresentation, milestone non-delivery, payout delay) with case IDs, independent reviewer routing, and remediation options including partial refunds and campaign suspension.
+15. **Predictive Campaign Failure Early Warning System** — ML-informed early warning at 7/14/30 days post-launch using sector, velocity, disclosure completeness, and KYC tier features; high-risk campaigns escalated to a campaign support team.
+
 ## Edge Cases Handled
-- Campaign disclosure is required at campaign publication — a campaign cannot be opened to investors without a linked disclosure, preventing uninformed commitments
+- Campaign disclosure required at publication — campaigns cannot open to investors without a linked disclosure
 - Beneficial owner evidence is separate from issuer KYC — entity KYC alone does not satisfy the UBO requirement
-- Investor updates must reference a disclosure document — freeform updates that are not anchored to a filed disclosure are rejected
-- Escrow funding requires a commitment in `funded` status, not just `pledged` — the funding record is rejected if the commitment has not been confirmed as funded
-- Payout approval is required regardless of payout amount — there is no low-value payout exemption; every payout must carry an approval reference
+- Investor updates must reference a disclosure document — freeform updates not anchored to a filed disclosure are rejected
+- Escrow funding requires a commitment in `funded` status, not just `pledged`
+- Payout approval required regardless of amount — no low-value exemption
 
 ## Composability
-- **Upstream**: `fintech_kyc` and `fintech_aml` provide issuer and investor identity evidence; `fintech_wallets` manages escrow accounts; `fintech_payments` executes payouts
-- **Downstream**: `fintech_portfolio` receives investment records for investor portfolio tracking; `fintech_wealth` supports accredited investor workflows
+- **Upstream**: `fintech_kyc` and `fintech_aml` provide identity evidence; `fintech_wallets` manages escrow accounts; `fintech_payments` executes payouts
+- **Downstream**: `fintech_portfolio` receives investment records; `fintech_wealth` supports accredited investor workflows
 - **Peer**: Commonly deployed alongside `fintech_portfolio` (investor holdings) and `fintech_compliance` (securities disclosure obligations)
+
+## Configuration Reference
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| campaigns.supported_types | list | equity, debt, reward, donation, revenue_share | Campaign structures |
+| campaigns.supported_currencies | list | USD, KES, EUR, GBP, NGN, GHS, ZAR | Supported currencies |
+| commitments.supported_statuses | list | pledged, funded, cancelled, refunded | Commitment states |
+| disclosures.supported_types | list | offering_memo, risk_factors, financials, use_of_funds, issuer_update | Disclosure categories |
+| compliance.supported_severities | list | low, medium, high, critical | Alert severity levels |
 
 ## Development Notes
 - Campaign types `equity` and `debt` imply securities regulation requirements; the capability enforces disclosure and KYC but does not perform securities registration — that remains an adapter boundary
-- Disclosure review (`review_required: True` in configuration) means a disclosure must have a recorded review before the campaign can be published
-- `recipient_scope` on investor updates can be `all`, `committed`, or `funded`; the service layer enforces filtering — the rule engine only checks the field is present
-- Commitment statuses (`pledged`, `funded`, `cancelled`, `refunded`) are transitions managed by the service; the rule engine validates that escrow funding links to a `funded` commitment
+- `recipient_scope` on investor updates: `all`, `committed`, or `funded`; service layer enforces filtering
+- Commitment statuses (`pledged`, `funded`, `cancelled`, `refunded`) are service-layer transitions; the rule engine validates that escrow funding links to a `funded` commitment
+- `CrowdfundingPlatformService` is an alias for `CrowdfundingService` for backward compatibility
+
+---
+© 2025 Datacraft | www.datacraft.co.ke

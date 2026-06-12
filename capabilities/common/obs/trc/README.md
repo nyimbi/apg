@@ -121,3 +121,27 @@ Pass `X-Tenant-ID: <tenant>` on every request for multi-tenant isolation.
 Spans are published to NATS subject `obs.trc.spans.live.<tenant_id>` as CloudEvents on
 `create_span` and `finish_span`.  Connect a NATS subscriber or use the SSE endpoint to
 receive live span updates with sub-100 ms latency.  (Uses NATS+bytewax — not NATS JetStream.)
+
+---
+
+## World-Class Enhancements (v2.0)
+
+Fifteen targeted improvements over baseline implementation:
+
+- **I1. Adaptive Head-Based Sampling with Feedback Loop** [Sampling]
+- **I2. Tail-Based Sampling via NATS JetStream Buffer** [Sampling]
+- **I3. Exemplar Linking to Metrics (OpenMetrics Compatibility)** [Integration]
+- **I4. Automatic Anomaly Detection on Span Latency (z-score + IQR)** [Analytics]
+- **I5. Distributed Context Propagation via W3C TraceContext + Baggage** [Standards Compliance]
+- **I6. Span Compression and Deduplication for High-Cardinality Operations** [Storage Efficiency]
+- **I7. Real-Time Critical Path Analysis** [Analytics]
+- **I8. NATS-Based Live Span Streaming (Push to Subscribers)** [Integration]
+- **I9. Per-Tenant Retention Policies with Automated TTL Eviction** [Multi-Tenancy]
+- **I10. Flamegraph-Ready Span Tree Serialisation** [Visualisation]
+- **I11. OpenTelemetry Resource Attribute Enrichment** [Standards Compliance]
+- **I12. Trace Comparison and Regression Detection** [Analytics]
+- **I13. Multi-Hop Correlation: Traces + Logs + Metrics** [Integration]
+- **I14. Intelligent Rate-Limiting Sampler with Token Bucket** [Sampling]
+- **I15. Trace-to-Profile Linking via Continuous Profiling Integration** [Integration]
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

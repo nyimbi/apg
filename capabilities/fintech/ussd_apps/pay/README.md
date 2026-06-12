@@ -52,3 +52,92 @@ Large send-money transactions (>= KES 10,000) require a second-factor confirmati
 - Bill amounts validated against per-biller min/max limits
 - Telcos: safaricom, airtel, telkom, faiba
 - Utility codes: kplc_prepaid, kplc_postpaid, nairobi_water, mombasa_water, kisumu_water, nwsc
+
+## World-Class Enhancements (v2.0)
+
+**I1. Scheduled / Recurring Payments** — Cron-driven payment schedules with count/date expiry for standing orders [Feature]
+
+**I2. Favourite / Speed-Dial Payments** — Aliased payment templates reduce 6-step dial to 2 steps for repeat payers [UX]
+
+**I3. Payment Limits & Velocity Controls** — Per-tenant/phone daily, monthly, per-txn, and hourly transaction caps (CBK-compliant) [Risk / Compliance]
+
+**I4. Two-Factor OTP Confirmation** — HMAC-SHA1 TOTP step-up authentication for high-value transactions above a configurable threshold [Security]
+
+**I5. Bulk Payment Disbursement** — Fan-out up to 200 payout records via `asyncio.gather` with per-item status and aggregate receipt [Feature]
+
+**I6. Merchant QR Code Payment** — Generates USSD deep-link QR (Base64 PNG) for pre-filled merchant payment sessions [Feature]
+
+**I7. Transaction Dispute & Chargeback Workflow** — Structured dispute lifecycle (raised → under_review → resolved) with 72-hour CBK compliance [Operations]
+
+**I8. Cashback & Rewards Engine** — Configurable per-tenant cashback rate applied post-payment with unclaimed rewards ledger [Engagement]
+
+**I9. FX / Multi-Currency Bill Pay** — Rate-store driven currency conversion at point of payment for diaspora remittance corridors [Feature]
+
+**I10. USSD Session Timeout & Resume** — Stale session expiry with context restoration for network-dropped sessions [UX / Reliability]
+
+**I11. Payment Notifications via SMS/WhatsApp** — Protocol-based `NotificationAdapter` with pluggable SMS/WhatsApp backends and default logging adapter [UX]
+
+**I12. Biller Account Validation (Pre-payment Lookup)** — Protocol-based pre-validation returning account name and outstanding balance before payment commits [Risk]
+
+**I13. Paybill Split Payment** — Splits a single bill across multiple participants with per-contributor `pay_bill` execution and partial completion tracking [Feature]
+
+**I14. Offline Voucher / Float Management** — Per-agent float accounts with low-water-mark alerts and pre-deduction guards for rural agent networks [Feature]
+
+**I15. Audit Trail Export (CSV / JSON)** — Cross-payment-type chronological export enriched with biller/merchant names for CBK AML/CFT compliance [Compliance]
+
+## New Methods
+
+The three highest-impact async methods added in v2.0:
+
+### `initiate_bulk_disbursement`
+
+Disburse to up to 200 recipients in a single call. All entries are validated before fan-out; failed items do not abort the batch.
+
+```python
+svc = PaymentUSSDService(tenant_id="acme")
+result = await svc.initiate_bulk_disbursement(
+    from_phone="+254700000001",
+    pin="1234",
+    recipients=[
+        {"to_phone": "+254711000001", "amount": 5000, "narration": "Jan stipend"},
+        {"to_phone": "+254722000002", "amount": 7500, "narration": "Jan stipend"},
+    ],
+    tenant_id="acme",
+)
+# result: {bulk_id, total_amount, success_count, fail_count, items: [...]}
+```
+
+### `export_audit_trail`
+
+Produces a CBK-compliant transaction report across all payment types for a date range.
+
+```python
+report = await svc.export_audit_trail(
+    tenant_id="acme",
+    date_from="2026-01-01",
+    date_to="2026-01-31",
+    fmt="csv",   # or "json"
+)
+# report: {content: "<csv string>", record_count: 412, exported_at: "2026-02-01T08:00:00Z"}
+with open("jan_audit.csv", "w") as f:
+    f.write(report["content"])
+```
+
+### `expire_stale_sessions` / `resume_ussd_session`
+
+Clean up sessions abandoned mid-flow and restore context for the same phone on re-dial.
+
+```python
+# Periodic cleanup (call from a scheduler every 60 seconds)
+expired = await svc.expire_stale_sessions(max_age_seconds=180)
+# expired: {expired_count: 3, session_ids: [...]}
+
+# On new dial-in, check for resumable context
+resumed = await svc.resume_ussd_session(
+    phone_number="+254700000001",
+    tenant_id="acme",
+)
+if resumed["found"]:
+    # Restore menu state from resumed["context"]
+    menu_level = resumed["context"]["level"]
+```

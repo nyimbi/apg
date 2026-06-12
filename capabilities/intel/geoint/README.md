@@ -141,3 +141,25 @@ Live satellite/aerial tasking, sensor control, weapon targeting, harmful
 operational planning, map tile rendering, GIS engines, large imagery storage,
 computer vision extraction, geocoding, routing, dissemination delivery, GraphRAG
 projection, and durable Bytewax topology execution stay behind adapters.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** GEOINT Capability - World Class Improvements
+- **I2.** Multi-Spectral Band Analysis Pipeline
+- **I3.** Persistent Trajectory Reconstruction
+- **I4.** Spatial Clustering and Hot-Zone Detection
+- **I5.** Event-Driven Geofence Subscription Model
+- **I6.** Federated Source Fusion
+- **I7.** Temporal Change Velocity
+- **I8.** Shadow and Occlusion Modelling
+- **I9.** Coordinate Reference System (CRS) Normalisation
+- **I10.** Pattern-of-Life Baseline Construction
+- **I11.** Tile-Based Coverage Tracking
+- **I12.** Confidence Propagation Through the Workflow Chain
+- **I13.** Cross-Tenant Federation and Compartmented Sharing
+- **I14.** Satellite Revisit Optimisation
+- **I15.** Immutable Audit Log with Tamper-Evidence
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.
