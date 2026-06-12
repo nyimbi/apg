@@ -183,3 +183,25 @@ git diff --check -- capabilities/fin/arc/accounts_receivable
 - Implement `submit_to_tax_authority` for KRA eTIMS, URA, and ZATCA e-invoicing compliance.
 - Build credit insurance policy management and claim workflow.
 - Add intercompany netting and settlement engine.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Accounts Receivable — World-Class Improvements
+- **I2.** Predictive Payment Probability Scoring (per Invoice)
+- **I3.** Real-Time Bank Statement Reconciliation (ISO 20022 / MT940)
+- **I4.** Dynamic Early-Payment Discount Engine
+- **I5.** Subscription Billing & Recurring Invoice Engine
+- **I6.** BNPL (Buy Now Pay Later) Instalment Plan Management
+- **I7.** AI-Driven Dispute Root-Cause Classification
+- **I8.** Customer Self-Service Payment Portal API
+- **I9.** Automated Period-Close AR Checklist
+- **I10.** Credit Insurance Integration
+- **I11.** Intercompany Netting & Settlement
+- **I12.** Configurable Approval Matrix (Multi-Level)
+- **I13.** Cash Flow Confidence Intervals (Probabilistic Forecasting)
+- **I14.** E-Invoice Compliance (KRA ETims / Kenya eTIMS, URA, ZATCA)
+- **I15.** Predictive Customer Churn Scoring from AR Signals
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

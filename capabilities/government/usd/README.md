@@ -131,3 +131,25 @@ print(result["outcome"])  # "approved" | "rejected"
 **ID types**: `national_id`, `passport`, `alien_card`, `military_id`
 
 **Certificate types**: `good_conduct`, `tax_compliance`, `business_registration`, `birth_certificate`, `death_certificate`, `marriage_certificate`, `clearance_certificate`
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** USSD Government Services — World-Class Improvements
+- **I2.** Adaptive Multi-Modal Session Continuity
+- **I3.** Biometric Liveness-Anchored ID Verification
+- **I4.** NATS-Backed Real-Time Event Streaming
+- **I5.** Permit Expiry Early-Warning Push
+- **I6.** Composable Payment Gateway Orchestration
+- **I7.** Citizen Service History & Portfolio
+- **I8.** Dynamic Menu Localisation (Swahili / Regional Languages)
+- **I9.** Rate Limiting & Fraud Pattern Detection
+- **I10.** Bulk Certificate Status Reconciliation
+- **I11.** Service-Level Agreement (SLA) Tracking
+- **I12.** Offline-Capable Agent (Sub-dealer) USSD Proxy
+- **I13.** Tax Payment Instalment Plan Management
+- **I14.** Cryptographic Receipt Generation
+- **I15.** Cross-Capability Workflow Orchestration via NATS
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

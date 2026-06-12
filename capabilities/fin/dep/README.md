@@ -197,3 +197,25 @@ python -m pytest capabilities/fin/dep/tests/ -v
 - **API prefix**: `/api/fin/dep`
 - **DB table prefix**: `dep_`
 - **Standalone**: works with null adapters — no APG platform required for dev/test
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** fin.dep — World-Class Improvements
+- **I2.** Promotional Rate Windows
+- **I3.** Stepped / Escalating Interest Rate Schedules
+- **I4.** Multi-Currency FX Conversion on Maturity
+- **I5.** Penalty Waiver Workflow with Approval Chain
+- **I6.** Interest Rate Scenario Comparison (Multi-Product Simulator)
+- **I7.** Dormancy Detection and Fee Assessment
+- **I8.** Interest Capitalization Control (Capitalise vs. Pay-Out)
+- **I9.** Batch Maturity Sweep
+- **I10.** Accrual Reversal with GL Correction Entry
+- **I11.** Loyalty Bonus Rate on Deposit Renewal
+- **I12.** Regulatory Concentration Limit Enforcement
+- **I13.** Interest Rate Floor and Cap Guards
+- **I14.** Statement Generation (Account Statement Export)
+- **I15.** Product Cloning with Override Support
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

@@ -348,3 +348,25 @@ uv run pytest -vxs capabilities/fin/lms/tests/
 
 © 2025 Datacraft. All rights reserved.  
 Contact: nyimbi@gmail.com | www.datacraft.co.ke
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** LMS World-Class Improvements
+- **I2.** Partial Prepayment with Configurable Waterfall Override
+- **I3.** Interest Accrual Engine (Daily Accrual, Month-End Posting)
+- **I4.** Effective Interest Rate (EIR) / XIRR Calculation
+- **I5.** Expected Credit Loss (ECL) — IFRS 9 Stage Bucketing
+- **I6.** Covenant Monitoring and Breach Alerts
+- **I7.** Instalment-Level Partial Pay Tracking (Split Installment Clearing)
+- **I8.** Loan Top-Up (Additional Drawdown on Existing Facility)
+- **I9.** Collateral Tracking and Forced Sale Value
+- **I10.** Collections Workflow Automation (Escalation Ladder)
+- **I11.** Fee Schedule Engine (Disbursement, Processing, Annual, Exit Fees)
+- **I12.** Bulk Portfolio Operations with Idempotency Keys
+- **I13.** Loan Participations / Syndication Splits
+- **I14.** Regulatory Reporting Pack (CBK, CRB, IFRS 9 Disclosures)
+- **I15.** Multi-Currency Loan Support with FX Revaluation
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

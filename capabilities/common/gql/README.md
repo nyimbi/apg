@@ -230,3 +230,25 @@ result = await svc.execute_query_with_region_affinity(
 topology = await svc.get_region_topology("acme")
 # topology["regions"] == {"us-east-1": [...], "eu-west-1": [...]}
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** GraphQL Federation Gateway — World Class Improvements
+- **I2.** Query Complexity Analysis & Cost Limiting
+- **I3.** Query Depth Limiting
+- **I4.** Field-Level Authorization via Directives
+- **I5.** Response Caching with TTL and Cache-Control
+- **I6.** Subscription Support via SSE Transport
+- **I7.** Distributed Tracing with OpenTelemetry
+- **I8.** Schema Registry with Semantic Versioning and Changelogs
+- **I9.** Automatic Query Normalization and Deduplication
+- **I10.** Circuit Breaker per Subgraph
+- **I11.** Federated Entity Resolution with
+- **I12.** Query Cost Estimation API (Dry Run)
+- **I13.** Subgraph Canary / Traffic Splitting
+- **I14.** Persisted Query Allowlist Mode (Security Lockdown)
+- **I15.** Webhook Integration for Schema Change Events
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

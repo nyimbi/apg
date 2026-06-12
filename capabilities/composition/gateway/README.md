@@ -184,3 +184,25 @@ Stream states: `draft → active → healthy → degraded → canary → blocked
 - The `SMLoadBalancer` model is not directly bound to a route; it is associated with a service. Apply circuit breaker and health check settings at the load balancer level, not per-endpoint.
 - Key files: `capability_contract.py` (executable contract and rule engine), `models.py` (SQLAlchemy + Pydantic models), `service.py` (lifecycle operations + 8 new async methods), `api.py` (API helpers), `views.py` (UI model helpers).
 - `WORLD_CLASS_IMPROVEMENTS.md` documents 15 architectural improvements with competitor references.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** API Gateway (composition_gateway) — World-Class Improvements
+- **I2.** Adaptive Circuit Breaker with Sliding-Window Error Budget
+- **I3.** NATS-Native Request Shadowing for Dark Traffic Testing
+- **I4.** Predictive Auto-Scaling Signal Emission via Bytewax
+- **I5.** mTLS Sidecar-Free Workload Identity via SPIFFE/SPIRE
+- **I6.** Distributed Rate Limiting via NATS Key-Value Store
+- **I7.** OpenTelemetry W3C Trace Context Propagation
+- **I8.** Header-Based Blue/Green Routing with Automatic Rollback
+- **I9.** GraphQL Schema Stitching Proxy
+- **I10.** Request/Response Payload Validation with JSON Schema Enforcement
+- **I11.** Async WebSocket and Server-Sent Events Proxying
+- **I12.** Locality-Aware Load Balancing with Latency-Based Failover
+- **I13.** Policy-as-Code with OPA (Open Policy Agent) Integration
+- **I14.** Zero-Downtime Hot Reload of Route and Policy Configuration
+- **I15.** Semantic Versioning-Aware API Deprecation Management
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

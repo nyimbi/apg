@@ -145,3 +145,25 @@ Medical device lifecycle management covering device inventory with FDA UDI track
 
 ## Composability Notes
 Device adverse events feed into `healthcare_reg` for FDA MDR tracking. Calibration records are consumed by `healthcare_lab` instrument management. Maintenance schedules integrate with `schd` for PM reminders and with `healthcare_cli` for workflow task creation. Manufacturer scorecards compose with procurement capabilities for vendor management. Audit replay integrates with `comp` for regulatory submission evidence packages.
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Medical Device Management — World-Class Improvements
+- **I2.** Real-Time Telemetry Streaming via NATS JetStream
+- **I3.** Predictive Maintenance via Ollama-Served Time-Series Models
+- **I4.** UDI Barcode / QR Scanner Integration
+- **I5.** Regulatory Submission Workflow Engine
+- **I6.** Multi-Jurisdiction Regulatory Profile Overlay
+- **I7.** Device Certificate & Documentation Vault
+- **I8.** Automated Recall Impact Analysis
+- **I9.** IoT Device Shadow / Digital Twin State
+- **I10.** Lease & Loan Asset Tracking
+- **I11.** Warranty & Contract Lifecycle Alerts
+- **I12.** Shift-Based Device Assignment & Chain of Custody
+- **I13.** Decontamination & Sterility Tracking
+- **I14.** Comparative Benchmarking Against Fleet Averages
+- **I15.** Supplier & Manufacturer Quality Scorecard
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

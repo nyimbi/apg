@@ -130,3 +130,25 @@ The Predictive Analytics capability (bia_pda) provides ML-based model training a
 - schd drives periodic retraining with wflo approval gates
 - crm consumes churn_risk scores directly for campaign targeting
 - fin consumes revenue_at_risk Decimal outputs for P&L planning
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements for bia_pda — Predictive Analytics
+- **I2.** Online / Incremental Model Learning
+- **I3.** Probabilistic Forecasting with Conformal Prediction Intervals
+- **I4.** Churn Probability Scorer with Revenue Impact
+- **I5.** Multi-Armed Bandit Champion/Challenger Framework
+- **I6.** Demand Forecasting with Hierarchical Reconciliation
+- **I7.** Model Carbon Footprint Tracker
+- **I8.** Federated Model Aggregation
+- **I9.** Automated Retraining Trigger Engine
+- **I10.** Demand Sensing via External Signal Fusion
+- **I11.** Model Lineage Graph
+- **I12.** Prediction Monetisation: Revenue Lift Estimator
+- **I13.** Hyperparameter Optimisation with Bayesian Search
+- **I14.** Real-Time Model Serving SLA Dashboard
+- **I15.** Feature Store with Point-in-Time Correctness
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

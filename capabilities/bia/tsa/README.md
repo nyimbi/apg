@@ -114,3 +114,25 @@ The Time Series Analytics capability (bia_tsa) provides high-frequency time-seri
 - bia_rpt generates scheduled stream health and anomaly summary reports
 - mqeb (bytewax) handles high-throughput streaming ingestion pipeline
 - moni tracks ingestion rates, latency, and anomaly detection accuracy
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** World-Class Improvements: Time Series Analytics (bia_tsa)
+- **I2.** Improvement 1: Adaptive Threshold Anomaly Detection
+- **I3.** Improvement 2: Hierarchical Time Series Forecasting
+- **I4.** Improvement 3: Online Learning / Incremental Model Updates
+- **I5.** Improvement 4: Causal Impact Analysis
+- **I6.** Improvement 5: Vector Autoregression (VAR) Multi-Series Forecasting
+- **I7.** Improvement 6: Time Series Feature Engineering (tsfresh-style)
+- **I8.** Improvement 7: Spectral Analysis (FFT / Periodogram)
+- **I9.** Improvement 8: Conformal Prediction Intervals
+- **I10.** Improvement 9: Automated Data Quality Scoring
+- **I11.** Improvement 10: Stream Backfill and Replay
+- **I12.** Improvement 11: Multi-Condition Alert Rules Engine
+- **I13.** Improvement 12: Exponential Smoothing (ETS) Models
+- **I14.** Improvement 13: Time Series Clustering (DTW)
+- **I15.** Improvement 14: Persistence Layer Abstraction (TimescaleDB Backend)
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

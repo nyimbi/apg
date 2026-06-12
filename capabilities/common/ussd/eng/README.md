@@ -117,3 +117,25 @@ trace = await svc.replay_session(session_id="sess-xyz", stop_at_hop=5)
 for step in trace:
     print(f"Hop {step['hop']} input={step['input']!r} menu={step['menu']} {step['response_type']}")
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** USSD Engine — World-Class Improvement Proposals
+- **I2.** Multi-Language Menu Fallback Chain
+- **I3.** Session Resumption After Timeout
+- **I4.** Idempotent Transaction Execution
+- **I5.** Rate Limiting Per Phone Number
+- **I6.** Input Validation Schema per Menu Item
+- **I7.** Menu Versioning and Rollback
+- **I8.** Bulk Session Import from Gateway
+- **I9.** Conditional Menu Item Weighting and A/B Testing
+- **I10.** Real-Time Session Broadcast / Webhook Delivery
+- **I11.** Session Encryption for PII at Rest
+- **I12.** Dead-Letter Queue for Failed Handler Executions
+- **I13.** Paginated Session and Audit Log Queries
+- **I14.** Phone Number Masking and Anonymization
+- **I15.** Menu Import/Export (JSON Schema)
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

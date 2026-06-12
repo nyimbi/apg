@@ -138,3 +138,25 @@ async def main():
 
 asyncio.run(main())
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Land Registry — World-Class Improvements
+- **I2.** Overview
+- **I3.** Parcel Subdivision and Amalgamation
+- **I4.** Stamp Duty and Transfer Tax Computation
+- **I5.** Geospatial Boundary Management (GeoJSON)
+- **I6.** Title History / Chain of Ownership
+- **I7.** Lease Management and Renewal Workflow
+- **I8.** Caution and Restriction Workflow
+- **I9.** Bulk Import / Systematic Registration
+- **I10.** Title Rectification (Error Correction)
+- **I11.** Land Use Change / Rezoning Workflow
+- **I12.** Stamp Duty Exemptions Registry
+- **I13.** Property Rates Ledger and Arrears Tracking
+- **I14.** Survey Plan Registry and Surveyor Licensing
+- **I15.** Spousal Consent and Co-ownership Enforcement
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

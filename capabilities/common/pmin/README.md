@@ -59,3 +59,25 @@ Infer BPMN process models from NATS event streams, conformance checking, bottlen
 | POST | /api/pmin/streaming-conformance | Streaming conformance update |
 | POST | /api/pmin/logs/{id}/cases/enrich | Enrich case attributes |
 | POST | /api/pmin/logs/{id}/segment | Segmented variant/bottleneck analysis |
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** Process Mining — World Class Improvements
+- **I2.** Temporal Drift Detection | Analytics | Process behaviour changes over time (seas
+- **I3.** Resource Social Network Analysis | Analytics | Knowing who hands off work to who
+- **I4.** Decision Mining on Branching Points | AI/ML | When the process splits (XOR gatew
+- **I5.** Root-Cause Analysis for Deviating Cases | Analytics | Surfacing deviating cases 
+- **I6.** SLA / KPI Breach Alerting | Compliance | Regulatory SLAs (e.g. payment settlemen
+- **I7.** Inductive Process Tree Discovery | Algorithms | Alpha miner produces non-sound m
+- **I8.** Case Attribute Enrichment and Segmentation | Data | Events alone are insufficien
+- **I9.** Predictive Completion Time | AI/ML | Knowing remaining cycle time for in-flight 
+- **I10.** Automated Happy-Path Extraction and Benchmark | Quality | The happy path is the 
+- **I11.** Multi-Log Process Comparison | Analytics | Comparing the same process across reg
+- **I12.** Object-Centric Process Mining (OCPM) | Advanced | Single-case-id models miss mul
+- **I13.** Process Cost Analysis with Decimal Precision | Finance | Throughput time is a pr
+- **I14.** Interactive Filtering with Dotted-Notation Attribute Paths | UX | Deep nested ev
+- **I15.** Process Model Merging / Overlay | Collaboration | Multiple teams discover models
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.

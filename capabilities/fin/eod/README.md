@@ -146,3 +146,25 @@ print(result["returns_generated"])   # ["BSL02_BALANCE_SHEET", "BSL03_CREDIT_EXP
 ```bash
 python -m pytest capabilities/fin/eod/tests/ -v
 ```
+
+---
+
+## World-Class Enhancements (v2.0)
+
+- **I1.** EOD Processing Engine — World-Class Improvements
+- **I2.** Penalty Interest on Overdue Loans | Credit Risk | Missed instalments should accr
+- **I3.** IFRS 9 ECL Staging and Provision Posting | Regulatory / IFRS | IFRS 9 requires c
+- **I4.** Liquidity Coverage Ratio (LCR) Computation | Regulatory Liquidity | Basel III ma
+- **I5.** Intraday Nostro Reconciliation | Operational Risk | Unreconciled nostro entries 
+- **I6.** Tiered Interest Rate Bands | Product Management | Most deposit products tier rat
+- **I7.** Cheque Clearance and Float Management | Operations | Deposited cheques sit in fl
+- **I8.** Automated Regulatory Return Generation | Compliance | CBK, RBA, and similar regu
+- **I9.** Non-Working Day Roll Logic | Calendar Management | Financial contracts use day-c
+- **I10.** Parallel Job Execution with Dependency Graph | Performance | 10 sequential jobs 
+- **I11.** Audit Trail with Immutable Journal Entries | Audit / Compliance | All financial 
+- **I12.** Configurable Dormancy Rules per Product Type | Product / Regulatory | Dormancy t
+- **I13.** NPA (Non-Performing Asset) Classification | Credit Risk / Regulatory | RBI/CBK r
+- **I14.** Multi-Currency Balance Sheet Generation | Reporting / FX | A bank reporting in U
+- **I15.** Sweep Optimisation and Zero-Balance Accounting | Treasury | Corporate clients wi
+
+See `WORLD_CLASS_IMPROVEMENTS.md` for full justification and implementation details.
