@@ -1,10 +1,25 @@
-// ========================================
-// AI AGENT SYSTEMS EXAMPLES
-// Advanced autonomous agents and multi-agent systems
-// ========================================
+// ============================================================
+// EXAMPLE: AI Agent Systems
+// ============================================================
+// WHAT IT SHOWS:
+//   How to define autonomous AI agents, multi-agent teams (swarms),
+//   and agent configuration in APG. Demonstrates:
+//   - Individual agent definitions with model, capabilities, configuration
+//   - Multi-agent team composition (swarm/team blocks)
+//   - Agent roles for planning, research, coding, monitoring
+//
+// HOW TO COMPILE:
+//   apg compile examples/ai_agent_systems.apg --output out/
+//
+// GENERATED ENDPOINTS:
+//   GET  /agents              — list all defined agents
+//   GET  /agents/{name}       — describe a specific agent
+//   POST /agents/{name}/invoke — invoke an agent with a task payload
+//   GET  /teams               — list agent teams
+// ============================================================
 
-// 1. AUTONOMOUS RESEARCH AGENT
 agent ResearchAgent {
+    model: local;
     models: gpt4->claude3->llama2->local_model;
     memory: {
         episodic: conversation_history + experience_logs;
@@ -69,6 +84,7 @@ agent ResearchAgent {
 
 // 2. CONVERSATIONAL AI ASSISTANT
 agent ConversationalAssistant {
+    model: local;
     models: gpt4->claude3->gemini_pro->local_backup;
     personality: {
         traits: [helpful, curious, patient, knowledgeable, empathetic];
@@ -115,28 +131,24 @@ agent ConversationalAssistant {
 
 // 3. MULTI-AGENT COLLABORATION SYSTEM
 swarm CollaborativeAgentSystem {
-    agents: {
-        coordinator: TaskCoordinator {
-            role: planning + scheduling + resource_allocation + conflict_resolution;
-            capabilities: project_management + team_coordination + deadline_tracking;
-        };
+    agents: [ResearchAgent, SoftwareDeveloper];
         
-        analyst: DataAnalyst {
+        analyst: ResearchAgent {
             role: data_processing + statistical_analysis + pattern_recognition;
             capabilities: data_cleaning + visualization + predictive_modeling + reporting;
         };
         
-        researcher: InformationGatherer {
+        researcher: ResearchAgent {
             role: information_collection + source_validation + knowledge_synthesis;
             capabilities: web_scraping + api_integration + document_processing + fact_checking;
         };
         
-        writer: ContentCreator {
+        writer: ResearchAgent {
             role: documentation + communication + presentation + storytelling;
             capabilities: technical_writing + creative_writing + editing + formatting;
         };
         
-        critic: QualityAssurance {
+        critic: ResearchAgent {
             role: review + validation + improvement_suggestions + quality_control;
             capabilities: proofreading + fact_checking + bias_detection + consistency_verification;
         };
@@ -176,6 +188,7 @@ swarm CollaborativeAgentSystem {
 
 // 4. AUTONOMOUS SOFTWARE DEVELOPMENT AGENT
 agent SoftwareDeveloper {
+    model: local;
     models: codex->github_copilot->code_llama->local_code_model;
     languages: [python, javascript, typescript, java, c++, rust, go, sql];
     frameworks: [fastapi, react, django, flask, nodejs, spring, pytorch, tensorflow];
@@ -238,6 +251,7 @@ agent SoftwareDeveloper {
 
 // 5. INTELLIGENT MONITORING AND ALERTING AGENT
 agent SystemMonitor {
+    model: local;
     models: specialized_anomaly_detection + time_series_forecasting + classification_models;
     data_sources: [
         system_metrics: cpu + memory + disk + network + processes,

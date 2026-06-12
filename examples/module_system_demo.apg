@@ -1,9 +1,22 @@
-// ========================================
-// MODULE SYSTEM DEMONSTRATION
-// Showcasing APG v11's comprehensive module system with imports, exports, and dependencies
-// ========================================
+// ============================================================
+// EXAMPLE: Module System and Composition
+// ============================================================
+// WHAT IT SHOWS:
+//   APG's module composition system — how capabilities can import
+//   and compose from other modules. Demonstrates:
+//   - Module imports and dependency declarations
+//   - Entity reuse across capability boundaries
+//   - Inventory management with stock tracking
+//   - Form field definitions with validation rules
+//   - Multi-module application assembly
+//
+// HOW TO COMPILE:
+//   apg compile examples/module_system_demo.apg --output out/
+//
+// KEY PATTERN: The 'module' keyword creates reusable APG libraries
+// that other capabilities can import and extend.
+// ============================================================
 
-// 1. MODULE DECLARATION WITH METADATA
 module InventoryManagement version 2.1.0 {
 	description: "Comprehensive inventory management system with real-time tracking";
 	author: "Development Team";
@@ -29,20 +42,20 @@ module InventoryManagement version 2.1.0 {
 
 // 2. IMPORT STATEMENTS WITH OPTIONS
 import UserManagement as Users from "core/user_management" {
-	lazy: false;
+	lazy: bool;
 	version: "^1.5.0";
-	optional: false;
-	cache: true;
+	optional: bool;
+	cache: bool;
 };
 
 import NotificationSystem.{EmailService, SMSService, SlackNotifier} from "communications/notifications" {
-	lazy: true;
-	cache: true;
+	lazy: bool;
+	cache: bool;
 	conditional: env("ENABLE_NOTIFICATIONS") == "true";
 };
 
 import DatabaseConnector.* from "data/database" {
-	lazy: false;
+	lazy: bool;
 	version: "latest";
 	fallback: "data/mock_database";
 };
@@ -53,9 +66,9 @@ from ReportingEngine import {
 	ExcelExporter as Excel,
 	PDFExporter as PDF
 } {
-	lazy: true;
+	lazy: bool;
 	version: ">=1.2.0";
-	optional: true;
+	optional: bool;
 };
 
 // Conditional imports based on environment
@@ -168,7 +181,7 @@ db InventoryDB {
 }
 
 // 4. BUSINESS LOGIC WITH ADVANCED FEATURES
-biz InventoryManagement {
+biz InventoryTracking {
 	@async: parallel_processing + batch_size(100);
 	@retry: max_attempts(3) + backoff(exponential);
 	@cache: ttl(300s) + eviction_policy(lru);
@@ -185,10 +198,10 @@ biz InventoryManagement {
 		alerts = [];
 		for product in low_stock_products {
 			alert = StockAlert {
-				product_id: product.id;
-				current_stock: product.available_quantity;
-				reorder_point: product.reorder_point;
-				severity: product.available_quantity == 0 ? "critical" : "warning";
+				product_id: string;
+				current_stock: string;
+				reorder_point: string;
+				severity: int == 0 ? "critical" : "warning";
 				message: f"Product {product.name} ({product.sku}) is running low";
 			};
 			alerts.append(alert);
@@ -219,21 +232,21 @@ biz InventoryManagement {
 				
 				if (!product) {
 					return ReservationResult {
-						success: false;
+						success: bool;
 						error: "Product not found";
 					};
 				}
 				
 				if (product.available_quantity < quantity) {
 					return ReservationResult {
-						success: false;
+						success: bool;
 						error: f"Insufficient stock. Available: {product.available_quantity}, Requested: {quantity}";
 					};
 				}
 				
 				// Update reserved quantity
 				await tx.products.update(product_id) {
-					reserved_quantity: product.reserved_quantity + quantity;
+					reserved_quantity: int + quantity;
 					updated_at: now();
 					updated_by: current_user().id;
 				};
@@ -249,16 +262,16 @@ biz InventoryManagement {
 				};
 				
 				return ReservationResult {
-					success: true;
-					reservation_id: tx.last_insert_id();
+					success: bool;
+					reservation_id: int();
 					expires_at: now() + interval("2 hours");
 				};
 			}
 		} except InsufficientStockError as e {
 			log.warning(f"Stock reservation failed: {e}");
 			return ReservationResult {
-				success: false;
-				error: e.message;
+				success: bool;
+				error: string;
 			};
 		} except DatabaseError as e {
 			log.error(f"Database error during stock reservation: {e}");
@@ -284,33 +297,33 @@ biz InventoryManagement {
 			// Use ML model for demand forecasting
 			forecast = await DemandForecastingModel.predict(
 				historical_data: product_sales,
-				forecast_horizon: 12,  // 12 weeks ahead
-				confidence_level: 0.95
+				forecast_horizon: int,  // 12 weeks ahead
+				confidence_level: string
 			);
 			
 			// Calculate optimal reorder point using service level
 			optimal_reorder_point = calculate_optimal_reorder_point(
 				demand_forecast: forecast,
-				lead_time: product.supplier.average_lead_time,
-				service_level: 0.95,
-				demand_variability: forecast.standard_deviation
+				lead_time: string,
+				service_level: string,
+				demand_variability: string
 			);
 			
 			optimization_results.append({
 				product_id: product_id;
-				current_reorder_point: product.reorder_point;
+				current_reorder_point: string;
 				recommended_reorder_point: optimal_reorder_point;
 				potential_savings: calculate_holding_cost_savings(
-					current: product.reorder_point,
+					current: string,
 					optimal: optimal_reorder_point,
-					holding_cost_rate: 0.25
+					holding_cost_rate: string
 				);
 			});
 		}
 		
 		return OptimizationReport {
-			total_products_analyzed: optimization_results.length;
-			total_potential_savings: optimization_results.sum(potential_savings);
+			total_products_analyzed: string;
+			total_potential_savings: int(potential_savings);
 			recommendations: optimization_results;
 			generated_at: now();
 		};
@@ -326,38 +339,38 @@ form ProductForm {
 			desktop: 1440px;
 		};
 	};
-	
+
 	// Product Information Section
 	section ProductInfo {
 		title: "Product Information";
-		collapsible: true;
-		
+		collapsible: bool;
+
 		row {
 			column(span: 6) {
 				input sku {
 					label: "Product SKU";
 					type: text;
-					required: true;
+					required: bool;
 					pattern: /^[A-Z0-9-]+$/;
 					placeholder: "e.g., LAPTOP-DELL-001";
 					help_text: "Unique product identifier (uppercase letters, numbers, and hyphens only)";
-					
+
 					@validation: {
 						async_validator: check_sku_uniqueness;
 						debounce: 500ms;
 					};
 				};
 			};
-			
+
 			column(span: 6) {
 				select category_id {
 					label: "Category";
-					required: true;
+					required: bool;
 					data_source: "api/categories";
 					option_value: "id";
 					option_label: "name";
-					searchable: true;
-					
+					searchable: bool;
+
 					@cascade: {
 						triggers: ["subcategory"];
 						url: "api/categories/{value}/subcategories";
@@ -365,63 +378,63 @@ form ProductForm {
 				};
 			};
 		};
-		
+
 		row {
 			column(span: 12) {
 				input name {
 					label: "Product Name";
 					type: text;
-					required: true;
-					max_length: 200;
+					required: bool;
+					max_length: int;
 					placeholder: "Enter descriptive product name";
 				};
 			};
 		};
-		
+
 		row {
 			column(span: 12) {
 				textarea description {
 					label: "Description";
-					max_length: 1000;
-					rows: 4;
+					max_length: int;
+					rows: int;
 					placeholder: "Detailed product description...";
-					
+
 					@rich_text: {
 						toolbar: ["bold", "italic", "list", "link"];
-						max_words: 200;
+						max_words: int;
 					};
 				};
 			};
 		};
 	};
-	
+
 	// Pricing Section
 	section Pricing {
 		title: "Pricing & Cost";
-		
+
 		row {
 			column(span: 4) {
 				input cost_price {
 					label: "Cost Price";
 					type: currency;
 					currency: "USD";
-					required: true;
-					min_value: 0;
-					step: 0.01;
-					
+					required: bool;
+					min_value: int;
+					step: string;
+
 					@calculation_trigger: ["selling_price"];
 				};
 			};
-			
+
 			column(span: 4) {
 				input selling_price {
 					label: "Selling Price";
 					type: currency;
 					currency: "USD";
-					required: true;
-					min_value: 0;
-					step: 0.01;
-					
+					required: bool;
+					min_value: int;
+					step: string;
+
 					@validation: {
 						custom_validator: (value, form) => {
 							if (value <= form.cost_price) {
@@ -432,21 +445,21 @@ form ProductForm {
 					};
 				};
 			};
-			
+
 			column(span: 4) {
 				display margin {
 					label: "Margin %";
 					type: percentage;
-					readonly: true;
-					precision: 2;
-					
+					readonly: bool;
+					precision: int;
+
 					@computed: (form) => {
 						if (form.cost_price && form.selling_price) {
 							return ((form.selling_price - form.cost_price) / form.cost_price * 100);
 						}
 						return 0;
 					};
-					
+
 					@conditional_styling: {
 						rules: [
 							{condition: "value < 10", style: "color: red"},
@@ -458,53 +471,53 @@ form ProductForm {
 			};
 		};
 	};
-	
+
 	// Inventory Section
 	section Inventory {
 		title: "Inventory Management";
-		
+
 		row {
 			column(span: 3) {
 				input stock_quantity {
 					label: "Current Stock";
 					type: number;
-					min_value: 0;
-					default: 0;
-					
-					@real_time_validation: true;
+					min_value: int;
+					default: int;
+
+					@real_time_validation: bool;
 				};
 			};
-			
+
 			column(span: 3) {
 				input reorder_point {
 					label: "Reorder Point";
 					type: number;
-					min_value: 0;
-					default: 10;
+					min_value: int;
+					default: int;
 					help_text: "Minimum stock level before reordering";
 				};
 			};
-			
+
 			column(span: 3) {
 				input reorder_quantity {
 					label: "Reorder Quantity";
 					type: number;
-					min_value: 1;
-					default: 50;
+					min_value: int;
+					default: int;
 					help_text: "Quantity to order when restocking";
 				};
 			};
-			
+
 			column(span: 3) {
 				display available_quantity {
 					label: "Available";
 					type: number;
-					readonly: true;
-					
+					readonly: bool;
+
 					@computed: (form) => {
 						return (form.stock_quantity || 0) - (form.reserved_quantity || 0);
 					};
-					
+
 					@conditional_styling: {
 						rules: [
 							{condition: "value == 0", style: "background: #ffebee; color: #c62828"},
@@ -516,51 +529,51 @@ form ProductForm {
 			};
 		};
 	};
-	
+
 	// Physical Properties Section
 	section PhysicalProperties {
 		title: "Physical Properties";
-		collapsible: true;
-		collapsed: true;
-		
+		collapsible: bool;
+		collapsed: bool;
+
 		row {
 			column(span: 6) {
 				input weight {
 					label: "Weight";
 					type: number;
-					step: 0.001;
-					min_value: 0;
+					step: string;
+					min_value: int;
 					unit: "kg";
-					precision: 3;
+					precision: int;
 				};
 			};
-			
+
 			column(span: 6) {
 				fieldset dimensions {
 					legend: "Dimensions (cm)";
-					
-					grid(columns: 3, gap: "10px") {
+
+					grid(columns: int, gap: "10px") {
 						input length {
 							label: "L";
 							type: number;
-							step: 0.1;
-							min_value: 0;
+							step: string;
+							min_value: int;
 							unit: "cm";
 						};
-						
+
 						input width {
 							label: "W";
 							type: number;
-							step: 0.1;
-							min_value: 0;
+							step: string;
+							min_value: int;
 							unit: "cm";
 						};
-						
+
 						input height {
 							label: "H";
 							type: number;
-							step: 0.1;
-							min_value: 0;
+							step: string;
+							min_value: int;
 							unit: "cm";
 						};
 					};
@@ -568,13 +581,13 @@ form ProductForm {
 			};
 		};
 	};
-	
+
 	// Advanced Options Section
 	section AdvancedOptions {
 		title: "Advanced Options";
-		collapsible: true;
-		collapsed: true;
-		
+		collapsible: bool;
+		collapsed: bool;
+
 		row {
 			column(span: 6) {
 				select status {
@@ -587,99 +600,99 @@ form ProductForm {
 					];
 					default: "active";
 				};
-				
+
 				checkbox is_serialized {
 					label: "Track by Serial Number";
 					help_text: "Enable individual item tracking";
 				};
-				
+
 				checkbox is_perishable {
 					label: "Perishable Item";
 					help_text: "Item has expiration date";
-					
+
 					@toggle_fields: ["expiry_date"];
 				};
 			};
-			
+
 			column(span: 6) {
 				input expiry_date {
 					label: "Expiry Date";
 					type: date;
 					min_value: today();
-					
+
 					@conditional: "is_perishable == true";
 				};
-				
+
 				select supplier_id {
 					label: "Primary Supplier";
 					data_source: "api/suppliers";
 					option_value: "id";
 					option_label: "company_name";
-					searchable: true;
-					clearable: true;
+					searchable: bool;
+					clearable: bool;
 				};
 			};
 		};
 	};
-	
+
 	// Form Actions
 	actions {
 		align: right;
-		
+
 		button cancel {
 			text: "Cancel";
 			type: secondary;
 			action: "close";
 		};
-		
+
 		button save_draft {
 			text: "Save Draft";
 			type: tertiary;
 			action: "save_draft";
-			
+
 			@hotkey: "Ctrl+S";
 		};
-		
+
 		button save {
 			text: "Save Product";
 			type: primary;
 			action: "save";
-			
+
 			@validation: "full_form";
 			@confirmation: "Are you sure you want to save this product?";
 			@loading_text: "Saving...";
 		};
 	};
-	
+
 	// Form-level configurations
 	@auto_save: {
-		enabled: true;
+		enabled: bool;
 		interval: 30s;
 		fields: ["name", "description", "cost_price", "selling_price"];
 	};
-	
+
 	@accessibility: {
-		screen_reader: true;
-		keyboard_navigation: true;
-		high_contrast: true;
-		focus_indicators: true;
+		screen_reader: bool;
+		keyboard_navigation: bool;
+		high_contrast: bool;
+		focus_indicators: bool;
 	};
-	
+
 	@responsive_behavior: {
 		mobile: {
 			sections: {
-				accordion: true;
-				single_column: true;
+				accordion: bool;
+				single_column: bool;
 			};
 			actions: {
-				sticky: true;
-				full_width: true;
+				sticky: bool;
+				full_width: bool;
 			};
 		};
-		
+
 		tablet: {
 			sections: {
-				collapsible: true;
+				collapsible: bool;
 			};
 		};
 	};
@@ -688,7 +701,7 @@ form ProductForm {
 // 6. TESTING CONFIGURATION
 test ProductManagementTests {
 	@framework: pytest + coverage(95%);
-	@parallel: true;
+	@parallel: bool;
 	@isolation: database_per_test;
 	
 	// Unit tests
@@ -700,15 +713,15 @@ test ProductManagementTests {
 		
 		setup: async () => {
 			await create_test_product({
-				id: 1,
+				id: int,
 				sku: "TEST-001",
-				stock_quantity: 100,
-				reserved_quantity: 20
+				stock_quantity: int,
+				reserved_quantity: int
 			});
 		};
 		
 		test: async () => {
-			result = await InventoryManagement.reserve_stock(1, 50, "ORDER-123");
+			result = await InventoryTracking.reserve_stock(1, 50, "ORDER-123");
 			
 			assert result.success == true;
 			assert result.reservation_id is not null;
@@ -732,7 +745,7 @@ test ProductManagementTests {
 		};
 		
 		test: async () => {
-			alerts = await InventoryManagement.check_stock_levels();
+			alerts = await InventoryTracking.check_stock_levels();
 			
 			assert alerts.length > 0;
 			assert any(alert.severity == "critical" for alert in alerts);
@@ -745,7 +758,7 @@ test ProductManagementTests {
 	
 	// Performance tests
 	load_test "test_concurrent_stock_reservations" {
-		@concurrent_users: 100;
+		@concurrent_users: int;
 		@duration: "2 minutes";
 		@ramp_up: "30 seconds";
 		
@@ -755,7 +768,7 @@ test ProductManagementTests {
 			order_id = f"LOAD-TEST-{random_uuid()}";
 			
 			start_time = time.now();
-			result = await InventoryManagement.reserve_stock(product_id, quantity, order_id);
+			result = await InventoryTracking.reserve_stock(product_id, quantity, order_id);
 			response_time = time.now() - start_time;
 			
 			// Assert response time is acceptable
@@ -778,8 +791,8 @@ test ProductManagementTests {
 notification InventoryAlerts {
 	// Stock level notifications
 	alert low_stock {
-		condition: product.available_quantity <= product.reorder_point;
-		severity: product.available_quantity == 0 ? "critical" : "warning";
+		condition: int <= string;
+		severity: int == 0 ? "critical" : "warning";
 		
 		recipients: {
 			email: ["inventory@company.com"];
@@ -810,7 +823,7 @@ notification InventoryAlerts {
 	
 	// Expiry notifications
 	alert expiring_products {
-		condition: product.is_perishable && product.expiry_date <= now() + interval("7 days");
+		condition: int && product.expiry_date <= now() + interval("7 days");
 		severity: "warning";
 		
 		schedule: daily at "09:00";
@@ -840,9 +853,9 @@ notification InventoryAlerts {
 		};
 		
 		@smart_grouping: {
-			group_similar_alerts: true;
+			group_similar_alerts: bool;
 			time_window: 5 minutes;
-			max_group_size: 10;
+			max_group_size: int;
 		};
 	};
 }
@@ -875,7 +888,7 @@ logger InventoryLogger {
 		service: "inventory-management";
 		version: "2.1.0";
 		environment: env("NODE_ENV");
-		correlation_id: request.correlation_id;
+		correlation_id: string;
 		user_id: current_user()?.id;
 	};
 	
@@ -899,7 +912,7 @@ metrics InventoryMetrics {
 	
 	histogram stock_reservation_duration {
 		labels: ["product_id"];
-		buckets: [0.1, 0.5, 1.0, 2.0, 5.0];
+		buckets: [0.1, string, string, string, 5.0];
 		description: "Time taken to process stock reservations";
 	};
 	
@@ -911,7 +924,7 @@ metrics InventoryMetrics {
 	
 	histogram api_request_duration {
 		labels: ["method", "endpoint"];
-		buckets: [0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0];
+		buckets: [0.05, string, string, string, string, string, string, 10.0];
 		description: "API request duration in seconds";
 	};
 	
@@ -928,7 +941,7 @@ metrics InventoryMetrics {
 export {
 	// Main entities
 	InventoryDB,
-	InventoryManagement,
+	InventoryTracking,
 	ProductForm,
 	
 	// Types and interfaces

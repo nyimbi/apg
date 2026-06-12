@@ -397,15 +397,21 @@
       "type": "file"
     },
     {
-      "path": "compiler/code_generator.py",
-      "accessCount": 12,
-      "lastAccessed": 1781111020963,
+      "path": "compiler/compiler.py",
+      "accessCount": 15,
+      "lastAccessed": 1781244873542,
       "type": "file"
     },
     {
-      "path": "compiler/compiler.py",
-      "accessCount": 11,
-      "lastAccessed": 1781112480013,
+      "path": "compiler/semantic_analyzer.py",
+      "accessCount": 14,
+      "lastAccessed": 1781244997421,
+      "type": "file"
+    },
+    {
+      "path": "compiler/code_generator.py",
+      "accessCount": 12,
+      "lastAccessed": 1781111020963,
       "type": "file"
     },
     {
@@ -424,12 +430,6 @@
       "path": "capabilities/common/phi/service.py",
       "accessCount": 7,
       "lastAccessed": 1781178158781,
-      "type": "file"
-    },
-    {
-      "path": "compiler/semantic_analyzer.py",
-      "accessCount": 6,
-      "lastAccessed": 1781111150999,
       "type": "file"
     },
     {
@@ -520,6 +520,12 @@
       "path": "capabilities/common/phi/docs/user_guide.md",
       "accessCount": 2,
       "lastAccessed": 1781178251867,
+      "type": "file"
+    },
+    {
+      "path": "compiler/parser.py",
+      "accessCount": 2,
+      "lastAccessed": 1781244722092,
       "type": "file"
     },
     {
@@ -670,12 +676,6 @@
       "path": "capabilities/composition/studio/docs/user_guide.md",
       "accessCount": 1,
       "lastAccessed": 1781072739230,
-      "type": "file"
-    },
-    {
-      "path": "compiler/parser.py",
-      "accessCount": 1,
-      "lastAccessed": 1781110900201,
       "type": "file"
     },
     {

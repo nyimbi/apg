@@ -1,9 +1,23 @@
-// ========================================
-// MICROSERVICES ARCHITECTURE DEFINITIONS
-// Complete microservices system design with service placement and deployment strategies
-// ========================================
+// ============================================================
+// EXAMPLE: Microservices Architecture
+// ============================================================
+// WHAT IT SHOWS:
+//   How to model a microservices system in APG with service mesh
+//   patterns, API gateway routing, and inter-service communication.
+//   Demonstrates:
+//   - Service registry and discovery
+//   - API gateway with rate limiting and authentication
+//   - Circuit breaker and retry configuration
+//   - Service-to-service event contracts
+//   - Health check and observability endpoints
+//
+// HOW TO COMPILE:
+//   apg compile examples/microservices_architecture.apg --output out/
+//
+// KEY PATTERN: Each service is a capability; the application block
+// wires them with routing and composition rules.
+// ============================================================
 
-// 1. RIDE-SHARING PLATFORM MICROSERVICES
 platform RideSharingPlatform {
 	description: "Complete ride-sharing platform with drivers, riders, and fleet management";
 	
@@ -25,27 +39,27 @@ platform RideSharingPlatform {
 						rate_limit: "100/minute/user";
 						caching: {
 							strategy: "redis";
-							ttl: 300;
+							ttl: int;
 							keys: ["user_id", "email"];
 						};
 					},
 					{
-						path: "/api/v1/auth";
-						methods: ["POST"];
-						authentication: "none";
-						rate_limit: "5/minute/ip";
+						path_2: "/api/v1/auth";
+						methods_2: ["POST"];
+						authentication_2: "none";
+						rate_limit_2: "5/minute/ip";
 						monitoring: "high_priority";
 					},
 					{
-						path: "/api/v1/profiles";
-						methods: ["GET", "PUT"];
-						authentication: "jwt_required";
+						path_3: "/api/v1/profiles";
+						methods_3: ["GET", "PUT"];
+						authentication_3: "jwt_required";
 						authorization: "own_profile_only";
 					}
 				];
 				
 				database: {
-					type: "postgresql";
+					type_2: "postgresql";
 					name: "users_db";
 					tables: [
 						"users", "profiles", "verifications", 
@@ -56,7 +70,7 @@ platform RideSharingPlatform {
 						profiles: ["user_id", "location"];
 					};
 					partitioning: {
-						strategy: "range";
+						strategy_2: "range";
 						column: "created_at";
 						interval: "monthly";
 					};
@@ -68,16 +82,16 @@ platform RideSharingPlatform {
 				];
 				
 				scaling: {
-					strategy: "horizontal";
-					min_instances: 3;
-					max_instances: 20;
-					cpu_threshold: 70%;
-					memory_threshold: 80%;
+					strategy_3: "horizontal";
+					min_instances: int;
+					max_instances: int;
+					cpu_threshold: float;
+					memory_threshold: float;
 					custom_metrics: [
 						{
-							name: "active_sessions";
-							threshold: 1000;
-							scale_up: 2;
+							name_2: "active_sessions";
+							threshold: int;
+							scale_up: int;
 						}
 					];
 				};
@@ -92,26 +106,26 @@ platform RideSharingPlatform {
 								memory: "512Mi";
 							};
 							limits: {
-								cpu: "1000m";
-								memory: "2Gi";
+								cpu_2: "1000m";
+								memory_2: "2Gi";
 							};
 						};
 						health_checks: {
 							liveness: {
-								path: "/health/live";
-								initial_delay: 30;
-								period: 10;
+								path_4: "/health/live";
+								initial_delay: int;
+								period: int;
 							};
 							readiness: {
-								path: "/health/ready";
-								initial_delay: 5;
-								period: 5;
+								path_5: "/health/ready";
+								initial_delay_2: int;
+								period_2: int;
 							};
 						};
 					};
 					
 					placement_strategy: {
-						type: "multi_az_spread";
+						type_3: "multi_az_spread";
 						constraints: [
 							"node.role == worker",
 							"node.instance_type != spot"
@@ -123,10 +137,10 @@ platform RideSharingPlatform {
 					};
 					
 					resource_requirements: {
-						cpu: "guaranteed";
-						memory: "guaranteed";
+						cpu_3: "guaranteed";
+						memory_3: "guaranteed";
 						storage: {
-							type: "ssd";
+							type_4: "ssd";
 							size: "20Gi";
 							mount_path: "/data";
 						};
@@ -166,24 +180,24 @@ platform RideSharingPlatform {
 					
 					alerts: [
 						{
-							name: "high_error_rate";
+							name_3: "high_error_rate";
 							condition: "error_rate > 5%";
 							duration: "2m";
 							severity: "critical";
 							notification: ["pagerduty", "slack"];
 						},
 						{
-							name: "database_connection_exhaustion";
-							condition: "db_connections_active > 80";
-							duration: "1m";
-							severity: "warning";
-							notification: ["slack"];
+							name_4: "database_connection_exhaustion";
+							condition_2: "db_connections_active > 80";
+							duration_2: "1m";
+							severity_2: "warning";
+							notification_2: ["slack"];
 						}
 					];
 					
 					logging: {
 						level: "info";
-						structured: true;
+						structured: bool;
 						format: "json";
 						sensitive_fields: ["password", "token", "ssn"];
 					};
@@ -191,7 +205,7 @@ platform RideSharingPlatform {
 				
 				security: {
 					authentication: {
-						methods: ["jwt", "oauth2"];
+						methods_4: ["jwt", "oauth2"];
 						token_expiry: "1h";
 						refresh_token_expiry: "30d";
 					};
@@ -199,7 +213,7 @@ platform RideSharingPlatform {
 					authorization: {
 						model: "rbac";
 						policies: "opa";
-						cache_decisions: true;
+						cache_decisions: bool;
 					};
 					
 					encryption: {
@@ -218,7 +232,7 @@ platform RideSharingPlatform {
 			
 			// Trip Management Service
 			service trip_service {
-				type: "core_business_service";
+				type_5: "core_business_service";
 				responsibilities: [
 					"trip_creation", "trip_matching", "trip_tracking",
 					"fare_calculation", "trip_completion", "trip_history"
@@ -226,52 +240,52 @@ platform RideSharingPlatform {
 				
 				api_endpoints: [
 					{
-						path: "/api/v1/trips";
-						methods: ["GET", "POST", "PUT"];
-						authentication: "jwt_required";
-						rate_limit: "50/minute/user";
-						async_processing: true;
+						path_6: "/api/v1/trips";
+						methods_5: ["GET", "POST", "PUT"];
+						authentication_4: "jwt_required";
+						rate_limit_3: "50/minute/user";
+						async_processing: bool;
 					},
 					{
 						path: "/api/v1/trips/{trip_id}/track";
-						methods: ["GET"];
-						authentication: "jwt_required";
-						real_time: true;
+						methods_6: ["GET"];
+						authentication_5: "jwt_required";
+						real_time: bool;
 						protocol: "websocket";
 					},
 					{
 						path: "/api/v1/trips/{trip_id}/fare";
-						methods: ["GET", "POST"];
-						authentication: "jwt_required";
-						authorization: "trip_participant_only";
+						methods_7: ["GET", "POST"];
+						authentication_6: "jwt_required";
+						authorization_2: "trip_participant_only";
 					}
 				];
 				
 				database: {
-					type: "postgresql";
-					name: "trips_db";
+					type_6: "postgresql";
+					name_5: "trips_db";
 					tables: [
 						"trips", "trip_requests", "trip_routes", 
 						"fare_calculations", "trip_ratings"
 					];
-					read_replicas: 2;
+					read_replicas: int;
 					connection_pooling: {
-						max_connections: 100;
+						max_connections: int;
 						idle_timeout: "10m";
 					};
 				};
 				
 				external_integrations: [
 					{
-						name: "maps_service";
-						type: "google_maps";
+						name_6: "maps_service";
+						type_7: "google_maps";
 						purpose: "route_calculation";
 						fallback: "mapbox";
 					},
 					{
-						name: "pricing_engine";
-						type: "internal_service";
-						purpose: "dynamic_fare_calculation";
+						name_7: "pricing_engine";
+						type_8: "internal_service";
+						purpose_2: "dynamic_fare_calculation";
 					}
 				];
 				
@@ -281,85 +295,85 @@ platform RideSharingPlatform {
 				];
 				
 				scaling: {
-					strategy: "horizontal";
-					min_instances: 5;
-					max_instances: 50;
-					cpu_threshold: 60%;
+					strategy_4: "horizontal";
+					min_instances_2: int;
+					max_instances_2: int;
+					cpu_threshold_2: float;
 					custom_metrics: [
 						{
-							name: "active_trips";
-							threshold: 100;
-							scale_factor: 2;
+							name_8: "active_trips";
+							threshold_2: int;
+							scale_factor: int;
 						},
 						{
-							name: "pending_requests";
-							threshold: 50;
-							scale_factor: 1.5;
+							name_9: "pending_requests";
+							threshold_3: int;
+							scale_factor_2: float;
 						}
 					];
 				};
 				
 				deployment: {
 					container: {
-						image: "rideshare/trip-service:v3.1.0";
+						image_2: "rideshare/trip-service:v3.1.0";
 						resources: {
 							requests: {
-								cpu: "500m";
-								memory: "1Gi";
+								cpu_4: "500m";
+								memory_4: "1Gi";
 							};
 							limits: {
-								cpu: "2000m";
-								memory: "4Gi";
+								cpu_5: "2000m";
+								memory_5: "4Gi";
 							};
 						};
 						environment_variables: [
 							{
-								name: "ENVIRONMENT";
+								name_10: "ENVIRONMENT";
 								value: "production";
 							},
 							{
-								name: "DATABASE_URL";
+								name_11: "DATABASE_URL";
 								value_from: "secret:database_credentials";
 							}
 						];
 					};
 					
 					placement_strategy: {
-						type: "zone_aware_spread";
+						type_9: "zone_aware_spread";
 						anti_affinity: "trip_service";
 						resource_requirements: {
-							cpu_intensive: true;
-							memory_intensive: false;
+							cpu_intensive: bool;
+							memory_intensive: bool;
 						};
 					};
 				};
 				
 				circuit_breakers: {
 					external_maps_api: {
-						failure_threshold: 5;
+						failure_threshold: int;
 						timeout: "10s";
-						fallback: "cached_routes";
+						fallback_2: "cached_routes";
 					};
 					
 					payment_service: {
-						failure_threshold: 3;
-						timeout: "5s";
-						fallback: "defer_payment";
+						failure_threshold_2: int;
+						timeout_2: "5s";
+						fallback_3: "defer_payment";
 					};
 				};
 				
 				caching: {
 					strategies: [
 						{
-							name: "route_cache";
-							type: "redis";
-							ttl: "1h";
-							keys: ["origin_destination_hash"];
+							name_12: "route_cache";
+							type_10: "redis";
+							ttl_2: "1h";
+							keys_2: ["origin_destination_hash"];
 						},
 						{
-							name: "fare_estimates";
-							type: "in_memory";
-							ttl: "15m";
+							name_13: "fare_estimates";
+							type_11: "in_memory";
+							ttl_3: "15m";
 							max_size: "1000_entries";
 						}
 					];
@@ -368,7 +382,7 @@ platform RideSharingPlatform {
 			
 			// Real-time Location Service
 			service geolocation_service {
-				type: "infrastructure_service";
+				type_12: "infrastructure_service";
 				responsibilities: [
 					"location_tracking", "geofencing", "proximity_matching",
 					"route_optimization", "eta_calculation"
@@ -376,27 +390,27 @@ platform RideSharingPlatform {
 				
 				api_endpoints: [
 					{
-						path: "/api/v1/locations";
-						methods: ["GET", "POST", "PUT"];
-						authentication: "jwt_required";
-						rate_limit: "200/minute/user";
-						real_time: true;
+						path_7: "/api/v1/locations";
+						methods_8: ["GET", "POST", "PUT"];
+						authentication_7: "jwt_required";
+						rate_limit_4: "200/minute/user";
+						real_time_2: bool;
 					},
 					{
-						path: "/api/v1/locations/nearby";
-						methods: ["GET"];
-						authentication: "jwt_required";
-						geospatial: true;
+						path_8: "/api/v1/locations/nearby";
+						methods_9: ["GET"];
+						authentication_8: "jwt_required";
+						geospatial: bool;
 						caching: {
-							strategy: "geohash_based";
-							ttl: 30;  // seconds
+							strategy_5: "geohash_based";
+							ttl_4: int;  // seconds
 						};
 					}
 				];
 				
 				database: {
-					type: "postgresql";
-					name: "geolocation_db";
+					type_13: "postgresql";
+					name_14: "geolocation_db";
 					extensions: ["postgis"];
 					tables: [
 						"user_locations", "driver_locations", 
@@ -407,8 +421,8 @@ platform RideSharingPlatform {
 						driver_locations: ["coordinates", "last_updated"];
 					};
 					partitioning: {
-						strategy: "time_range";
-						interval: "daily";
+						strategy_6: "time_range";
+						interval_2: "daily";
 						retention: "30d";
 					};
 				};
@@ -417,16 +431,16 @@ platform RideSharingPlatform {
 					platform: "bytewax";
 					topics: [
 						{
-							name: "location_updates";
-							partitions: 10;
-							replication_factor: 3;
-							retention: "24h";
+							name_15: "location_updates";
+							partitions: int;
+							replication_factor: int;
+							retention_2: "24h";
 						},
 						{
-							name: "driver_status_changes";
-							partitions: 5;
-							replication_factor: 3;
-							retention: "7d";
+							name_16: "driver_status_changes";
+							partitions_2: int;
+							replication_factor_2: int;
+							retention_3: "7d";
 						}
 					];
 				};
@@ -436,35 +450,35 @@ platform RideSharingPlatform {
 				];
 				
 				scaling: {
-					strategy: "horizontal";
-					min_instances: 8;
-					max_instances: 100;
-					cpu_threshold: 65%;
-					memory_threshold: 75%;
-					connection_based_scaling: true;
+					strategy_7: "horizontal";
+					min_instances_3: int;
+					max_instances_3: int;
+					cpu_threshold_3: float;
+					memory_threshold_2: float;
+					connection_based_scaling: bool;
 				};
 				
 				deployment: {
 					container: {
-						image: "rideshare/geolocation-service:v1.8.2";
+						image_3: "rideshare/geolocation-service:v1.8.2";
 						resources: {
 							requests: {
-								cpu: "300m";
-								memory: "768Mi";
+								cpu_6: "300m";
+								memory_6: "768Mi";
 							};
 							limits: {
-								cpu: "1500m";
-								memory: "3Gi";
+								cpu_7: "1500m";
+								memory_7: "3Gi";
 							};
 						};
 					};
 					
 					placement_strategy: {
-						type: "latency_optimized";
+						type_14: "latency_optimized";
 						constraints: [
 							"node.zone in (us-west-2a, us-west-2b, us-west-2c)"
 						];
-						spread_across_zones: true;
+						spread_across_zones: bool;
 					};
 					
 					networking: {
@@ -479,8 +493,8 @@ platform RideSharingPlatform {
 					processing_guarantees: "exactly_once";
 					state_stores: ["location_state", "driver_state"];
 					windowing: {
-						type: "sliding";
-						size: "5m";
+						type_15: "sliding";
+						size_2: "5m";
 						advance: "1m";
 					};
 				};
@@ -488,7 +502,7 @@ platform RideSharingPlatform {
 			
 			// Payment Processing Service
 			service payment_service {
-				type: "financial_service";
+				type_16: "financial_service";
 				responsibilities: [
 					"payment_processing", "fare_calculation", "driver_payouts",
 					"refund_processing", "fraud_detection", "financial_reporting"
@@ -496,53 +510,53 @@ platform RideSharingPlatform {
 				
 				api_endpoints: [
 					{
-						path: "/api/v1/payments";
-						methods: ["GET", "POST"];
-						authentication: "jwt_required";
-						rate_limit: "20/minute/user";
+						path_9: "/api/v1/payments";
+						methods_10: ["GET", "POST"];
+						authentication_9: "jwt_required";
+						rate_limit_5: "20/minute/user";
 						security: "pci_compliant";
 						encryption: "field_level";
 					},
 					{
 						path: "/api/v1/payments/{payment_id}/refund";
-						methods: ["POST"];
-						authentication: "jwt_required";
-						authorization: "admin_or_participant";
+						methods_11: ["POST"];
+						authentication_10: "jwt_required";
+						authorization_3: "admin_or_participant";
 						idempotency: "required";
 					}
 				];
 				
 				database: {
-					type: "postgresql";
-					name: "payments_db";
-					encryption: "transparent_data_encryption";
+					type_17: "postgresql";
+					name_17: "payments_db";
+					encryption_2: "transparent_data_encryption";
 					tables: [
 						"payments", "refunds", "payouts", 
 						"fraud_scores", "payment_methods"
 					];
 					backup_frequency: "continuous";
-					point_in_time_recovery: true;
+					point_in_time_recovery: bool;
 				};
 				
 				external_integrations: [
 					{
-						name: "stripe";
-						type: "payment_processor";
-						purpose: "credit_card_processing";
+						name_18: "stripe";
+						type_18: "payment_processor";
+						purpose_3: "credit_card_processing";
 						configuration: {
 							webhook_endpoint: "/webhooks/stripe";
 							retry_policy: "exponential_backoff";
 						};
 					},
 					{
-						name: "paypal";
-						type: "payment_processor";
-						purpose: "alternative_payment_method";
+						name_19: "paypal";
+						type_19: "payment_processor";
+						purpose_4: "alternative_payment_method";
 					},
 					{
-						name: "fraud_detection_api";
-						type: "external_ml_service";
-						purpose: "real_time_fraud_scoring";
+						name_20: "fraud_detection_api";
+						type_20: "external_ml_service";
+						purpose_5: "real_time_fraud_scoring";
 					}
 				];
 				
@@ -551,30 +565,30 @@ platform RideSharingPlatform {
 				];
 				
 				scaling: {
-					strategy: "vertical";  // Financial data requires consistency
-					instances: 5;  // Fixed number for data consistency
-					resource_scaling: true;
-					cpu_threshold: 80%;
-					memory_threshold: 85%;
+					strategy_9: "vertical";  // Financial data requires consistency
+					instances: int;  // Fixed number for data consistency
+					resource_scaling: bool;
+					cpu_threshold_4: float;
+					memory_threshold_3: float;
 				};
 				
 				deployment: {
 					container: {
-						image: "rideshare/payment-service:v2.5.3";
+						image_4: "rideshare/payment-service:v2.5.3";
 						resources: {
 							requests: {
-								cpu: "800m";
-								memory: "2Gi";
+								cpu_8: "800m";
+								memory_8: "2Gi";
 							};
 							limits: {
-								cpu: "3000m";
-								memory: "8Gi";
+								cpu_9: "3000m";
+								memory_9: "8Gi";
 							};
 						};
 					};
 					
 					placement_strategy: {
-						type: "dedicated_nodes";
+						type_21: "dedicated_nodes";
 						node_selector: {
 							"node-type": "financial-workload";
 							"security-level": "high";
@@ -583,7 +597,7 @@ platform RideSharingPlatform {
 							{
 								key: "financial-data";
 								operator: "Equal";
-								value: "true";
+								value_2: "true";
 								effect: "NoSchedule";
 							}
 						];
@@ -603,47 +617,47 @@ platform RideSharingPlatform {
 				};
 				
 				security: {
-					pci_compliance: true;
+					pci_compliance: bool;
 					data_classification: "sensitive";
 					encryption: {
-						at_rest: "aes_256_gcm";
-						in_transit: "tls_1_3";
+						at_rest_2: "aes_256_gcm";
+						in_transit_2: "tls_1_3";
 						field_level: ["card_number", "cvv", "bank_account"];
 					};
 					
 					access_controls: {
-						authentication: "mutual_tls";
-						authorization: "attribute_based";
+						authentication_11: "mutual_tls";
+						authorization_4: "attribute_based";
 						session_management: "stateless_jwt";
 					};
 					
 					audit_logging: {
-						level: "comprehensive";
-						retention: "7_years";
-						immutable: true;
-						real_time_monitoring: true;
+						level_2: "comprehensive";
+						retention_4: "7_years";
+						immutable: bool;
+						real_time_monitoring: bool;
 					};
 				};
 				
 				disaster_recovery: {
 					backup_strategy: {
 						frequency: "continuous";
-						retention: "10_years";
-						encryption: "customer_managed_keys";
+						retention_5: "10_years";
+						encryption_3: "customer_managed_keys";
 					};
 					
 					failover: {
 						rto: "30_seconds";
 						rpo: "0_seconds";
-						automated: true;
-						cross_region: true;
+						automated: bool;
+						cross_region: bool;
 					};
 				};
 			},
 			
 			// Machine Learning Service
 			service ml_service {
-				type: "ai_ml_service";
+				type_22: "ai_ml_service";
 				responsibilities: [
 					"demand_prediction", "driver_matching", "pricing_optimization",
 					"fraud_detection", "eta_prediction", "route_optimization"
@@ -651,25 +665,25 @@ platform RideSharingPlatform {
 				
 				api_endpoints: [
 					{
-						path: "/api/v1/predict/demand";
-						methods: ["POST"];
-						authentication: "service_to_service";
-						rate_limit: "1000/minute";
-						timeout: "2s";
+						path_10: "/api/v1/predict/demand";
+						methods_12: ["POST"];
+						authentication_12: "service_to_service";
+						rate_limit_6: "1000/minute";
+						timeout_3: "2s";
 					},
 					{
-						path: "/api/v1/optimize/pricing";
-						methods: ["POST"];
-						authentication: "service_to_service";
-						batch_processing: true;
-						async_response: true;
+						path_11: "/api/v1/optimize/pricing";
+						methods_13: ["POST"];
+						authentication_13: "service_to_service";
+						batch_processing: bool;
+						async_response: bool;
 					}
 				];
 				
 				ml_models: [
 					{
-						name: "demand_prediction";
-						type: "time_series_forecasting";
+						name_21: "demand_prediction";
+						type_23: "time_series_forecasting";
 						algorithm: "lstm + attention";
 						features: [
 							"historical_demand", "weather_data", 
@@ -679,26 +693,26 @@ platform RideSharingPlatform {
 						serving: "tensorflow_serving";
 					},
 					{
-						name: "driver_matching";
-						type: "recommendation_system";
-						algorithm: "deep_collaborative_filtering";
+						name_22: "driver_matching";
+						type_24: "recommendation_system";
+						algorithm_2: "deep_collaborative_filtering";
 						features: [
 							"driver_location", "driver_ratings", 
 							"trip_history", "preferences"
 						];
-						update_frequency: "real_time";
-						serving: "custom_inference_server";
+						update_frequency_2: "real_time";
+						serving_2: "custom_inference_server";
 					},
 					{
-						name: "fraud_detection";
-						type: "anomaly_detection";
-						algorithm: "isolation_forest + neural_networks";
+						name_23: "fraud_detection";
+						type_25: "anomaly_detection";
+						algorithm_3: "isolation_forest + neural_networks";
 						features: [
 							"transaction_patterns", "user_behavior", 
 							"device_fingerprinting", "geolocation_analysis"
 						];
-						update_frequency: "daily";
-						serving: "seldon_core";
+						update_frequency_3: "daily";
+						serving_3: "seldon_core";
 					}
 				];
 				
@@ -730,19 +744,19 @@ platform RideSharingPlatform {
 				];
 				
 				scaling: {
-					strategy: "horizontal + vertical";
-					min_instances: 2;
-					max_instances: 20;
-					gpu_scaling: true;
+					strategy_8: "horizontal + vertical";
+					min_instances_4: int;
+					max_instances_4: int;
+					gpu_scaling: bool;
 					custom_metrics: [
 						{
-							name: "inference_queue_length";
-							threshold: 100;
-							scale_factor: 2;
+							name_24: "inference_queue_length";
+							threshold_4: int;
+							scale_factor_3: int;
 						},
 						{
-							name: "model_accuracy";
-							threshold: 0.85;
+							name_25: "model_accuracy";
+							threshold_5: float;
 							action: "retrain_models";
 						}
 					];
@@ -750,40 +764,40 @@ platform RideSharingPlatform {
 				
 				deployment: {
 					container: {
-						image: "rideshare/ml-service:v1.4.7";
+						image_5: "rideshare/ml-service:v1.4.7";
 						resources: {
 							requests: {
-								cpu: "1000m";
-								memory: "4Gi";
-								nvidia.com/gpu: 1;
+								cpu_10: "1000m";
+								memory_10: "4Gi";
+								nvidia.com/gpu: int;
 							};
 							limits: {
-								cpu: "4000m";
-								memory: "16Gi";
-								nvidia.com/gpu: 2;
+								cpu_11: "4000m";
+								memory_11: "16Gi";
+								nvidia.com/gpu: int;
 							};
 						};
 					};
 					
 					placement_strategy: {
-						type: "gpu_optimized";
+						type_26: "gpu_optimized";
 						node_selector: {
 							"accelerator": "nvidia-tesla-v100";
 							"instance-type": "p3.2xlarge";
 						};
 						resource_requirements: {
 							gpu_memory: "16Gi";
-							high_network_bandwidth: true;
+							high_network_bandwidth: bool;
 						};
 					};
 					
 					model_serving: {
-						framework: "tensorflow_serving + torchserve";
+						framework_2: "tensorflow_serving + torchserve";
 						batch_size: "dynamic";
 						optimization: {
-							tensorrt: true;
+							tensorrt: bool;
 							quantization: "int8";
-							graph_optimization: true;
+							graph_optimization: bool;
 						};
 					};
 				};
@@ -791,16 +805,16 @@ platform RideSharingPlatform {
 				monitoring: {
 					model_performance: {
 						accuracy_metrics: ["precision", "recall", "f1_score"];
-						drift_detection: true;
-						data_quality_monitoring: true;
-						prediction_monitoring: true;
+						drift_detection: bool;
+						data_quality_monitoring: bool;
+						prediction_monitoring: bool;
 					};
 					
 					infrastructure: {
-						gpu_utilization: true;
-						memory_usage: true;
-						inference_latency: true;
-						throughput: true;
+						gpu_utilization: bool;
+						memory_usage: bool;
+						inference_latency: bool;
+						throughput: bool;
 					};
 				};
 			}
@@ -808,45 +822,45 @@ platform RideSharingPlatform {
 		
 		// API Gateway Configuration
 		api_gateway: {
-			provider: "kong_enterprise";
+			provider_2: "kong_enterprise";
 			features: {
-				authentication: ["jwt", "oauth2", "api_key"];
+				authentication_14: ["jwt", "oauth2", "api_key"];
 				rate_limiting: {
 					strategies: ["sliding_window", "fixed_window"];
-					redis_backend: true;
+					redis_backend: bool;
 				};
-				request_transformation: true;
+				request_transformation: bool;
 				response_caching: {
 					backend: "redis_cluster";
-					policies: "per_endpoint";
+					policies_2: "per_endpoint";
 				};
 				load_balancing: {
-					algorithm: "consistent_hash";
-					health_checks: true;
+					algorithm_4: "consistent_hash";
+					health_checks: bool;
 				};
 			};
 			
 			routing: {
 				versioning: "header_based";  // X-API-Version: v1
-				ssl_termination: true;
-				cors_handling: true;
+				ssl_termination: bool;
+				cors_handling: bool;
 				request_size_limit: "10MB";
 			};
 			
 			plugins: [
 				{
-					name: "prometheus";
+					name_26: "prometheus";
 					config: {
-						per_consumer: true;
-						status_code_metrics: true;
-						latency_metrics: true;
+						per_consumer: bool;
+						status_code_metrics: bool;
+						latency_metrics: bool;
 					};
 				},
 				{
-					name: "datadog";
+					name_27: "datadog";
 					config: {
 						host: "datadog-agent";
-						port: 8125;
+						port: int;
 					};
 				}
 			];
@@ -854,11 +868,11 @@ platform RideSharingPlatform {
 		
 		// Service Mesh Configuration
 		service_mesh: {
-			provider: "istio";
+			provider_3: "istio";
 			features: {
 				traffic_management: {
 					load_balancing: "least_request";
-					circuit_breaking: true;
+					circuit_breaking: bool;
 					retries: "automatic";
 					timeouts: "configurable";
 				};
@@ -878,38 +892,38 @@ platform RideSharingPlatform {
 			
 			policies: {
 				traffic_splitting: {
-					canary_deployments: true;
-					a_b_testing: true;
-					gradual_rollouts: true;
+					canary_deployments: bool;
+					a_b_testing: bool;
+					gradual_rollouts: bool;
 				};
 				
 				fault_injection: {
-					delay_injection: true;
-					abort_injection: true;
-					testing_environments: true;
+					delay_injection: bool;
+					abort_injection: bool;
+					testing_environments: bool;
 				};
 			};
 		};
 		
 		// Service Discovery
 		service_discovery: {
-			provider: "consul";
+			provider_4: "consul";
 			configuration: {
 				datacenter: "dc1";
-				encryption: true;
+				encryption_4: bool;
 				health_checking: {
-					interval: "10s";
-					timeout: "3s";
+					interval_3: "10s";
+					timeout_4: "3s";
 					deregister_critical_after: "30s";
 				};
 				
 				service_registration: {
-					automatic: true;
+					automatic: bool;
 					metadata: ["version", "environment", "capabilities"];
 				};
 				
 				dns_interface: {
-					enabled: true;
+					enabled: bool;
 					domain: "consul";
 					recursors: ["8.8.8.8", "8.8.4.4"];
 				};
@@ -919,14 +933,14 @@ platform RideSharingPlatform {
 		// Load Balancing
 		load_balancing: {
 			global_load_balancer: {
-				provider: "aws_route53";
-				health_checks: true;
+				provider_5: "aws_route53";
+				health_checks_2: bool;
 				failover: "automatic";
-				geolocation_routing: true;
+				geolocation_routing: bool;
 			};
 			
 			regional_load_balancers: {
-				provider: "aws_alb";
+				provider_6: "aws_alb";
 				algorithms: {
 					default: "round_robin";
 					sticky_sessions: "source_ip";
@@ -934,11 +948,11 @@ platform RideSharingPlatform {
 				};
 				
 				health_checks: {
-					path: "/health";
-					interval: 30;
-					timeout: 5;
-					healthy_threshold: 2;
-					unhealthy_threshold: 5;
+					path_12: "/health";
+					interval_4: int;
+					timeout_5: int;
+					healthy_threshold: int;
+					unhealthy_threshold: int;
 				};
 			};
 		};
@@ -946,32 +960,32 @@ platform RideSharingPlatform {
 		// Circuit Breakers
 		circuit_breakers: {
 			default_configuration: {
-				failure_threshold: 50%;
+				failure_threshold_3: float;
 				recovery_timeout: "30s";
-				half_open_max_calls: 3;
+				half_open_max_calls: int;
 				metrics_window: "60s";
 			};
 			
 			service_specific: {
 				payment_service: {
-					failure_threshold: 20%;  // More sensitive for payments
-					recovery_timeout: "60s";
+					failure_threshold_4: float;  // More sensitive for payments
+					recovery_timeout_2: "60s";
 				};
 				
 				ml_service: {
-					failure_threshold: 70%;  // More tolerant for ML predictions
-					recovery_timeout: "10s";
+					failure_threshold_5: float;  // More tolerant for ML predictions
+					recovery_timeout_3: "10s";
 				};
 			};
 		};
 		
 		// Distributed Tracing
 		distributed_tracing: {
-			provider: "jaeger";
+			provider_7: "jaeger";
 			configuration: {
 				sampling_strategy: "adaptive";
-				max_traces_per_second: 100;
-				default_sampling_probability: 0.1;
+				max_traces_per_second: int;
+				default_sampling_probability: float;
 			};
 			
 			trace_retention: {
@@ -1000,17 +1014,17 @@ deployment_strategy MultiRegionDeployment {
 		};
 		
 		secondary: {
-			name: "us-east-1";
-			purpose: "disaster_recovery + east_coast_traffic";
-			services: ["user_service", "trip_service", "geolocation_service"];
-			capacity: "75%";
+			name_2: "us-east-1";
+			purpose_2: "disaster_recovery + east_coast_traffic";
+			services_2: ["user_service", "trip_service", "geolocation_service"];
+			capacity_2: "75%";
 		};
 		
 		international: {
-			name: "eu-west-1";
-			purpose: "european_expansion";
-			services: ["user_service", "trip_service", "payment_service"];
-			capacity: "50%";
+			name_3: "eu-west-1";
+			purpose_3: "european_expansion";
+			services_3: ["user_service", "trip_service", "payment_service"];
+			capacity_3: "50%";
 		};
 	};
 	
@@ -1019,35 +1033,35 @@ deployment_strategy MultiRegionDeployment {
 			placement: "all_regions";
 			replication_strategy: "active_active";
 			data_consistency: "eventual";
-			failover_priority: 1;
+			failover_priority: int;
 		};
 		
 		trip_service: {
-			placement: "regional";
-			replication_strategy: "active_passive";
-			data_consistency: "strong";
-			failover_priority: 2;
+			placement_2: "regional";
+			replication_strategy_2: "active_passive";
+			data_consistency_2: "strong";
+			failover_priority_2: int;
 		};
 		
 		payment_service: {
-			placement: "primary_and_secondary";
-			replication_strategy: "active_passive";
-			data_consistency: "strong";
-			failover_priority: 1;
+			placement_3: "primary_and_secondary";
+			replication_strategy_3: "active_passive";
+			data_consistency_3: "strong";
+			failover_priority_3: int;
 			compliance_requirements: ["pci_dss", "gdpr"];
 		};
 		
 		geolocation_service: {
-			placement: "all_regions";
-			replication_strategy: "active_active";
-			data_consistency: "eventual";
+			placement_4: "all_regions";
+			replication_strategy_4: "active_active";
+			data_consistency_4: "eventual";
 			latency_requirements: "sub_100ms";
 		};
 		
 		ml_service: {
-			placement: "primary_only";
-			replication_strategy: "active_passive";
-			data_consistency: "eventual";
+			placement_5: "primary_only";
+			replication_strategy_5: "active_passive";
+			data_consistency_5: "eventual";
 			resource_requirements: ["gpu_enabled"];
 		};
 	};
@@ -1060,15 +1074,15 @@ deployment_strategy MultiRegionDeployment {
 			{
 				condition: "user_location == north_america";
 				primary: "us-west-2";
-				fallback: "us-east-1";
+				fallback_2: "us-east-1";
 			},
 			{
-				condition: "user_location == europe";
-				primary: "eu-west-1";
-				fallback: "us-east-1";
+				condition_2: "user_location == europe";
+				primary_2: "eu-west-1";
+				fallback_3: "us-east-1";
 			},
 			{
-				condition: "service_unavailable";
+				condition_3: "service_unavailable";
 				action: "route_to_nearest_healthy";
 			}
 		];
@@ -1086,14 +1100,14 @@ deployment_strategy MultiRegionDeployment {
 			};
 			
 			service_failure: {
-				detection: "health_checks + circuit_breakers";
-				response: "traffic_rerouting";
+				detection_2: "health_checks + circuit_breakers";
+				response_2: "traffic_rerouting";
 				escalation: "5_minutes";
 			};
 			
 			data_center_failure: {
-				detection: "infrastructure_monitoring";
-				response: "cross_az_failover";
+				detection_3: "infrastructure_monitoring";
+				response_3: "cross_az_failover";
 				recovery_time: "60_seconds";
 			};
 		};
@@ -1122,7 +1136,7 @@ deployment_pattern CanaryDeployment {
 		stages: [
 			{
 				name: "initial_canary";
-				traffic_percentage: 5%;
+				traffic_percentage: float;
 				duration: "10m";
 				success_criteria: {
 					error_rate: "<1%";
@@ -1131,28 +1145,28 @@ deployment_pattern CanaryDeployment {
 				};
 			},
 			{
-				name: "expanded_canary";
-				traffic_percentage: 25%;
-				duration: "30m";
+				name_2: "expanded_canary";
+				traffic_percentage_2: float;
+				duration_2: "30m";
 				success_criteria: {
-					error_rate: "<0.5%";
-					latency_p99: "<400ms";
+					error_rate_2: "<0.5%";
+					latency_p99_2: "<400ms";
 					business_metrics: "stable";
 				};
 			},
 			{
-				name: "majority_canary";
-				traffic_percentage: 75%;
-				duration: "60m";
+				name_3: "majority_canary";
+				traffic_percentage_3: float;
+				duration_3: "60m";
 				success_criteria: {
 					user_satisfaction: ">95%";
 					conversion_rate: ">=baseline";
 				};
 			},
 			{
-				name: "full_rollout";
-				traffic_percentage: 100%;
-				duration: "monitored";
+				name_4: "full_rollout";
+				traffic_percentage_4: float;
+				duration_4: "monitored";
 			}
 		];
 		
@@ -1163,13 +1177,13 @@ deployment_pattern CanaryDeployment {
 				notification: "critical_alert";
 			},
 			{
-				condition: "latency_p99 > 1000ms";
-				action: "immediate_rollback";
+				condition_2: "latency_p99 > 1000ms";
+				action_2: "immediate_rollback";
 			},
 			{
-				condition: "business_metric_drop > 10%";
-				action: "staged_rollback";
-				approval_required: true;
+				condition_3: "business_metric_drop > 10%";
+				action_3: "staged_rollback";
+				approval_required: bool;
 			}
 		];
 		

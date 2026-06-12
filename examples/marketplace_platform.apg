@@ -1,9 +1,23 @@
-// ========================================
-// COMPREHENSIVE MARKETPLACE PLATFORM
-// Two-sided and multi-sided marketplace implementation with full microservices architecture
-// ========================================
+// ============================================================
+// EXAMPLE: Two-Sided Marketplace Platform
+// ============================================================
+// WHAT IT SHOWS:
+//   A multi-sided marketplace (e.g. freelance services, e-commerce)
+//   with buyer/seller roles, escrow, and reputation systems.
+//   Demonstrates:
+//   - Role-based access control (buyer, seller, admin)
+//   - Payment escrow workflow
+//   - Review and rating entities
+//   - Commission structure configuration
+//   - Notification and messaging capabilities
+//
+// HOW TO COMPILE:
+//   apg compile examples/marketplace_platform.apg --output out/
+//
+// KEY PATTERN: Multiple user_types in one application, each with
+// distinct permissions, onboarding flows, and dashboard layouts.
+// ============================================================
 
-// 1. FREELANCE SERVICES MARKETPLACE (Two-Sided Platform)
 marketplace FreelanceHub {
 	description: "Professional freelance services marketplace connecting clients with service providers";
 	version: "3.2.0";
@@ -57,15 +71,15 @@ marketplace FreelanceHub {
 				"view_earnings_analytics"
 			];
 			data_access: {
-				own_data: "full_access";
+				own_data_1: "full_access";
 				client_profiles: "basic_info_only";
-				project_data: "applied_projects_and_hired";
+				project_data_1: "applied_projects_and_hired";
 				earnings_data: "own_earnings_only";
 			};
 			verification_required: {
-				email: true;
-				phone: true;
-				identity: true;
+				email_1: true;
+				phone_1: true;
+				identity_1: true;
 				professional_credentials: true;
 				background_check: "optional_premium";
 				portfolio_review: true;
@@ -86,16 +100,16 @@ marketplace FreelanceHub {
 				};
 			};
 			dashboard: {
-				layout: "freelancer_dashboard";
+				layout_1: "freelancer_dashboard";
 				widgets: [
 					"project_feed", "proposal_status", "earnings_overview",
 					"client_messages", "skill_recommendations", "performance_metrics"
 				];
 			};
-			payment_methods: ["bank_transfer", "paypal", "stripe_connect", "cryptocurrency"];
+			payment_methods_1: ["bank_transfer", "paypal", "stripe_connect", "cryptocurrency"];
 			commission_structure: {
-				platform_fee: 8%;  // 8% commission on earnings
-				payment_processing_fee: 2.9%;
+				platform_fee_1: 8%;  // 8% commission on earnings
+				payment_processing_fee_1: 2.9%;
 				withdrawal_fee: "$1 per withdrawal";
 			};
 		};
@@ -113,11 +127,11 @@ marketplace FreelanceHub {
 			};
 			verification_required: {
 				employee_verification: true;
-				background_check: true;
+				background_check_1: true;
 				two_factor_auth: true;
 			};
 			dashboard: {
-				layout: "admin_dashboard";
+				layout_2: "admin_dashboard";
 				widgets: [
 					"platform_metrics", "user_management", "dispute_queue",
 					"financial_overview", "content_moderation", "system_health"
@@ -133,15 +147,15 @@ marketplace FreelanceHub {
 			data_access: {
 				user_content: "moderation_access";
 				reported_content: "full_access";
-				user_communications: "flagged_only";
+				user_communications_1: "flagged_only";
 			};
 			verification_required: {
-				employee_verification: true;
-				background_check: true;
+				employee_verification_1: true;
+				background_check_2: true;
 				content_moderation_training: true;
 			};
 			dashboard: {
-				layout: "moderator_dashboard";
+				layout_3: "moderator_dashboard";
 				widgets: [
 					"moderation_queue", "user_reports", "escalated_issues",
 					"moderation_metrics", "policy_updates"
@@ -165,17 +179,17 @@ marketplace FreelanceHub {
 				supported_currencies: ["USD", "EUR", "GBP", "AUD", "CAD"];
 			},
 			{
-				name: "paypal";
+				name_1: "paypal";
 				config: {
 					client_id: env("PAYPAL_CLIENT_ID");
 					client_secret: env("PAYPAL_CLIENT_SECRET");
 					mode: env("PAYPAL_MODE", "sandbox");
 				};
-				supported_methods: ["paypal_account", "credit_card"];
-				supported_currencies: ["USD", "EUR", "GBP"];
+				supported_methods_1: ["paypal_account", "credit_card"];
+				supported_currencies_1: ["USD", "EUR", "GBP"];
 			},
 			{
-				name: "cryptocurrency";
+				name_2: "cryptocurrency";
 				config: {
 					supported_coins: ["BTC", "ETH", "USDC", "USDT"];
 					wallet_provider: "coinbase_commerce";
@@ -184,16 +198,16 @@ marketplace FreelanceHub {
 			}
 		];
 		
-		supported_currencies: ["USD", "EUR", "GBP", "AUD", "CAD", "JPY"];
+		supported_currencies_2: ["USD", "EUR", "GBP", "AUD", "CAD", "JPY"];
 		
 		fee_structure: {
 			client_fees: {
 				payment_processing: 2.9% + $0.30;
-				platform_fee: 0%;
+				platform_fee_2: 0%;
 			};
 			freelancer_fees: {
 				platform_commission: 8%;
-				payment_processing: 2.9% + $0.30;
+				payment_processing_1: 2.9% + $0.30;
 				withdrawal_fee: {
 					bank_transfer: $1.00;
 					paypal: 1%;
@@ -244,19 +258,19 @@ marketplace FreelanceHub {
 					};
 				},
 				{
-					scenario: "team_project";
+					scenario_1: "team_project";
 					splits: {
 						lead_freelancer: 60%;
 						team_members: 32%;  // Split among team
-						platform: 8%;
+						platform_1: 8%;
 					};
 				},
 				{
-					scenario: "referral_bonus";
+					scenario_2: "referral_bonus";
 					splits: {
-						freelancer: 90%;
+						freelancer_1: 90%;
 						referring_user: 2%;
-						platform: 8%;
+						platform_2: 8%;
 					};
 				}
 			];
@@ -289,12 +303,12 @@ marketplace FreelanceHub {
 					verification_methods: ["email_link", "sms_code"];
 				};
 				standard: {
-					requirements: ["email", "phone", "government_id"];
-					verification_methods: ["jumio_id_verification", "onfido"];
+					requirements_1: ["email", "phone", "government_id"];
+					verification_methods_1: ["jumio_id_verification", "onfido"];
 				};
 				premium: {
-					requirements: ["email", "phone", "government_id", "address_proof"];
-					verification_methods: ["jumio_id_verification", "address_verification"];
+					requirements_2: ["email", "phone", "government_id", "address_proof"];
+					verification_methods_2: ["jumio_id_verification", "address_verification"];
 					additional_checks: ["professional_license_verification"];
 				};
 			};
@@ -352,7 +366,7 @@ marketplace FreelanceHub {
 				text_analysis: {
 					profanity_detection: true;
 					hate_speech_detection: true;
-					spam_detection: true;
+					spam_detection_1: true;
 					personal_info_detection: true;
 				};
 				image_analysis: {
@@ -373,7 +387,7 @@ marketplace FreelanceHub {
 		
 		fraud_prevention: {
 			account_security: {
-				two_factor_auth: "optional_recommended";
+				two_factor_auth_1: "optional_recommended";
 				login_anomaly_detection: true;
 				device_tracking: true;
 				session_management: true;
@@ -396,7 +410,7 @@ marketplace FreelanceHub {
 		
 		compliance_frameworks: [
 			{
-				name: "gdpr";
+				name_3: "gdpr";
 				requirements: {
 					data_protection: true;
 					consent_management: true;
@@ -405,7 +419,7 @@ marketplace FreelanceHub {
 				};
 			},
 			{
-				name: "ccpa";
+				name_4: "ccpa";
 				requirements: {
 					privacy_disclosures: true;
 					opt_out_mechanisms: true;
@@ -413,7 +427,7 @@ marketplace FreelanceHub {
 				};
 			},
 			{
-				name: "pci_dss";
+				name_5: "pci_dss";
 				requirements: {
 					secure_payment_processing: true;
 					data_encryption: true;
@@ -424,7 +438,7 @@ marketplace FreelanceHub {
 		];
 		
 		background_checks: {
-			enabled: true;
+			enabled_1: true;
 			providers: ["checkr", "sterling"];
 			check_types: {
 				criminal_background: "premium_users";
@@ -440,7 +454,7 @@ marketplace FreelanceHub {
 	search_discovery: {
 		search_engine: {
 			provider: "elasticsearch";
-			version: "8.0";
+			version_1: "8.0";
 			configuration: {
 				cluster_name: "freelancehub_search";
 				nodes: 3;
@@ -465,7 +479,7 @@ marketplace FreelanceHub {
 					};
 				},
 				{
-					type: "projects";
+					type_1: "projects";
 					fields: [
 						"title", "description", "required_skills", "budget",
 						"timeline", "client_location", "project_type"
@@ -489,14 +503,14 @@ marketplace FreelanceHub {
 						weight: 0.3;
 					};
 					item_based: {
-						similarity_metric: "jaccard";
-						weight: 0.2;
+						similarity_metric_1: "jaccard";
+						weight_1: 0.2;
 					};
 				};
 				content_based: {
 					feature_extraction: "tfidf + embeddings";
 					similarity_threshold: 0.7;
-					weight: 0.3;
+					weight_2: 0.3;
 				};
 				hybrid_ensemble: {
 					weights: {
@@ -522,7 +536,7 @@ marketplace FreelanceHub {
 		};
 		
 		geolocation: {
-			enabled: true;
+			enabled_2: true;
 			precision: "city_level";
 			search_radius: {
 				default: "50km";
@@ -535,39 +549,39 @@ marketplace FreelanceHub {
 		faceted_search: {
 			facets: [
 				{
-					name: "skills";
-					type: "multi_select";
+					name_6: "skills";
+					type_2: "multi_select";
 					aggregation: "terms";
 					size: 100;
 				},
 				{
-					name: "hourly_rate";
-					type: "range";
+					name_7: "hourly_rate";
+					type_3: "range";
 					ranges: [
 						{"to": 25}, {"from": 25, "to": 50}, 
 						{"from": 50, "to": 100}, {"from": 100}
 					];
 				},
 				{
-					name: "experience_level";
-					type: "single_select";
+					name_8: "experience_level";
+					type_4: "single_select";
 					options: ["entry", "intermediate", "expert"];
 				},
 				{
-					name: "availability";
-					type: "single_select";
-					options: ["immediate", "within_week", "within_month"];
+					name_9: "availability";
+					type_5: "single_select";
+					options_1: ["immediate", "within_week", "within_month"];
 				},
 				{
-					name: "location";
-					type: "hierarchical";
+					name_10: "location";
+					type_6: "hierarchical";
 					levels: ["country", "state", "city"];
 				}
 			];
 		};
 		
 		autocomplete: {
-			enabled: true;
+			enabled_3: true;
 			sources: ["skills", "job_titles", "company_names", "locations"];
 			suggestions_count: 8;
 			fuzzy_matching: true;
@@ -592,7 +606,7 @@ marketplace FreelanceHub {
 	// Real-time communication system
 	communication: {
 		messaging: {
-			platform: "custom_websocket + redis";
+			platform_3: "custom_websocket + redis";
 			features: {
 				real_time_chat: true;
 				file_sharing: true;
@@ -609,12 +623,12 @@ marketplace FreelanceHub {
 					encryption: "end_to_end";
 				};
 				project_rooms: {
-					participants: "unlimited";
+					participants_1: "unlimited";
 					features: ["file_sharing", "task_management", "milestone_tracking"];
 				};
 				support_channels: {
-					participants: ["user", "support_agent"];
-					features: ["ticket_integration", "knowledge_base_search"];
+					participants_2: ["user", "support_agent"];
+					features_1: ["ticket_integration", "knowledge_base_search"];
 				};
 			};
 			
@@ -628,17 +642,17 @@ marketplace FreelanceHub {
 		notifications: {
 			channels: [
 				{
-					type: "push_notification";
+					type_7: "push_notification";
 					platforms: ["ios", "android", "web"];
 					urgency_levels: ["low", "normal", "high", "critical"];
 				},
 				{
-					type: "email";
+					type_8: "email";
 					templates: ["project_invitation", "payment_received", "dispute_alert"];
 					personalization: true;
 				},
 				{
-					type: "sms";
+					type_9: "sms";
 					use_cases: ["security_alerts", "payment_confirmations"];
 					international: true;
 				}
@@ -670,11 +684,11 @@ marketplace FreelanceHub {
 		};
 		
 		video_calls: {
-			provider: "agora.io";
+			provider_1: "agora.io";
 			features: {
 				one_on_one: true;
 				group_calls: true;
-				screen_sharing: true;
+				screen_sharing_1: true;
 				recording: "optional";
 			};
 			quality: {
@@ -687,11 +701,11 @@ marketplace FreelanceHub {
 		negotiation_system: {
 			workflows: {
 				project_proposals: {
-					stages: ["initial_proposal", "negotiation", "final_terms", "acceptance"];
+					stages_1: ["initial_proposal", "negotiation", "final_terms", "acceptance"];
 					auto_expiry: 7d;
 				};
 				rate_negotiations: {
-					stages: ["rate_proposal", "counter_offer", "agreement"];
+					stages_2: ["rate_proposal", "counter_offer", "agreement"];
 					history_tracking: true;
 				};
 			};
@@ -709,8 +723,8 @@ marketplace FreelanceHub {
 	microservices: {
 		services: [
 			{
-				name: "user_service";
-				type: "core_service";
+				name_11: "user_service";
+				type_10: "core_service";
 				responsibilities: [
 					"user_authentication", "profile_management", 
 					"user_verification", "preference_management"
@@ -722,14 +736,14 @@ marketplace FreelanceHub {
 						authentication: "jwt_required";
 					},
 					{
-						path: "/api/auth";
-						methods: ["POST"];
+						path_1: "/api/auth";
+						methods_1: ["POST"];
 						rate_limit: "10/minute";
 					}
 				];
 				database: {
-					type: "postgresql";
-					name: "users_db";
+					type_11: "postgresql";
+					name_12: "users_db";
 					tables: ["users", "profiles", "verifications", "preferences"];
 				};
 				dependencies: ["notification_service", "verification_service"];
@@ -751,7 +765,7 @@ marketplace FreelanceHub {
 						};
 					};
 					placement_strategy: {
-						type: "spread";
+						type_12: "spread";
 						constraints: ["node.role==worker"];
 						preferences: ["zone==us-west-2a"];
 					};
@@ -759,65 +773,65 @@ marketplace FreelanceHub {
 			},
 			
 			{
-				name: "project_service";
-				type: "business_service";
+				name_13: "project_service";
+				type_13: "business_service";
 				responsibilities: [
 					"project_management", "proposal_handling",
 					"milestone_tracking", "project_search"
 				];
 				api_endpoints: [
 					{
-						path: "/api/projects";
-						methods: ["GET", "POST", "PUT", "DELETE"];
+						path_2: "/api/projects";
+						methods_2: ["GET", "POST", "PUT", "DELETE"];
 						caching: "redis:300s";
 					},
 					{
-						path: "/api/proposals";
-						methods: ["GET", "POST", "PUT"];
+						path_3: "/api/proposals";
+						methods_3: ["GET", "POST", "PUT"];
 						async_processing: true;
 					}
 				];
 				database: {
-					type: "postgresql";
-					name: "projects_db";
-					tables: ["projects", "proposals", "milestones", "contracts"];
+					type_14: "postgresql";
+					name_14: "projects_db";
+					tables_1: ["projects", "proposals", "milestones", "contracts"];
 				};
-				dependencies: ["user_service", "search_service", "notification_service"];
+				dependencies_1: ["user_service", "search_service", "notification_service"];
 				
 				scaling: {
-					strategy: "horizontal";
-					min_instances: 3;
-					max_instances: 15;
-					cpu_threshold: 65%;
+					strategy_1: "horizontal";
+					min_instances_1: 3;
+					max_instances_1: 15;
+					cpu_threshold_1: 65%;
 					custom_metrics: ["active_projects_count"];
 				};
 			},
 			
 			{
-				name: "payment_service";
-				type: "financial_service";
+				name_15: "payment_service";
+				type_15: "financial_service";
 				responsibilities: [
 					"payment_processing", "escrow_management",
 					"fee_calculation", "payout_processing"
 				];
 				api_endpoints: [
 					{
-						path: "/api/payments";
-						methods: ["GET", "POST"];
+						path_4: "/api/payments";
+						methods_4: ["GET", "POST"];
 						security: "pci_compliant";
-						encryption: "tls_1_3";
+						encryption_1: "tls_1_3";
 					}
 				];
 				database: {
-					type: "postgresql";
-					name: "payments_db";
-					encryption: "field_level";
+					type_16: "postgresql";
+					name_16: "payments_db";
+					encryption_2: "field_level";
 					backup_frequency: "continuous";
 				};
-				dependencies: ["user_service", "notification_service"];
+				dependencies_2: ["user_service", "notification_service"];
 				
 				scaling: {
-					strategy: "vertical";  // Financial data requires consistency
+					strategy_2: "vertical";  // Financial data requires consistency
 					instances: 3;  // Fixed for data consistency
 				};
 				
@@ -829,100 +843,100 @@ marketplace FreelanceHub {
 			},
 			
 			{
-				name: "search_service";
-				type: "data_service";
+				name_17: "search_service";
+				type_17: "data_service";
 				responsibilities: [
 					"search_indexing", "recommendation_engine",
 					"personalization", "search_analytics"
 				];
 				api_endpoints: [
 					{
-						path: "/api/search";
-						methods: ["GET", "POST"];
-						caching: "elasticsearch";
+						path_5: "/api/search";
+						methods_5: ["GET", "POST"];
+						caching_1: "elasticsearch";
 					}
 				];
 				database: {
-					type: "elasticsearch";
+					type_18: "elasticsearch";
 					cluster: "search_cluster";
 					indices: ["freelancers", "projects", "skills"];
 				};
-				dependencies: ["user_service", "project_service"];
+				dependencies_3: ["user_service", "project_service"];
 				
 				scaling: {
-					strategy: "horizontal";
-					min_instances: 2;
-					max_instances: 8;
-					cpu_threshold: 80%;
+					strategy_3: "horizontal";
+					min_instances_2: 2;
+					max_instances_2: 8;
+					cpu_threshold_2: 80%;
 				};
 			},
 			
 			{
-				name: "communication_service";
-				type: "communication_service";
+				name_18: "communication_service";
+				type_19: "communication_service";
 				responsibilities: [
 					"messaging", "notifications", "video_calls", "file_sharing"
 				];
 				api_endpoints: [
 					{
-						path: "/api/messages";
-						methods: ["GET", "POST", "PUT"];
+						path_6: "/api/messages";
+						methods_6: ["GET", "POST", "PUT"];
 						websocket: true;
 					}
 				];
 				database: {
-					type: "mongodb";
-					name: "communications_db";
+					type_20: "mongodb";
+					name_19: "communications_db";
 					collections: ["messages", "channels", "notifications"];
 				};
-				dependencies: ["user_service"];
+				dependencies_4: ["user_service"];
 				
 				scaling: {
-					strategy: "horizontal";
-					min_instances: 2;
-					max_instances: 20;
+					strategy_4: "horizontal";
+					min_instances_3: 2;
+					max_instances_3: 20;
 					connection_based: true;
 				};
 			},
 			
 			{
-				name: "analytics_service";
-				type: "analytics_service";
+				name_20: "analytics_service";
+				type_21: "analytics_service";
 				responsibilities: [
 					"data_collection", "business_intelligence",
 					"reporting", "ml_insights"
 				];
 				api_endpoints: [
 					{
-						path: "/api/analytics";
-						methods: ["GET", "POST"];
-						rate_limit: "100/minute";
+						path_7: "/api/analytics";
+						methods_7: ["GET", "POST"];
+						rate_limit_1: "100/minute";
 					}
 				];
 				database: {
-					type: "clickhouse";
-					name: "analytics_db";
+					type_22: "clickhouse";
+					name_21: "analytics_db";
 					partitioning: "by_date";
 				};
-				dependencies: ["all_services"];
+				dependencies_5: ["all_services"];
 				
 				scaling: {
-					strategy: "horizontal";
-					min_instances: 1;
-					max_instances: 5;
+					strategy_5: "horizontal";
+					min_instances_4: 1;
+					max_instances_4: 5;
 					schedule_based: true;
 				};
 			}
 		];
 		
 		api_gateway: {
-			provider: "kong";
+			provider_2: "kong";
 			features: {
 				rate_limiting: true;
-				authentication: "jwt + oauth2";
+				authentication_1: "jwt + oauth2";
 				request_transformation: true;
 				response_caching: true;
-				load_balancing: "round_robin";
+				load_balancing_1: "round_robin";
 			};
 			
 			routes: {
@@ -933,7 +947,7 @@ marketplace FreelanceHub {
 		};
 		
 		service_mesh: {
-			provider: "istio";
+			provider_3: "istio";
 			features: {
 				traffic_management: true;
 				security_policies: true;
@@ -949,7 +963,7 @@ marketplace FreelanceHub {
 		};
 		
 		service_discovery: {
-			provider: "consul";
+			provider_4: "consul";
 			configuration: {
 				health_checking: true;
 				service_registration: "automatic";
@@ -959,7 +973,7 @@ marketplace FreelanceHub {
 		
 		load_balancing: {
 			algorithms: {
-				default: "least_connections";
+				default_1: "least_connections";
 				cpu_intensive: "least_response_time";
 				session_sticky: "ip_hash";
 			};
@@ -977,7 +991,7 @@ marketplace FreelanceHub {
 		};
 		
 		distributed_tracing: {
-			provider: "jaeger";
+			provider_5: "jaeger";
 			sampling_rate: 0.1;  // 10% of requests
 			trace_retention: "7d";
 		};
@@ -1011,19 +1025,19 @@ marketplace FreelanceHub {
 				date_formats: "region_specific";
 				number_formats: "locale_specific";
 				address_formats: "country_specific";
-				payment_methods: "region_preferred";
+				payment_methods_2: "region_preferred";
 			};
 		};
 		
 		currency_conversion: {
-			provider: "currencylayer";
-			update_frequency: "hourly";
-			caching: "redis:1h";
+			provider_6: "currencylayer";
+			update_frequency_1: "hourly";
+			caching_2: "redis:1h";
 			fallback_rates: "ecb";
 		};
 		
 		tax_calculation: {
-			providers: ["avalara", "taxjar"];
+			providers_1: ["avalara", "taxjar"];
 			requirements: {
 				vat_handling: "eu_regions";
 				sales_tax: "us_states";
@@ -1037,7 +1051,7 @@ marketplace FreelanceHub {
 				delivery_options: ["standard", "express", "overnight"];
 			};
 			international: {
-				cost_calculation: "weight_zone_based";
+				cost_calculation_1: "weight_zone_based";
 				customs_handling: "automated";
 				duty_calculation: "integrated";
 			};
@@ -1047,7 +1061,7 @@ marketplace FreelanceHub {
 	// Advanced analytics and business intelligence
 	analytics: {
 		data_warehouse: {
-			provider: "snowflake";
+			provider_7: "snowflake";
 			configuration: {
 				compute_clusters: 3;
 				storage_size: "10TB";
@@ -1086,20 +1100,20 @@ marketplace FreelanceHub {
 			reports: {
 				user_analytics: {
 					metrics: ["acquisition", "activation", "retention", "revenue", "referral"];
-					frequency: "daily";
+					frequency_1: "daily";
 					stakeholders: ["product", "marketing", "growth"];
 				};
 				
 				financial_analytics: {
-					metrics: ["revenue", "commission", "transaction_volume", "payment_success_rate"];
-					frequency: "hourly";
-					stakeholders: ["finance", "operations", "executive"];
+					metrics_1: ["revenue", "commission", "transaction_volume", "payment_success_rate"];
+					frequency_2: "hourly";
+					stakeholders_1: ["finance", "operations", "executive"];
 				};
 				
 				marketplace_health: {
-					metrics: ["supply_demand_ratio", "matching_efficiency", "user_satisfaction"];
-					frequency: "weekly";
-					stakeholders: ["product", "operations", "executive"];
+					metrics_2: ["supply_demand_ratio", "matching_efficiency", "user_satisfaction"];
+					frequency_3: "weekly";
+					stakeholders_2: ["product", "operations", "executive"];
 				};
 			};
 		};
@@ -1107,22 +1121,22 @@ marketplace FreelanceHub {
 		machine_learning: {
 			models: [
 				{
-					name: "user_lifetime_value";
-					type: "regression";
-					features: ["user_activity", "transaction_history", "engagement_metrics"];
-					update_frequency: "weekly";
+					name_22: "user_lifetime_value";
+					type_23: "regression";
+					features_2: ["user_activity", "transaction_history", "engagement_metrics"];
+					update_frequency_2: "weekly";
 				},
 				{
-					name: "churn_prediction";
-					type: "classification";
-					features: ["usage_patterns", "support_interactions", "satisfaction_scores"];
-					update_frequency: "daily";
+					name_23: "churn_prediction";
+					type_24: "classification";
+					features_3: ["usage_patterns", "support_interactions", "satisfaction_scores"];
+					update_frequency_3: "daily";
 				},
 				{
-					name: "price_optimization";
-					type: "reinforcement_learning";
-					features: ["market_demand", "competitor_pricing", "success_rates"];
-					update_frequency: "real_time";
+					name_24: "price_optimization";
+					type_25: "reinforcement_learning";
+					features_4: ["market_demand", "competitor_pricing", "success_rates"];
+					update_frequency_4: "real_time";
 				}
 			];
 			
@@ -1134,7 +1148,7 @@ marketplace FreelanceHub {
 		};
 		
 		ab_testing: {
-			platform: "optimizely";
+			platform_4: "optimizely";
 			
 			experiment_types: [
 				"ui_variations", "algorithm_changes", "pricing_tests", 
@@ -1151,17 +1165,17 @@ marketplace FreelanceHub {
 		conversion_tracking: {
 			funnels: [
 				{
-					name: "client_onboarding";
+					name_25: "client_onboarding";
 					steps: ["signup", "profile_complete", "first_project_post", "first_hire"];
 				},
 				{
-					name: "freelancer_onboarding";
-					steps: ["signup", "profile_complete", "first_proposal", "first_job"];
+					name_26: "freelancer_onboarding";
+					steps_1: ["signup", "profile_complete", "first_proposal", "first_job"];
 				}
 			];
 			
 			attribution: {
-				models: ["first_touch", "last_touch", "linear", "time_decay"];
+				models_1: ["first_touch", "last_touch", "linear", "time_decay"];
 				lookback_window: "30d";
 			};
 		};
@@ -1182,13 +1196,13 @@ marketplace FreelanceHub {
 			forecasting_models: [
 				{
 					metric: "monthly_revenue";
-					method: "arima + prophet";
+					method_1: "arima + prophet";
 					forecast_horizon: "12_months";
 				},
 				{
-					metric: "user_growth";
-					method: "regression + seasonality";
-					forecast_horizon: "6_months";
+					metric_1: "user_growth";
+					method_2: "regression + seasonality";
+					forecast_horizon_1: "6_months";
 				}
 			];
 		};
@@ -1218,13 +1232,13 @@ marketplace FreelanceHub {
 		project_created: {
 			schema: {
 				project_id: "uuid";
-				client_id: "uuid";
+				client_id_1: "uuid";
 				project_type: "string";
 				budget_range: "string";
 				skills_required: "array[string]";
-				timestamp: "datetime";
+				timestamp_1: "datetime";
 			};
-			triggers: ["project_publish"];
+			triggers_1: ["project_publish"];
 			handlers: [
 				"index_project_for_search",
 				"notify_matching_freelancers",
@@ -1239,9 +1253,9 @@ marketplace FreelanceHub {
 				recipient_id: "uuid";
 				amount: "decimal";
 				currency: "string";
-				timestamp: "datetime";
+				timestamp_2: "datetime";
 			};
-			triggers: ["payment_success"];
+			triggers_2: ["payment_success"];
 			handlers: [
 				"release_escrow_funds",
 				"send_payment_confirmation",
@@ -1253,13 +1267,13 @@ marketplace FreelanceHub {
 		dispute_created: {
 			schema: {
 				dispute_id: "uuid";
-				project_id: "uuid";
+				project_id_1: "uuid";
 				initiator_id: "uuid";
 				dispute_type: "string";
 				severity: "enum[low, medium, high, critical]";
-				timestamp: "datetime";
+				timestamp_3: "datetime";
 			};
-			triggers: ["dispute_initiated"];
+			triggers_3: ["dispute_initiated"];
 			handlers: [
 				"freeze_related_payments",
 				"notify_dispute_team",
@@ -1304,13 +1318,13 @@ marketplace EcommerceHub {
 				"access_analytics", "communicate_with_buyers"
 			];
 			verification_required: {
-				email: true;
-				phone: true;
+				email_1: true;
+				phone_1: true;
 				business_license: true;
 				tax_id: true;
 			};
 			dashboard: {
-				layout: "seller_dashboard";
+				layout_1: "seller_dashboard";
 				widgets: [
 					"sales_overview", "inventory_status", "order_management",
 					"customer_messages", "performance_metrics"
@@ -1318,7 +1332,7 @@ marketplace EcommerceHub {
 			};
 			commission_structure: {
 				platform_fee: 6%;
-				payment_processing_fee: 2.9%;
+				payment_processing_fee_1: 2.9%;
 				listing_fee: "$0.35 per item";
 			};
 		};
@@ -1329,14 +1343,14 @@ marketplace EcommerceHub {
 				"handle_installations", "provide_maintenance"
 			];
 			verification_required: {
-				email: true;
-				phone: true;
+				email_2: true;
+				phone_2: true;
 				professional_license: true;
 				insurance_proof: true;
 				background_check: true;
 			};
 			commission_structure: {
-				platform_fee: 12%;
+				platform_fee_1: 12%;
 				booking_fee: "$2 per service";
 			};
 		};
@@ -1351,7 +1365,7 @@ marketplace EcommerceHub {
 				exclusive_agreements: true;
 			};
 			commission_structure: {
-				platform_fee: 4%;  // Reduced for brand partners
+				platform_fee_2: 4%;  // Reduced for brand partners
 				marketing_co_op: 2%;
 			};
 		};
@@ -1470,7 +1484,7 @@ marketplace EcommerceHub {
 		
 		seller_verification: {
 			business_verification: {
-				business_license: "required";
+				business_license_1: "required";
 				tax_registration: "required";
 				bank_account_verification: "required";
 			};
@@ -1547,7 +1561,7 @@ marketplace EcommerceHub {
 		
 		discovery_features: {
 			trending_products: {
-				algorithms: ["velocity", "social_signals", "engagement"];
+				algorithms_1: ["velocity", "social_signals", "engagement"];
 				update_frequency: "hourly";
 			};
 			
@@ -1592,14 +1606,14 @@ marketplace EcommerceHub {
 		
 		shipping_optimization: {
 			carrier_selection: {
-				algorithm: "cost_speed_reliability_optimization";
+				algorithm_1: "cost_speed_reliability_optimization";
 				factors: ["cost", "delivery_time", "reliability", "sustainability"];
 			};
 			
 			route_optimization: {
 				last_mile_efficiency: true;
 				consolidation_opportunities: true;
-				delivery_windows: "flexible";
+				delivery_windows_1: "flexible";
 			};
 			
 			international_shipping: {
@@ -1612,7 +1626,7 @@ marketplace EcommerceHub {
 		delivery_options: {
 			standard_delivery: "3-5 business days";
 			expedited_delivery: "1-2 business days";
-			same_day_delivery: "select_metro_areas";
+			same_day_delivery_1: "select_metro_areas";
 			scheduled_delivery: "customer_preferred_time";
 			pickup_points: "partner_network";
 		};
@@ -1639,18 +1653,18 @@ deployment_architecture EcommerceInfrastructure {
 					purpose: "general_workloads";
 				},
 				{
-					name: "memory_optimized";
-					instance_type: "r5.xlarge";
-					min_size: 2;
-					max_size: 10;
-					purpose: "data_intensive_workloads";
+					name_1: "memory_optimized";
+					instance_type_1: "r5.xlarge";
+					min_size_1: 2;
+					max_size_1: 10;
+					purpose_1: "data_intensive_workloads";
 				},
 				{
-					name: "gpu_enabled";
-					instance_type: "p3.2xlarge";
-					min_size: 0;
-					max_size: 5;
-					purpose: "ml_workloads";
+					name_2: "gpu_enabled";
+					instance_type_2: "p3.2xlarge";
+					min_size_2: 0;
+					max_size_2: 5;
+					purpose_2: "ml_workloads";
 				}
 			];
 		};
@@ -1668,35 +1682,35 @@ deployment_architecture EcommerceInfrastructure {
 		};
 		
 		product_service: {
-			placement: "multi_region";
-			replicas: 8;
+			placement_1: "multi_region";
+			replicas_1: 8;
 			resource_requirements: {
-				cpu: "500m";
-				memory: "1Gi";
+				cpu_1: "500m";
+				memory_1: "1Gi";
 			};
 			caching: {
 				type: "redis_cluster";
-				memory: "4Gi";
+				memory_2: "4Gi";
 			};
 		};
 		
 		search_service: {
-			placement: "dedicated_nodes";
-			replicas: 4;
+			placement_2: "dedicated_nodes";
+			replicas_2: 4;
 			resource_requirements: {
-				cpu: "1000m";
-				memory: "4Gi";
+				cpu_2: "1000m";
+				memory_3: "4Gi";
 				storage: "100Gi_ssd";
 			};
-			node_affinity: "memory_optimized";
+			node_affinity_1: "memory_optimized";
 		};
 		
 		ml_service: {
-			placement: "gpu_nodes";
-			replicas: 2;
+			placement_3: "gpu_nodes";
+			replicas_3: 2;
 			resource_requirements: {
 				gpu: "1_nvidia_v100";
-				memory: "16Gi";
+				memory_4: "16Gi";
 			};
 			scaling: {
 				schedule_based: true;
@@ -1705,11 +1719,11 @@ deployment_architecture EcommerceInfrastructure {
 		};
 		
 		payment_service: {
-			placement: "isolated_nodes";
-			replicas: 3;
+			placement_4: "isolated_nodes";
+			replicas_4: 3;
 			resource_requirements: {
-				cpu: "500m";
-				memory: "1Gi";
+				cpu_3: "500m";
+				memory_5: "1Gi";
 			};
 			security: {
 				pod_security_policy: "restricted";
@@ -1751,17 +1765,17 @@ deployment_architecture EcommerceInfrastructure {
 				deployment: "operator_managed";
 				high_availability: true;
 				backup_strategy: "continuous + daily_snapshots";
-				encryption: "at_rest + in_transit";
+				encryption_1: "at_rest + in_transit";
 			};
 			
 			redis: {
-				deployment: "cluster_mode";
+				deployment_1: "cluster_mode";
 				persistence: "aof + rdb";
 				memory_optimization: true;
 			};
 			
 			elasticsearch: {
-				deployment: "multi_master";
+				deployment_2: "multi_master";
 				index_management: "automated_lifecycle";
 				monitoring: "x_pack";
 			};
@@ -1784,7 +1798,7 @@ deployment_architecture EcommerceInfrastructure {
 		tracing: {
 			system: "jaeger";
 			sampling: "adaptive";
-			retention: "7d";
+			retention_1: "7d";
 		};
 		
 		apm: {
@@ -1796,9 +1810,9 @@ deployment_architecture EcommerceInfrastructure {
 	
 	security: {
 		secrets_management: {
-			provider: "aws_secrets_manager";
+			provider_1: "aws_secrets_manager";
 			rotation: "automatic";
-			encryption: "kms";
+			encryption_2: "kms";
 		};
 		
 		image_security: {
@@ -1809,7 +1823,7 @@ deployment_architecture EcommerceInfrastructure {
 		
 		network_security: {
 			segmentation: "microsegmentation";
-			encryption: "mtls_everywhere";
+			encryption_3: "mtls_everywhere";
 			inspection: "deep_packet_inspection";
 		};
 		
@@ -1823,7 +1837,7 @@ deployment_architecture EcommerceInfrastructure {
 	disaster_recovery: {
 		backup_strategy: {
 			frequency: "continuous";
-			retention: "7d_local + 30d_regional + 365d_cross_region";
+			retention_2: "7d_local + 30d_regional + 365d_cross_region";
 			testing: "monthly";
 		};
 		

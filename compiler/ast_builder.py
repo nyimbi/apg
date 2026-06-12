@@ -617,6 +617,28 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			if kind in {"workflow", "flow"}:
 				module.entities.append(self._parse_source_workflow(name, body, source_file, kind=kind))
 				continue
+			# Form and business-logic entities contain nested sub-block syntax
+			# (widget properties, inline object literals, async def method bodies)
+			# that the flat line scanner misreads as top-level entity properties,
+			# causing spurious duplicate-property errors. Register these with no
+			# flat properties — the full ANTLR grammar path handles them correctly.
+			if kind in {
+				# Form layout / UI
+				"form", "screen", "view", "ui", "component", "widget",
+				# Business logic (async def bodies contain inline object literals)
+				"biz", "service", "logic", "controller",
+				# Test / notification / metrics (also contain nested object syntax)
+				"test", "notification", "notify", "metrics", "logger",
+			}:
+				entity_type = self._entity_type_for_source_kind(kind)
+				module.entities.append(EntityDeclaration(
+					entity_type=entity_type,
+					name=name,
+					properties=[],
+					methods=[],
+					source_file=source_file,
+				))
+				continue
 			properties, methods = self._parse_source_members(body, source_file)
 			entity_type = self._entity_type_for_source_kind(kind)
 			module.entities.append(EntityDeclaration(

@@ -1,9 +1,22 @@
-// ========================================
-// PRODUCTION LINE MONITORING EXAMPLES
-// Real-time quality control and process optimization
-// ========================================
+// ============================================================
+// EXAMPLE: Production Line Monitoring
+// ============================================================
+// WHAT IT SHOWS:
+//   Real-time manufacturing execution and quality control using APG.
+//   Demonstrates:
+//   - Machine telemetry ingestion and OEE calculation
+//   - Statistical process control (SPC) with alert thresholds
+//   - Defect detection and classification workflows
+//   - Maintenance scheduling and work order generation
+//   - Bytewax streaming processor for real-time data
+//
+// HOW TO COMPILE:
+//   apg compile examples/production_line_monitoring.apg --output out/
+//
+// KEY PATTERN: streaming: {processor: bytewax} wires the capability
+// to APG's native stream processing runtime for sub-second latency.
+// ============================================================
 
-// 1. AUTOMOTIVE ASSEMBLY LINE MONITORING
 production AutoAssemblyLine {
     stations: [
         body_welding: {
@@ -28,8 +41,8 @@ production AutoAssemblyLine {
     @line_monitoring: {
         cycle_time: target(180s) ± tolerance(10s);
         takt_time: customer_demand(480_units/day) / operating_time(16h);
-        throughput: real_time_calculation(units_per_hour);
-        bottleneck_detection: constraint_analysis(real_time);
+        throughput: float;
+        bottleneck_detection: string;
         
         quality_gates: [
             station_01: pass_criteria(weld_quality>98% && dimensional_ok),
@@ -140,7 +153,7 @@ inspect SemiconductorWaferInspection {
     ];
     
     @defect_classification: machine_learning_pipeline {
-        training_data: expert_labeled_defects(1M_samples);
+        training_data: string;
         models: [
             convolutional_neural_network: defect_detection + localization,
             transformer_architecture: contextual_analysis + pattern_matching,

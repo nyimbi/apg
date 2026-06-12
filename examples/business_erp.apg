@@ -1,9 +1,22 @@
-// ========================================
-// BUSINESS ERP SYSTEM EXAMPLES
-// Comprehensive enterprise resource planning and business process automation
-// ========================================
+// ============================================================
+// EXAMPLE: Business ERP Suite
+// ============================================================
+// WHAT IT SHOWS:
+//   A complete enterprise resource planning system with interconnected
+//   modules. Demonstrates cross-capability composition for:
+//   - General ledger and financial reporting
+//   - Inventory, procurement, and supply chain
+//   - Human resources and payroll
+//   - Customer relationship management
+//   - Portfolio and project management
+//
+// HOW TO COMPILE:
+//   apg compile examples/business_erp.apg --output out/
+//
+// KEY PATTERN: The 'application' block composes all modules into
+// a unified ERP with shared routing, themes, and data access.
+// ============================================================
 
-// 1. MANUFACTURING ERP SYSTEM
 erp ManufacturingERP {
     core_modules: {
         production_planning: {
@@ -181,7 +194,7 @@ erp FinancialServicesERP {
         lending_operations: {
             loan_origination: application_processing + credit_scoring + underwriting + approval_workflows;
             loan_servicing: payment_processing + escrow_management + customer_communications + collections;
-            portfolio_management: risk_assessment + performance_monitoring + provisioning + reporting;
+            loan_portfolio_management: risk_assessment + performance_monitoring + provisioning + reporting;
             regulatory_reporting: call_reports + stress_testing + capital_adequacy + fair_lending;
         };
         

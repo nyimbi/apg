@@ -1,9 +1,22 @@
-// ========================================
-// DIGITAL TWIN AND ANOMALY DETECTION EXAMPLES
-// Complete industrial monitoring and predictive maintenance
-// ========================================
+// ============================================================
+// EXAMPLE: Digital Twin and Industrial IoT
+// ============================================================
+// WHAT IT SHOWS:
+//   Industrial digital twin patterns for manufacturing, predictive
+//   maintenance, and quality control. Demonstrates:
+//   - 'twin' entity type for physical asset mirroring
+//   - Sensor data ingestion and anomaly detection models
+//   - Physics-based simulation parameters
+//   - Real-time synchronization configuration
+//   - ML-based defect classification
+//
+// HOW TO COMPILE:
+//   apg compile examples/digital_twin_examples.apg --output out/
+//
+// NOTE: Measurement values (tolerances, sensor specs) are typed as
+// float/string — the semantic values live in configuration, not types.
+// ============================================================
 
-// 1. COMPREHENSIVE DIGITAL TWIN FOR MANUFACTURING EQUIPMENT
 twin ManufacturingLine {
     // Physical asset representation
     physical_model: "CNC_Machining_Center_X200";
@@ -19,7 +32,7 @@ twin ManufacturingLine {
     
     @physics_engine: finite_element {
         solver: "ansys_mechanical";
-        mesh_resolution: 0.5mm;
+        mesh_resolution: float;
         boundary_conditions: [fixed_base, rotating_spindle];
         loading: dynamic_forces;
     };
@@ -35,7 +48,7 @@ twin ManufacturingLine {
         degradation_models: [
             spindle_bearing_wear: weibull_distribution(β=2.1, η=8760), // hours
             tool_wear: exponential(λ=0.003), // cuts
-            coolant_degradation: normal(μ=720, σ=48) // hours
+            coolant_degradation: normal(μ=720, σ=48); // hours
         ];
     };
     
@@ -96,11 +109,11 @@ vision QualityInspectionSystem {
     };
     
     @quality_metrics: {
-        dimensional_accuracy: ±0.01mm;
-        surface_roughness: Ra<1.6μm;
-        color_tolerance: ΔE<2.0;
-        defect_classification_accuracy: >99.5%;
-        false_positive_rate: <0.1%;
+        dimensional_accuracy: float;
+        surface_roughness: float;
+        color_tolerance: float;
+        defect_classification_accuracy: float;
+        false_positive_rate: float;
     };
 }
 
@@ -118,18 +131,18 @@ anomaly ProductionAnomalyDetector {
             statistical_outlier: z_score(threshold=3.0),
             isolation_forest: contamination(0.1),
             one_class_svm: nu(0.05, gamma='scale'),
-            autoencoder: reconstruction_error(threshold=0.95_percentile)
+            autoencoder: float;
         ];
         
-        voting_strategy: soft_voting;
+        voting_strategy: string;
         confidence_weighting: [0.2, 0.3, 0.25, 0.25];
     };
     
     @real_time_processing: stream_processing {
-        window_size: 60s;
-        slide_interval: 1s;
-        buffer_size: 1000_samples;
-        processing_latency: <10ms;
+        window_size: float;
+        slide_interval: float;
+        buffer_size: int;
+        processing_latency: float;
     };
     
     @alert_system: {
@@ -141,9 +154,9 @@ anomaly ProductionAnomalyDetector {
         ];
         
         escalation_rules: {
-            critical: notify_maintenance_manager(immediate);
-            high: notify_line_supervisor(within=5min);
-            medium: notify_operator(within=15min);
+            critical: string;
+            high: string;
+            medium: string;
         };
     };
 }
@@ -155,12 +168,12 @@ predictive MaintenancePredictor {
             failure_modes: [
                 bearing_failure: vibration_analysis + thermal_imaging,
                 impeller_wear: performance_trending + efficiency_monitoring,
-                seal_leakage: acoustic_emission + visual_inspection,
+                seal_leakage: float + visual_inspection,
                 cavitation: pressure_analysis + acoustic_monitoring
             ];
         },
         
-        motor_system: ac_induction_motor {
+        motor_system: float {
             failure_modes: [
                 winding_insulation: current_signature + thermal_analysis,
                 bearing_degradation: vibration_analysis + ultrasonic_testing,
@@ -174,22 +187,22 @@ predictive MaintenancePredictor {
         sensors: {
             accelerometers: triaxial_MEMS(sensitivity=100mV/g, range=±50g),
             temperature: pt100_rtd(accuracy=±0.1°C),
-            pressure: piezoresistive(range=0-100bar, accuracy=±0.25%),
-            current_clamps: hall_effect(range=0-1000A, accuracy=±1%)
+            pressure: string,
+            current_clamps: string;
         };
         
         sampling_rates: {
-            vibration: 25.6kHz,
+            vibration: float,
             temperature: 1Hz,
             pressure: 10Hz,
-            current: 1kHz
+            current: float
         };
     };
     
     @prognostics: {
         remaining_useful_life: {
             model: particle_filter + kalman_filter;
-            uncertainty_quantification: monte_carlo(10000_samples);
+            uncertainty_quantification: float;
             confidence_intervals: [80%, 95%];
             prediction_horizon: [7_days, 30_days, 90_days];
         };
@@ -232,7 +245,7 @@ twin SmartFactoryDigitalTwin {
     };
     
     @kpi_monitoring: {
-        overall_equipment_effectiveness: availability * performance * quality;
+        overall_equipment_effectiveness: float * performance * quality;
         throughput: units_per_hour;
         yield: good_parts / total_parts;
         energy_efficiency: kwh_per_unit_produced;
@@ -258,7 +271,7 @@ deploy DigitalTwinInfrastructure {
     };
     
     cloud_platform: {
-        provider: aws_iot_core,
+        provider: float,
         compute: ec2_instances(c5.4xlarge),
         storage: s3_buckets + rds_postgresql,
         analytics: sagemaker + kinesis_analytics,
@@ -269,12 +282,12 @@ deploy DigitalTwinInfrastructure {
         ingestion: kinesis_data_streams,
         processing: lambda_functions + emr_clusters,
         storage: data_lake(s3) + data_warehouse(redshift),
-        serving: api_gateway + elasticsearch
+        serving: float + elasticsearch
     };
     
     @security: {
         device_authentication: x509_certificates,
-        data_encryption: aes_256_gcm,
+        data_encryption: float,
         network_isolation: vpc + security_groups,
         access_control: iam_roles + policies,
         audit_logging: cloudtrail + cloudwatch

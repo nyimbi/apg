@@ -1,9 +1,22 @@
-// ========================================
-// REAL-TIME SYNCHRONIZATION AND PREDICTIVE MAINTENANCE
-// Physical-digital data flows and failure prediction systems
-// ========================================
+// ============================================================
+// EXAMPLE: Sync and Maintenance Workflows
+// ============================================================
+// WHAT IT SHOWS:
+//   Data synchronisation pipelines and scheduled maintenance workflows.
+//   Demonstrates:
+//   - Cron-triggered sync jobs between systems
+//   - Idempotent bulk data operations
+//   - Error handling and retry policies in workflows
+//   - Audit trail for data mutations
+//   - Health checks and SLA monitoring
+//
+// HOW TO COMPILE:
+//   apg compile examples/sync_and_maintenance.apg --output out/
+//
+// KEY PATTERN: workflow + scheduler = reliable background jobs that
+// survive restarts and produce a full audit trail automatically.
+// ============================================================
 
-// 1. REAL-TIME PHYSICAL-DIGITAL SYNCHRONIZATION
 sync FactoryDataSynchronization {
     // Multi-protocol data ingestion
     data_sources: {

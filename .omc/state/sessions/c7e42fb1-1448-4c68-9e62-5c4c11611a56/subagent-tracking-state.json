@@ -3962,10 +3962,78 @@
       "status": "completed",
       "completed_at": "2026-06-12T03:03:05.491Z",
       "duration_ms": 69821
+    },
+    {
+      "agent_id": "ac87efac09a803779",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-12T06:11:29.102Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-12T06:20:41.482Z",
+      "duration_ms": 552380
+    },
+    {
+      "agent_id": "a66eaedf362b278f8",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-12T06:11:29.146Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-12T06:21:47.801Z",
+      "duration_ms": 618655
+    },
+    {
+      "agent_id": "afc564dba0d2f24e6",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-12T06:11:29.123Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-12T06:13:01.288Z",
+      "duration_ms": 92165
+    },
+    {
+      "agent_id": "ac8e7b9ad79a2b24c",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-12T06:11:28.928Z",
+      "parent_mode": "none",
+      "status": "running"
+    },
+    {
+      "agent_id": "a7d112c176359cf0d",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-12T06:11:29.214Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-12T06:13:56.251Z",
+      "duration_ms": 147037
+    },
+    {
+      "agent_id": "a6a401fce7fac84c5",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-12T06:11:29.182Z",
+      "parent_mode": "none",
+      "status": "running"
+    },
+    {
+      "agent_id": "abced5618fbad90d1",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-12T06:11:29.058Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-12T06:16:21.405Z",
+      "duration_ms": 292347
+    },
+    {
+      "agent_id": "a2264cab38fade039",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-12T06:16:59.019Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-12T06:20:35.899Z",
+      "duration_ms": 216880
     }
   ],
-  "total_spawned": 389,
-  "total_completed": 343,
+  "total_spawned": 392,
+  "total_completed": 349,
   "total_failed": 0,
-  "last_updated": "2026-06-12T03:03:17.884Z"
+  "last_updated": "2026-06-12T06:21:47.907Z"
 }

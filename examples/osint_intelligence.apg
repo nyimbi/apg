@@ -1,9 +1,22 @@
-// ========================================
-// OSINT AND INTELLIGENCE SYSTEM EXAMPLES
-// Comprehensive intelligence gathering and analysis platforms
-// ========================================
+// ============================================================
+// EXAMPLE: OSINT Intelligence Platform
+// ============================================================
+// WHAT IT SHOWS:
+//   Open-source intelligence collection and analysis pipeline using
+//   APG capabilities and AI agents. Demonstrates:
+//   - Intelligence collection from public sources (news, social, web)
+//   - Entity extraction and relationship mapping
+//   - Threat assessment workflows with human-in-the-loop
+//   - Agent-assisted analysis and report generation
+//   - Structured intelligence products (SITREPs, threat assessments)
+//
+// HOW TO COMPILE:
+//   apg compile examples/osint_intelligence.apg --output out/
+//
+// KEY PATTERN: AI agents augment human analysts — agents collect
+// and process, humans make final judgements in approval workflows.
+// ============================================================
 
-// 1. COMPREHENSIVE THREAT INTELLIGENCE PLATFORM
 intel ThreatIntelligencePlatform {
     sources: {
         open_source: [
