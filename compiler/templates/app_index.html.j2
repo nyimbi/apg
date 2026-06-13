@@ -1,0 +1,118 @@
+<!--- app_index.html.j2 — APG application home page --->
+{# Variables: module_name, module_description, entities, capabilities, databases,
+              application_routes, ui_routes, agents, agent_teams #}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ module_name }}</h1>
+  <p class="text-gray-500 mt-1">{{ module_description or 'Generated APG application' }}</p>
+</div>
+
+{# Quick nav #}
+<nav class="flex flex-wrap gap-2 mb-8 text-sm" aria-label="API navigation">
+  {% for link in api_links %}
+  <a href="{{ link.url }}"
+     class="inline-flex items-center px-3 py-1.5 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-apg-primary transition-colors">
+    {{ link.label }}
+  </a>
+  {% endfor %}
+</nav>
+
+{# Stats row #}
+<div class="apg-grid-4 mb-8">
+  <div class="apg-card">
+    <div class="apg-stat">
+      <span class="apg-stat-value">{{ entities | length }}</span>
+      <span class="apg-stat-label">Entities</span>
+    </div>
+  </div>
+  <div class="apg-card">
+    <div class="apg-stat">
+      <span class="apg-stat-value">{{ capabilities | length }}</span>
+      <span class="apg-stat-label">Capabilities</span>
+    </div>
+  </div>
+  <div class="apg-card">
+    <div class="apg-stat">
+      <span class="apg-stat-value">{{ agents | length }}</span>
+      <span class="apg-stat-label">AI Agents</span>
+    </div>
+  </div>
+  <div class="apg-card">
+    <div class="apg-stat">
+      <span class="apg-stat-value">{{ ui_routes | length }}</span>
+      <span class="apg-stat-label">Screens</span>
+    </div>
+  </div>
+</div>
+
+<div class="apg-grid-2 gap-6">
+  {% if entities %}
+  <div class="apg-card">
+    <div class="apg-card-header">
+      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Entities</h2>
+    </div>
+    <ul class="divide-y divide-gray-100 dark:divide-gray-700">
+      {% for entity in entities %}
+      <li class="py-2 flex items-center justify-between">
+        <a href="/ui/entities/{{ entity.name | urlencode }}"
+           class="text-sm text-apg-primary hover:underline font-medium">
+          {{ entity.name }}
+        </a>
+        <span class="apg-badge apg-badge-neutral">{{ entity.type }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if capabilities %}
+  <div class="apg-card">
+    <div class="apg-card-header">
+      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Capabilities</h2>
+    </div>
+    <ul class="divide-y divide-gray-100 dark:divide-gray-700">
+      {% for cap in capabilities %}
+      <li class="py-2">
+        <a href="/ui/capabilities/{{ cap | urlencode }}"
+           class="text-sm text-apg-primary hover:underline font-medium">
+          {{ cap }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if ui_routes %}
+  <div class="apg-card">
+    <div class="apg-card-header">
+      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Application Screens</h2>
+    </div>
+    <ul class="divide-y divide-gray-100 dark:divide-gray-700">
+      {% for route, screen in ui_routes.items() %}
+      <li class="py-2 flex items-center justify-between">
+        <a href="{{ route }}" class="text-sm text-apg-primary hover:underline">{{ route }}</a>
+        <span class="text-xs text-gray-400">{{ screen.get('application', '') }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if agents %}
+  <div class="apg-card">
+    <div class="apg-card-header">
+      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Agents</h2>
+    </div>
+    <ul class="divide-y divide-gray-100 dark:divide-gray-700">
+      {% for agent_name in agents %}
+      <li class="py-2">
+        <a href="/ui/agents/{{ agent_name | urlencode }}"
+           class="text-sm text-apg-primary hover:underline font-medium">
+          {{ agent_name }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>

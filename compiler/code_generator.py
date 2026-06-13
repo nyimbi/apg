@@ -3336,6 +3336,43 @@ def _html_page(title: str, body: str) -> str:
     )
 
 
+def _render_template(template_name: str, **context: Any) -> str | None:
+    """Render a Jinja2 template from APG_UI_TEMPLATES dict if Jinja2 is available.
+
+    Returns None when Jinja2 is not installed — callers fall back to the existing
+    f-string builder so the generated app works with zero extra dependencies.
+
+    APG_UI_TEMPLATES is injected at module level when the compiler embeds templates
+    as string literals. In standalone mode (running code_generator.py directly),
+    templates are loaded from compiler/templates/*.j2 relative to this file.
+    """
+    try:
+        from jinja2 import Environment, DictLoader, BaseLoader, FileSystemLoader, ChoiceLoader  # type: ignore[import]
+    except ImportError:
+        return None
+    try:
+        # APG_UI_TEMPLATES injected at compile time takes priority
+        templates: dict[str, str] = globals().get("APG_UI_TEMPLATES", {{}})
+        if templates:
+            env = Environment(loader=DictLoader(templates), autoescape=True)
+        else:
+            # Standalone: load from compiler/templates/ directory
+            import pathlib
+            tmpl_dir = pathlib.Path(__file__).parent / "templates"
+            if not tmpl_dir.exists():
+                return None
+            env = Environment(loader=FileSystemLoader(str(tmpl_dir)), autoescape=True)
+            # Adjust template name for standalone (files have .j2 extension, no nested path)
+            if not template_name.endswith(".j2"):
+                template_name = template_name.replace(".html", ".html.j2") if ".html" in template_name else template_name + ".j2"
+        # Add url encode filter
+        env.filters["urlencode"] = lambda s: __import__("urllib.parse", fromlist=["quote"]).quote(str(s), safe="")
+        tmpl = env.get_template(template_name)
+        return tmpl.render(**context)
+    except Exception:
+        return None
+
+
 def _entity_spec(entity_name: str) -> Dict[str, Any] | None:
     for entity in ENTITIES:
         if entity["name"] == entity_name:
@@ -3596,20 +3633,47 @@ def _ui_index_html() -> str:
     )
     if not team_links:
         team_links = "<li>No AI agent teams declared.</li>"
+
+    # Prefer Jinja2 template; fall back to f-string for zero-dep mode
+    api_links = [
+        {{"url": "/manifest",       "label": "Manifest JSON"}},
+        {{"url": "/component.json", "label": "Component JSON"}},
+        {{"url": "/capabilities",   "label": "Capabilities"}},
+        {{"url": "/agents",         "label": "Agents"}},
+        {{"url": "/events",         "label": "Events"}},
+        {{"url": "/metrics",        "label": "Metrics"}},
+        {{"url": "/self-test",      "label": "Self-Test"}},
+        {{"url": "/openapi.json",   "label": "API Contract"}},
+        {{"url": "/ui/databases",   "label": "Databases"}},
+    ]
+    tmpl_body = _render_template(
+        "app_index.html.j2",
+        module_name=html.escape(MODULE_NAME),
+        module_description=html.escape(MODULE_DESCRIPTION or "Generated APG application"),
+        entities=ENTITIES,
+        capabilities=app.get("capabilities", []),
+        databases=app.get("databases", []),
+        application_routes=app.get("application_routes", {{}}),
+        ui_routes=app.get("ui_routes", {{}}),
+        agents=app.get("ai_agents", []),
+        agent_teams=app.get("ai_agent_teams", []),
+        api_links=api_links,
+    )
+    if tmpl_body is not None:
+        return _html_page(MODULE_NAME, tmpl_body)
+
+    # Fallback: original f-string builder
     body = (
         f"<h1>{{html.escape(MODULE_NAME)}}</h1>"
         f"<p>{{html.escape(MODULE_DESCRIPTION or 'Generated APG application')}}</p>"
         '<nav><a href="/manifest">Manifest JSON</a> | '
         '<a href="/component.json">Component JSON</a> | '
-        '<a href="/applications">Applications</a> | '
         '<a href="/capabilities">Capabilities</a> | '
         '<a href="/agents">Agents</a> | '
         '<a href="/events">Events</a> | '
         '<a href="/metrics">Metrics</a> | '
         '<a href="/self-test">Self-Test</a> | '
-        '<a href="/records">Record JSON</a> | '
         '<a href="/ui/databases">Databases</a> | '
-        '<a href="/relationships">Relationships</a> | '
         '<a href="/openapi.json">API Contract</a></nav>'
         "<h2>Application Routes</h2>"
         f"<ul>{{application_route_links}}</ul>"
@@ -3827,13 +3891,31 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
     query_result = query_records(entity_name, query)
     safe_entity = html.escape(entity_name, quote=True)
     fields = _field_specs(entity_name) or [{{"name": "value", "type": "string", "required": True}}]
-    inputs = "".join(_ui_field_input_html(field) for field in fields)
-    query_form = _ui_records_query_form_html(entity_name, query)
     records_table = _ui_records_table_html(entity_name, query_result["records"])
     records_json = html.escape(json.dumps(query_result["records"], indent=2, sort_keys=True))
-    result_summary = (
-        f'<p>Showing {{query_result["count"]}} of {{query_result["total"]}} matching records.</p>'
+
+    # Prefer Jinja2 template for rich UI; fall back to f-string builder for zero-dep mode
+    tmpl_body = _render_template(
+        "entity_list.html.j2",
+        entity_name=html.escape(entity_name),
+        entity_type=html.escape(entity.get("type", "entity")),
+        safe_entity=safe_entity,
+        fields=fields,
+        records=query_result["records"],
+        total=query_result["total"],
+        count=query_result["count"],
+        records_table=records_table,
+        records_json=records_json,
+        notice=html.escape(notice) if notice else "",
+        query=query,
     )
+    if tmpl_body is not None:
+        return 200, _html_page(entity_name, tmpl_body)
+
+    # Fallback: original f-string builder
+    inputs = "".join(_ui_field_input_html(field) for field in fields)
+    query_form = _ui_records_query_form_html(entity_name, query)
+    result_summary = f'<p>Showing {{query_result["count"]}} of {{query_result["total"]}} matching records.</p>'
     notice_html = f'<section role="alert"><strong>{{html.escape(notice)}}</strong></section>' if notice else ""
     body = (
         f'<nav><a href="/ui">Application</a> | '
