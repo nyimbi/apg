@@ -29,7 +29,7 @@ Base = declarative_base()
 class EntityType(str, Enum):
 	"""Master data entity types supported by APG MDM"""
 	CUSTOMER = "customer"
-	PRODUCT = "product" 
+	PRODUCT = "product"
 	SUPPLIER = "supplier"
 	EMPLOYEE = "employee"
 	ASSET = "asset"
@@ -37,6 +37,7 @@ class EntityType(str, Enum):
 	ACCOUNT = "account"
 	CONTRACT = "contract"
 	ORGANIZATION = "organization"
+	PARTY = "party"       # cross-domain person: citizen, patient, contact, member
 	CUSTOM = "custom"
 
 

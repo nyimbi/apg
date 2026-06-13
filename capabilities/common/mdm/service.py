@@ -2456,6 +2456,84 @@ class MdmService:
 			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
 		}
 
+	def resolve_entity(
+		self,
+		*,
+		source_system: str,
+		source_identifier: str,
+		entity_type: str,
+		tenant_id: str,
+		name: str | None = None,
+	) -> str:
+		"""Return the canonical MDM entity_id for a source-system local ID.
+
+		If a cross-reference already exists for (source_system, source_identifier),
+		returns the mapped canonical entity_id immediately.
+
+		If not found, registers a new canonical entity and creates the cross-reference
+		so that all future calls with the same (source_system, source_identifier) resolve
+		to the same canonical UUID.
+
+		This is the SAP Business Partner / Microsoft CDM Party pattern:
+		  crm_adv customer → MDM CUSTOMER
+		  fintech_kyc subject → MDM CUSTOMER
+		  healthcare_emr patient → MDM PARTY
+		  government_cas citizen → MDM PARTY
+		"""
+		guard_tenant_id(tenant_id)
+		assert source_system and isinstance(source_system, str), "source_system required"
+		assert source_identifier and isinstance(source_identifier, str), "source_identifier required"
+
+		# Search existing cross-references for this source pair
+		for xref in self.cross_references.values():
+			if (
+				xref.tenant_id == tenant_id
+				and xref.source_system == source_system
+				and xref.source_identifier == source_identifier
+				and xref.status == "active"
+			):
+				return xref.entity_id
+
+		# Not found — register a new canonical entity and create the cross-reference
+		canonical_name = name or f"{entity_type}:{source_identifier}"
+		entity_record = self.register_entity(
+			tenant_id=tenant_id,
+			entity_id=uuid7str(),
+			entity_type=entity_type,
+			name=canonical_name,
+			business_key=f"{source_system}:{source_identifier}",
+			source_system=source_system,
+			data_owner=None,
+			attributes={"source_system": source_system, "source_identifier": source_identifier},
+		)
+		self.update_cross_reference(
+			tenant_id=tenant_id,
+			entity_id=entity_record.entity_id,
+			source_system=source_system,
+			source_identifier=source_identifier,
+			evidence_reference=None,
+		)
+		return entity_record.entity_id
+
+	def get_cross_references(
+		self,
+		canonical_entity_id: str,
+		tenant_id: str,
+	) -> list[tuple[str, str]]:
+		"""Return all (source_system, source_identifier) pairs for a canonical entity.
+
+		Example: canonical_id for "John Doe" returns:
+		  [("crm_adv", "cust-001"), ("fintech_kyc", "kyc-789"), ("healthcare_emr", "pat-42")]
+		"""
+		guard_tenant_id(tenant_id)
+		return [
+			(xref.source_system, xref.source_identifier)
+			for xref in self.cross_references.values()
+			if xref.tenant_id == tenant_id
+			and xref.entity_id == canonical_entity_id
+			and xref.status == "active"
+		]
+
 	def list_pending_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		"""Return all MDM records awaiting steward or human review."""
 		tenant_id = tenant_id or self.tenant_id
