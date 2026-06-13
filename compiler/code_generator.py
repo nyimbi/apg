@@ -3364,6 +3364,10 @@ def _html_page(title: str, body: str) -> str:
         '<body class="min-h-full bg-gray-50 text-gray-900">'
         f'<header class="apg-topbar sticky top-0 z-50" role="banner">'
         f'  <a class="apg-logo" href="/ui">{{safe_module}}</a>'
+        f'  <nav class="apg-topnav ml-4">'
+        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui">Home</a>'
+        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/workflows">⚡ Workflows</a>'
+        f'  </nav>'
         f'</header>'
         f'<main class="apg-content" id="main-content">{{body}}</main>'
         "</body></html>"

@@ -8,6 +8,10 @@
 
 {# Quick nav #}
 <nav class="flex flex-wrap gap-2 mb-8 text-sm" aria-label="API navigation">
+  <a href="/ui/workflows"
+     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-apg-primary text-white hover:opacity-90 transition-opacity font-medium">
+    ⚡ Workflows
+  </a>
   {% for link in api_links %}
   <a href="{{ link.url }}"
      class="inline-flex items-center px-3 py-1.5 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-apg-primary transition-colors">
