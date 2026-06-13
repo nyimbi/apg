@@ -1,0 +1,32 @@
+{
+  "app": {
+    "name": "common_mlr",
+    "description": "MLOps Pipeline APG capability",
+    "version": "1.0.0",
+    "entity_count": 7
+  },
+  "capabilities": {
+    "common_mlr": {
+      "domain": "common",
+      "display_name": "MLOps Pipeline",
+      "version": "1.0.0",
+      "provides": [
+        "experiment_tracking",
+        "feature_store",
+        "model_registry",
+        "drift_detection",
+        "ab_testing"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "common_mlcm",
+        "common_mlx"
+      ]
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13"
+  }
+}

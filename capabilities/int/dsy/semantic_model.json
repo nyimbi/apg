@@ -1,0 +1,92 @@
+{
+  "capability_id": "int_dsy",
+  "capability_name": "Data Synchronisation",
+  "version": "1.0.0",
+  "domain": "int",
+  "entities": {
+    "DsySyncConfig": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "DsySyncRun": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "DsySyncConflict": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "DsyFieldMapping": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/int-dsy/dsysyncconfigs",
+      "description": "List DsySyncConfig"
+    },
+    {
+      "method": "POST",
+      "path": "/api/int-dsy/dsysyncconfigs",
+      "description": "Create DsySyncConfig"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "sync.completed",
+      "sync.conflict_detected",
+      "sync.failed"
+    ],
+    "subscribes": []
+  }
+}

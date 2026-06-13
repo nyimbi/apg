@@ -1,0 +1,30 @@
+{
+  "app": {
+    "name": "int_dsy",
+    "description": "Data Synchronisation APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "int_dsy": {
+      "domain": "int",
+      "display_name": "Data Synchronisation",
+      "version": "1.0.0",
+      "provides": [
+        "sync_configuration",
+        "bidirectional_sync",
+        "change_data_capture",
+        "conflict_resolution"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "int_esb"
+      ]
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13"
+  }
+}

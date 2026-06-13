@@ -1,0 +1,30 @@
+{
+  "app": {
+    "name": "int_esb",
+    "description": "Enterprise Service Bus APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "int_esb": {
+      "domain": "int",
+      "display_name": "Enterprise Service Bus",
+      "version": "1.0.0",
+      "provides": [
+        "integration_flow_management",
+        "message_routing",
+        "data_transformation",
+        "dead_letter_management"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "common_nats"
+      ]
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13"
+  }
+}
