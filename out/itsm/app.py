@@ -3165,6 +3165,273 @@ def relationship_graph() -> Dict[str, Any]:
     return {"nodes": nodes, "edges": edges}
 
 
+# ── Workflow engine ─────────────────────────────────────────────────────────
+
+_WORKFLOW_PATTERNS: list[tuple[list[str], str, str, str]] = [
+    # (name_keywords, workflow_name_fmt, description_fmt, icon)
+    (["loan", "credit", "lending"], "Apply for {entity_name}", "Step-by-step {entity_name} application and approval", "💳"),
+    (["repayment", "payment", "installment"], "Record {entity_name}", "Capture payment details and update balances", "💰"),
+    (["member", "customer", "client", "subscriber"], "Register {entity_name}", "Complete {entity_name} onboarding and KYC", "👤"),
+    (["patient", "beneficiary", "recipient"], "Enroll {entity_name}", "Register and profile the {entity_name}", "🏥"),
+    (["ticket", "incident", "issue", "fault"], "Log {entity_name}", "Capture incident details and assign for resolution", "🎫"),
+    (["change", "request", "order"], "Submit {entity_name}", "Prepare and route the {entity_name} for approval", "📋"),
+    (["asset", "equipment", "device"], "Register {entity_name}", "Record asset details, location and assignment", "🖥️"),
+    (["grant", "award", "fund"], "Register {entity_name}", "Document {entity_name} details and donor linkage", "🌍"),
+    (["contribution", "deposit", "saving"], "Record {entity_name}", "Capture and confirm the {entity_name}", "🏦"),
+    (["farmer", "supplier", "vendor"], "Onboard {entity_name}", "Complete {entity_name} registration and verification", "🌱"),
+    (["produce", "product", "item", "listing"], "List {entity_name}", "Create a new {entity_name} listing with pricing", "📦"),
+    (["appointment", "booking", "schedule"], "Book {entity_name}", "Select date, time and details for the {entity_name}", "📅"),
+    (["prescription", "medication", "drug"], "Issue {entity_name}", "Document prescribed treatment and dosage", "💊"),
+    (["invoice", "bill", "charge"], "Generate {entity_name}", "Prepare and issue the {entity_name}", "🧾"),
+    (["score", "assessment", "evaluation", "rating"], "Run {entity_name}", "Collect inputs and compute the {entity_name}", "📊"),
+]
+_DEFAULT_WORKFLOW = ("Create {entity_name}", "Fill in all required fields to create a new {entity_name}", "➕")
+
+def _workflow_meta(entity_name: str) -> tuple[str, str, str]:
+    lower = entity_name.lower()
+    for keywords, name_fmt, desc_fmt, icon in _WORKFLOW_PATTERNS:
+        if any(kw in lower for kw in keywords):
+            return name_fmt.format(entity_name=entity_name), desc_fmt.format(entity_name=entity_name), icon
+    name_fmt, desc_fmt, icon = _DEFAULT_WORKFLOW
+    return name_fmt.format(entity_name=entity_name), desc_fmt.format(entity_name=entity_name), icon
+
+
+def _group_fields_into_steps(entity_name: str, fields: list[dict]) -> list[dict]:
+    """Group entity fields into logical wizard steps."""
+    # Categorise fields
+    id_fields, ref_fields, core_fields, numeric_fields, date_fields, other_fields = [], [], [], [], [], []
+    tables = SEMANTIC_MODEL.get("tables", {})
+    table_fields = tables.get(entity_name, {}).get("fields", {})
+
+    for f in fields:
+        fname = str(f["name"])
+        ftype = str(f.get("type", "")).lower()
+        rel = table_fields.get(fname, {}).get("relationship")
+        real_rel = rel and rel.get("target_table") and rel["target_table"] in {e["name"] for e in ENTITIES}
+
+        if fname in {"id", "_revision"}:
+            id_fields.append(f)
+        elif real_rel:
+            ref_fields.append(f)
+        elif ftype in {"float", "double", "decimal", "money", "int", "integer", "number"}:
+            numeric_fields.append(f)
+        elif ftype in {"date", "datetime", "timestamp"}:
+            date_fields.append(f)
+        elif any(fname.endswith(sfx) for sfx in ("_id", "_code", "_number", "_ref", "_key")):
+            core_fields.append(f)
+        else:
+            other_fields.append(f)
+
+    steps = []
+    # Step 1: Identity (own ID + code/number fields)
+    s1 = id_fields + core_fields
+    if s1:
+        steps.append({"title": "Identity", "subtitle": f"Enter the unique identifiers for this {entity_name}", "fields": s1})
+    # Step 2: Core details (name/title/description/type/status/category)
+    priority = ["name", "full_name", "title", "description", "type", "category", "status",
+                "gender", "email", "phone", "nationality", "country"]
+    prio_fields = [f for f in other_fields if str(f["name"]) in priority]
+    rest_other = [f for f in other_fields if str(f["name"]) not in priority]
+    if prio_fields:
+        steps.append({"title": "Core Details", "subtitle": "Enter the primary descriptive information", "fields": prio_fields})
+    # Step 3: Relationships (FK dropdowns)
+    if ref_fields:
+        steps.append({"title": "Relationships", "subtitle": "Link to related records", "fields": ref_fields})
+    # Step 4: Financial / numeric
+    if numeric_fields:
+        steps.append({"title": "Amounts & Rates", "subtitle": "Enter financial and numeric values", "fields": numeric_fields})
+    # Step 5: Dates
+    if date_fields:
+        steps.append({"title": "Dates & Schedule", "subtitle": "Set relevant dates and deadlines", "fields": date_fields})
+    # Step 6: Remaining details
+    if rest_other:
+        # Split into chunks of max 5 fields per step
+        for i in range(0, len(rest_other), 5):
+            chunk = rest_other[i:i+5]
+            steps.append({"title": "Additional Details" if i == 0 else "More Details", "subtitle": "Provide any additional information", "fields": chunk})
+    # Ensure at least one step
+    if not steps:
+        steps.append({"title": "Details", "subtitle": f"Enter information for this {entity_name}", "fields": fields})
+    return steps
+
+
+def _build_app_workflows() -> dict[str, list[dict]]:
+    result = {}
+    for entity in ENTITIES:
+        if entity.get("type") in {"application"}:
+            continue
+        name = entity["name"]
+        fields = entity.get("fields") or []
+        wf_name, wf_desc, wf_icon = _workflow_meta(name)
+        steps = _group_fields_into_steps(name, fields)
+        result[name] = [{
+            "id": f"create_{name.lower()}",
+            "name": wf_name,
+            "description": wf_desc,
+            "icon": wf_icon,
+            "entity": name,
+            "action": "create",
+            "steps": steps,
+        }]
+    return result
+
+APP_WORKFLOWS: dict[str, list[dict]] = _build_app_workflows()
+
+
+def _ui_workflow_list_html() -> tuple[int, str]:
+    """Render the list of all available workflows across all entities."""
+    total = sum(len(wfs) for wfs in APP_WORKFLOWS.values())
+    cards = []
+    for entity_name, workflows in APP_WORKFLOWS.items():
+        for wf in workflows:
+            safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+            safe_wf_id = html.escape(quote(wf["id"], safe=""), quote=True)
+            cards.append(
+                f'<a href="/ui/workflows/{safe_entity}/{safe_wf_id}"'
+                f'   class="group block bg-white rounded-xl border border-gray-200 p-5 hover:border-blue-400 hover:shadow-md transition-all">'
+                f'<div class="flex items-start gap-3 mb-3">'
+                f'  <span class="text-2xl" aria-hidden="true">{html.escape(wf["icon"])}</span>'
+                f'  <div>'
+                f'    <h3 class="font-semibold text-gray-900 group-hover:text-blue-600 text-sm">{html.escape(wf["name"])}</h3>'
+                f'    <p class="text-xs text-gray-400 mt-0.5">{html.escape(entity_name)} · {len(wf["steps"])} steps</p>'
+                f'  </div>'
+                f'</div>'
+                f'<p class="text-xs text-gray-500 leading-relaxed">{html.escape(wf["description"])}</p>'
+                f'<div class="mt-3 flex items-center gap-1">'
+                + "".join(
+                    f'<div class="h-1.5 flex-1 rounded-full bg-gray-100 first:bg-blue-400"></div>'
+                    for _ in wf["steps"]
+                )
+                + f'</div>'
+                f'</a>'
+            )
+    grid = f'<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{"".join(cards)}</div>' if cards else "<p>No workflows available.</p>"
+    body = (
+        '<nav class="flex items-center gap-2 text-sm mb-6 text-gray-500">'
+        '<a href="/ui" class="hover:text-blue-600">Application</a>'
+        '<span>/</span><span class="font-semibold text-gray-900">Workflows</span></nav>'
+        f'<div class="flex items-center justify-between mb-6">'
+        f'<div><h1 class="text-xl font-bold text-gray-900">Workflows</h1>'
+        f'<p class="text-sm text-gray-500 mt-1">{total} guided workflows across {len(APP_WORKFLOWS)} entities</p></div>'
+        f'</div>'
+        + grid
+    )
+    return 200, _html_page("Workflows", body)
+
+
+def _ui_workflow_wizard_html(
+    entity_name: str,
+    workflow_id: str,
+    step_index: int = 0,
+    accumulated: dict | None = None,
+    error: str = "",
+) -> tuple[int, str]:
+    """Render one step of the multi-step workflow wizard."""
+    entity_workflows = APP_WORKFLOWS.get(entity_name, [])
+    wf = next((w for w in entity_workflows if w["id"] == workflow_id), None)
+    if wf is None:
+        return 404, _html_page("Workflow not found", f"<h1>Workflow not found</h1>")
+
+    steps = wf["steps"]
+    total_steps = len(steps)
+    accumulated = accumulated or {}
+
+    # Final step: show summary and create record
+    if step_index >= total_steps:
+        record_data = dict(accumulated)
+        result = create_record(entity_name, record_data)
+        if result.get("ok"):
+            record_id = result.get("record", {}).get("id", "")
+            safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+            body = (
+                f'<div class="max-w-lg mx-auto text-center py-12">'
+                f'<div class="text-5xl mb-4">✅</div>'
+                f'<h1 class="text-xl font-bold text-gray-900 mb-2">{html.escape(wf["name"])} complete!</h1>'
+                f'<p class="text-gray-500 text-sm mb-6">Your {html.escape(entity_name)} record has been created successfully.</p>'
+                f'<div class="flex items-center justify-center gap-3 flex-wrap">'
+                f'<a href="/ui/entities/{safe_entity}" class="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">View all {html.escape(entity_name)} records →</a>'
+                f'<a href="/ui/workflows/{safe_entity}/{html.escape(quote(workflow_id, safe=""), quote=True)}" class="px-5 py-2.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">Start again</a>'
+                f'<a href="/ui/workflows" class="px-5 py-2.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">All workflows</a>'
+                f'</div></div>'
+            )
+            return 200, _html_page(wf["name"], body)
+        else:
+            error = result.get("error") or "Failed to create record"
+            step_index = total_steps - 1  # Stay on last step
+
+    step = steps[min(step_index, total_steps - 1)]
+    step_fields = step.get("fields", [])
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    safe_wf_id = html.escape(quote(workflow_id, safe=""), quote=True)
+
+    # Progress bar
+    pct = int((step_index / total_steps) * 100)
+    step_indicators = "".join(
+        f'<div class="flex items-center gap-1.5 text-xs font-medium '
+        f'{("text-blue-600" if i == step_index else "text-gray-400 opacity-60")}">'
+        f'<span class="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs '
+        f'{("bg-blue-600" if i < step_index else "bg-blue-600" if i == step_index else "bg-gray-200 text-gray-500")}">'
+        f'{("✓" if i < step_index else str(i + 1))}</span>'
+        f'<span class="hidden sm:block">{html.escape(steps[i]["title"])}</span></div>'
+        + (f'<div class="flex-1 h-px bg-gray-200 mx-1"><div class="h-px bg-blue-600 transition-all" style="width:{("100%" if i < step_index else "0%")}"></div></div>'
+           if i < total_steps - 1 else "")
+        for i in range(total_steps)
+    )
+
+    # Hidden fields to carry accumulated data through steps
+    hidden_fields = "".join(
+        f'<input type="hidden" name="__acc_{html.escape(k, quote=True)}" value="{html.escape(str(v), quote=True)}">'
+        for k, v in accumulated.items()
+    )
+
+    # Current step fields
+    step_inputs = "".join(_ui_field_input_html(f, entity_name) for f in step_fields)
+
+    # Navigation buttons
+    is_last = step_index == total_steps - 1
+    next_label = "Create Record ✓" if is_last else "Next →"
+    next_url = f"/ui/workflows/{safe_entity}/{safe_wf_id}/step/{step_index + 1}"
+
+    error_html = (
+        f'<div role="alert" class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">⚠ {html.escape(error)}</div>'
+        if error else ""
+    )
+
+    body = (
+        # Breadcrumb
+        f'<nav class="flex items-center gap-2 text-sm mb-6 text-gray-500">'
+        f'<a href="/ui" class="hover:text-blue-600">Application</a><span>/</span>'
+        f'<a href="/ui/workflows" class="hover:text-blue-600">Workflows</a><span>/</span>'
+        f'<span class="font-semibold text-gray-900">{html.escape(wf["name"])}</span></nav>'
+        # Header
+        f'<div class="max-w-2xl mx-auto">'
+        f'<div class="text-center mb-8">'
+        f'<div class="text-4xl mb-3">{html.escape(wf["icon"])}</div>'
+        f'<h1 class="text-xl font-bold text-gray-900">{html.escape(wf["name"])}</h1>'
+        f'<p class="text-sm text-gray-500 mt-1">{html.escape(wf["description"])}</p>'
+        f'</div>'
+        # Step progress
+        f'<div class="flex items-center gap-0 mb-8 px-2">{step_indicators}</div>'
+        # Step card
+        f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">'
+        f'<div class="px-6 py-4 border-b border-gray-100 bg-gray-50">'
+        f'<h2 class="font-semibold text-gray-900">Step {step_index + 1} of {total_steps}: {html.escape(step["title"])}</h2>'
+        f'<p class="text-sm text-gray-500 mt-0.5">{html.escape(step.get("subtitle", ""))}</p>'
+        f'</div>'
+        f'<div class="p-6">'
+        f'{error_html}'
+        f'<form method="post" action="{next_url}" class="space-y-4">'
+        f'{hidden_fields}'
+        f'{step_inputs}'
+        f'<div class="flex items-center justify-between pt-4 border-t border-gray-100 mt-6">'
+        + (f'<a href="/ui/workflows/{safe_entity}/{safe_wf_id}/step/{step_index - 1}" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">← Back</a>'
+           if step_index > 0 else f'<a href="/ui/workflows" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">← Cancel</a>')
+        + f'<button type="submit" class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">{next_label}</button>'
+        f'</div></form></div></div></div>'
+    )
+    return 200, _html_page(wf["name"], body)
+
+
 def _landing_page_html() -> str:
     """Render the application landing page using landing.html.j2."""
     theme = APG_CAPABILITIES.capability_theme(MODULE_NAME) if APG_CAPABILITIES and hasattr(APG_CAPABILITIES, "capability_theme") else {}
@@ -3667,12 +3934,51 @@ def _ui_error_payload(path: str, response: Dict[str, Any]) -> str:
     return _html_page("Form error", f"<h1>Form error</h1><p>{html.escape(message)}</p><pre>{details}</pre>")
 
 
+def _extract_accumulated(form: dict) -> dict:
+    """Pull __acc_FIELD hidden fields from a step POST into an accumulated dict."""
+    return {
+        k[6:]: v  # strip '__acc_' prefix
+        for k, v in form.items()
+        if k.startswith("__acc_")
+    }
+
+
+def _ui_workflow_step_post(
+    entity_name: str, workflow_id: str, step_index: int, form: dict
+) -> tuple[int, str]:
+    """Handle POST to a workflow step: accumulate data and advance."""
+    accumulated = _extract_accumulated(form)
+    step_fields_data = {k: v for k, v in form.items() if not k.startswith("__acc_") and k != "expected_revision"}
+    accumulated.update(step_fields_data)
+
+    entity_workflows = APP_WORKFLOWS.get(entity_name, [])
+    wf = next((w for w in entity_workflows if w["id"] == workflow_id), None)
+    if wf is None:
+        return 404, _html_page("Workflow not found", "<h1>Workflow not found</h1>")
+
+    next_step = step_index + 1
+    return _ui_workflow_wizard_html(entity_name, workflow_id, next_step, accumulated)
+
+
 def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, str]:
     parts = [part for part in path.split("/") if part]
     if parts == ["ui"]:
         return 200, _ui_index_html()
     if parts == ["ui", "databases"]:
         return _ui_database_catalog_html()
+    if parts == ["ui", "workflows"]:
+        return _ui_workflow_list_html()
+    # /ui/workflows/ENTITY/WORKFLOW_ID  or  /ui/workflows/ENTITY/WORKFLOW_ID/step/N
+    if len(parts) >= 4 and parts[0] == "ui" and parts[1] == "workflows":
+        entity_name = parts[2]
+        workflow_id = parts[3]
+        step_index = 0
+        if len(parts) == 6 and parts[4] == "step":
+            try:
+                step_index = int(parts[5])
+            except ValueError:
+                step_index = 0
+        return _ui_workflow_wizard_html(entity_name, workflow_id, step_index)
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "entities":
         return _ui_entity_html(parts[2], query=query)
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "agents":
@@ -3763,6 +4069,17 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
     parts = [part for part in path.split("/") if part]
     raw_form_record = payload.get("record", payload)
     form_record = dict(raw_form_record) if isinstance(raw_form_record, dict) else {}
+
+    # Workflow step POST: /ui/workflows/ENTITY/WORKFLOW_ID/step/N
+    if (len(parts) == 6 and parts[0] == "ui" and parts[1] == "workflows" and parts[4] == "step"):
+        entity_name, workflow_id = parts[2], parts[3]
+        try:
+            step_index = int(parts[5])
+        except ValueError:
+            step_index = 0
+        _status, html_payload = _ui_workflow_step_post(entity_name, workflow_id, step_index, form_record)
+        return _status, {"html": html_payload}
+
     if len(parts) == 4 and parts[0] == "ui" and parts[1] == "agents" and parts[3] == "invoke":
         request_payload, error = _parse_json_object_field(form_record, "payload_json")
         if error:
