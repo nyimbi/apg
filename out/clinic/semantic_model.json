@@ -1,0 +1,2288 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 8,
+    "name": "clinic_demo",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "ClinicApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Integrated health facility management",
+        "integrations": {},
+        "name": "ClinicApp",
+        "policies": {},
+        "routes": [],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "clinic_demo.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "clinic_demo.apg",
+      "fixes": [],
+      "message": "Application 'ClinicApp' should compose capabilities, components, or routes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "deployment": {
+      "edges": 8,
+      "kind": "deployment",
+      "nodes": 9
+    },
+    "er": {
+      "edges": 90,
+      "kind": "er",
+      "nodes": 89
+    },
+    "handler": {
+      "edges": 8,
+      "kind": "handler",
+      "nodes": 9
+    },
+    "lookup": {
+      "edges": 8,
+      "kind": "lookup",
+      "nodes": 9
+    },
+    "package": {
+      "edges": 8,
+      "kind": "package",
+      "nodes": 9
+    },
+    "security": {
+      "edges": 8,
+      "kind": "security",
+      "nodes": 9
+    },
+    "workflow": {
+      "edges": 8,
+      "kind": "workflow",
+      "nodes": 9
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "clinic_demo.apg"
+  ],
+  "symbols": {
+    "app.ClinicApp": {
+      "file": "clinic_demo.apg",
+      "id": "app.ClinicApp",
+      "kind": "app",
+      "name": "ClinicApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Appointment.appointment_date": {
+      "file": "clinic_demo.apg",
+      "id": "field.Appointment.appointment_date",
+      "kind": "field",
+      "name": "Appointment.appointment_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Appointment.appointment_time": {
+      "file": "clinic_demo.apg",
+      "id": "field.Appointment.appointment_time",
+      "kind": "field",
+      "name": "Appointment.appointment_time",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Appointment.appointment_type": {
+      "file": "clinic_demo.apg",
+      "id": "field.Appointment.appointment_type",
+      "kind": "field",
+      "name": "Appointment.appointment_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Appointment.doctor_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Appointment.doctor_id",
+      "kind": "field",
+      "name": "Appointment.doctor_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Appointment.id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Appointment.id",
+      "kind": "field",
+      "name": "Appointment.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Appointment.notes": {
+      "file": "clinic_demo.apg",
+      "id": "field.Appointment.notes",
+      "kind": "field",
+      "name": "Appointment.notes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Appointment.patient_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Appointment.patient_id",
+      "kind": "field",
+      "name": "Appointment.patient_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Appointment.reason": {
+      "file": "clinic_demo.apg",
+      "id": "field.Appointment.reason",
+      "kind": "field",
+      "name": "Appointment.reason",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Appointment.room": {
+      "file": "clinic_demo.apg",
+      "id": "field.Appointment.room",
+      "kind": "field",
+      "name": "Appointment.room",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Appointment.status": {
+      "file": "clinic_demo.apg",
+      "id": "field.Appointment.status",
+      "kind": "field",
+      "name": "Appointment.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.amount_paid": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.amount_paid",
+      "kind": "field",
+      "name": "Bill.amount_paid",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.balance": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.balance",
+      "kind": "field",
+      "name": "Bill.balance",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.consultation_fee": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.consultation_fee",
+      "kind": "field",
+      "name": "Bill.consultation_fee",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.drug_fees": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.drug_fees",
+      "kind": "field",
+      "name": "Bill.drug_fees",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.id",
+      "kind": "field",
+      "name": "Bill.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.insurance_claim": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.insurance_claim",
+      "kind": "field",
+      "name": "Bill.insurance_claim",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.lab_fees": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.lab_fees",
+      "kind": "field",
+      "name": "Bill.lab_fees",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.patient_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.patient_id",
+      "kind": "field",
+      "name": "Bill.patient_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.payment_method": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.payment_method",
+      "kind": "field",
+      "name": "Bill.payment_method",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.procedure_fees": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.procedure_fees",
+      "kind": "field",
+      "name": "Bill.procedure_fees",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.status": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.status",
+      "kind": "field",
+      "name": "Bill.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.total_amount": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.total_amount",
+      "kind": "field",
+      "name": "Bill.total_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Bill.visit_date": {
+      "file": "clinic_demo.apg",
+      "id": "field.Bill.visit_date",
+      "kind": "field",
+      "name": "Bill.visit_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.appointment_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.appointment_id",
+      "kind": "field",
+      "name": "Consultation.appointment_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.chief_complaint": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.chief_complaint",
+      "kind": "field",
+      "name": "Consultation.chief_complaint",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.consultation_date": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.consultation_date",
+      "kind": "field",
+      "name": "Consultation.consultation_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.diagnosis": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.diagnosis",
+      "kind": "field",
+      "name": "Consultation.diagnosis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.doctor_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.doctor_id",
+      "kind": "field",
+      "name": "Consultation.doctor_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.examination_findings": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.examination_findings",
+      "kind": "field",
+      "name": "Consultation.examination_findings",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.follow_up_date": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.follow_up_date",
+      "kind": "field",
+      "name": "Consultation.follow_up_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.history": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.history",
+      "kind": "field",
+      "name": "Consultation.history",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.icd10_code": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.icd10_code",
+      "kind": "field",
+      "name": "Consultation.icd10_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.id",
+      "kind": "field",
+      "name": "Consultation.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.patient_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.patient_id",
+      "kind": "field",
+      "name": "Consultation.patient_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Consultation.treatment_plan": {
+      "file": "clinic_demo.apg",
+      "id": "field.Consultation.treatment_plan",
+      "kind": "field",
+      "name": "Consultation.treatment_plan",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LabTest.collected_date": {
+      "file": "clinic_demo.apg",
+      "id": "field.LabTest.collected_date",
+      "kind": "field",
+      "name": "LabTest.collected_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LabTest.consultation_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.LabTest.consultation_id",
+      "kind": "field",
+      "name": "LabTest.consultation_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LabTest.id": {
+      "file": "clinic_demo.apg",
+      "id": "field.LabTest.id",
+      "kind": "field",
+      "name": "LabTest.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LabTest.ordered_date": {
+      "file": "clinic_demo.apg",
+      "id": "field.LabTest.ordered_date",
+      "kind": "field",
+      "name": "LabTest.ordered_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LabTest.patient_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.LabTest.patient_id",
+      "kind": "field",
+      "name": "LabTest.patient_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LabTest.reference_range": {
+      "file": "clinic_demo.apg",
+      "id": "field.LabTest.reference_range",
+      "kind": "field",
+      "name": "LabTest.reference_range",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LabTest.result": {
+      "file": "clinic_demo.apg",
+      "id": "field.LabTest.result",
+      "kind": "field",
+      "name": "LabTest.result",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LabTest.result_date": {
+      "file": "clinic_demo.apg",
+      "id": "field.LabTest.result_date",
+      "kind": "field",
+      "name": "LabTest.result_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LabTest.status": {
+      "file": "clinic_demo.apg",
+      "id": "field.LabTest.status",
+      "kind": "field",
+      "name": "LabTest.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LabTest.technician": {
+      "file": "clinic_demo.apg",
+      "id": "field.LabTest.technician",
+      "kind": "field",
+      "name": "LabTest.technician",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LabTest.test_name": {
+      "file": "clinic_demo.apg",
+      "id": "field.LabTest.test_name",
+      "kind": "field",
+      "name": "LabTest.test_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.allergies": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.allergies",
+      "kind": "field",
+      "name": "Patient.allergies",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.blood_group": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.blood_group",
+      "kind": "field",
+      "name": "Patient.blood_group",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.county": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.county",
+      "kind": "field",
+      "name": "Patient.county",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.date_of_birth": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.date_of_birth",
+      "kind": "field",
+      "name": "Patient.date_of_birth",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.emergency_contact": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.emergency_contact",
+      "kind": "field",
+      "name": "Patient.emergency_contact",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.full_name": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.full_name",
+      "kind": "field",
+      "name": "Patient.full_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.gender": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.gender",
+      "kind": "field",
+      "name": "Patient.gender",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.id",
+      "kind": "field",
+      "name": "Patient.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.insurance_number": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.insurance_number",
+      "kind": "field",
+      "name": "Patient.insurance_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.insurance_provider": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.insurance_provider",
+      "kind": "field",
+      "name": "Patient.insurance_provider",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.national_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.national_id",
+      "kind": "field",
+      "name": "Patient.national_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.next_of_kin": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.next_of_kin",
+      "kind": "field",
+      "name": "Patient.next_of_kin",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.patient_number": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.patient_number",
+      "kind": "field",
+      "name": "Patient.patient_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Patient.phone": {
+      "file": "clinic_demo.apg",
+      "id": "field.Patient.phone",
+      "kind": "field",
+      "name": "Patient.phone",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.consultation_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.consultation_id",
+      "kind": "field",
+      "name": "Prescription.consultation_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.dispensed": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.dispensed",
+      "kind": "field",
+      "name": "Prescription.dispensed",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.doctor_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.doctor_id",
+      "kind": "field",
+      "name": "Prescription.doctor_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.dosage": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.dosage",
+      "kind": "field",
+      "name": "Prescription.dosage",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.drug_name": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.drug_name",
+      "kind": "field",
+      "name": "Prescription.drug_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.duration_days": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.duration_days",
+      "kind": "field",
+      "name": "Prescription.duration_days",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.frequency": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.frequency",
+      "kind": "field",
+      "name": "Prescription.frequency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.id",
+      "kind": "field",
+      "name": "Prescription.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.instructions": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.instructions",
+      "kind": "field",
+      "name": "Prescription.instructions",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.patient_id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.patient_id",
+      "kind": "field",
+      "name": "Prescription.patient_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.prescribed_date": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.prescribed_date",
+      "kind": "field",
+      "name": "Prescription.prescribed_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.quantity": {
+      "file": "clinic_demo.apg",
+      "id": "field.Prescription.quantity",
+      "kind": "field",
+      "name": "Prescription.quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Staff.department": {
+      "file": "clinic_demo.apg",
+      "id": "field.Staff.department",
+      "kind": "field",
+      "name": "Staff.department",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Staff.email": {
+      "file": "clinic_demo.apg",
+      "id": "field.Staff.email",
+      "kind": "field",
+      "name": "Staff.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Staff.full_name": {
+      "file": "clinic_demo.apg",
+      "id": "field.Staff.full_name",
+      "kind": "field",
+      "name": "Staff.full_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Staff.id": {
+      "file": "clinic_demo.apg",
+      "id": "field.Staff.id",
+      "kind": "field",
+      "name": "Staff.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Staff.license_number": {
+      "file": "clinic_demo.apg",
+      "id": "field.Staff.license_number",
+      "kind": "field",
+      "name": "Staff.license_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Staff.phone": {
+      "file": "clinic_demo.apg",
+      "id": "field.Staff.phone",
+      "kind": "field",
+      "name": "Staff.phone",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Staff.role": {
+      "file": "clinic_demo.apg",
+      "id": "field.Staff.role",
+      "kind": "field",
+      "name": "Staff.role",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Staff.shift": {
+      "file": "clinic_demo.apg",
+      "id": "field.Staff.shift",
+      "kind": "field",
+      "name": "Staff.shift",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Staff.specialization": {
+      "file": "clinic_demo.apg",
+      "id": "field.Staff.specialization",
+      "kind": "field",
+      "name": "Staff.specialization",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Staff.staff_number": {
+      "file": "clinic_demo.apg",
+      "id": "field.Staff.staff_number",
+      "kind": "field",
+      "name": "Staff.staff_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.clinic_demo": {
+      "file": "clinic_demo.apg",
+      "id": "module.clinic_demo",
+      "kind": "module",
+      "name": "clinic_demo",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Appointment": {
+      "file": "clinic_demo.apg",
+      "id": "table.Appointment",
+      "kind": "table",
+      "name": "Appointment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Bill": {
+      "file": "clinic_demo.apg",
+      "id": "table.Bill",
+      "kind": "table",
+      "name": "Bill",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Consultation": {
+      "file": "clinic_demo.apg",
+      "id": "table.Consultation",
+      "kind": "table",
+      "name": "Consultation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.LabTest": {
+      "file": "clinic_demo.apg",
+      "id": "table.LabTest",
+      "kind": "table",
+      "name": "LabTest",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Patient": {
+      "file": "clinic_demo.apg",
+      "id": "table.Patient",
+      "kind": "table",
+      "name": "Patient",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Prescription": {
+      "file": "clinic_demo.apg",
+      "id": "table.Prescription",
+      "kind": "table",
+      "name": "Prescription",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Staff": {
+      "file": "clinic_demo.apg",
+      "id": "table.Staff",
+      "kind": "table",
+      "name": "Staff",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Appointment": {
+      "fields": {
+        "appointment_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "appointment_time": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "appointment_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "doctor_id": {
+          "relationship": {
+            "alias": "doctor",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Doctor"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "notes": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "patient_id": {
+          "relationship": {
+            "alias": "patient",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Patient"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "reason": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "room": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "appointment_date.id": {
+          "chain": [
+            "Appointment.appointment_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Appointment"
+    },
+    "Bill": {
+      "fields": {
+        "amount_paid": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "balance": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "consultation_fee": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "drug_fees": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "insurance_claim": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "lab_fees": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "patient_id": {
+          "relationship": {
+            "alias": "patient",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Patient"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "payment_method": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "procedure_fees": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "visit_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        }
+      },
+      "lookup_paths": {
+        "visit_date.id": {
+          "chain": [
+            "Bill.visit_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Bill"
+    },
+    "Consultation": {
+      "fields": {
+        "appointment_id": {
+          "relationship": {
+            "alias": "appointment",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Appointment"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "chief_complaint": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "consultation_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "diagnosis": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "doctor_id": {
+          "relationship": {
+            "alias": "doctor",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Doctor"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "examination_findings": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "follow_up_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "history": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "icd10_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "patient_id": {
+          "relationship": {
+            "alias": "patient",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Patient"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "treatment_plan": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "consultation_date.id": {
+          "chain": [
+            "Consultation.consultation_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "follow_up_date.id": {
+          "chain": [
+            "Consultation.follow_up_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Consultation"
+    },
+    "LabTest": {
+      "fields": {
+        "collected_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "consultation_id": {
+          "relationship": {
+            "alias": "consultation",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Consultation"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "ordered_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "patient_id": {
+          "relationship": {
+            "alias": "patient",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Patient"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "reference_range": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "result": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "result_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "technician": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "test_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "collected_date.id": {
+          "chain": [
+            "LabTest.collected_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "ordered_date.id": {
+          "chain": [
+            "LabTest.ordered_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "result_date.id": {
+          "chain": [
+            "LabTest.result_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "LabTest"
+    },
+    "Patient": {
+      "fields": {
+        "allergies": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "blood_group": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "county": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "date_of_birth": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "emergency_contact": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "full_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "gender": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "insurance_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "insurance_provider": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "national_id": {
+          "relationship": {
+            "alias": "national",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "National"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "next_of_kin": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "patient_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "date_of_birth.id": {
+          "chain": [
+            "Patient.date_of_birth",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Patient"
+    },
+    "Prescription": {
+      "fields": {
+        "consultation_id": {
+          "relationship": {
+            "alias": "consultation",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Consultation"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "dispensed": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "doctor_id": {
+          "relationship": {
+            "alias": "doctor",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Doctor"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "dosage": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "drug_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "duration_days": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "frequency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "instructions": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "patient_id": {
+          "relationship": {
+            "alias": "patient",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Patient"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "prescribed_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {
+        "prescribed_date.id": {
+          "chain": [
+            "Prescription.prescribed_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Prescription"
+    },
+    "Staff": {
+      "fields": {
+        "department": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "full_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "license_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "role": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "shift": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "specialization": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "staff_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Staff"
+    }
+  },
+  "views": {}
+}

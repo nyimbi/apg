@@ -1,0 +1,1386 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 6,
+    "name": "sacco_demo",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "SaccoApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Cooperative banking platform",
+        "integrations": {},
+        "name": "SaccoApp",
+        "policies": {},
+        "routes": [],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "sacco_demo.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "sacco_demo.apg",
+      "fixes": [],
+      "message": "Application 'SaccoApp' should compose capabilities, components, or routes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "deployment": {
+      "edges": 6,
+      "kind": "deployment",
+      "nodes": 7
+    },
+    "er": {
+      "edges": 49,
+      "kind": "er",
+      "nodes": 51
+    },
+    "handler": {
+      "edges": 6,
+      "kind": "handler",
+      "nodes": 7
+    },
+    "lookup": {
+      "edges": 6,
+      "kind": "lookup",
+      "nodes": 7
+    },
+    "package": {
+      "edges": 6,
+      "kind": "package",
+      "nodes": 7
+    },
+    "security": {
+      "edges": 6,
+      "kind": "security",
+      "nodes": 7
+    },
+    "workflow": {
+      "edges": 6,
+      "kind": "workflow",
+      "nodes": 7
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "sacco_demo.apg"
+  ],
+  "symbols": {
+    "app.SaccoApp": {
+      "file": "sacco_demo.apg",
+      "id": "app.SaccoApp",
+      "kind": "app",
+      "name": "SaccoApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contribution.amount": {
+      "file": "sacco_demo.apg",
+      "id": "field.Contribution.amount",
+      "kind": "field",
+      "name": "Contribution.amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contribution.contribution_date": {
+      "file": "sacco_demo.apg",
+      "id": "field.Contribution.contribution_date",
+      "kind": "field",
+      "name": "Contribution.contribution_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contribution.contribution_type": {
+      "file": "sacco_demo.apg",
+      "id": "field.Contribution.contribution_type",
+      "kind": "field",
+      "name": "Contribution.contribution_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contribution.id": {
+      "file": "sacco_demo.apg",
+      "id": "field.Contribution.id",
+      "kind": "field",
+      "name": "Contribution.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contribution.member_id": {
+      "file": "sacco_demo.apg",
+      "id": "field.Contribution.member_id",
+      "kind": "field",
+      "name": "Contribution.member_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contribution.payment_method": {
+      "file": "sacco_demo.apg",
+      "id": "field.Contribution.payment_method",
+      "kind": "field",
+      "name": "Contribution.payment_method",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contribution.reference": {
+      "file": "sacco_demo.apg",
+      "id": "field.Contribution.reference",
+      "kind": "field",
+      "name": "Contribution.reference",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Dividend.declared_date": {
+      "file": "sacco_demo.apg",
+      "id": "field.Dividend.declared_date",
+      "kind": "field",
+      "name": "Dividend.declared_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Dividend.dividend_rate": {
+      "file": "sacco_demo.apg",
+      "id": "field.Dividend.dividend_rate",
+      "kind": "field",
+      "name": "Dividend.dividend_rate",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Dividend.financial_year": {
+      "file": "sacco_demo.apg",
+      "id": "field.Dividend.financial_year",
+      "kind": "field",
+      "name": "Dividend.financial_year",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Dividend.id": {
+      "file": "sacco_demo.apg",
+      "id": "field.Dividend.id",
+      "kind": "field",
+      "name": "Dividend.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Dividend.payment_date": {
+      "file": "sacco_demo.apg",
+      "id": "field.Dividend.payment_date",
+      "kind": "field",
+      "name": "Dividend.payment_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Dividend.status": {
+      "file": "sacco_demo.apg",
+      "id": "field.Dividend.status",
+      "kind": "field",
+      "name": "Dividend.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Dividend.total_profit": {
+      "file": "sacco_demo.apg",
+      "id": "field.Dividend.total_profit",
+      "kind": "field",
+      "name": "Dividend.total_profit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.disbursement_date": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.disbursement_date",
+      "kind": "field",
+      "name": "Loan.disbursement_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.guarantor_1_id": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.guarantor_1_id",
+      "kind": "field",
+      "name": "Loan.guarantor_1_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.guarantor_2_id": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.guarantor_2_id",
+      "kind": "field",
+      "name": "Loan.guarantor_2_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.id": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.id",
+      "kind": "field",
+      "name": "Loan.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.interest_rate": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.interest_rate",
+      "kind": "field",
+      "name": "Loan.interest_rate",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.loan_number": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.loan_number",
+      "kind": "field",
+      "name": "Loan.loan_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.loan_type": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.loan_type",
+      "kind": "field",
+      "name": "Loan.loan_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.member_id": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.member_id",
+      "kind": "field",
+      "name": "Loan.member_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.monthly_repayment": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.monthly_repayment",
+      "kind": "field",
+      "name": "Loan.monthly_repayment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.outstanding_balance": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.outstanding_balance",
+      "kind": "field",
+      "name": "Loan.outstanding_balance",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.principal_amount": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.principal_amount",
+      "kind": "field",
+      "name": "Loan.principal_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.status": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.status",
+      "kind": "field",
+      "name": "Loan.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Loan.term_months": {
+      "file": "sacco_demo.apg",
+      "id": "field.Loan.term_months",
+      "kind": "field",
+      "name": "Loan.term_months",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.designation": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.designation",
+      "kind": "field",
+      "name": "Member.designation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.email": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.email",
+      "kind": "field",
+      "name": "Member.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.employer": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.employer",
+      "kind": "field",
+      "name": "Member.employer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.full_name": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.full_name",
+      "kind": "field",
+      "name": "Member.full_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.id": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.id",
+      "kind": "field",
+      "name": "Member.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.join_date": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.join_date",
+      "kind": "field",
+      "name": "Member.join_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.member_number": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.member_number",
+      "kind": "field",
+      "name": "Member.member_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.monthly_contribution": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.monthly_contribution",
+      "kind": "field",
+      "name": "Member.monthly_contribution",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.national_id": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.national_id",
+      "kind": "field",
+      "name": "Member.national_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.phone": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.phone",
+      "kind": "field",
+      "name": "Member.phone",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.share_capital": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.share_capital",
+      "kind": "field",
+      "name": "Member.share_capital",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Member.status": {
+      "file": "sacco_demo.apg",
+      "id": "field.Member.status",
+      "kind": "field",
+      "name": "Member.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SavingsAccount.account_number": {
+      "file": "sacco_demo.apg",
+      "id": "field.SavingsAccount.account_number",
+      "kind": "field",
+      "name": "SavingsAccount.account_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SavingsAccount.account_type": {
+      "file": "sacco_demo.apg",
+      "id": "field.SavingsAccount.account_type",
+      "kind": "field",
+      "name": "SavingsAccount.account_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SavingsAccount.balance": {
+      "file": "sacco_demo.apg",
+      "id": "field.SavingsAccount.balance",
+      "kind": "field",
+      "name": "SavingsAccount.balance",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SavingsAccount.id": {
+      "file": "sacco_demo.apg",
+      "id": "field.SavingsAccount.id",
+      "kind": "field",
+      "name": "SavingsAccount.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SavingsAccount.interest_rate": {
+      "file": "sacco_demo.apg",
+      "id": "field.SavingsAccount.interest_rate",
+      "kind": "field",
+      "name": "SavingsAccount.interest_rate",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SavingsAccount.last_transaction_date": {
+      "file": "sacco_demo.apg",
+      "id": "field.SavingsAccount.last_transaction_date",
+      "kind": "field",
+      "name": "SavingsAccount.last_transaction_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SavingsAccount.member_id": {
+      "file": "sacco_demo.apg",
+      "id": "field.SavingsAccount.member_id",
+      "kind": "field",
+      "name": "SavingsAccount.member_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.sacco_demo": {
+      "file": "sacco_demo.apg",
+      "id": "module.sacco_demo",
+      "kind": "module",
+      "name": "sacco_demo",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Contribution": {
+      "file": "sacco_demo.apg",
+      "id": "table.Contribution",
+      "kind": "table",
+      "name": "Contribution",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Dividend": {
+      "file": "sacco_demo.apg",
+      "id": "table.Dividend",
+      "kind": "table",
+      "name": "Dividend",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Loan": {
+      "file": "sacco_demo.apg",
+      "id": "table.Loan",
+      "kind": "table",
+      "name": "Loan",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Member": {
+      "file": "sacco_demo.apg",
+      "id": "table.Member",
+      "kind": "table",
+      "name": "Member",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.SavingsAccount": {
+      "file": "sacco_demo.apg",
+      "id": "table.SavingsAccount",
+      "kind": "table",
+      "name": "SavingsAccount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Contribution": {
+      "fields": {
+        "amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "contribution_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "contribution_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "member_id": {
+          "relationship": {
+            "alias": "member",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Member"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "payment_method": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "reference": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "contribution_date.id": {
+          "chain": [
+            "Contribution.contribution_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Contribution"
+    },
+    "Dividend": {
+      "fields": {
+        "declared_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "dividend_rate": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "financial_year": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "payment_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total_profit": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {
+        "declared_date.id": {
+          "chain": [
+            "Dividend.declared_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "payment_date.id": {
+          "chain": [
+            "Dividend.payment_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Dividend"
+    },
+    "Loan": {
+      "fields": {
+        "disbursement_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "guarantor_1_id": {
+          "relationship": {
+            "alias": "guarantor_1",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Guarantor1"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "guarantor_2_id": {
+          "relationship": {
+            "alias": "guarantor_2",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Guarantor2"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "interest_rate": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "loan_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "loan_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "member_id": {
+          "relationship": {
+            "alias": "member",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Member"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "monthly_repayment": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "outstanding_balance": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "principal_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "term_months": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {
+        "disbursement_date.id": {
+          "chain": [
+            "Loan.disbursement_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Loan"
+    },
+    "Member": {
+      "fields": {
+        "designation": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "employer": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "full_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "join_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "member_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "monthly_contribution": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "national_id": {
+          "relationship": {
+            "alias": "national",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "National"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "share_capital": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "join_date.id": {
+          "chain": [
+            "Member.join_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Member"
+    },
+    "SavingsAccount": {
+      "fields": {
+        "account_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "account_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "balance": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "interest_rate": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "last_transaction_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "member_id": {
+          "relationship": {
+            "alias": "member",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Member"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "last_transaction_date.id": {
+          "chain": [
+            "SavingsAccount.last_transaction_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "SavingsAccount"
+    }
+  },
+  "views": {}
+}

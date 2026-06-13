@@ -3325,22 +3325,28 @@ def theme_stylesheet() -> str:
 def _html_page(title: str, body: str) -> str:
     safe_title = html.escape(title)
     safe_module = html.escape(MODULE_NAME)
-    inter_font = (
+    head_extras = (
+        # Inter font
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">'
+        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">'
+        # Tailwind CDN — enables utility classes in Jinja2 templates
+        '<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>'
+        '<script>tailwind.config={{theme:{{extend:{{fontFamily:{{sans:["Inter","system-ui","sans-serif"],mono:["JetBrains Mono","ui-monospace","monospace"]}},colors:{{apg:{{primary:"#1E5B5A",accent:"#D97706"}}}}}}}}}}</script>'
+        # htmx — progressive enhancement for partial updates
+        '<script defer src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>'
     )
     return (
         "<!doctype html>"
-        '<html lang="en"><head>'
+        '<html lang="en" class="h-full"><head>'
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        f"{{inter_font}}"
+        f"{{head_extras}}"
         '<link rel="stylesheet" href="/theme.css">'
         f"<title>{{safe_title}} — {{safe_module}}</title>"
         "</head>"
-        "<body>"
-        f'<header class="apg-topbar" role="banner">'
+        '<body class="min-h-full bg-gray-50 text-gray-900">'
+        f'<header class="apg-topbar sticky top-0 z-50" role="banner">'
         f'  <a class="apg-logo" href="/ui">{{safe_module}}</a>'
         f'</header>'
         f'<main class="apg-content" id="main-content">{{body}}</main>'

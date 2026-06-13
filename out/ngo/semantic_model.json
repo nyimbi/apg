@@ -1,0 +1,2328 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 8,
+    "name": "ngo_grants",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "NGOApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Grant management and impact measurement",
+        "integrations": {},
+        "name": "NGOApp",
+        "policies": {},
+        "routes": [],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "ngo_grants.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "ngo_grants.apg",
+      "fixes": [],
+      "message": "Application 'NGOApp' should compose capabilities, components, or routes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "deployment": {
+      "edges": 8,
+      "kind": "deployment",
+      "nodes": 9
+    },
+    "er": {
+      "edges": 92,
+      "kind": "er",
+      "nodes": 93
+    },
+    "handler": {
+      "edges": 8,
+      "kind": "handler",
+      "nodes": 9
+    },
+    "lookup": {
+      "edges": 8,
+      "kind": "lookup",
+      "nodes": 9
+    },
+    "package": {
+      "edges": 8,
+      "kind": "package",
+      "nodes": 9
+    },
+    "security": {
+      "edges": 8,
+      "kind": "security",
+      "nodes": 9
+    },
+    "workflow": {
+      "edges": 8,
+      "kind": "workflow",
+      "nodes": 9
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "ngo_grants.apg"
+  ],
+  "symbols": {
+    "app.NGOApp": {
+      "file": "ngo_grants.apg",
+      "id": "app.NGOApp",
+      "kind": "app",
+      "name": "NGOApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.activity_code": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.activity_code",
+      "kind": "field",
+      "name": "Activity.activity_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.activity_name": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.activity_name",
+      "kind": "field",
+      "name": "Activity.activity_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.actual_expenditure": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.actual_expenditure",
+      "kind": "field",
+      "name": "Activity.actual_expenditure",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.beneficiaries_reached": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.beneficiaries_reached",
+      "kind": "field",
+      "name": "Activity.beneficiaries_reached",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.budget": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.budget",
+      "kind": "field",
+      "name": "Activity.budget",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.description": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.description",
+      "kind": "field",
+      "name": "Activity.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.end_date": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.end_date",
+      "kind": "field",
+      "name": "Activity.end_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.grant_id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.grant_id",
+      "kind": "field",
+      "name": "Activity.grant_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.id",
+      "kind": "field",
+      "name": "Activity.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.lead_person": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.lead_person",
+      "kind": "field",
+      "name": "Activity.lead_person",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.start_date": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.start_date",
+      "kind": "field",
+      "name": "Activity.start_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.status": {
+      "file": "ngo_grants.apg",
+      "id": "field.Activity.status",
+      "kind": "field",
+      "name": "Activity.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.age": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.age",
+      "kind": "field",
+      "name": "Beneficiary.age",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.beneficiary_code": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.beneficiary_code",
+      "kind": "field",
+      "name": "Beneficiary.beneficiary_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.county": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.county",
+      "kind": "field",
+      "name": "Beneficiary.county",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.enrolment_date": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.enrolment_date",
+      "kind": "field",
+      "name": "Beneficiary.enrolment_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.full_name": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.full_name",
+      "kind": "field",
+      "name": "Beneficiary.full_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.gender": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.gender",
+      "kind": "field",
+      "name": "Beneficiary.gender",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.household_size": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.household_size",
+      "kind": "field",
+      "name": "Beneficiary.household_size",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.id",
+      "kind": "field",
+      "name": "Beneficiary.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.phone": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.phone",
+      "kind": "field",
+      "name": "Beneficiary.phone",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.programme_id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.programme_id",
+      "kind": "field",
+      "name": "Beneficiary.programme_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.status": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.status",
+      "kind": "field",
+      "name": "Beneficiary.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.sub_county": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.sub_county",
+      "kind": "field",
+      "name": "Beneficiary.sub_county",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Beneficiary.vulnerability_category": {
+      "file": "ngo_grants.apg",
+      "id": "field.Beneficiary.vulnerability_category",
+      "kind": "field",
+      "name": "Beneficiary.vulnerability_category",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Disbursement.amount": {
+      "file": "ngo_grants.apg",
+      "id": "field.Disbursement.amount",
+      "kind": "field",
+      "name": "Disbursement.amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Disbursement.bank_reference": {
+      "file": "ngo_grants.apg",
+      "id": "field.Disbursement.bank_reference",
+      "kind": "field",
+      "name": "Disbursement.bank_reference",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Disbursement.conditions_met": {
+      "file": "ngo_grants.apg",
+      "id": "field.Disbursement.conditions_met",
+      "kind": "field",
+      "name": "Disbursement.conditions_met",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Disbursement.currency": {
+      "file": "ngo_grants.apg",
+      "id": "field.Disbursement.currency",
+      "kind": "field",
+      "name": "Disbursement.currency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Disbursement.disbursement_date": {
+      "file": "ngo_grants.apg",
+      "id": "field.Disbursement.disbursement_date",
+      "kind": "field",
+      "name": "Disbursement.disbursement_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Disbursement.donor_id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Disbursement.donor_id",
+      "kind": "field",
+      "name": "Disbursement.donor_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Disbursement.grant_id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Disbursement.grant_id",
+      "kind": "field",
+      "name": "Disbursement.grant_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Disbursement.id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Disbursement.id",
+      "kind": "field",
+      "name": "Disbursement.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Disbursement.purpose": {
+      "file": "ngo_grants.apg",
+      "id": "field.Disbursement.purpose",
+      "kind": "field",
+      "name": "Disbursement.purpose",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Disbursement.status": {
+      "file": "ngo_grants.apg",
+      "id": "field.Disbursement.status",
+      "kind": "field",
+      "name": "Disbursement.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Disbursement.tranche_number": {
+      "file": "ngo_grants.apg",
+      "id": "field.Disbursement.tranche_number",
+      "kind": "field",
+      "name": "Disbursement.tranche_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.contact_person": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.contact_person",
+      "kind": "field",
+      "name": "Donor.contact_person",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.country": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.country",
+      "kind": "field",
+      "name": "Donor.country",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.donor_code": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.donor_code",
+      "kind": "field",
+      "name": "Donor.donor_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.donor_type": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.donor_type",
+      "kind": "field",
+      "name": "Donor.donor_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.email": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.email",
+      "kind": "field",
+      "name": "Donor.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.id",
+      "kind": "field",
+      "name": "Donor.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.organisation_name": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.organisation_name",
+      "kind": "field",
+      "name": "Donor.organisation_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.phone": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.phone",
+      "kind": "field",
+      "name": "Donor.phone",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.preferred_reporting": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.preferred_reporting",
+      "kind": "field",
+      "name": "Donor.preferred_reporting",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.relationship_manager": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.relationship_manager",
+      "kind": "field",
+      "name": "Donor.relationship_manager",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.total_committed": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.total_committed",
+      "kind": "field",
+      "name": "Donor.total_committed",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Donor.total_disbursed": {
+      "file": "ngo_grants.apg",
+      "id": "field.Donor.total_disbursed",
+      "kind": "field",
+      "name": "Donor.total_disbursed",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.amount": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.amount",
+      "kind": "field",
+      "name": "Grant.amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.country": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.country",
+      "kind": "field",
+      "name": "Grant.country",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.currency": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.currency",
+      "kind": "field",
+      "name": "Grant.currency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.donor_id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.donor_id",
+      "kind": "field",
+      "name": "Grant.donor_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.end_date": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.end_date",
+      "kind": "field",
+      "name": "Grant.end_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.grant_code": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.grant_code",
+      "kind": "field",
+      "name": "Grant.grant_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.grant_type": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.grant_type",
+      "kind": "field",
+      "name": "Grant.grant_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.id",
+      "kind": "field",
+      "name": "Grant.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.project_manager": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.project_manager",
+      "kind": "field",
+      "name": "Grant.project_manager",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.reporting_frequency": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.reporting_frequency",
+      "kind": "field",
+      "name": "Grant.reporting_frequency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.sector": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.sector",
+      "kind": "field",
+      "name": "Grant.sector",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.start_date": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.start_date",
+      "kind": "field",
+      "name": "Grant.start_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.status": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.status",
+      "kind": "field",
+      "name": "Grant.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.thematic_area": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.thematic_area",
+      "kind": "field",
+      "name": "Grant.thematic_area",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Grant.title": {
+      "file": "ngo_grants.apg",
+      "id": "field.Grant.title",
+      "kind": "field",
+      "name": "Grant.title",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.baseline_value": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.baseline_value",
+      "kind": "field",
+      "name": "Indicator.baseline_value",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.collection_frequency": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.collection_frequency",
+      "kind": "field",
+      "name": "Indicator.collection_frequency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.current_value": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.current_value",
+      "kind": "field",
+      "name": "Indicator.current_value",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.data_source": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.data_source",
+      "kind": "field",
+      "name": "Indicator.data_source",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.disaggregation": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.disaggregation",
+      "kind": "field",
+      "name": "Indicator.disaggregation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.grant_id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.grant_id",
+      "kind": "field",
+      "name": "Indicator.grant_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.id": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.id",
+      "kind": "field",
+      "name": "Indicator.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.indicator_code": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.indicator_code",
+      "kind": "field",
+      "name": "Indicator.indicator_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.indicator_name": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.indicator_name",
+      "kind": "field",
+      "name": "Indicator.indicator_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.indicator_type": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.indicator_type",
+      "kind": "field",
+      "name": "Indicator.indicator_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.target_value": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.target_value",
+      "kind": "field",
+      "name": "Indicator.target_value",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Indicator.unit_of_measurement": {
+      "file": "ngo_grants.apg",
+      "id": "field.Indicator.unit_of_measurement",
+      "kind": "field",
+      "name": "Indicator.unit_of_measurement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProgressReport.achievements": {
+      "file": "ngo_grants.apg",
+      "id": "field.ProgressReport.achievements",
+      "kind": "field",
+      "name": "ProgressReport.achievements",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProgressReport.challenges": {
+      "file": "ngo_grants.apg",
+      "id": "field.ProgressReport.challenges",
+      "kind": "field",
+      "name": "ProgressReport.challenges",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProgressReport.financial_expenditure": {
+      "file": "ngo_grants.apg",
+      "id": "field.ProgressReport.financial_expenditure",
+      "kind": "field",
+      "name": "ProgressReport.financial_expenditure",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProgressReport.grant_id": {
+      "file": "ngo_grants.apg",
+      "id": "field.ProgressReport.grant_id",
+      "kind": "field",
+      "name": "ProgressReport.grant_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProgressReport.id": {
+      "file": "ngo_grants.apg",
+      "id": "field.ProgressReport.id",
+      "kind": "field",
+      "name": "ProgressReport.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProgressReport.narrative_summary": {
+      "file": "ngo_grants.apg",
+      "id": "field.ProgressReport.narrative_summary",
+      "kind": "field",
+      "name": "ProgressReport.narrative_summary",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProgressReport.next_steps": {
+      "file": "ngo_grants.apg",
+      "id": "field.ProgressReport.next_steps",
+      "kind": "field",
+      "name": "ProgressReport.next_steps",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProgressReport.report_period": {
+      "file": "ngo_grants.apg",
+      "id": "field.ProgressReport.report_period",
+      "kind": "field",
+      "name": "ProgressReport.report_period",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProgressReport.reviewed_by": {
+      "file": "ngo_grants.apg",
+      "id": "field.ProgressReport.reviewed_by",
+      "kind": "field",
+      "name": "ProgressReport.reviewed_by",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProgressReport.status": {
+      "file": "ngo_grants.apg",
+      "id": "field.ProgressReport.status",
+      "kind": "field",
+      "name": "ProgressReport.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProgressReport.submission_date": {
+      "file": "ngo_grants.apg",
+      "id": "field.ProgressReport.submission_date",
+      "kind": "field",
+      "name": "ProgressReport.submission_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.ngo_grants": {
+      "file": "ngo_grants.apg",
+      "id": "module.ngo_grants",
+      "kind": "module",
+      "name": "ngo_grants",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Activity": {
+      "file": "ngo_grants.apg",
+      "id": "table.Activity",
+      "kind": "table",
+      "name": "Activity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Beneficiary": {
+      "file": "ngo_grants.apg",
+      "id": "table.Beneficiary",
+      "kind": "table",
+      "name": "Beneficiary",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Disbursement": {
+      "file": "ngo_grants.apg",
+      "id": "table.Disbursement",
+      "kind": "table",
+      "name": "Disbursement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Donor": {
+      "file": "ngo_grants.apg",
+      "id": "table.Donor",
+      "kind": "table",
+      "name": "Donor",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Grant": {
+      "file": "ngo_grants.apg",
+      "id": "table.Grant",
+      "kind": "table",
+      "name": "Grant",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Indicator": {
+      "file": "ngo_grants.apg",
+      "id": "table.Indicator",
+      "kind": "table",
+      "name": "Indicator",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.ProgressReport": {
+      "file": "ngo_grants.apg",
+      "id": "table.ProgressReport",
+      "kind": "table",
+      "name": "ProgressReport",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Activity": {
+      "fields": {
+        "activity_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "activity_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "actual_expenditure": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "beneficiaries_reached": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "budget": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "end_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "grant_id": {
+          "relationship": {
+            "alias": "grant",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Grant"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "lead_person": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "start_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "end_date.id": {
+          "chain": [
+            "Activity.end_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "start_date.id": {
+          "chain": [
+            "Activity.start_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Activity"
+    },
+    "Beneficiary": {
+      "fields": {
+        "age": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "beneficiary_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "county": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "enrolment_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "full_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "gender": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "household_size": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "programme_id": {
+          "relationship": {
+            "alias": "programme",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Programme"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "sub_county": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "vulnerability_category": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "enrolment_date.id": {
+          "chain": [
+            "Beneficiary.enrolment_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Beneficiary"
+    },
+    "Disbursement": {
+      "fields": {
+        "amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "bank_reference": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "conditions_met": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "disbursement_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "donor_id": {
+          "relationship": {
+            "alias": "donor",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Donor"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "grant_id": {
+          "relationship": {
+            "alias": "grant",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Grant"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "purpose": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "tranche_number": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {
+        "disbursement_date.id": {
+          "chain": [
+            "Disbursement.disbursement_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Disbursement"
+    },
+    "Donor": {
+      "fields": {
+        "contact_person": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "country": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "donor_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "donor_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "organisation_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "preferred_reporting": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "relationship_manager": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total_committed": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "total_disbursed": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Donor"
+    },
+    "Grant": {
+      "fields": {
+        "amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "country": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "donor_id": {
+          "relationship": {
+            "alias": "donor",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Donor"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "end_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "grant_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "grant_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "project_manager": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "reporting_frequency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "sector": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "start_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "thematic_area": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "title": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "end_date.id": {
+          "chain": [
+            "Grant.end_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "start_date.id": {
+          "chain": [
+            "Grant.start_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Grant"
+    },
+    "Indicator": {
+      "fields": {
+        "baseline_value": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "collection_frequency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "current_value": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "data_source": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "disaggregation": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "grant_id": {
+          "relationship": {
+            "alias": "grant",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Grant"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "indicator_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "indicator_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "indicator_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "target_value": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "unit_of_measurement": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Indicator"
+    },
+    "ProgressReport": {
+      "fields": {
+        "achievements": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "challenges": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "financial_expenditure": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "grant_id": {
+          "relationship": {
+            "alias": "grant",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Grant"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "narrative_summary": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "next_steps": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "report_period": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "reviewed_by": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "submission_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        }
+      },
+      "lookup_paths": {
+        "submission_date.id": {
+          "chain": [
+            "ProgressReport.submission_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "ProgressReport"
+    }
+  },
+  "views": {}
+}
