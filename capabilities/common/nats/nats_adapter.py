@@ -83,6 +83,21 @@ class NATSEventAdapter:
 	def __init__(self, capability_id: str = "platform") -> None:
 		self._capability_id = capability_id
 
+	async def publish_event(self, event: "IntegrationEvent") -> None:
+		"""Publish a typed IntegrationEvent envelope to JetStream."""
+		from .events import IntegrationEvent  # local import avoids circular deps
+		data = json.dumps(event.model_dump(mode="json"), default=str).encode()
+		for attempt in range(3):
+			try:
+				js = await _get_js()
+				await js.publish(event.subject(), data, headers={"Msg-Id": event.msg_id()})
+				return
+			except Exception as exc:
+				if attempt == 2:
+					_log.error("Failed to publish IntegrationEvent %s after 3 attempts: %s", event.subject(), exc)
+				else:
+					await asyncio.sleep(0.1 * (attempt + 1))
+
 	async def log_event(
 		self,
 		event_type: str,
@@ -154,6 +169,13 @@ class NATSConnector:
 
 	async def connect(self) -> None:
 		self._js = await _get_js()
+
+	async def publish_event(self, event: "IntegrationEvent") -> None:
+		"""Publish a typed IntegrationEvent envelope."""
+		if self._js is None:
+			await self.connect()
+		data = json.dumps(event.model_dump(mode="json"), default=str).encode()
+		await self._js.publish(event.subject(), data, headers={"Msg-Id": event.msg_id()})
 
 	async def publish(self, event_type: str, tenant_id: str, payload: dict[str, Any]) -> None:
 		if self._js is None:

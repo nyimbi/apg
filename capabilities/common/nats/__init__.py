@@ -15,11 +15,13 @@ Usage::
     adapter = get_nats_audit_adapter()
     await adapter.log_event("workflow_started", "user1", "tenant1", "wf-123", {...})
 """
+from .events import IntegrationEvent
 from .nats_adapter import NATSEventAdapter, NATSConnector, get_nats_audit_adapter
 from .stream_setup import setup_apg_stream, APG_STREAM_NAME, APG_SUBJECT_PREFIX
 from .subject_registry import subject_for, parse_subject
 
 __all__ = [
+	"IntegrationEvent",
 	"NATSEventAdapter",
 	"NATSConnector",
 	"get_nats_audit_adapter",

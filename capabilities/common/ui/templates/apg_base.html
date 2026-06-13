@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="{{ html_lang | default('en') }}" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ page_title | default(capability_name | default('APG')) }}{% endblock %} — {{ app_name | default('APG') }}</title>
+
+  {# Inter font — preconnect for zero-latency #}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  {# Tailwind CSS CDN — no build step required #}
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+          },
+          colors: {
+            apg: {
+              primary: '#1E5B5A',
+              accent:  '#D97706',
+              surface: '#ffffff',
+              canvas:  '#f6f8fa',
+              border:  '#d0d7de',
+              text:    '#1f2328',
+              muted:   '#59636e',
+            },
+          },
+        },
+      },
+    }
+  </script>
+
+  {# htmx — progressive enhancement for partial updates #}
+  <script defer src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+
+  {# Alpine.js — micro-interactions (dropdowns, modals, tabs) #}
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+
+  {# APG design tokens as CSS custom properties #}
+  <style>
+    :root {
+      --apg-primary:       #1E5B5A;
+      --apg-accent:        #D97706;
+      --apg-surface:       #ffffff;
+      --apg-canvas:        #f6f8fa;
+      --apg-border:        #d0d7de;
+      --apg-text:          #1f2328;
+      --apg-muted:         #59636e;
+      --apg-radius:        8px;
+      --apg-radius-sm:     4px;
+      --apg-shadow-sm:     0 1px 2px rgba(0,0,0,0.08);
+      --apg-shadow-md:     0 4px 6px rgba(0,0,0,0.10);
+      --apg-topbar-height: 56px;
+      --apg-sidebar-width: 240px;
+    }
+    [data-theme="dark"] {
+      --apg-surface: #1e2028;
+      --apg-canvas:  #0d1117;
+      --apg-border:  #30363d;
+      --apg-text:    #e6edf3;
+      --apg-muted:   #8b949e;
+    }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--apg-canvas); color: var(--apg-text); }
+    /* htmx loading indicator */
+    .htmx-indicator { opacity: 0; transition: opacity 200ms; }
+    .htmx-request .htmx-indicator { opacity: 1; }
+  </style>
+
+  {% block head %}{% endblock %}
+</head>
+
+<body class="min-h-screen" x-data="apgShell()" x-init="init()">
+
+  {# Topbar #}
+  <header class="sticky top-0 z-50 flex items-center gap-4 px-6 border-b bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-sm" style="height: var(--apg-topbar-height)">
+    <a href="{{ url_for('apg_index') if 'apg_index' in current_app.view_functions else '/' }}"
+       class="font-bold text-base tracking-tight text-apg-primary no-underline hover:opacity-80">
+      {{ app_name | default('APG') }}
+    </a>
+
+    <nav class="flex items-center gap-1 flex-1" aria-label="Capability navigation">
+      {% block topnav %}
+        {% for item in nav_items | default([]) %}
+          <a href="{{ item.url }}"
+             class="inline-flex items-center px-3 py-1.5 rounded text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 {{ 'font-medium bg-gray-100 dark:bg-gray-800' if item.active else '' }}">
+            {{ item.label }}
+          </a>
+        {% endfor %}
+      {% endblock %}
+    </nav>
+
+    <div class="flex items-center gap-2 ml-auto">
+      {# Dark mode toggle #}
+      <button @click="toggleDark()"
+              class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+              :aria-label="dark ? 'Switch to light mode' : 'Switch to dark mode'">
+        <span x-show="!dark">🌙</span>
+        <span x-show="dark">☀️</span>
+      </button>
+
+      {% if current_user is defined and current_user.is_authenticated %}
+        <span class="text-sm text-gray-500">{{ current_user.username | default('') }}</span>
+      {% endif %}
+    </div>
+  </header>
+
+  {# Main layout with optional sidebar #}
+  <div class="flex min-h-[calc(100vh-var(--apg-topbar-height))]">
+    {% if show_sidebar | default(false) %}
+      <aside class="hidden md:flex flex-col w-60 shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 gap-1"
+             aria-label="Sidebar navigation">
+        {% block sidebar %}{% endblock %}
+      </aside>
+    {% endif %}
+
+    <main class="flex-1 max-w-7xl mx-auto px-6 py-6 w-full" id="main-content">
+      {# Flash messages #}
+      {% with messages = get_flashed_messages(with_categories=true) if get_flashed_messages is defined else [] %}
+        {% for category, message in messages %}
+          <div role="alert"
+               class="mb-4 px-4 py-3 rounded text-sm border {{ 'bg-green-50 border-green-200 text-green-800' if category == 'success' else 'bg-red-50 border-red-200 text-red-800' if category == 'danger' else 'bg-yellow-50 border-yellow-200 text-yellow-800' }}"
+               x-data="{ show: true }" x-show="show">
+            {{ message }}
+            <button @click="show=false" class="float-right font-bold opacity-60 hover:opacity-100">&times;</button>
+          </div>
+        {% endfor %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  {# htmx CSRF (for Flask-WTF / FAB) #}
+  <script>
+    document.body.addEventListener('htmx:configRequest', function(e) {
+      const meta = document.querySelector('meta[name=csrf-token]');
+      if (meta) e.detail.headers['X-CSRFToken'] = meta.content;
+    });
+
+    function apgShell() {
+      return {
+        dark: localStorage.getItem('apg-dark') === '1',
+        init() {
+          this.$watch('dark', v => {
+            document.documentElement.classList.toggle('dark', v);
+            document.documentElement.setAttribute('data-theme', v ? 'dark' : 'light');
+            localStorage.setItem('apg-dark', v ? '1' : '0');
+          });
+          document.documentElement.classList.toggle('dark', this.dark);
+          document.documentElement.setAttribute('data-theme', this.dark ? 'dark' : 'light');
+        },
+        toggleDark() { this.dark = !this.dark; },
+      };
+    }
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

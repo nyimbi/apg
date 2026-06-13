@@ -1,0 +1,16 @@
+{# _tokens.html — converts APG theme token dict to CSS :root {} block
+   Usage: {% from "_tokens.html" import apg_tokens %}
+          {{ apg_tokens(theme.tokens) }}
+#}
+{% macro apg_tokens(tokens) %}
+<style>
+  :root {
+    {% for key, value in tokens.items() %}
+    --apg-{{ key | replace('.', '-') | replace('_', '-') }}: {{ value }};
+    {% endfor %}
+    {% if 'color.primary' in tokens %}--apg-primary: {{ tokens['color.primary'] }};{% endif %}
+    {% if 'color.accent' in tokens %}--apg-accent: {{ tokens['color.accent'] }};{% endif %}
+    {% if 'border.radius' in tokens %}--apg-radius: {{ tokens['border.radius'] }};{% endif %}
+  }
+</style>
+{% endmacro %}

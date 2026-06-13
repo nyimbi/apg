@@ -1,0 +1,120 @@
+{# macros/settings.html — settings page layout macros
+   Usage: {% from "macros/settings.html" import settings_layout, settings_group, toggle_field %}
+#}
+
+{# settings_layout — page-level layout with sidebar nav and content area.
+   nav_sections: list of {label, items: [{label, url, active?, icon?}]}
+#}
+{% macro settings_layout(nav_sections, title='Settings') %}
+<div class="flex gap-6">
+  {# Settings sidebar nav #}
+  <aside class="w-52 shrink-0" aria-label="Settings navigation">
+    <h1 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">{{ title }}</h1>
+    {% for section in nav_sections %}
+      {% if section.get('label') %}
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1 mt-3 first:mt-0">{{ section.label }}</p>
+      {% endif %}
+      <ul class="space-y-0.5">
+        {% for item in section.items %}
+          <li>
+            <a href="{{ item.url }}"
+               class="flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors
+                      {{ 'bg-apg-primary text-white font-medium' if item.get('active') else 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}"
+               {{ 'aria-current="page"' if item.get('active') }}>
+              {% if item.get('icon') %}<span aria-hidden="true" class="text-base">{{ item.icon }}</span>{% endif %}
+              {{ item.label }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endfor %}
+  </aside>
+
+  {# Content area #}
+  <div class="flex-1 min-w-0">
+    {{ caller() }}
+  </div>
+</div>
+{% endmacro %}
+
+
+{# settings_group(title, description=None, save_url=None, method='post')
+   Wraps a group of settings fields. If save_url provided, renders as a form with auto-save.
+#}
+{% macro settings_group(title, description=None, save_url=None, method='post', hx_save=false) %}
+<div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-6">
+  <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+    <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ title }}</h2>
+    {% if description %}
+      <p class="text-xs text-gray-500 mt-0.5">{{ description }}</p>
+    {% endif %}
+  </div>
+
+  {% if save_url %}
+    <form {% if hx_save %}
+            hx-{{ method }}="{{ save_url }}"
+            hx-target="this"
+            hx-swap="outerHTML"
+          {% else %}
+            method="{{ method }}"
+            action="{{ save_url }}"
+          {% endif %}
+          class="px-5 py-4">
+      {{ caller() }}
+      <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex items-center gap-3">
+        <button type="submit"
+                class="px-4 py-2 bg-apg-primary text-white text-sm font-medium rounded hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-apg-primary focus:ring-offset-2">
+          Save changes
+        </button>
+        <span class="htmx-indicator text-xs text-gray-400">Saving…</span>
+      </div>
+    </form>
+  {% else %}
+    <div class="px-5 py-4">
+      {{ caller() }}
+    </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# toggle_field(name, label, checked=False, help=None, save_url=None)
+   Renders a styled toggle switch. If save_url, auto-saves on change via htmx.
+#}
+{% macro toggle_field(name, label, checked=false, help=None, save_url=None) %}
+<div class="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
+  <div>
+    <label for="toggle-{{ name }}" class="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer">{{ label }}</label>
+    {% if help %}
+      <p class="text-xs text-gray-500 mt-0.5">{{ help }}</p>
+    {% endif %}
+  </div>
+  <button type="button"
+          id="toggle-{{ name }}"
+          role="switch"
+          aria-checked="{{ 'true' if checked else 'false' }}"
+          {% if save_url %}
+            hx-post="{{ save_url }}"
+            hx-vals='{"{{ name }}": "toggle"}'
+            hx-swap="none"
+          {% endif %}
+          x-data="{ on: {{ 'true' if checked else 'false' }} }"
+          @click="on = !on; $el.setAttribute('aria-checked', on)"
+          class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-apg-primary focus:ring-offset-2"
+          :class="on ? 'bg-apg-primary' : 'bg-gray-300 dark:bg-gray-600'">
+    <span class="sr-only">{{ label }}</span>
+    <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+          :class="on ? 'translate-x-6' : 'translate-x-1'"></span>
+    <input type="hidden" name="{{ name }}" :value="on ? '1' : '0'">
+  </button>
+</div>
+{% endmacro %}
+
+
+{# danger_zone(title='Danger Zone') — red-bordered section for destructive actions #}
+{% macro danger_zone(title='Danger Zone') %}
+<div class="rounded-lg border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10 p-5 mt-6">
+  <h2 class="text-sm font-semibold text-red-700 dark:text-red-400 mb-3">{{ title }}</h2>
+  {{ caller() }}
+</div>
+{% endmacro %}

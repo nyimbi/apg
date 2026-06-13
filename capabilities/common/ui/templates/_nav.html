@@ -1,0 +1,41 @@
+{# _nav.html — renders capability contract routes[] as an accessible nav strip
+   Usage: {% from "_nav.html" import cap_nav, breadcrumb %}
+
+   cap_nav(routes, current_path):
+     routes: list of {label, url, icon?} dicts (from capability_contract.py routes[])
+     current_path: request.path for active-state detection
+
+   breadcrumb(crumbs):
+     crumbs: list of {label, url?} — last item is current page (no link)
+#}
+{% macro cap_nav(routes, current_path='') %}
+<nav class="flex items-center gap-1 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700 overflow-x-auto"
+     aria-label="Capability sections">
+  {% for route in routes %}
+    {% set is_active = current_path == route.url or current_path.startswith(route.url ~ '/') %}
+    <a href="{{ route.url }}"
+       class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm whitespace-nowrap transition-colors
+              {{ 'bg-apg-primary text-white font-medium' if is_active else 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}"
+       {{ 'aria-current="page"' if is_active }}>
+      {% if route.icon %}<span aria-hidden="true">{{ route.icon }}</span>{% endif %}
+      {{ route.label }}
+    </a>
+  {% endfor %}
+</nav>
+{% endmacro %}
+
+
+{% macro breadcrumb(crumbs) %}
+<nav aria-label="Breadcrumb" class="mb-4">
+  <ol class="flex items-center gap-1 text-sm text-gray-500">
+    {% for crumb in crumbs %}
+      {% if not loop.last %}
+        <li><a href="{{ crumb.url }}" class="hover:text-apg-primary">{{ crumb.label }}</a></li>
+        <li aria-hidden="true" class="text-gray-300">/</li>
+      {% else %}
+        <li aria-current="page" class="font-medium text-gray-900 dark:text-gray-100">{{ crumb.label }}</li>
+      {% endif %}
+    {% endfor %}
+  </ol>
+</nav>
+{% endmacro %}

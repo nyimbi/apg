@@ -1,0 +1,131 @@
+{# macros/form.html — accessible form field macros
+   Usage: {% from "macros/form.html" import field, form_section, submit_row, select_field, textarea_field %}
+#}
+
+{# field(name, label, type='text', value='', required=False, help=None, error=None, placeholder='', readonly=False) #}
+{% macro field(name, label, type='text', value='', required=false, help=None, error=None,
+               placeholder='', readonly=false, autocomplete=None) %}
+{% set field_id = 'field-' ~ name %}
+<div class="mb-4">
+  <label for="{{ field_id }}"
+         class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+    {{ label }}
+    {% if required %}<span class="text-red-500 ml-0.5" aria-hidden="true">*</span>{% endif %}
+  </label>
+  <input type="{{ type }}"
+         id="{{ field_id }}"
+         name="{{ name }}"
+         value="{{ value }}"
+         {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+         {% if required %}required aria-required="true"{% endif %}
+         {% if readonly %}readonly aria-readonly="true"{% endif %}
+         {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
+         {% if error %}aria-describedby="{{ field_id }}-error" aria-invalid="true"{% elif help %}aria-describedby="{{ field_id }}-help"{% endif %}
+         class="block w-full max-w-lg px-3 py-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-apg-primary transition-colors
+                {{ 'border-red-400 bg-red-50 dark:bg-red-900/10' if error else 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700' }}
+                {{ 'bg-gray-50 dark:bg-gray-800 text-gray-500 cursor-not-allowed' if readonly else 'text-gray-900 dark:text-gray-100' }}">
+  {% if error %}
+    <p id="{{ field_id }}-error" role="alert" class="mt-1 text-xs text-red-600 dark:text-red-400">{{ error }}</p>
+  {% elif help %}
+    <p id="{{ field_id }}-help" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ help }}</p>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# select_field(name, label, options, value='', required=False, help=None, error=None)
+   options: list of {value, label} dicts or plain strings
+#}
+{% macro select_field(name, label, options, value='', required=false, help=None, error=None) %}
+{% set field_id = 'field-' ~ name %}
+<div class="mb-4">
+  <label for="{{ field_id }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+    {{ label }}
+    {% if required %}<span class="text-red-500 ml-0.5" aria-hidden="true">*</span>{% endif %}
+  </label>
+  <select id="{{ field_id }}"
+          name="{{ name }}"
+          {% if required %}required aria-required="true"{% endif %}
+          {% if error %}aria-describedby="{{ field_id }}-error" aria-invalid="true"{% elif help %}aria-describedby="{{ field_id }}-help"{% endif %}
+          class="block w-full max-w-lg px-3 py-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-apg-primary
+                 {{ 'border-red-400 bg-red-50' if error else 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700' }}
+                 text-gray-900 dark:text-gray-100">
+    {% for opt in options %}
+      {% if opt is mapping %}
+        <option value="{{ opt.value }}" {{ 'selected' if opt.value | string == value | string }}>{{ opt.label }}</option>
+      {% else %}
+        <option value="{{ opt }}" {{ 'selected' if opt | string == value | string }}>{{ opt }}</option>
+      {% endif %}
+    {% endfor %}
+  </select>
+  {% if error %}
+    <p id="{{ field_id }}-error" role="alert" class="mt-1 text-xs text-red-600">{{ error }}</p>
+  {% elif help %}
+    <p id="{{ field_id }}-help" class="mt-1 text-xs text-gray-500">{{ help }}</p>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# textarea_field(name, label, value='', rows=4, required=False, help=None, error=None, placeholder='') #}
+{% macro textarea_field(name, label, value='', rows=4, required=false, help=None, error=None, placeholder='') %}
+{% set field_id = 'field-' ~ name %}
+<div class="mb-4">
+  <label for="{{ field_id }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+    {{ label }}
+    {% if required %}<span class="text-red-500 ml-0.5" aria-hidden="true">*</span>{% endif %}
+  </label>
+  <textarea id="{{ field_id }}"
+            name="{{ name }}"
+            rows="{{ rows }}"
+            {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+            {% if required %}required aria-required="true"{% endif %}
+            {% if error %}aria-describedby="{{ field_id }}-error" aria-invalid="true"{% elif help %}aria-describedby="{{ field_id }}-help"{% endif %}
+            class="block w-full max-w-lg px-3 py-2 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-apg-primary resize-y
+                   {{ 'border-red-400 bg-red-50' if error else 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700' }}
+                   text-gray-900 dark:text-gray-100">{{ value }}</textarea>
+  {% if error %}
+    <p id="{{ field_id }}-error" role="alert" class="mt-1 text-xs text-red-600">{{ error }}</p>
+  {% elif help %}
+    <p id="{{ field_id }}-help" class="mt-1 text-xs text-gray-500">{{ help }}</p>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# form_section(title, description=None) — wraps a group of fields with a heading #}
+{% macro form_section(title, description=None) %}
+<fieldset class="mb-6 pb-6 border-b border-gray-100 dark:border-gray-700 last:border-0 last:mb-0 last:pb-0">
+  <legend class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">{{ title }}</legend>
+  {% if description %}
+    <p class="text-xs text-gray-500 mb-4">{{ description }}</p>
+  {% endif %}
+  {{ caller() }}
+</fieldset>
+{% endmacro %}
+
+
+{# submit_row(label='Save', cancel_url=None, danger_label=None, danger_url=None) #}
+{% macro submit_row(label='Save', cancel_url=None, danger_label=None, danger_action=None) %}
+<div class="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-gray-700 mt-2">
+  <button type="submit"
+          class="inline-flex items-center px-4 py-2 bg-apg-primary text-white text-sm font-medium rounded hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-apg-primary focus:ring-offset-2">
+    {{ label }}
+  </button>
+  {% if cancel_url %}
+    <a href="{{ cancel_url }}"
+       class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+      Cancel
+    </a>
+  {% endif %}
+  {% if danger_label and danger_action %}
+    <button type="button"
+            class="ml-auto px-4 py-2 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50 transition-colors"
+            hx-delete="{{ danger_action }}"
+            hx-confirm="Are you sure? This cannot be undone."
+            hx-swap="outerHTML">
+      {{ danger_label }}
+    </button>
+  {% endif %}
+</div>
+{% endmacro %}

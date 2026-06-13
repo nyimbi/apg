@@ -1,0 +1,121 @@
+{# macros/dashboard.html — dashboard composition macros
+   Usage: {% from "macros/dashboard.html" import kpi_card, kpi_grid, activity_feed, health_strip %}
+#}
+
+{# kpi_card(label, value, delta=None, delta_label=None, icon=None, hx_url=None, color='primary')
+   delta: numeric (positive = up, negative = down, None = no delta)
+   hx_url: if set, card auto-refreshes every 30s via htmx
+#}
+{% macro kpi_card(label, value, delta=None, delta_label=None, icon=None, hx_url=None, color='primary') %}
+{% set colors = {
+  'primary': 'border-t-apg-primary',
+  'success': 'border-t-green-500',
+  'warning': 'border-t-yellow-500',
+  'danger':  'border-t-red-500',
+  'info':    'border-t-blue-500',
+} %}
+<div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4 border-t-4 {{ colors.get(color, colors.primary) }}"
+     {% if hx_url %}hx-get="{{ hx_url }}" hx-trigger="load, every 30s" hx-swap="outerHTML"{% endif %}>
+  <div class="flex items-start justify-between">
+    <div class="flex-1">
+      <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">{{ label }}</p>
+      <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-none">
+        <span class="htmx-indicator text-gray-300 text-sm">…</span>
+        {{ value }}
+      </p>
+      {% if delta is not none %}
+        <p class="text-xs mt-1 font-medium {{ 'text-green-600' if delta >= 0 else 'text-red-600' }}">
+          {{ '▲' if delta >= 0 else '▼' }} {{ delta | abs }}{% if delta_label %} {{ delta_label }}{% endif %}
+        </p>
+      {% endif %}
+    </div>
+    {% if icon %}
+      <span class="text-2xl opacity-20 ml-2" aria-hidden="true">{{ icon }}</span>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+
+{# kpi_grid(cards) — renders a list of kpi_card dicts in a responsive grid
+   Each card dict: {label, value, delta?, delta_label?, icon?, hx_url?, color?}
+#}
+{% macro kpi_grid(cards, cols=4) %}
+{% set col_class = {1: 'grid-cols-1', 2: 'grid-cols-1 sm:grid-cols-2', 3: 'grid-cols-1 sm:grid-cols-3', 4: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'} %}
+<div class="grid {{ col_class.get(cols, 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4') }} gap-4 mb-6">
+  {% for card in cards %}
+    {{ kpi_card(card.label, card.value, card.get('delta'), card.get('delta_label'), card.get('icon'), card.get('hx_url'), card.get('color', 'primary')) }}
+  {% endfor %}
+</div>
+{% endmacro %}
+
+
+{# activity_feed(events, title='Recent Activity')
+   events: list of {timestamp, actor?, action, entity?, entity_url?, severity?}
+   severity: 'info'|'success'|'warning'|'danger' (default 'info')
+#}
+{% macro activity_feed(events, title='Recent Activity', hx_url=None, max_items=10) %}
+{% set sev_colors = {
+  'info':    'bg-blue-100 text-blue-700',
+  'success': 'bg-green-100 text-green-700',
+  'warning': 'bg-yellow-100 text-yellow-800',
+  'danger':  'bg-red-100 text-red-700',
+} %}
+<div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+     {% if hx_url %}hx-get="{{ hx_url }}" hx-trigger="every 60s" hx-swap="outerHTML"{% endif %}>
+  <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+    <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ title }}</h3>
+    {% if hx_url %}
+      <span class="htmx-indicator text-xs text-gray-400">Loading…</span>
+    {% endif %}
+  </div>
+  <ul class="divide-y divide-gray-100 dark:divide-gray-700" role="feed">
+    {% for event in events[:max_items] %}
+      <li class="flex items-start gap-3 px-4 py-3">
+        <span class="mt-0.5 inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0 {{ sev_colors.get(event.get('severity', 'info'), sev_colors.info) }}"
+              aria-hidden="true">
+          {{ '✓' if event.get('severity') == 'success' else '!' if event.get('severity') in ('warning','danger') else 'i' }}
+        </span>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm text-gray-800 dark:text-gray-200">
+            {% if event.actor %}<span class="font-medium">{{ event.actor }}</span> {% endif %}
+            {{ event.action }}
+            {% if event.entity_url %}<a href="{{ event.entity_url }}" class="font-medium text-apg-primary">{{ event.entity }}</a>
+            {% elif event.entity %}<span class="font-medium">{{ event.entity }}</span>{% endif %}
+          </p>
+          <p class="text-xs text-gray-400 mt-0.5">{{ event.timestamp }}</p>
+        </div>
+      </li>
+    {% else %}
+      <li class="px-4 py-6 text-center text-sm text-gray-400">No recent activity.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endmacro %}
+
+
+{# health_strip(components)
+   components: list of {name, status: 'healthy'|'degraded'|'unhealthy'|'unknown', latency_ms?}
+#}
+{% macro health_strip(components, title='System Health') %}
+{% set status_styles = {
+  'healthy':   ('bg-green-100 text-green-800', '●'),
+  'degraded':  ('bg-yellow-100 text-yellow-800', '◐'),
+  'unhealthy': ('bg-red-100 text-red-800', '○'),
+  'unknown':   ('bg-gray-100 text-gray-600', '?'),
+} %}
+<div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4 mb-4">
+  <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">{{ title }}</h3>
+  <div class="flex flex-wrap gap-2">
+    {% for comp in components %}
+      {% set style, icon = status_styles.get(comp.get('status', 'unknown'), status_styles.unknown) %}
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium {{ style }}"
+            title="{{ comp.name }}: {{ comp.get('status', 'unknown') }}{% if comp.latency_ms %} ({{ comp.latency_ms }}ms){% endif %}">
+        <span aria-hidden="true">{{ icon }}</span>
+        {{ comp.name }}
+        {% if comp.latency_ms %}<span class="opacity-60">{{ comp.latency_ms }}ms</span>{% endif %}
+      </span>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}

@@ -1,0 +1,137 @@
+{# macros/table.html — data table with htmx sort/filter/paginate
+   Usage: {% from "macros/table.html" import data_table, empty_state %}
+
+   data_table(rows, cols, hx_url=None, ...)
+     rows: list of dicts
+     cols: list of {key, label, sortable?, type?, href_key?}
+     hx_url: base URL for htmx sort/filter/paginate (returns only <tbody> on HX-Request)
+     page/total/page_size: pagination state
+     sort_key/sort_dir: current sort state
+#}
+{% macro data_table(rows, cols, hx_url=None, page=1, total=None, page_size=25,
+                    sort_key=None, sort_dir='asc', show_actions=false, action_col=None) %}
+<div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+  {# Filter bar #}
+  {% if hx_url %}
+  <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+    <input type="search"
+           name="q"
+           placeholder="Filter…"
+           class="flex-1 max-w-sm px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-apg-primary"
+           hx-get="{{ hx_url }}"
+           hx-trigger="input changed delay:300ms, search"
+           hx-target="#table-body-{{ loop.index0 | default(0) }}"
+           hx-swap="innerHTML"
+           hx-include="[name='page'],[name='sort_key'],[name='sort_dir']"
+           aria-label="Filter records">
+    <span class="htmx-indicator text-xs text-gray-400">Searching…</span>
+    {% if total is not none %}
+      <span class="text-xs text-gray-400 ml-auto whitespace-nowrap">{{ total }} record{{ 's' if total != 1 }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <table class="w-full text-sm" role="grid">
+    <thead class="bg-gray-50 dark:bg-gray-900">
+      <tr>
+        {% for col in cols %}
+          <th scope="col"
+              class="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap
+                     {{ 'cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200' if col.get('sortable') and hx_url else '' }}"
+              {% if col.get('sortable') and hx_url %}
+                hx-get="{{ hx_url }}"
+                hx-vals='{"sort_key": "{{ col.key }}", "sort_dir": "{{ 'desc' if sort_key == col.key and sort_dir == 'asc' else 'asc' }}"}'
+                hx-target="#table-body-main"
+                hx-swap="innerHTML"
+                hx-include="[name='q'],[name='page']"
+                role="columnheader"
+                aria-sort="{{ sort_dir if sort_key == col.key else 'none' }}"
+              {% endif %}>
+            {{ col.label }}
+            {% if sort_key == col.key %}
+              <span aria-hidden="true">{{ '↑' if sort_dir == 'asc' else '↓' }}</span>
+            {% endif %}
+          </th>
+        {% endfor %}
+        {% if show_actions %}<th scope="col" class="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody id="table-body-main" class="divide-y divide-gray-100 dark:divide-gray-700">
+      {% if rows %}
+        {% for row in rows %}
+          <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            {% for col in cols %}
+              <td class="px-3 py-2.5 text-gray-800 dark:text-gray-200">
+                {% set val = row.get(col.key, '') %}
+                {% if col.get('href_key') and row.get(col.href_key) %}
+                  <a href="{{ row[col.href_key] }}" class="text-apg-primary hover:underline font-medium">{{ val }}</a>
+                {% elif col.get('type') == 'badge' %}
+                  {% set badge_colors = {'active': 'bg-green-100 text-green-800', 'inactive': 'bg-gray-100 text-gray-600',
+                                         'pending': 'bg-yellow-100 text-yellow-800', 'error': 'bg-red-100 text-red-800',
+                                         'success': 'bg-green-100 text-green-800', 'failed': 'bg-red-100 text-red-800'} %}
+                  <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold {{ badge_colors.get(val | lower, 'bg-blue-100 text-blue-800') }}">{{ val }}</span>
+                {% elif col.get('type') == 'currency' %}
+                  <span class="font-mono">{{ val }}</span>
+                {% elif col.get('type') == 'bool' %}
+                  <span aria-label="{{ 'Yes' if val else 'No' }}">{{ '✓' if val else '—' }}</span>
+                {% else %}
+                  {{ val | truncate(80) if val | string | length > 80 else val }}
+                {% endif %}
+              </td>
+            {% endfor %}
+            {% if show_actions and action_col %}
+              <td class="px-3 py-2.5 text-right">{{ action_col(row) }}</td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="{{ cols | length + (1 if show_actions else 0) }}" class="px-4 py-8 text-center text-sm text-gray-400">
+            No records found.
+          </td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  {# Pagination #}
+  {% if total is not none and total > page_size %}
+    {% set total_pages = ((total - 1) // page_size) + 1 %}
+    <div class="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+      <p class="text-xs text-gray-500">
+        Showing {{ ((page - 1) * page_size) + 1 }}–{{ [page * page_size, total] | min }} of {{ total }}
+      </p>
+      <div class="flex items-center gap-1">
+        {% if page > 1 %}
+          <button class="px-2.5 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
+                  hx-get="{{ hx_url }}" hx-vals='{"page": {{ page - 1 }}}' hx-target="#table-body-main" hx-swap="innerHTML"
+                  hx-include="[name='q'],[name='sort_key'],[name='sort_dir']">← Prev</button>
+        {% endif %}
+        <span class="px-2 text-xs text-gray-600 dark:text-gray-400">{{ page }} / {{ total_pages }}</span>
+        {% if page < total_pages %}
+          <button class="px-2.5 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
+                  hx-get="{{ hx_url }}" hx-vals='{"page": {{ page + 1 }}}' hx-target="#table-body-main" hx-swap="innerHTML"
+                  hx-include="[name='q'],[name='sort_key'],[name='sort_dir']">Next →</button>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{% macro empty_state(title, description='', action_label=None, action_url=None, icon='📭') %}
+<div class="text-center py-12 px-6">
+  <div class="text-4xl mb-3" aria-hidden="true">{{ icon }}</div>
+  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">{{ title }}</h3>
+  {% if description %}
+    <p class="text-sm text-gray-500 mb-4">{{ description }}</p>
+  {% endif %}
+  {% if action_label and action_url %}
+    <a href="{{ action_url }}"
+       class="inline-flex items-center px-4 py-2 bg-apg-primary text-white text-sm font-medium rounded hover:opacity-90 transition-opacity">
+      {{ action_label }}
+    </a>
+  {% endif %}
+</div>
+{% endmacro %}

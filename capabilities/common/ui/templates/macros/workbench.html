@@ -1,0 +1,148 @@
+{# macros/workbench.html — split-pane workbench layout for queue/detail views
+   Typical use: incident queue (list on left, detail on right), inbox, task manager.
+   Usage: {% from "macros/workbench.html" import workbench_layout, queue_item, detail_panel %}
+#}
+
+{# workbench_layout — wraps the queue list + detail panel in a responsive split layout.
+   Use with caller() blocks for queue and detail content.
+
+   Example:
+     {% call(slot) workbench_layout() %}
+       {% if slot == 'queue' %}
+         {% for item in items %}{{ queue_item(item) }}{% endfor %}
+       {% elif slot == 'detail' %}
+         {{ detail_panel(selected_item) }}
+       {% endif %}
+     {% endcall %}
+#}
+{% macro workbench_layout(queue_title='Queue', detail_title='Detail', queue_width='w-80') %}
+<div class="flex h-[calc(100vh-var(--apg-topbar-height)-96px)] gap-0 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
+  {# Queue pane #}
+  <div class="{{ queue_width }} shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-700">
+    <div class="px-3 py-2.5 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+      <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ queue_title }}</h2>
+    </div>
+    <div class="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
+      {{ caller('queue') }}
+    </div>
+  </div>
+
+  {# Detail pane #}
+  <div class="flex-1 flex flex-col min-w-0">
+    <div class="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
+      <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ detail_title }}</h2>
+    </div>
+    <div class="flex-1 overflow-y-auto p-4">
+      {{ caller('detail') }}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+
+{# queue_item — single row in a workbench queue list.
+   item dict: {id, title, subtitle?, timestamp?, badge_label?, badge_color?, active?, hx_url?}
+#}
+{% macro queue_item(item) %}
+{% set badge_colors = {
+  'critical': 'bg-red-100 text-red-800',
+  'high':     'bg-orange-100 text-orange-800',
+  'medium':   'bg-yellow-100 text-yellow-800',
+  'low':      'bg-gray-100 text-gray-600',
+  'success':  'bg-green-100 text-green-800',
+  'info':     'bg-blue-100 text-blue-800',
+} %}
+<div class="flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors
+            {{ 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-apg-primary' if item.get('active') else 'hover:bg-gray-50 dark:hover:bg-gray-700' }}"
+     {% if item.get('hx_url') %}
+       hx-get="{{ item.hx_url }}"
+       hx-target="#detail-panel-content"
+       hx-swap="innerHTML"
+       hx-push-url="true"
+     {% endif %}
+     role="button"
+     tabindex="0"
+     aria-selected="{{ 'true' if item.get('active') else 'false' }}"
+     onkeydown="if(event.key==='Enter'||event.key===' ')this.click()">
+  <div class="flex-1 min-w-0">
+    <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ item.title }}</p>
+    {% if item.get('subtitle') %}
+      <p class="text-xs text-gray-500 truncate mt-0.5">{{ item.subtitle }}</p>
+    {% endif %}
+  </div>
+  <div class="flex flex-col items-end gap-1 shrink-0">
+    {% if item.get('badge_label') %}
+      <span class="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold {{ badge_colors.get(item.badge_label | lower, badge_colors.info) }}">
+        {{ item.badge_label }}
+      </span>
+    {% endif %}
+    {% if item.get('timestamp') %}
+      <span class="text-xs text-gray-400">{{ item.timestamp }}</span>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+
+{# detail_panel — right-hand content area for a selected queue item.
+   model dict from views.py screen model.
+   sections: list of {title, fields: [{label, value, type?}]}
+#}
+{% macro detail_panel(model, sections=None, actions=None) %}
+{% if not model %}
+  <div class="flex flex-col items-center justify-center h-full text-center text-gray-400">
+    <span class="text-4xl mb-3" aria-hidden="true">←</span>
+    <p class="text-sm">Select an item to view details.</p>
+  </div>
+{% else %}
+  <div id="detail-panel-content">
+    {# Header #}
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ model.get('title', model.get('name', 'Detail')) }}</h1>
+        {% if model.get('subtitle') %}
+          <p class="text-sm text-gray-500 mt-0.5">{{ model.subtitle }}</p>
+        {% endif %}
+      </div>
+      {% if actions %}
+        <div class="flex items-center gap-2">
+          {% for action in actions %}
+            <a href="{{ action.url }}"
+               class="px-3 py-1.5 text-xs font-medium rounded border transition-colors
+                      {{ 'bg-apg-primary text-white border-apg-primary hover:opacity-90' if action.get('primary') else 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700' }}">
+              {{ action.label }}
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    {# Sections #}
+    {% if sections %}
+      {% for section in sections %}
+        <div class="mb-5">
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">{{ section.title }}</h3>
+          <dl class="grid grid-cols-2 gap-x-4 gap-y-2">
+            {% for f in section.fields %}
+              <div>
+                <dt class="text-xs text-gray-500 dark:text-gray-400">{{ f.label }}</dt>
+                <dd class="text-sm font-medium text-gray-900 dark:text-gray-100 mt-0.5">
+                  {% if f.get('type') == 'badge' %}
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">{{ f.value }}</span>
+                  {% elif f.get('type') == 'link' and f.get('url') %}
+                    <a href="{{ f.url }}" class="text-apg-primary hover:underline">{{ f.value }}</a>
+                  {% else %}
+                    {{ f.value | default('—') }}
+                  {% endif %}
+                </dd>
+              </div>
+            {% endfor %}
+          </dl>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {{ caller() if caller is defined else '' }}
+  </div>
+{% endif %}
+{% endmacro %}
