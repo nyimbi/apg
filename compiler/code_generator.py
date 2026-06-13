@@ -421,10 +421,21 @@ class PythonCodeGenerator:
 			]
 		return spec
 
+	@staticmethod
+	def _load_ui_templates() -> dict[str, str]:
+		"""Load Jinja2 UI templates from compiler/templates/ to embed in generated app."""
+		tmpl_dir = Path(__file__).parent / "templates"
+		templates: dict[str, str] = {}
+		if tmpl_dir.exists():
+			for f in tmpl_dir.glob("*.j2"):
+				templates[f.name] = f.read_text(encoding="utf-8")
+		return templates
+
 	def _generate_python_app(self, module: ModuleDeclaration) -> str:
 		"""Generate a framework-neutral Python app.py entrypoint."""
 		entity_specs = [self._entity_spec(entity) for entity in module.entities]
 		semantic_model = build_semantic_model_from_module(module, f"{module.name}.apg")
+		ui_templates = self._load_ui_templates()
 		return f'''"""
 {module.name} - APG Python Application
 {"=" * (len(module.name) + 25)}
@@ -457,6 +468,7 @@ NEXT_EVENT_ID = 1
 WORKFLOW_RUNS: Dict[str, Dict[str, Any]] = {{}}
 NEXT_WORKFLOW_RUN_ID = 1
 SEMANTIC_MODEL: Dict[str, Any] = {semantic_model!r}
+APG_UI_TEMPLATES: Dict[str, str] = {ui_templates!r}
 
 
 def _optional_module(name: str) -> Optional[Any]:
