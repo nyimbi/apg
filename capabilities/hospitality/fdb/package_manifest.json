@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "hos_fdb",
+    "description": "F&B Management package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "hos_fdb": {
+      "domain": "hospitality",
+      "display_name": "F&B Management",
+      "version": "1.0.0",
+      "description": "Restaurant POS, menu management, table reservations, cost control, inventory",
+      "provides": [
+        "restaurant_pos",
+        "menu_management",
+        "table_reservations",
+        "cost_control",
+        "fb_inventory"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "fintech_payments",
+        "scm_inv"
+      ],
+      "entities": [
+        "MenuItem",
+        "TableOrder",
+        "RestaurantReservation",
+        "FBInventoryItem"
+      ],
+      "configuration": {
+        "theme": "hos_fdb_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "capability_id": "ins_act",
+  "capability_name": "Actuarial Tools",
+  "version": "1.0.0",
+  "domain": "insurance",
+  "entities": {
+    "ReserveEstimate": {
+      "type": "object",
+      "description": "ReserveEstimate entity for Actuarial Tools",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "LossRatioReport": {
+      "type": "object",
+      "description": "LossRatioReport entity for Actuarial Tools",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "PricingModel": {
+      "type": "object",
+      "description": "PricingModel entity for Actuarial Tools",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "StressTestResult": {
+      "type": "object",
+      "description": "StressTestResult entity for Actuarial Tools",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/ins-act/reserveestimates",
+      "description": "List ReserveEstimate records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ins-act/reserveestimates",
+      "description": "Create ReserveEstimate"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ins-act/reserveestimates/{id}",
+      "description": "Get ReserveEstimate by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ins-act/reserveestimates/{id}",
+      "description": "Update ReserveEstimate"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/ins-act/reserveestimates/{id}",
+      "description": "Delete ReserveEstimate"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "reserve.calculated",
+      "pricing_model.updated"
+    ],
+    "subscribes": []
+  }
+}

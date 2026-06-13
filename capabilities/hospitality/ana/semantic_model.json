@@ -1,0 +1,142 @@
+{
+  "capability_id": "hos_ana",
+  "capability_name": "Hospitality Analytics",
+  "version": "1.0.0",
+  "domain": "hospitality",
+  "entities": {
+    "OccupancyReport": {
+      "type": "object",
+      "description": "OccupancyReport entity for Hospitality Analytics",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "RevPARReport": {
+      "type": "object",
+      "description": "RevPARReport entity for Hospitality Analytics",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "GuestSatisfactionScore": {
+      "type": "object",
+      "description": "GuestSatisfactionScore entity for Hospitality Analytics",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "BenchmarkRecord": {
+      "type": "object",
+      "description": "BenchmarkRecord entity for Hospitality Analytics",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/hos-ana/occupancyreports",
+      "description": "List OccupancyReport records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hos-ana/occupancyreports",
+      "description": "Create OccupancyReport"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hos-ana/occupancyreports/{id}",
+      "description": "Get OccupancyReport by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/hos-ana/occupancyreports/{id}",
+      "description": "Update OccupancyReport"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hos-ana/occupancyreports/{id}",
+      "description": "Delete OccupancyReport"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "report.generated",
+      "benchmark.updated"
+    ],
+    "subscribes": []
+  }
+}

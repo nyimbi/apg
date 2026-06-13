@@ -1,0 +1,143 @@
+{
+  "capability_id": "agr_mkt",
+  "capability_name": "Agri-Marketplace",
+  "version": "1.0.0",
+  "domain": "agriculture",
+  "entities": {
+    "ProduceListing": {
+      "type": "object",
+      "description": "ProduceListing entity for Agri-Marketplace",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "MarketBid": {
+      "type": "object",
+      "description": "MarketBid entity for Agri-Marketplace",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "MarketOrder": {
+      "type": "object",
+      "description": "MarketOrder entity for Agri-Marketplace",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "PriceRecord": {
+      "type": "object",
+      "description": "PriceRecord entity for Agri-Marketplace",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/agr-mkt/producelistings",
+      "description": "List ProduceListing records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/agr-mkt/producelistings",
+      "description": "Create ProduceListing"
+    },
+    {
+      "method": "GET",
+      "path": "/api/agr-mkt/producelistings/{id}",
+      "description": "Get ProduceListing by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/agr-mkt/producelistings/{id}",
+      "description": "Update ProduceListing"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/agr-mkt/producelistings/{id}",
+      "description": "Delete ProduceListing"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "listing.created",
+      "bid.accepted",
+      "payment.escrowed"
+    ],
+    "subscribes": []
+  }
+}

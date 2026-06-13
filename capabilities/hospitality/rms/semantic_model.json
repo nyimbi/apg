@@ -1,0 +1,142 @@
+{
+  "capability_id": "hos_rms",
+  "capability_name": "Revenue Management & Rates",
+  "version": "1.0.0",
+  "domain": "hospitality",
+  "entities": {
+    "RatePlan": {
+      "type": "object",
+      "description": "RatePlan entity for Revenue Management & Rates",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "PricingRule": {
+      "type": "object",
+      "description": "PricingRule entity for Revenue Management & Rates",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "DemandForecast": {
+      "type": "object",
+      "description": "DemandForecast entity for Revenue Management & Rates",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "RateAudit": {
+      "type": "object",
+      "description": "RateAudit entity for Revenue Management & Rates",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/hos-rms/rateplans",
+      "description": "List RatePlan records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hos-rms/rateplans",
+      "description": "Create RatePlan"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hos-rms/rateplans/{id}",
+      "description": "Get RatePlan by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/hos-rms/rateplans/{id}",
+      "description": "Update RatePlan"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hos-rms/rateplans/{id}",
+      "description": "Delete RatePlan"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "rate.updated",
+      "demand_forecast.generated"
+    ],
+    "subscribes": []
+  }
+}

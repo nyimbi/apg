@@ -1,0 +1,143 @@
+{
+  "capability_id": "agr_fms",
+  "capability_name": "Farm Management System",
+  "version": "1.0.0",
+  "domain": "agriculture",
+  "entities": {
+    "Farm": {
+      "type": "object",
+      "description": "Farm entity for Farm Management System",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "Parcel": {
+      "type": "object",
+      "description": "Parcel entity for Farm Management System",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "InputRecord": {
+      "type": "object",
+      "description": "InputRecord entity for Farm Management System",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "LabourRecord": {
+      "type": "object",
+      "description": "LabourRecord entity for Farm Management System",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/agr-fms/farms",
+      "description": "List Farm records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/agr-fms/farms",
+      "description": "Create Farm"
+    },
+    {
+      "method": "GET",
+      "path": "/api/agr-fms/farms/{id}",
+      "description": "Get Farm by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/agr-fms/farms/{id}",
+      "description": "Update Farm"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/agr-fms/farms/{id}",
+      "description": "Delete Farm"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "farm.registered",
+      "input.applied",
+      "operation.completed"
+    ],
+    "subscribes": []
+  }
+}

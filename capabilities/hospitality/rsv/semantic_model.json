@@ -1,0 +1,143 @@
+{
+  "capability_id": "hos_rsv",
+  "capability_name": "Reservations & Channel Manager",
+  "version": "1.0.0",
+  "domain": "hospitality",
+  "entities": {
+    "Booking": {
+      "type": "object",
+      "description": "Booking entity for Reservations & Channel Manager",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "ChannelAllotment": {
+      "type": "object",
+      "description": "ChannelAllotment entity for Reservations & Channel Manager",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "GroupBlock": {
+      "type": "object",
+      "description": "GroupBlock entity for Reservations & Channel Manager",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "RateAvailability": {
+      "type": "object",
+      "description": "RateAvailability entity for Reservations & Channel Manager",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/hos-rsv/bookings",
+      "description": "List Booking records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hos-rsv/bookings",
+      "description": "Create Booking"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hos-rsv/bookings/{id}",
+      "description": "Get Booking by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/hos-rsv/bookings/{id}",
+      "description": "Update Booking"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hos-rsv/bookings/{id}",
+      "description": "Delete Booking"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "reservation.confirmed",
+      "reservation.cancelled",
+      "availability.synced"
+    ],
+    "subscribes": []
+  }
+}

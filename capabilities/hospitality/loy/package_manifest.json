@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "hos_loy",
+    "description": "Guest Loyalty Programme package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "hos_loy": {
+      "domain": "hospitality",
+      "display_name": "Guest Loyalty Programme",
+      "version": "1.0.0",
+      "description": "Points accumulation, tier management, redemption, member benefits, campaigns",
+      "provides": [
+        "points_management",
+        "tier_management",
+        "redemption",
+        "member_benefits",
+        "loyalty_campaigns"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "fintech_payments"
+      ],
+      "entities": [
+        "LoyaltyMember",
+        "PointsTransaction",
+        "Redemption",
+        "LoyaltyTier"
+      ],
+      "configuration": {
+        "theme": "hos_loy_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

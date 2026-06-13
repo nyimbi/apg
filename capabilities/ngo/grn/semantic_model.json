@@ -1,0 +1,143 @@
+{
+  "capability_id": "ngo_grn",
+  "capability_name": "Grant Management",
+  "version": "1.0.0",
+  "domain": "ngo",
+  "entities": {
+    "GrantApplication": {
+      "type": "object",
+      "description": "GrantApplication entity for Grant Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "GrantAward": {
+      "type": "object",
+      "description": "GrantAward entity for Grant Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "Disbursement": {
+      "type": "object",
+      "description": "Disbursement entity for Grant Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "DonorReport": {
+      "type": "object",
+      "description": "DonorReport entity for Grant Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/ngo-grn/grantapplications",
+      "description": "List GrantApplication records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ngo-grn/grantapplications",
+      "description": "Create GrantApplication"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ngo-grn/grantapplications/{id}",
+      "description": "Get GrantApplication by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ngo-grn/grantapplications/{id}",
+      "description": "Update GrantApplication"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/ngo-grn/grantapplications/{id}",
+      "description": "Delete GrantApplication"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "grant.awarded",
+      "disbursement.processed",
+      "report.submitted"
+    ],
+    "subscribes": []
+  }
+}

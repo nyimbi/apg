@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "leg_mat",
+    "description": "Matter Management package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "leg_mat": {
+      "domain": "legal",
+      "display_name": "Matter Management",
+      "version": "1.0.0",
+      "description": "Legal matter lifecycle, client intake, task management, deadline tracking",
+      "provides": [
+        "matter_management",
+        "client_intake",
+        "task_management",
+        "deadline_tracking",
+        "matter_analytics"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "esig"
+      ],
+      "entities": [
+        "LegalMatter",
+        "MatterTask",
+        "MatterDeadline",
+        "ClientIntake"
+      ],
+      "configuration": {
+        "theme": "leg_mat_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

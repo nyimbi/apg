@@ -1,0 +1,145 @@
+{
+  "capability_id": "agr_ins",
+  "capability_name": "Crop Insurance",
+  "version": "1.0.0",
+  "domain": "agriculture",
+  "entities": {
+    "CropPolicy": {
+      "type": "object",
+      "description": "CropPolicy entity for Crop Insurance",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "InsuranceClaim": {
+      "type": "object",
+      "description": "InsuranceClaim entity for Crop Insurance",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "SatelliteIndex": {
+      "type": "object",
+      "description": "SatelliteIndex entity for Crop Insurance",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "PayoutRecord": {
+      "type": "object",
+      "description": "PayoutRecord entity for Crop Insurance",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/agr-ins/croppolicys",
+      "description": "List CropPolicy records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/agr-ins/croppolicys",
+      "description": "Create CropPolicy"
+    },
+    {
+      "method": "GET",
+      "path": "/api/agr-ins/croppolicys/{id}",
+      "description": "Get CropPolicy by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/agr-ins/croppolicys/{id}",
+      "description": "Update CropPolicy"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/agr-ins/croppolicys/{id}",
+      "description": "Delete CropPolicy"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "policy.issued",
+      "claim.triggered",
+      "payout.disbursed"
+    ],
+    "subscribes": [
+      "drought.alert"
+    ]
+  }
+}

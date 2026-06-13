@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "ngo_me",
+    "description": "M&E \u2014 Monitoring & Evaluation package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "ngo_me": {
+      "domain": "ngo",
+      "display_name": "M&E \u2014 Monitoring & Evaluation",
+      "version": "1.0.0",
+      "description": "Indicator tracking, data collection, evaluation frameworks, impact reporting",
+      "provides": [
+        "indicator_tracking",
+        "data_collection",
+        "evaluation_management",
+        "impact_reporting",
+        "log_frame"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ngo_prg",
+        "bia_anl"
+      ],
+      "entities": [
+        "Indicator",
+        "DataCollectionForm",
+        "EvaluationReport",
+        "ImpactScore"
+      ],
+      "configuration": {
+        "theme": "ngo_me_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "capability_id": "leg_mat",
+  "capability_name": "Matter Management",
+  "version": "1.0.0",
+  "domain": "legal",
+  "entities": {
+    "LegalMatter": {
+      "type": "object",
+      "description": "LegalMatter entity for Matter Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "MatterTask": {
+      "type": "object",
+      "description": "MatterTask entity for Matter Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "MatterDeadline": {
+      "type": "object",
+      "description": "MatterDeadline entity for Matter Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "ClientIntake": {
+      "type": "object",
+      "description": "ClientIntake entity for Matter Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/leg-mat/legalmatters",
+      "description": "List LegalMatter records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/leg-mat/legalmatters",
+      "description": "Create LegalMatter"
+    },
+    {
+      "method": "GET",
+      "path": "/api/leg-mat/legalmatters/{id}",
+      "description": "Get LegalMatter by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/leg-mat/legalmatters/{id}",
+      "description": "Update LegalMatter"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/leg-mat/legalmatters/{id}",
+      "description": "Delete LegalMatter"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "matter.opened",
+      "matter.closed",
+      "deadline.approaching"
+    ],
+    "subscribes": []
+  }
+}

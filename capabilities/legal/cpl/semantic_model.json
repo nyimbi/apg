@@ -1,0 +1,143 @@
+{
+  "capability_id": "leg_cpl",
+  "capability_name": "Legal Compliance Management",
+  "version": "1.0.0",
+  "domain": "legal",
+  "entities": {
+    "ComplianceObligation": {
+      "type": "object",
+      "description": "ComplianceObligation entity for Legal Compliance Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "ComplianceTest": {
+      "type": "object",
+      "description": "ComplianceTest entity for Legal Compliance Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "ComplianceReport": {
+      "type": "object",
+      "description": "ComplianceReport entity for Legal Compliance Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "RegulatoryBreach": {
+      "type": "object",
+      "description": "RegulatoryBreach entity for Legal Compliance Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/leg-cpl/complianceobligations",
+      "description": "List ComplianceObligation records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/leg-cpl/complianceobligations",
+      "description": "Create ComplianceObligation"
+    },
+    {
+      "method": "GET",
+      "path": "/api/leg-cpl/complianceobligations/{id}",
+      "description": "Get ComplianceObligation by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/leg-cpl/complianceobligations/{id}",
+      "description": "Update ComplianceObligation"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/leg-cpl/complianceobligations/{id}",
+      "description": "Delete ComplianceObligation"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "obligation.due",
+      "breach.reported",
+      "compliance.tested"
+    ],
+    "subscribes": []
+  }
+}

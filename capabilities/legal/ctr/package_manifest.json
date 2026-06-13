@@ -1,0 +1,44 @@
+{
+  "app": {
+    "name": "leg_ctr",
+    "description": "Contract Lifecycle Management package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "leg_ctr": {
+      "domain": "legal",
+      "display_name": "Contract Lifecycle Management",
+      "version": "1.0.0",
+      "description": "Contract drafting, negotiation, signing, obligation tracking, renewal alerts",
+      "provides": [
+        "contract_drafting",
+        "negotiation_management",
+        "contract_execution",
+        "obligation_tracking",
+        "renewal_management"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "esig",
+        "ckm_wfa"
+      ],
+      "entities": [
+        "Contract",
+        "ContractObligation",
+        "ContractNegotiation",
+        "ContractRenewal"
+      ],
+      "configuration": {
+        "theme": "leg_ctr_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

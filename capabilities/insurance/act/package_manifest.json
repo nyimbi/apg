@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "ins_act",
+    "description": "Actuarial Tools package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "ins_act": {
+      "domain": "insurance",
+      "display_name": "Actuarial Tools",
+      "version": "1.0.0",
+      "description": "Reserve calculations, loss ratio analysis, pricing models, stress testing",
+      "provides": [
+        "reserve_calculation",
+        "loss_ratio_analysis",
+        "pricing_models",
+        "stress_testing",
+        "actuarial_reporting"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ins_pol",
+        "ins_clm"
+      ],
+      "entities": [
+        "ReserveEstimate",
+        "LossRatioReport",
+        "PricingModel",
+        "StressTestResult"
+      ],
+      "configuration": {
+        "theme": "ins_act_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

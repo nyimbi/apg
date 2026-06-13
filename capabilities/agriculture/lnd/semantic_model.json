@@ -1,0 +1,143 @@
+{
+  "capability_id": "agr_lnd",
+  "capability_name": "Land Management",
+  "version": "1.0.0",
+  "domain": "agriculture",
+  "entities": {
+    "LandParcel": {
+      "type": "object",
+      "description": "LandParcel entity for Land Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "TenureRecord": {
+      "type": "object",
+      "description": "TenureRecord entity for Land Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "BoundaryPoint": {
+      "type": "object",
+      "description": "BoundaryPoint entity for Land Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "TitleDeed": {
+      "type": "object",
+      "description": "TitleDeed entity for Land Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/agr-lnd/landparcels",
+      "description": "List LandParcel records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/agr-lnd/landparcels",
+      "description": "Create LandParcel"
+    },
+    {
+      "method": "GET",
+      "path": "/api/agr-lnd/landparcels/{id}",
+      "description": "Get LandParcel by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/agr-lnd/landparcels/{id}",
+      "description": "Update LandParcel"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/agr-lnd/landparcels/{id}",
+      "description": "Delete LandParcel"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "parcel.registered",
+      "title.issued",
+      "boundary.updated"
+    ],
+    "subscribes": []
+  }
+}

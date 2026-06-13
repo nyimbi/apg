@@ -1,0 +1,42 @@
+{
+  "app": {
+    "name": "ngo_ben",
+    "description": "Beneficiary Registry package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "ngo_ben": {
+      "domain": "ngo",
+      "display_name": "Beneficiary Registry",
+      "version": "1.0.0",
+      "description": "Beneficiary registration, vulnerability assessment, case management, deduplication",
+      "provides": [
+        "beneficiary_registration",
+        "vulnerability_assessment",
+        "case_management",
+        "deduplication",
+        "beneficiary_analytics"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "mdm"
+      ],
+      "entities": [
+        "Beneficiary",
+        "VulnerabilityScore",
+        "BeneficiaryCase",
+        "ServiceDelivery"
+      ],
+      "configuration": {
+        "theme": "ngo_ben_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

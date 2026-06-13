@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "hos_pms",
+    "description": "Property Management System package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "hos_pms": {
+      "domain": "hospitality",
+      "display_name": "Property Management System",
+      "version": "1.0.0",
+      "description": "Room inventory, check-in/check-out, housekeeping, folio management",
+      "provides": [
+        "room_management",
+        "check_in_out",
+        "housekeeping_management",
+        "folio_management",
+        "room_assignment"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "fintech_payments"
+      ],
+      "entities": [
+        "Room",
+        "Reservation",
+        "Folio",
+        "HousekeepingTask"
+      ],
+      "configuration": {
+        "theme": "hos_pms_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

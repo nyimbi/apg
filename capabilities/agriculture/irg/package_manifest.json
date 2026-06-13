@@ -1,0 +1,42 @@
+{
+  "app": {
+    "name": "agr_irg",
+    "description": "Irrigation Management package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "agr_irg": {
+      "domain": "agriculture",
+      "display_name": "Irrigation Management",
+      "version": "1.0.0",
+      "description": "Sensor integration, irrigation schedule optimisation, water usage tracking",
+      "provides": [
+        "irrigation_scheduling",
+        "water_usage_tracking",
+        "sensor_integration",
+        "schedule_optimisation"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "agr_iot",
+        "agr_crp"
+      ],
+      "entities": [
+        "IrrigationZone",
+        "IrrigationSchedule",
+        "WaterUsageRecord",
+        "SensorReading"
+      ],
+      "configuration": {
+        "theme": "agr_irg_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

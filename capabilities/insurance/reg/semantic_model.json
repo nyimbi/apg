@@ -1,0 +1,142 @@
+{
+  "capability_id": "ins_reg",
+  "capability_name": "Regulatory Reporting",
+  "version": "1.0.0",
+  "domain": "insurance",
+  "entities": {
+    "RegulatoryReturn": {
+      "type": "object",
+      "description": "RegulatoryReturn entity for Regulatory Reporting",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "SolvencyReport": {
+      "type": "object",
+      "description": "SolvencyReport entity for Regulatory Reporting",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "StatutorySubmission": {
+      "type": "object",
+      "description": "StatutorySubmission entity for Regulatory Reporting",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "RegulatorCorrespondence": {
+      "type": "object",
+      "description": "RegulatorCorrespondence entity for Regulatory Reporting",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/ins-reg/regulatoryreturns",
+      "description": "List RegulatoryReturn records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ins-reg/regulatoryreturns",
+      "description": "Create RegulatoryReturn"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ins-reg/regulatoryreturns/{id}",
+      "description": "Get RegulatoryReturn by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ins-reg/regulatoryreturns/{id}",
+      "description": "Update RegulatoryReturn"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/ins-reg/regulatoryreturns/{id}",
+      "description": "Delete RegulatoryReturn"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "return.submitted",
+      "solvency.reported"
+    ],
+    "subscribes": []
+  }
+}

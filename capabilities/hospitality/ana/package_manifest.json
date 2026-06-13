@@ -1,0 +1,44 @@
+{
+  "app": {
+    "name": "hos_ana",
+    "description": "Hospitality Analytics package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "hos_ana": {
+      "domain": "hospitality",
+      "display_name": "Hospitality Analytics",
+      "version": "1.0.0",
+      "description": "RevPAR, occupancy analytics, guest satisfaction, competitor benchmarking",
+      "provides": [
+        "revpar_analytics",
+        "occupancy_reporting",
+        "guest_satisfaction",
+        "competitor_benchmarking",
+        "forecast_reporting"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "hos_pms",
+        "hos_rms",
+        "bia_anl"
+      ],
+      "entities": [
+        "OccupancyReport",
+        "RevPARReport",
+        "GuestSatisfactionScore",
+        "BenchmarkRecord"
+      ],
+      "configuration": {
+        "theme": "hos_ana_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

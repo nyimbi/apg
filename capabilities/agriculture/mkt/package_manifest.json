@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "agr_mkt",
+    "description": "Agri-Marketplace package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "agr_mkt": {
+      "domain": "agriculture",
+      "display_name": "Agri-Marketplace",
+      "version": "1.0.0",
+      "description": "Farmer listing, price discovery, escrow payments, buyer matching",
+      "provides": [
+        "produce_listing",
+        "price_discovery",
+        "buyer_matching",
+        "escrow_payments",
+        "market_analytics"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "fintech_payments"
+      ],
+      "entities": [
+        "ProduceListing",
+        "MarketBid",
+        "MarketOrder",
+        "PriceRecord"
+      ],
+      "configuration": {
+        "theme": "agr_mkt_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

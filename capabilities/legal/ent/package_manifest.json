@@ -1,0 +1,42 @@
+{
+  "app": {
+    "name": "leg_ent",
+    "description": "Entity & Corporate Secretary package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "leg_ent": {
+      "domain": "legal",
+      "display_name": "Entity & Corporate Secretary",
+      "version": "1.0.0",
+      "description": "Corporate entity registry, shareholder register, board resolutions, filings",
+      "provides": [
+        "entity_registry",
+        "shareholder_register",
+        "board_resolutions",
+        "statutory_filings",
+        "cap_table"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "esig"
+      ],
+      "entities": [
+        "LegalEntity",
+        "Shareholder",
+        "BoardResolution",
+        "StatutoryFiling"
+      ],
+      "configuration": {
+        "theme": "leg_ent_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

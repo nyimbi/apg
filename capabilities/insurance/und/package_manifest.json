@@ -1,0 +1,42 @@
+{
+  "app": {
+    "name": "ins_und",
+    "description": "Underwriting Engine package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "ins_und": {
+      "domain": "insurance",
+      "display_name": "Underwriting Engine",
+      "version": "1.0.0",
+      "description": "Risk assessment, premium calculation, policy acceptance/declination",
+      "provides": [
+        "risk_assessment",
+        "premium_calculation",
+        "acceptance_decision",
+        "rating_engine",
+        "underwriting_rules"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "mlx"
+      ],
+      "entities": [
+        "UnderwritingApplication",
+        "RiskAssessment",
+        "PremiumQuote",
+        "UnderwritingDecision"
+      ],
+      "configuration": {
+        "theme": "ins_und_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

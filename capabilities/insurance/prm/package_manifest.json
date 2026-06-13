@@ -1,0 +1,44 @@
+{
+  "app": {
+    "name": "ins_prm",
+    "description": "Premium & Billing package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "ins_prm": {
+      "domain": "insurance",
+      "display_name": "Premium & Billing",
+      "version": "1.0.0",
+      "description": "Premium collection, instalment schedules, payment reminders, lapse management",
+      "provides": [
+        "premium_collection",
+        "instalment_scheduling",
+        "payment_reminders",
+        "lapse_management",
+        "refund_processing"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "ins_pol",
+        "fintech_payments"
+      ],
+      "entities": [
+        "PremiumSchedule",
+        "PremiumPayment",
+        "LapseNotice",
+        "Refund"
+      ],
+      "configuration": {
+        "theme": "ins_prm_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

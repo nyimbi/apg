@@ -1,0 +1,143 @@
+{
+  "capability_id": "ins_dst",
+  "capability_name": "Distribution & Agency Management",
+  "version": "1.0.0",
+  "domain": "insurance",
+  "entities": {
+    "InsuranceAgent": {
+      "type": "object",
+      "description": "InsuranceAgent entity for Distribution & Agency Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "Commission": {
+      "type": "object",
+      "description": "Commission entity for Distribution & Agency Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "AgentLicence": {
+      "type": "object",
+      "description": "AgentLicence entity for Distribution & Agency Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "ChannelPartner": {
+      "type": "object",
+      "description": "ChannelPartner entity for Distribution & Agency Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/ins-dst/insuranceagents",
+      "description": "List InsuranceAgent records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ins-dst/insuranceagents",
+      "description": "Create InsuranceAgent"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ins-dst/insuranceagents/{id}",
+      "description": "Get InsuranceAgent by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ins-dst/insuranceagents/{id}",
+      "description": "Update InsuranceAgent"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/ins-dst/insuranceagents/{id}",
+      "description": "Delete InsuranceAgent"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "agent.onboarded",
+      "commission.calculated",
+      "licence.renewed"
+    ],
+    "subscribes": []
+  }
+}

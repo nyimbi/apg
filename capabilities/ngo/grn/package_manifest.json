@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "ngo_grn",
+    "description": "Grant Management package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "ngo_grn": {
+      "domain": "ngo",
+      "display_name": "Grant Management",
+      "version": "1.0.0",
+      "description": "Grant application, award management, disbursement tracking, donor reporting",
+      "provides": [
+        "grant_application",
+        "award_management",
+        "disbursement_tracking",
+        "donor_reporting",
+        "grant_compliance"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "fin_gl"
+      ],
+      "entities": [
+        "GrantApplication",
+        "GrantAward",
+        "Disbursement",
+        "DonorReport"
+      ],
+      "configuration": {
+        "theme": "ngo_grn_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

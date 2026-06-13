@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "leg_cpl",
+    "description": "Legal Compliance Management package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "leg_cpl": {
+      "domain": "legal",
+      "display_name": "Legal Compliance Management",
+      "version": "1.0.0",
+      "description": "Regulatory compliance calendar, obligations register, compliance testing, reporting",
+      "provides": [
+        "compliance_calendar",
+        "obligations_register",
+        "compliance_testing",
+        "compliance_reporting",
+        "breach_management"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "grc_pol"
+      ],
+      "entities": [
+        "ComplianceObligation",
+        "ComplianceTest",
+        "ComplianceReport",
+        "RegulatoryBreach"
+      ],
+      "configuration": {
+        "theme": "leg_cpl_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "app": {
+    "name": "hos_rsv",
+    "description": "Reservations & Channel Manager package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "hos_rsv": {
+      "domain": "hospitality",
+      "display_name": "Reservations & Channel Manager",
+      "version": "1.0.0",
+      "description": "Booking engine, OTA channel management, group bookings, availability sync",
+      "provides": [
+        "booking_engine",
+        "channel_management",
+        "group_bookings",
+        "availability_sync",
+        "cancellation_management"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "hos_pms",
+        "fintech_payments"
+      ],
+      "entities": [
+        "Booking",
+        "ChannelAllotment",
+        "GroupBlock",
+        "RateAvailability"
+      ],
+      "configuration": {
+        "theme": "hos_rsv_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

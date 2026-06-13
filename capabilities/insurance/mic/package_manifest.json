@@ -1,0 +1,44 @@
+{
+  "app": {
+    "name": "ins_mic",
+    "description": "Micro-Insurance Platform package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "ins_mic": {
+      "domain": "insurance",
+      "display_name": "Micro-Insurance Platform",
+      "version": "1.0.0",
+      "description": "Mobile-first micro-insurance, USSD enrolment, parametric payouts, feature phones",
+      "provides": [
+        "micro_policy_issuance",
+        "ussd_enrolment",
+        "parametric_claims",
+        "mobile_money_payout",
+        "group_insurance"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "ussd",
+        "fintech_payments"
+      ],
+      "entities": [
+        "MicroPolicy",
+        "MicroClaim",
+        "GroupPolicy",
+        "MobilePayout"
+      ],
+      "configuration": {
+        "theme": "ins_mic_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

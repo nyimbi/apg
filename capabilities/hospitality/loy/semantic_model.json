@@ -1,0 +1,145 @@
+{
+  "capability_id": "hos_loy",
+  "capability_name": "Guest Loyalty Programme",
+  "version": "1.0.0",
+  "domain": "hospitality",
+  "entities": {
+    "LoyaltyMember": {
+      "type": "object",
+      "description": "LoyaltyMember entity for Guest Loyalty Programme",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "PointsTransaction": {
+      "type": "object",
+      "description": "PointsTransaction entity for Guest Loyalty Programme",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "Redemption": {
+      "type": "object",
+      "description": "Redemption entity for Guest Loyalty Programme",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "LoyaltyTier": {
+      "type": "object",
+      "description": "LoyaltyTier entity for Guest Loyalty Programme",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/hos-loy/loyaltymembers",
+      "description": "List LoyaltyMember records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hos-loy/loyaltymembers",
+      "description": "Create LoyaltyMember"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hos-loy/loyaltymembers/{id}",
+      "description": "Get LoyaltyMember by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/hos-loy/loyaltymembers/{id}",
+      "description": "Update LoyaltyMember"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hos-loy/loyaltymembers/{id}",
+      "description": "Delete LoyaltyMember"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "points.earned",
+      "tier.upgraded",
+      "reward.redeemed"
+    ],
+    "subscribes": [
+      "guest.checked_out"
+    ]
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "capability_id": "ngo_ben",
+  "capability_name": "Beneficiary Registry",
+  "version": "1.0.0",
+  "domain": "ngo",
+  "entities": {
+    "Beneficiary": {
+      "type": "object",
+      "description": "Beneficiary entity for Beneficiary Registry",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "VulnerabilityScore": {
+      "type": "object",
+      "description": "VulnerabilityScore entity for Beneficiary Registry",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "BeneficiaryCase": {
+      "type": "object",
+      "description": "BeneficiaryCase entity for Beneficiary Registry",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "ServiceDelivery": {
+      "type": "object",
+      "description": "ServiceDelivery entity for Beneficiary Registry",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/ngo-ben/beneficiarys",
+      "description": "List Beneficiary records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ngo-ben/beneficiarys",
+      "description": "Create Beneficiary"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ngo-ben/beneficiarys/{id}",
+      "description": "Get Beneficiary by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ngo-ben/beneficiarys/{id}",
+      "description": "Update Beneficiary"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/ngo-ben/beneficiarys/{id}",
+      "description": "Delete Beneficiary"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "beneficiary.registered",
+      "case.opened",
+      "service.delivered"
+    ],
+    "subscribes": []
+  }
+}

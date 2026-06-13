@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "agr_crp",
+    "description": "Crop Management package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "agr_crp": {
+      "domain": "agriculture",
+      "display_name": "Crop Management",
+      "version": "1.0.0",
+      "description": "Planting calendar, phenology tracking, variety registry, yield recording",
+      "provides": [
+        "crop_registration",
+        "planting_calendar",
+        "phenology_tracking",
+        "yield_recording",
+        "variety_registry"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "agr_wth",
+        "agr_iot"
+      ],
+      "entities": [
+        "Crop",
+        "PlantingRecord",
+        "YieldRecord",
+        "CropVariety"
+      ],
+      "configuration": {
+        "theme": "agr_crp_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

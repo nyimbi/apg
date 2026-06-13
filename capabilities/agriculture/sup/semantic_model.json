@@ -1,0 +1,143 @@
+{
+  "capability_id": "agr_sup",
+  "capability_name": "Agricultural Supply Chain",
+  "version": "1.0.0",
+  "domain": "agriculture",
+  "entities": {
+    "ProduceLot": {
+      "type": "object",
+      "description": "ProduceLot entity for Agricultural Supply Chain",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "ColdChainRecord": {
+      "type": "object",
+      "description": "ColdChainRecord entity for Agricultural Supply Chain",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "AggregationCenter": {
+      "type": "object",
+      "description": "AggregationCenter entity for Agricultural Supply Chain",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "BuyerOrder": {
+      "type": "object",
+      "description": "BuyerOrder entity for Agricultural Supply Chain",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/agr-sup/producelots",
+      "description": "List ProduceLot records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/agr-sup/producelots",
+      "description": "Create ProduceLot"
+    },
+    {
+      "method": "GET",
+      "path": "/api/agr-sup/producelots/{id}",
+      "description": "Get ProduceLot by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/agr-sup/producelots/{id}",
+      "description": "Update ProduceLot"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/agr-sup/producelots/{id}",
+      "description": "Delete ProduceLot"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "produce.dispatched",
+      "lot.received",
+      "cold_chain.breach"
+    ],
+    "subscribes": []
+  }
+}

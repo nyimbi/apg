@@ -1,0 +1,143 @@
+{
+  "capability_id": "agr_crp",
+  "capability_name": "Crop Management",
+  "version": "1.0.0",
+  "domain": "agriculture",
+  "entities": {
+    "Crop": {
+      "type": "object",
+      "description": "Crop entity for Crop Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "PlantingRecord": {
+      "type": "object",
+      "description": "PlantingRecord entity for Crop Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "YieldRecord": {
+      "type": "object",
+      "description": "YieldRecord entity for Crop Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "CropVariety": {
+      "type": "object",
+      "description": "CropVariety entity for Crop Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/agr-crp/crops",
+      "description": "List Crop records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/agr-crp/crops",
+      "description": "Create Crop"
+    },
+    {
+      "method": "GET",
+      "path": "/api/agr-crp/crops/{id}",
+      "description": "Get Crop by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/agr-crp/crops/{id}",
+      "description": "Update Crop"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/agr-crp/crops/{id}",
+      "description": "Delete Crop"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "crop.planted",
+      "crop.harvested",
+      "yield.recorded"
+    ],
+    "subscribes": []
+  }
+}

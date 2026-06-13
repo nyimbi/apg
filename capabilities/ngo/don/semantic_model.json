@@ -1,0 +1,143 @@
+{
+  "capability_id": "ngo_don",
+  "capability_name": "Donor Relationship Management",
+  "version": "1.0.0",
+  "domain": "ngo",
+  "entities": {
+    "Donor": {
+      "type": "object",
+      "description": "Donor entity for Donor Relationship Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "Donation": {
+      "type": "object",
+      "description": "Donation entity for Donor Relationship Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "Pledge": {
+      "type": "object",
+      "description": "Pledge entity for Donor Relationship Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "StewardshipActivity": {
+      "type": "object",
+      "description": "StewardshipActivity entity for Donor Relationship Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/ngo-don/donors",
+      "description": "List Donor records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ngo-don/donors",
+      "description": "Create Donor"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ngo-don/donors/{id}",
+      "description": "Get Donor by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ngo-don/donors/{id}",
+      "description": "Update Donor"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/ngo-don/donors/{id}",
+      "description": "Delete Donor"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "donation.received",
+      "pledge.created",
+      "stewardship.completed"
+    ],
+    "subscribes": []
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "capability_id": "ngo_prg",
+  "capability_name": "Programme & Project Monitoring",
+  "version": "1.0.0",
+  "domain": "ngo",
+  "entities": {
+    "Programme": {
+      "type": "object",
+      "description": "Programme entity for Programme & Project Monitoring",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "Activity": {
+      "type": "object",
+      "description": "Activity entity for Programme & Project Monitoring",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "ProgrammeBudget": {
+      "type": "object",
+      "description": "ProgrammeBudget entity for Programme & Project Monitoring",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "Milestone": {
+      "type": "object",
+      "description": "Milestone entity for Programme & Project Monitoring",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/ngo-prg/programmes",
+      "description": "List Programme records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ngo-prg/programmes",
+      "description": "Create Programme"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ngo-prg/programmes/{id}",
+      "description": "Get Programme by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ngo-prg/programmes/{id}",
+      "description": "Update Programme"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/ngo-prg/programmes/{id}",
+      "description": "Delete Programme"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "activity.completed",
+      "milestone.reached",
+      "budget.alert"
+    ],
+    "subscribes": []
+  }
+}

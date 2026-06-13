@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "agr_coo",
+    "description": "Cooperative Management package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "agr_coo": {
+      "domain": "agriculture",
+      "display_name": "Cooperative Management",
+      "version": "1.0.0",
+      "description": "Member registry, pooled inputs, bulk sales, dividend distribution",
+      "provides": [
+        "member_management",
+        "pooled_input_procurement",
+        "bulk_sales",
+        "dividend_distribution",
+        "cooperative_accounting"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "fin_gl"
+      ],
+      "entities": [
+        "CooperativeMember",
+        "InputOrder",
+        "BulkSale",
+        "DividendRecord"
+      ],
+      "configuration": {
+        "theme": "agr_coo_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

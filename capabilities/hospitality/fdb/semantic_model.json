@@ -1,0 +1,143 @@
+{
+  "capability_id": "hos_fdb",
+  "capability_name": "F&B Management",
+  "version": "1.0.0",
+  "domain": "hospitality",
+  "entities": {
+    "MenuItem": {
+      "type": "object",
+      "description": "MenuItem entity for F&B Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "TableOrder": {
+      "type": "object",
+      "description": "TableOrder entity for F&B Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "RestaurantReservation": {
+      "type": "object",
+      "description": "RestaurantReservation entity for F&B Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "FBInventoryItem": {
+      "type": "object",
+      "description": "FBInventoryItem entity for F&B Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/hos-fdb/menuitems",
+      "description": "List MenuItem records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hos-fdb/menuitems",
+      "description": "Create MenuItem"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hos-fdb/menuitems/{id}",
+      "description": "Get MenuItem by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/hos-fdb/menuitems/{id}",
+      "description": "Update MenuItem"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hos-fdb/menuitems/{id}",
+      "description": "Delete MenuItem"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "order.placed",
+      "table.reserved",
+      "inventory.low"
+    ],
+    "subscribes": []
+  }
+}

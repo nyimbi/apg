@@ -1,0 +1,44 @@
+{
+  "app": {
+    "name": "ins_reg",
+    "description": "Regulatory Reporting package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "ins_reg": {
+      "domain": "insurance",
+      "display_name": "Regulatory Reporting",
+      "version": "1.0.0",
+      "description": "IRA/FSA regulatory submissions, solvency reporting, statutory returns",
+      "provides": [
+        "regulatory_submissions",
+        "solvency_reporting",
+        "statutory_returns",
+        "compliance_monitoring",
+        "regulator_portal"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ins_pol",
+        "ins_clm",
+        "ins_act"
+      ],
+      "entities": [
+        "RegulatoryReturn",
+        "SolvencyReport",
+        "StatutorySubmission",
+        "RegulatorCorrespondence"
+      ],
+      "configuration": {
+        "theme": "ins_reg_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

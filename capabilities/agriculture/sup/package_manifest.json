@@ -1,0 +1,42 @@
+{
+  "app": {
+    "name": "agr_sup",
+    "description": "Agricultural Supply Chain package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "agr_sup": {
+      "domain": "agriculture",
+      "display_name": "Agricultural Supply Chain",
+      "version": "1.0.0",
+      "description": "Farm-to-buyer traceability, cold chain management, produce aggregation",
+      "provides": [
+        "produce_traceability",
+        "cold_chain_management",
+        "aggregation_management",
+        "buyer_linkage"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "agr_crp",
+        "scm_inv"
+      ],
+      "entities": [
+        "ProduceLot",
+        "ColdChainRecord",
+        "AggregationCenter",
+        "BuyerOrder"
+      ],
+      "configuration": {
+        "theme": "agr_sup_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

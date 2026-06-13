@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "hos_rms",
+    "description": "Revenue Management & Rates package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "hos_rms": {
+      "domain": "hospitality",
+      "display_name": "Revenue Management & Rates",
+      "version": "1.0.0",
+      "description": "Dynamic pricing, demand forecasting, rate management, channel rate parity",
+      "provides": [
+        "dynamic_pricing",
+        "demand_forecasting",
+        "rate_management",
+        "rate_parity",
+        "yield_optimisation"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "hos_pms",
+        "mlx"
+      ],
+      "entities": [
+        "RatePlan",
+        "PricingRule",
+        "DemandForecast",
+        "RateAudit"
+      ],
+      "configuration": {
+        "theme": "hos_rms_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}

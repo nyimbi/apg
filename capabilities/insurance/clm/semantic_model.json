@@ -1,0 +1,145 @@
+{
+  "capability_id": "ins_clm",
+  "capability_name": "Claims Management",
+  "version": "1.0.0",
+  "domain": "insurance",
+  "entities": {
+    "Claim": {
+      "type": "object",
+      "description": "Claim entity for Claims Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "ClaimItem": {
+      "type": "object",
+      "description": "ClaimItem entity for Claims Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "ClaimsAdjudication": {
+      "type": "object",
+      "description": "ClaimsAdjudication entity for Claims Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    },
+    "ClaimsPayment": {
+      "type": "object",
+      "description": "ClaimsPayment entity for Claims Management",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "tenant_id"
+      ]
+    }
+  },
+  "api_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/ins-clm/claims",
+      "description": "List Claim records"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ins-clm/claims",
+      "description": "Create Claim"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ins-clm/claims/{id}",
+      "description": "Get Claim by ID"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ins-clm/claims/{id}",
+      "description": "Update Claim"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/ins-clm/claims/{id}",
+      "description": "Delete Claim"
+    }
+  ],
+  "events": {
+    "publishes": [
+      "claim.filed",
+      "claim.approved",
+      "claim.paid"
+    ],
+    "subscribes": [
+      "policy.issued"
+    ]
+  }
+}

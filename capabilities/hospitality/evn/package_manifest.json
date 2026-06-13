@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "hos_evn",
+    "description": "Events & Venue Management package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "hos_evn": {
+      "domain": "hospitality",
+      "display_name": "Events & Venue Management",
+      "version": "1.0.0",
+      "description": "Event booking, space management, AV setup, catering coordination, billing",
+      "provides": [
+        "event_booking",
+        "space_management",
+        "av_management",
+        "catering_coordination",
+        "event_billing"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "fintech_payments"
+      ],
+      "entities": [
+        "Event",
+        "VenueSpace",
+        "EventSetup",
+        "CateringOrder"
+      ],
+      "configuration": {
+        "theme": "hos_evn_theme",
+        "allow_tenant_overrides": true
+      }
+    }
+  },
+  "metadata": {
+    "generated": "2026-06-13",
+    "generator": "apg-contract-generator"
+  }
+}
