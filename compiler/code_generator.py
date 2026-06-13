@@ -3228,34 +3228,110 @@ def theme_stylesheet() -> str:
                     if str(token_name).lower() in {{"accent", "primary", "brand"}}:
                         lines.append(":root {{ --apg-accent: var(" + css_var + "); }}")
     lines.extend([
-        "body {{ margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--apg-text); background: #f6f8fa; line-height: 1.5; }}",
-        "body > * {{ max-width: 1100px; margin-left: auto; margin-right: auto; }}",
-        "h1 {{ margin-top: 24px; color: var(--apg-text); }}",
-        "h2 {{ margin-top: 24px; color: var(--apg-text); }}",
-        "nav {{ margin: 16px auto; padding: 10px 0; border-bottom: 1px solid var(--apg-border); }}",
-        "a {{ color: var(--apg-accent); text-decoration: none; }}",
-        "a:hover {{ text-decoration: underline; }}",
-        "form {{ padding: 16px; background: var(--apg-surface); border: 1px solid var(--apg-border); border-radius: 8px; }}",
-        "label {{ display: block; margin: 8px 0; color: var(--apg-muted); }}",
-        "input {{ min-width: 280px; padding: 8px; border: 1px solid var(--apg-border); border-radius: 6px; }}",
-        "button {{ padding: 8px 12px; border: 1px solid var(--apg-accent); border-radius: 6px; background: var(--apg-accent); color: white; cursor: pointer; }}",
-        "pre {{ padding: 16px; overflow: auto; background: var(--apg-surface); border: 1px solid var(--apg-border); border-left: 4px solid var(--apg-accent); border-radius: 8px; }}",
-        "code {{ color: var(--apg-accent); }}",
+        # Extended spacing + radius + shadow tokens
+        ":root {{ --apg-radius: 8px; --apg-radius-sm: 4px; --apg-radius-full: 9999px; }}",
+        ":root {{ --apg-shadow-sm: 0 1px 2px rgba(0,0,0,0.08); --apg-shadow-md: 0 4px 6px rgba(0,0,0,0.10); --apg-shadow-lg: 0 10px 15px rgba(0,0,0,0.12); }}",
+        ":root {{ --apg-sidebar-width: 240px; --apg-topbar-height: 56px; }}",
+        ":root {{ --apg-font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --apg-font-mono: 'JetBrains Mono', ui-monospace, monospace; }}",
+        ":root {{ --apg-space-1: 4px; --apg-space-2: 8px; --apg-space-3: 12px; --apg-space-4: 16px; --apg-space-6: 24px; --apg-space-8: 32px; }}",
+        ":root {{ --apg-duration-fast: 150ms; --apg-duration-base: 200ms; }}",
+        ":root {{ --apg-bg-canvas: #f6f8fa; --apg-bg-card: var(--apg-surface); --apg-bg-hover: rgba(0,0,0,0.04); }}",
+        # Dark mode
+        "@media (prefers-color-scheme: dark) {{ :root {{ --apg-surface: #1e2028; --apg-border: #30363d; --apg-text: #e6edf3; --apg-muted: #8b949e; --apg-bg-canvas: #0d1117; --apg-bg-card: #161b22; --apg-bg-hover: rgba(255,255,255,0.06); }} }}",
+        # Base styles
+        "*, *::before, *::after {{ box-sizing: border-box; }}",
+        "body {{ margin: 0; font-family: var(--apg-font-sans); color: var(--apg-text); background: var(--apg-bg-canvas); line-height: 1.5; font-size: 14px; }}",
+        "h1 {{ margin: 0 0 var(--apg-space-4); font-size: 1.5rem; font-weight: 600; color: var(--apg-text); }}",
+        "h2 {{ margin: var(--apg-space-6) 0 var(--apg-space-3); font-size: 1.125rem; font-weight: 600; color: var(--apg-text); }}",
+        "h3 {{ margin: var(--apg-space-4) 0 var(--apg-space-2); font-size: 1rem; font-weight: 600; color: var(--apg-text); }}",
+        "a {{ color: var(--apg-accent); text-decoration: none; transition: opacity var(--apg-duration-fast); }}",
+        "a:hover {{ text-decoration: underline; opacity: 0.85; }}",
+        "p {{ margin: 0 0 var(--apg-space-3); }}",
+        # Topbar layout shell
+        ".apg-topbar {{ position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: var(--apg-space-4); height: var(--apg-topbar-height); padding: 0 var(--apg-space-6); border-bottom: 1px solid var(--apg-border); background: var(--apg-surface); box-shadow: var(--apg-shadow-sm); }}",
+        ".apg-logo {{ font-weight: 700; font-size: 1rem; color: var(--apg-accent) !important; text-decoration: none !important; letter-spacing: -0.02em; }}",
+        ".apg-topnav {{ display: flex; align-items: center; gap: var(--apg-space-1); flex: 1; }}",
+        ".apg-content {{ max-width: 1280px; margin: 0 auto; padding: var(--apg-space-6); }}",
+        # Nav links
+        ".apg-nav-link {{ display: inline-flex; align-items: center; padding: var(--apg-space-2) var(--apg-space-3); border-radius: var(--apg-radius-sm); font-size: 0.875rem; color: var(--apg-text); text-decoration: none !important; transition: background var(--apg-duration-fast); white-space: nowrap; }}",
+        ".apg-nav-link:hover {{ background: var(--apg-bg-hover); text-decoration: none !important; opacity: 1; }}",
+        ".apg-nav-link.active {{ background: var(--apg-bg-hover); font-weight: 500; }}",
+        # Card
+        ".apg-card {{ background: var(--apg-bg-card); border: 1px solid var(--apg-border); border-radius: var(--apg-radius); box-shadow: var(--apg-shadow-sm); padding: var(--apg-space-4); margin-bottom: var(--apg-space-4); }}",
+        ".apg-card-header {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--apg-space-3); padding-bottom: var(--apg-space-3); border-bottom: 1px solid var(--apg-border); }}",
+        # Table
+        ".apg-table {{ width: 100%; border-collapse: collapse; font-size: 0.875rem; }}",
+        ".apg-table thead {{ background: var(--apg-bg-canvas); }}",
+        ".apg-table th {{ padding: var(--apg-space-2) var(--apg-space-3); text-align: left; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--apg-muted); border-bottom: 2px solid var(--apg-border); white-space: nowrap; }}",
+        ".apg-table td {{ padding: var(--apg-space-2) var(--apg-space-3); border-bottom: 1px solid var(--apg-border); vertical-align: middle; }}",
+        ".apg-table tbody tr:hover {{ background: var(--apg-bg-hover); }}",
+        ".apg-table-wrap {{ overflow-x: auto; border: 1px solid var(--apg-border); border-radius: var(--apg-radius); background: var(--apg-bg-card); }}",
+        # Badge
+        ".apg-badge {{ display: inline-flex; align-items: center; padding: 2px var(--apg-space-2); border-radius: var(--apg-radius-full); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; line-height: 1.6; }}",
+        ".apg-badge-success {{ background: #dcfce7; color: #166534; }}",
+        ".apg-badge-warning {{ background: #fef9c3; color: #854d0e; }}",
+        ".apg-badge-danger {{ background: #fee2e2; color: #991b1b; }}",
+        ".apg-badge-info {{ background: #dbeafe; color: #1e40af; }}",
+        ".apg-badge-neutral {{ background: var(--apg-bg-hover); color: var(--apg-muted); }}",
+        # Form
+        "form, .apg-form {{ padding: var(--apg-space-4); background: var(--apg-bg-card); border: 1px solid var(--apg-border); border-radius: var(--apg-radius); box-shadow: var(--apg-shadow-sm); }}",
+        "label {{ display: block; margin-bottom: var(--apg-space-1); font-size: 0.875rem; font-weight: 500; color: var(--apg-text); }}",
+        "input, select, textarea {{ width: 100%; max-width: 480px; padding: var(--apg-space-2) var(--apg-space-3); border: 1px solid var(--apg-border); border-radius: var(--apg-radius-sm); background: var(--apg-surface); color: var(--apg-text); font-family: var(--apg-font-sans); font-size: 0.875rem; transition: border-color var(--apg-duration-fast); outline: none; }}",
+        "input:focus, select:focus, textarea:focus {{ border-color: var(--apg-accent); box-shadow: 0 0 0 3px rgba(18,110,130,0.12); }}",
+        ".apg-field {{ margin-bottom: var(--apg-space-4); }}",
+        # Button
+        "button, .apg-btn {{ display: inline-flex; align-items: center; gap: var(--apg-space-2); padding: var(--apg-space-2) var(--apg-space-4); border: 1px solid var(--apg-accent); border-radius: var(--apg-radius-sm); background: var(--apg-accent); color: white; font-family: var(--apg-font-sans); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: opacity var(--apg-duration-fast); line-height: 1.5; }}",
+        "button:hover, .apg-btn:hover {{ opacity: 0.88; }}",
+        ".apg-btn-secondary {{ background: var(--apg-surface); color: var(--apg-text); border-color: var(--apg-border); }}",
+        ".apg-btn-danger {{ background: #dc2626; border-color: #dc2626; }}",
+        # Alert / notice
+        "[role=alert] {{ padding: var(--apg-space-3) var(--apg-space-4); background: #fef9c3; border: 1px solid #fde68a; border-radius: var(--apg-radius-sm); margin-bottom: var(--apg-space-4); font-size: 0.875rem; }}",
+        # Code / pre
+        "pre {{ padding: var(--apg-space-4); overflow: auto; background: var(--apg-bg-canvas); border: 1px solid var(--apg-border); border-left: 3px solid var(--apg-accent); border-radius: var(--apg-radius); font-family: var(--apg-font-mono); font-size: 0.8rem; line-height: 1.6; }}",
+        "code {{ font-family: var(--apg-font-mono); font-size: 0.85em; color: var(--apg-accent); background: var(--apg-bg-hover); padding: 1px 5px; border-radius: 3px; }}",
+        "pre code {{ background: transparent; padding: 0; color: inherit; }}",
+        # Stat card
+        ".apg-stat {{ display: flex; flex-direction: column; gap: var(--apg-space-1); }}",
+        ".apg-stat-value {{ font-size: 1.75rem; font-weight: 700; color: var(--apg-text); line-height: 1; }}",
+        ".apg-stat-label {{ font-size: 0.75rem; color: var(--apg-muted); text-transform: uppercase; letter-spacing: 0.05em; }}",
+        ".apg-stat-delta {{ font-size: 0.8rem; font-weight: 500; }}",
+        ".apg-stat-delta.up {{ color: #16a34a; }} .apg-stat-delta.down {{ color: #dc2626; }}",
+        # Grid helpers
+        ".apg-grid-2 {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--apg-space-4); }}",
+        ".apg-grid-3 {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--apg-space-4); }}",
+        ".apg-grid-4 {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--apg-space-4); }}",
+        "@media (max-width: 768px) {{ .apg-grid-2, .apg-grid-3, .apg-grid-4 {{ grid-template-columns: 1fr; }} }}",
+        # Utility
+        ".apg-flex {{ display: flex; align-items: center; }} .apg-flex-between {{ justify-content: space-between; }}",
+        ".apg-mt-4 {{ margin-top: var(--apg-space-4); }} .apg-mb-4 {{ margin-bottom: var(--apg-space-4); }}",
+        ".apg-text-muted {{ color: var(--apg-muted); }} .apg-text-sm {{ font-size: 0.875rem; }}",
+        ".apg-sr-only {{ position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }}",
     ])
     return "\\n".join(lines) + "\\n"
 
 
 def _html_page(title: str, body: str) -> str:
     safe_title = html.escape(title)
+    safe_module = html.escape(MODULE_NAME)
+    inter_font = (
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">'
+    )
     return (
         "<!doctype html>"
-        "<html><head>"
+        '<html lang="en"><head>'
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"{{inter_font}}"
         '<link rel="stylesheet" href="/theme.css">'
-        f"<title>{{safe_title}}</title>"
-        "</head><body>"
-        f"{{body}}"
+        f"<title>{{safe_title}} — {{safe_module}}</title>"
+        "</head>"
+        "<body>"
+        f'<header class="apg-topbar" role="banner">'
+        f'  <a class="apg-logo" href="/ui">{{safe_module}}</a>'
+        f'</header>'
+        f'<main class="apg-content" id="main-content">{{body}}</main>'
         "</body></html>"
     )
 
@@ -3735,7 +3811,12 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
             '</form>'
         )
         rows.append(f"<tr>{{''.join(cells)}}<td>{{action}}</td></tr>")
-    return f"<table><thead><tr>{{header}}<th>Actions</th></tr></thead><tbody>{{''.join(rows)}}</tbody></table>"
+    return (
+        f'<div class="apg-table-wrap">'
+        f'<table class="apg-table"><thead><tr>{{header}}<th>Actions</th></tr></thead>'
+        f'<tbody>{{"".join(rows)}}</tbody></table>'
+        f'</div>'
+    )
 
 
 def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[str]] | None = None) -> tuple[int, str]:
