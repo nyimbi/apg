@@ -1,0 +1,88 @@
+{
+  "format": "apg.semantic-model.v1",
+  "app": {
+    "name": "common_tax_calc",
+    "description": "APG Tax Calculation Engine — horizontal integration point for all tax computation",
+    "version": "1.0.0",
+    "entity_count": 6
+  },
+  "capabilities": {
+    "common_tax_calc": {
+      "name": "Tax Calculation Engine",
+      "version": "1.0.0",
+      "provides": [
+        "tax_calculation_workflow",
+        "tax_rate_lookup",
+        "tax_period_management",
+        "tax_audit_trail",
+        "tax_cross_capability_api"
+      ],
+      "requires": ["audl", "auth", "tax_vat", "tax_wht"],
+      "entities": {
+        "TxTaxRate": {
+          "prefix": "Tx",
+          "description": "Master rate record keyed by country, tax type, product category, effective date",
+          "fields": ["id", "tenant_id", "country_code", "tax_type", "product_category", "rate_pct", "is_compound", "authority_name", "effective_from", "effective_to"]
+        },
+        "TxTaxCalculation": {
+          "prefix": "Tx",
+          "description": "Single tax calculation result — retained permanently for audit",
+          "fields": ["id", "tenant_id", "reference_id", "reference_type", "tax_type", "country_code", "taxable_amount", "tax_amount", "total_amount", "applicable_rates", "tax_breakdown", "status", "period_id"]
+        },
+        "TxTaxPeriod": {
+          "prefix": "Tx",
+          "description": "Tax filing period with open/close/file lifecycle",
+          "fields": ["id", "tenant_id", "country_code", "tax_type", "period_name", "period_start", "period_end", "filing_due_date", "status", "total_taxable_amount", "total_tax_amount"]
+        },
+        "TxTaxAudit": {
+          "prefix": "Tx",
+          "description": "Immutable audit event — append-only, 7-year retention",
+          "fields": ["id", "tenant_id", "action", "reference_id", "reference_type", "actor", "country_code", "tax_type", "snapshot", "occurred_at"]
+        },
+        "TxTaxResult": {
+          "prefix": "Tx",
+          "description": "Return value of calculate_tax() — primary cross-capability API contract",
+          "fields": ["calculation_id", "tenant_id", "reference_id", "reference_type", "tax_type", "country_code", "taxable_amount", "tax_amount", "total_amount", "effective_rate_pct", "tax_breakdown"]
+        },
+        "TxApplicableRate": {
+          "prefix": "Tx",
+          "description": "Rate entry resolved for a specific calculation context",
+          "fields": ["rate_id", "tax_type", "country_code", "product_category", "rate_pct", "is_compound", "effective_from", "source"]
+        }
+      },
+      "country_packs": {
+        "KE": {"authority": "KRA", "system": "iTax", "standard_vat": "16.0%"},
+        "NG": {"authority": "FIRS", "system": "TaxPro", "standard_vat": "7.5%"},
+        "GH": {"authority": "GRA", "system": "GRA Portal", "standard_vat": "15.0%", "levies": ["NHIL 2.5%", "GETFund 1.0%"]},
+        "UG": {"authority": "URA", "system": "URA e-Tax", "standard_vat": "18.0%"},
+        "TZ": {"authority": "TRA", "system": "TRA Portal", "standard_vat": "18.0%"},
+        "ZA": {"authority": "SARS", "system": "eFiling", "standard_vat": "15.0%"},
+        "RW": {"authority": "RRA", "system": "RRA Portal", "standard_vat": "18.0%"}
+      },
+      "cross_capability_api": {
+        "compute_invoice_tax": "Batch VAT calculation for all invoice lines — used by invoicing capability",
+        "compute_payroll_tax": "PAYE calculation for a payroll run — used by payroll capability",
+        "calculate_tax": "Single-item tax calculation — used by commerce, procurement, any other cap"
+      }
+    }
+  },
+  "composition": {
+    "capability_dependencies": {
+      "common_tax_calc": ["audl", "auth", "tax_vat", "tax_wht"]
+    },
+    "consumers": [
+      "fintech_invoicing",
+      "hr_payroll",
+      "ecom_commerce",
+      "proc_po",
+      "fintech_ar",
+      "fintech_ap"
+    ]
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "ok": true,
+  "diagnostics": []
+}

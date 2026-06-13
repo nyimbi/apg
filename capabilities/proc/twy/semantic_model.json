@@ -1,0 +1,236 @@
+{
+  "format": "apg.semantic-model.v1",
+  "ok": true,
+  "diagnostics": [],
+  "app": {
+    "name": "proc_twy",
+    "description": "Three-Way Match Engine — matches Purchase Orders, Goods Receipts, and Vendor Invoices with configurable tolerance rules and exception management.",
+    "version": "1.0.0",
+    "entity_count": 5
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "packages": {
+    "proc_twy": {
+      "entrypoint": "service.py",
+      "profile": "capability"
+    }
+  },
+  "graphs": {
+    "capability": {
+      "kind": "capability",
+      "nodes": 1,
+      "edges": 6
+    }
+  },
+  "contracts": {
+    "proc_twy": {
+      "id": "proc_twy",
+      "provides": [
+        "three_way_match",
+        "exception_management",
+        "tolerance_rules",
+        "match_analytics"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "fin_arc",
+        "scm_prc",
+        "scm_wms"
+      ],
+      "configuration": {
+        "tenant_id": "default",
+        "matching": {
+          "default_price_tolerance_pct": 2.0,
+          "default_quantity_tolerance_pct": 5.0,
+          "default_date_tolerance_days": 30,
+          "require_all_three_documents": true,
+          "allow_two_way_match_fallback": false,
+          "auto_approve_within_tolerance": true,
+          "line_level_matching": true,
+          "header_level_matching": true
+        },
+        "exceptions": {
+          "supported_statuses": ["open", "pending_review", "escalated", "resolved", "cancelled"],
+          "supported_resolution_types": [
+            "approved_with_variance",
+            "rejected",
+            "duplicate_invoice",
+            "cancelled_po",
+            "goods_not_received",
+            "price_correction",
+            "quantity_correction",
+            "date_extension",
+            "manual_override"
+          ],
+          "auto_escalation_age_days": 7,
+          "max_resolution_days": 30,
+          "require_resolution_note": true
+        },
+        "tolerance_rules": {
+          "supported_scopes": ["global", "vendor", "category", "line_item"],
+          "allow_zero_tolerance": true,
+          "allow_per_vendor_overrides": true,
+          "allow_per_category_overrides": true
+        },
+        "governance": {
+          "require_tenant_context": true,
+          "audit_events": true,
+          "cross_tenant_match_denied": true,
+          "auto_approve_over_threshold_denied": false,
+          "policy_attached_for_writes": true
+        },
+        "observability": {
+          "event_stream": "apg.proc.twy.lifecycle",
+          "stream_processor": "nats"
+        },
+        "adapters": {
+          "auth": "auth",
+          "audit": "audl",
+          "notifications": "ntfy",
+          "fin_arc": "fin_arc",
+          "scm_prc": "scm_prc",
+          "scm_wms": "scm_wms"
+        },
+        "ui": {
+          "enable_dashboard": true,
+          "enable_match_queue": true,
+          "enable_exceptions": true,
+          "enable_tolerance_rules": true,
+          "enable_analytics": true,
+          "enable_settings": true
+        },
+        "theme": {
+          "default_theme": "proc_twy_control",
+          "allow_tenant_overrides": true
+        }
+      },
+      "rule_engine": {
+        "type": "deterministic",
+        "rules": [
+          {"name": "tenant_context_required", "condition": {"tenant_context_present": false}, "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}},
+          {"name": "match_write_requires_policy", "condition": {"operation_type": "write", "policy_attached": false}, "effect": {"decision": "deny", "reason": "match_policy_required", "required_action": "attach_match_policy"}},
+          {"name": "cross_tenant_match_denied", "condition": {"operation": "match_documents", "cross_tenant": true}, "effect": {"decision": "deny", "reason": "cross_tenant_match_not_allowed", "required_action": "use_single_tenant_documents"}},
+          {"name": "document_type_supported", "condition": {"operation": "create_document", "document_type_supported": false}, "effect": {"decision": "deny", "reason": "document_type_not_supported", "required_action": "select_supported_document_type"}},
+          {"name": "tolerance_scope_supported", "condition": {"operation": "create_tolerance_rule", "tolerance_scope_supported": false}, "effect": {"decision": "deny", "reason": "tolerance_scope_not_supported", "required_action": "select_supported_tolerance_scope"}},
+          {"name": "exception_status_supported", "condition": {"operation": "update_exception", "exception_status_supported": false}, "effect": {"decision": "deny", "reason": "exception_status_not_supported", "required_action": "select_supported_exception_status"}},
+          {"name": "exception_resolution_type_supported", "condition": {"operation": "resolve_exception", "resolution_type_supported": false}, "effect": {"decision": "deny", "reason": "resolution_type_not_supported", "required_action": "select_supported_resolution_type"}},
+          {"name": "exception_resolution_note_required", "condition": {"operation": "resolve_exception", "resolution_note_present": false}, "effect": {"decision": "deny", "reason": "resolution_note_required", "required_action": "add_resolution_note"}},
+          {"name": "escalation_target_supported", "condition": {"operation": "escalate_exception", "escalation_target_supported": false}, "effect": {"decision": "deny", "reason": "escalation_target_not_supported", "required_action": "select_supported_escalation_target"}},
+          {"name": "auto_approve_requires_tolerance_check", "condition": {"operation": "auto_approve", "within_tolerance": false}, "effect": {"decision": "deny", "reason": "auto_approve_only_within_tolerance", "required_action": "resolve_exception_manually"}}
+        ]
+      }
+    }
+  },
+  "capabilities": {
+    "proc_twy": {
+      "name": "Three-Way Match Engine",
+      "version": "1.0.0",
+      "provides": [
+        "three_way_match",
+        "exception_management",
+        "tolerance_rules",
+        "match_analytics"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "fin_arc",
+        "scm_prc",
+        "scm_wms"
+      ],
+      "entities": {
+        "TwMatchDocument": {
+          "description": "A procurement document (PO, GR, or Vendor Invoice) ingested into the match engine",
+          "fields": ["id", "tenant_id", "document_type", "external_ref", "vendor_id", "currency", "document_date", "total_amount", "lines"]
+        },
+        "TwMatchAttempt": {
+          "description": "A single attempt to match a (PO, GR, Invoice) triple, recording variances found",
+          "fields": ["id", "tenant_id", "po_id", "gr_id", "invoice_id", "status", "variances", "tolerance_rules_applied"]
+        },
+        "TwMatchResult": {
+          "description": "Final outcome of a three-way match with outcome code, variance summary, and auto-approval flag",
+          "fields": ["id", "tenant_id", "match_attempt_id", "outcome", "po_total", "gr_total", "invoice_total", "price_variance_pct", "quantity_variance_pct", "date_variance_days", "all_within_tolerance", "auto_approved", "exception_id"]
+        },
+        "TwMatchException": {
+          "description": "Exception raised when variances exceed tolerance, routed to AP reviewer",
+          "fields": ["id", "tenant_id", "match_result_id", "status", "variance_summary", "assigned_to", "resolution_type", "resolution_note", "resolved_by", "due_at", "age_days"]
+        },
+        "TwMatchToleranceRule": {
+          "description": "Configurable tolerance rule applied in specificity cascade: line_item > category > vendor > global",
+          "fields": ["id", "tenant_id", "name", "scope", "vendor_id", "category_code", "item_code", "price_tolerance_pct", "quantity_tolerance_pct", "date_tolerance_days", "amount_threshold", "active", "priority"]
+        }
+      },
+      "service_methods": [
+        {"name": "match_documents", "signature": "async (po_id, gr_id, invoice_id, tenant_id, initiated_by?) -> TwMatchResult", "description": "Core 3-way match: price, quantity, date tolerance checks with auto-approve and exception raise"},
+        {"name": "list_exceptions", "signature": "async (tenant_id, status?) -> list[TwMatchException]", "description": "List exceptions for tenant, optionally filtered by status"},
+        {"name": "resolve_exception", "signature": "async (exception_id, resolution, resolved_by, tenant_id, resolution_note) -> TwMatchException", "description": "Mark exception resolved with resolution type and note"},
+        {"name": "escalate_exception", "signature": "async (exception_id, escalate_to, reason, tenant_id, escalated_by?) -> TwMatchException", "description": "Escalate open exception to named reviewer"},
+        {"name": "create_tolerance_rule", "signature": "async (rule: TwMatchToleranceRule) -> TwMatchToleranceRule", "description": "Persist a new tolerance rule"},
+        {"name": "auto_approve_within_tolerance", "signature": "async (match_id, tenant_id, approved_by?) -> TwMatchResult", "description": "Re-evaluate and auto-approve a result where all variances are within tolerance"},
+        {"name": "get_match_statistics", "signature": "async (tenant_id, date_from, date_to) -> dict", "description": "Compute match-rate, exception-rate, variance breakdowns, and resolution time KPIs"}
+      ],
+      "nats": {
+        "publishes": ["match.completed", "exception.raised", "exception.resolved", "auto_approved"],
+        "subscribes": [
+          {"source_capability": "fin_arc", "event_type": "invoice.received", "handler": "on_invoice_received"}
+        ]
+      },
+      "runtime": {
+        "service": "service.py",
+        "models": "models.py",
+        "contract": "capability_contract.py"
+      },
+      "ui": {
+        "shell": "apg_python",
+        "api_prefix": "/proc-twy/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {"name": "dashboard", "path": "/proc-twy/dashboard", "component": "TwyDashboard", "permission": "proc_twy:view"},
+          {"name": "match_queue", "path": "/proc-twy/queue", "component": "TwyMatchQueue", "permission": "proc_twy:match"},
+          {"name": "exceptions", "path": "/proc-twy/exceptions", "component": "TwyExceptionConsole", "permission": "proc_twy:exceptions"},
+          {"name": "tolerance_rules", "path": "/proc-twy/tolerance-rules", "component": "TwyToleranceRuleEditor", "permission": "proc_twy:admin"},
+          {"name": "analytics", "path": "/proc-twy/analytics", "component": "TwyAnalytics", "permission": "proc_twy:view"},
+          {"name": "settings", "path": "/proc-twy/settings", "component": "TwySettings", "permission": "proc_twy:admin"}
+        ]
+      },
+      "streaming": {
+        "processor": "nats",
+        "stream": "apg.proc.twy.lifecycle",
+        "key": "tenant_id",
+        "publishes": ["match.completed", "exception.raised", "exception.resolved", "auto_approved"],
+        "subscribes": [
+          {"source_capability": "fin_arc", "event_type": "invoice.received", "handler": "on_invoice_received"}
+        ]
+      },
+      "theme": {
+        "name": "proc_twy_control",
+        "tokens": {
+          "color.primary": "#1D4ED8",
+          "color.accent": "#0369A1",
+          "color.success": "#166534",
+          "color.warning": "#A16207",
+          "color.danger": "#991B1B",
+          "surface.canvas": "#F0F9FF",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#0F172A",
+          "text.secondary": "#475569",
+          "border.radius": "6px",
+          "density": "comfortable"
+        }
+      }
+    }
+  },
+  "composition": {
+    "capability_dependencies": {
+      "proc_twy": ["auth", "audl", "ntfy", "fin_arc", "scm_prc", "scm_wms"]
+    },
+    "applications": {},
+    "agent_teams": {}
+  }
+}

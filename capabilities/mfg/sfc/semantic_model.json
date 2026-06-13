@@ -1,0 +1,25 @@
+{
+  "capability": "mfg_sfc",
+  "version": "1.0.0",
+  "domain": "mfg",
+  "entities": {
+    "MfSfcWorkCentre": {"description": "Production work centre (machine, labour, subcontract)", "fields": {"id": {"type": "string"}, "code": {"type": "string"}, "name": {"type": "string"}, "wc_type": {"type": "string"}, "capacity_hours_per_day": {"type": "number"}, "status": {"type": "string"}}},
+    "MfSfcRouting": {"description": "Manufacturing routing (sequence of operations)", "fields": {"id": {"type": "string"}, "item_id": {"type": "string"}, "version": {"type": "string"}, "total_lead_time_days": {"type": "number"}}},
+    "MfSfcOperation": {"description": "Single routing operation step", "fields": {"id": {"type": "string"}, "routing_id": {"type": "string"}, "sequence": {"type": "integer"}, "work_centre_id": {"type": "string"}, "status": {"type": "string"}, "run_time_hrs": {"type": "number"}}},
+    "MfSfcLabourRecord": {"description": "Labour time entry for an operation", "fields": {"id": {"type": "string"}, "operation_id": {"type": "string"}, "operator_id": {"type": "string"}, "hours_logged": {"type": "number"}, "labour_type": {"type": "string"}}}
+  },
+  "api_endpoints": {
+    "POST /mfg-sfc/api/v1/work-centres": {"description": "Create work centre"},
+    "GET /mfg-sfc/api/v1/work-centres": {"description": "List work centres"},
+    "POST /mfg-sfc/api/v1/routings": {"description": "Create routing"},
+    "POST /mfg-sfc/api/v1/routings/{id}/operations": {"description": "Add operation to routing"},
+    "POST /mfg-sfc/api/v1/operations/{id}/start": {"description": "Start operation"},
+    "POST /mfg-sfc/api/v1/operations/{id}/complete": {"description": "Complete operation"},
+    "POST /mfg-sfc/api/v1/labour": {"description": "Log labour time"},
+    "GET /mfg-sfc/api/v1/dispatch/{work_centre_id}": {"description": "Get dispatch list for work centre"}
+  },
+  "events": {
+    "publishes": ["apg.mfg.sfc.operation_started", "apg.mfg.sfc.operation_completed", "apg.mfg.sfc.labour_recorded"],
+    "subscribes": ["apg.mfg.mes.work_order_started"]
+  }
+}

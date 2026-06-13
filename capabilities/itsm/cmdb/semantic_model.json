@@ -1,0 +1,54 @@
+{
+  "format": "apg.semantic-model.v1",
+  "ok": true,
+  "diagnostics": [],
+  "app": {
+    "name": "itsm_cmdb",
+    "description": "Configuration Management Database — APG ITSM subcapability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "itsm_cmdb": {
+      "name": "Configuration Management Database",
+      "version": "1.0.0",
+      "provides": ["cmdb_ci_registry", "cmdb_relationship_graph", "cmdb_discovery_workflow", "cmdb_change_tracking", "cmdb_health_scoring", "cmdb_dependency_map"],
+      "requires": ["auth", "audl", "disc", "grph", "ntfy"],
+      "entities": {
+        "ItCmdbCI": {
+          "description": "Configuration Item — server, VM, application, network device, license, etc.",
+          "key_fields": ["id", "tenant_id", "ci_type", "environment", "owner_id"],
+          "lifecycle": ["active", "inactive", "maintenance", "planned", "decommissioned", "retired", "unknown"]
+        },
+        "ItCmdbRelationship": {
+          "description": "Directed typed edge between two CIs",
+          "key_fields": ["id", "source_ci_id", "target_ci_id", "relationship_type"]
+        },
+        "ItCmdbChangeRecord": {
+          "description": "Attribute-level audit trail for CI mutations",
+          "key_fields": ["id", "ci_id", "change_type", "status"]
+        },
+        "ItDiscoveryJob": {
+          "description": "Auto-discovery scan targeting a network range or cloud account",
+          "key_fields": ["id", "discovery_method", "target", "status"]
+        }
+      },
+      "event_stream": "apg.itsm.cmdb.lifecycle",
+      "stream_processor": "bytewax"
+    }
+  },
+  "composition": {
+    "publishes_to": ["itsm_inc", "itsm_chg"],
+    "subscribes_from": [],
+    "nats_subjects": {
+      "ci_registered": "itsm.cmdb.ci.registered",
+      "ci_updated": "itsm.cmdb.ci.updated",
+      "ci_decommissioned": "itsm.cmdb.ci.decommissioned",
+      "change_requested": "itsm.cmdb.ci.change_requested"
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  }
+}

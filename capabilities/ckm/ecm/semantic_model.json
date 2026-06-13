@@ -1,0 +1,297 @@
+{
+  "format": "apg.semantic-model.v1",
+  "ok": true,
+  "diagnostics": [],
+  "app": {
+    "name": "ckm_ecm",
+    "description": "ECM / Records Management package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 6
+  },
+  "capabilities": {
+    "ckm_ecm": {
+      "name": "ECM / Records Management",
+      "version": "1.0.0",
+      "provides": [
+        "document_management",
+        "version_control",
+        "retention_management",
+        "content_workflow",
+        "disposal_management"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "srch",
+        "esig"
+      ],
+      "configuration": {
+        "tenant_id": "default",
+        "documents": {
+          "supported_types": [
+            "contract", "policy", "procedure", "report", "form",
+            "correspondence", "invoice", "patient_record", "case_file",
+            "regulatory_submission", "public_record", "evidence", "certificate",
+            "permit", "minutes", "memo", "technical_document", "other"
+          ],
+          "supported_statuses": [
+            "draft", "under_review", "approved", "active", "superseded",
+            "archived", "pending_disposal", "disposed"
+          ],
+          "title_required": true,
+          "content_hash_required": true,
+          "retention_category_required": true
+        },
+        "versions": {
+          "author_required": true,
+          "change_summary_required": true,
+          "content_hash_required": true,
+          "immutable": true
+        },
+        "retention_policies": {
+          "supported_categories": [
+            "permanent", "long_term", "medium_term", "short_term",
+            "transient", "regulatory", "legal_hold", "vital_record"
+          ],
+          "supported_triggers": ["creation", "last_access", "last_modified", "event"],
+          "supported_disposal_methods": [
+            "secure_delete", "physical_destruction", "transfer_to_archives",
+            "redaction", "anonymisation", "offsite_shredding"
+          ],
+          "years_positive": true
+        },
+        "classifications": {
+          "supported_sensitivity_levels": [
+            "public", "internal", "confidential", "restricted", "secret"
+          ],
+          "supported_regulatory_frameworks": [
+            "hipaa", "gdpr", "sox", "iso_15489", "nara", "ico", "pci_dss",
+            "local_government", "custom", "none"
+          ]
+        },
+        "workflows": {
+          "supported_types": [
+            "approval", "review", "compliance_review", "legal_review",
+            "quality_check", "publication", "disposal_authorisation"
+          ],
+          "supported_decisions": [
+            "approved", "rejected", "returned_for_revision", "escalated"
+          ],
+          "approvers_required": true
+        },
+        "disposal": {
+          "supported_methods": [
+            "secure_delete", "physical_destruction", "transfer_to_archives",
+            "redaction", "anonymisation", "offsite_shredding"
+          ],
+          "authorized_by_required": true,
+          "audit_trail_required": true
+        },
+        "search": {
+          "supported_fields": [
+            "title", "document_type", "status", "retention_category",
+            "sensitivity", "regulatory_framework", "author"
+          ],
+          "full_text_enabled": true
+        },
+        "governance": {
+          "require_tenant_context": true,
+          "policy_attached_for_writes": true,
+          "audit_events": true,
+          "cross_tenant_access_denied": true,
+          "unapproved_disposal_denied": true,
+          "version_deletion_denied": true,
+          "retention_override_denied": true
+        },
+        "observability": {
+          "event_stream": "apg.ckm.ecm.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "adapters": {
+          "auth": "auth",
+          "audit": "audl",
+          "notifications": "ntfy",
+          "search": "srch",
+          "esig": "esig"
+        },
+        "ui": {
+          "enable_dashboard": true,
+          "enable_documents": true,
+          "enable_versions": true,
+          "enable_retention": true,
+          "enable_classification": true,
+          "enable_workflows": true,
+          "enable_disposal": true,
+          "enable_search": true
+        },
+        "theme": {
+          "default_theme": "ecm_records_control",
+          "allow_tenant_overrides": true
+        }
+      },
+      "rule_engine": {
+        "type": "deterministic",
+        "default_decision": "allow",
+        "rules": [
+          {"name": "tenant_context_required", "condition": {"tenant_context_present": false}, "effect": {"decision": "deny", "reason": "tenant_context_required"}},
+          {"name": "write_requires_policy", "condition": {"operation_type": "write", "policy_attached": false}, "effect": {"decision": "deny", "reason": "ecm_policy_required"}},
+          {"name": "document_title_required", "condition": {"operation": "create_document", "title_present": false}, "effect": {"decision": "deny", "reason": "document_title_required"}},
+          {"name": "document_type_supported", "condition": {"operation": "create_document", "document_type_supported": false}, "effect": {"decision": "deny", "reason": "document_type_not_supported"}},
+          {"name": "document_content_hash_required", "condition": {"operation": "create_document", "content_hash_present": false}, "effect": {"decision": "deny", "reason": "content_hash_required"}},
+          {"name": "document_retention_category_required", "condition": {"operation": "create_document", "retention_category_present": false}, "effect": {"decision": "deny", "reason": "retention_category_required"}},
+          {"name": "retention_category_supported", "condition": {"operation": "create_document", "retention_category_supported": false}, "effect": {"decision": "deny", "reason": "retention_category_not_supported"}},
+          {"name": "version_document_required", "condition": {"operation": "add_version", "document_present": false}, "effect": {"decision": "deny", "reason": "document_required"}},
+          {"name": "version_author_required", "condition": {"operation": "add_version", "author_present": false}, "effect": {"decision": "deny", "reason": "version_author_required"}},
+          {"name": "version_change_summary_required", "condition": {"operation": "add_version", "change_summary_present": false}, "effect": {"decision": "deny", "reason": "change_summary_required"}},
+          {"name": "version_content_hash_required", "condition": {"operation": "add_version", "content_hash_present": false}, "effect": {"decision": "deny", "reason": "content_hash_required"}},
+          {"name": "version_deletion_denied", "condition": {"operation": "delete_version"}, "effect": {"decision": "deny", "reason": "version_deletion_denied"}},
+          {"name": "retention_policy_category_supported", "condition": {"operation": "create_retention_policy", "retention_category_supported": false}, "effect": {"decision": "deny", "reason": "retention_category_not_supported"}},
+          {"name": "retention_policy_trigger_supported", "condition": {"operation": "create_retention_policy", "trigger_supported": false}, "effect": {"decision": "deny", "reason": "retention_trigger_not_supported"}},
+          {"name": "retention_policy_disposal_method_supported", "condition": {"operation": "create_retention_policy", "disposal_method_supported": false}, "effect": {"decision": "deny", "reason": "disposal_method_not_supported"}},
+          {"name": "retention_policy_years_positive", "condition": {"operation": "create_retention_policy", "years_positive": false}, "effect": {"decision": "deny", "reason": "retention_years_must_be_positive"}},
+          {"name": "classification_sensitivity_supported", "condition": {"operation": "classify_document", "sensitivity_supported": false}, "effect": {"decision": "deny", "reason": "sensitivity_level_not_supported"}},
+          {"name": "classification_framework_supported", "condition": {"operation": "classify_document", "regulatory_framework_supported": false}, "effect": {"decision": "deny", "reason": "regulatory_framework_not_supported"}},
+          {"name": "disposal_document_required", "condition": {"operation": "dispose_documents", "document_present": false}, "effect": {"decision": "deny", "reason": "document_required"}},
+          {"name": "disposal_method_supported", "condition": {"operation": "dispose_documents", "disposal_method_supported": false}, "effect": {"decision": "deny", "reason": "disposal_method_not_supported"}},
+          {"name": "disposal_authorized_by_required", "condition": {"operation": "dispose_documents", "authorized_by_present": false}, "effect": {"decision": "deny", "reason": "disposal_authorization_required"}},
+          {"name": "unapproved_disposal_denied", "condition": {"operation": "dispose_documents", "disposal_approved": false}, "effect": {"decision": "deny", "reason": "disposal_requires_approval"}},
+          {"name": "workflow_type_supported", "condition": {"operation": "start_review_workflow", "workflow_type_supported": false}, "effect": {"decision": "deny", "reason": "workflow_type_not_supported"}},
+          {"name": "workflow_approvers_required", "condition": {"operation": "start_review_workflow", "approvers_present": false}, "effect": {"decision": "deny", "reason": "approvers_required"}},
+          {"name": "workflow_document_required", "condition": {"operation": "start_review_workflow", "document_present": false}, "effect": {"decision": "deny", "reason": "document_required"}},
+          {"name": "workflow_decision_supported", "condition": {"operation": "approve_workflow_step", "decision_supported": false}, "effect": {"decision": "deny", "reason": "workflow_decision_not_supported"}},
+          {"name": "cross_tenant_access_denied", "condition": {"cross_tenant_access": true}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied"}},
+          {"name": "retention_override_denied", "condition": {"operation": "override_retention_policy", "retention_override": true}, "effect": {"decision": "deny", "reason": "retention_policy_override_denied"}}
+        ]
+      },
+      "ui": {
+        "shell": "apg_python",
+        "api_prefix": "/ckm-ecm/api/v1",
+        "requires_theme": true,
+        "view_module": "views.py",
+        "template_roots": ["templates/", "static/"],
+        "routes": [
+          {"name": "dashboard", "path": "/ckm-ecm/dashboard", "component": "EcmDashboard", "permission": "ckm_ecm:view", "nav_group": "Overview"},
+          {"name": "documents", "path": "/ckm-ecm/documents", "component": "EcmDocumentRegistry", "permission": "ckm_ecm:documents", "nav_group": "Records"},
+          {"name": "versions", "path": "/ckm-ecm/versions", "component": "EcmVersionHistory", "permission": "ckm_ecm:documents", "nav_group": "Records"},
+          {"name": "retention", "path": "/ckm-ecm/retention", "component": "EcmRetentionPolicyConsole", "permission": "ckm_ecm:retention", "nav_group": "Governance"},
+          {"name": "classification", "path": "/ckm-ecm/classification", "component": "EcmClassificationConsole", "permission": "ckm_ecm:classification", "nav_group": "Governance"},
+          {"name": "workflows", "path": "/ckm-ecm/workflows", "component": "EcmWorkflowQueue", "permission": "ckm_ecm:workflows", "nav_group": "Operations"},
+          {"name": "disposal", "path": "/ckm-ecm/disposal", "component": "EcmDisposalConsole", "permission": "ckm_ecm:disposal", "nav_group": "Lifecycle"},
+          {"name": "search", "path": "/ckm-ecm/search", "component": "EcmSearchConsole", "permission": "ckm_ecm:view", "nav_group": "Discovery"},
+          {"name": "settings", "path": "/ckm-ecm/settings", "component": "EcmSettings", "permission": "ckm_ecm:admin", "nav_group": "Administration"}
+        ]
+      },
+      "theme": {
+        "name": "ecm_records_control",
+        "tokens": {
+          "color.primary": "#1D4ED8",
+          "color.accent": "#0369A1",
+          "color.success": "#166534",
+          "color.warning": "#A16207",
+          "color.danger": "#B91C1C",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563",
+          "border.radius": "8px",
+          "density": "comfortable"
+        },
+        "components": {
+          "documents": {"icon": "file-text", "status_indicator": "document-status-chip"},
+          "versions": {"icon": "git-branch", "status_indicator": "version-chip"},
+          "retention": {"icon": "clock", "status_indicator": "retention-chip"},
+          "classification": {"icon": "shield", "status_indicator": "sensitivity-chip"},
+          "workflows": {"icon": "check-square", "status_indicator": "workflow-chip"},
+          "disposal": {"icon": "trash-2", "status_indicator": "disposal-chip"}
+        }
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "stream": "apg.ckm.ecm.lifecycle",
+        "key": "tenant_id",
+        "events": [
+          "document.created",
+          "document.versioned",
+          "document.classified",
+          "document.status_changed",
+          "retention_policy.created",
+          "retention_policy.applied",
+          "document.due_for_disposal",
+          "workflow.started",
+          "workflow.step_completed",
+          "workflow.completed",
+          "disposal.executed"
+        ],
+        "guardrails": [
+          "cross_tenant_access_denied",
+          "unapproved_disposal_denied",
+          "version_deletion_denied",
+          "retention_override_denied"
+        ]
+      },
+      "runtime": {
+        "service": "service.py",
+        "views": "views.py",
+        "api": "api.py",
+        "entrypoint": "app.py"
+      },
+      "screens": {
+        "dashboard": {"component": "EcmDashboard", "permission": "ckm_ecm:view", "route": "/ckm-ecm/dashboard"},
+        "documents": {"component": "EcmDocumentRegistry", "permission": "ckm_ecm:documents", "route": "/ckm-ecm/documents"},
+        "versions": {"component": "EcmVersionHistory", "permission": "ckm_ecm:documents", "route": "/ckm-ecm/versions"},
+        "retention": {"component": "EcmRetentionPolicyConsole", "permission": "ckm_ecm:retention", "route": "/ckm-ecm/retention"},
+        "classification": {"component": "EcmClassificationConsole", "permission": "ckm_ecm:classification", "route": "/ckm-ecm/classification"},
+        "workflows": {"component": "EcmWorkflowQueue", "permission": "ckm_ecm:workflows", "route": "/ckm-ecm/workflows"},
+        "disposal": {"component": "EcmDisposalConsole", "permission": "ckm_ecm:disposal", "route": "/ckm-ecm/disposal"},
+        "search": {"component": "EcmSearchConsole", "permission": "ckm_ecm:view", "route": "/ckm-ecm/search"},
+        "settings": {"component": "EcmSettings", "permission": "ckm_ecm:admin", "route": "/ckm-ecm/settings"}
+      }
+    }
+  },
+  "contracts": {
+    "ckm_ecm": {
+      "id": "ckm_ecm",
+      "provides": [
+        "document_management",
+        "version_control",
+        "retention_management",
+        "content_workflow",
+        "disposal_management"
+      ],
+      "requires": ["auth", "audl", "ntfy", "srch", "esig"]
+    }
+  },
+  "composition": {
+    "capability_dependencies": {
+      "ckm_ecm": ["auth", "audl", "ntfy", "srch", "esig"]
+    },
+    "applications": {},
+    "composable_with": [
+      "ckm_kbs",
+      "ckm_kno",
+      "ckm_doc",
+      "proc_cont",
+      "lgl_case",
+      "hlth_phr",
+      "gov_pubr"
+    ]
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "graphs": {
+    "capability": {
+      "kind": "capability",
+      "nodes": 1,
+      "edges": 5
+    }
+  },
+  "packages": {
+    "ckm_ecm": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  }
+}

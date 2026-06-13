@@ -1,0 +1,11 @@
+{
+  "format": "apg.package-manifest.v1",
+  "name": "mfg_sfc",
+  "display_name": "Shop Floor Control",
+  "version": "1.0.0",
+  "domain": "mfg",
+  "base_target": "python",
+  "profile": "capability",
+  "profile_artifacts": ["package_manifest.json"],
+  "generated_artifacts": ["capability_contract.py", "models.py", "service.py", "semantic_model.json"]
+}

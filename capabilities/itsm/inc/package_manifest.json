@@ -1,0 +1,17 @@
+{
+  "format": "apg.package-manifest.v1",
+  "name": "itsm_inc",
+  "display_name": "Incident Management",
+  "version": "1.0.0",
+  "base_target": "python",
+  "profile": "capability",
+  "profile_artifacts": ["package_manifest.json"],
+  "generated_artifacts": [
+    "__init__.py",
+    "capability_contract.py",
+    "models.py",
+    "service.py",
+    "semantic_model.json",
+    "package_manifest.json"
+  ]
+}

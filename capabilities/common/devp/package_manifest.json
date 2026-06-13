@@ -1,0 +1,18 @@
+{
+  "format": "apg.package-manifest.v1",
+  "name": "common_devp",
+  "display_name": "Developer Portal",
+  "version": "1.0.0",
+  "profile": "capability",
+  "base_target": "python",
+  "generated_artifacts": [
+    "__init__.py",
+    "capability_contract.py",
+    "models.py",
+    "service.py",
+    "semantic_model.json"
+  ],
+  "profile_artifacts": [
+    "package_manifest.json"
+  ]
+}

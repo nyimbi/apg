@@ -1,0 +1,261 @@
+{
+  "format": "apg.semantic-model.v1",
+  "ok": true,
+  "diagnostics": [],
+  "app": {
+    "name": "common_sbl",
+    "description": "SaaS Billing Engine package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 7
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "packages": {
+    "common_sbl": {
+      "profile": "capability",
+      "entrypoint": "service.py"
+    }
+  },
+  "graphs": {
+    "capability": {
+      "kind": "capability",
+      "nodes": 1,
+      "edges": 5
+    }
+  },
+  "capabilities": {
+    "common_sbl": {
+      "name": "SaaS Billing Engine",
+      "version": "1.0.0",
+      "provides": [
+        "subscription_management",
+        "usage_metering",
+        "invoice_generation",
+        "tenant_provisioning",
+        "billing_analytics"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "fin_gl",
+        "fintech_payments"
+      ],
+      "configuration": {
+        "tenant_id": "default",
+        "plans": {
+          "supported_tiers": ["free", "starter", "professional", "enterprise"],
+          "supported_billing_cycles": ["monthly", "annual"],
+          "currency": "USD",
+          "default_trial_days": 14
+        },
+        "subscriptions": {
+          "supported_statuses": ["active", "cancelled", "past_due", "trialing", "paused"],
+          "proration_modes": ["immediate", "next_cycle", "prorated"],
+          "grace_period_days": 7,
+          "renewal_reminder_days": [7, 3, 1]
+        },
+        "usage": {
+          "supported_metrics": ["api_calls", "storage_gb", "users", "transactions", "exports", "webhooks", "seats"],
+          "aggregation_interval_minutes": 60,
+          "retention_days": 90,
+          "limit_enforcement": "hard"
+        },
+        "invoicing": {
+          "supported_statuses": ["draft", "open", "paid", "void", "uncollectible"],
+          "auto_generate": true,
+          "net_days": 30,
+          "dunning_schedule_days": [1, 7, 14, 21]
+        },
+        "payments": {
+          "supported_methods": ["card", "bank_transfer", "mpesa", "paypal", "stripe_token"],
+          "tokenization_required": true,
+          "raw_card_storage_denied": true
+        },
+        "credit_notes": {
+          "supported_reasons": ["duplicate", "fraudulent", "customer_request", "adjustment", "subscription_upgrade"],
+          "approval_required": true
+        },
+        "governance": {
+          "require_tenant_context": true,
+          "policy_attached_for_writes": true,
+          "audit_events": true,
+          "cross_tenant_billing_denied": true,
+          "raw_card_storage_denied": true,
+          "invoice_tampering_denied": true,
+          "usage_fabrication_denied": true
+        },
+        "observability": {
+          "event_stream": "apg.common.sbl.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "adapters": {
+          "auth": "auth",
+          "audit": "audl",
+          "notifications": "ntfy",
+          "gl": "fin_gl",
+          "payments": "fintech_payments"
+        },
+        "agents": {
+          "enabled": true,
+          "supported_runtimes": ["codex", "claude_code", "opencode", "pi"],
+          "supported_roles": ["billing_analyst", "usage_auditor", "invoice_reviewer", "churn_predictor", "dunning_agent"],
+          "human_approval_required_for_refunds": true
+        },
+        "ui": {
+          "enable_dashboard": true,
+          "enable_plans": true,
+          "enable_tenants": true,
+          "enable_subscriptions": true,
+          "enable_usage": true,
+          "enable_invoices": true,
+          "enable_payments": true,
+          "enable_credit_notes": true,
+          "enable_analytics": true,
+          "enable_agents": true
+        }
+      },
+      "entities": {
+        "SbPlan": {
+          "prefix": "Sb",
+          "description": "Billing plan definition (free/starter/professional/enterprise)",
+          "key_fields": ["id", "name", "tier"],
+          "mutable": false
+        },
+        "SbTenant": {
+          "prefix": "Sb",
+          "description": "Billable tenant/organisation on the platform",
+          "key_fields": ["id", "email", "plan_id"],
+          "mutable": true
+        },
+        "SbSubscription": {
+          "prefix": "Sb",
+          "description": "Active subscription linking a tenant to a plan",
+          "key_fields": ["id", "tenant_id", "plan_id"],
+          "mutable": true
+        },
+        "SbUsageRecord": {
+          "prefix": "Sb",
+          "description": "Single metered usage event",
+          "key_fields": ["id", "tenant_id", "metric"],
+          "mutable": false
+        },
+        "SbInvoice": {
+          "prefix": "Sb",
+          "description": "Generated invoice with line items",
+          "key_fields": ["id", "tenant_id", "invoice_number"],
+          "mutable": true
+        },
+        "SbPaymentMethod": {
+          "prefix": "Sb",
+          "description": "Tokenized payment instrument (card/bank/mpesa/paypal)",
+          "key_fields": ["id", "tenant_id", "token"],
+          "mutable": true
+        },
+        "SbCreditNote": {
+          "prefix": "Sb",
+          "description": "Credit note for refunds and billing adjustments",
+          "key_fields": ["id", "tenant_id", "invoice_id"],
+          "mutable": false
+        }
+      },
+      "service_methods": {
+        "create_tenant":           {"async": true, "returns": "SbTenant"},
+        "create_subscription":     {"async": true, "returns": "SbSubscription"},
+        "upgrade_plan":            {"async": true, "returns": "SbSubscription"},
+        "cancel_subscription":     {"async": true, "returns": "SbSubscription"},
+        "record_usage":            {"async": true, "returns": "SbUsageRecord"},
+        "get_current_usage":       {"async": true, "returns": "dict"},
+        "check_limit":             {"async": true, "returns": "bool"},
+        "generate_invoice":        {"async": true, "returns": "SbInvoice"},
+        "list_invoices":           {"async": true, "returns": "list[SbInvoice]"},
+        "mark_invoice_paid":       {"async": true, "returns": "SbInvoice"},
+        "void_invoice":            {"async": true, "returns": "SbInvoice"},
+        "attach_payment_method":   {"async": true, "returns": "SbPaymentMethod"},
+        "list_payment_methods":    {"async": true, "returns": "list[SbPaymentMethod]"},
+        "issue_credit_note":       {"async": true, "returns": "SbCreditNote"},
+        "self_provision":          {"async": true, "returns": "SbTenant"},
+        "billing_analytics":       {"async": true, "returns": "dict"},
+        "dunning_candidates":      {"async": true, "returns": "list[dict]"},
+        "dashboard_summary":       {"async": true, "returns": "dict"}
+      },
+      "ui": {
+        "shell": "apg_python",
+        "api_prefix": "/sbl/api/v1",
+        "requires_theme": true,
+        "view_module": "views.py",
+        "routes": [
+          {"name": "dashboard",     "path": "/sbl/dashboard",     "component": "BillingDashboard",     "permission": "sbl:view",          "nav_group": "Overview"},
+          {"name": "tenants",       "path": "/sbl/tenants",       "component": "TenantConsole",         "permission": "sbl:tenants",       "nav_group": "Tenants"},
+          {"name": "plans",         "path": "/sbl/plans",         "component": "PlanCatalog",           "permission": "sbl:plans",         "nav_group": "Configuration"},
+          {"name": "subscriptions", "path": "/sbl/subscriptions", "component": "SubscriptionLedger",    "permission": "sbl:subscriptions", "nav_group": "Billing"},
+          {"name": "usage",         "path": "/sbl/usage",         "component": "UsageMeter",            "permission": "sbl:usage",         "nav_group": "Metering"},
+          {"name": "invoices",      "path": "/sbl/invoices",      "component": "InvoiceQueue",          "permission": "sbl:invoices",      "nav_group": "Billing"},
+          {"name": "payments",      "path": "/sbl/payments",      "component": "PaymentConsole",        "permission": "sbl:payments",      "nav_group": "Billing"},
+          {"name": "credit_notes",  "path": "/sbl/credit-notes",  "component": "CreditNoteConsole",     "permission": "sbl:credit_notes",  "nav_group": "Adjustments"},
+          {"name": "analytics",     "path": "/sbl/analytics",     "component": "BillingAnalytics",      "permission": "sbl:analytics",     "nav_group": "Analytics"},
+          {"name": "agents",        "path": "/sbl/agents",        "component": "BillingAgentWorkbench", "permission": "sbl:admin",         "nav_group": "Automation"},
+          {"name": "settings",      "path": "/sbl/settings",      "component": "BillingSettings",       "permission": "sbl:admin",         "nav_group": "Administration"}
+        ]
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "stream": "apg.common.sbl.lifecycle",
+        "key": "tenant_id",
+        "events": [
+          "tenant_created",
+          "subscription_created",
+          "subscription_upgraded",
+          "subscription_cancelled",
+          "usage_recorded",
+          "invoice_generated",
+          "invoice_paid",
+          "payment_method_attached",
+          "credit_note_issued",
+          "usage_limit_approaching",
+          "usage_limit_exceeded"
+        ],
+        "guardrails": [
+          "raw_card_storage_denied",
+          "cross_tenant_billing_denied",
+          "invoice_tampering_denied",
+          "usage_fabrication_denied",
+          "unauthorized_refund_denied"
+        ]
+      }
+    }
+  },
+  "contracts": {
+    "common_sbl": {
+      "id": "common_sbl",
+      "provides": [
+        "subscription_management",
+        "usage_metering",
+        "invoice_generation",
+        "tenant_provisioning",
+        "billing_analytics"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "fin_gl",
+        "fintech_payments"
+      ]
+    }
+  },
+  "composition": {
+    "capability_dependencies": {
+      "common_sbl": ["auth", "audl", "ntfy", "fin_gl", "fintech_payments"]
+    },
+    "agent_teams": {
+      "billing_operations": {
+        "roles": ["billing_analyst", "usage_auditor", "invoice_reviewer", "churn_predictor", "dunning_agent"],
+        "runtimes": ["codex", "claude_code", "opencode", "pi"]
+      }
+    },
+    "applications": {}
+  }
+}

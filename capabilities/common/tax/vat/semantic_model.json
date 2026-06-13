@@ -1,0 +1,50 @@
+{
+  "format": "apg.semantic-model.v1",
+  "app": {
+    "name": "common_tax_vat",
+    "description": "VAT/GST Country Rule Packs for 20 African jurisdictions",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "common_tax_vat": {
+      "name": "VAT/GST Country Rule Packs",
+      "version": "1.0.0",
+      "provides": ["vat_rate_lookup", "vat_return_workflow", "vat_exemption_registry", "vat_country_config"],
+      "requires": ["audl", "auth", "tax_calc"],
+      "entities": {
+        "TxVatRate": {
+          "prefix": "Tx",
+          "description": "VAT rate per country, category, effective period. Ghana has multiple (NHIL + GETFund).",
+          "fields": ["id", "country_code", "vat_category", "rate_pct", "is_levy", "levy_name", "authority_name", "effective_from", "effective_to"]
+        },
+        "TxVatCountryConfig": {
+          "prefix": "Tx",
+          "description": "Per-country VAT config: registration thresholds, filing frequency, authority details",
+          "fields": ["id", "country_code", "authority_name", "registration_threshold_local", "filing_frequency", "standard_rate_pct", "has_compound_levies"]
+        },
+        "TxVatReturn": {
+          "prefix": "Tx",
+          "description": "VAT return filed with a tax authority for a given period",
+          "fields": ["id", "tenant_id", "country_code", "tax_period_id", "period_name", "output_vat", "input_vat", "net_vat_payable", "status", "submitted_at"]
+        },
+        "TxVatExemption": {
+          "prefix": "Tx",
+          "description": "Registered VAT exemption for a product, entity, or transaction type",
+          "fields": ["id", "tenant_id", "country_code", "exemption_type", "entity_reference", "evidence_reference", "granted_from", "expires_at"]
+        }
+      },
+      "country_packs": {
+        "KE": {"authority": "KRA", "rate": "16%", "threshold": "KES 5m", "filing": "monthly"},
+        "NG": {"authority": "FIRS", "rate": "7.5%", "threshold": "NGN 25m", "filing": "monthly"},
+        "GH": {"authority": "GRA", "rate": "15% + 2.5% NHIL + 1% GETFund", "threshold": "GHS 200k", "filing": "monthly"},
+        "UG": {"authority": "URA", "rate": "18%", "threshold": "UGX 150m", "filing": "monthly"},
+        "TZ": {"authority": "TRA", "rate": "18%", "threshold": "TZS 100m", "filing": "monthly"},
+        "ZA": {"authority": "SARS", "rate": "15%", "threshold": "ZAR 1m", "filing": "monthly"},
+        "RW": {"authority": "RRA", "rate": "18%", "threshold": "RWF 20m", "filing": "monthly"}
+      }
+    }
+  },
+  "ok": true,
+  "diagnostics": []
+}

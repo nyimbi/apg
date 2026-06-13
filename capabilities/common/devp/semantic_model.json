@@ -1,0 +1,264 @@
+{
+  "format": "apg.semantic-model.v1",
+  "ok": true,
+  "diagnostics": [],
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "app": {
+    "name": "common_devp",
+    "description": "Developer Portal package-backed APG capability",
+    "version": "1.0.0",
+    "entity_count": 6
+  },
+  "capabilities": {
+    "common_devp": {
+      "name": "Developer Portal",
+      "version": "1.0.0",
+      "provides": [
+        "api_key_management",
+        "developer_onboarding",
+        "usage_analytics",
+        "openapi_browser",
+        "webhook_management"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "common_apig",
+        "common_sbl"
+      ],
+      "publishes": [
+        "api_key.created",
+        "api_key.revoked",
+        "subscription.activated"
+      ],
+      "configuration": {
+        "tenant_id": "default",
+        "api_keys": {
+          "supported_statuses": ["active", "revoked", "suspended", "expired"],
+          "key_length_bytes": 32,
+          "hash_algorithm": "sha256",
+          "default_rate_limit": {
+            "requests_per_minute": 60,
+            "requests_per_day": 10000
+          },
+          "require_app_binding": true
+        },
+        "api_products": {
+          "supported_plan_types": ["free", "starter", "professional", "enterprise", "custom"],
+          "require_capability_list": true,
+          "require_endpoint_list": true
+        },
+        "developer_apps": {
+          "require_owner": true,
+          "max_keys_per_app": 5,
+          "max_apps_per_tenant": 100
+        },
+        "subscriptions": {
+          "supported_statuses": ["pending", "active", "suspended", "cancelled"],
+          "require_product": true,
+          "require_developer_app": true
+        },
+        "webhooks": {
+          "supported_events": [
+            "api_key.created",
+            "api_key.revoked",
+            "api_key.suspended",
+            "subscription.activated",
+            "subscription.cancelled",
+            "usage.quota_warning",
+            "usage.quota_exceeded"
+          ],
+          "require_https": true,
+          "require_secret": true,
+          "max_endpoints_per_app": 10
+        },
+        "usage_stats": {
+          "retention_days": 90,
+          "aggregation_intervals": ["1h", "1d", "7d", "30d"],
+          "track_per_endpoint": true,
+          "track_errors": true,
+          "track_latency": true
+        },
+        "openapi_browser": {
+          "enabled": true,
+          "proxy_to_capability": true,
+          "cache_ttl_seconds": 300
+        },
+        "governance": {
+          "require_tenant_context": true,
+          "audit_events": true,
+          "cross_tenant_key_denied": true,
+          "key_exposure_denied": true,
+          "policy_attached_for_writes": true
+        },
+        "observability": {
+          "event_stream": "apg.common.devp.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "adapters": {
+          "auth": "auth",
+          "audit": "audl",
+          "notifications": "ntfy",
+          "api_gateway": "common_apig",
+          "billing": "common_sbl"
+        },
+        "ui": {
+          "enable_dashboard": true,
+          "enable_api_products": true,
+          "enable_api_keys": true,
+          "enable_developer_apps": true,
+          "enable_subscriptions": true,
+          "enable_usage_analytics": true,
+          "enable_openapi_browser": true,
+          "enable_webhooks": true
+        },
+        "theme": {
+          "default_theme": "devp_portal",
+          "allow_tenant_overrides": true
+        }
+      },
+      "rule_engine": {
+        "type": "deterministic",
+        "default_decision": "allow",
+        "rules": [
+          {"name": "tenant_context_required", "condition": {"tenant_context_present": false}, "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}},
+          {"name": "write_requires_policy", "condition": {"operation_type": "write", "policy_attached": false}, "effect": {"decision": "deny", "reason": "devp_policy_required", "required_action": "attach_devp_policy"}},
+          {"name": "cross_tenant_key_denied", "condition": {"operation": "validate_api_key", "cross_tenant": true}, "effect": {"decision": "deny", "reason": "cross_tenant_key_access_denied", "required_action": "use_tenant_scoped_key"}},
+          {"name": "key_plaintext_denied", "condition": {"operation": "get_api_key", "return_plaintext": true}, "effect": {"decision": "deny", "reason": "key_plaintext_exposure_denied", "required_action": "use_key_hash_only"}},
+          {"name": "app_required_for_key", "condition": {"operation": "create_api_key", "app_present": false}, "effect": {"decision": "deny", "reason": "developer_app_required", "required_action": "create_or_select_developer_app"}},
+          {"name": "scopes_required_for_key", "condition": {"operation": "create_api_key", "scopes_present": false}, "effect": {"decision": "deny", "reason": "key_scopes_required", "required_action": "specify_key_scopes"}},
+          {"name": "product_required_for_subscription", "condition": {"operation": "subscribe_to_product", "product_present": false}, "effect": {"decision": "deny", "reason": "api_product_required", "required_action": "select_api_product"}},
+          {"name": "webhook_https_required", "condition": {"operation": "register_webhook", "url_scheme_ne": "https"}, "effect": {"decision": "deny", "reason": "webhook_https_required", "required_action": "use_https_webhook_url"}},
+          {"name": "webhook_secret_required", "condition": {"operation": "register_webhook", "secret_present": false}, "effect": {"decision": "deny", "reason": "webhook_secret_required", "required_action": "provide_webhook_secret"}},
+          {"name": "webhook_events_required", "condition": {"operation": "register_webhook", "events_present": false}, "effect": {"decision": "deny", "reason": "webhook_event_list_required", "required_action": "specify_webhook_events"}},
+          {"name": "revoke_requires_ownership", "condition": {"operation": "revoke_api_key", "owner_match": false}, "effect": {"decision": "deny", "reason": "key_ownership_required_for_revocation", "required_action": "use_owned_key_or_admin_role"}},
+          {"name": "stats_require_key_ownership", "condition": {"operation": "get_usage_stats", "owner_match": false}, "effect": {"decision": "deny", "reason": "key_ownership_required_for_stats", "required_action": "use_owned_key_or_admin_role"}}
+        ]
+      },
+      "runtime": {
+        "service": "service.py",
+        "entrypoint": "app.py",
+        "api": "api.py",
+        "views": "views.py"
+      },
+      "ui": {
+        "shell": "apg_python",
+        "api_prefix": "/devp/api/v1",
+        "requires_theme": true,
+        "view_module": "views.py",
+        "routes": [
+          {"name": "dashboard", "path": "/devp/dashboard", "component": "DevpDashboard", "permission": "devp:view", "nav_group": "Overview"},
+          {"name": "api_products", "path": "/devp/products", "component": "DevpApiProductCatalog", "permission": "devp:products", "nav_group": "Catalog"},
+          {"name": "openapi_browser", "path": "/devp/openapi", "component": "DevpOpenApiBrowser", "permission": "devp:products", "nav_group": "Catalog"},
+          {"name": "developer_apps", "path": "/devp/apps", "component": "DevpAppConsole", "permission": "devp:apps", "nav_group": "My Apps"},
+          {"name": "api_keys", "path": "/devp/keys", "component": "DevpApiKeyManager", "permission": "devp:keys", "nav_group": "My Apps"},
+          {"name": "subscriptions", "path": "/devp/subscriptions", "component": "DevpSubscriptionConsole", "permission": "devp:subscriptions", "nav_group": "My Apps"},
+          {"name": "usage_analytics", "path": "/devp/usage", "component": "DevpUsageAnalytics", "permission": "devp:usage", "nav_group": "Analytics"},
+          {"name": "webhooks", "path": "/devp/webhooks", "component": "DevpWebhookConsole", "permission": "devp:webhooks", "nav_group": "My Apps"},
+          {"name": "settings", "path": "/devp/settings", "component": "DevpSettings", "permission": "devp:admin", "nav_group": "Administration"}
+        ]
+      },
+      "theme": {
+        "name": "devp_portal",
+        "tokens": {
+          "color.primary": "#1D4ED8",
+          "color.accent": "#0891B2",
+          "color.success": "#15803D",
+          "color.warning": "#B45309",
+          "color.danger": "#B91C1C",
+          "surface.canvas": "#F8FAFC",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#111827",
+          "text.secondary": "#4B5563",
+          "border.radius": "8px",
+          "density": "comfortable"
+        },
+        "components": {
+          "api_keys": {"icon": "key", "status_indicator": "key-status-chip"},
+          "api_products": {"icon": "package", "status_indicator": "plan-chip"},
+          "developer_apps": {"icon": "code-2", "status_indicator": "app-status-chip"},
+          "subscriptions": {"icon": "layers", "status_indicator": "subscription-chip"},
+          "usage": {"icon": "bar-chart-2", "status_indicator": "usage-gauge"},
+          "webhooks": {"icon": "webhook", "status_indicator": "webhook-chip"},
+          "openapi": {"icon": "file-code", "status_indicator": "spec-chip"}
+        }
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "stream": "apg.common.devp.lifecycle",
+        "key": "tenant_id",
+        "events": [
+          "api_key_created",
+          "api_key_revoked",
+          "api_key_suspended",
+          "developer_app_created",
+          "developer_app_updated",
+          "subscription_activated",
+          "subscription_cancelled",
+          "webhook_registered",
+          "webhook_deleted",
+          "usage_quota_warning",
+          "usage_quota_exceeded"
+        ],
+        "guardrails": [
+          "cross_tenant_key_access_denied",
+          "key_plaintext_exposure_denied",
+          "write_requires_policy"
+        ]
+      }
+    }
+  },
+  "contracts": {
+    "common_devp": {
+      "id": "common_devp",
+      "provides": [
+        "api_key_management",
+        "developer_onboarding",
+        "usage_analytics",
+        "openapi_browser",
+        "webhook_management"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "common_apig",
+        "common_sbl"
+      ],
+      "publishes": [
+        "api_key.created",
+        "api_key.revoked",
+        "subscription.activated"
+      ]
+    }
+  },
+  "composition": {
+    "applications": {},
+    "capability_dependencies": {
+      "common_devp": [
+        "auth",
+        "audl",
+        "ntfy",
+        "common_apig",
+        "common_sbl"
+      ]
+    }
+  },
+  "graphs": {
+    "capability": {
+      "kind": "capability",
+      "nodes": 1,
+      "edges": 5
+    }
+  },
+  "packages": {
+    "common_devp": {
+      "profile": "capability",
+      "entrypoint": "app.py"
+    }
+  }
+}

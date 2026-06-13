@@ -1,0 +1,318 @@
+{
+  "app": {
+    "description": "Chama & ROSCA Engine — APG's Africa-native savings group capability",
+    "entity_count": 8,
+    "name": "fintech_chama",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "fintech_chama": {
+      "configuration": {
+        "adapters": {
+          "audit": "audl",
+          "auth": "auth",
+          "event_stream": "bytewax",
+          "kyc": "fintech_kyc",
+          "notifications": "ntfy",
+          "payments": "fintech_payments"
+        },
+        "contributions": {
+          "amount_required": true,
+          "cycle_required": true,
+          "member_required": true,
+          "supported_payment_methods": [
+            "mpesa",
+            "airtel_money",
+            "bank_transfer",
+            "cash",
+            "equity_eazzy",
+            "kcb_mobi"
+          ],
+          "supported_statuses": [
+            "pending",
+            "paid",
+            "overdue",
+            "waived",
+            "partial"
+          ]
+        },
+        "cycles": {
+          "auto_advance": true,
+          "completion_requires_all_contributions": false,
+          "supported_statuses": [
+            "active",
+            "completed",
+            "skipped",
+            "suspended"
+          ]
+        },
+        "governance": {
+          "audit_events": true,
+          "cross_tenant_group_denied": true,
+          "loan_exceeds_treasury_denied": true,
+          "overpayment_flagged": true,
+          "payout_without_cycle_denied": true,
+          "require_tenant_context": true
+        },
+        "groups": {
+          "contribution_amount_required": true,
+          "kyc_required": true,
+          "max_members": 100,
+          "min_members": 3,
+          "name_required": true,
+          "supported_frequencies": [
+            "weekly",
+            "biweekly",
+            "monthly",
+            "quarterly"
+          ],
+          "supported_group_types": [
+            "chama",
+            "rosca",
+            "table_banking"
+          ]
+        },
+        "loans": {
+          "approval_required": true,
+          "guarantors_required": true,
+          "max_interest_rate_monthly_pct": 10.0,
+          "max_multiple_of_savings": 3,
+          "min_guarantors": 2,
+          "supported_statuses": [
+            "pending_approval",
+            "approved",
+            "active",
+            "fully_repaid",
+            "defaulted",
+            "written_off"
+          ]
+        },
+        "meetings": {
+          "quorum_tracking": true,
+          "supported_types": [
+            "regular",
+            "special",
+            "agm",
+            "emergency"
+          ]
+        },
+        "payouts": {
+          "approval_required": true,
+          "cycle_complete_before_payout": true,
+          "mpesa_default": true,
+          "supported_payment_methods": [
+            "mpesa",
+            "airtel_money",
+            "bank_transfer",
+            "cash",
+            "equity_eazzy",
+            "kcb_mobi"
+          ],
+          "supported_statuses": [
+            "pending",
+            "processing",
+            "disbursed",
+            "failed",
+            "reversed"
+          ]
+        },
+        "reminders": {
+          "days_before_due": [3, 1],
+          "enabled": true,
+          "overdue_escalation_days": 3,
+          "supported_channels": [
+            "sms",
+            "whatsapp",
+            "push_notification",
+            "voice_call"
+          ]
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "chama_community"
+        },
+        "treasury": {
+          "real_time_balance": true,
+          "track_interest_income": true,
+          "track_penalty_income": true
+        },
+        "ui": {
+          "enable_contributions": true,
+          "enable_cycles": true,
+          "enable_dashboard": true,
+          "enable_groups": true,
+          "enable_loans": true,
+          "enable_meetings": true,
+          "enable_members": true,
+          "enable_payouts": true,
+          "enable_statements": true,
+          "enable_treasury": true
+        }
+      },
+      "name": "Chama & ROSCA Engine",
+      "provides": [
+        "chama_management",
+        "rosca_rotation",
+        "group_lending",
+        "treasury_management",
+        "mobile_disbursement"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "fintech_payments",
+        "fintech_kyc"
+      ],
+      "rule_engine": {
+        "rules": [
+          {"name": "tenant_context_required", "condition": {"tenant_context_present": false}, "effect": {"decision": "deny", "reason": "tenant_context_required"}},
+          {"name": "chama_write_requires_policy", "condition": {"operation_type": "write", "policy_attached": false}, "effect": {"decision": "deny", "reason": "chama_policy_required"}},
+          {"name": "group_type_supported", "condition": {"operation": "create_group", "group_type_supported": false}, "effect": {"decision": "deny", "reason": "group_type_not_supported"}},
+          {"name": "group_name_required", "condition": {"operation": "create_group", "group_name_present": false}, "effect": {"decision": "deny", "reason": "group_name_required"}},
+          {"name": "group_contribution_amount_required", "condition": {"operation": "create_group", "contribution_amount_present": false}, "effect": {"decision": "deny", "reason": "contribution_amount_required"}},
+          {"name": "group_frequency_supported", "condition": {"operation": "create_group", "frequency_supported": false}, "effect": {"decision": "deny", "reason": "frequency_not_supported"}},
+          {"name": "contribution_member_required", "condition": {"operation": "record_contribution", "member_present": false}, "effect": {"decision": "deny", "reason": "member_required"}},
+          {"name": "contribution_payment_method_supported", "condition": {"operation": "record_contribution", "payment_method_supported": false}, "effect": {"decision": "deny", "reason": "payment_method_not_supported"}},
+          {"name": "contribution_amount_positive", "condition": {"operation": "record_contribution", "amount_positive": false}, "effect": {"decision": "deny", "reason": "contribution_amount_must_be_positive"}},
+          {"name": "payout_cycle_required", "condition": {"operation": "disburse_payout", "cycle_present": false}, "effect": {"decision": "deny", "reason": "cycle_required_for_payout"}},
+          {"name": "payout_recipient_required", "condition": {"operation": "disburse_payout", "recipient_present": false}, "effect": {"decision": "deny", "reason": "recipient_required"}},
+          {"name": "loan_amount_positive", "condition": {"operation": "create_loan", "amount_positive": false}, "effect": {"decision": "deny", "reason": "loan_amount_must_be_positive"}},
+          {"name": "loan_guarantors_required", "condition": {"operation": "create_loan", "guarantors_present": false}, "effect": {"decision": "deny", "reason": "guarantors_required"}},
+          {"name": "loan_exceeds_treasury", "condition": {"operation": "create_loan", "loan_exceeds_treasury": true}, "effect": {"decision": "deny", "reason": "loan_exceeds_available_treasury"}},
+          {"name": "repayment_amount_positive", "condition": {"operation": "record_repayment", "amount_positive": false}, "effect": {"decision": "deny", "reason": "repayment_amount_must_be_positive"}},
+          {"name": "cross_tenant_group_denied", "condition": {"operation_type": "write", "cross_tenant": true}, "effect": {"decision": "deny", "reason": "cross_tenant_group_access_denied"}}
+        ],
+        "type": "deterministic"
+      },
+      "runtime": {
+        "entrypoint": "service.py",
+        "models": "models.py",
+        "service": "service.py"
+      },
+      "screens": {
+        "contributions": {"component": "ChamaContributionLedger", "permission": "chama:contributions", "route": "/chama/contributions"},
+        "cycles": {"component": "ChamaCycleConsole", "permission": "chama:cycles", "route": "/chama/cycles"},
+        "dashboard": {"component": "ChamaDashboard", "permission": "chama:view", "route": "/chama/dashboard"},
+        "groups": {"component": "ChamaGroupConsole", "permission": "chama:groups", "route": "/chama/groups"},
+        "loans": {"component": "ChamaLoanWorkbench", "permission": "chama:loans", "route": "/chama/loans"},
+        "meetings": {"component": "ChamaMeetingConsole", "permission": "chama:meetings", "route": "/chama/meetings"},
+        "members": {"component": "ChamaMemberConsole", "permission": "chama:members", "route": "/chama/members"},
+        "payouts": {"component": "ChamaPayoutConsole", "permission": "chama:payouts", "route": "/chama/payouts"},
+        "settings": {"component": "ChamaSettings", "permission": "chama:admin", "route": "/chama/settings"},
+        "statements": {"component": "ChamaStatementView", "permission": "chama:statements", "route": "/chama/statements"},
+        "treasury": {"component": "ChamaTreasuryView", "permission": "chama:treasury", "route": "/chama/treasury"}
+      },
+      "streaming": {
+        "events": [
+          "group.created",
+          "contribution.received",
+          "payout.disbursed",
+          "loan.approved",
+          "loan.repayment.received",
+          "cycle.completed",
+          "cycle.started",
+          "meeting.recorded",
+          "treasury.updated",
+          "reminder.sent"
+        ],
+        "guardrails": [
+          "payout_without_completed_cycle_denied",
+          "loan_exceeds_treasury_denied",
+          "cross_tenant_group_denied",
+          "overpayment_flagged"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.chama.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "contributions": {"icon": "coins", "status_indicator": "contribution-status-chip"},
+          "cycles": {"icon": "refresh-cw", "status_indicator": "cycle-status-chip"},
+          "groups": {"icon": "users", "status_indicator": "group-type-chip"},
+          "loans": {"icon": "hand-coins", "status_indicator": "loan-status-chip"},
+          "meetings": {"icon": "calendar-check", "status_indicator": "meeting-type-chip"},
+          "payouts": {"icon": "banknote", "status_indicator": "payout-status-chip"},
+          "treasury": {"icon": "vault", "status_indicator": "balance-chip"}
+        },
+        "name": "chama_community",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#C49A6C",
+          "color.danger": "#9B2335",
+          "color.primary": "#8B5E3C",
+          "color.success": "#2D6A4F",
+          "color.warning": "#E9A825",
+          "density": "comfortable",
+          "surface.canvas": "#FDF6EE",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#2C1810",
+          "text.secondary": "#6B4C35"
+        }
+      },
+      "ui": {
+        "api_prefix": "/chama/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {"component": "ChamaDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/chama/dashboard", "permission": "chama:view"},
+          {"component": "ChamaGroupConsole", "name": "groups", "nav_group": "Groups", "path": "/chama/groups", "permission": "chama:groups"},
+          {"component": "ChamaMemberConsole", "name": "members", "nav_group": "Groups", "path": "/chama/members", "permission": "chama:members"},
+          {"component": "ChamaContributionLedger", "name": "contributions", "nav_group": "Transactions", "path": "/chama/contributions", "permission": "chama:contributions"},
+          {"component": "ChamaPayoutConsole", "name": "payouts", "nav_group": "Transactions", "path": "/chama/payouts", "permission": "chama:payouts"},
+          {"component": "ChamaLoanWorkbench", "name": "loans", "nav_group": "Lending", "path": "/chama/loans", "permission": "chama:loans"},
+          {"component": "ChamaTreasuryView", "name": "treasury", "nav_group": "Finance", "path": "/chama/treasury", "permission": "chama:treasury"},
+          {"component": "ChamaCycleConsole", "name": "cycles", "nav_group": "Operations", "path": "/chama/cycles", "permission": "chama:cycles"},
+          {"component": "ChamaMeetingConsole", "name": "meetings", "nav_group": "Operations", "path": "/chama/meetings", "permission": "chama:meetings"},
+          {"component": "ChamaStatementView", "name": "statements", "nav_group": "Reports", "path": "/chama/statements", "permission": "chama:statements"},
+          {"component": "ChamaSettings", "name": "settings", "nav_group": "Administration", "path": "/chama/settings", "permission": "chama:admin"}
+        ],
+        "shell": "apg_python",
+        "template_roots": ["templates/", "static/"],
+        "view_module": "views.py"
+      },
+      "version": "1.0.0"
+    }
+  },
+  "composition": {
+    "applications": {},
+    "capability_dependencies": {
+      "fintech_chama": ["auth", "audl", "ntfy", "fintech_payments", "fintech_kyc"]
+    }
+  },
+  "contracts": {
+    "fintech_chama": {
+      "id": "fintech_chama",
+      "provides": ["chama_management", "rosca_rotation", "group_lending", "treasury_management", "mobile_disbursement"],
+      "requires": ["auth", "audl", "ntfy", "fintech_payments", "fintech_kyc"]
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "domain_context": {
+    "geography": "East Africa",
+    "market_penetration": "60%+ of Kenya/Tanzania/Uganda population use informal savings groups",
+    "differentiator": "No SAP/Oracle product addresses ROSCA rotation or Chama table banking natively",
+    "key_payment_rails": ["MPESA", "Airtel Money", "Equity EAzzy"],
+    "regulatory_context": "Kenya: Cooperative Societies Act; informal groups < 20M KES exempt from formal licensing"
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 5,
+      "kind": "capability",
+      "nodes": 1
+    }
+  },
+  "ok": true,
+  "packages": {
+    "fintech_chama": {
+      "entrypoint": "service.py",
+      "profile": "capability"
+    }
+  }
+}

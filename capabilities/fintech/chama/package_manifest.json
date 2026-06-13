@@ -1,0 +1,52 @@
+{
+  "base_target": "python",
+  "display_name": "Chama & ROSCA Engine",
+  "format": "apg.package-manifest.v1",
+  "generated_artifacts": [
+    "__init__.py",
+    "capability_contract.py",
+    "models.py",
+    "service.py",
+    "semantic_model.json",
+    "package_manifest.json"
+  ],
+  "name": "fintech_chama",
+  "profile": "capability",
+  "profile_artifacts": [
+    "package_manifest.json"
+  ],
+  "version": "1.0.0",
+  "domain": "fintech",
+  "subdomain": "chama",
+  "geography": "east_africa",
+  "theme_color": "#8B5E3C",
+  "provides": ["chama_management", "rosca_rotation", "group_lending", "treasury_management", "mobile_disbursement"],
+  "requires": ["auth", "audl", "ntfy", "fintech_payments", "fintech_kyc"],
+  "publishes": ["contribution.received", "payout.disbursed", "loan.approved", "cycle.completed"],
+  "models": [
+    {"name": "ChGroup", "prefix": "Ch", "description": "Savings group (Chama/ROSCA/Table Banking)"},
+    {"name": "ChMember", "prefix": "Ch", "description": "Group member with KYC and contribution tracking"},
+    {"name": "ChContribution", "prefix": "Ch", "description": "Individual contribution record per cycle"},
+    {"name": "ChPayout", "prefix": "Ch", "description": "ROSCA payout disbursement via MPESA"},
+    {"name": "ChCycle", "prefix": "Ch", "description": "Contribution + payout cycle"},
+    {"name": "ChTreasury", "prefix": "Ch", "description": "Group treasury state (real-time balance)"},
+    {"name": "ChLoan", "prefix": "Ch", "description": "Member loan from group treasury"},
+    {"name": "ChLoanRepayment", "prefix": "Ch", "description": "Loan repayment instalment"},
+    {"name": "ChMeetingRecord", "prefix": "Ch", "description": "Group meeting minutes and resolutions"}
+  ],
+  "service_methods": [
+    "create_group",
+    "add_member",
+    "record_contribution",
+    "calculate_next_payout",
+    "disburse_payout",
+    "create_loan",
+    "record_repayment",
+    "get_treasury_summary",
+    "get_contribution_status",
+    "send_contribution_reminders",
+    "get_member_statement",
+    "record_meeting",
+    "dashboard_summary"
+  ]
+}

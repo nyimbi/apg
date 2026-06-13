@@ -1,0 +1,64 @@
+{
+  "format": "apg.semantic-model.v1",
+  "ok": true,
+  "diagnostics": [],
+  "app": {
+    "name": "itsm_inc",
+    "description": "ITIL v4 Incident Management — APG ITSM subcapability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "itsm_inc": {
+      "name": "Incident Management",
+      "version": "1.0.0",
+      "provides": ["incident_lifecycle_workflow", "incident_sla_tracking", "incident_escalation_workflow", "major_incident_workflow", "post_incident_review", "incident_analytics"],
+      "requires": ["auth", "audl", "ntfy", "itsm_cmdb"],
+      "entities": {
+        "ItIncident": {
+          "description": "ITIL v4 incident record, full lifecycle new→closed, SLA-tracked",
+          "key_fields": ["id", "tenant_id", "priority", "status", "category"],
+          "lifecycle": ["new", "acknowledged", "in_progress", "resolved", "closed", "cancelled"]
+        },
+        "ItIncidentUpdate": {
+          "description": "Timestamped update on an incident (note, workaround, status change)",
+          "key_fields": ["id", "incident_id", "update_type", "author_id"]
+        },
+        "ItIncidentSLA": {
+          "description": "SLA snapshot tracking resolve-by clock per incident",
+          "key_fields": ["id", "incident_id", "sla_type", "target_minutes", "breached"]
+        },
+        "ItMajorIncident": {
+          "description": "Major incident declaration with commander, bridge, PIR",
+          "key_fields": ["id", "incident_id", "incident_commander_id", "pir_required"]
+        }
+      },
+      "sla_targets": {
+        "P1": "60 minutes",
+        "P2": "4 hours",
+        "P3": "8 hours",
+        "P4": "24 hours"
+      },
+      "event_stream": "apg.itsm.inc.lifecycle",
+      "stream_processor": "bytewax"
+    }
+  },
+  "composition": {
+    "publishes_to": ["itsm_prb", "itsm_chg"],
+    "subscribes_from": ["itsm_cmdb", "intel_alerts"],
+    "nats_subjects": {
+      "incident_created": "itsm.inc.incident.created",
+      "incident_resolved": "itsm.inc.incident.resolved",
+      "incident_escalated": "itsm.inc.incident.escalated",
+      "incident_major_declared": "itsm.inc.major.declared"
+    },
+    "nats_subscriptions": {
+      "ci_failure": "itsm.cmdb.ci.failure",
+      "alert_created": "intel.alerts.alert_created"
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  }
+}

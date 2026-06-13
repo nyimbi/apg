@@ -1,0 +1,69 @@
+{
+  "format": "apg.package-manifest.v1",
+  "name": "ckm_ecm",
+  "display_name": "ECM / Records Management",
+  "version": "1.0.0",
+  "profile": "capability",
+  "base_target": "python",
+  "capability_id": "ckm_ecm",
+  "domain": "ckm",
+  "description": "Content lifecycle, version-controlled records archiving, retention policy automation, and content workflow. Horizontal records management for healthcare, government, legal, and pharma.",
+  "vertical_applicability": [
+    "healthcare",
+    "government",
+    "legal",
+    "pharma",
+    "financial_services",
+    "education"
+  ],
+  "generated_artifacts": [
+    "__init__.py",
+    "capability_contract.py",
+    "models.py",
+    "service.py",
+    "semantic_model.json",
+    "package_manifest.json"
+  ],
+  "profile_artifacts": [
+    "package_manifest.json"
+  ],
+  "provides": [
+    "document_management",
+    "version_control",
+    "retention_management",
+    "content_workflow",
+    "disposal_management"
+  ],
+  "requires": ["auth", "audl", "ntfy", "srch", "esig"],
+  "publishes": [
+    "document.created",
+    "document.versioned",
+    "document.due_for_disposal",
+    "disposal.executed"
+  ],
+  "models": [
+    {"name": "EcDocument", "prefix": "Ec", "description": "A managed document under ECM lifecycle control"},
+    {"name": "EcDocumentVersion", "prefix": "Ec", "description": "Immutable version snapshot of a document"},
+    {"name": "EcRetentionPolicy", "prefix": "Ec", "description": "Retention rule for a document category"},
+    {"name": "EcRecordClassification", "prefix": "Ec", "description": "Sensitivity and regulatory classification of a record"},
+    {"name": "EcWorkflowInstance", "prefix": "Ec", "description": "Content approval/review workflow instance"},
+    {"name": "EcDisposalRecord", "prefix": "Ec", "description": "Immutable audit record of a document disposal action"}
+  ],
+  "service_methods": [
+    "create_document",
+    "add_version",
+    "get_document",
+    "classify_document",
+    "create_retention_policy",
+    "apply_retention_policy",
+    "find_due_for_disposal",
+    "dispose_documents",
+    "start_review_workflow",
+    "approve_workflow_step",
+    "search_documents"
+  ],
+  "streaming": {
+    "processor": "bytewax",
+    "stream": "apg.ckm.ecm.lifecycle"
+  }
+}

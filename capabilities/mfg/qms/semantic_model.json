@@ -1,0 +1,27 @@
+{
+  "capability": "mfg_qms",
+  "version": "1.0.0",
+  "domain": "mfg",
+  "entities": {
+    "MfQmsInspection": {"description": "Quality inspection record", "fields": {"id": {"type": "string"}, "item_id": {"type": "string"}, "inspection_type": {"type": "string"}, "quantity_inspected": {"type": "number"}, "quantity_accepted": {"type": "number"}, "quantity_rejected": {"type": "number"}, "disposition": {"type": "string", "nullable": true}, "status": {"type": "string"}}},
+    "MfQmsNcr": {"description": "Non-Conformance Report", "fields": {"id": {"type": "string"}, "item_id": {"type": "string"}, "quantity_defective": {"type": "number"}, "severity": {"type": "string"}, "status": {"type": "string"}, "capa_id": {"type": "string", "nullable": true}}},
+    "MfQmsCapa": {"description": "Corrective and Preventive Action", "fields": {"id": {"type": "string"}, "ncr_id": {"type": "string"}, "capa_type": {"type": "string"}, "title": {"type": "string"}, "status": {"type": "string"}, "due_date": {"type": "string"}}},
+    "MfQmsSpcSample": {"description": "SPC data point for a process characteristic", "fields": {"id": {"type": "string"}, "process_id": {"type": "string"}, "characteristic": {"type": "string"}, "value": {"type": "number"}, "sampled_at": {"type": "string"}}}
+  },
+  "api_endpoints": {
+    "POST /mfg-qms/api/v1/inspections": {"description": "Create inspection"},
+    "POST /mfg-qms/api/v1/inspections/{id}/complete": {"description": "Complete inspection with disposition"},
+    "POST /mfg-qms/api/v1/ncrs": {"description": "Raise NCR"},
+    "POST /mfg-qms/api/v1/ncrs/{id}/close": {"description": "Close NCR"},
+    "GET /mfg-qms/api/v1/ncrs": {"description": "List NCRs"},
+    "POST /mfg-qms/api/v1/capas": {"description": "Create CAPA"},
+    "POST /mfg-qms/api/v1/capas/{id}/close": {"description": "Close CAPA"},
+    "POST /mfg-qms/api/v1/spc/samples": {"description": "Add SPC sample"},
+    "GET /mfg-qms/api/v1/spc/summary": {"description": "Get SPC summary stats"},
+    "GET /mfg-qms/api/v1/dashboard": {"description": "Dashboard summary"}
+  },
+  "events": {
+    "publishes": ["apg.mfg.qms.ncr_raised", "apg.mfg.qms.capa_completed", "apg.mfg.qms.inspection_completed", "apg.mfg.qms.spc_alert"],
+    "subscribes": ["apg.mfg.mes.scrap_recorded", "apg.mfg.mes.work_order_completed"]
+  }
+}

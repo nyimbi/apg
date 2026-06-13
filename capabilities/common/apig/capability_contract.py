@@ -391,6 +391,9 @@ STREAMING: dict[str, Any] = {
 		"canary_released",
 		"gateway_deployed",
 		"agent_registered",
+		"api_call.recorded",
+		"quota.threshold_reached",
+		"rate_limit.exceeded",
 	],
 	"guardrails": [
 		"apig_batch_requires_bytewax",
@@ -405,8 +408,22 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "apig",
 		"display_name": "API Gateway & Management",
-		"provides": ["api_gateway", "traffic_management", "gateway_agent_composition", "review_evidence"],
+		"provides": [
+			"api_gateway",
+			"traffic_management",
+			"gateway_agent_composition",
+			"review_evidence",
+			"api_analytics",
+			"rate_limit_transparency",
+			"quota_management",
+			"consumer_usage_dashboards",
+		],
 		"requires": ["auth", "moni", "mqeb", "conf"],
+		"publishes": [
+			"api_call.recorded",
+			"quota.threshold_reached",
+			"rate_limit.exceeded",
+		],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
