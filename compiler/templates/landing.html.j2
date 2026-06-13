@@ -1,0 +1,155 @@
+{# landing.html.j2 — APG application landing page
+   Variables: module_name, module_description, entities, capabilities,
+              theme_primary, theme_accent, landing_style, api_links
+   landing_style: "default" | "minimal" | "corporate" | "africa"
+#}
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ module_name | replace('_', ' ') | title }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            brand: { DEFAULT: '{{ theme_primary }}', light: '{{ theme_accent }}' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --brand: {{ theme_primary }};
+      --accent: {{ theme_accent }};
+    }
+    .hero-gradient {
+      background: linear-gradient(135deg, {{ theme_primary }} 0%, {{ theme_accent }} 100%);
+    }
+    {% if landing_style == 'minimal' %}
+    .hero-gradient { background: {{ theme_primary }}; }
+    {% elif landing_style == 'africa' %}
+    .hero-gradient {
+      background: linear-gradient(135deg, #8B1A1A 0%, {{ theme_primary }} 50%, #E9A84B 100%);
+    }
+    {% elif landing_style == 'corporate' %}
+    .hero-gradient { background: linear-gradient(180deg, #0F172A 0%, {{ theme_primary }} 100%); }
+    {% endif %}
+  </style>
+</head>
+<body class="min-h-full bg-gray-50 font-sans antialiased">
+
+  {# ── Hero ──────────────────────────────────────────────────────── #}
+  <div class="hero-gradient text-white">
+    <div class="max-w-6xl mx-auto px-6">
+      {# Topnav #}
+      <nav class="flex items-center justify-between py-5">
+        <span class="text-lg font-bold tracking-tight">
+          {{ module_name | replace('_', ' ') | title }}
+        </span>
+        <div class="flex items-center gap-3">
+          <a href="/ui"
+             class="px-4 py-2 text-sm font-medium bg-white/15 hover:bg-white/25 rounded-lg transition-colors">
+            Open App
+          </a>
+          <a href="/openapi.json"
+             class="px-4 py-2 text-sm font-medium border border-white/30 hover:bg-white/10 rounded-lg transition-colors">
+            API Docs
+          </a>
+        </div>
+      </nav>
+
+      {# Hero content #}
+      <div class="py-20 text-center max-w-3xl mx-auto">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 text-xs font-medium mb-6">
+          <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+          Powered by APG · Datacraft
+        </div>
+        <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-5">
+          {{ module_name | replace('_', ' ') | title }}
+        </h1>
+        <p class="text-lg text-white/80 mb-8 leading-relaxed">
+          {{ module_description or 'A fully generated application by Datacraft APG.' }}
+        </p>
+        <div class="flex items-center justify-center gap-3 flex-wrap">
+          <a href="/ui"
+             class="px-6 py-3 bg-white text-gray-900 font-semibold rounded-xl hover:bg-white/90 transition-colors shadow-lg">
+            Open Application →
+          </a>
+          <a href="/manifest"
+             class="px-6 py-3 border border-white/40 text-white font-medium rounded-xl hover:bg-white/10 transition-colors">
+            View Manifest
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Stats strip ────────────────────────────────────────────────── #}
+  <div class="bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-6xl mx-auto px-6 py-5 grid grid-cols-2 sm:grid-cols-4 gap-6 divide-x divide-gray-100">
+      {% for stat in stats %}
+      <div class="px-6 first:pl-0 last:pr-0 text-center">
+        <p class="text-2xl font-bold text-gray-900">{{ stat.value }}</p>
+        <p class="text-xs font-medium uppercase tracking-wide text-gray-400 mt-0.5">{{ stat.label }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ── Entity cards ───────────────────────────────────────────────── #}
+  <main class="max-w-6xl mx-auto px-6 py-12">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-5">Data Entities</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
+      {% for entity in entities %}
+      {% if entity.type != 'application' %}
+      <a href="/ui/entities/{{ entity.name }}"
+         class="group bg-white rounded-xl border border-gray-200 p-5 hover:border-brand hover:shadow-md transition-all">
+        <div class="flex items-start justify-between mb-3">
+          <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white text-sm font-bold"
+               style="background: var(--brand)">
+            {{ entity.name[0] | upper }}
+          </div>
+          <span class="text-xs font-medium text-gray-400 bg-gray-50 px-2 py-0.5 rounded uppercase tracking-wide">
+            {{ entity.type }}
+          </span>
+        </div>
+        <h3 class="font-semibold text-gray-900 group-hover:text-brand transition-colors">
+          {{ entity.name }}
+        </h3>
+        <p class="text-xs text-gray-400 mt-1">
+          {{ entity.fields | length if entity.fields else entity.properties | length }} fields
+        </p>
+      </a>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    {# ── API quick links ──────────────────────────────────────────── #}
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-4">API Endpoints</h2>
+    <div class="flex flex-wrap gap-2">
+      {% for link in api_links %}
+      <a href="{{ link.url }}"
+         class="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:border-brand hover:text-brand transition-colors">
+        {{ link.label }}
+      </a>
+      {% endfor %}
+    </div>
+  </main>
+
+  {# ── Footer ─────────────────────────────────────────────────────── #}
+  <footer class="border-t border-gray-200 py-6 text-center text-xs text-gray-400">
+    Generated by <span class="font-medium text-gray-600">APG</span> ·
+    <a href="https://www.datacraft.co.ke" class="hover:underline">Datacraft</a> ·
+    © 2025
+  </footer>
+
+</body>
+</html>

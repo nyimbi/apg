@@ -422,6 +422,19 @@ class PythonCodeGenerator:
 		return spec
 
 	@staticmethod
+	def _landing_style_for(module: "ModuleDeclaration") -> str:
+		"""Derive a landing page style from the APG module's theme declaration."""
+		for entity in module.entities:
+			theme_name = getattr(entity, "name", "") or ""
+			if "africa" in theme_name.lower():
+				return "africa"
+			if "corporate" in theme_name.lower() or "enterprise" in theme_name.lower():
+				return "corporate"
+			if "minimal" in theme_name.lower() or "simple" in theme_name.lower():
+				return "minimal"
+		return "default"
+
+	@staticmethod
 	def _load_ui_templates() -> dict[str, str]:
 		"""Load Jinja2 UI templates from compiler/templates/ to embed in generated app."""
 		tmpl_dir = Path(__file__).parent / "templates"
@@ -436,6 +449,8 @@ class PythonCodeGenerator:
 		entity_specs = [self._entity_spec(entity) for entity in module.entities]
 		semantic_model = build_semantic_model_from_module(module, f"{module.name}.apg")
 		ui_templates = self._load_ui_templates()
+		# Derive landing style from theme name or default to "default"
+		landing_style = self._landing_style_for(module)
 		return f'''"""
 {module.name} - APG Python Application
 {"=" * (len(module.name) + 25)}
@@ -459,6 +474,7 @@ from urllib.parse import parse_qs, quote
 MODULE_NAME = {module.name!r}
 MODULE_VERSION = {module.version!r}
 MODULE_DESCRIPTION = {module.description!r}
+LANDING_STYLE = {landing_style!r}
 ENTITIES = {entity_specs!r}
 ENTITY_NAMES = {{entity["name"] for entity in ENTITIES}}
 RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {{entity["name"]: [] for entity in ENTITIES}}
@@ -3602,6 +3618,49 @@ def relationship_graph() -> Dict[str, Any]:
     return {{"nodes": nodes, "edges": edges}}
 
 
+def _landing_page_html() -> str:
+    """Render the application landing page using landing.html.j2."""
+    theme = APG_CAPABILITIES.capability_theme(MODULE_NAME) if APG_CAPABILITIES and hasattr(APG_CAPABILITIES, "capability_theme") else {{}}
+    tokens = theme.get("tokens", {{}}) if isinstance(theme, dict) else {{}}
+    theme_primary = tokens.get("color.primary") or "#1E5B5A"
+    theme_accent = tokens.get("color.accent") or "#D97706"
+    landing_style = os.environ.get("APG_LANDING_STYLE", LANDING_STYLE)
+    api_links = [
+        {{"url": "/ui",            "label": "Open App"}},
+        {{"url": "/manifest",      "label": "Manifest"}},
+        {{"url": "/openapi.json",  "label": "OpenAPI"}},
+        {{"url": "/capabilities",  "label": "Capabilities"}},
+        {{"url": "/metrics",       "label": "Metrics"}},
+        {{"url": "/self-test",     "label": "Self-Test"}},
+    ]
+    stats = [
+        {{"value": len([e for e in ENTITIES if e.get("type") not in {{"application"}}]), "label": "Entities"}},
+        {{"value": len(describe_application().get("capabilities", [])), "label": "Capabilities"}},
+        {{"value": len(describe_application().get("ai_agents", [])), "label": "AI Agents"}},
+        {{"value": sum(len(list_records(e["name"])) for e in ENTITIES if e.get("type") not in {{"application"}}), "label": "Records"}},
+    ]
+    rendered = _render_template(
+        "landing.html.j2",
+        module_name=MODULE_NAME,
+        module_description=MODULE_DESCRIPTION or "",
+        entities=ENTITIES,
+        theme_primary=theme_primary,
+        theme_accent=theme_accent,
+        landing_style=landing_style,
+        api_links=api_links,
+        stats=stats,
+    )
+    if rendered is not None:
+        return rendered
+    # Fallback: redirect to /ui
+    return (
+        "<!doctype html><html><head>"
+        f'<meta http-equiv="refresh" content="0; url=/ui">'
+        f"<title>{{html.escape(MODULE_NAME)}}</title>"
+        "</head><body></body></html>"
+    )
+
+
 def _ui_index_html() -> str:
     app = describe_application()
     entity_links = "".join(
@@ -3754,11 +3813,71 @@ def _ui_database_catalog_html() -> tuple[int, str]:
     return status_code, _html_page("Databases", body)
 
 
-def _ui_field_input_html(field: Dict[str, Any]) -> str:
+def _field_relationship(entity_name: str, field_name: str) -> Dict[str, Any] | None:
+    """Return relationship metadata for a field from SEMANTIC_MODEL, or None."""
+    tables = SEMANTIC_MODEL.get("tables", {{}})
+    table = tables.get(entity_name, {{}})
+    field_info = table.get("fields", {{}}).get(field_name, {{}})
+    rel = field_info.get("relationship")
+    if not rel or not rel.get("target_table"):
+        return None
+    # Skip relationships to synthetic types like 'date' that aren't real entities
+    target = rel["target_table"]
+    if target not in {{e["name"] for e in ENTITIES}}:
+        return None
+    return rel
+
+
+def _best_display_field(target_entity: str) -> str:
+    """Return the best human-readable field name for a FK select option label."""
+    priority = ["name", "full_name", "title", "label", "description",
+                "company_name", "display_name", "username", "email",
+                "first_name", "code", "number", "reference"]
+    fields = _field_specs(target_entity)
+    field_names = [str(f["name"]) for f in fields]
+    for candidate in priority:
+        if candidate in field_names:
+            return candidate
+    # Fall back to first non-id string field
+    for f in fields:
+        if str(f["name"]) not in {{"id", "_revision", "_created_at"}} and _json_schema_type(str(f.get("type", ""))) == "string":
+            return str(f["name"])
+    return "id"
+
+
+def _fk_select_options(target_entity: str, current_value: str = "", form_id: str = "") -> str:
+    """Render <option> elements for a foreign key select, populated from live records."""
+    records = list_records(target_entity)
+    display_field = _best_display_field(target_entity)
+    blank_label = html.escape(f"— select {{target_entity}} —")
+    options = [f'<option value="">{{blank_label}}</option>']
+    for rec in records:
+        val = str(rec.get("id", ""))
+        label_val = rec.get(display_field) or val
+        display = html.escape(str(label_val))
+        sel = ' selected' if val == current_value else ''
+        options.append(f'<option value="{{html.escape(val, quote=True)}}"{{sel}}>{{display}}</option>')
+    return "".join(options)
+
+
+def _ui_field_input_html(field: Dict[str, Any], entity_name: str = "") -> str:
     field_name = str(field["name"])
     safe_name = html.escape(field_name, quote=True)
     safe_label = html.escape(field_name)
     expected = _json_schema_type(str(field.get("type", "any")))
+
+    # Foreign key → dropdown populated from the related entity's records
+    rel = _field_relationship(entity_name, field_name) if entity_name else None
+    if rel:
+        target = rel["target_table"]
+        opts = _fk_select_options(target)
+        return (
+            f'<label>{{safe_label}}</label>'
+            f'<select name="{{safe_name}}">'
+            f'{{opts}}'
+            f'</select><br>'
+        )
+
     if expected == "boolean":
         return (
             f'<input type="hidden" name="{{safe_name}}" value="false">'
@@ -3769,6 +3888,8 @@ def _ui_field_input_html(field: Dict[str, Any]) -> str:
         attributes = 'type="number" step="1"'
     elif expected == "number":
         attributes = 'type="number" step="any"'
+    elif field.get("type", "").lower() in {{"date", "datetime", "timestamp"}}:
+        attributes = 'type="date"'
     else:
         attributes = 'type="text"'
     return f'<label>{{safe_label}} <input name="{{safe_name}}" {{attributes}}></label><br>'
@@ -3786,12 +3907,22 @@ def _ui_record_display_value(value: Any) -> str:
     return str(value)
 
 
-def _ui_record_editor_input_html(field: Dict[str, Any], record: Dict[str, Any], form_id: str) -> str:
+def _ui_record_editor_input_html(
+    field: Dict[str, Any], record: Dict[str, Any], form_id: str, entity_name: str = ""
+) -> str:
     field_name = str(field["name"])
     safe_name = html.escape(field_name, quote=True)
     safe_form_id = html.escape(form_id, quote=True)
     expected = _json_schema_type(str(field.get("type", "any")))
     value = record.get(field_name)
+
+    # Foreign key → dropdown showing related entity records
+    rel = _field_relationship(entity_name, field_name) if entity_name else None
+    if rel:
+        target = rel["target_table"]
+        opts = _fk_select_options(target, current_value=str(value or ""), form_id=form_id)
+        return f'<select form="{{safe_form_id}}" name="{{safe_name}}">{{opts}}</select>'
+
     if expected == "boolean":
         checked = " checked" if value is True else ""
         return (
@@ -3802,6 +3933,8 @@ def _ui_record_editor_input_html(field: Dict[str, Any], record: Dict[str, Any], 
         attributes = 'type="number" step="1"'
     elif expected == "number":
         attributes = 'type="number" step="any"'
+    elif field.get("type", "").lower() in {{"date", "datetime", "timestamp"}}:
+        attributes = 'type="date"'
     else:
         attributes = 'type="text"'
     safe_value = html.escape(_ui_record_display_value(value), quote=True)
@@ -3857,6 +3990,11 @@ def _ui_records_query_form_html(entity_name: str, query: Dict[str, list[str]]) -
     )
 
 
+def _ui_create_form_html(entity_name: str, fields: list[Dict[str, Any]]) -> str:
+    """Return the HTML for the create-record form fields (used by the Jinja2 template)."""
+    return "".join(_ui_field_input_html(field, entity_name) for field in fields)
+
+
 def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | None = None) -> str:
     records = records if records is not None else list_records(entity_name)
     if not records:
@@ -3878,7 +4016,7 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
         cells = []
         for column in columns:
             if column in field_by_name:
-                cell_value = _ui_record_editor_input_html(field_by_name[column], record, form_id)
+                cell_value = _ui_record_editor_input_html(field_by_name[column], record, form_id, entity_name)
             else:
                 cell_value = html.escape(_ui_record_display_value(record.get(column)))
             cells.append(f"<td>{{cell_value}}</td>")
@@ -3910,9 +4048,9 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
     safe_entity = html.escape(entity_name, quote=True)
     fields = _field_specs(entity_name) or [{{"name": "value", "type": "string", "required": True}}]
     records_table = _ui_records_table_html(entity_name, query_result["records"])
-    records_json = html.escape(json.dumps(query_result["records"], indent=2, sort_keys=True))
 
     # Prefer Jinja2 template for rich UI; fall back to f-string builder for zero-dep mode
+    create_inputs = _ui_create_form_html(entity_name, fields)
     tmpl_body = _render_template(
         "entity_list.html.j2",
         entity_name=html.escape(entity_name),
@@ -3923,7 +4061,7 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
         total=query_result["total"],
         count=query_result["count"],
         records_table=records_table,
-        records_json=records_json,
+        create_inputs=create_inputs,
         notice=html.escape(notice) if notice else "",
         query=query,
     )
@@ -3931,7 +4069,7 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
         return 200, _html_page(entity_name, tmpl_body)
 
     # Fallback: original f-string builder
-    inputs = "".join(_ui_field_input_html(field) for field in fields)
+    inputs = _ui_create_form_html(entity_name, fields)
     query_form = _ui_records_query_form_html(entity_name, query)
     result_summary = f'<p>Showing {{query_result["count"]}} of {{query_result["total"]}} matching records.</p>'
     notice_html = f'<section role="alert"><strong>{{html.escape(notice)}}</strong></section>' if notice else ""
@@ -4827,7 +4965,11 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path, _, raw_query = self.path.partition("?")
         query = parse_qs(raw_query, keep_blank_values=True)
-        if path == "/theme.css":
+        if path in ("/", "/home"):
+            body = _landing_page_html().encode("utf-8")
+            status = 200
+            content_type = "text/html; charset=utf-8"
+        elif path == "/theme.css":
             body = theme_stylesheet().encode("utf-8")
             status = 200
             content_type = "text/css; charset=utf-8"
