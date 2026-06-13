@@ -1,475 +1,366 @@
 # APG Research Report: Beautiful Interfaces, Capability Integration & Missing Capabilities
 
 **Date**: 2026-06-13 | **Author**: Nyimbi Odero | © 2025 Datacraft
+**Method**: 5-agent parallel research workflow (218k tokens, 168 tool uses, 551s)
 
 ---
 
 ## Executive Summary
 
-APG has 351 world-class capabilities with robust business logic, reliability infrastructure, and a clean architecture. However three critical gaps prevent it from being a complete enterprise platform:
+APG has 351 capabilities across 33 domains with solid foundations: NATS JetStream, Temporal, OPA, MDM golden-record machinery, a working capability contract registry, and a 260-file `capability_contract.py` corpus. Three critical gaps block enterprise-grade delivery:
 
-1. **UI**: The generated `/ui` is functionally correct but visually circa 2005 — no CSS framework, no JavaScript, 5 design tokens, pure `html.escape()` string concatenation. This undermines the platform's credibility despite the backend quality.
+1. **UI**: The generated `/ui` is HTML4-era unstyled bare markup while the Studio design system sits unused next to it. The studio.css token vocabulary already proves the design language — it just needs to be ported into the code_generator path.
 
-2. **Integration**: `requires: [...]` in MANIFEST is metadata-only. Most capabilities (fintech_gateway, fintech_fraud, fintech_aml) don't actually call each other — they're isolated services that happen to be registered together. NATS event streams are emitted but **nothing subscribes to them cross-capability**.
+2. **Integration**: The NATS event bus is **publish-only with zero cross-capability subscriptions** despite 2,502 `provides` entries in MANIFEST.json. `requires: [...]` is metadata-only; no code enforces it.
 
-3. **Gaps**: ~40 high-value capabilities are still missing. The most impactful: AI model governance, API monetisation, tenant/billing management, workflow designer UI, and 5 underweight domains (crm=1, eam=1).
+3. **Gaps**: Eight high-value domains (agriculture, legal, hospitality, NGO, insurance, mfg, itsm, int/iPaaS) have zero or near-zero executable contracts. The manufacturing domain alone has 14 subdirectories and zero MANIFEST entries.
+
+**The path is clear**: none of these require architectural rewrites. The scaffolding is in place.
 
 ---
 
 ## Part 1: Beautiful State-of-the-Art Interfaces
 
-### Current State (Accurate Assessment)
+### Current State
 
-The generated `app.py` UI produces:
-- **Zero CSS frameworks** — pure server-rendered HTML, no Tailwind, no Bootstrap, no nothing
-- **Zero JavaScript** — no htmx, no Alpine, no React, no event handlers
-- **5 design tokens** — `--apg-accent`, `--apg-surface`, `--apg-border`, `--apg-text`, `--apg-muted`
-- **No component classes** — raw `<h1>`, `<table>`, `<form>` elements with minimal styling
-- **No layout grid** — single-column `max-width: 1100px` block flow
-- **No responsive design** — single breakpoint only
+Generated `app.py` UI:
+- Zero CSS frameworks, zero JavaScript
+- 5 design tokens: `--apg-accent`, `--apg-surface`, `--apg-border`, `--apg-text`, `--apg-muted`
+- No component classes — raw `<h1>`, `<table>`, `<form>` with minimal inline styling
+- No layout grid, no persistent navigation shell, no responsive design
+- String-built HTML via `html.escape()` in `_ui_*` functions
 
-The APG Studio (`/studio`) runs a completely separate, high-quality design system (dark theme, glassmorphism, Inter font, CSS Grid, animated counters). Generated applications get none of this.
+The APG Studio (`/studio`) runs a completely separate, high-quality design system (dark theme, glassmorphism, Inter font, CSS Grid). Generated applications get none of this.
 
-### What World-Class Looks Like
+### Design System Recommendation
 
-| Platform | UI Approach | Key Principle |
-|----------|-------------|---------------|
-| **Salesforce Lightning** | Design System (SLDS) with 200+ components | Semantic tokens → component variants → layouts |
-| **SAP Fiori** | SAPUI5 framework | Role-based, task-oriented, "intuitive by design" |
-| **Retool** | Code-generated from schema | Type inference → widget selection → automatic layout |
-| **Appsmith** | Drag-drop + JSON binding | Data schema → UI widget mapping |
-| **Shadcn/ui** | Copy-paste Radix + Tailwind | Accessible headless + visual layer separation |
-| **Linear** | High-density, keyboard-first | Speed as design principle |
+**htmx 2.x + Tailwind CSS CDN + Alpine.js 3.x, rendered from Jinja2 macros.**
 
-### Recommendation: The HTMX+Tailwind CDN Renderer
+**Critical constraint**: Do NOT extend Flask-AppBuilder `base.html`. Bootstrap 3 CSS specificity conflicts with Tailwind are unresolvable without a clean break. The APG-native `apg_base.html` template is the correct single inheritance point for Flask blueprint views.
 
-**The right solution for APG is not a SPA framework. It's progressive enhancement of server-rendered HTML.**
+**Why this stack is right for APG:**
+- Zero webpack, zero npm build step in generated apps
+- First Contentful Paint < 1.0s, total client payload < 30KB
+- Server-rendered HTML + htmx partial updates (`hx-get`/`hx-swap`) matches APG's Python architecture
+- Alpine.js handles micro-interactions (dropdowns, modals, tabs) with 3KB overhead
 
-**Proposed architecture:**
+### Implementation Plan
+
+#### Tier 1 — Immediate (7 hours, zero API changes, zero grammar changes)
+
+**Step 1 — Expand `theme_stylesheet()` in `compiler/code_generator.py` lines 3206–3244 (4h)**
+
+Add to the CSS token block:
+```css
+--apg-radius: 8px;
+--apg-shadow-sm: 0 1px 2px rgba(0,0,0,0.08);
+--apg-shadow-md: 0 4px 6px rgba(0,0,0,0.10);
+--apg-shadow-lg: 0 10px 15px rgba(0,0,0,0.12);
+--apg-sidebar-width: 240px;
+--apg-font-sans: 'Inter', system-ui, sans-serif;
+--apg-space-1: 4px; --apg-space-2: 8px; --apg-space-3: 12px;
+--apg-space-4: 16px; --apg-space-6: 24px; --apg-space-8: 32px;
+--apg-duration-fast: 150ms;
+--apg-bg-card: var(--apg-surface);
 ```
-APG Theme Tokens → Tailwind Config → Component Classes → Server HTML → htmx interactions
+
+Then add 35 lines of component CSS after the token block:
+```css
+.apg-card { background: var(--apg-bg-card); border-radius: var(--apg-radius);
+            box-shadow: var(--apg-shadow-sm); padding: var(--apg-space-4); }
+.apg-table { width: 100%; border-collapse: collapse; }
+.apg-table th, .apg-table td { padding: 8px 12px; border-bottom: 1px solid var(--apg-border);
+                                text-align: left; }
+.apg-table th { font-weight: 600; background: var(--apg-surface); }
+.apg-badge { display: inline-flex; align-items: center; padding: 2px 8px;
+             border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+.apg-topbar { display: flex; align-items: center; gap: var(--apg-space-4);
+              padding: var(--apg-space-3) var(--apg-space-6);
+              border-bottom: 1px solid var(--apg-border); background: var(--apg-surface); }
+.apg-content { max-width: 1280px; margin: 0 auto; padding: var(--apg-space-6); }
+.apg-nav-link { color: var(--apg-text); text-decoration: none; padding: var(--apg-space-2) var(--apg-space-3);
+                border-radius: 4px; transition: background var(--apg-duration-fast); }
+.apg-nav-link:hover { background: var(--apg-border); }
 ```
 
-**Why this is right for APG:**
-1. `app.py` already serves pure HTML — adding CDN Tailwind + htmx requires changing only `_html_page()` and the CSS generator
-2. Zero build step — just CDN links in the HTML `<head>`
-3. htmx enables reactive updates (`hx-get`, `hx-post`, `hx-trigger`) without a SPA
-4. Tailwind maps directly to APG's 11 design tokens → CSS variables → utility classes
-5. Alpine.js adds micro-interactions (dropdowns, modals, tabs) with 3KB
+**Step 2 — Add layout shell to `_html_page()` at line 3248 (3h)**
 
-**Immediate changes (code-generator.py — 2 function changes):**
-
+Replace bare `<body>{body}</body>` with:
 ```python
-def _html_page(title: str, body: str, ...) -> str:
-    return f"""<!DOCTYPE html>
-<html lang="en" class="h-full">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{html.escape(title)}</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- htmx for reactivity -->
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <!-- Alpine.js for micro-interactions -->
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <style>
-    :root {{ {theme_vars} }}
-    /* Tailwind config using APG tokens */
-  </style>
-</head>
-<body class="bg-gray-50 text-gray-900 h-full">
-  <nav class="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4">
-    {nav_html}
-  </nav>
-  <main class="max-w-7xl mx-auto px-6 py-8">{body}</main>
-</body>
-</html>"""
+f"""<body>
+<header class='apg-topbar'>
+  <a class='apg-logo' href='/ui' style='font-weight:700;color:var(--apg-accent)'>{module_name}</a>
+  <nav class='apg-topnav' style='display:flex;gap:4px'>{nav_links}</nav>
+</header>
+<main class='apg-content'>{body}</main>
+</body>"""
 ```
 
-**APG Theme Token → Tailwind Mapping:**
+Add `class='apg-table'` to the `<table>` tag in `_ui_records_table_html()` at line 3712.
+
+**Result**: Every generated app gets persistent navigation and consistent page chrome. Zero test regressions — pure CSS addition.
+
+Also extend token promotion from the current 3 names (`accent`/`primary`/`brand`) to all 12 `DEFAULT_THEME_TOKENS`: map `surface`→`--apg-surface`, `text.primary`→`--apg-text`, `border.radius`→`--apg-radius`. APG grammar-level `theme { }` declarations will propagate to rendered UI.
+
+#### Tier 2 — Flask Blueprint Templates (1 day)
+
+Create `capabilities/common/ui/` as a shared Flask blueprint template library:
+
+```
+capabilities/common/ui/
+├── __init__.py              # registers as blueprint template search path
+├── templates/
+│   ├── apg_base.html        # Tailwind CDN + htmx + Alpine via CDN, NOT FAB base.html
+│   ├── _tokens.html         # macro: convert DEFAULT_THEME_TOKENS dict to CSS :root{}
+│   └── _nav.html            # macro: render capability contract routes[] as accessible nav
+```
+
+This serves capabilities that render via Flask blueprints (mob/mdm, fintech/gateway, intel/, crm/) — not the code_generator path.
+
+#### Tier 3 — Jinja2 Macro Library (3 days)
+
+Build six macro files in `capabilities/common/ui/macros/`:
+
+| File | Macros |
+|------|--------|
+| `dashboard.html` | `kpi_card(label, value, delta)`, `activity_feed(events)`, `health_strip(components)` |
+| `table.html` | `data_table(rows, cols, hx_url)` — htmx returns only `<tbody>` fragment on `HX-Request` |
+| `form.html` | `field(name, type, label)`, `form_section(title, fields, save_url)` with ARIA |
+| `workbench.html` | `split_pane(queue, detail)`, `queue_item(item)` |
+| `settings.html` | `settings_group(title, fields, save_url)` |
+| `shell.html` | Full APG shell rendering MANIFEST.json capability list as collapsible left sidebar |
+
+Each macro takes the views.py Python dict as input. No DataTables, no ag-Grid dependency.
+
+Additional medium-term items:
+- Dark mode via `prefers-color-scheme` media query + Alpine.js `data-theme='dark'` toggle (critical for intel/SOC dashboard)
+- APG unified shell at `capabilities/common/ui/shell.html`: reads `/capabilities/manifest` API, renders domain groups as collapsible sections with htmx `hx-push-url=true` navigation
+
+#### Tier 4 — Jinja2 Template Layer in Compiler (1 week)
+
+Create `compiler/templates/` with `base.html.j2`, `entity_list.html.j2`, `entity_detail.html.j2`. Embed as string literals inside generated `app.py` (preserving zero-dependency constraint). Generated app calls:
 ```python
-TOKEN_TAILWIND_MAP = {
-    "color.primary":   ("--apg-primary",   "primary"),
-    "color.accent":    ("--apg-accent",    "accent"),
-    "color.success":   ("--apg-success",   "success"),
-    "color.warning":   ("--apg-warning",   "warning"),
-    "color.danger":    ("--apg-danger",    "danger"),
-    "surface.canvas":  ("--apg-canvas",    None),
-    "surface.panel":   ("--apg-panel",     None),
-    "text.primary":    ("--apg-text",      None),
-    "text.secondary":  ("--apg-muted",     None),
-    "border.radius":   ("--apg-radius",    None),
-    "density":         ("--apg-density",   None),
-}
+jinja2.Environment(loader=DictLoader(TEMPLATES)).get_template('entity_list.html.j2').render(**model)
 ```
+instead of raw f-strings. Separates concerns, enables theming by template substitution.
 
-### 3-Tier UI Strategy
+**Also connect views.py to the template system**: add a Flask route decorator in capability blueprints that calls the views.py function, passes the returned dict to a Jinja2 macro, and returns rendered HTML. Currently views.py dicts are never rendered — the connection is entirely missing.
 
-**Tier 1 — Generated App UI (app.py) — `immediate`**
-- Replace string-built HTML with Tailwind CDN + htmx
-- Map APG theme tokens to Tailwind `tailwind.config` at runtime
-- Use shadcn-inspired component HTML patterns (cards, tables, badges, sidebars)
-- Add hx-get on table rows for inline record detail
-- Impact: dramatic visual improvement with ~100 lines of changes to code_generator.py
-
-**Tier 2 — Capability Blueprint UI (blueprint.py) — `medium term`**
-- Standardise all FAB blueprints on a shared APG component library
-- Build `capabilities/common/ui/` with APG-branded Jinja2 components (nav, sidebar, data-table, form, badge, stat-card)
-- Every capability blueprint imports from this shared library
-- Screen models from views.py become data props to components
-
-**Tier 3 — Application Shell (SPA option) — `long term`**
-- Build a React/Next.js application shell that consumes APG JSON APIs
-- The generated `semantic_model.json` + `openapi.json` auto-generates TypeScript types
-- Each capability's screen model dict maps to auto-generated React components
-- Hosted at `https://studio.datacraft.co.ke` — white-labelled per tenant
-
-### Design System Specification for APG
+### Design Tokens
 
 ```
-Brand: Datacraft / APG
 Primary: #1E5B5A (deep teal — professional, African, trustworthy)
 Accent: #D97706 (amber — energy, action)
-Typeface: Inter (body) + JetBrains Mono (code)
+Typeface: Inter (body) + JetBrains Mono (code) — CDN, no install
 Density: Compact (data-heavy enterprise apps)
-Border radius: 8px (modern, not overly round)
-Shadow: 0 1px 3px rgba(0,0,0,0.12)
+Border radius: 8px
 Grid: 12-column, 1280px max-width, 24px gutter
 ```
 
-### Accessibility Requirements (Non-Negotiable)
+### Accessibility
 
-- WCAG 2.1 AA minimum for all generated interfaces
-- 4.5:1 contrast ratio on all text
-- All interactive elements keyboard-accessible
-- ARIA labels on all form fields
-- Focus rings visible
+- WCAG 2.1 AA minimum (APG's existing `#172033` text on `#F7F8FA` = 14.8:1, already exceeds 4.5:1 requirement)
+- `scope=col` on all `<th>`, `<caption>` elements, `aria-live=polite` on async update targets
+- 44×44px minimum touch targets
 
 ---
 
 ## Part 2: Capability Integration Architecture
 
-### Current State
+### Current State (Accurate)
 
-**The integration gap is severe.** `requires: [...]` in MANIFEST.json is purely documentary — no code enforcement, no actual wiring.
-
-Observed patterns:
-- `fintech_gateway` declares `requires: [crm_adv, bia_anl, cbm_cash_management]` — none are imported in service.py
-- `fintech_fraud` declares `requires: [fintech_payments, fintech_kyc, fintech_aml]` — none called
-- NATS streams are **emitted but never subscribed to** cross-capability
+- NATS publish events are emitted by ~60 capabilities via `get_audit_adapter()`
+- **Zero cross-capability NATS subscriptions exist**
+- `requires: [...]` in MANIFEST.json is documentation-only, not code
+- 2,502 `provides` entries in MANIFEST.json — none are consumed by other capabilities
 - Only the SACCO sub-cluster has actual cross-capability calls (gua→dep→lnd chain)
+- MDM already has `MdGoldenRecord`, `MdCrossReference`, `MdEntity` with `EntityType(CUSTOMER, PRODUCT)` — needs extension and wiring only
 
-### How World-Class Platforms Do It
+### Architecture Pattern
 
-**Salesforce approach**: Shared data model (sObject) + Platform Events + Process Builder
-- Every object (Account, Contact, Opportunity) is shared across all clouds
-- Platform Events trigger automated processes cross-module
-- Integration is automatic because data model is unified
+**Choreography-first with orchestration escape hatch:**
+- NATS JetStream push consumers for peer-to-peer event choreography
+- Temporal workflows for multi-step sagas requiring compensation, human approval gates, or SLA enforcement
+- MDM as shared entity registry (SAP Business Partner / Microsoft CDM Party pattern)
+- `ComposedView` base class for cross-capability data assembly using `asyncio.gather()`
 
-**SAP S/4HANA approach**: Universal Journal (ACDOCA table) + BAPI/RFC layer
-- Single accounting document that every module writes to
-- Remote Function Calls between modules with defined contracts
-- Master data (Business Partner) shared by all modules
+### Implementation Plan
 
-**Microsoft Dynamics approach**: Common Data Model (CDM) + Power Automate
-- Canonical entities shared across Finance, HR, Sales
-- Power Automate flows wire modules together
-- Azure Service Bus for async cross-module events
+#### Step 1 — IntegrationEvent Envelope (prerequisite for everything else)
 
-### Recommended APG Integration Architecture
-
-#### 1. Canonical Entity Registry (highest impact, implement first)
-
-Create `capabilities/common/entity_registry/` — a shared entity store where capabilities register their "canonical" entity representations:
-
+Create `capabilities/common/nats/events.py`:
 ```python
-# capabilities/common/entity_registry/service.py
-class EntityRegistry:
-    """Single source of truth for cross-capability entity resolution."""
-    
-    async def register_entity(self, capability_id, entity_type, entity_id, canonical_fields):
-        """A capability registers a real-world entity with canonical fields."""
-        # e.g. fintech_kyc registers Customer{id, name, dob, id_number, risk_level}
-        
-    async def resolve_entity(self, entity_type, entity_id) -> dict:
-        """Any capability can look up the canonical representation of an entity."""
-        # Returns merged view from all capabilities that know this entity
-        
-    async def link_entities(self, entity_type, canonical_id, capability_id, local_id):
-        """Link a capability-local ID to the canonical entity."""
+class IntegrationEvent(BaseModel):
+    capability_id: str
+    event_type: str
+    entity_type: str
+    entity_id: str
+    canonical_entity_id: str | None = None
+    tenant_id: str
+    payload: dict[str, Any]
+    correlation_id: str = Field(default_factory=uuid7str)
+    causation_id: str | None = None
+    occurred_at: datetime = Field(default_factory=datetime.utcnow)
+    schema_version: str = "1.0"
 ```
 
-#### 2. NATS Subscription Wiring (automatic integration)
+Wire into `get_audit_adapter()` factory: if `NATS_URL` set, publish to `apg.events.{capability_id}.{event_type}`; else log. Add `publishes` key to each `capability_contract.py` alongside `provides`. **Effort**: 2 days
 
-**The NATS infrastructure exists. Nothing subscribes to it.** Fix this with automatic subscription wiring in `domain/adapters.py`:
+#### Step 2 — Declarative Subscriptions
 
+Add `subscribes` section to each `capability_contract.py`:
 ```python
-# Template for fintech_fraud/domain/adapters.py
-def get_fraud_event_handler():
-    """Subscribe to fintech_gateway payment events for automatic fraud scoring."""
-    async def handle_payment(event: dict) -> None:
-        if event.get("event_type") in ("payment_intent.created", "authorize_payment.completed"):
-            svc = FraudService(tenant_id=event.get("tenant_id", "default"))
-            await svc.score_signal({
-                "transaction_id": event.get("resource_id"),
-                "amount": event.get("details", {}).get("amount"),
-                "merchant": event.get("details", {}).get("merchant_code"),
-                "source": "fintech_gateway_event",
-            })
-    return handle_payment
-
-# Register on startup
-from capabilities.common.nats.nats_adapter import NATSConnector
-connector = NATSConnector("fintech_fraud")
-await connector.subscribe("apg.events.fintech_gateway.payment_intent.created", handle_payment)
-```
-
-#### 3. Integration Contract Standard
-
-Every capability should publish an `integration_contract.py` defining what it produces and consumes:
-
-```python
-# Template: capabilities/{domain}/{cap}/integration_contract.py
-PRODUCES_EVENTS = [
-    {"subject": "apg.events.fintech_gateway.payment_intent.created",
-     "schema": {"transaction_id": "str", "amount": "Decimal", "merchant_code": "str"},
-     "consumers": ["fintech_fraud", "fintech_aml", "bia_anl"]},
+subscribes = [
+    {
+        "source_capability": "fintech_gateway",
+        "event_type": "payment_authorized",
+        "handler": "on_payment_authorized",
+        "filter": None,
+    },
 ]
-
-CONSUMES_EVENTS = [
-    {"subject": "apg.events.fintech_fraud.risk_decision.completed",
-     "handler": "apply_risk_decision",
-     "description": "Apply fraud risk score to pending payment"},
-]
-
-PROVIDES_DATA = {
-    "payment_intent": {"endpoint": "/api/fintech/gateway/payments/{id}", "schema": PaymentIntent},
-}
-
-REQUIRES_DATA = {
-    "customer_risk_profile": {"capability": "fintech_kyc", "endpoint": "/api/fintech/kyc/profiles/{customer_id}"},
-}
 ```
 
-#### 4. Cross-Capability Screen Composition
+Create `capabilities/common/nats/subscription_wirer.py` that reads all contracts from the registry on startup, connects to NATS JetStream, and creates durable push consumers for each declared subscription.
 
-views.py screen models should automatically include related capability data:
+**Five highest-value pairs to wire first:**
 
+| Publisher | Event | Subscriber | Handler |
+|-----------|-------|------------|---------|
+| `fintech_gateway` | `payment_authorized` | `fintech_fraud` | `on_payment_authorized` |
+| `fintech_kyc` | `kyc_cleared` | `fintech_aml` | `on_kyc_cleared` |
+| `intel_alerts` | `alert_created` | `intel_correlation` | `on_alert_created` |
+| `government_cas` | `case_created` | `ntfy` | `on_case_created` |
+| `mob_mdm` | `device_enrolled` | `auth` | `on_device_enrolled` |
+
+**Effort**: 3 days after Step 1
+
+#### Step 3 — Canonical Entity Registry (MDM extension)
+
+MDM already has `MdGoldenRecord`, `MdCrossReference`, `EntityType(CUSTOMER, PRODUCT)`. Add:
+- `ORGANISATION` and `PARTY` entity types
+- `resolve_entity(source: str, local_id: str) → str` — returns canonical UUID
+- `cross_references(canonical_id: str) → list[tuple[str, str]]` — returns `(capability_id, local_id)` pairs
+
+Wire four domain capabilities to call `resolve_entity` on entity creation:
+- `crm_adv` Customer → MDM CUSTOMER
+- `fintech_kyc` Subject → MDM CUSTOMER
+- `healthcare_emr` Patient → MDM CUSTOMER
+- `government_cas` Citizen → MDM PARTY
+
+One canonical UUID spans all four domains. **Effort**: 4 days
+
+#### Step 4 — ComposedView
+
+Add `ComposedView` base class in `capabilities/common/views/composition.py`:
 ```python
-# capabilities/fintech/gateway/views.py
-def payment_detail_model(service, tenant_id: str, payment_id: str) -> dict[str, Any]:
-    model = _base("payment_detail", tenant_id)
-    model["payment"] = service.get_record("payment_intents", payment_id, tenant_id)
-    
-    # Automatic cross-capability enrichment (lazy-loaded)
-    try:
-        from capabilities.fintech.fraud.service import FraudService
-        fraud = FraudService(tenant_id)
-        model["fraud_assessment"] = asyncio.run(fraud.get_risk_assessment(payment_id))
-    except Exception:
-        model["fraud_assessment"] = None
-    
-    try:
-        from capabilities.fintech.kyc.service import KYCService
-        kyc = KYCService(tenant_id)
-        customer_id = model["payment"].get("customer_id")
-        model["customer_kyc"] = asyncio.run(kyc.get_profile(customer_id)) if customer_id else None
-    except Exception:
-        model["customer_kyc"] = None
-    
-    return model
+class ComposedView:
+    async def compose(
+        self,
+        canonical_id: str,
+        tenant_id: str,
+        sources: list[tuple[str, str, dict]],  # (capability_id, method, kwargs)
+    ) -> dict[str, Any]:
+        results = await safe_gather(*[
+            self._call(cap_id, method, canonical_id=canonical_id, tenant_id=tenant_id, **kwargs)
+            for cap_id, method, kwargs in sources
+        ], label="composed_view")
+        return {sources[i][0]: r for i, r in enumerate(results)}
 ```
 
-#### 5. Workflow Auto-Wiring
+First use: `fintech_gateway` transaction detail view pulling fraud assessment + KYC status + AML flags in a single parallel fetch — Salesforce 360-degree view equivalent. **Effort**: 2 days
 
-APG should auto-generate cross-capability workflows when `requires: [X]` includes a workflow-capable capability:
+#### Step 5 — Temporal Saga Workflows
 
-```apg
-// APG source — declares integration intent
-application PaymentPlatform {
-  capabilities: [fintech_gateway, fintech_fraud, fintech_aml, fintech_kyc];
-  
-  // APG compiler generates:
-  // 1. NATS subscriptions wiring gateway → fraud → aml
-  // 2. Temporal workflow: PaymentApprovalWorkflow
-  // 3. Shared entity registry entries for Customer, Transaction
-  // 4. Cross-capability screen composition in views.py
-}
-```
+Define five sagas in `capabilities/composition/workflows/`:
+
+| Saga | Participants | Trigger |
+|------|-------------|---------|
+| `PaymentProcessingSaga` | gateway→kyc→aml→fraud→ledger | payment intent created |
+| `CustomerOnboardingSaga` | crm_adv→fintech_kyc→fintech_aml→auth | customer registered |
+| `IncidentResponseSaga` | intel_alerts→intel_correlation→intel_threats→ntfy | alert triggered |
+| `ComplianceReportingSaga` | grc_pol→grc_aud→grc_rcm→fin_rpt | period close |
+| `DeviceEnrolmentSaga` | mob_mdm→auth→mten→ntfy | device enrolled |
+
+**Effort**: 1 week
 
 ---
 
 ## Part 3: Missing Capabilities
 
-### Critical Gaps (must-have for enterprise credibility)
+### Critical — Block enterprise sales
 
-| # | Capability | Domain | Priority | Effort | Justification |
-|---|-----------|--------|---------|--------|---------------|
-| 1 | **AI Model Registry & Governance** | `common/mlr` | Critical | 2 weeks | Every ML model needs versioning, bias monitoring, rollback, A/B. MLflow equivalent. |
-| 2 | **Tenant & Billing Management** | `common/tenancy` | Critical | 3 weeks | SaaS model requires per-tenant subscription, usage metering, invoice generation. |
-| 3 | **API Monetisation** | `common/apim` | Critical | 2 weeks | Rate limiting + per-API pricing + developer keys + usage analytics. |
-| 4 | **Workflow Visual Designer** | `common/wfdesigner` | Critical | 3 weeks | BPMN drag-drop workflow builder. ckm_wfa has engine but no visual designer UI. |
-| 5 | **Notification Centre** | `common/notifctr` | High | 1 week | Unified in-app notification centre (bell icon, read/unread, preferences). ntfy is backend; this is the UX layer. |
-| 6 | **Developer Portal** | `common/devportal` | High | 2 weeks | API docs, sandbox, SDKs, changelog, deprecation notices. Backstage alternative. |
-| 7 | **Event Streaming Dashboard** | `common/streamdash` | High | 1 week | Real-time NATS stream viewer, event replay, dead letter inspection. |
-| 8 | **Multi-Currency Accounting** | `fin/mca` | High | 2 weeks | FX revaluation engine, multi-currency P&L, hedge accounting. fin/gl lacks this. |
-| 9 | **Consolidation Accounting** | `fin/cons` | High | 2 weeks | Multi-entity consolidation, intercompany elimination, group reporting. |
-| 10 | **Revenue Recognition** | `fin/rev` | High | 2 weeks | ASC 606 / IFRS 15 deferred revenue, contract liability, POC recognition. |
+| # | Capability | Domain | Effort | Justification |
+|---|-----------|--------|--------|---------------|
+| 1 | **ITSM CMDB** (`itsm/cmdb`) | `itsm` (new) | 3w | Foundation for incident/problem/change. `eam/ast` covers physical assets only; CMDB covers IT assets, software licenses, CI relationships. |
+| 2 | **ITSM Incident Management** (`itsm/inc`) | `itsm` (new) | 2w | Zero presence in APG. Highest attach rate to fintech/healthcare/government/telecom. Depends on CMDB. |
+| 3 | **ITSM Problem + Change** (`itsm/prb`, `itsm/chg`) | `itsm` (new) | 2w each | Root-cause analysis + change advisory board workflows. Temporal CAB approval gate integration. |
+| 4 | **Three-Way Match Engine** (`proc/twy`) | `proc` | 3w | PO vs GR vs Invoice matching. #1 ROI in enterprise procurement (saves 3–5% of spend). Required for government, mining, pharma compliance. |
+| 5 | **Horizontal Tax Engine** (`common/tax`) | `common` (new) | 3w | Africa has 54 distinct VAT/GST regimes. Use OPA (already in `common/comp`) for country Rego rule packs: KRA iTax, FIRS, GRA. |
 
-### High-Value Africa-Specific Gaps
+### High — Africa differentiation and revenue
 
-| # | Capability | Domain | Priority | Justification |
-|---|-----------|--------|---------|---------------|
-| 11 | **USSD Application Builder** | `common/ussdbuilder` | High | Visual builder for USSD flows targeting feature phones (Kenya, Nigeria, Ghana) |
-| 12 | **Informal Economy Digitisation** | `common/informal` | High | Jua kali, mama mbogas, hawkers — digital receipts, savings groups, credit profiles |
-| 13 | **M-PESA for Business** | `fintech/mpesabiz` | High | Paybill management, till numbers, reconciliation — beyond the connector |
-| 14 | **CRB Integration (East Africa)** | `fintech/crb` | High | TransUnion Kenya, Metropol, CreditInfo — credit bureau query and reporting |
-| 15 | **County Government Portal** | `government/portal` | Medium | Kenya's 47 counties each need e-service delivery — revenue, permits, welfare |
-
-### Domain Depth Gaps (existing domains that are too shallow)
-
-| Domain | Current | Should Have | Gap |
-|--------|---------|-------------|-----|
-| `crm` | 1 cap | 8 caps | crm_contact, crm_account, crm_pipeline, crm_activity, crm_analytics, crm_email, crm_cpq |
-| `eam` | 1 cap | 6 caps | eam_maintenance, eam_inspection, eam_spares, eam_condition, eam_lifecycle |
-| `ecd` | 1 cap | 5 caps | ecd_cad, ecd_bom, ecd_change, ecd_plm, ecd_simulation |
-| `pde` | 1 cap | 5 caps | pde_roadmap, pde_feedback, pde_ab_test, pde_analytics, pde_release |
-| `int` | 1 cap | 8 caps | int_etl_visual, int_api_mgmt, int_cdc, int_master_data, int_dq, int_lineage |
-
-### Emerging Technology Gaps
-
-| # | Capability | Priority | Description |
-|---|-----------|---------|-------------|
-| 16 | **AI Reasoning Chains** | High | Chain-of-thought audit logs, decision explanation, counterfactual analysis |
-| 17 | **Vector Database** | High | pgvector/Qdrant integration for semantic search beyond RAG |
-| 18 | **Streaming Analytics** | High | Real-time aggregations over NATS events (Flink-style over Bytewax) |
-| 19 | **Edge Sync Protocol** | Medium | CRDT-based offline-first sync for mobile/rural deployments |
-| 20 | **Smart Contract Audit** | Medium | Solidity/Move contract analysis and formal verification hooks |
+| # | Capability | Domain | Effort | Justification |
+|---|-----------|--------|--------|---------------|
+| 6 | Agriculture contracts (all 12) | `agriculture` | 1w | Directories + MANIFEST exist; only `capability_contract.py` + `semantic_model.json` missing. Zero SAP/Oracle competitor covers Kenya smallholder farming or cooperative management. |
+| 7 | Insurance contracts (all 8) | `insurance` | 1w | Same pattern. `ins_mic` (microinsurance) targets underserved Africa. Zero contracts in codebase. |
+| 8 | Manufacturing domain (14 subdirs) | `mfg` | 5w | 14 subdirectories, **zero MANIFEST entries, zero contracts**. MRP+MES are critical path; BOM/SFC/QMS depend on them. |
+| 9 | iPaaS Integration Hub (`int/esb`, `int/dsy`) | `int` | 6w | Empty directories. NATS+Temporal infrastructure present but no flow designer or no-code sync. Mulesoft/Boomi equivalent entirely absent. |
+| 10 | SaaS Billing Engine (`common/sbl`) | `common` (new) | 5w | No metered billing, subscription lifecycle, or usage-based API billing. `fin/bil` has revenue recognition only. Critical for APG commercial deployment. |
+| 11 | Developer Portal (`common/devp`) | `common` (new) | 4w | `common/apig` is a gateway only. No developer-facing portal, API key self-service, OpenAPI browser, or API monetization. |
+| 12 | Chama & ROSCA Engine (`fintech/chama`) | `fintech` | 3w | Dominant financial instrument for 60%+ of East Africa's population. Merry-go-round scheduling, payout rotation, MPESA disbursement. No SAP/Oracle equivalent exists. |
+| 13 | MLOps Pipeline (`common/mlr`) | `common` | 5w | `common/mlcm` has governance but lacks experiment tracking, feature store, model A/B promotion. MLOps loop is incomplete. |
+| 14 | Legal contracts (all 8) | `legal` | 1w | Directories + MANIFEST exist; zero contracts. High-value for law firms and corporate legal. `leg_adr` maps to African customary arbitration. |
+| 15 | Hospitality contracts (`hos_pms`, `hos_rms` first) | `hospitality` | 3w | Tourism is Kenya's #2 foreign exchange earner. 8 caps, zero contracts. |
+| 16 | NGO contracts (all 6) | `ngo` | 1w | `ngo_rbf` (results-based financing) maps directly to World Bank/USAID disbursement models. |
+| 17 | USSD Enhancement | `common/ussd` | 2w | APG's primary mobile access channel in Africa. Needs: session state machine, menu DSL, Swahili/Amharic i18n, MPESA callback integration. |
 
 ---
 
 ## Part 4: Top 10 Actionable Recommendations
 
-### Ranked by Impact × Feasibility
+| Rank | Action | Effort |
+|------|--------|--------|
+| **1** | Expand `theme_stylesheet()` + layout shell in `code_generator.py` (lines 3206–3244, 3248, 3712) | 7 hours |
+| **2** | Define `IntegrationEvent` envelope in `capabilities/common/nats/events.py`, wire into 10 foundation-tier capabilities | 2 days |
+| **3** | Wire first 5 NATS cross-capability subscriptions via `subscription_wirer.py` | 3 days |
+| **4** | Generate contracts for 42 zero-contract capabilities (agr×12, ins×8, leg×8, hos×8, ngo×6) | 2 weeks |
+| **5** | Extend MDM to canonical entity registry: `ORGANISATION`/`PARTY` types + `resolve_entity()` + wire 4 capabilities | 4 days |
+| **6** | Create `capabilities/common/ui/` Flask blueprint template library | 1 day |
+| **7** | Implement manufacturing domain: MRP+MES contracts first, then remaining 12 subcaps | 5 weeks |
+| **8** | Define 5 Temporal saga workflows in `capabilities/composition/workflows/` | 1 week |
+| **9** | Build `itsm/` domain: CMDB foundation → INC → PRB+CHG | 6 weeks |
+| **10** | Implement `common/tax/` horizontal tax engine using OPA rule packs | 3 weeks |
 
-#### #1. Replace code_generator.py HTML with Tailwind CDN + htmx `[immediate, 3 days]`
+---
 
-**Action**: Modify `_html_page()` and `theme_stylesheet()` in `compiler/code_generator.py` to add Tailwind CDN, htmx 2.0, and Alpine.js CDN links. Replace raw element styling with Tailwind utility classes in all `_ui_*` functions.
+## Implementation Timeline
 
-**First step**: Add these 3 CDN links to `_html_page()`:
-```html
-<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
-<script defer src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+```
+Week 1, Day 1:     code_generator.py CSS expansion + layout shell (7h)
+Week 1, Day 2-3:   capabilities/common/ui/ Flask blueprint templates
+Week 1-2:          IntegrationEvent envelope + subscription_wirer.py
+Week 2-3:          First 5 cross-capability NATS pairs wired
+Week 3-4:          MDM canonical entity registry extension + 4 domain capability wiring
+Week 4-5:          42 zero-contract capability_contract.py files (parallel per domain)
+Week 5-6:          ComposedView base class + 5 Temporal saga workflows
+Week 6-10:         Manufacturing domain (MRP+MES first)
+Month 3-4:         ITSM domain (CMDB→INC→PRB+CHG)
+Month 3:           Tax engine (common/tax with OPA rule packs)
+Month 4:           SaaS billing engine (common/sbl)
+Month 4-5:         Developer portal (common/devp)
+Month 5:           Chama/ROSCA engine (fintech/chama)
+Month 5-6:         iPaaS Integration Hub (int/esb + int/dsy)
 ```
 
-**Expected outcome**: Every generated app.py immediately gets a professional UI. Zero changes to capabilities.
-
 ---
 
-#### #2. Wire NATS subscriptions between fintech capabilities `[immediate, 1 week]`
+## Appendix: Research Methodology
 
-**Action**: Create `capabilities/common/nats/wiring.py` with automatic subscription setup. When `fintech_gateway` starts, `fintech_fraud` automatically subscribes to its events.
+Five agents running in parallel for 551 seconds (218k tokens, 168 tool uses):
+1. **UI/UX agent**: htmx/Tailwind/Alpine documentation; Salesforce/SAP/Linear design system analysis; exact code_generator.py line locations
+2. **Integration patterns agent**: Choreography vs orchestration in enterprise platforms; SAP Business Partner / Microsoft CDM Party; Salesforce Platform Events
+3. **Capability gap agent**: MANIFEST.json cross-reference vs executable contracts; Gartner Magic Quadrant gap analysis per domain; Africa market ROI ranking
+4. **APG codebase analysis agent**: Direct reading of compiler, NATS adapter, MDM service, capability_contract.py corpus, studio.css tokens
+5. **Synthesis agent**: Cross-dimension ranking by Africa market ROI × implementation complexity
 
-**First step**: 
-```python
-# capabilities/common/nats/wiring.py
-CAPABILITY_SUBSCRIPTIONS = {
-    "fintech_fraud": ["apg.events.fintech_gateway.payment_intent.created"],
-    "fintech_aml": ["apg.events.fintech_gateway.payment_intent.created", "apg.events.fintech_payments.transfer.completed"],
-    "bia_anl": ["apg.events.*.*.completed"],  # all completions
-}
-```
-
-**Expected outcome**: Payment events automatically trigger fraud scoring without any code changes to fintech_gateway.
-
----
-
-#### #3. Build `capabilities/common/entity_registry/` `[1 week]`
-
-**Action**: Create a canonical entity registry where any capability can register/resolve real-world entities (Customer, Transaction, Product). This is the foundation for true cross-capability integration.
-
-**First step**: Implement `EntityRegistry.register_entity()`, `resolve_entity()`, and `link_entities()` with PostgreSQL backing and NATS event emission on resolution.
-
-**Expected outcome**: `fintech_kyc` Customer, `crm_adv` Contact, and `healthcare_emr` Patient can be recognised as the same person. Cross-capability workflows become possible.
-
----
-
-#### #4. Create `integration_contract.py` standard for all capabilities `[2 weeks]`
-
-**Action**: Add `integration_contract.py` to every capability directory. Run a workflow to generate stubs for all 351 capabilities.
-
-**First step**: Define the standard format (see Part 2) and generate stubs using MANIFEST.json data.
-
-**Expected outcome**: The platform becomes self-documenting about integration topology. Auto-generation of NATS subscription wiring becomes possible.
-
----
-
-#### #5. Build `capabilities/common/tenancy/` billing & tenant management `[3 weeks]`
-
-**Action**: Implement per-tenant subscription management, usage metering, invoice generation, and plan limits. This is what makes APG a viable SaaS product.
-
-**Expected outcome**: APG can be offered as a multi-tenant SaaS with per-seat billing.
-
----
-
-#### #6. Expand `crm` domain from 1 to 8 capabilities `[2 weeks]`
-
-**Action**: `crm_adv` is fully implemented. Add: `crm_contact`, `crm_account`, `crm_pipeline`, `crm_activity`, `crm_analytics`, `crm_email`, `crm_cpq` to give CRM feature parity with HubSpot.
-
-**Expected outcome**: APG competes with HubSpot/Salesforce CRM for SME market.
-
----
-
-#### #7. Build APG Design System Component Library `[3 weeks]`
-
-**Action**: Create `capabilities/common/ui_components/` with a shared Jinja2 + Tailwind component library (nav, sidebar, data-table, form, badge, stat-card, chart). All capability blueprints import from this.
-
-**Expected outcome**: Every capability's UI looks consistent and professional without each team re-inventing CSS.
-
----
-
-#### #8. Add AI Model Registry `capabilities/common/mlr/` `[2 weeks]`
-
-**Action**: Build MLflow-equivalent model registry: versioning, stage transitions (staging → production), deployment tracking, bias monitoring hooks, rollback.
-
-**Expected outcome**: APG's MLX capability has proper governance for AI models in production.
-
----
-
-#### #9. Implement Workflow Visual Designer `[3 weeks]`
-
-**Action**: `ckm_wfa` has a powerful workflow engine (Temporal-backed) but no visual designer. Build a drag-drop BPMN designer as a Flask Blueprint that generates `workflow { }` APG source.
-
-**Expected outcome**: Non-developers can design workflows without writing APG code.
-
----
-
-#### #10. USSD Application Builder `capabilities/common/ussdbuilder/` `[2 weeks]`
-
-**Action**: Build a visual USSD menu tree designer that generates `ussd { menu: [...] }` APG source. This is a differentiator no global platform offers and is critical for the African market.
-
-**Expected outcome**: SACCO, healthcare, and government applications can reach feature phone users through an easily designed USSD interface.
-
----
-
-## Summary Matrix
-
-| Dimension | Current State | Recommended State | Effort |
-|-----------|--------------|------------------|--------|
-| Generated UI | String-built HTML, 5 tokens, no JS | Tailwind CDN + htmx + APG design system | 3 days → 3 weeks |
-| FAB blueprints | Each capability reinvents UI | Shared component library | 3 weeks |
-| NATS wiring | Emitted, nothing subscribes | Auto-subscription wiring | 1 week |
-| Entity resolution | No canonical entities | EntityRegistry service | 1 week |
-| Integration contracts | MANIFEST metadata only | Code-enforced contracts | 2 weeks |
-| CRM domain | 1 capability | 8 capabilities (HubSpot parity) | 2 weeks |
-| SaaS billing | Not present | Tenancy + billing capability | 3 weeks |
-| AI governance | MLX inference only | Model registry + governance | 2 weeks |
-| USSD designer | Engine exists, no designer | Visual USSD builder | 2 weeks |
-| Missing caps | ~40 critical gaps | 20 addressed | 8 weeks |
-
----
-
-*This document is the output of deep parallel research across UI/UX architecture, capability integration patterns, enterprise platform analysis, and codebase introspection.*
 *APG Platform · © 2025 Datacraft · www.datacraft.co.ke*
