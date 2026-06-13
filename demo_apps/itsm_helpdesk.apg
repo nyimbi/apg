@@ -1,0 +1,170 @@
+// ============================================================
+// ITSM Help Desk — APG Demo
+// IT incident management, asset tracking, change management
+// ============================================================
+
+module itsm_helpdesk version 1.0.0 {
+    description: "Datacraft ITSM — enterprise IT service management platform";
+}
+
+table Ticket {
+    id: str;
+    ticket_number: str;
+    title: str;
+    description: str;
+    category: str;
+    priority: str;
+    status: str;
+    reporter_id: str;
+    assignee_id: str;
+    department: str;
+    created_date: date;
+    resolved_date: date;
+    sla_breach: bool;
+    resolution: str;
+    impact: str;
+    urgency: str;
+}
+
+table Asset {
+    id: str;
+    asset_tag: str;
+    asset_name: str;
+    asset_type: str;
+    manufacturer: str;
+    model: str;
+    serial_number: str;
+    purchase_date: date;
+    warranty_expiry: date;
+    location: str;
+    assigned_to: str;
+    department: str;
+    status: str;
+    ip_address: str;
+    operating_system: str;
+    cost: float;
+}
+
+table ChangeRequest {
+    id: str;
+    change_number: str;
+    title: str;
+    description: str;
+    change_type: str;
+    risk_level: str;
+    status: str;
+    requester_id: str;
+    implementer_id: str;
+    cab_approval: bool;
+    scheduled_date: date;
+    implementation_date: date;
+    rollback_plan: str;
+    business_justification: str;
+    affected_systems: str;
+    post_implementation_review: str;
+}
+
+table KnowledgeArticle {
+    id: str;
+    article_number: str;
+    title: str;
+    category: str;
+    content: str;
+    author_id: str;
+    published_date: date;
+    last_updated: date;
+    views: int;
+    helpful_votes: int;
+    status: str;
+    tags: str;
+}
+
+table Problem {
+    id: str;
+    problem_number: str;
+    title: str;
+    description: str;
+    root_cause: str;
+    workaround: str;
+    permanent_fix: str;
+    status: str;
+    priority: str;
+    linked_incidents: int;
+    identified_date: date;
+    resolved_date: date;
+    problem_manager: str;
+}
+
+table SLAPolicy {
+    id: str;
+    policy_name: str;
+    priority: str;
+    response_time_hours: int;
+    resolution_time_hours: int;
+    escalation_time_hours: int;
+    applicable_categories: str;
+    business_hours_only: bool;
+}
+
+security {
+    authentication: required;
+    rate_limiting: enabled;
+    csrf_protection: enabled;
+}
+
+theme ITSMTheme {
+    name: "itsm_slate";
+    tokens {
+        color.primary: "#1E293B";
+        color.accent: "#3B82F6";
+        color.success: "#16A34A";
+        color.warning: "#D97706";
+        color.danger: "#DC2626";
+        surface.canvas: "#F1F5F9";
+        surface.panel: "#FFFFFF";
+        text.primary: "#0F172A";
+        border.radius: "6px";
+        density: "compact";
+    }
+}
+
+application ITSMApp {
+    title: "Datacraft ITSM";
+    description: "Enterprise IT service management";
+    theme: ITSMTheme;
+
+    screen TicketQueue {
+        route: "/itsm/tickets";
+        title: "Incident Queue";
+        entity: Ticket;
+        layout: table;
+    }
+
+    screen AssetInventory {
+        route: "/itsm/assets";
+        title: "Asset Inventory";
+        entity: Asset;
+        layout: table;
+    }
+
+    screen ChangeCalendar {
+        route: "/itsm/changes";
+        title: "Change Requests";
+        entity: ChangeRequest;
+        layout: table;
+    }
+
+    screen ProblemRegister {
+        route: "/itsm/problems";
+        title: "Problem Register";
+        entity: Problem;
+        layout: table;
+    }
+
+    screen KnowledgeBase {
+        route: "/itsm/knowledge";
+        title: "Knowledge Base";
+        entity: KnowledgeArticle;
+        layout: table;
+    }
+}

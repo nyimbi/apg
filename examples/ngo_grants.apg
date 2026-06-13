@@ -1,0 +1,186 @@
+// ============================================================
+// NGO Grant Management — APG Demo
+// Donor management, grant lifecycle, beneficiary tracking,
+// results-based financing, M&E
+// ============================================================
+
+module ngo_grants version 1.0.0 {
+    description: "Datacraft NGO — grant management and impact measurement for development organisations";
+}
+
+table Grant {
+    id: str;
+    grant_code: str;
+    title: str;
+    donor_id: str;
+    amount: float;
+    currency: str;
+    start_date: date;
+    end_date: date;
+    status: str;
+    grant_type: str;
+    reporting_frequency: str;
+    project_manager: str;
+    country: str;
+    sector: str;
+    thematic_area: str;
+}
+
+table Donor {
+    id: str;
+    donor_code: str;
+    organisation_name: str;
+    donor_type: str;
+    contact_person: str;
+    email: str;
+    phone: str;
+    country: str;
+    total_committed: float;
+    total_disbursed: float;
+    relationship_manager: str;
+    preferred_reporting: str;
+}
+
+table Disbursement {
+    id: str;
+    grant_id: str;
+    donor_id: str;
+    tranche_number: int;
+    amount: float;
+    currency: str;
+    disbursement_date: date;
+    bank_reference: str;
+    purpose: str;
+    status: str;
+    conditions_met: bool;
+}
+
+table Beneficiary {
+    id: str;
+    beneficiary_code: str;
+    full_name: str;
+    gender: str;
+    age: int;
+    county: str;
+    sub_county: str;
+    vulnerability_category: str;
+    programme_id: str;
+    enrolment_date: date;
+    status: str;
+    household_size: int;
+    phone: str;
+}
+
+table Indicator {
+    id: str;
+    grant_id: str;
+    indicator_code: str;
+    indicator_name: str;
+    indicator_type: str;
+    baseline_value: float;
+    target_value: float;
+    current_value: float;
+    unit_of_measurement: str;
+    data_source: str;
+    collection_frequency: str;
+    disaggregation: str;
+}
+
+table ProgressReport {
+    id: str;
+    grant_id: str;
+    report_period: str;
+    submission_date: date;
+    narrative_summary: str;
+    financial_expenditure: float;
+    achievements: str;
+    challenges: str;
+    next_steps: str;
+    status: str;
+    reviewed_by: str;
+}
+
+table Activity {
+    id: str;
+    grant_id: str;
+    activity_code: str;
+    activity_name: str;
+    description: str;
+    start_date: date;
+    end_date: date;
+    budget: float;
+    actual_expenditure: float;
+    status: str;
+    lead_person: str;
+    beneficiaries_reached: int;
+}
+
+security {
+    authentication: required;
+    rate_limiting: enabled;
+    csrf_protection: enabled;
+}
+
+theme NGOTheme {
+    name: "ngo_teal";
+    tokens {
+        color.primary: "#0E4D6E";
+        color.accent: "#0EA5E9";
+        color.success: "#059669";
+        color.warning: "#D97706";
+        color.danger: "#DC2626";
+        surface.canvas: "#F0F9FF";
+        surface.panel: "#FFFFFF";
+        text.primary: "#0C1A2B";
+        border.radius: "8px";
+        density: "comfortable";
+    }
+}
+
+application NGOApp {
+    title: "Datacraft NGO Platform";
+    description: "Grant management and impact measurement";
+    theme: NGOTheme;
+
+    screen GrantPortfolio {
+        route: "/ngo/grants";
+        title: "Grant Portfolio";
+        entity: Grant;
+        layout: table;
+    }
+
+    screen DonorCRM {
+        route: "/ngo/donors";
+        title: "Donor Relations";
+        entity: Donor;
+        layout: table;
+    }
+
+    screen BeneficiaryRegister {
+        route: "/ngo/beneficiaries";
+        title: "Beneficiary Registry";
+        entity: Beneficiary;
+        layout: table;
+    }
+
+    screen MandEDashboard {
+        route: "/ngo/indicators";
+        title: "M&E Indicators";
+        entity: Indicator;
+        layout: table;
+    }
+
+    screen ActivityTracker {
+        route: "/ngo/activities";
+        title: "Activity Tracker";
+        entity: Activity;
+        layout: table;
+    }
+
+    screen Reporting {
+        route: "/ngo/reports";
+        title: "Progress Reports";
+        entity: ProgressReport;
+        layout: table;
+    }
+}

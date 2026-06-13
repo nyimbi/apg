@@ -1,0 +1,146 @@
+// ============================================================
+// Agricultural Marketplace — APG Demo
+// Farm-to-buyer produce trading for East Africa smallholders
+// ============================================================
+
+module agri_marketplace version 1.0.0 {
+    description: "Datacraft AgriMarket — connecting smallholder farmers to buyers";
+}
+
+table Farmer {
+    id: str;
+    farmer_code: str;
+    full_name: str;
+    phone: str;
+    county: str;
+    sub_county: str;
+    ward: str;
+    farm_size_acres: float;
+    primary_crop: str;
+    cooperative_id: str;
+    verified: bool;
+    mpesa_number: str;
+}
+
+table Produce {
+    id: str;
+    farmer_id: str;
+    crop_name: str;
+    variety: str;
+    quantity_kg: float;
+    asking_price_per_kg: float;
+    harvest_date: date;
+    quality_grade: str;
+    location: str;
+    available_from: date;
+    available_until: date;
+    status: str;
+    description: str;
+}
+
+table Buyer {
+    id: str;
+    company_name: str;
+    contact_person: str;
+    phone: str;
+    email: str;
+    buyer_type: str;
+    county: str;
+    credit_limit: float;
+    payment_terms: str;
+    verified: bool;
+}
+
+table Order {
+    id: str;
+    order_number: str;
+    buyer_id: str;
+    produce_id: str;
+    farmer_id: str;
+    quantity_kg: float;
+    agreed_price_per_kg: float;
+    total_amount: float;
+    order_date: date;
+    delivery_date: date;
+    delivery_location: str;
+    payment_method: str;
+    payment_status: str;
+    order_status: str;
+}
+
+table PriceIndex {
+    id: str;
+    crop_name: str;
+    market_name: str;
+    price_per_kg: float;
+    recorded_date: date;
+    source: str;
+    county: str;
+}
+
+table WeatherAlert {
+    id: str;
+    alert_type: str;
+    county: str;
+    severity: str;
+    message: str;
+    issued_date: date;
+    valid_until: date;
+    affected_crops: str;
+}
+
+security {
+    authentication: required;
+    rate_limiting: enabled;
+    csrf_protection: enabled;
+}
+
+theme AgriTheme {
+    name: "agri_green";
+    tokens {
+        color.primary: "#2D6A4F";
+        color.accent: "#52B788";
+        color.success: "#40916C";
+        color.warning: "#E9C46A";
+        color.danger: "#E63946";
+        surface.canvas: "#F0FAF4";
+        surface.panel: "#FFFFFF";
+        text.primary: "#1B2A1B";
+        border.radius: "8px";
+        density: "comfortable";
+    }
+}
+
+application AgriMarketApp {
+    title: "AgriMarket Kenya";
+    description: "Farm-to-buyer produce marketplace";
+    theme: AgriTheme;
+
+    screen FarmerDirectory {
+        route: "/agri/farmers";
+        title: "Farmer Registry";
+        entity: Farmer;
+        layout: table;
+    }
+
+    screen ProduceListing {
+        route: "/agri/produce";
+        title: "Available Produce";
+        entity: Produce;
+        layout: table;
+    }
+
+    screen OrderBook {
+        route: "/agri/orders";
+        title: "Order Book";
+        entity: Order;
+        layout: table;
+    }
+
+    screen PriceBoard {
+        route: "/agri/prices";
+        title: "Market Price Board";
+        entity: PriceIndex;
+        layout: table;
+    }
+}

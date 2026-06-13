@@ -1,0 +1,138 @@
+// ============================================================
+// SACCO Management System — APG Demo
+// Full cooperative banking: members, savings, loans, dividends
+// ============================================================
+
+module sacco_demo version 1.0.0 {
+    description: "Datacraft SACCO Management System — cooperative banking for East Africa";
+}
+
+// Core member entity
+table Member {
+    id: str;
+    member_number: str;
+    full_name: str;
+    national_id: str;
+    phone: str;
+    email: str;
+    share_capital: float;
+    monthly_contribution: float;
+    join_date: date;
+    status: str;
+    employer: str;
+    designation: str;
+}
+
+// Savings account
+table SavingsAccount {
+    id: str;
+    member_id: str;
+    account_number: str;
+    balance: float;
+    account_type: str;
+    interest_rate: float;
+    last_transaction_date: date;
+}
+
+// Loan
+table Loan {
+    id: str;
+    member_id: str;
+    loan_number: str;
+    principal_amount: float;
+    interest_rate: float;
+    term_months: int;
+    monthly_repayment: float;
+    outstanding_balance: float;
+    disbursement_date: date;
+    status: str;
+    loan_type: str;
+    guarantor_1_id: str;
+    guarantor_2_id: str;
+}
+
+// Contribution / transaction
+table Contribution {
+    id: str;
+    member_id: str;
+    amount: float;
+    contribution_date: date;
+    payment_method: str;
+    reference: str;
+    contribution_type: str;
+}
+
+// Dividend
+table Dividend {
+    id: str;
+    financial_year: str;
+    total_profit: float;
+    dividend_rate: float;
+    declared_date: date;
+    payment_date: date;
+    status: str;
+}
+
+// Security
+security {
+    authentication: required;
+    rate_limiting: enabled;
+    csrf_protection: enabled;
+}
+
+// Theme — cooperative green
+theme SaccoTheme {
+    name: "sacco_green";
+    tokens {
+        color.primary: "#1B5E20";
+        color.accent: "#43A047";
+        color.success: "#2E7D32";
+        color.warning: "#F9A825";
+        color.danger: "#C62828";
+        surface.canvas: "#F1F8E9";
+        surface.panel: "#FFFFFF";
+        text.primary: "#1A2B1A";
+        border.radius: "8px";
+        density: "compact";
+    }
+}
+
+// Application shell
+application SaccoApp {
+    title: "SACCO Management System";
+    description: "Cooperative banking platform";
+    theme: SaccoTheme;
+
+    screen Dashboard {
+        route: "/sacco/dashboard";
+        title: "SACCO Dashboard";
+        layout: grid;
+        components: [
+            stat_card { label: "Total Members"; value: member_count; },
+            stat_card { label: "Total Savings (KES)"; value: total_savings; },
+            stat_card { label: "Loans Outstanding (KES)"; value: total_loans; },
+            stat_card { label: "Share Capital (KES)"; value: total_shares; }
+        ];
+    }
+
+    screen MemberDirectory {
+        route: "/sacco/members";
+        title: "Member Directory";
+        entity: Member;
+        layout: table;
+    }
+
+    screen LoanRegister {
+        route: "/sacco/loans";
+        title: "Loan Register";
+        entity: Loan;
+        layout: table;
+    }
+
+    screen Contributions {
+        route: "/sacco/contributions";
+        title: "Contribution Records";
+        entity: Contribution;
+        layout: table;
+    }
+}

@@ -1,0 +1,174 @@
+// ============================================================
+// Health Clinic Management — APG Demo
+// Patient care, appointments, prescriptions, billing
+// ============================================================
+
+module clinic_demo version 1.0.0 {
+    description: "Datacraft Clinic — integrated health facility management";
+}
+
+table Patient {
+    id: str;
+    patient_number: str;
+    full_name: str;
+    date_of_birth: date;
+    gender: str;
+    phone: str;
+    emergency_contact: str;
+    national_id: str;
+    blood_group: str;
+    allergies: str;
+    insurance_provider: str;
+    insurance_number: str;
+    next_of_kin: str;
+    county: str;
+}
+
+table Appointment {
+    id: str;
+    patient_id: str;
+    doctor_id: str;
+    appointment_date: date;
+    appointment_time: str;
+    appointment_type: str;
+    status: str;
+    reason: str;
+    notes: str;
+    room: str;
+}
+
+table Consultation {
+    id: str;
+    appointment_id: str;
+    patient_id: str;
+    doctor_id: str;
+    consultation_date: date;
+    chief_complaint: str;
+    history: str;
+    examination_findings: str;
+    diagnosis: str;
+    icd10_code: str;
+    treatment_plan: str;
+    follow_up_date: date;
+}
+
+table Prescription {
+    id: str;
+    consultation_id: str;
+    patient_id: str;
+    doctor_id: str;
+    drug_name: str;
+    dosage: str;
+    frequency: str;
+    duration_days: int;
+    instructions: str;
+    quantity: int;
+    dispensed: bool;
+    prescribed_date: date;
+}
+
+table LabTest {
+    id: str;
+    patient_id: str;
+    consultation_id: str;
+    test_name: str;
+    ordered_date: date;
+    collected_date: date;
+    result_date: date;
+    result: str;
+    reference_range: str;
+    status: str;
+    technician: str;
+}
+
+table Bill {
+    id: str;
+    patient_id: str;
+    visit_date: date;
+    consultation_fee: float;
+    lab_fees: float;
+    drug_fees: float;
+    procedure_fees: float;
+    total_amount: float;
+    amount_paid: float;
+    balance: float;
+    payment_method: str;
+    insurance_claim: float;
+    status: str;
+}
+
+table Staff {
+    id: str;
+    staff_number: str;
+    full_name: str;
+    role: str;
+    specialization: str;
+    phone: str;
+    email: str;
+    license_number: str;
+    department: str;
+    shift: str;
+}
+
+security {
+    authentication: required;
+    rate_limiting: enabled;
+    csrf_protection: enabled;
+}
+
+theme ClinicTheme {
+    name: "clinic_blue";
+    tokens {
+        color.primary: "#0D47A1";
+        color.accent: "#1976D2";
+        color.success: "#2E7D32";
+        color.warning: "#F57F17";
+        color.danger: "#C62828";
+        surface.canvas: "#F0F4FF";
+        surface.panel: "#FFFFFF";
+        text.primary: "#0D1B2A";
+        border.radius: "8px";
+        density: "compact";
+    }
+}
+
+application ClinicApp {
+    title: "Datacraft Clinic";
+    description: "Integrated health facility management";
+    theme: ClinicTheme;
+
+    screen PatientRegister {
+        route: "/clinic/patients";
+        title: "Patient Register";
+        entity: Patient;
+        layout: table;
+    }
+
+    screen AppointmentCalendar {
+        route: "/clinic/appointments";
+        title: "Appointments";
+        entity: Appointment;
+        layout: table;
+    }
+
+    screen ConsultationLog {
+        route: "/clinic/consultations";
+        title: "Consultations";
+        entity: Consultation;
+        layout: table;
+    }
+
+    screen Prescriptions {
+        route: "/clinic/prescriptions";
+        title: "Prescriptions";
+        entity: Prescription;
+        layout: table;
+    }
+
+    screen Billing {
+        route: "/clinic/billing";
+        title: "Patient Billing";
+        entity: Bill;
+        layout: table;
+    }
+}

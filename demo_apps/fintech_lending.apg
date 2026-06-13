@@ -1,0 +1,197 @@
+// ============================================================
+// Digital Lending Platform — APG Demo
+// Mobile-first credit scoring, loan origination, collections
+// ============================================================
+
+module fintech_lending version 1.0.0 {
+    description: "Datacraft Lend — AI-powered digital lending platform for East Africa";
+}
+
+table Applicant {
+    id: str;
+    applicant_code: str;
+    full_name: str;
+    national_id: str;
+    phone: str;
+    email: str;
+    date_of_birth: date;
+    gender: str;
+    county: str;
+    employer: str;
+    monthly_income: float;
+    employment_type: str;
+    credit_score: int;
+    risk_band: str;
+    mpesa_limit: float;
+    kyc_status: str;
+}
+
+table LoanProduct {
+    id: str;
+    product_code: str;
+    product_name: str;
+    min_amount: float;
+    max_amount: float;
+    min_term_months: int;
+    max_term_months: int;
+    interest_rate: float;
+    processing_fee_pct: float;
+    insurance_fee_pct: float;
+    target_segment: str;
+    collateral_required: bool;
+    status: str;
+}
+
+table LoanApplication {
+    id: str;
+    application_number: str;
+    applicant_id: str;
+    product_id: str;
+    requested_amount: float;
+    requested_term_months: int;
+    purpose: str;
+    application_date: date;
+    status: str;
+    credit_decision: str;
+    approved_amount: float;
+    approved_term_months: int;
+    decision_date: date;
+    decision_by: str;
+    rejection_reason: str;
+}
+
+table ActiveLoan {
+    id: str;
+    loan_number: str;
+    application_id: str;
+    applicant_id: str;
+    product_id: str;
+    principal_amount: float;
+    disbursed_amount: float;
+    interest_rate: float;
+    term_months: int;
+    monthly_repayment: float;
+    disbursement_date: date;
+    maturity_date: date;
+    outstanding_principal: float;
+    outstanding_interest: float;
+    days_past_due: int;
+    loan_status: str;
+    collection_bucket: str;
+}
+
+table Repayment {
+    id: str;
+    loan_id: str;
+    applicant_id: str;
+    amount: float;
+    payment_date: date;
+    payment_method: str;
+    mpesa_reference: str;
+    principal_portion: float;
+    interest_portion: float;
+    penalty_portion: float;
+    running_balance: float;
+    receipt_number: str;
+}
+
+table CreditScore {
+    id: str;
+    applicant_id: str;
+    score: int;
+    score_band: str;
+    scoring_date: date;
+    model_version: str;
+    repayment_history_score: int;
+    utilisation_score: int;
+    account_age_score: int;
+    income_stability_score: int;
+    bureau_score: int;
+    recommendation: str;
+}
+
+table Collection {
+    id: str;
+    loan_id: str;
+    applicant_id: str;
+    dpd: int;
+    bucket: str;
+    outstanding_amount: float;
+    last_contact_date: date;
+    last_contact_channel: str;
+    contact_result: str;
+    promise_to_pay_date: date;
+    promise_to_pay_amount: float;
+    collector_id: str;
+    action_taken: str;
+}
+
+security {
+    authentication: required;
+    rate_limiting: enabled;
+    csrf_protection: enabled;
+}
+
+theme LendTheme {
+    name: "lend_purple";
+    tokens {
+        color.primary: "#4C1D95";
+        color.accent: "#7C3AED";
+        color.success: "#059669";
+        color.warning: "#D97706";
+        color.danger: "#DC2626";
+        surface.canvas: "#FAF5FF";
+        surface.panel: "#FFFFFF";
+        text.primary: "#1E0A3C";
+        border.radius: "10px";
+        density: "compact";
+    }
+}
+
+application LendApp {
+    title: "Datacraft Lend";
+    description: "AI-powered digital lending platform";
+    theme: LendTheme;
+
+    screen ApplicantProfiles {
+        route: "/lend/applicants";
+        title: "Applicant Profiles";
+        entity: Applicant;
+        layout: table;
+    }
+
+    screen ApplicationPipeline {
+        route: "/lend/applications";
+        title: "Application Pipeline";
+        entity: LoanApplication;
+        layout: table;
+    }
+
+    screen LoanPortfolio {
+        route: "/lend/portfolio";
+        title: "Active Loan Portfolio";
+        entity: ActiveLoan;
+        layout: table;
+    }
+
+    screen RepaymentHistory {
+        route: "/lend/repayments";
+        title: "Repayment History";
+        entity: Repayment;
+        layout: table;
+    }
+
+    screen CollectionWorkbench {
+        route: "/lend/collections";
+        title: "Collections Workbench";
+        entity: Collection;
+        layout: table;
+    }
+
+    screen CreditScorecard {
+        route: "/lend/scores";
+        title: "Credit Scores";
+        entity: CreditScore;
+        layout: table;
+    }
+}
