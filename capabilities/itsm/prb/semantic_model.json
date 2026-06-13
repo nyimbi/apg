@@ -1,0 +1,32 @@
+{
+  "format": "apg.semantic-model.v1",
+  "ok": true,
+  "diagnostics": [],
+  "app": {
+    "name": "itsm_prb",
+    "description": "Problem Management — APG ITSM subcapability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "itsm_prb": {
+      "name": "Problem Management",
+      "version": "1.0.0",
+      "provides": ["problem_lifecycle_workflow", "rca_workflow", "known_error_database", "workaround_management"],
+      "requires": ["auth", "audl", "itsm_inc"],
+      "entities": {
+        "ItProblem": {"description": "Problem record — root cause of one or more incidents"},
+        "ItKnownError": {"description": "KEDB entry — documented workaround for a recurring problem"},
+        "ItRootCauseAnalysis": {"description": "RCA investigation record (5-Whys, Fishbone, etc.)"},
+        "ItWorkaround": {"description": "Instance of a workaround applied to a specific incident"}
+      },
+      "event_stream": "apg.itsm.prb.lifecycle",
+      "stream_processor": "bytewax"
+    }
+  },
+  "composition": {
+    "subscribes_from": ["itsm_inc"],
+    "publishes_to": ["itsm_chg"]
+  },
+  "deployment": {"source": "capability_contract.py", "target": "python"}
+}

@@ -1,0 +1,23 @@
+{
+  "capability": "mfg_cam",
+  "version": "1.0.0",
+  "domain": "mfg",
+  "entities": {
+    "MfCamNcProgram": {"description": "CNC / NC program with version control", "fields": {"id": {"type": "string"}, "program_number": {"type": "string"}, "machine_type": {"type": "string"}, "version": {"type": "string"}, "status": {"type": "string"}, "simulation_passed": {"type": "boolean"}}},
+    "MfCamTool": {"description": "Cutting tool in the tool library", "fields": {"id": {"type": "string"}, "tool_number": {"type": "string"}, "tool_type": {"type": "string"}, "tool_life_minutes": {"type": "number", "nullable": true}, "used_minutes": {"type": "number"}, "status": {"type": "string"}}}
+  },
+  "api_endpoints": {
+    "POST /mfg-cam/api/v1/programs": {"description": "Create NC program"},
+    "POST /mfg-cam/api/v1/programs/{id}/approve": {"description": "Approve NC program"},
+    "POST /mfg-cam/api/v1/programs/{id}/release": {"description": "Release NC program"},
+    "GET /mfg-cam/api/v1/programs": {"description": "List NC programs"},
+    "POST /mfg-cam/api/v1/tools": {"description": "Create tool"},
+    "POST /mfg-cam/api/v1/tools/{id}/usage": {"description": "Log tool usage minutes"},
+    "GET /mfg-cam/api/v1/tools": {"description": "List tools"},
+    "GET /mfg-cam/api/v1/dashboard": {"description": "Dashboard summary"}
+  },
+  "events": {
+    "publishes": ["apg.mfg.cam.program_released", "apg.mfg.cam.tool_life_expired"],
+    "subscribes": ["apg.mfg.sfc.operation_started"]
+  }
+}

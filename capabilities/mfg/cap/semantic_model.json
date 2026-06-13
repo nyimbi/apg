@@ -1,0 +1,21 @@
+{
+  "capability": "mfg_cap",
+  "version": "1.0.0",
+  "domain": "mfg",
+  "entities": {
+    "MfCapWorkCentreCapacity": {"description": "Defined capacity for a work centre in a period", "fields": {"id": {"type": "string"}, "work_centre_id": {"type": "string"}, "period_start": {"type": "string"}, "available_hours": {"type": "number"}, "effective_hours": {"type": "number"}, "efficiency_pct": {"type": "number"}}},
+    "MfCapLoadRecord": {"description": "Load (demand for capacity) from a source", "fields": {"id": {"type": "string"}, "work_centre_id": {"type": "string"}, "load_source": {"type": "string"}, "required_hours": {"type": "number"}, "utilisation_pct": {"type": "number", "nullable": true}, "is_overloaded": {"type": "boolean"}}}
+  },
+  "api_endpoints": {
+    "POST /mfg-cap/api/v1/capacities": {"description": "Define work centre capacity"},
+    "GET /mfg-cap/api/v1/capacities": {"description": "List capacities"},
+    "POST /mfg-cap/api/v1/loads": {"description": "Add load record"},
+    "GET /mfg-cap/api/v1/load-summary": {"description": "Load vs capacity summary"},
+    "GET /mfg-cap/api/v1/constraints": {"description": "Identify overloaded work centres"},
+    "GET /mfg-cap/api/v1/dashboard": {"description": "Dashboard summary"}
+  },
+  "events": {
+    "publishes": ["apg.mfg.cap.capacity_updated", "apg.mfg.cap.overload_detected"],
+    "subscribes": ["apg.mfg.mrp.production_order_released", "apg.mfg.ppl.master_schedule_updated"]
+  }
+}

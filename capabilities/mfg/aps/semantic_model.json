@@ -1,0 +1,20 @@
+{
+  "capability": "mfg_aps",
+  "version": "1.0.0",
+  "domain": "mfg",
+  "entities": {
+    "MfApsScheduleRun": {"description": "A finite-capacity APS scheduling run", "fields": {"id": {"type": "string"}, "scheduling_method": {"type": "string"}, "sequencing_rule": {"type": "string"}, "horizon_start": {"type": "string"}, "horizon_end": {"type": "string"}, "status": {"type": "string"}, "operations_scheduled": {"type": "integer"}}},
+    "MfApsScheduledOperation": {"description": "An operation scheduled by APS with finite capacity", "fields": {"id": {"type": "string"}, "schedule_run_id": {"type": "string"}, "operation_id": {"type": "string"}, "work_centre_id": {"type": "string"}, "sequence_number": {"type": "integer"}, "scheduled_start": {"type": "string"}, "scheduled_end": {"type": "string"}, "is_critical_path": {"type": "boolean"}}}
+  },
+  "api_endpoints": {
+    "POST /mfg-aps/api/v1/schedule-runs": {"description": "Create APS schedule run"},
+    "POST /mfg-aps/api/v1/schedule-runs/{id}/execute": {"description": "Execute schedule run"},
+    "GET /mfg-aps/api/v1/schedule-runs": {"description": "List schedule runs"},
+    "GET /mfg-aps/api/v1/schedule-runs/{id}/gantt": {"description": "Get Gantt chart data"},
+    "GET /mfg-aps/api/v1/dashboard": {"description": "Dashboard summary"}
+  },
+  "events": {
+    "publishes": ["apg.mfg.aps.schedule_published", "apg.mfg.aps.sequence_optimised"],
+    "subscribes": ["apg.mfg.mrp.production_order_released", "apg.mfg.cap.capacity_updated"]
+  }
+}

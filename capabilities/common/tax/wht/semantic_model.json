@@ -1,0 +1,56 @@
+{
+  "format": "apg.semantic-model.v1",
+  "app": {
+    "name": "common_tax_wht",
+    "description": "Withholding Tax Engine — treaty-aware rates, certificates, quarterly returns",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "common_tax_wht": {
+      "name": "Withholding Tax Engine",
+      "version": "1.0.0",
+      "provides": ["wht_rate_lookup", "wht_certificate_workflow", "wht_return_workflow", "wht_payment_record"],
+      "requires": ["audl", "auth", "tax_calc"],
+      "entities": {
+        "TxWhtRate": {
+          "prefix": "Tx",
+          "description": "WHT rate per country × payment_type × treaty_status × entity_type",
+          "fields": ["id", "country_code", "payment_type", "treaty_status", "entity_type", "treaty_country_code", "rate_pct", "authority_name", "effective_from", "effective_to"]
+        },
+        "TxWhtCertificate": {
+          "prefix": "Tx",
+          "description": "WHT certificate issued to payee; statutory requirement in most African jurisdictions",
+          "fields": ["id", "tenant_id", "certificate_number", "country_code", "payer_id", "payee_id", "payment_type", "gross_payment", "wht_rate_pct", "wht_amount", "payment_date", "status"]
+        },
+        "TxWhtReturn": {
+          "prefix": "Tx",
+          "description": "Quarterly WHT return aggregating all payments in the period",
+          "fields": ["id", "tenant_id", "country_code", "period_name", "period_start", "period_end", "total_gross_payments", "total_wht_amount", "status", "submitted_at"]
+        },
+        "TxWhtPayment": {
+          "prefix": "Tx",
+          "description": "Individual payment transaction that attracted WHT",
+          "fields": ["id", "tenant_id", "country_code", "payer_id", "payee_id", "payment_type", "gross_amount", "wht_rate_pct", "wht_amount", "net_amount", "payment_date", "certificate_id"]
+        }
+      },
+      "country_rates": {
+        "KE": {
+          "professional_fees": "5%",
+          "rent": "3%",
+          "dividends_domestic": "5-15%",
+          "dividends_non_resident": "10%",
+          "interest": "15%",
+          "royalties": "5%",
+          "winnings": "20%"
+        },
+        "NG": {"dividends": "10%", "interest": "10%", "royalties": "10%", "professional_fees": "5%"},
+        "GH": {"dividends": "8%", "interest": "8%", "royalties": "15%"},
+        "UG": {"dividends": "15%", "interest": "15%", "royalties": "15%", "professional_fees": "15%"},
+        "ZA": {"dividends": "20%", "royalties_non_resident": "15%", "interest_non_resident": "15%"}
+      }
+    }
+  },
+  "ok": true,
+  "diagnostics": []
+}

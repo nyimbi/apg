@@ -1,0 +1,23 @@
+{
+  "capability": "mfg_rfm",
+  "version": "1.0.0",
+  "domain": "mfg",
+  "entities": {
+    "MfRfmProductionLine": {"description": "Repetitive production line", "fields": {"id": {"type": "string"}, "line_code": {"type": "string"}, "item_id": {"type": "string"}, "takt_time_sec": {"type": "number", "nullable": true}, "status": {"type": "string"}}},
+    "MfRfmRateSchedule": {"description": "Rate-based daily/weekly production schedule", "fields": {"id": {"type": "string"}, "line_id": {"type": "string"}, "period_date": {"type": "string"}, "planned_rate": {"type": "number"}, "actual_rate": {"type": "number", "nullable": true}, "status": {"type": "string"}}},
+    "MfRfmBackflushRecord": {"description": "Backflush reporting of actual production", "fields": {"id": {"type": "string"}, "line_id": {"type": "string"}, "schedule_id": {"type": "string"}, "actual_quantity": {"type": "number"}, "scrap_quantity": {"type": "number"}, "recorded_at": {"type": "string"}}}
+  },
+  "api_endpoints": {
+    "POST /mfg-rfm/api/v1/lines": {"description": "Create production line"},
+    "GET /mfg-rfm/api/v1/lines": {"description": "List production lines"},
+    "POST /mfg-rfm/api/v1/lines/{id}/status": {"description": "Update line status"},
+    "POST /mfg-rfm/api/v1/schedules": {"description": "Create rate schedule"},
+    "GET /mfg-rfm/api/v1/schedules": {"description": "List schedules"},
+    "POST /mfg-rfm/api/v1/backflush": {"description": "Record backflush"},
+    "GET /mfg-rfm/api/v1/dashboard": {"description": "Dashboard summary"}
+  },
+  "events": {
+    "publishes": ["apg.mfg.rfm.daily_rate_confirmed", "apg.mfg.rfm.backflush_recorded", "apg.mfg.rfm.line_status_changed"],
+    "subscribes": ["apg.mfg.ppl.master_schedule_updated"]
+  }
+}

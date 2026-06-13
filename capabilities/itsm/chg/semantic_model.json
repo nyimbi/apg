@@ -1,0 +1,40 @@
+{
+  "format": "apg.semantic-model.v1",
+  "ok": true,
+  "diagnostics": [],
+  "app": {
+    "name": "itsm_chg",
+    "description": "Change Management — APG ITSM subcapability",
+    "version": "1.0.0",
+    "entity_count": 4
+  },
+  "capabilities": {
+    "itsm_chg": {
+      "name": "Change Management",
+      "version": "1.0.0",
+      "provides": ["change_lifecycle_workflow", "cab_approval_workflow", "change_schedule_management", "change_conflict_detection", "post_implementation_review", "emergency_change_workflow"],
+      "requires": ["auth", "audl", "itsm_cmdb", "tmprl"],
+      "entities": {
+        "ItChange": {"description": "Change ticket — standard, normal, or emergency", "lifecycle": ["draft", "submitted", "cab_pending", "cab_approved", "scheduled", "in_progress", "implemented", "failed", "rolled_back", "closed"]},
+        "ItCabApproval": {"description": "CAB meeting with quorum-based vote tallying"},
+        "ItChangeSchedule": {"description": "Maintenance/freeze window for conflict detection"},
+        "ItChangeReview": {"description": "Post-Implementation Review record"}
+      },
+      "temporal_signals": {
+        "cab_approval": "itsm_chg.cab.approve",
+        "cab_rejection": "itsm_chg.cab.reject",
+        "emergency_bypass": "itsm_chg.emergency.bypass"
+      },
+      "event_stream": "apg.itsm.chg.lifecycle",
+      "stream_processor": "bytewax"
+    }
+  },
+  "composition": {
+    "subscribes_from": ["itsm_cmdb"],
+    "publishes_to": ["itsm_cmdb", "itsm_inc"],
+    "nats_subscriptions": {
+      "ci_change_requested": "itsm.cmdb.ci.change_requested"
+    }
+  },
+  "deployment": {"source": "capability_contract.py", "target": "python"}
+}

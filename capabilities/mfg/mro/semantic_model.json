@@ -1,0 +1,22 @@
+{
+  "capability": "mfg_mro",
+  "version": "1.0.0",
+  "domain": "mfg",
+  "entities": {
+    "MfMroWorkOrder": {"description": "Maintenance work order", "fields": {"id": {"type": "string"}, "asset_id": {"type": "string"}, "work_order_type": {"type": "string"}, "priority": {"type": "string"}, "status": {"type": "string"}, "scheduled_date": {"type": "string"}}},
+    "MfMroPmSchedule": {"description": "Preventive maintenance trigger rule", "fields": {"id": {"type": "string"}, "asset_id": {"type": "string"}, "trigger_type": {"type": "string"}, "interval_days": {"type": "integer", "nullable": true}, "last_triggered": {"type": "string", "nullable": true}}},
+    "MfMroAsset": {"description": "Production asset tracked for maintenance", "fields": {"id": {"type": "string"}, "asset_code": {"type": "string"}, "asset_name": {"type": "string"}, "status": {"type": "string"}, "criticality": {"type": "string"}}}
+  },
+  "api_endpoints": {
+    "POST /mfg-mro/api/v1/work-orders": {"description": "Create maintenance work order"},
+    "GET /mfg-mro/api/v1/work-orders": {"description": "List work orders"},
+    "POST /mfg-mro/api/v1/work-orders/{id}/complete": {"description": "Complete work order"},
+    "POST /mfg-mro/api/v1/pm-schedules": {"description": "Create PM schedule rule"},
+    "GET /mfg-mro/api/v1/pm-schedules": {"description": "List PM schedules"},
+    "GET /mfg-mro/api/v1/dashboard": {"description": "Dashboard summary"}
+  },
+  "events": {
+    "publishes": ["apg.mfg.mro.work_order_created", "apg.mfg.mro.work_order_completed", "apg.mfg.mro.asset_downtime_recorded", "apg.mfg.mro.pm_triggered"],
+    "subscribes": ["apg.mfg.mes.downtime_recorded", "apg.eam.asset_condition_updated"]
+  }
+}
