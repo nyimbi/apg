@@ -1,16 +1,26 @@
 {# entity_list.html.j2 — APG entity list + create form
    Variables: entity_name, entity_type, safe_entity, fields, records,
-              total, count, records_table, create_inputs, notice, query #}
+              total, count, records_table, create_inputs, notice, query,
+              has_kanban (bool), q (search term) #}
 
-{# Breadcrumb #}
-<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500">
+{# Breadcrumb + view toggle #}
+<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">
   <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>
   <span>/</span>
   <span class="font-semibold text-gray-900">{{ entity_name }}</span>
-  <a href="/entities/{{ safe_entity }}/records"
-     class="ml-auto text-xs text-gray-400 hover:text-apg-primary transition-colors">
-    API JSON ↗
-  </a>
+  <div class="ml-auto flex items-center gap-1">
+    {% if has_kanban %}
+    <span class="px-3 py-1 text-xs bg-apg-primary text-white rounded-lg font-medium">≡ List</span>
+    <a href="/ui/entities/{{ safe_entity }}?view=kanban"
+       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">
+      ⊞ Kanban
+    </a>
+    {% endif %}
+    <a href="/entities/{{ safe_entity }}/records"
+       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-500 hover:border-gray-300 transition-colors">
+      API JSON ↗
+    </a>
+  </div>
 </nav>
 
 {% if notice %}
@@ -19,6 +29,20 @@
   ⚠ {{ notice }}
 </div>
 {% endif %}
+
+{# Search bar #}
+<form method="get" action="/ui/entities/{{ safe_entity }}" class="mb-5">
+  <div class="relative max-w-sm">
+    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">🔍</span>
+    <input type="text" name="q" value="{{ q or '' }}"
+           placeholder="Search {{ entity_name }} records…"
+           class="w-full pl-8 pr-8 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">
+    {% if q %}
+    <a href="/ui/entities/{{ safe_entity }}"
+       class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs leading-none">✕</a>
+    {% endif %}
+  </div>
+</form>
 
 <div class="flex items-start gap-5 flex-col xl:flex-row">
 
@@ -40,18 +64,16 @@
     </div>
   </aside>
 
-  {# ── Records table ───────────────────────────────────────────── #}
+  {# ── Records section ─────────────────────────────────────────── #}
   <section class="flex-1 min-w-0">
-    <div class="flex items-center gap-3 mb-3">
-      <h1 class="text-lg font-semibold text-gray-900">
-        {{ entity_name }}
-      </h1>
+    <div class="flex items-center gap-3 mb-3 flex-wrap">
+      <h1 class="text-lg font-semibold text-gray-900">{{ entity_name }}</h1>
       <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
         {{ total }} record{{ 's' if total != 1 else '' }}
       </span>
       {% if count != total %}
-      <span class="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-        Showing {{ count }}
+      <span class="text-xs text-apg-primary bg-blue-50 px-2 py-0.5 rounded-full">
+        {{ count }} match{% if q %} for "{{ q }}"{% endif %}
       </span>
       {% endif %}
     </div>
@@ -61,8 +83,15 @@
     {% else %}
       <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
         <div class="text-3xl mb-3 opacity-30">📋</div>
+        {% if q %}
+        <p class="text-sm font-medium text-gray-500">No {{ entity_name }} records match "{{ q }}".</p>
+        <p class="text-xs text-gray-400 mt-1">
+          <a href="/ui/entities/{{ safe_entity }}" class="text-apg-primary hover:underline">Clear search</a>
+        </p>
+        {% else %}
         <p class="text-sm font-medium text-gray-500">No {{ entity_name }} records yet.</p>
         <p class="text-xs text-gray-400 mt-1">Use the form on the left to create the first one.</p>
+        {% endif %}
       </div>
     {% endif %}
   </section>

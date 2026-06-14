@@ -4271,41 +4271,62 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
     if not records:
         return "<p>No records yet.</p>"
     fields = _field_specs(entity_name)
-    field_by_name = {{str(field["name"]): field for field in fields}}
-    field_names = list(field_by_name)
-    columns = ["id", "_revision"] + [
-        field_name for field_name in field_names if field_name not in {{"id", "_revision"}}
-    ]
-    header = "".join(f"<th>{{html.escape(column)}}</th>" for column in columns)
+    field_names = [str(f["name"]) for f in fields if str(f["name"]) not in {{"_revision"}}]
+    # Show at most 6 columns to keep table readable; id always first
+    display_cols = ["id"] + [c for c in field_names if c != "id"][:5]
     safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    header = "".join(
+        f'<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">'
+        f'{{html.escape(col.replace("_id","").replace("_"," ").title())}}</th>'
+        for col in display_cols
+    )
     rows: list[str] = []
     for record in records:
         raw_record_id = str(record.get("id", ""))
         record_id = html.escape(quote(raw_record_id, safe=""), quote=True)
-        form_id = f"apg-update-{{entity_name}}-{{raw_record_id}}"
-        safe_form_id = html.escape(form_id, quote=True)
-        cells = []
-        for column in columns:
-            if column in field_by_name:
-                cell_value = _ui_record_editor_input_html(field_by_name[column], record, form_id, entity_name)
-            else:
-                cell_value = html.escape(_ui_record_display_value(record.get(column)))
-            cells.append(f"<td>{{cell_value}}</td>")
         revision = html.escape(str(record.get("_revision", "")), quote=True)
+        cells = []
+        for col in display_cols:
+            val = html.escape(_ui_record_display_value(record.get(col)))
+            if col == "id":
+                # ID cell: click → record detail
+                cells.append(
+                    f'<td class="px-4 py-2.5">'
+                    f'<a href="/ui/entities/{{safe_entity}}/{{record_id}}"'
+                    f' class="text-xs font-mono text-apg-primary hover:underline truncate block max-w-24">{{val[:16]}}</a>'
+                    f'</td>'
+                )
+            else:
+                cells.append(
+                    f'<td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">{{val}}</td>'
+                )
         action = (
-            f'<form id="{{safe_form_id}}" method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}"></form>'
-            f'<input form="{{safe_form_id}}" type="hidden" name="expected_revision" value="{{revision}}">'
-            f'<button form="{{safe_form_id}}" type="submit">Save</button> '
-            f'<form method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}/delete">'
+            f'<div class="flex items-center gap-3 justify-end opacity-0 group-hover/row:opacity-100 transition-opacity">'
+            f'<a href="/ui/entities/{{safe_entity}}/{{record_id}}"'
+            f' class="text-xs font-medium text-apg-primary hover:underline whitespace-nowrap">View →</a>'
+            f'<form method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}/delete" class="inline">'
             f'<input type="hidden" name="expected_revision" value="{{revision}}">'
-            '<button type="submit">Delete</button>'
-            '</form>'
+            f'<button type="submit" onclick="return confirm(this.dataset.msg)" data-msg="Delete this record?"'
+            f' class="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>'
+            f'</form>'
+            f'</div>'
         )
-        rows.append(f"<tr>{{''.join(cells)}}<td>{{action}}</td></tr>")
+        rows.append(
+            f'<tr class="hover:bg-gray-50 transition-colors group/row border-b border-gray-50 last:border-0">'
+            f'{{"".join(cells)}}'
+            f'<td class="px-4 py-2.5 text-right">{{action}}</td>'
+            f'</tr>'
+        )
     return (
-        f'<div class="apg-table-wrap">'
-        f'<table class="apg-table"><thead><tr>{{header}}<th>Actions</th></tr></thead>'
-        f'<tbody>{{"".join(rows)}}</tbody></table>'
+        f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">'
+        f'<div class="overflow-x-auto">'
+        f'<table class="w-full">'
+        f'<thead class="bg-gray-50 border-b border-gray-100">'
+        f'<tr>{{header}}<th class="px-4 py-2.5 w-28"></th></tr>'
+        f'</thead>'
+        f'<tbody>{{"".join(rows)}}</tbody>'
+        f'</table>'
+        f'</div>'
         f'</div>'
     )
 
@@ -4315,10 +4336,28 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
     if entity is None:
         return 404, _html_page("Unknown entity", f"<h1>Unknown entity: {{html.escape(entity_name)}}</h1>")
     query = query or {{}}
-    query_result = query_records(entity_name, query)
     safe_entity = html.escape(entity_name, quote=True)
     fields = _field_specs(entity_name) or [{{"name": "value", "type": "string", "required": True}}]
-    records_table = _ui_records_table_html(entity_name, query_result["records"])
+
+    # Full-text search: filter records where any string field contains q
+    q = query.get("q", [""])[0].strip() if "q" in query else ""
+    base_query = {{k: v for k, v in query.items() if k != "q"}}
+    query_result = query_records(entity_name, base_query)
+    all_records = query_result["records"]
+    if q:
+        q_low = q.lower()
+        filtered = [
+            r for r in all_records
+            if any(q_low in str(v).lower() for v in r.values() if v is not None)
+        ]
+    else:
+        filtered = all_records
+
+    # Detect kanban-eligible status field
+    status_field_names = {{"status", "state", "stage", "phase"}}
+    has_kanban = any(str(f.get("name", "")).lower() in status_field_names for f in fields)
+
+    records_table = _ui_records_table_html(entity_name, filtered)
 
     # Prefer Jinja2 template for rich UI; fall back to f-string builder for zero-dep mode
     create_inputs = _ui_create_form_html(entity_name, fields)
@@ -4328,13 +4367,15 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
         entity_type=html.escape(entity.get("type", "entity")),
         safe_entity=safe_entity,
         fields=fields,
-        records=query_result["records"],
+        records=filtered,
         total=query_result["total"],
-        count=query_result["count"],
+        count=len(filtered),
         records_table=records_table,
         create_inputs=create_inputs,
         notice=html.escape(notice) if notice else "",
         query=query,
+        has_kanban=has_kanban,
+        q=html.escape(q) if q else "",
     )
     if tmpl_body is not None:
         return 200, _html_page(entity_name, tmpl_body)
@@ -4417,6 +4458,256 @@ def _ui_workflow_step_post(
     return _ui_workflow_wizard_html(entity_name, workflow_id, next_step, accumulated)
 
 
+def _ui_field_view_fragment(entity_name: str, record_id: str, field: Dict[str, Any], record: Dict[str, Any]) -> str:
+    """Return the view-mode div for one field (used after save or cancel)."""
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    safe_record_id = html.escape(quote(record_id, safe=""), quote=True)
+    field_name = str(field.get("name", ""))
+    fld_id = f"fld-{{safe_entity}}-{{safe_record_id}}-{{field_name}}"
+    field_val = record.get(field_name, "")
+    if field_val is None or field_val == "" or str(field_val) == "None":
+        display = '<span class="text-gray-300 italic text-xs">—</span>'
+    elif str(field_val).lower() == "true":
+        display = '<span class="inline-flex items-center gap-1 text-green-600"><span class="text-xs">✓</span> Yes</span>'
+    elif str(field_val).lower() == "false":
+        display = '<span class="inline-flex items-center gap-1 text-gray-400"><span class="text-xs">✕</span> No</span>'
+    else:
+        display = html.escape(str(field_val)[:200])
+    label = html.escape(field_name.replace("_id", "").replace("_", " ").title())
+    edit_url = f"/ui/entities/{{safe_entity}}/{{safe_record_id}}/fields/{{html.escape(field_name)}}/edit"
+    return (
+        f'<div id="{{fld_id}}" class="py-3 border-b border-gray-50 last:border-0 group/field">'
+        f'<dt class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{{label}}</dt>'
+        f'<dd class="flex items-center justify-between gap-2 min-h-6">'
+        f'<span class="text-sm text-gray-900 break-words">{{display}}</span>'
+        f'<button hx-get="{{edit_url}}" hx-target="#{{fld_id}}" hx-swap="outerHTML"'
+        f' class="opacity-0 group-hover/field:opacity-100 flex-shrink-0 p-1 text-gray-300 hover:text-apg-primary rounded transition-all"'
+        f' title="Edit {{html.escape(field_name)}}">'
+        f'<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">'
+        f'<path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zm-2.207 2.207L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>'
+        f'</svg></button>'
+        f'</dd></div>'
+    )
+
+
+def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
+    status, response = get_record(entity_name, record_id)
+    if status != 200 or not isinstance(response, dict):
+        return 404, _html_page("Not found", f"<h1>Record not found</h1><p>{{html.escape(entity_name)}}/{{html.escape(record_id)}}</p>")
+    record = response.get("record", response)
+    entity = _entity_spec(entity_name)
+    if entity is None:
+        return 404, _html_page("Not found", f"<h1>Unknown entity: {{html.escape(entity_name)}}</h1>")
+    fields = _field_specs(entity_name) or []
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    safe_record_id = html.escape(quote(record_id, safe=""), quote=True)
+
+    # Pick a good display title (first non-id string field value, or id prefix)
+    title_field = next(
+        (f for f in fields if str(f.get("type", "")).lower() in {{"str", "string", "text", "email", "varchar"}} and str(f.get("name")) not in {{"id", "_revision"}}),
+        None,
+    )
+    title = str(record.get(title_field["name"], record_id) if title_field else record_id)[:80]
+
+    # Status badge value
+    status_field = next(
+        (f for f in fields if str(f.get("name", "")).lower() in {{"status", "state", "stage", "phase"}}),
+        None,
+    )
+    status_val = str(record.get(status_field["name"], "")) if status_field else ""
+
+    # Related lists: find entities with FK fields pointing to this entity
+    related_lists: list[Dict[str, Any]] = []
+    for ent in sorted(ENTITY_NAMES):
+        if ent == entity_name:
+            continue
+        ent_fields = _field_specs(ent) or []
+        fk_field = next(
+            (f for f in ent_fields if str(f.get("name", "")).endswith("_id") and str(f.get("name", ""))[:-3] == entity_name.lower()),
+            None,
+        )
+        if fk_field is None:
+            # Try FK by entity name convention: field name == entity_name + "_id"
+            fk_candidates = [f for f in ent_fields if str(f.get("name", "")).lower().replace("_id", "") == entity_name.lower()]
+            fk_field = fk_candidates[0] if fk_candidates else None
+        if fk_field:
+            fk_name = str(fk_field["name"])
+            rel_result = query_records(ent, {{f"filter.{{fk_name}}": [record_id]}})
+            if rel_result.get("records"):
+                rel_cols = ["id"] + [str(f["name"]) for f in ent_fields if str(f.get("name")) not in {{"id", "_revision", fk_name}}][:4]
+                related_lists.append({{"entity": ent, "fk_field": fk_name, "records": rel_result["records"], "cols": rel_cols}})
+
+    has_kanban = any(str(f.get("name", "")).lower() in {{"status", "state", "stage", "phase"}} for f in fields)
+    revision = html.escape(str(record.get("_revision", "")))
+
+    tmpl_body = _render_template(
+        "record_detail.html.j2",
+        entity_name=html.escape(entity_name),
+        entity_type=html.escape(entity.get("type", "entity")),
+        safe_entity=safe_entity,
+        safe_record_id=safe_record_id,
+        record=record,
+        fields=[f for f in fields if str(f.get("name")) != "_revision"],
+        title=html.escape(title),
+        status_val=html.escape(status_val),
+        revision=revision,
+        related_lists=related_lists,
+        has_kanban=has_kanban,
+    )
+    if tmpl_body is not None:
+        return 200, _html_page(title or entity_name, tmpl_body)
+    return 200, _html_page(entity_name, f"<h1>{{html.escape(title)}}</h1><pre>{{html.escape(json.dumps(record, indent=2))}}</pre>")
+
+
+def _ui_field_edit_html(entity_name: str, record_id: str, field_name: str) -> tuple[int, str]:
+    status, response = get_record(entity_name, record_id)
+    if status != 200 or not isinstance(response, dict):
+        return 404, "{{}}"
+    record = response.get("record", response)
+    fields = _field_specs(entity_name) or []
+    field = next((f for f in fields if str(f.get("name")) == field_name), None)
+    if field is None:
+        return 404, "{{}}"
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    safe_record_id = html.escape(quote(record_id, safe=""), quote=True)
+    safe_field_name = html.escape(field_name)
+    fld_id = f"fld-{{safe_entity}}-{{safe_record_id}}-{{safe_field_name}}"
+    current_val = html.escape(str(record.get(field_name, "") or ""), quote=True)
+    label = html.escape(field_name.replace("_id", "").replace("_", " ").title())
+    patch_url = f"/ui/entities/{{safe_entity}}/{{safe_record_id}}/fields/{{safe_field_name}}/patch"
+    cancel_url = f"/ui/entities/{{safe_entity}}/{{safe_record_id}}/fields/{{safe_field_name}}/view"
+    field_type = str(field.get("type", "string"))
+    if field_type in {{"text", "markdown"}}:
+        input_html = (
+            f'<textarea name="{{safe_field_name}}" rows="3"'
+            f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary resize-none">'
+            f'{{current_val}}</textarea>'
+        )
+    elif field_type == "boolean":
+        checked = "checked" if str(record.get(field_name, "")).lower() == "true" else ""
+        input_html = f'<input type="checkbox" name="{{safe_field_name}}" value="true" {{checked}} class="w-4 h-4 text-apg-primary rounded">'
+    elif field_type in {{"integer", "number", "float"}}:
+        input_html = (
+            f'<input type="number" name="{{safe_field_name}}" value="{{current_val}}"'
+            f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary">'
+        )
+    else:
+        input_html = (
+            f'<input type="text" name="{{safe_field_name}}" value="{{current_val}}"'
+            f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary">'
+        )
+    revision = html.escape(str(record.get("_revision", "")), quote=True)
+    fragment = (
+        f'<div id="{{fld_id}}" class="py-3 border-b border-gray-50 last:border-0">'
+        f'<dt class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{{label}}</dt>'
+        f'<dd>'
+        f'<form hx-post="{{patch_url}}" hx-target="#{{fld_id}}" hx-swap="outerHTML" class="flex flex-col gap-1.5">'
+        f'<input type="hidden" name="expected_revision" value="{{revision}}">'
+        f'{{input_html}}'
+        f'<div class="flex gap-2">'
+        f'<button type="submit" class="px-2.5 py-1 bg-apg-primary text-white text-xs font-medium rounded-lg hover:opacity-90">Save</button>'
+        f'<button type="button" hx-get="{{cancel_url}}" hx-target="#{{fld_id}}" hx-swap="outerHTML"'
+        f' class="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg">Cancel</button>'
+        f'</div>'
+        f'</form>'
+        f'</dd></div>'
+    )
+    return 200, fragment
+
+
+def _ui_field_view_html(entity_name: str, record_id: str, field_name: str) -> tuple[int, str]:
+    status, response = get_record(entity_name, record_id)
+    if status != 200 or not isinstance(response, dict):
+        return 404, "{{}}"
+    record = response.get("record", response)
+    fields = _field_specs(entity_name) or []
+    field = next((f for f in fields if str(f.get("name")) == field_name), None)
+    if field is None:
+        return 404, "{{}}"
+    return 200, _ui_field_view_fragment(entity_name, record_id, field, record)
+
+
+def _ui_field_patch_post(entity_name: str, record_id: str, field_name: str, form: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    status, response = get_record(entity_name, record_id)
+    if status != 200 or not isinstance(response, dict):
+        return 404, {{"error": "record not found"}}
+    current = response.get("record", response)
+    fields = _field_specs(entity_name) or []
+    field = next((f for f in fields if str(f.get("name")) == field_name), None)
+    if field is None:
+        return 404, {{"error": "field not found"}}
+    new_val = form.get(field_name, "")
+    field_type = str(field.get("type", "string"))
+    if field_type == "boolean":
+        new_val = "true" if new_val == "true" else "false"
+    elif field_type == "integer":
+        try:
+            new_val = str(int(new_val))
+        except (ValueError, TypeError):
+            new_val = "0"
+    updated = dict(current)
+    updated[field_name] = new_val
+    expected_revision_raw = form.get("expected_revision")
+    try:
+        expected_revision_int: int | None = int(expected_revision_raw) if expected_revision_raw is not None else None
+    except (TypeError, ValueError):
+        expected_revision_int = None
+    save_status, save_result = update_record(entity_name, record_id, updated, expected_revision_int)
+    if save_status not in (200, 201, 204):
+        err_msg = html.escape(str(save_result.get("error") or save_result.get("message") or "Save failed"))
+        fragment = (
+            f'<div class="py-3 border-b border-gray-50">'
+            f'<p class="text-xs text-red-500">{{err_msg}}</p>'
+            f'</div>'
+        )
+        return save_status, {{"html": fragment}}
+    _status2, refreshed_resp = get_record(entity_name, record_id)
+    refreshed = refreshed_resp.get("record", refreshed_resp) if isinstance(refreshed_resp, dict) else {{}}
+    rec = refreshed if refreshed else updated
+    return 200, {{"html": _ui_field_view_fragment(entity_name, record_id, field, rec)}}
+
+
+def _ui_kanban_html(entity_name: str) -> tuple[int, str]:
+    entity = _entity_spec(entity_name)
+    if entity is None:
+        return 404, _html_page("Not found", f"<h1>Unknown entity: {{html.escape(entity_name)}}</h1>")
+    fields = _field_specs(entity_name) or []
+    status_field_names = {{"status", "state", "stage", "phase"}}
+    status_field = next((f for f in fields if str(f.get("name", "")).lower() in status_field_names), None)
+    if status_field is None:
+        return _ui_entity_html(entity_name)
+    status_fname = str(status_field["name"])
+    all_records = query_records(entity_name, {{}}).get("records", [])
+    # Gather unique status values preserving insertion order
+    seen: list[str] = []
+    for r in all_records:
+        v = str(r.get(status_fname, "") or "")
+        if v and v not in seen:
+            seen.append(v)
+    if not seen:
+        seen = ["active", "inactive"]
+    columns = [{{"label": v, "records": [r for r in all_records if str(r.get(status_fname, "")) == v]}} for v in seen]
+    # Choose display field: first non-id, non-status string field
+    display_field_obj = next(
+        (f for f in fields if str(f.get("type", "")).lower() in {{"str", "string", "text", "email", "varchar"}} and str(f.get("name")) not in {{"id", "_revision", status_fname}}),
+        None,
+    )
+    display_field = str(display_field_obj["name"]) if display_field_obj else "id"
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    tmpl_body = _render_template(
+        "kanban_view.html.j2",
+        entity_name=html.escape(entity_name),
+        safe_entity=safe_entity,
+        columns=columns,
+        display_field=display_field,
+        status_field=status_fname,
+        fields=fields,
+    )
+    if tmpl_body is not None:
+        return 200, _html_page(f"{{entity_name}} — Kanban", tmpl_body)
+    return _ui_entity_html(entity_name)
+
+
 def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, str]:
     parts = [part for part in path.split("/") if part]
     if parts == ["ui"]:
@@ -4437,7 +4728,20 @@ def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[i
                 step_index = 0
         return _ui_workflow_wizard_html(entity_name, workflow_id, step_index)
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "entities":
+        if query and query.get("view", [""])[0] == "kanban":
+            return _ui_kanban_html(parts[2])
         return _ui_entity_html(parts[2], query=query)
+    # /ui/entities/ENTITY/RECORD_ID
+    if len(parts) == 4 and parts[0] == "ui" and parts[1] == "entities":
+        return _ui_record_detail_html(parts[2], parts[3])
+    # /ui/entities/ENTITY/RECORD_ID/fields/FIELD_NAME/edit|view
+    if (len(parts) == 7 and parts[0] == "ui" and parts[1] == "entities"
+            and parts[4] == "fields" and parts[6] in {{"edit", "view"}}):
+        if parts[6] == "edit":
+            status, fragment = _ui_field_edit_html(parts[2], parts[3], parts[5])
+        else:
+            status, fragment = _ui_field_view_html(parts[2], parts[3], parts[5])
+        return status, fragment
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "agents":
         return _ui_agent_console_html(parts[2])
     if len(parts) == 3 and parts[0] == "ui" and parts[1] in {{"agent-teams", "teams"}}:
@@ -4526,6 +4830,11 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
     parts = [part for part in path.split("/") if part]
     raw_form_record = payload.get("record", payload)
     form_record = dict(raw_form_record) if isinstance(raw_form_record, dict) else {{}}
+
+    # Field patch POST: /ui/entities/ENTITY/RECORD_ID/fields/FIELD_NAME/patch
+    if (len(parts) == 7 and parts[0] == "ui" and parts[1] == "entities"
+            and parts[4] == "fields" and parts[6] == "patch"):
+        return _ui_field_patch_post(parts[2], parts[3], parts[5], form_record)
 
     # Workflow step POST: /ui/workflows/ENTITY/WORKFLOW_ID/step/N
     if (len(parts) == 6 and parts[0] == "ui" and parts[1] == "workflows" and parts[4] == "step"):
