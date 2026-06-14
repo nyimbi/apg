@@ -1,8 +1,9 @@
 {# record_detail.html.j2 — Salesforce-quality record detail page
    Variables: entity_name, entity_type, safe_entity, safe_record_id,
-              record, fields, title, status_val, revision, related_lists,
-              has_kanban (bool)
+              record, fields, field_semantics, title, status_val, revision,
+              related_lists, has_kanban (bool)
    related_lists: [{"entity": str, "fk_field": str, "records": [dict], "cols": [str]}]
+   field_semantics: {field_name: semantic_type}
 #}
 
 {# Breadcrumb #}
@@ -99,15 +100,8 @@
         </dt>
         <dd class="flex items-center justify-between gap-2 min-h-6">
           <span class="text-sm text-gray-900 break-words">
-            {% if field_val is none or field_val == '' or field_val == 'None' %}
-              <span class="text-gray-300 italic text-xs">—</span>
-            {% elif field_val | string | lower == 'true' %}
-              <span class="inline-flex items-center gap-1 text-green-600"><span class="text-xs">✓</span> Yes</span>
-            {% elif field_val | string | lower == 'false' %}
-              <span class="inline-flex items-center gap-1 text-gray-400"><span class="text-xs">✕</span> No</span>
-            {% else %}
-              {{ field_val | string | truncate(100) }}
-            {% endif %}
+            {% set semantic = field_semantics.get(field.name, 'text') if field_semantics else 'text' %}
+            {% include 'widgets/field_display.html.j2' %}
           </span>
           <button
             hx-get="/ui/entities/{{ safe_entity }}/{{ safe_record_id }}/fields/{{ field.name }}/edit"

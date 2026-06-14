@@ -440,8 +440,10 @@ class PythonCodeGenerator:
 		tmpl_dir = Path(__file__).parent / "templates"
 		templates: dict[str, str] = {}
 		if tmpl_dir.exists():
-			for f in tmpl_dir.glob("*.j2"):
-				templates[f.name] = f.read_text(encoding="utf-8")
+			for f in tmpl_dir.rglob("*.j2"):
+				# Use path relative to tmpl_dir as key so subdirs work with include
+				key = f.relative_to(tmpl_dir).as_posix()
+				templates[key] = f.read_text(encoding="utf-8")
 		return templates
 
 	def _generate_python_app(self, module: ModuleDeclaration) -> str:
@@ -4131,6 +4133,23 @@ def _fk_select_options(target_entity: str, current_value: str = "", form_id: str
     return "".join(options)
 
 
+def _ui_field_semantic(field_name: str, field_type: str) -> str:
+    name = field_name.lower()
+    ft = field_type.lower()
+    if "email" in name: return "email"
+    if any(x in name for x in ("phone", "mobile", "tel")): return "phone"
+    if any(x in name for x in ("url", "website", "link", "href")): return "url"
+    if any(x in name for x in ("avatar", "photo", "image", "thumbnail", "picture", "logo")): return "image_url"
+    if any(x in name for x in ("amount", "price", "cost", "fee", "salary", "balance", "revenue", "total")): return "currency"
+    if any(x in name for x in ("percent", "progress", "completion")): return "percent"
+    if any(x in name for x in ("rating", "score", "stars", "grade")): return "rating"
+    if any(x in name for x in ("color", "colour", "hex")): return "color"
+    if any(x in name for x in ("config", "metadata", "settings", "payload", "extra")) or ft in ("json", "jsonb"): return "json"
+    if any(x in name for x in ("status", "state", "stage", "phase")): return "status"
+    if ft in ("bool", "boolean"): return "boolean"
+    return "text"
+
+
 def _ui_field_input_html(field: Dict[str, Any], entity_name: str = "") -> str:
     field_name = str(field["name"])
     safe_name = html.escape(field_name, quote=True)
@@ -4540,6 +4559,11 @@ def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
     has_kanban = any(str(f.get("name", "")).lower() in {{"status", "state", "stage", "phase"}} for f in fields)
     revision = html.escape(str(record.get("_revision", "")))
 
+    display_fields = [f for f in fields if str(f.get("name")) != "_revision"]
+    field_semantics = {{
+        str(f.get("name", "")): _ui_field_semantic(str(f.get("name", "")), str(f.get("type", "")))
+        for f in display_fields
+    }}
     tmpl_body = _render_template(
         "record_detail.html.j2",
         entity_name=html.escape(entity_name),
@@ -4547,7 +4571,8 @@ def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
         safe_entity=safe_entity,
         safe_record_id=safe_record_id,
         record=record,
-        fields=[f for f in fields if str(f.get("name")) != "_revision"],
+        fields=display_fields,
+        field_semantics=field_semantics,
         title=html.escape(title),
         status_val=html.escape(status_val),
         revision=revision,
