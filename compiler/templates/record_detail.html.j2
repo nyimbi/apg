@@ -59,6 +59,42 @@
       </form>
     </div>
   </div>
+{# Highlights panel — top fields at a glance #}
+{% set highlight_fields = [] %}
+{% for f in fields %}
+  {% if f.name not in ['id', '_revision'] and not f.name.endswith('_id') %}
+    {% if highlight_fields | length < 4 %}
+      {% set _ = highlight_fields.append(f) %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+{% if highlight_fields %}
+<div class="border-t border-gray-100 px-6 py-3 grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50/50">
+  {% for f in highlight_fields %}
+  {% set fv = record.get(f.name, '') %}
+  {% set sem = field_semantics.get(f.name, 'text') if field_semantics else 'text' %}
+  <div class="min-w-0">
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5 truncate">
+      {{ (f.name[:-3] | replace('_',' ') | title ~ ' ID') if f.name.endswith('_id') else (f.name | replace('_',' ') | title) }}
+    </p>
+    <p class="text-sm font-medium text-gray-900 truncate">
+      {% if fv is none or fv == '' or fv | string == 'None' %}
+      <span class="text-gray-300 italic text-xs">—</span>
+      {% elif sem == 'currency' %}
+      <span class="tabular-nums">{{ fv | string }}</span>
+      {% elif sem == 'status' %}
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-semibold
+        {% if fv | string | lower in ['active','approved','paid','open','enabled','complete','completed','success','done'] %}bg-green-100 text-green-800
+        {% elif fv | string | lower in ['inactive','rejected','closed','disabled','cancelled','canceled','failed','expired'] %}bg-red-100 text-red-800
+        {% else %}bg-yellow-100 text-yellow-800{% endif %}">{{ fv }}</span>
+      {% else %}
+      {{ fv | string | truncate(30) }}
+      {% endif %}
+    </p>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 </div>
 
 {# Tab bar #}
@@ -96,7 +132,7 @@
       {% set fld_id = 'fld-' ~ safe_entity ~ '-' ~ safe_record_id ~ '-' ~ field.name %}
       <div id="{{ fld_id }}" class="py-3 border-b border-gray-50 last:border-0 group/field">
         <dt class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
-          {{ field.name | replace('_id', '') | replace('_', ' ') | title }}
+          {{ (field.name[:-3] | replace('_', ' ') | title ~ ' ID') if field.name.endswith('_id') else (field.name | replace('_', ' ') | title) }}
         </dt>
         <dd class="flex items-center justify-between gap-2 min-h-6">
           <span class="text-sm text-gray-900 break-words">
@@ -141,7 +177,7 @@
             <tr class="bg-gray-50 border-b border-gray-100">
               {% for col in rel.cols %}
               <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                {{ col | replace('_id', '') | replace('_', ' ') | title }}
+                {{ (col[:-3] | replace('_', ' ') | title ~ ' ID') if col.endswith('_id') else (col | replace('_', ' ') | title) }}
               </th>
               {% endfor %}
               <th class="px-4 py-2 w-16"></th>

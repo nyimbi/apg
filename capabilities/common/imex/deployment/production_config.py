@@ -22,7 +22,7 @@ from typing import Dict, List, Optional, Any, Union
 from pathlib import Path
 from enum import Enum
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 try:
     from cryptography.fernet import Fernet
 except ImportError:
@@ -155,7 +155,7 @@ class ProductionConfig(BaseModel):
 
     model_config = ConfigDict(extra='forbid')
 
-    @validator('upload_folder', 'temp_folder')
+    @field_validator('upload_folder', 'temp_folder')
     def validate_paths(cls, v):
         """Ensure paths exist"""
         Path(v).mkdir(parents=True, exist_ok=True)

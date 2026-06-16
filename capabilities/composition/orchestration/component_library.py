@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from abc import ABC, abstractmethod
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field
 import inspect
 
 from apg.framework.base_service import APGBaseService

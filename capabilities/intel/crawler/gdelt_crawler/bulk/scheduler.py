@@ -75,7 +75,7 @@ except ImportError:
     # Create a mock class for fallback
     class GDELTDatabaseETL:
         def __init__(self, *args, **kwargs):
-            pass
+            logger.warning("GDELTDatabaseETL unavailable (import failed) — using no-op stub ETL")
         async def health_check(self):
             return False
         async def process_file(self, *args, **kwargs):

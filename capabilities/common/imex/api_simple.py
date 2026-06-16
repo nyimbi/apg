@@ -83,14 +83,14 @@ class SchemaMappingRequest(BaseModel):
 class DataQualityRequest(BaseModel):
 	"""Request model for data quality assessment"""
 	job_id: Optional[str] = Field(None)
-	sample_data: List[Dict[str, Any]] = Field(..., min_items=1)
+	sample_data: List[Dict[str, Any]] = Field(..., min_length=1)
 	quality_rules: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
 
 class WorkflowCreateRequest(BaseModel):
 	"""Request model for creating workflows"""
 	name: str = Field(..., min_length=1, max_length=255)
 	description: Optional[str] = Field(None, max_length=1000)
-	steps: List[Dict[str, Any]] = Field(..., min_items=1)
+	steps: List[Dict[str, Any]] = Field(..., min_length=1)
 	schedule: Optional[Dict[str, Any]] = Field(None)
 	tags: Optional[List[str]] = Field(default_factory=list)
 

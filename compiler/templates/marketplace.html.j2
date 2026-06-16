@@ -1,0 +1,63 @@
+{# marketplace.html.j2 — APG Connector Marketplace
+   Variables: connectors (list of manifest dicts), installed_count
+#}
+
+<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">
+  <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>
+  <span>/</span>
+  <span class="font-semibold text-gray-900">Connector Marketplace</span>
+</nav>
+
+<div class="flex items-center gap-4 mb-6">
+  <h1 class="text-xl font-bold text-gray-900">Connector Marketplace</h1>
+  <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
+    {{ connectors | length }} connector{{ 's' if connectors | length != 1 else '' }}
+  </span>
+</div>
+
+{% if connectors %}
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+  {% for conn in connectors %}
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:border-apg-primary hover:shadow-md transition-all p-5 group">
+    <div class="flex items-start gap-4 mb-3">
+      <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold flex-shrink-0"
+           style="background: var(--apg-primary, #0ea5e9)">
+        {{ (conn.title or conn.name or '?')[:1] | upper }}
+      </div>
+      <div class="flex-1 min-w-0">
+        <h2 class="text-sm font-bold text-gray-900 group-hover:text-apg-primary transition-colors truncate">
+          {{ conn.title or conn.name }}
+        </h2>
+        <p class="text-xs text-gray-400 truncate">{{ conn.base_url or 'Custom connector' }}</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 text-xs text-gray-500 mb-4">
+      <span class="flex items-center gap-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>
+        {{ (conn.operations or []) | length }} operations
+      </span>
+      {% if conn.version %}
+      <span class="text-gray-300">·</span>
+      <span>v{{ conn.version }}</span>
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="flex-1 text-xs text-gray-400 font-mono truncate">{{ conn.file or conn.name }}</span>
+      <a href="/entities/connectors/{{ conn.name | urlencode }}"
+         class="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">
+        View API ↗
+      </a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm p-16 text-center">
+  <div class="text-5xl mb-4 opacity-20">🔌</div>
+  <p class="text-sm font-medium text-gray-500 mb-1">No connectors installed</p>
+  <p class="text-xs text-gray-400 mb-6">Generate a connector from an OpenAPI spec to get started.</p>
+  <div class="bg-gray-50 rounded-lg border border-gray-200 px-4 py-3 text-left max-w-sm mx-auto">
+    <p class="text-xs font-mono text-gray-600">apg connector generate --spec openapi.yaml</p>
+  </div>
+</div>
+{% endif %}

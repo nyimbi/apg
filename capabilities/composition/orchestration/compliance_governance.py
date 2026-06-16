@@ -23,10 +23,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 import re
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from uuid_extensions import uuid7str
 
-from .enterprise_integration import ComplianceFramework, AuditEvent, enterprise_integration
+from.enterprise_integration import ComplianceFramework, AuditEvent, enterprise_integration
 from .database import get_async_db_session
 
 

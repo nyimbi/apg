@@ -453,6 +453,7 @@ class PythonCodeGenerator:
 		ui_templates = self._load_ui_templates()
 		# Derive landing style from theme name or default to "default"
 		landing_style = self._landing_style_for(module)
+		cmd_palette_literal = '<div id="apg-cmd" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onclick="if(event.target===this)apgCmdClose()"><div class="mx-auto mt-[15vh] max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"><div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100"><svg class="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9 a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg><input id="apg-cmd-input" type="text" placeholder="Search records, entities..." autocomplete="off" class="flex-1 text-sm outline-none placeholder-gray-400" oninput="apgCmdSearch(this.value)"><kbd class="text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">Esc</kbd></div><div id="apg-cmd-results" class="max-h-80 overflow-y-auto py-2"><p class="text-xs text-gray-400 text-center py-8">Type to search...</p></div></div></div><script>document.addEventListener("keydown",function(e){if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();apgCmdOpen();}if(e.key==="Escape")apgCmdClose();});function apgCmdOpen(){document.getElementById("apg-cmd").classList.remove("hidden");document.getElementById("apg-cmd-input").focus();}function apgCmdClose(){document.getElementById("apg-cmd").classList.add("hidden");document.getElementById("apg-cmd-input").value="";document.getElementById("apg-cmd-results").innerHTML=\'<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>\';}var _cmdTimer;function apgCmdSearch(q){clearTimeout(_cmdTimer);if(!q.trim()){document.getElementById("apg-cmd-results").innerHTML=\'<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>\';return;}_cmdTimer=setTimeout(function(){fetch("/api/search?q="+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(d){var el=document.getElementById("apg-cmd-results");if(!d.results||!d.results.length){el.innerHTML=\'<p class="text-xs text-gray-400 text-center py-8">No results</p>\';return;}el.innerHTML=d.results.map(function(r){return \'<a href="/ui/entities/\'+encodeURIComponent(r.entity)+\'/\'+encodeURIComponent(r.id)+\'"\'+\'  onclick="apgCmdClose()"\'+\'  class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group">\'+\'<span class="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center text-xs font-bold text-blue-600 flex-shrink-0">\'+r.entity.charAt(0).toUpperCase()+\'</span>\'+\'<div class="min-w-0"><p class="text-sm font-medium text-gray-900 truncate">\'+r.label+\'</p>\'+\'<p class="text-xs text-gray-400 truncate">\'+r.entity+\'</p></div>\'+\'</a>\';}).join("");});},200);}</script>'
 		return f'''"""
 {module.name} - APG Python Application
 {"=" * (len(module.name) + 25)}
@@ -485,6 +486,16 @@ EVENT_LOG: list[Dict[str, Any]] = []
 NEXT_EVENT_ID = 1
 WORKFLOW_RUNS: Dict[str, Dict[str, Any]] = {{}}
 NEXT_WORKFLOW_RUN_ID = 1
+CIRCUIT_BREAKERS: Dict[str, Dict[str, Any]] = {{}}
+APG_EVENT_SUBSCRIPTIONS: Dict[str, list[str]] = {{}}
+APG_CONNECTOR_REGISTRY: list[Dict[str, Any]] = []
+APG_ACTIVITY_LOG: Dict[str, list[Dict[str, Any]]] = {{}}
+WORKFLOW_EVENT_JOURNAL: Dict[str, list[Dict[str, Any]]] = {{}}
+WORKFLOW_SIGNALS: Dict[str, list[str]] = {{}}
+TENANT_SCOPED_ENTITIES: set[str] = {{
+    e["name"] for e in ENTITIES
+    if any(str(f.get("name")) == "tenant_id" for f in e.get("fields", []))
+}}
 SEMANTIC_MODEL: Dict[str, Any] = {semantic_model!r}
 APG_UI_TEMPLATES: Dict[str, str] = {ui_templates!r}
 
@@ -501,9 +512,92 @@ def _optional_module(name: str) -> Optional[Any]:
         return None
 
 
+def _log_activity(entity_name: str, record_id: str, event_type: str, actor: str = "system", detail: str = "") -> None:
+    key = f"{{entity_name}}:{{record_id}}"
+    if key not in APG_ACTIVITY_LOG:
+        APG_ACTIVITY_LOG[key] = []
+    import datetime
+    APG_ACTIVITY_LOG[key].append({{
+        "type": event_type,
+        "actor": actor,
+        "detail": detail,
+        "ts": datetime.datetime.utcnow().isoformat() + "Z",
+    }})
+    if len(APG_ACTIVITY_LOG[key]) > 50:
+        APG_ACTIVITY_LOG[key] = APG_ACTIVITY_LOG[key][-50:]
+
+
+def _get_activity(entity_name: str, record_id: str) -> list[Dict[str, Any]]:
+    return list(reversed(APG_ACTIVITY_LOG.get(f"{{entity_name}}:{{record_id}}", [])))
+
+
 AI_AGENTS = _optional_module("ai_agents")
 APG_APPLICATIONS = _optional_module("apg_application")
 APG_CAPABILITIES = _optional_module("apg_capabilities")
+
+import hashlib as _hashlib
+
+
+def _journal_append(run_id: str, event_type: str, step: str, data: Dict[str, Any]) -> None:
+    import datetime
+    if run_id not in WORKFLOW_EVENT_JOURNAL:
+        WORKFLOW_EVENT_JOURNAL[run_id] = []
+    prev_hash = WORKFLOW_EVENT_JOURNAL[run_id][-1]["hash"] if WORKFLOW_EVENT_JOURNAL[run_id] else "0" * 64
+    entry = {{
+        "seq": len(WORKFLOW_EVENT_JOURNAL[run_id]),
+        "run_id": run_id,
+        "event_type": event_type,
+        "step": step,
+        "ts": datetime.datetime.utcnow().isoformat() + "Z",
+        "data": data,
+    }}
+    raw = f"{{prev_hash}}{{entry['seq']}}{{entry['event_type']}}{{entry['step']}}{{entry['ts']}}"
+    entry["hash"] = _hashlib.sha256(raw.encode()).hexdigest()
+    WORKFLOW_EVENT_JOURNAL[run_id].append(entry)
+    if _APG_PG_URL:
+        _pg_save_journal_entry(entry)
+
+
+def _pg_save_journal_entry(entry: Dict[str, Any]) -> None:
+    conn = _pg_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS apg_workflow_journal ("
+                "  id SERIAL PRIMARY KEY,"
+                "  run_id TEXT NOT NULL,"
+                "  seq INTEGER NOT NULL,"
+                "  module_name TEXT NOT NULL,"
+                "  event_type TEXT NOT NULL,"
+                "  step TEXT NOT NULL,"
+                "  ts TIMESTAMPTZ NOT NULL,"
+                "  data TEXT NOT NULL,"
+                "  hash TEXT NOT NULL,"
+                "  UNIQUE(run_id, seq)"
+                ")"
+            )
+            cur.execute(
+                "INSERT INTO apg_workflow_journal (run_id, seq, module_name, event_type, step, ts, data, hash)"
+                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                " ON CONFLICT DO NOTHING",
+                (
+                    entry["run_id"], entry["seq"], MODULE_NAME,
+                    entry["event_type"], entry["step"],
+                    entry["ts"], json.dumps(entry.get("data", {{}}), default=str),
+                    entry["hash"]
+                )
+            )
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+
+def _get_journal(run_id: str) -> list[Dict[str, Any]]:
+    return WORKFLOW_EVENT_JOURNAL.get(run_id, [])
 
 
 def list_agents() -> list[str]:
@@ -970,6 +1064,19 @@ def describe_workflows() -> Dict[str, Dict[str, Any]]:
     }}
 
 
+def _trigger_saga_compensation(workflow: Dict[str, Any], completed_steps: list[str]) -> None:
+    comp = workflow.get("compensation", {{}})
+    if not isinstance(comp, dict):
+        return
+    for step in reversed(completed_steps):
+        action = comp.get(step)
+        if action:
+            try:
+                _record_event("saga.compensate", str(workflow.get("name", "workflow")), after={{"step": step, "action": str(action)}})
+            except Exception:
+                pass
+
+
 def _execute_workflow_steps(
     workflow: Dict[str, Any],
     steps: list[str],
@@ -978,6 +1085,7 @@ def _execute_workflow_steps(
     pause_at: str | None = None,
     existing_trace: list[Dict[str, Any]] | None = None,
     existing_completed_steps: list[str] | None = None,
+    run_id: str = "",
 ) -> Dict[str, Any]:
     selected_steps = steps[start_index:]
     if pause_at is not None and pause_at not in selected_steps:
@@ -1001,6 +1109,8 @@ def _execute_workflow_steps(
             "step": step,
             **_workflow_step_metadata(workflow, step),
         }}
+        if run_id:
+            _journal_append(run_id, "step_started", step, {{}})
         guard = guards.get(step)
         if guard is not None:
             guard_passed = _evaluate_workflow_condition(guard, payload)
@@ -1046,6 +1156,34 @@ def _execute_workflow_steps(
             entry["event_received"] = event_name
         failure_budget = _step_failure_budget(step, payload)
         retry_limit = _retry_limit(retry_policy.get(step)) if isinstance(retry_policy, dict) and step in retry_policy else 1
+        # Circuit breaker: fail fast if open
+        cb_k = _cb_key(workflow.get("name", "wf"), step)
+        # Check workflow-level circuit_breaker config for this step
+        wf_circuit_breakers = workflow.get("circuit_breakers", {{}})
+        step_cb_spec = wf_circuit_breakers.get(step, {{}}) if isinstance(wf_circuit_breakers, dict) else {{}}
+        step_policy = retry_policy.get(step, {{}}) if isinstance(retry_policy, dict) else {{}}
+        cb_threshold = int(step_cb_spec.get("threshold", step_policy.get("circuit_threshold", 5)) if isinstance(step_cb_spec, dict) else step_policy.get("circuit_threshold", 5))
+        cb_reset = int(step_cb_spec.get("reset_timeout", step_policy.get("reset_timeout", 60)) if isinstance(step_cb_spec, dict) else step_policy.get("reset_timeout", 60))
+        if _cb_is_open(cb_k, cb_threshold, cb_reset):
+            entry["status"] = "circuit_open"
+            trace.append(entry)
+            return {{
+                "status": "failed",
+                "current_step": step,
+                "completed_at": None,
+                "steps": selected_steps,
+                "completed_steps": completed_steps,
+                "pending_steps": selected_steps[offset:],
+                "trace": trace,
+                "payload": payload,
+                "failed_at": step,
+                "failure_reason": "circuit_open",
+                "compensations": _compensation_actions(workflow, completed_steps),
+            }}
+        # Step timeout metadata (from timers dict)
+        timers = workflow.get("timers", {{}})
+        if isinstance(timers, dict) and step in timers:
+            entry["timeout_spec"] = timers[step]
         attempts: list[Dict[str, Any]] = []
         for attempt_number in range(1, retry_limit + 1):
             failed = failure_budget >= attempt_number
@@ -1057,6 +1195,17 @@ def _execute_workflow_steps(
                 break
         entry["attempts"] = attempts
         if attempts and attempts[-1]["status"] == "failed":
+            _cb_fail(cb_k, cb_threshold, cb_reset)
+            # Saga: auto-trigger compensation for completed steps
+            is_saga = bool(workflow.get("is_saga", False))
+            if is_saga and completed_steps:
+                _trigger_saga_compensation(workflow, completed_steps)
+                if run_id:
+                    comp = workflow.get("compensation", {{}})
+                    comp_action = str(comp.get(step, "")) if isinstance(comp, dict) else ""
+                    _journal_append(run_id, "saga_compensating", step, {{"compensation": comp_action}})
+            if run_id:
+                _journal_append(run_id, "step_failed", step, {{"error": "step_failed_after_retries"}})
             entry["status"] = "failed"
             trace.append(entry)
             return {{
@@ -1073,9 +1222,12 @@ def _execute_workflow_steps(
                 "attempts": attempts,
                 "compensations": _compensation_actions(workflow, completed_steps),
             }}
+        _cb_success(cb_k)
         entry["status"] = "completed"
         trace.append(entry)
         completed_steps.append(step)
+        if run_id:
+            _journal_append(run_id, "step_completed", step, {{"attempts": len(attempts)}})
         if pause_at == step and offset < len(selected_steps) - 1:
             return {{
                 "status": "paused",
@@ -1126,14 +1278,14 @@ def run_workflow(workflow_name: str, payload: Dict[str, Any] | None = None) -> D
     selected_steps = steps[start_index:]
     pause_at = payload.get("pause_at", payload.get("stop_after"))
     pause_at = str(pause_at) if pause_at is not None else None
-    execution = _execute_workflow_steps(workflow, steps, start_index, payload, pause_at)
+    run_id = f"workflow-run-{{NEXT_WORKFLOW_RUN_ID}}"
+    NEXT_WORKFLOW_RUN_ID += 1
+    execution = _execute_workflow_steps(workflow, steps, start_index, payload, pause_at, run_id=run_id)
     if execution.get("status") == "error":
         return {{
             "workflow": workflow_name,
             **execution,
         }}
-    run_id = f"workflow-run-{{NEXT_WORKFLOW_RUN_ID}}"
-    NEXT_WORKFLOW_RUN_ID += 1
     result = {{
         "id": run_id,
         "workflow": workflow_name,
@@ -1143,10 +1295,28 @@ def run_workflow(workflow_name: str, payload: Dict[str, Any] | None = None) -> D
     event = _record_event("workflow.run", workflow_name, after=result)
     result["event_id"] = event["id"]
     WORKFLOW_RUNS[run_id] = dict(result)
+    # PostgreSQL persistence for durable workflows
+    if _APG_PG_URL:
+        _pg_save_workflow_run(result)
     persistence_error = _persist_record_store()
     if persistence_error:
         result["persistence_error"] = persistence_error
         WORKFLOW_RUNS[run_id] = dict(result)
+    # Emit declared completion events
+    emit_events = workflow.get("emit_events") or workflow.get("events", {{}}).get("emit", [])
+    if isinstance(emit_events, str):
+        emit_events = [emit_events]
+    for ev_name in (emit_events or []):
+        try:
+            emit_apg_event(str(ev_name), {{"workflow": workflow_name, "run_id": run_id, "status": execution.get("status")}})
+        except Exception:
+            pass
+    # Register subscriptions declared on this workflow
+    subscribe_events = workflow.get("subscribe_events") or workflow.get("events", {{}}).get("subscribe", [])
+    if isinstance(subscribe_events, str):
+        subscribe_events = [subscribe_events]
+    for ev_name in (subscribe_events or []):
+        _subscribe_workflow_event(str(ev_name), workflow_name)
     return dict(result)
 
 
@@ -1206,6 +1376,7 @@ def resume_workflow(run_id: str, payload: Dict[str, Any] | None = None) -> Dict[
         pause_at,
         existing_trace=list(existing.get("trace", [])),
         existing_completed_steps=list(existing.get("completed_steps", [])),
+        run_id=run_id,
     )
     if execution.get("status") == "error":
         return {{
@@ -1285,6 +1456,88 @@ def execute_workflow_compensations(
     }}
 
 
+import threading as _apg_threading
+_CB_LOCK = _apg_threading.Lock()
+_ES_LOCK = _apg_threading.Lock()
+
+
+def _cb_key(workflow_name: str, step: str) -> str:
+    return f"{{workflow_name}}:{{step}}"
+
+
+def _cb_is_open(key: str, threshold: int = 5, reset: int = 60) -> bool:
+    import time as _t
+    with _CB_LOCK:
+        cb = CIRCUIT_BREAKERS.get(key)
+        if cb is None:
+            return False
+        if cb["state"] == "open":
+            if _t.time() - cb.get("opened_at", 0.0) > reset:
+                cb["state"] = "half_open"
+                return False
+            return True
+        return False
+
+
+def _cb_fail(key: str, threshold: int = 5, reset: int = 60) -> None:
+    import time as _t
+    with _CB_LOCK:
+        cb = CIRCUIT_BREAKERS.setdefault(key, {{"state": "closed", "failures": 0, "opened_at": 0.0}})
+        cb["failures"] += 1
+        if cb["failures"] >= threshold:
+            cb["state"] = "open"
+            cb["opened_at"] = _t.time()
+
+
+def _cb_success(key: str) -> None:
+    with _CB_LOCK:
+        cb = CIRCUIT_BREAKERS.get(key)
+        if cb:
+            cb.update({{"state": "closed", "failures": 0, "opened_at": 0.0}})
+
+
+def circuit_breaker_status() -> Dict[str, Any]:
+    with _CB_LOCK:
+        return {{k: dict(v) for k, v in CIRCUIT_BREAKERS.items()}}
+
+
+_TENANT_LOCAL = _apg_threading.local()
+
+
+def _tenant_id() -> str | None:
+    return getattr(_TENANT_LOCAL, "tenant_id", None)
+
+
+def _subscribe_workflow_event(event_name: str, workflow_name: str) -> None:
+    with _ES_LOCK:
+        APG_EVENT_SUBSCRIPTIONS.setdefault(event_name, [])
+        if workflow_name not in APG_EVENT_SUBSCRIPTIONS[event_name]:
+            APG_EVENT_SUBSCRIPTIONS[event_name].append(workflow_name)
+
+
+def emit_apg_event(event_name: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    global NEXT_EVENT_ID
+    import time as _t
+    ev: Dict[str, Any] = {{
+        "id": NEXT_EVENT_ID,
+        "name": event_name,
+        "payload": payload or {{}},
+        "ts": _t.time(),
+        "triggered": [],
+    }}
+    with _ES_LOCK:
+        NEXT_EVENT_ID += 1
+        EVENT_LOG.append(ev)
+    subs = list(APG_EVENT_SUBSCRIPTIONS.get(event_name, []))
+    for wf_name in subs:
+        try:
+            run_workflow(wf_name, {{"trigger_event": event_name, **(payload or {{}})}})
+            ev["triggered"].append(wf_name)
+        except Exception:
+            pass
+    return dict(ev)
+
+
 def semantic_model() -> Dict[str, Any]:
     return json.loads(json.dumps(SEMANTIC_MODEL))
 
@@ -1333,6 +1586,10 @@ def query_records(entity_name: str, query: Dict[str, list[str]] | None = None) -
         for key, values in query.items()
         if values and key not in {{"limit", "offset", "sort", "order"}}
     }}
+    # Tenant routing: auto-scope to current tenant when entity has tenant_id field
+    tid = _tenant_id()
+    if tid and entity_name in TENANT_SCOPED_ENTITIES and "tenant_id" not in filters:
+        filters["tenant_id"] = tid
     records = [
         record
         for record in records
@@ -1503,6 +1760,12 @@ def _load_record_store() -> None:
     _sync_next_record_ids()
     _sync_next_event_id()
     _sync_next_workflow_run_id()
+    # Merge from PostgreSQL if available
+    if _APG_PG_URL:
+        for run in _pg_load_workflow_runs():
+            rid = str(run.get("id", ""))
+            if rid and rid not in WORKFLOW_RUNS:
+                WORKFLOW_RUNS[rid] = run
 
 
 def _persist_record_store() -> str | None:
@@ -1762,9 +2025,13 @@ def _record_event(
     return dict(event)
 
 
-def _prepare_new_record(record: Dict[str, Any]) -> Dict[str, Any]:
+def _prepare_new_record(record: Dict[str, Any], entity_name: str = "") -> Dict[str, Any]:
     prepared = dict(record)
     prepared.setdefault("_revision", 1)
+    # Auto-inject tenant_id for tenant-scoped entities
+    tid = _tenant_id()
+    if tid and entity_name in TENANT_SCOPED_ENTITIES:
+        prepared.setdefault("tenant_id", tid)
     return prepared
 
 
@@ -1802,7 +2069,7 @@ def _record_schema(entity: Dict[str, Any], partial: bool = False) -> Dict[str, A
     for field in fields:
         field_name = str(field["name"])
         schema_properties[field_name] = {{"type": _json_schema_type(str(field.get("type", "any")))}}
-        if not partial and field.get("required", True):
+        if not partial and field.get("required", False):
             required_fields.append(field_name)
     schema: Dict[str, Any] = {{
         "type": "object",
@@ -3353,13 +3620,52 @@ def _html_page(title: str, body: str) -> str:
         '<script>tailwind.config={{theme:{{extend:{{fontFamily:{{sans:["Inter","system-ui","sans-serif"],mono:["JetBrains Mono","ui-monospace","monospace"]}},colors:{{apg:{{primary:"#1E5B5A",accent:"#D97706"}}}}}}}}}}</script>'
         # htmx — progressive enhancement for partial updates
         '<script defer src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>'
+        # SortableJS — drag-and-drop for kanban
+        '<script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>'
     )
+    toast_js = (
+        '<div id="apg-toast-root" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>'
+        '<script>'
+        'function apgToast(m,t){{'
+        'var c=t==="error"?"bg-red-600":"bg-gray-900";'
+        'var el=document.createElement("div");'
+        'el.className=c+" text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto transition-all duration-300 opacity-0 translate-y-2";'
+        'el.textContent=m;'
+        'document.getElementById("apg-toast-root").appendChild(el);'
+        'requestAnimationFrame(function(){{el.classList.remove("opacity-0","translate-y-2");}});'
+        'setTimeout(function(){{el.classList.add("opacity-0");setTimeout(function(){{el.remove();}},300);}},3000);'
+        '}}'
+        'document.addEventListener("htmx:afterOnLoad",function(e){{'
+        'var t=e.detail.xhr.getResponseHeader("HX-Trigger");'
+        'if(!t)return;'
+        'try{{var d=JSON.parse(t);if(d.apgToast)apgToast(d.apgToast.msg,d.apgToast.type||"success");}}catch(ex){{}}'
+        '}});'
+        '</script>'
+    )
+    skeleton_css = (
+        '<style>'
+        '.apg-skeleton{{'
+        '  background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);'
+        '  background-size:200% 100%;'
+        '  animation:apg-shimmer 1.5s infinite;'
+        '  border-radius:4px;'
+        '}}'
+        '@keyframes apg-shimmer{{'
+        '  0%{{background-position:200% 0}}'
+        '  100%{{background-position:-200% 0}}'
+        '}}'
+        '.apg-loading .apg-skeleton-row{{height:40px;margin-bottom:8px;}}'
+        '.htmx-request .apg-content-area{{opacity:0.6;transition:opacity 0.2s;}}'
+        '</style>'
+    )
+    cmd_palette_html = {cmd_palette_literal!r}
     return (
         "<!doctype html>"
         '<html lang="en" class="h-full"><head>'
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         f"{{head_extras}}"
+        f"{{skeleton_css}}"
         '<link rel="stylesheet" href="/theme.css">'
         f"<title>{{safe_title}} — {{safe_module}}</title>"
         "</head>"
@@ -3369,9 +3675,12 @@ def _html_page(title: str, body: str) -> str:
         f'  <nav class="apg-topnav ml-4">'
         f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui">Home</a>'
         f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/workflows">⚡ Workflows</a>'
+        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/marketplace">Marketplace</a>'
         f'  </nav>'
         f'</header>'
         f'<main class="apg-content" id="main-content">{{body}}</main>'
+        f"{{toast_js}}"
+        f"{{cmd_palette_html}}"
         "</body></html>"
     )
 
@@ -3509,7 +3818,7 @@ def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = Fa
     fields = _field_specs(entity_name)
     for field in fields:
         field_name = str(field["name"])
-        if not partial and field.get("required", True) and field_name not in record:
+        if not partial and field.get("required", False) and field_name not in record:
             errors.append(f"{{field_name}} is required")
             continue
         if field_name in record and not _value_matches_type(record[field_name], str(field.get("type", "any"))):
@@ -4150,39 +4459,60 @@ def _ui_field_semantic(field_name: str, field_type: str) -> str:
     return "text"
 
 
+_INPUT_CLS = 'class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white placeholder-gray-300"'
+_LABEL_CLS = 'class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1"'
+_SELECT_CLS = 'class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary bg-white"'
+_CHECKBOX_CLS = 'class="w-4 h-4 text-apg-primary rounded border-gray-300"'
+
+
+def _humanize_label(field_name: str) -> str:
+    if field_name.endswith("_id"):
+        base = field_name[:-3].replace("_", " ").strip()
+        return " ".join(w.capitalize() for w in base.split()) + " ID"
+    return " ".join(w.capitalize() for w in field_name.replace("_", " ").split())
+
+
 def _ui_field_input_html(field: Dict[str, Any], entity_name: str = "") -> str:
     field_name = str(field["name"])
     safe_name = html.escape(field_name, quote=True)
-    safe_label = html.escape(field_name)
+    human_label = html.escape(_humanize_label(field_name))
     expected = _json_schema_type(str(field.get("type", "any")))
 
-    # Foreign key → dropdown populated from the related entity's records
+    # Foreign key → styled dropdown
     rel = _field_relationship(entity_name, field_name) if entity_name else None
     if rel:
         target = rel["target_table"]
         opts = _fk_select_options(target)
         return (
-            f'<label>{{safe_label}}</label>'
-            f'<select name="{{safe_name}}">'
-            f'{{opts}}'
-            f'</select><br>'
+            f'<div class="space-y-1">'
+            f'<label {{_LABEL_CLS}}>{{human_label}}</label>'
+            f'<select name="{{safe_name}}" {{_SELECT_CLS}}>{{opts}}</select>'
+            f'</div>'
         )
 
     if expected == "boolean":
         return (
+            f'<div class="flex items-center gap-2">'
             f'<input type="hidden" name="{{safe_name}}" value="false">'
-            f'<label>{{safe_label}} '
-            f'<input type="checkbox" name="{{safe_name}}" value="true"></label><br>'
+            f'<input type="checkbox" name="{{safe_name}}" value="true" {{_CHECKBOX_CLS}}>'
+            f'<label {{_LABEL_CLS}} style="margin-bottom:0">{{human_label}}</label>'
+            f'</div>'
         )
     if expected == "integer":
-        attributes = 'type="number" step="1"'
+        type_attr = 'type="number" step="1"'
     elif expected == "number":
-        attributes = 'type="number" step="any"'
+        type_attr = 'type="number" step="any"'
     elif field.get("type", "").lower() in {{"date", "datetime", "timestamp"}}:
-        attributes = 'type="date"'
+        type_attr = 'type="date"'
     else:
-        attributes = 'type="text"'
-    return f'<label>{{safe_label}} <input name="{{safe_name}}" {{attributes}}></label><br>'
+        type_attr = 'type="text"'
+    placeholder = f'placeholder="{{human_label}}"'
+    return (
+        f'<div class="space-y-1">'
+        f'<label {{_LABEL_CLS}}>{{human_label}}</label>'
+        f'<input name="{{safe_name}}" {{type_attr}} {{placeholder}} {{_INPUT_CLS}}>'
+        f'</div>'
+    )
 
 
 def _ui_entity_location(entity_name: str) -> str:
@@ -4282,10 +4612,16 @@ def _ui_records_query_form_html(entity_name: str, query: Dict[str, list[str]]) -
 
 def _ui_create_form_html(entity_name: str, fields: list[Dict[str, Any]]) -> str:
     """Return the HTML for the create-record form fields (used by the Jinja2 template)."""
-    return "".join(_ui_field_input_html(field, entity_name) for field in fields)
+    _SKIP = {{"id", "_revision"}}
+    parts = []
+    for field in fields:
+        if str(field.get("name", "")) in _SKIP:
+            continue
+        parts.append(_ui_field_input_html(field, entity_name))
+    return '<div class="space-y-3">' + "".join(parts) + "</div>"
 
 
-def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | None = None) -> str:
+def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | None = None, sort_field: str = "", sort_dir: str = "asc", q: str = "") -> str:
     records = records if records is not None else list_records(entity_name)
     if not records:
         return "<p>No records yet.</p>"
@@ -4294,21 +4630,36 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
     # Show at most 6 columns to keep table readable; id always first
     display_cols = ["id"] + [c for c in field_names if c != "id"][:5]
     safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
-    header = "".join(
-        f'<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">'
-        f'{{html.escape(col.replace("_id","").replace("_"," ").title())}}</th>'
-        for col in display_cols
-    )
+    q_part = f"&q={{html.escape(quote(q, safe=''), quote=True)}}" if q else ""
+    header_cells = []
+    for col in display_cols:
+        label = html.escape((col[:-3].replace("_", " ").title() + " ID") if col.endswith("_id") else col.replace("_", " ").title())
+        next_dir = "desc" if sort_field == col and sort_dir == "asc" else "asc"
+        sort_icon = ""
+        if sort_field == col:
+            sort_icon = " ▼" if sort_dir == "desc" else " ▲"
+        header_cells.append(
+            f'<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">'
+            f'<a href="/ui/entities/{{safe_entity}}?sort={{html.escape(col)}}&dir={{next_dir}}{{q_part}}"'
+            f' class="hover:text-gray-900 transition-colors">{{label}}{{sort_icon}}</a>'
+            f'</th>'
+        )
+    header = "".join(header_cells)
     rows: list[str] = []
     for record in records:
         raw_record_id = str(record.get("id", ""))
         record_id = html.escape(quote(raw_record_id, safe=""), quote=True)
         revision = html.escape(str(record.get("_revision", "")), quote=True)
-        cells = []
+        cb_cell = (
+            f'<td class="pl-3 pr-1 py-2.5 w-8">'
+            f'<input type="checkbox" class="apg-row-cb w-4 h-4 rounded border-gray-300 text-apg-primary"'
+            f' data-row-id="{{raw_record_id}}" data-rev="{{revision}}">'
+            f'</td>'
+        )
+        cells = [cb_cell]
         for col in display_cols:
             val = html.escape(_ui_record_display_value(record.get(col)))
             if col == "id":
-                # ID cell: click → record detail
                 cells.append(
                     f'<td class="px-4 py-2.5">'
                     f'<a href="/ui/entities/{{safe_entity}}/{{record_id}}"'
@@ -4316,9 +4667,7 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
                     f'</td>'
                 )
             else:
-                cells.append(
-                    f'<td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">{{val}}</td>'
-                )
+                cells.append(f'<td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">{{val}}</td>')
         action = (
             f'<div class="flex items-center gap-3 justify-end opacity-0 group-hover/row:opacity-100 transition-opacity">'
             f'<a href="/ui/entities/{{safe_entity}}/{{record_id}}"'
@@ -4336,17 +4685,65 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
             f'<td class="px-4 py-2.5 text-right">{{action}}</td>'
             f'</tr>'
         )
+    bulk_bar = (
+        f'<div id="apg-bulk-bar" data-entity="{{safe_entity}}"'
+        f' class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50'
+        f' bg-gray-900 text-white rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-3 text-sm">'
+        f'<span id="apg-bulk-cnt" class="font-semibold tabular-nums"></span>'
+        f'<button onclick="apgBulkDelete()"'
+        f' class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors">Delete</button>'
+        f'<a id="apg-csv-link" href="/entities/{{safe_entity}}/records.csv"'
+        f' class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition-colors">Export CSV</a>'
+        f'<button onclick="apgBulkClear()" class="ml-1 text-gray-400 hover:text-white leading-none text-base">✕</button>'
+        f'</div>'
+    )
+    bulk_js = (
+        '<script>'
+        '(function(){{'
+        'function upd(){{'
+        'var cc=document.querySelectorAll(".apg-row-cb:checked");'
+        'var bar=document.getElementById("apg-bulk-bar");'
+        'if(!bar)return;'
+        'var cnt=document.getElementById("apg-bulk-cnt");'
+        'if(cc.length>0){{bar.classList.remove("hidden");cnt.textContent=cc.length+" selected";}}else{{bar.classList.add("hidden");}}'
+        '}}'
+        'window.apgBulkClear=function(){{'
+        'document.querySelectorAll(".apg-row-cb").forEach(function(c){{c.checked=false;}});'
+        'upd();'
+        '}};'
+        'window.apgBulkDelete=function(){{'
+        'var cc=document.querySelectorAll(".apg-row-cb:checked");'
+        'if(!cc.length)return;'
+        'if(!confirm("Delete "+cc.length+" record(s)? This cannot be undone."))return;'
+        'var ids=Array.from(cc).map(function(c){{return c.dataset.rowId;}}).join(",");'
+        'var entity=document.getElementById("apg-bulk-bar").dataset.entity;'
+        'var fd=new FormData();fd.append("ids",ids);'
+        'fetch("/ui/entities/"+entity+"/records/bulk_delete",{{method:"POST",headers:{{"Content-Type":"application/x-www-form-urlencoded"}},body:"ids="+encodeURIComponent(ids)}})'
+        '.then(function(r){{if(r.redirected||r.ok)window.location.reload();}});'
+        '}};'
+        'document.addEventListener("change",function(e){{if(e.target.classList.contains("apg-row-cb"))upd();}});'
+        'document.addEventListener("click",function(e){{'
+        'var allCb=e.target.closest(".apg-select-all");'
+        'if(allCb){{document.querySelectorAll(".apg-row-cb").forEach(function(c){{c.checked=allCb.checked;}});upd();}}'
+        '}});'
+        '}})()'
+        '</script>'
+    )
     return (
-        f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">'
-        f'<div class="overflow-x-auto">'
-        f'<table class="w-full">'
-        f'<thead class="bg-gray-50 border-b border-gray-100">'
-        f'<tr>{{header}}<th class="px-4 py-2.5 w-28"></th></tr>'
-        f'</thead>'
-        f'<tbody>{{"".join(rows)}}</tbody>'
-        f'</table>'
-        f'</div>'
-        f'</div>'
+        bulk_bar
+        + f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">'
+        + f'<div class="overflow-x-auto">'
+        + f'<table class="w-full">'
+        + f'<thead class="bg-gray-50 border-b border-gray-100">'
+        + f'<tr>'
+        + f'<th class="pl-3 pr-1 py-2.5 w-8"><input type="checkbox" class="apg-select-all w-4 h-4 rounded border-gray-300"></th>'
+        + f'{{header}}<th class="px-4 py-2.5 w-28"></th></tr>'
+        + f'</thead>'
+        + f'<tbody>{{"".join(rows)}}</tbody>'
+        + f'</table>'
+        + f'</div>'
+        + f'</div>'
+        + bulk_js
     )
 
 
@@ -4360,9 +4757,29 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
 
     # Full-text search: filter records where any string field contains q
     q = query.get("q", [""])[0].strip() if "q" in query else ""
-    base_query = {{k: v for k, v in query.items() if k != "q"}}
+    sort_field = query.get("sort", [""])[0].strip()
+    sort_dir = query.get("dir", ["asc"])[0].strip().lower()
+    if sort_dir not in ("asc", "desc"):
+        sort_dir = "asc"
+    # Pagination
+    try:
+        page = max(1, int(query.get("page", ["1"])[0]))
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        per = max(5, min(200, int(query.get("per", ["50"])[0])))
+    except (ValueError, TypeError):
+        per = 50
+
+    # Build query for sort/pagination (not q — we do q client-side)
+    base_query: Dict[str, list[str]] = {{}}
+    if sort_field:
+        base_query["sort"] = [sort_field]
+        base_query["order"] = [sort_dir]
     query_result = query_records(entity_name, base_query)
     all_records = query_result["records"]
+
+    # Full-text search filter
     if q:
         q_low = q.lower()
         filtered = [
@@ -4372,11 +4789,17 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
     else:
         filtered = all_records
 
+    total_filtered = len(filtered)
+    total_pages = max(1, (total_filtered + per - 1) // per)
+    page = min(page, total_pages)
+    offset = (page - 1) * per
+    paginated = filtered[offset:offset + per]
+
     # Detect kanban-eligible status field
     status_field_names = {{"status", "state", "stage", "phase"}}
     has_kanban = any(str(f.get("name", "")).lower() in status_field_names for f in fields)
 
-    records_table = _ui_records_table_html(entity_name, filtered)
+    records_table = _ui_records_table_html(entity_name, paginated, sort_field=sort_field, sort_dir=sort_dir, q=q)
 
     # Prefer Jinja2 template for rich UI; fall back to f-string builder for zero-dep mode
     create_inputs = _ui_create_form_html(entity_name, fields)
@@ -4386,15 +4809,20 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
         entity_type=html.escape(entity.get("type", "entity")),
         safe_entity=safe_entity,
         fields=fields,
-        records=filtered,
+        records=paginated,
         total=query_result["total"],
-        count=len(filtered),
+        count=total_filtered,
         records_table=records_table,
         create_inputs=create_inputs,
         notice=html.escape(notice) if notice else "",
         query=query,
         has_kanban=has_kanban,
         q=html.escape(q) if q else "",
+        sort_field=sort_field,
+        sort_dir=sort_dir,
+        page=page,
+        per=per,
+        total_pages=total_pages,
     )
     if tmpl_body is not None:
         return 200, _html_page(entity_name, tmpl_body)
@@ -4492,7 +4920,7 @@ def _ui_field_view_fragment(entity_name: str, record_id: str, field: Dict[str, A
         display = '<span class="inline-flex items-center gap-1 text-gray-400"><span class="text-xs">✕</span> No</span>'
     else:
         display = html.escape(str(field_val)[:200])
-    label = html.escape(field_name.replace("_id", "").replace("_", " ").title())
+    label = html.escape((field_name[:-3].replace("_", " ").title() + " ID") if field_name.endswith("_id") else field_name.replace("_", " ").title())
     edit_url = f"/ui/entities/{{safe_entity}}/{{safe_record_id}}/fields/{{html.escape(field_name)}}/edit"
     return (
         f'<div id="{{fld_id}}" class="py-3 border-b border-gray-50 last:border-0 group/field">'
@@ -4578,6 +5006,7 @@ def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
         revision=revision,
         related_lists=related_lists,
         has_kanban=has_kanban,
+        activity_events=_get_activity(entity_name, record_id),
     )
     if tmpl_body is not None:
         return 200, _html_page(title or entity_name, tmpl_body)
@@ -4598,7 +5027,7 @@ def _ui_field_edit_html(entity_name: str, record_id: str, field_name: str) -> tu
     safe_field_name = html.escape(field_name)
     fld_id = f"fld-{{safe_entity}}-{{safe_record_id}}-{{safe_field_name}}"
     current_val = html.escape(str(record.get(field_name, "") or ""), quote=True)
-    label = html.escape(field_name.replace("_id", "").replace("_", " ").title())
+    label = html.escape((field_name[:-3].replace("_", " ").title() + " ID") if field_name.endswith("_id") else field_name.replace("_", " ").title())
     patch_url = f"/ui/entities/{{safe_entity}}/{{safe_record_id}}/fields/{{safe_field_name}}/patch"
     cancel_url = f"/ui/entities/{{safe_entity}}/{{safe_record_id}}/fields/{{safe_field_name}}/view"
     field_type = str(field.get("type", "string"))
@@ -4689,7 +5118,8 @@ def _ui_field_patch_post(entity_name: str, record_id: str, field_name: str, form
     _status2, refreshed_resp = get_record(entity_name, record_id)
     refreshed = refreshed_resp.get("record", refreshed_resp) if isinstance(refreshed_resp, dict) else {{}}
     rec = refreshed if refreshed else updated
-    return 200, {{"html": _ui_field_view_fragment(entity_name, record_id, field, rec)}}
+    label = str(field.get("name", "")).replace("_", " ").title()
+    return 200, {{"html": _ui_field_view_fragment(entity_name, record_id, field, rec), "hx_trigger": {{"apgToast": {{"msg": f"{{label}} saved", "type": "success"}}}}}}
 
 
 def _ui_kanban_html(entity_name: str) -> tuple[int, str]:
@@ -4733,6 +5163,141 @@ def _ui_kanban_html(entity_name: str) -> tuple[int, str]:
     return _ui_entity_html(entity_name)
 
 
+def _ui_debug_html(run_id: str | None = None) -> tuple[int, str]:
+    runs = list_workflow_runs()
+    cb_status = circuit_breaker_status()
+    subs = dict(APG_EVENT_SUBSCRIPTIONS)
+    # Run detail
+    detail_html = ""
+    if run_id:
+        try:
+            run = get_workflow_run(run_id)
+        except KeyError:
+            run = None
+        if run:
+            trace = run.get("trace", [])
+            trace_rows = []
+            for t in trace:
+                status_cls = (
+                    "bg-green-100 text-green-800" if t.get("status") == "completed"
+                    else "bg-red-100 text-red-800" if t.get("status") in {{"failed", "circuit_open"}}
+                    else "bg-yellow-100 text-yellow-800"
+                )
+                attempts = t.get("attempts", [])
+                attempts_html = f', {{len(attempts)}} attempt(s)' if len(attempts) > 1 else ""
+                trace_rows.append(
+                    f'<tr class="border-b border-gray-50">'
+                    f'<td class="px-4 py-2 text-xs font-mono text-gray-500">{{t.get("index", "")}}</td>'
+                    f'<td class="px-4 py-2 text-sm font-medium">{{html.escape(str(t.get("step", "")))}}</td>'
+                    f'<td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold {{status_cls}}">{{html.escape(str(t.get("status", "")))}}</span></td>'
+                    f'<td class="px-4 py-2 text-xs text-gray-500">{{html.escape(str(t.get("timeout_spec", "")))}}{{attempts_html}}</td>'
+                    f'</tr>'
+                )
+            # Journal timeline
+            journal = _get_journal(run_id)
+            ev_color_map = {{"step_completed": "bg-green-400", "step_failed": "bg-red-400", "saga_compensating": "bg-orange-400", "signal_received": "bg-purple-400"}}
+            journal_items = []
+            for ev in journal:
+                ev_color = ev_color_map.get(ev["event_type"], "bg-gray-400")
+                journal_items.append(
+                    f'<li class="ml-6 mb-3 relative">'
+                    f'<span class="absolute flex items-center justify-center w-6 h-6 rounded-full -left-3 ring-2 ring-white {{ev_color}}"></span>'
+                    f'<div class="pl-1">'
+                    f'<p class="text-xs font-semibold text-gray-900">#{{ev["seq"]}} {{html.escape(ev["event_type"].replace("_"," ").title())}}</p>'
+                    f'<p class="text-xs text-gray-500">Step: {{html.escape(str(ev["step"]))}} \xb7 {{html.escape(ev["ts"][:19].replace("T"," "))}} UTC</p>'
+                    f'<p class="text-xs font-mono text-gray-300 truncate">{{html.escape(ev["hash"][:16])}}...</p>'
+                    f'</div></li>'
+                )
+            journal_html = (
+                f'<div class="px-4 py-3 border-t border-gray-100">'
+                f'<h3 class="text-xs font-semibold text-gray-700 mb-2">Event Journal</h3>'
+                f'<ol class="relative border-l border-gray-200 ml-3">'
+                + ("".join(journal_items) if journal_items else '<li class="ml-6"><p class="text-xs text-gray-400">No journal events yet.</p></li>')
+                + f'</ol></div>'
+            )
+            detail_html = (
+                f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
+                f'<div class="px-4 py-3 border-b border-gray-100"><h2 class="text-sm font-semibold">Run: {{html.escape(str(run_id))}}'
+                f' <span class="ml-2 text-xs text-gray-400">{{html.escape(str(run.get("workflow","")))}}</span></h2></div>'
+                f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
+                f'<tr><th class="px-4 py-2 text-left">#</th><th class="px-4 py-2 text-left">Step</th>'
+                f'<th class="px-4 py-2 text-left">Status</th><th class="px-4 py-2 text-left">Notes</th></tr></thead>'
+                f'<tbody>{{" ".join(trace_rows)}}</tbody></table>'
+                + journal_html
+                + f'</div>'
+            )
+    # Run list
+    run_rows = []
+    for r in sorted(runs, key=lambda x: str(x.get("id", "")), reverse=True)[:50]:
+        rid = html.escape(str(r.get("id", "")))
+        wf = html.escape(str(r.get("workflow", "")))
+        st = html.escape(str(r.get("status", "")))
+        sc = "bg-green-100 text-green-800" if st == "completed" else "bg-red-100 text-red-800" if st == "failed" else "bg-yellow-100 text-yellow-800"
+        run_rows.append(
+            f'<tr class="hover:bg-gray-50 border-b border-gray-50">'
+            f'<td class="px-4 py-2 text-xs font-mono"><a href="/ui/debug/{{rid}}" class="text-apg-primary hover:underline">{{rid}}</a></td>'
+            f'<td class="px-4 py-2 text-sm">{{wf}}</td>'
+            f'<td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold {{sc}}">{{st}}</span></td>'
+            f'<td class="px-4 py-2 text-xs text-gray-400">{{len(r.get("trace", []))}} steps</td>'
+            f'</tr>'
+        )
+    # Circuit breakers section
+    cb_rows = []
+    for k, v in cb_status.items():
+        st = v.get("state", "closed")
+        sc = "bg-green-100 text-green-800" if st == "closed" else "bg-red-100 text-red-800" if st == "open" else "bg-yellow-100 text-yellow-800"
+        cb_rows.append(
+            f'<tr class="border-b border-gray-50">'
+            f'<td class="px-4 py-2 text-xs font-mono">{{html.escape(k)}}</td>'
+            f'<td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold {{sc}}">{{st}}</span></td>'
+            f'<td class="px-4 py-2 text-xs tabular-nums">{{v.get("failures", 0)}}</td>'
+            f'</tr>'
+        )
+    cb_section = (
+        f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
+        f'<div class="px-4 py-3 border-b border-gray-100"><h2 class="text-sm font-semibold text-gray-900">Circuit Breakers</h2></div>'
+        + (f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
+           f'<tr><th class="px-4 py-2 text-left">Key</th><th class="px-4 py-2 text-left">State</th><th class="px-4 py-2 text-left">Failures</th></tr></thead>'
+           f'<tbody>{{" ".join(cb_rows)}}</tbody></table>' if cb_rows else
+           f'<p class="px-4 py-6 text-sm text-gray-400 text-center">No circuit breakers tripped.</p>')
+        + f'</div>'
+    )
+    # Event subscriptions section
+    sub_rows = [
+        f'<tr class="border-b border-gray-50"><td class="px-4 py-2 text-xs font-mono">{{html.escape(ev)}}</td>'
+        f'<td class="px-4 py-2 text-xs text-gray-600">{{html.escape(", ".join(wfs))}}</td></tr>'
+        for ev, wfs in subs.items()
+    ]
+    sub_section = (
+        f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
+        f'<div class="px-4 py-3 border-b border-gray-100"><h2 class="text-sm font-semibold text-gray-900">Event Subscriptions</h2></div>'
+        + (f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
+           f'<tr><th class="px-4 py-2 text-left">Event</th><th class="px-4 py-2 text-left">Subscribed Workflows</th></tr></thead>'
+           f'<tbody>{{" ".join(sub_rows)}}</tbody></table>' if sub_rows else
+           f'<p class="px-4 py-6 text-sm text-gray-400 text-center">No active subscriptions.</p>')
+        + f'</div>'
+    )
+    body = (
+        f'<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500">'
+        f'<a href="/ui" class="hover:text-apg-primary">Application</a><span>/</span>'
+        f'<span class="font-semibold text-gray-900">Flow Debugger</span></nav>'
+        + detail_html
+        + f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
+        + f'<div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">'
+        + f'<h2 class="text-sm font-semibold text-gray-900">Workflow Runs</h2>'
+        + f'<span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{len(runs)}} total</span></div>'
+        + (f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
+           f'<tr><th class="px-4 py-2 text-left">Run ID</th><th class="px-4 py-2 text-left">Workflow</th>'
+           f'<th class="px-4 py-2 text-left">Status</th><th class="px-4 py-2 text-left">Steps</th></tr></thead>'
+           f'<tbody>{{" ".join(run_rows)}}</tbody></table>' if run_rows else
+           f'<p class="px-4 py-10 text-sm text-gray-400 text-center">No workflow runs yet.</p>')
+        + f'</div>'
+        + cb_section
+        + sub_section
+    )
+    return 200, _html_page("Flow Debugger", body)
+
+
 def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, str]:
     parts = [part for part in path.split("/") if part]
     if parts == ["ui"]:
@@ -4773,6 +5338,21 @@ def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[i
         return _ui_agent_console_html(parts[2], team=True)
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "capabilities":
         return _ui_capability_console_html(parts[2])
+    if parts[:2] == ["ui", "debug"]:
+        return _ui_debug_html(parts[2] if len(parts) > 2 else None)
+    if parts == ["ui", "marketplace"]:
+        try:
+            from compiler.connector_generator import scan_connectors
+            connectors = scan_connectors("connectors")
+        except Exception:
+            connectors = list(APG_CONNECTOR_REGISTRY)
+        tmpl_body = _render_template("marketplace.html.j2",
+            connectors=connectors,
+            installed_count=len(connectors),
+        )
+        if tmpl_body is not None:
+            return 200, _html_page("Connector Marketplace", tmpl_body)
+        return 200, _html_page("Connector Marketplace", "<h1>Connector Marketplace</h1>")
     return 404, _html_page("Not found", f"<h1>Not found</h1><p>{{html.escape(path)}}</p>")
 
 
@@ -4928,6 +5508,17 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
         if status == 201:
             return 303, {{"location": _ui_entity_location(entity_name)}}
         return status, response
+    if (len(parts) == 5 and parts[0] == "ui" and parts[1] == "entities"
+            and parts[3] == "records" and parts[4] == "bulk_delete"):
+        entity_name = parts[2]
+        ids_raw = form_record.get("ids", "")
+        ids = [i.strip() for i in ids_raw.split(",") if i.strip()]
+        for rid in ids:
+            try:
+                delete_record(entity_name, rid)
+            except Exception:
+                pass
+        return 303, {{"location": _ui_entity_location(entity_name)}}
     if len(parts) == 5 and parts[0] == "ui" and parts[1] == "entities" and parts[3] == "records":
         entity_name = parts[2]
         record_id = parts[4]
@@ -4956,6 +5547,14 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
         if status == 200:
             return 303, {{"location": _ui_entity_location(entity_name)}}
         return status, response
+    if (len(parts) == 6 and parts[0] == "ui" and parts[1] == "entities"
+            and parts[3] == "records" and parts[5] == "note"):
+        entity_name = parts[2]
+        record_id = parts[4]
+        note = str(form_record.get("note", "")).strip()
+        if note:
+            _log_activity(entity_name, record_id, "note", detail=note[:200])
+        return 303, {{"location": f"/ui/entities/{{entity_name}}/{{record_id}}"}}
     return 404, {{"error": "not_found", "path": path}}
 
 
@@ -5133,6 +5732,8 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, {{"runs": list_workflow_runs()}}
     if path.startswith("/workflows/runs/"):
         parts = [part for part in path.split("/") if part]
+        if len(parts) == 4 and parts[3] == "journal":
+            return 200, {{"run_id": parts[2], "events": _get_journal(parts[2])}}
         if len(parts) == 3:
             try:
                 return 200, get_workflow_run(parts[2])
@@ -5163,6 +5764,34 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, auth_status()
     if path == "/events":
         return 200, {{"events": list_events()}}
+    if path == "/events/subscriptions":
+        return 200, {{"subscriptions": dict(APG_EVENT_SUBSCRIPTIONS)}}
+    if path == "/api/search":
+        q = str((query or {{}}).get("q", [""])[0]).strip().lower() if query else ""
+        results: list[Dict[str, Any]] = []
+        if q:
+            for ent in ENTITIES:
+                ename = str(ent["name"])
+                for rec in list_records(ename)[:200]:
+                    for v in rec.values():
+                        if q in str(v).lower():
+                            label_field = next(
+                                (f["name"] for f in ent.get("fields", [])
+                                 if f["name"] not in ["id", "_revision"]),
+                                "id",
+                            )
+                            results.append({{
+                                "entity": ename,
+                                "id": str(rec.get("id", "")),
+                                "label": str(rec.get(label_field, rec.get("id", "")))[:60],
+                            }})
+                            break
+        results = results[:20]
+        return 200, {{"results": results, "query": q, "count": len(results)}}
+    if path == "/circuit-breakers":
+        return 200, {{"circuit_breakers": circuit_breaker_status()}}
+    if path == "/connectors":
+        return 200, {{"connectors": APG_CONNECTOR_REGISTRY}}
     if path == "/metrics":
         return 200, metrics_snapshot()
     if path == "/self-test":
@@ -5413,9 +6042,10 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
         NEXT_RECORD_IDS[entity_name] += 1
     elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
         return 409, {{"error": "duplicate_record_id", "entity": entity_name, "id": record["id"]}}
-    record = _prepare_new_record(record)
+    record = _prepare_new_record(record, entity_name)
     RECORD_STORE[entity_name].append(record)
     event = _record_event("create", entity_name, after=record)
+    _log_activity(entity_name, str(record.get("id", "")), "created", detail=f"Record created with {{len(record)}} fields")
     persistence_error = _persist_record_store()
     if persistence_error:
         return 500, {{"error": "persistence_failed", "message": persistence_error}}
@@ -5494,6 +6124,7 @@ def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
             updated["_revision"] = int(existing.get("_revision", 1)) + 1
             RECORD_STORE[entity_name][index] = updated
             event = _record_event("update", entity_name, before=existing, after=updated)
+            _log_activity(entity_name, str(record_id), "updated", detail="Fields updated")
             persistence_error = _persist_record_store()
             if persistence_error:
                 return 500, {{"error": "persistence_failed", "message": persistence_error}}
@@ -5524,6 +6155,7 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
             conflict = _revision_conflict(existing, expected_revision)
             if conflict is not None:
                 return 409, conflict
+            _log_activity(entity_name, str(record_id), "deleted", detail="Record deleted")
             deleted = RECORD_STORE[entity_name].pop(index)
             event = _record_event("delete", entity_name, before=deleted)
             persistence_error = _persist_record_store()
@@ -5540,6 +6172,12 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
 
 def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     path = path.rstrip("/") or "/"
+    if path == "/events/emit":
+        event_name = payload.get("name") or payload.get("event") or ""
+        if not event_name:
+            return 422, {{"error": "missing_field", "field": "name"}}
+        ev = emit_apg_event(str(event_name), payload.get("payload") or {{}})
+        return 200, {{"event": ev}}
     if (
         path.startswith("/agents/") and path.endswith(("/invoke", "/run"))
     ) or (
@@ -5566,6 +6204,16 @@ def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, An
         path.startswith("/capabilities/") and path.endswith("/approval/plan")
     ):
         return _approval_plan_payload(path, payload)
+    if path.startswith("/workflows/runs/") and "/signal/" in path:
+        parts = [part for part in path.split("/") if part]
+        if len(parts) == 5 and parts[0] == "workflows" and parts[1] == "runs" and parts[3] == "signal":
+            sig_run_id = parts[2]
+            signal_name = parts[4]
+            if sig_run_id not in WORKFLOW_SIGNALS:
+                WORKFLOW_SIGNALS[sig_run_id] = []
+            WORKFLOW_SIGNALS[sig_run_id].append(signal_name)
+            _journal_append(sig_run_id, "signal_received", signal_name, {{"from": "external"}})
+            return 200, {{"status": "signal_received", "run_id": sig_run_id, "signal": signal_name}}
     if path.startswith("/workflows/runs/") and path.endswith("/compensate"):
         return _workflow_compensation_payload(path, payload)
     if path.startswith("/workflows/runs/") and path.endswith("/resume"):
@@ -5584,6 +6232,88 @@ def _put_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any
     return 404, {{"error": "not_found", "path": path}}
 
 
+def _csv_export_body(entity_name: str) -> bytes:
+    records = list_records(entity_name)
+    if not records:
+        return b""
+    import io, csv as _csv
+    fields = _field_specs(entity_name)
+    cols = [str(f["name"]) for f in fields if str(f["name"]) != "_revision"] or list(records[0].keys())
+    buf = io.StringIO()
+    w = _csv.writer(buf)
+    w.writerow(cols)
+    for rec in records:
+        w.writerow([str(rec.get(c, "")) for c in cols])
+    return buf.getvalue().encode("utf-8")
+
+
+import os as _os_env
+_APG_PG_URL: str | None = _os_env.environ.get("APG_PG_URL") or _os_env.environ.get("DATABASE_URL") or None
+
+
+def _pg_connection():
+    if not _APG_PG_URL:
+        return None
+    try:
+        import psycopg2  # type: ignore
+        return psycopg2.connect(_APG_PG_URL)
+    except Exception:
+        return None
+
+
+def _pg_ensure_runs_table(conn) -> None:
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS apg_workflow_runs ("
+                "  run_id TEXT PRIMARY KEY,"
+                "  module_name TEXT NOT NULL,"
+                "  data TEXT NOT NULL,"
+                "  updated_at TIMESTAMPTZ DEFAULT NOW()"
+                ")"
+            )
+        conn.commit()
+    except Exception:
+        pass
+
+
+def _pg_save_workflow_run(run: Dict[str, Any]) -> None:
+    conn = _pg_connection()
+    if not conn:
+        return
+    try:
+        _pg_ensure_runs_table(conn)
+        rid = str(run.get("id", ""))
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO apg_workflow_runs (run_id, module_name, data)"
+                " VALUES (%s, %s, %s)"
+                " ON CONFLICT (run_id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()",
+                (rid, MODULE_NAME, json.dumps(run, default=str))
+            )
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+
+def _pg_load_workflow_runs() -> list[Dict[str, Any]]:
+    conn = _pg_connection()
+    if not conn:
+        return []
+    try:
+        _pg_ensure_runs_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT data FROM apg_workflow_runs WHERE module_name = %s", (MODULE_NAME,))
+            rows = cur.fetchall()
+        return [json.loads(row[0]) for row in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+
 _load_record_store()
 
 
@@ -5596,11 +6326,13 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_html(self, status: int, html_payload: str) -> None:
+    def _send_html(self, status: int, html_payload: str, hx_trigger: dict | None = None) -> None:
         body = html_payload.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        if hx_trigger:
+            self.send_header("HX-Trigger", json.dumps(hx_trigger))
         self.end_headers()
         self.wfile.write(body)
 
@@ -5617,7 +6349,12 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
         self._send_json(status, response)
         return False
 
+    def _setup_tenant(self) -> None:
+        tid = self.headers.get("X-APG-Tenant") or self.headers.get("X-Tenant-ID")
+        _TENANT_LOCAL.tenant_id = tid or None
+
     def do_GET(self) -> None:
+        self._setup_tenant()
         path, _, raw_query = self.path.partition("?")
         query = parse_qs(raw_query, keep_blank_values=True)
         if path in ("/", "/home"):
@@ -5628,6 +6365,11 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
             body = theme_stylesheet().encode("utf-8")
             status = 200
             content_type = "text/css; charset=utf-8"
+        elif path.startswith("/entities/") and path.endswith("/records.csv"):
+            entity_name = path.split("/")[2]
+            body = _csv_export_body(entity_name)
+            status = 200
+            content_type = "text/csv; charset=utf-8"
         elif path == "/ui" or path.startswith("/ui/"):
             status, html_payload = _ui_payload(path, query)
             body = html_payload.encode("utf-8")
@@ -5651,6 +6393,7 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:
+        self._setup_tenant()
         path = self.path.split("?", 1)[0]
         if not self._authorize_mutation():
             return
@@ -5671,7 +6414,8 @@ class ApplicationRequestHandler(BaseHTTPRequestHandler):
                     self._send_redirect(status, str(response["location"]))
                     return
                 if "html" in response:
-                    self._send_html(status, str(response["html"]))
+                    hx_trigger = response.get("hx_trigger")
+                    self._send_html(status, str(response["html"]), hx_trigger=hx_trigger)
                     return
                 self._send_html(status, _ui_error_payload(path, response))
                 return

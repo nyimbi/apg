@@ -37,9 +37,9 @@ import re
 from collections import defaultdict, deque
 import time
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
-logger = logging.getLogger(__name__)
+logger= logging.getLogger(__name__)
 
 # Security models and enums
 class AuthenticationMethod(str, Enum):

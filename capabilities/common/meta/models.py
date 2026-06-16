@@ -14,10 +14,10 @@ from enum import Enum
 import json
 from uuid_extensions import uuid7str
 
-from pydantic import BaseModel, Field, ConfigDict, validator, root_validator, AfterValidator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator, AfterValidator
 from pydantic import UUID4
 from sqlalchemy import Column, String, Text, DateTime, Float, Integer, Boolean, JSON, ForeignKey, Index
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.schema import CheckConstraint
@@ -153,13 +153,13 @@ class MetaAssetBase(BaseModel):
 	quality_score: Optional[float] = Field(None, ge=0.0, le=100.0, description="Overall quality score")
 	usage_score: Optional[float] = Field(None, ge=0.0, le=100.0, description="Usage popularity score")
 	
-	@validator('name')
+	@field_validator('name')
 	def validate_name(cls, v):
 		if not v or v.strip() == "":
 			raise ValueError("Asset name cannot be empty")
 		return v.strip()
 	
-	@validator('schema_info')
+	@field_validator('schema_info')
 	def validate_schema_info(cls, v):
 		if v is None:
 			return {}

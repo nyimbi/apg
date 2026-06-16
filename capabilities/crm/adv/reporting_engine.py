@@ -21,9 +21,9 @@ import json
 import base64
 from io import BytesIO
 
-from pydantic import BaseModel, Field, validator, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
-from .database import DatabaseManager
+from.database import DatabaseManager
 
 
 logger = logging.getLogger(__name__)
@@ -198,12 +198,12 @@ class ReportDefinition(BaseModel):
 	status: ReportStatus = Field(default=ReportStatus.DRAFT, description="Report status")
 	
 	# Data source configuration
-	data_sources: List[str] = Field(..., min_items=1, description="Data source tables")
+	data_sources: List[str] = Field(..., min_length=1, description="Data source tables")
 	joins: List[Dict[str, Any]] = Field(default_factory=list, description="Table join configurations")
 	base_query: Optional[str] = Field(None, description="Base SQL query")
 	
 	# Fields and structure
-	fields: List[ReportField] = Field(..., min_items=1, description="Report fields")
+	fields: List[ReportField] = Field(..., min_length=1, description="Report fields")
 	filters: List[Dict[str, Any]] = Field(default_factory=list, description="Report filters")
 	parameters: List[Dict[str, Any]] = Field(default_factory=list, description="Report parameters")
 	
@@ -301,7 +301,7 @@ class ReportSchedule(BaseModel):
 	next_run_at: Optional[datetime] = Field(None, description="Next scheduled run")
 	
 	# Export and delivery
-	export_formats: List[ExportFormat] = Field(..., min_items=1, description="Export formats")
+	export_formats: List[ExportFormat] = Field(..., min_length=1, description="Export formats")
 	email_recipients: List[str] = Field(default_factory=list, description="Email recipients")
 	email_subject: Optional[str] = Field(None, description="Email subject template")
 	email_body: Optional[str] = Field(None, description="Email body template")

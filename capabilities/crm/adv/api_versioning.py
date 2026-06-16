@@ -20,7 +20,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from packaging import version as pkg_version
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from uuid_extensions import uuid7str
 
 try:

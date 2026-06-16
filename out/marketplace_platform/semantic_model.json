@@ -1,0 +1,135 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 2,
+    "name": "main",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "main.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 2,
+      "kind": "deployment",
+      "nodes": 3
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 2,
+      "kind": "handler",
+      "nodes": 3
+    },
+    "lookup": {
+      "edges": 2,
+      "kind": "lookup",
+      "nodes": 3
+    },
+    "package": {
+      "edges": 2,
+      "kind": "package",
+      "nodes": 3
+    },
+    "security": {
+      "edges": 2,
+      "kind": "security",
+      "nodes": 3
+    },
+    "workflow": {
+      "edges": 2,
+      "kind": "workflow",
+      "nodes": 3
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "main.apg"
+  ],
+  "symbols": {
+    "marketplace.EcommerceHub": {
+      "file": "main.apg",
+      "id": "marketplace.EcommerceHub",
+      "kind": "marketplace",
+      "name": "EcommerceHub",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "marketplace.FreelanceHub": {
+      "file": "main.apg",
+      "id": "marketplace.FreelanceHub",
+      "kind": "marketplace",
+      "name": "FreelanceHub",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.main": {
+      "file": "main.apg",
+      "id": "module.main",
+      "kind": "module",
+      "name": "main",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

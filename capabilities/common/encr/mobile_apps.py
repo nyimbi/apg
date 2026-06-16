@@ -21,10 +21,10 @@ from uuid_extensions import uuid7str
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from pydantic import constr
 
-from ..request_context import get_tenant_id_from_context
+from..request_context import get_tenant_id_from_context
 
 # Mobile Platform Definitions
 class MobilePlatform(str, Enum):

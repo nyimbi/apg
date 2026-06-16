@@ -32,9 +32,9 @@ from google.cloud import pubsub_v1
 from google.oauth2 import service_account
 from google.auth.exceptions import GoogleAuthError
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
-from .base_connector import BaseConnector, ConnectorConfiguration
+from.base_connector import BaseConnector, ConnectorConfiguration
 
 logger = logging.getLogger(__name__)
 

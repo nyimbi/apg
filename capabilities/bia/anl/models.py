@@ -15,13 +15,13 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator, root_validator
-from pydantic.config import ConfigDict
+from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic, model_validator.config import ConfigDict
 from pydantic import EmailStr, HttpUrl, Json
 from uuid_extensions import uuid7str
 
 
-class ConfigDict(ConfigDict):
+class ConfigDict, field_validator, model_validator(ConfigDict):
 	extra = 'forbid'
 	validate_by_name = True
 	validate_by_alias = True
@@ -531,14 +531,15 @@ class APHealthcareAnalytics(APAnalyticsBase):
 
 
 # Validation Methods
-@validator('processing_config', pre=True, always=True)
+@field_validator('processing_config', mode='before')
 def validate_processing_config(cls, v):
 	if not isinstance(v, dict):
 		raise ValueError("Processing configuration must be a dictionary")
 	return v
 
 
-@root_validator
+@model_validator(mode='before')
+@classmethod
 def validate_date_consistency(cls, values):
 	started_at = values.get('started_at')
 	completed_at = values.get('completed_at')
@@ -549,7 +550,7 @@ def validate_date_consistency(cls, values):
 	return values
 
 
-@validator('confidence_thresholds')
+@field_validator('confidence_thresholds')
 def validate_confidence_thresholds(cls, v):
 	for key, value in v.items():
 		if not 0.0 <= value <= 1.0:

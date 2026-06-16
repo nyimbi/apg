@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from enum import Enum
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field
 import numpy as np
 from collections import defaultdict, deque
 

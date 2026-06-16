@@ -14,11 +14,11 @@ from enum import Enum
 import json
 import uuid
 
-from pydantic import BaseModel, Field, ConfigDict, validator, root_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from pydantic import UUID4
 from uuid_extensions import uuid7str
 from sqlalchemy import Column, String, Text, DateTime, Float, Integer, Boolean, JSON, ForeignKey, Index
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
@@ -101,13 +101,13 @@ class MdEntityBase(BaseModel):
 	tags: List[str] = Field(default_factory=list)
 	data_classification: str = Field("internal", max_length=50)
 	
-	@validator('business_key')
+	@field_validator('business_key')
 	def validate_business_key(cls, v):
 		if not v or v.strip() == "":
 			raise ValueError("Business key cannot be empty")
 		return v.strip()
 	
-	@validator('attributes')
+	@field_validator('attributes')
 	def validate_attributes(cls, v):
 		if v is None:
 			return {}

@@ -17,7 +17,7 @@ import json
 import logging
 from uuid_extensions import uuid7str
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, JSON, Index
 from sqlalchemy.orm import relationship
 from flask import Flask

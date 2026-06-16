@@ -13,10 +13,10 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from uuid_extensions import uuid7str
 
-from .models import (
+from, field_validator.models import (
 	ARCustomer, ARCreditAssessment, ARInvoice, ARPayment,
 	ARCreditRating, CurrencyCode
 )
@@ -59,7 +59,7 @@ class CreditScoringFeatures(BaseModel):
 	geographic_risk_factor: float = Field(default=0.0, ge=0, le=1, description="Geographic risk assessment")
 	macroeconomic_indicator: float = Field(default=0.0, ge=-1, le=1, description="Economic climate factor")
 	
-	@validator('paid_invoices')
+	@field_validator('paid_invoices')
 	def validate_paid_invoices(cls, v, values):
 		if 'total_invoices' in values and v > values['total_invoices']:
 			raise ValueError("Paid invoices cannot exceed total invoices")
@@ -93,7 +93,7 @@ class CreditScoringResult(BaseModel):
 	assessed_at: datetime = Field(default_factory=datetime.utcnow, description="Assessment timestamp")
 	next_review_date: date = Field(..., description="Recommended next review date")
 	
-	@validator('risk_rating', pre=True)
+	@field_validator('risk_rating', mode='before')
 	def validate_risk_rating_consistency(cls, v, values):
 		"""Ensure risk rating is consistent with credit score."""
 		if 'credit_score' not in values:

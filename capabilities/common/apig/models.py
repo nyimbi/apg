@@ -16,9 +16,8 @@ from enum import Enum
 from typing import Dict, List, Any, Optional, Union, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict, validator, field_validator, model_validator
-from pydantic import PositiveInt, NonNegativeFloat
-# Use uuid7 for time-based UUIDs
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+from pydantic import PositiveInt, NonNegativeFloat, model_validator# Use uuid7 for time-based UUIDs
 try:
 	from uuid7 import uuid7
 	def uuid7str() -> str:

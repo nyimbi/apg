@@ -16,7 +16,7 @@ from uuid_extensions import uuid7str
 
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator
 from sqlalchemy import Column, String, DateTime, Float, Integer, Boolean, Text, LargeBinary, JSON, ForeignKey, Index
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship
 
 # Base SQLAlchemy model

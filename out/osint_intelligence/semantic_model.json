@@ -1,0 +1,5451 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 7,
+    "name": "main",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "main.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 7,
+      "kind": "deployment",
+      "nodes": 8
+    },
+    "er": {
+      "edges": 157,
+      "kind": "er",
+      "nodes": 164
+    },
+    "handler": {
+      "edges": 7,
+      "kind": "handler",
+      "nodes": 8
+    },
+    "lookup": {
+      "edges": 7,
+      "kind": "lookup",
+      "nodes": 8
+    },
+    "package": {
+      "edges": 7,
+      "kind": "package",
+      "nodes": 8
+    },
+    "security": {
+      "edges": 7,
+      "kind": "security",
+      "nodes": 8
+    },
+    "workflow": {
+      "edges": 7,
+      "kind": "workflow",
+      "nodes": 8
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "main.apg"
+  ],
+  "symbols": {
+    "field.CyberThreatHunter.alert_triage": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.alert_triage",
+      "kind": "field",
+      "name": "CyberThreatHunter.alert_triage",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.application_behavior": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.application_behavior",
+      "kind": "field",
+      "name": "CyberThreatHunter.application_behavior",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.atomic_indicators": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.atomic_indicators",
+      "kind": "field",
+      "name": "CyberThreatHunter.atomic_indicators",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.automated_hunting": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.automated_hunting",
+      "kind": "field",
+      "name": "CyberThreatHunter.automated_hunting",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.composite_indicators": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.composite_indicators",
+      "kind": "field",
+      "name": "CyberThreatHunter.composite_indicators",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.contextual_indicators": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.contextual_indicators",
+      "kind": "field",
+      "name": "CyberThreatHunter.contextual_indicators",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.data_exfiltration": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.data_exfiltration",
+      "kind": "field",
+      "name": "CyberThreatHunter.data_exfiltration",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.impact_assessment": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.impact_assessment",
+      "kind": "field",
+      "name": "CyberThreatHunter.impact_assessment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.kill_chain_mapping": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.kill_chain_mapping",
+      "kind": "field",
+      "name": "CyberThreatHunter.kill_chain_mapping",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.lateral_movement": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.lateral_movement",
+      "kind": "field",
+      "name": "CyberThreatHunter.lateral_movement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.predictive_indicators": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.predictive_indicators",
+      "kind": "field",
+      "name": "CyberThreatHunter.predictive_indicators",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.response_orchestration": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.response_orchestration",
+      "kind": "field",
+      "name": "CyberThreatHunter.response_orchestration",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.system_behavior": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.system_behavior",
+      "kind": "field",
+      "name": "CyberThreatHunter.system_behavior",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.temporal_analysis": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.temporal_analysis",
+      "kind": "field",
+      "name": "CyberThreatHunter.temporal_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.threat_intelligence": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.threat_intelligence",
+      "kind": "field",
+      "name": "CyberThreatHunter.threat_intelligence",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CyberThreatHunter.user_behavior": {
+      "file": "main.apg",
+      "id": "field.CyberThreatHunter.user_behavior",
+      "kind": "field",
+      "name": "CyberThreatHunter.user_behavior",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.audio_forensics": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.audio_forensics",
+      "kind": "field",
+      "name": "DisinformationDetector.audio_forensics",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.centrality_analysis": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.centrality_analysis",
+      "kind": "field",
+      "name": "DisinformationDetector.centrality_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.community_detection": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.community_detection",
+      "kind": "field",
+      "name": "DisinformationDetector.community_detection",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.deep_learning": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.deep_learning",
+      "kind": "field",
+      "name": "DisinformationDetector.deep_learning",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.ensemble_methods": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.ensemble_methods",
+      "kind": "field",
+      "name": "DisinformationDetector.ensemble_methods",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.evidence_quality": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.evidence_quality",
+      "kind": "field",
+      "name": "DisinformationDetector.evidence_quality",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.expert_validation": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.expert_validation",
+      "kind": "field",
+      "name": "DisinformationDetector.expert_validation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.fact_checking": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.fact_checking",
+      "kind": "field",
+      "name": "DisinformationDetector.fact_checking",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.image_forensics": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.image_forensics",
+      "kind": "field",
+      "name": "DisinformationDetector.image_forensics",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.linguistic_analysis": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.linguistic_analysis",
+      "kind": "field",
+      "name": "DisinformationDetector.linguistic_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.logical_consistency": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.logical_consistency",
+      "kind": "field",
+      "name": "DisinformationDetector.logical_consistency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.multimedia_correlation": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.multimedia_correlation",
+      "kind": "field",
+      "name": "DisinformationDetector.multimedia_correlation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.narrative_analysis": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.narrative_analysis",
+      "kind": "field",
+      "name": "DisinformationDetector.narrative_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.network_behavior": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.network_behavior",
+      "kind": "field",
+      "name": "DisinformationDetector.network_behavior",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.platform_behavior": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.platform_behavior",
+      "kind": "field",
+      "name": "DisinformationDetector.platform_behavior",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.propagation_analysis": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.propagation_analysis",
+      "kind": "field",
+      "name": "DisinformationDetector.propagation_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.semantic_analysis": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.semantic_analysis",
+      "kind": "field",
+      "name": "DisinformationDetector.semantic_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.source_credibility": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.source_credibility",
+      "kind": "field",
+      "name": "DisinformationDetector.source_credibility",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.supervised_learning": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.supervised_learning",
+      "kind": "field",
+      "name": "DisinformationDetector.supervised_learning",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.temporal_behavior": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.temporal_behavior",
+      "kind": "field",
+      "name": "DisinformationDetector.temporal_behavior",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.temporal_graph_analysis": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.temporal_graph_analysis",
+      "kind": "field",
+      "name": "DisinformationDetector.temporal_graph_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.unsupervised_learning": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.unsupervised_learning",
+      "kind": "field",
+      "name": "DisinformationDetector.unsupervised_learning",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.user_behavior": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.user_behavior",
+      "kind": "field",
+      "name": "DisinformationDetector.user_behavior",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.DisinformationDetector.video_forensics": {
+      "file": "main.apg",
+      "id": "field.DisinformationDetector.video_forensics",
+      "kind": "field",
+      "name": "DisinformationDetector.video_forensics",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.behavioral_anomalies": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.behavioral_anomalies",
+      "kind": "field",
+      "name": "FinancialIntelligence.behavioral_anomalies",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.centrality_analysis": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.centrality_analysis",
+      "kind": "field",
+      "name": "FinancialIntelligence.centrality_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.community_detection": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.community_detection",
+      "kind": "field",
+      "name": "FinancialIntelligence.community_detection",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.currency_transaction_reports": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.currency_transaction_reports",
+      "kind": "field",
+      "name": "FinancialIntelligence.currency_transaction_reports",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.customer_risk_scoring": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.customer_risk_scoring",
+      "kind": "field",
+      "name": "FinancialIntelligence.customer_risk_scoring",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.entity_relationship_mapping": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.entity_relationship_mapping",
+      "kind": "field",
+      "name": "FinancialIntelligence.entity_relationship_mapping",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.geographic_anomalies": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.geographic_anomalies",
+      "kind": "field",
+      "name": "FinancialIntelligence.geographic_anomalies",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.internal_reporting": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.internal_reporting",
+      "kind": "field",
+      "name": "FinancialIntelligence.internal_reporting",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.portfolio_risk_assessment": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.portfolio_risk_assessment",
+      "kind": "field",
+      "name": "FinancialIntelligence.portfolio_risk_assessment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.predictive_modeling": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.predictive_modeling",
+      "kind": "field",
+      "name": "FinancialIntelligence.predictive_modeling",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.regulatory_reporting": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.regulatory_reporting",
+      "kind": "field",
+      "name": "FinancialIntelligence.regulatory_reporting",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.structuring_detection": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.structuring_detection",
+      "kind": "field",
+      "name": "FinancialIntelligence.structuring_detection",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.suspicious_activity_reports": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.suspicious_activity_reports",
+      "kind": "field",
+      "name": "FinancialIntelligence.suspicious_activity_reports",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.temporal_network_analysis": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.temporal_network_analysis",
+      "kind": "field",
+      "name": "FinancialIntelligence.temporal_network_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.transaction_risk_scoring": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.transaction_risk_scoring",
+      "kind": "field",
+      "name": "FinancialIntelligence.transaction_risk_scoring",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.FinancialIntelligence.typology_matching": {
+      "file": "main.apg",
+      "id": "field.FinancialIntelligence.typology_matching",
+      "kind": "field",
+      "name": "FinancialIntelligence.typology_matching",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.academic_research": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.academic_research",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.academic_research",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.causal_analysis": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.causal_analysis",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.causal_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.commercial_intelligence": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.commercial_intelligence",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.commercial_intelligence",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.comparative_analysis": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.comparative_analysis",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.comparative_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.conflict_prediction": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.conflict_prediction",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.conflict_prediction",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.digital_media": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.digital_media",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.digital_media",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.diplomatic_channels": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.diplomatic_channels",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.diplomatic_channels",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.economic_forecasting": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.economic_forecasting",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.economic_forecasting",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.government_communications": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.government_communications",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.government_communications",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.international_organizations": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.international_organizations",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.international_organizations",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.ngo_reports": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.ngo_reports",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.ngo_reports",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.political_forecasting": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.political_forecasting",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.political_forecasting",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.regulatory_filings": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.regulatory_filings",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.regulatory_filings",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.scenario_planning": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.scenario_planning",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.scenario_planning",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.social_forecasting": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.social_forecasting",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.social_forecasting",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.social_media": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.social_media",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.social_media",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.specialized_sources": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.specialized_sources",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.specialized_sources",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.temporal_patterns": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.temporal_patterns",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.temporal_patterns",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.think_tanks": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.think_tanks",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.think_tanks",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.GeopoliticalAnalysis.traditional_media": {
+      "file": "main.apg",
+      "id": "field.GeopoliticalAnalysis.traditional_media",
+      "kind": "field",
+      "name": "GeopoliticalAnalysis.traditional_media",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.access_control": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.access_control",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.access_control",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.anonymization": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.anonymization",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.anonymization",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.business_continuity": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.business_continuity",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.business_continuity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.data_loss_prevention": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.data_loss_prevention",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.data_loss_prevention",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.data_protection": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.data_protection",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.data_protection",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.encrypted_communications": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.encrypted_communications",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.encrypted_communications",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.encryption_at_rest": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.encryption_at_rest",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.encryption_at_rest",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.encryption_in_transit": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.encryption_in_transit",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.encryption_in_transit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.incident_response": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.incident_response",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.incident_response",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.industry_standards": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.industry_standards",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.industry_standards",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.infrastructure_security": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.infrastructure_security",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.infrastructure_security",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.intelligence_standards": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.intelligence_standards",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.intelligence_standards",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.network_segmentation": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.network_segmentation",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.network_segmentation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.perimeter_defense": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.perimeter_defense",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.perimeter_defense",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.secure_development": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.secure_development",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.secure_development",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceInfrastructure.security_standards": {
+      "file": "main.apg",
+      "id": "field.IntelligenceInfrastructure.security_standards",
+      "kind": "field",
+      "name": "IntelligenceInfrastructure.security_standards",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.competitive_intelligence": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.competitive_intelligence",
+      "kind": "field",
+      "name": "OSINTInvestigator.competitive_intelligence",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.confidence_scoring": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.confidence_scoring",
+      "kind": "field",
+      "name": "OSINTInvestigator.confidence_scoring",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.corporate_filings": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.corporate_filings",
+      "kind": "field",
+      "name": "OSINTInvestigator.corporate_filings",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.cross_validation": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.cross_validation",
+      "kind": "field",
+      "name": "OSINTInvestigator.cross_validation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.expert_validation": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.expert_validation",
+      "kind": "field",
+      "name": "OSINTInvestigator.expert_validation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.financial_analysis": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.financial_analysis",
+      "kind": "field",
+      "name": "OSINTInvestigator.financial_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.flight_tracking": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.flight_tracking",
+      "kind": "field",
+      "name": "OSINTInvestigator.flight_tracking",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.gap_analysis": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.gap_analysis",
+      "kind": "field",
+      "name": "OSINTInvestigator.gap_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.image_recognition": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.image_recognition",
+      "kind": "field",
+      "name": "OSINTInvestigator.image_recognition",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.maritime_tracking": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.maritime_tracking",
+      "kind": "field",
+      "name": "OSINTInvestigator.maritime_tracking",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.multi_source_correlation": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.multi_source_correlation",
+      "kind": "field",
+      "name": "OSINTInvestigator.multi_source_correlation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.professional_networks": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.professional_networks",
+      "kind": "field",
+      "name": "OSINTInvestigator.professional_networks",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.public_records": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.public_records",
+      "kind": "field",
+      "name": "OSINTInvestigator.public_records",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.regulatory_compliance": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.regulatory_compliance",
+      "kind": "field",
+      "name": "OSINTInvestigator.regulatory_compliance",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.satellite_imagery": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.satellite_imagery",
+      "kind": "field",
+      "name": "OSINTInvestigator.satellite_imagery",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.social_media_profiling": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.social_media_profiling",
+      "kind": "field",
+      "name": "OSINTInvestigator.social_media_profiling",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.source_validation": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.source_validation",
+      "kind": "field",
+      "name": "OSINTInvestigator.source_validation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.street_view_analysis": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.street_view_analysis",
+      "kind": "field",
+      "name": "OSINTInvestigator.street_view_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.technical_verification": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.technical_verification",
+      "kind": "field",
+      "name": "OSINTInvestigator.technical_verification",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OSINTInvestigator.timeline_reconstruction": {
+      "file": "main.apg",
+      "id": "field.OSINTInvestigator.timeline_reconstruction",
+      "kind": "field",
+      "name": "OSINTInvestigator.timeline_reconstruction",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.attack_attribution": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.attack_attribution",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.attack_attribution",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.attack_prediction": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.attack_prediction",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.attack_prediction",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.attack_surface_mapping": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.attack_surface_mapping",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.attack_surface_mapping",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.behavioral_correlation": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.behavioral_correlation",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.behavioral_correlation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.campaign_evolution": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.campaign_evolution",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.campaign_evolution",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.campaign_tracking": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.campaign_tracking",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.campaign_tracking",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.code_analysis": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.code_analysis",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.code_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.email_monitoring": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.email_monitoring",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.email_monitoring",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.encoding_handling": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.encoding_handling",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.encoding_handling",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.entity_correlation": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.entity_correlation",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.entity_correlation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.entity_extraction": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.entity_extraction",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.entity_extraction",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.file_monitoring": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.file_monitoring",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.file_monitoring",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.format_standardization": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.format_standardization",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.format_standardization",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.geopolitical_analysis": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.geopolitical_analysis",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.geopolitical_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.indicator_enrichment": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.indicator_enrichment",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.indicator_enrichment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.infrastructure_mapping": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.infrastructure_mapping",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.infrastructure_mapping",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.interactive_maps": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.interactive_maps",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.interactive_maps",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.language_detection": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.language_detection",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.language_detection",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.language_identification": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.language_identification",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.language_identification",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.malware_analysis": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.malware_analysis",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.malware_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.metadata_analysis": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.metadata_analysis",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.metadata_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.network_analysis": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.network_analysis",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.network_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.network_graphs": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.network_graphs",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.network_graphs",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.network_monitoring": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.network_monitoring",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.network_monitoring",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.rate_limiting": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.rate_limiting",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.rate_limiting",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.real_time_monitoring": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.real_time_monitoring",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.real_time_monitoring",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.risk_scoring": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.risk_scoring",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.risk_scoring",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.rss_feeds": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.rss_feeds",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.rss_feeds",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.scrapy_framework": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.scrapy_framework",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.scrapy_framework",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.search_engines": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.search_engines",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.search_engines",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.security_services": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.security_services",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.security_services",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.selenium_automation": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.selenium_automation",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.selenium_automation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.sentiment_analysis": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.sentiment_analysis",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.sentiment_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.social_network_mapping": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.social_network_mapping",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.social_network_mapping",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.social_platforms": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.social_platforms",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.social_platforms",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.spatial_correlation": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.spatial_correlation",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.spatial_correlation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.supply_chain_analysis": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.supply_chain_analysis",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.supply_chain_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.temporal_correlation": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.temporal_correlation",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.temporal_correlation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.threat_feeds": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.threat_feeds",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.threat_feeds",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.threat_forecasting": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.threat_forecasting",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.threat_forecasting",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.threat_landscapes": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.threat_landscapes",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.threat_landscapes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.timeline_analysis": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.timeline_analysis",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.timeline_analysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.timestamp_normalization": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.timestamp_normalization",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.timestamp_normalization",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.topic_modeling": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.topic_modeling",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.topic_modeling",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIntelligencePlatform.tor_integration": {
+      "file": "main.apg",
+      "id": "field.ThreatIntelligencePlatform.tor_integration",
+      "kind": "field",
+      "name": "ThreatIntelligencePlatform.tor_integration",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.main": {
+      "file": "main.apg",
+      "id": "module.main",
+      "kind": "module",
+      "name": "main",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.CyberThreatHunter": {
+      "file": "main.apg",
+      "id": "table.CyberThreatHunter",
+      "kind": "table",
+      "name": "CyberThreatHunter",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.DisinformationDetector": {
+      "file": "main.apg",
+      "id": "table.DisinformationDetector",
+      "kind": "table",
+      "name": "DisinformationDetector",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.FinancialIntelligence": {
+      "file": "main.apg",
+      "id": "table.FinancialIntelligence",
+      "kind": "table",
+      "name": "FinancialIntelligence",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.GeopoliticalAnalysis": {
+      "file": "main.apg",
+      "id": "table.GeopoliticalAnalysis",
+      "kind": "table",
+      "name": "GeopoliticalAnalysis",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.IntelligenceInfrastructure": {
+      "file": "main.apg",
+      "id": "table.IntelligenceInfrastructure",
+      "kind": "table",
+      "name": "IntelligenceInfrastructure",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.OSINTInvestigator": {
+      "file": "main.apg",
+      "id": "table.OSINTInvestigator",
+      "kind": "table",
+      "name": "OSINTInvestigator",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.ThreatIntelligencePlatform": {
+      "file": "main.apg",
+      "id": "table.ThreatIntelligencePlatform",
+      "kind": "table",
+      "name": "ThreatIntelligencePlatform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "CyberThreatHunter": {
+      "fields": {
+        "alert_triage": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "automated_classification + priority_scoring + false_positive_reduction"
+          },
+          "required": true,
+          "type": "automated_classification + priority_scoring + false_positive_reduction"
+        },
+        "application_behavior": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "usage_patterns + error_rates + performance_metrics"
+          },
+          "required": true,
+          "type": "usage_patterns + error_rates + performance_metrics"
+        },
+        "atomic_indicators": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "ip_addresses + domain_names + file_hashes + registry_keys"
+          },
+          "required": true,
+          "type": "ip_addresses + domain_names + file_hashes + registry_keys"
+        },
+        "automated_hunting": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "playbook_execution + rule_based_hunting + scheduled_searches"
+          },
+          "required": true,
+          "type": "playbook_execution + rule_based_hunting + scheduled_searches"
+        },
+        "composite_indicators": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "attack_patterns + behavioral_signatures + campaign_markers"
+          },
+          "required": true,
+          "type": "attack_patterns + behavioral_signatures + campaign_markers"
+        },
+        "contextual_indicators": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "environmental_context + temporal_context + relational_context"
+          },
+          "required": true,
+          "type": "environmental_context + temporal_context + relational_context"
+        },
+        "data_exfiltration": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "data_identification + collection + staging + transmission"
+          },
+          "required": true,
+          "type": "data_identification + collection + staging + transmission"
+        },
+        "impact_assessment": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "system_compromise + data_loss + operational_disruption"
+          },
+          "required": true,
+          "type": "system_compromise + data_loss + operational_disruption"
+        },
+        "kill_chain_mapping": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "reconnaissance + weaponization + delivery + exploitation + installation + c2 + actions"
+          },
+          "required": true,
+          "type": "reconnaissance + weaponization + delivery + exploitation + installation + c2 + actions"
+        },
+        "lateral_movement": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "network_traversal + privilege_escalation + persistence_establishment"
+          },
+          "required": true,
+          "type": "network_traversal + privilege_escalation + persistence_establishment"
+        },
+        "predictive_indicators": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "precursor_events + early_warning_signs + trend_analysis"
+          },
+          "required": true,
+          "type": "precursor_events + early_warning_signs + trend_analysis"
+        },
+        "response_orchestration": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "automated_containment + evidence_collection + stakeholder_notification"
+          },
+          "required": true,
+          "type": "automated_containment + evidence_collection + stakeholder_notification"
+        },
+        "system_behavior": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "process_patterns + network_communications + resource_utilization"
+          },
+          "required": true,
+          "type": "process_patterns + network_communications + resource_utilization"
+        },
+        "temporal_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "time_based_patterns + seasonal_variations + activity_clustering"
+          },
+          "required": true,
+          "type": "time_based_patterns + seasonal_variations + activity_clustering"
+        },
+        "threat_intelligence": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "automated_ioc_extraction + feed_integration + indicator_sharing"
+          },
+          "required": true,
+          "type": "automated_ioc_extraction + feed_integration + indicator_sharing"
+        },
+        "user_behavior": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "login_patterns + access_anomalies + privilege_usage + data_access"
+          },
+          "required": true,
+          "type": "login_patterns + access_anomalies + privilege_usage + data_access"
+        }
+      },
+      "lookup_paths": {
+        "alert_triage.id": {
+          "chain": [
+            "CyberThreatHunter.alert_triage",
+            "automated_classification + priority_scoring + false_positive_reduction.id"
+          ],
+          "valid": true
+        },
+        "application_behavior.id": {
+          "chain": [
+            "CyberThreatHunter.application_behavior",
+            "usage_patterns + error_rates + performance_metrics.id"
+          ],
+          "valid": true
+        },
+        "atomic_indicators.id": {
+          "chain": [
+            "CyberThreatHunter.atomic_indicators",
+            "ip_addresses + domain_names + file_hashes + registry_keys.id"
+          ],
+          "valid": true
+        },
+        "automated_hunting.id": {
+          "chain": [
+            "CyberThreatHunter.automated_hunting",
+            "playbook_execution + rule_based_hunting + scheduled_searches.id"
+          ],
+          "valid": true
+        },
+        "composite_indicators.id": {
+          "chain": [
+            "CyberThreatHunter.composite_indicators",
+            "attack_patterns + behavioral_signatures + campaign_markers.id"
+          ],
+          "valid": true
+        },
+        "contextual_indicators.id": {
+          "chain": [
+            "CyberThreatHunter.contextual_indicators",
+            "environmental_context + temporal_context + relational_context.id"
+          ],
+          "valid": true
+        },
+        "data_exfiltration.id": {
+          "chain": [
+            "CyberThreatHunter.data_exfiltration",
+            "data_identification + collection + staging + transmission.id"
+          ],
+          "valid": true
+        },
+        "impact_assessment.id": {
+          "chain": [
+            "CyberThreatHunter.impact_assessment",
+            "system_compromise + data_loss + operational_disruption.id"
+          ],
+          "valid": true
+        },
+        "kill_chain_mapping.id": {
+          "chain": [
+            "CyberThreatHunter.kill_chain_mapping",
+            "reconnaissance + weaponization + delivery + exploitation + installation + c2 + actions.id"
+          ],
+          "valid": true
+        },
+        "lateral_movement.id": {
+          "chain": [
+            "CyberThreatHunter.lateral_movement",
+            "network_traversal + privilege_escalation + persistence_establishment.id"
+          ],
+          "valid": true
+        },
+        "predictive_indicators.id": {
+          "chain": [
+            "CyberThreatHunter.predictive_indicators",
+            "precursor_events + early_warning_signs + trend_analysis.id"
+          ],
+          "valid": true
+        },
+        "response_orchestration.id": {
+          "chain": [
+            "CyberThreatHunter.response_orchestration",
+            "automated_containment + evidence_collection + stakeholder_notification.id"
+          ],
+          "valid": true
+        },
+        "system_behavior.id": {
+          "chain": [
+            "CyberThreatHunter.system_behavior",
+            "process_patterns + network_communications + resource_utilization.id"
+          ],
+          "valid": true
+        },
+        "temporal_analysis.id": {
+          "chain": [
+            "CyberThreatHunter.temporal_analysis",
+            "time_based_patterns + seasonal_variations + activity_clustering.id"
+          ],
+          "valid": true
+        },
+        "threat_intelligence.id": {
+          "chain": [
+            "CyberThreatHunter.threat_intelligence",
+            "automated_ioc_extraction + feed_integration + indicator_sharing.id"
+          ],
+          "valid": true
+        },
+        "user_behavior.id": {
+          "chain": [
+            "CyberThreatHunter.user_behavior",
+            "login_patterns + access_anomalies + privilege_usage + data_access.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "CyberThreatHunter"
+    },
+    "DisinformationDetector": {
+      "fields": {
+        "audio_forensics": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "spectral_analysis + voice_comparison + synthesis_detection + background_noise"
+          },
+          "required": true,
+          "type": "spectral_analysis + voice_comparison + synthesis_detection + background_noise"
+        },
+        "centrality_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "key_influencers + bridge_nodes + bottlenecks + information_brokers"
+          },
+          "required": true,
+          "type": "key_influencers + bridge_nodes + bottlenecks + information_brokers"
+        },
+        "community_detection": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "echo_chambers + filter_bubbles + polarization_analysis + group_dynamics"
+          },
+          "required": true,
+          "type": "echo_chambers + filter_bubbles + polarization_analysis + group_dynamics"
+        },
+        "deep_learning": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "neural_networks + transformer_models + attention_mechanisms + transfer_learning"
+          },
+          "required": true,
+          "type": "neural_networks + transformer_models + attention_mechanisms + transfer_learning"
+        },
+        "ensemble_methods": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "model_combination + voting_systems + confidence_aggregation + robustness_improvement"
+          },
+          "required": true,
+          "type": "model_combination + voting_systems + confidence_aggregation + robustness_improvement"
+        },
+        "evidence_quality": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "primary_sources + corroboration + documentation + chain_of_custody"
+          },
+          "required": true,
+          "type": "primary_sources + corroboration + documentation + chain_of_custody"
+        },
+        "expert_validation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "fact_checker_networks + domain_experts + peer_review + consensus_building"
+          },
+          "required": true,
+          "type": "fact_checker_networks + domain_experts + peer_review + consensus_building"
+        },
+        "fact_checking": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "claim_verification + source_validation + evidence_assessment"
+          },
+          "required": true,
+          "type": "claim_verification + source_validation + evidence_assessment"
+        },
+        "image_forensics": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "pixel_analysis + compression_artifacts + metadata_analysis + reverse_image_search"
+          },
+          "required": true,
+          "type": "pixel_analysis + compression_artifacts + metadata_analysis + reverse_image_search"
+        },
+        "linguistic_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "writing_style + vocabulary_analysis + sentiment_patterns"
+          },
+          "required": true,
+          "type": "writing_style + vocabulary_analysis + sentiment_patterns"
+        },
+        "logical_consistency": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "internal_consistency + external_consistency + contradiction_detection + coherence_analysis"
+          },
+          "required": true,
+          "type": "internal_consistency + external_consistency + contradiction_detection + coherence_analysis"
+        },
+        "multimedia_correlation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "cross_media_consistency + synchronization_analysis + contextual_matching"
+          },
+          "required": true,
+          "type": "cross_media_consistency + synchronization_analysis + contextual_matching"
+        },
+        "narrative_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "story_structure + plot_coherence + character_consistency"
+          },
+          "required": true,
+          "type": "story_structure + plot_coherence + character_consistency"
+        },
+        "network_behavior": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "coordinated_activity + amplification_patterns + cascade_analysis + timing_analysis"
+          },
+          "required": true,
+          "type": "coordinated_activity + amplification_patterns + cascade_analysis + timing_analysis"
+        },
+        "platform_behavior": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "cross_platform_coordination + migration_patterns + platform_specific_adaptations"
+          },
+          "required": true,
+          "type": "cross_platform_coordination + migration_patterns + platform_specific_adaptations"
+        },
+        "propagation_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "information_diffusion + viral_spreading + influence_measurement + cascade_prediction"
+          },
+          "required": true,
+          "type": "information_diffusion + viral_spreading + influence_measurement + cascade_prediction"
+        },
+        "semantic_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "meaning_extraction + context_understanding + logical_consistency"
+          },
+          "required": true,
+          "type": "meaning_extraction + context_understanding + logical_consistency"
+        },
+        "source_credibility": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "reputation_scoring + track_record + expertise_assessment + bias_evaluation"
+          },
+          "required": true,
+          "type": "reputation_scoring + track_record + expertise_assessment + bias_evaluation"
+        },
+        "supervised_learning": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "labeled_training_data + classification_models + performance_evaluation"
+          },
+          "required": true,
+          "type": "labeled_training_data + classification_models + performance_evaluation"
+        },
+        "temporal_behavior": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "activity_timing + lifecycle_analysis + campaign_duration + decay_patterns"
+          },
+          "required": true,
+          "type": "activity_timing + lifecycle_analysis + campaign_duration + decay_patterns"
+        },
+        "temporal_graph_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "network_evolution + relationship_dynamics + activity_patterns + trend_analysis"
+          },
+          "required": true,
+          "type": "network_evolution + relationship_dynamics + activity_patterns + trend_analysis"
+        },
+        "unsupervised_learning": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "anomaly_detection + clustering + pattern_discovery + outlier_identification"
+          },
+          "required": true,
+          "type": "anomaly_detection + clustering + pattern_discovery + outlier_identification"
+        },
+        "user_behavior": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "posting_patterns + engagement_metrics + network_interactions + account_history"
+          },
+          "required": true,
+          "type": "posting_patterns + engagement_metrics + network_interactions + account_history"
+        },
+        "video_forensics": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "temporal_consistency + lighting_analysis + facial_analysis + deepfake_detection"
+          },
+          "required": true,
+          "type": "temporal_consistency + lighting_analysis + facial_analysis + deepfake_detection"
+        }
+      },
+      "lookup_paths": {
+        "audio_forensics.id": {
+          "chain": [
+            "DisinformationDetector.audio_forensics",
+            "spectral_analysis + voice_comparison + synthesis_detection + background_noise.id"
+          ],
+          "valid": true
+        },
+        "centrality_analysis.id": {
+          "chain": [
+            "DisinformationDetector.centrality_analysis",
+            "key_influencers + bridge_nodes + bottlenecks + information_brokers.id"
+          ],
+          "valid": true
+        },
+        "community_detection.id": {
+          "chain": [
+            "DisinformationDetector.community_detection",
+            "echo_chambers + filter_bubbles + polarization_analysis + group_dynamics.id"
+          ],
+          "valid": true
+        },
+        "deep_learning.id": {
+          "chain": [
+            "DisinformationDetector.deep_learning",
+            "neural_networks + transformer_models + attention_mechanisms + transfer_learning.id"
+          ],
+          "valid": true
+        },
+        "ensemble_methods.id": {
+          "chain": [
+            "DisinformationDetector.ensemble_methods",
+            "model_combination + voting_systems + confidence_aggregation + robustness_improvement.id"
+          ],
+          "valid": true
+        },
+        "evidence_quality.id": {
+          "chain": [
+            "DisinformationDetector.evidence_quality",
+            "primary_sources + corroboration + documentation + chain_of_custody.id"
+          ],
+          "valid": true
+        },
+        "expert_validation.id": {
+          "chain": [
+            "DisinformationDetector.expert_validation",
+            "fact_checker_networks + domain_experts + peer_review + consensus_building.id"
+          ],
+          "valid": true
+        },
+        "fact_checking.id": {
+          "chain": [
+            "DisinformationDetector.fact_checking",
+            "claim_verification + source_validation + evidence_assessment.id"
+          ],
+          "valid": true
+        },
+        "image_forensics.id": {
+          "chain": [
+            "DisinformationDetector.image_forensics",
+            "pixel_analysis + compression_artifacts + metadata_analysis + reverse_image_search.id"
+          ],
+          "valid": true
+        },
+        "linguistic_analysis.id": {
+          "chain": [
+            "DisinformationDetector.linguistic_analysis",
+            "writing_style + vocabulary_analysis + sentiment_patterns.id"
+          ],
+          "valid": true
+        },
+        "logical_consistency.id": {
+          "chain": [
+            "DisinformationDetector.logical_consistency",
+            "internal_consistency + external_consistency + contradiction_detection + coherence_analysis.id"
+          ],
+          "valid": true
+        },
+        "multimedia_correlation.id": {
+          "chain": [
+            "DisinformationDetector.multimedia_correlation",
+            "cross_media_consistency + synchronization_analysis + contextual_matching.id"
+          ],
+          "valid": true
+        },
+        "narrative_analysis.id": {
+          "chain": [
+            "DisinformationDetector.narrative_analysis",
+            "story_structure + plot_coherence + character_consistency.id"
+          ],
+          "valid": true
+        },
+        "network_behavior.id": {
+          "chain": [
+            "DisinformationDetector.network_behavior",
+            "coordinated_activity + amplification_patterns + cascade_analysis + timing_analysis.id"
+          ],
+          "valid": true
+        },
+        "platform_behavior.id": {
+          "chain": [
+            "DisinformationDetector.platform_behavior",
+            "cross_platform_coordination + migration_patterns + platform_specific_adaptations.id"
+          ],
+          "valid": true
+        },
+        "propagation_analysis.id": {
+          "chain": [
+            "DisinformationDetector.propagation_analysis",
+            "information_diffusion + viral_spreading + influence_measurement + cascade_prediction.id"
+          ],
+          "valid": true
+        },
+        "semantic_analysis.id": {
+          "chain": [
+            "DisinformationDetector.semantic_analysis",
+            "meaning_extraction + context_understanding + logical_consistency.id"
+          ],
+          "valid": true
+        },
+        "source_credibility.id": {
+          "chain": [
+            "DisinformationDetector.source_credibility",
+            "reputation_scoring + track_record + expertise_assessment + bias_evaluation.id"
+          ],
+          "valid": true
+        },
+        "supervised_learning.id": {
+          "chain": [
+            "DisinformationDetector.supervised_learning",
+            "labeled_training_data + classification_models + performance_evaluation.id"
+          ],
+          "valid": true
+        },
+        "temporal_behavior.id": {
+          "chain": [
+            "DisinformationDetector.temporal_behavior",
+            "activity_timing + lifecycle_analysis + campaign_duration + decay_patterns.id"
+          ],
+          "valid": true
+        },
+        "temporal_graph_analysis.id": {
+          "chain": [
+            "DisinformationDetector.temporal_graph_analysis",
+            "network_evolution + relationship_dynamics + activity_patterns + trend_analysis.id"
+          ],
+          "valid": true
+        },
+        "unsupervised_learning.id": {
+          "chain": [
+            "DisinformationDetector.unsupervised_learning",
+            "anomaly_detection + clustering + pattern_discovery + outlier_identification.id"
+          ],
+          "valid": true
+        },
+        "user_behavior.id": {
+          "chain": [
+            "DisinformationDetector.user_behavior",
+            "posting_patterns + engagement_metrics + network_interactions + account_history.id"
+          ],
+          "valid": true
+        },
+        "video_forensics.id": {
+          "chain": [
+            "DisinformationDetector.video_forensics",
+            "temporal_consistency + lighting_analysis + facial_analysis + deepfake_detection.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "DisinformationDetector"
+    },
+    "FinancialIntelligence": {
+      "fields": {
+        "behavioral_anomalies": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "deviation_from_normal + unusual_transactions + suspicious_timing"
+          },
+          "required": true,
+          "type": "deviation_from_normal + unusual_transactions + suspicious_timing"
+        },
+        "centrality_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "key_player_identification + influence_measurement + risk_propagation"
+          },
+          "required": true,
+          "type": "key_player_identification + influence_measurement + risk_propagation"
+        },
+        "community_detection": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "cluster_identification + group_behavior + collective_risk"
+          },
+          "required": true,
+          "type": "cluster_identification + group_behavior + collective_risk"
+        },
+        "currency_transaction_reports": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "threshold_monitoring + aggregation_rules + exemption_management"
+          },
+          "required": true,
+          "type": "threshold_monitoring + aggregation_rules + exemption_management"
+        },
+        "customer_risk_scoring": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "static_factors + dynamic_behavior + external_intelligence"
+          },
+          "required": true,
+          "type": "static_factors + dynamic_behavior + external_intelligence"
+        },
+        "entity_relationship_mapping": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "ownership_networks + transaction_networks + communication_networks"
+          },
+          "required": true,
+          "type": "ownership_networks + transaction_networks + communication_networks"
+        },
+        "geographic_anomalies": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "unusual_jurisdictions + sanctions_evasion + trade_mispricing"
+          },
+          "required": true,
+          "type": "unusual_jurisdictions + sanctions_evasion + trade_mispricing"
+        },
+        "internal_reporting": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "management_dashboards + risk_metrics + performance_indicators + trend_analysis"
+          },
+          "required": true,
+          "type": "management_dashboards + risk_metrics + performance_indicators + trend_analysis"
+        },
+        "portfolio_risk_assessment": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "concentration_risk + correlated_exposures + systemic_risk"
+          },
+          "required": true,
+          "type": "concentration_risk + correlated_exposures + systemic_risk"
+        },
+        "predictive_modeling": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "early_warning_indicators + risk_forecasting + scenario_analysis"
+          },
+          "required": true,
+          "type": "early_warning_indicators + risk_forecasting + scenario_analysis"
+        },
+        "regulatory_reporting": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "periodic_reports + ad_hoc_reporting + audit_trails + documentation"
+          },
+          "required": true,
+          "type": "periodic_reports + ad_hoc_reporting + audit_trails + documentation"
+        },
+        "structuring_detection": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "smurfing + layering + integration + structuring_avoidance"
+          },
+          "required": true,
+          "type": "smurfing + layering + integration + structuring_avoidance"
+        },
+        "suspicious_activity_reports": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "automated_sar_generation + narrative_creation + regulatory_submission"
+          },
+          "required": true,
+          "type": "automated_sar_generation + narrative_creation + regulatory_submission"
+        },
+        "temporal_network_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "relationship_evolution + transaction_timing + coordination_detection"
+          },
+          "required": true,
+          "type": "relationship_evolution + transaction_timing + coordination_detection"
+        },
+        "transaction_risk_scoring": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "amount + frequency + counterparties + geographic + timing"
+          },
+          "required": true,
+          "type": "amount + frequency + counterparties + geographic + timing"
+        },
+        "typology_matching": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "known_ml_typologies + emerging_patterns + sector_specific_risks"
+          },
+          "required": true,
+          "type": "known_ml_typologies + emerging_patterns + sector_specific_risks"
+        }
+      },
+      "lookup_paths": {
+        "behavioral_anomalies.id": {
+          "chain": [
+            "FinancialIntelligence.behavioral_anomalies",
+            "deviation_from_normal + unusual_transactions + suspicious_timing.id"
+          ],
+          "valid": true
+        },
+        "centrality_analysis.id": {
+          "chain": [
+            "FinancialIntelligence.centrality_analysis",
+            "key_player_identification + influence_measurement + risk_propagation.id"
+          ],
+          "valid": true
+        },
+        "community_detection.id": {
+          "chain": [
+            "FinancialIntelligence.community_detection",
+            "cluster_identification + group_behavior + collective_risk.id"
+          ],
+          "valid": true
+        },
+        "currency_transaction_reports.id": {
+          "chain": [
+            "FinancialIntelligence.currency_transaction_reports",
+            "threshold_monitoring + aggregation_rules + exemption_management.id"
+          ],
+          "valid": true
+        },
+        "customer_risk_scoring.id": {
+          "chain": [
+            "FinancialIntelligence.customer_risk_scoring",
+            "static_factors + dynamic_behavior + external_intelligence.id"
+          ],
+          "valid": true
+        },
+        "entity_relationship_mapping.id": {
+          "chain": [
+            "FinancialIntelligence.entity_relationship_mapping",
+            "ownership_networks + transaction_networks + communication_networks.id"
+          ],
+          "valid": true
+        },
+        "geographic_anomalies.id": {
+          "chain": [
+            "FinancialIntelligence.geographic_anomalies",
+            "unusual_jurisdictions + sanctions_evasion + trade_mispricing.id"
+          ],
+          "valid": true
+        },
+        "internal_reporting.id": {
+          "chain": [
+            "FinancialIntelligence.internal_reporting",
+            "management_dashboards + risk_metrics + performance_indicators + trend_analysis.id"
+          ],
+          "valid": true
+        },
+        "portfolio_risk_assessment.id": {
+          "chain": [
+            "FinancialIntelligence.portfolio_risk_assessment",
+            "concentration_risk + correlated_exposures + systemic_risk.id"
+          ],
+          "valid": true
+        },
+        "predictive_modeling.id": {
+          "chain": [
+            "FinancialIntelligence.predictive_modeling",
+            "early_warning_indicators + risk_forecasting + scenario_analysis.id"
+          ],
+          "valid": true
+        },
+        "regulatory_reporting.id": {
+          "chain": [
+            "FinancialIntelligence.regulatory_reporting",
+            "periodic_reports + ad_hoc_reporting + audit_trails + documentation.id"
+          ],
+          "valid": true
+        },
+        "structuring_detection.id": {
+          "chain": [
+            "FinancialIntelligence.structuring_detection",
+            "smurfing + layering + integration + structuring_avoidance.id"
+          ],
+          "valid": true
+        },
+        "suspicious_activity_reports.id": {
+          "chain": [
+            "FinancialIntelligence.suspicious_activity_reports",
+            "automated_sar_generation + narrative_creation + regulatory_submission.id"
+          ],
+          "valid": true
+        },
+        "temporal_network_analysis.id": {
+          "chain": [
+            "FinancialIntelligence.temporal_network_analysis",
+            "relationship_evolution + transaction_timing + coordination_detection.id"
+          ],
+          "valid": true
+        },
+        "transaction_risk_scoring.id": {
+          "chain": [
+            "FinancialIntelligence.transaction_risk_scoring",
+            "amount + frequency + counterparties + geographic + timing.id"
+          ],
+          "valid": true
+        },
+        "typology_matching.id": {
+          "chain": [
+            "FinancialIntelligence.typology_matching",
+            "known_ml_typologies + emerging_patterns + sector_specific_risks.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "FinancialIntelligence"
+    },
+    "GeopoliticalAnalysis": {
+      "fields": {
+        "academic_research": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "university_studies + research_institutions + policy_analysis + expert_opinions"
+          },
+          "required": true,
+          "type": "university_studies + research_institutions + policy_analysis + expert_opinions"
+        },
+        "causal_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "root_cause_identification + impact_assessment + unintended_consequences + feedback_loops"
+          },
+          "required": true,
+          "type": "root_cause_identification + impact_assessment + unintended_consequences + feedback_loops"
+        },
+        "commercial_intelligence": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "market_research + industry_analysis + competitive_intelligence + economic_forecasting"
+          },
+          "required": true,
+          "type": "market_research + industry_analysis + competitive_intelligence + economic_forecasting"
+        },
+        "comparative_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "cross_country_comparisons + regional_analysis + peer_benchmarking + best_practices"
+          },
+          "required": true,
+          "type": "cross_country_comparisons + regional_analysis + peer_benchmarking + best_practices"
+        },
+        "conflict_prediction": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "early_warning_systems + escalation_dynamics + peace_processes + intervention_effectiveness"
+          },
+          "required": true,
+          "type": "early_warning_systems + escalation_dynamics + peace_processes + intervention_effectiveness"
+        },
+        "digital_media": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "online_news + blogs + podcasts + video_platforms + streaming_services"
+          },
+          "required": true,
+          "type": "online_news + blogs + podcasts + video_platforms + streaming_services"
+        },
+        "diplomatic_channels": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "embassy_reports + consular_communications + international_agreements"
+          },
+          "required": true,
+          "type": "embassy_reports + consular_communications + international_agreements"
+        },
+        "economic_forecasting": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "growth_projections + market_predictions + trade_flows + resource_prices"
+          },
+          "required": true,
+          "type": "growth_projections + market_predictions + trade_flows + resource_prices"
+        },
+        "government_communications": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "press_releases + speeches + policy_documents + legislative_proceedings"
+          },
+          "required": true,
+          "type": "press_releases + speeches + policy_documents + legislative_proceedings"
+        },
+        "international_organizations": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "un_reports + world_bank + imf + regional_organizations"
+          },
+          "required": true,
+          "type": "un_reports + world_bank + imf + regional_organizations"
+        },
+        "ngo_reports": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "human_rights + environmental + development + advocacy_organizations"
+          },
+          "required": true,
+          "type": "human_rights + environmental + development + advocacy_organizations"
+        },
+        "political_forecasting": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "election_prediction + policy_outcomes + stability_assessment + leadership_changes"
+          },
+          "required": true,
+          "type": "election_prediction + policy_outcomes + stability_assessment + leadership_changes"
+        },
+        "regulatory_filings": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "corporate_disclosures + trade_data + financial_reports + compliance_documents"
+          },
+          "required": true,
+          "type": "corporate_disclosures + trade_data + financial_reports + compliance_documents"
+        },
+        "scenario_planning": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "alternative_futures + contingency_planning + risk_assessment + opportunity_identification"
+          },
+          "required": true,
+          "type": "alternative_futures + contingency_planning + risk_assessment + opportunity_identification"
+        },
+        "social_forecasting": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "demographic_projections + migration_patterns + urbanization + social_change"
+          },
+          "required": true,
+          "type": "demographic_projections + migration_patterns + urbanization + social_change"
+        },
+        "social_media": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "twitter + facebook + instagram + tiktok + linkedin + regional_platforms"
+          },
+          "required": true,
+          "type": "twitter + facebook + instagram + tiktok + linkedin + regional_platforms"
+        },
+        "specialized_sources": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "trade_publications + academic_journals + think_tank_reports + government_publications"
+          },
+          "required": true,
+          "type": "trade_publications + academic_journals + think_tank_reports + government_publications"
+        },
+        "temporal_patterns": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "historical_trends + cyclical_patterns + seasonal_variations + long_term_trajectories"
+          },
+          "required": true,
+          "type": "historical_trends + cyclical_patterns + seasonal_variations + long_term_trajectories"
+        },
+        "think_tanks": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "policy_recommendations + strategic_analysis + scenario_planning + expert_networks"
+          },
+          "required": true,
+          "type": "policy_recommendations + strategic_analysis + scenario_planning + expert_networks"
+        },
+        "traditional_media": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "newspapers + television + radio + magazines + wire_services"
+          },
+          "required": true,
+          "type": "newspapers + television + radio + magazines + wire_services"
+        }
+      },
+      "lookup_paths": {
+        "academic_research.id": {
+          "chain": [
+            "GeopoliticalAnalysis.academic_research",
+            "university_studies + research_institutions + policy_analysis + expert_opinions.id"
+          ],
+          "valid": true
+        },
+        "causal_analysis.id": {
+          "chain": [
+            "GeopoliticalAnalysis.causal_analysis",
+            "root_cause_identification + impact_assessment + unintended_consequences + feedback_loops.id"
+          ],
+          "valid": true
+        },
+        "commercial_intelligence.id": {
+          "chain": [
+            "GeopoliticalAnalysis.commercial_intelligence",
+            "market_research + industry_analysis + competitive_intelligence + economic_forecasting.id"
+          ],
+          "valid": true
+        },
+        "comparative_analysis.id": {
+          "chain": [
+            "GeopoliticalAnalysis.comparative_analysis",
+            "cross_country_comparisons + regional_analysis + peer_benchmarking + best_practices.id"
+          ],
+          "valid": true
+        },
+        "conflict_prediction.id": {
+          "chain": [
+            "GeopoliticalAnalysis.conflict_prediction",
+            "early_warning_systems + escalation_dynamics + peace_processes + intervention_effectiveness.id"
+          ],
+          "valid": true
+        },
+        "digital_media.id": {
+          "chain": [
+            "GeopoliticalAnalysis.digital_media",
+            "online_news + blogs + podcasts + video_platforms + streaming_services.id"
+          ],
+          "valid": true
+        },
+        "diplomatic_channels.id": {
+          "chain": [
+            "GeopoliticalAnalysis.diplomatic_channels",
+            "embassy_reports + consular_communications + international_agreements.id"
+          ],
+          "valid": true
+        },
+        "economic_forecasting.id": {
+          "chain": [
+            "GeopoliticalAnalysis.economic_forecasting",
+            "growth_projections + market_predictions + trade_flows + resource_prices.id"
+          ],
+          "valid": true
+        },
+        "government_communications.id": {
+          "chain": [
+            "GeopoliticalAnalysis.government_communications",
+            "press_releases + speeches + policy_documents + legislative_proceedings.id"
+          ],
+          "valid": true
+        },
+        "international_organizations.id": {
+          "chain": [
+            "GeopoliticalAnalysis.international_organizations",
+            "un_reports + world_bank + imf + regional_organizations.id"
+          ],
+          "valid": true
+        },
+        "ngo_reports.id": {
+          "chain": [
+            "GeopoliticalAnalysis.ngo_reports",
+            "human_rights + environmental + development + advocacy_organizations.id"
+          ],
+          "valid": true
+        },
+        "political_forecasting.id": {
+          "chain": [
+            "GeopoliticalAnalysis.political_forecasting",
+            "election_prediction + policy_outcomes + stability_assessment + leadership_changes.id"
+          ],
+          "valid": true
+        },
+        "regulatory_filings.id": {
+          "chain": [
+            "GeopoliticalAnalysis.regulatory_filings",
+            "corporate_disclosures + trade_data + financial_reports + compliance_documents.id"
+          ],
+          "valid": true
+        },
+        "scenario_planning.id": {
+          "chain": [
+            "GeopoliticalAnalysis.scenario_planning",
+            "alternative_futures + contingency_planning + risk_assessment + opportunity_identification.id"
+          ],
+          "valid": true
+        },
+        "social_forecasting.id": {
+          "chain": [
+            "GeopoliticalAnalysis.social_forecasting",
+            "demographic_projections + migration_patterns + urbanization + social_change.id"
+          ],
+          "valid": true
+        },
+        "social_media.id": {
+          "chain": [
+            "GeopoliticalAnalysis.social_media",
+            "twitter + facebook + instagram + tiktok + linkedin + regional_platforms.id"
+          ],
+          "valid": true
+        },
+        "specialized_sources.id": {
+          "chain": [
+            "GeopoliticalAnalysis.specialized_sources",
+            "trade_publications + academic_journals + think_tank_reports + government_publications.id"
+          ],
+          "valid": true
+        },
+        "temporal_patterns.id": {
+          "chain": [
+            "GeopoliticalAnalysis.temporal_patterns",
+            "historical_trends + cyclical_patterns + seasonal_variations + long_term_trajectories.id"
+          ],
+          "valid": true
+        },
+        "think_tanks.id": {
+          "chain": [
+            "GeopoliticalAnalysis.think_tanks",
+            "policy_recommendations + strategic_analysis + scenario_planning + expert_networks.id"
+          ],
+          "valid": true
+        },
+        "traditional_media.id": {
+          "chain": [
+            "GeopoliticalAnalysis.traditional_media",
+            "newspapers + television + radio + magazines + wire_services.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "GeopoliticalAnalysis"
+    },
+    "IntelligenceInfrastructure": {
+      "fields": {
+        "access_control": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "multi_factor_authentication + role_based_access + attribute_based_access + privileged_access_management"
+          },
+          "required": true,
+          "type": "multi_factor_authentication + role_based_access + attribute_based_access + privileged_access_management"
+        },
+        "anonymization": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "tor_networks + proxy_chains + traffic_obfuscation + identity_protection"
+          },
+          "required": true,
+          "type": "tor_networks + proxy_chains + traffic_obfuscation + identity_protection"
+        },
+        "business_continuity": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "backup_systems + disaster_recovery + failover_procedures + continuity_planning"
+          },
+          "required": true,
+          "type": "backup_systems + disaster_recovery + failover_procedures + continuity_planning"
+        },
+        "data_loss_prevention": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "content_inspection + policy_enforcement + monitoring + incident_response"
+          },
+          "required": true,
+          "type": "content_inspection + policy_enforcement + monitoring + incident_response"
+        },
+        "data_protection": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "gdpr + ccpa + hipaa + sox + pci_dss"
+          },
+          "required": true,
+          "type": "gdpr + ccpa + hipaa + sox + pci_dss"
+        },
+        "encrypted_communications": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "vpn_tunnels + tls_encryption + end_to_end_encryption + secure_messaging"
+          },
+          "required": true,
+          "type": "vpn_tunnels + tls_encryption + end_to_end_encryption + secure_messaging"
+        },
+        "encryption_at_rest": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "full_disk_encryption + database_encryption + file_encryption + key_management"
+          },
+          "required": true,
+          "type": "full_disk_encryption + database_encryption + file_encryption + key_management"
+        },
+        "encryption_in_transit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "network_encryption + api_encryption + message_encryption + certificate_management"
+          },
+          "required": true,
+          "type": "network_encryption + api_encryption + message_encryption + certificate_management"
+        },
+        "incident_response": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "threat_detection + incident_classification + response_procedures + forensic_analysis"
+          },
+          "required": true,
+          "type": "threat_detection + incident_classification + response_procedures + forensic_analysis"
+        },
+        "industry_standards": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "financial_regulations + healthcare_compliance + government_standards + international_law"
+          },
+          "required": true,
+          "type": "financial_regulations + healthcare_compliance + government_standards + international_law"
+        },
+        "infrastructure_security": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "container_security + orchestration_security + cloud_security + compliance_monitoring"
+          },
+          "required": true,
+          "type": "container_security + orchestration_security + cloud_security + compliance_monitoring"
+        },
+        "intelligence_standards": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "odni_ics + nato_standards + five_eyes + national_requirements"
+          },
+          "required": true,
+          "type": "odni_ics + nato_standards + five_eyes + national_requirements"
+        },
+        "network_segmentation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "vlan_isolation + micro_segmentation + zero_trust + access_control"
+          },
+          "required": true,
+          "type": "vlan_isolation + micro_segmentation + zero_trust + access_control"
+        },
+        "perimeter_defense": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "firewalls + intrusion_detection + ddos_protection + traffic_analysis"
+          },
+          "required": true,
+          "type": "firewalls + intrusion_detection + ddos_protection + traffic_analysis"
+        },
+        "secure_development": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "secure_coding + vulnerability_testing + code_review + dependency_management"
+          },
+          "required": true,
+          "type": "secure_coding + vulnerability_testing + code_review + dependency_management"
+        },
+        "security_standards": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "iso27001 + nist_cybersecurity + cis_controls + owasp"
+          },
+          "required": true,
+          "type": "iso27001 + nist_cybersecurity + cis_controls + owasp"
+        }
+      },
+      "lookup_paths": {
+        "access_control.id": {
+          "chain": [
+            "IntelligenceInfrastructure.access_control",
+            "multi_factor_authentication + role_based_access + attribute_based_access + privileged_access_management.id"
+          ],
+          "valid": true
+        },
+        "anonymization.id": {
+          "chain": [
+            "IntelligenceInfrastructure.anonymization",
+            "tor_networks + proxy_chains + traffic_obfuscation + identity_protection.id"
+          ],
+          "valid": true
+        },
+        "business_continuity.id": {
+          "chain": [
+            "IntelligenceInfrastructure.business_continuity",
+            "backup_systems + disaster_recovery + failover_procedures + continuity_planning.id"
+          ],
+          "valid": true
+        },
+        "data_loss_prevention.id": {
+          "chain": [
+            "IntelligenceInfrastructure.data_loss_prevention",
+            "content_inspection + policy_enforcement + monitoring + incident_response.id"
+          ],
+          "valid": true
+        },
+        "data_protection.id": {
+          "chain": [
+            "IntelligenceInfrastructure.data_protection",
+            "gdpr + ccpa + hipaa + sox + pci_dss.id"
+          ],
+          "valid": true
+        },
+        "encrypted_communications.id": {
+          "chain": [
+            "IntelligenceInfrastructure.encrypted_communications",
+            "vpn_tunnels + tls_encryption + end_to_end_encryption + secure_messaging.id"
+          ],
+          "valid": true
+        },
+        "encryption_at_rest.id": {
+          "chain": [
+            "IntelligenceInfrastructure.encryption_at_rest",
+            "full_disk_encryption + database_encryption + file_encryption + key_management.id"
+          ],
+          "valid": true
+        },
+        "encryption_in_transit.id": {
+          "chain": [
+            "IntelligenceInfrastructure.encryption_in_transit",
+            "network_encryption + api_encryption + message_encryption + certificate_management.id"
+          ],
+          "valid": true
+        },
+        "incident_response.id": {
+          "chain": [
+            "IntelligenceInfrastructure.incident_response",
+            "threat_detection + incident_classification + response_procedures + forensic_analysis.id"
+          ],
+          "valid": true
+        },
+        "industry_standards.id": {
+          "chain": [
+            "IntelligenceInfrastructure.industry_standards",
+            "financial_regulations + healthcare_compliance + government_standards + international_law.id"
+          ],
+          "valid": true
+        },
+        "infrastructure_security.id": {
+          "chain": [
+            "IntelligenceInfrastructure.infrastructure_security",
+            "container_security + orchestration_security + cloud_security + compliance_monitoring.id"
+          ],
+          "valid": true
+        },
+        "intelligence_standards.id": {
+          "chain": [
+            "IntelligenceInfrastructure.intelligence_standards",
+            "odni_ics + nato_standards + five_eyes + national_requirements.id"
+          ],
+          "valid": true
+        },
+        "network_segmentation.id": {
+          "chain": [
+            "IntelligenceInfrastructure.network_segmentation",
+            "vlan_isolation + micro_segmentation + zero_trust + access_control.id"
+          ],
+          "valid": true
+        },
+        "perimeter_defense.id": {
+          "chain": [
+            "IntelligenceInfrastructure.perimeter_defense",
+            "firewalls + intrusion_detection + ddos_protection + traffic_analysis.id"
+          ],
+          "valid": true
+        },
+        "secure_development.id": {
+          "chain": [
+            "IntelligenceInfrastructure.secure_development",
+            "secure_coding + vulnerability_testing + code_review + dependency_management.id"
+          ],
+          "valid": true
+        },
+        "security_standards.id": {
+          "chain": [
+            "IntelligenceInfrastructure.security_standards",
+            "iso27001 + nist_cybersecurity + cis_controls + owasp.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "IntelligenceInfrastructure"
+    },
+    "OSINTInvestigator": {
+      "fields": {
+        "competitive_intelligence": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "market_position + strategic_partnerships + merger_activity"
+          },
+          "required": true,
+          "type": "market_position + strategic_partnerships + merger_activity"
+        },
+        "confidence_scoring": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "source_reliability + information_quality + verification_status"
+          },
+          "required": true,
+          "type": "source_reliability + information_quality + verification_status"
+        },
+        "corporate_filings": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "sec_filings + annual_reports + regulatory_submissions + patent_applications"
+          },
+          "required": true,
+          "type": "sec_filings + annual_reports + regulatory_submissions + patent_applications"
+        },
+        "cross_validation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "multiple_source_confirmation + triangulation + consistency_analysis"
+          },
+          "required": true,
+          "type": "multiple_source_confirmation + triangulation + consistency_analysis"
+        },
+        "expert_validation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "subject_matter_expert_review + peer_verification + quality_assurance"
+          },
+          "required": true,
+          "type": "subject_matter_expert_review + peer_verification + quality_assurance"
+        },
+        "financial_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "revenue_analysis + ownership_structure + subsidiary_mapping + credit_ratings"
+          },
+          "required": true,
+          "type": "revenue_analysis + ownership_structure + subsidiary_mapping + credit_ratings"
+        },
+        "flight_tracking": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "aircraft_registration + flight_patterns + ownership_analysis"
+          },
+          "required": true,
+          "type": "aircraft_registration + flight_patterns + ownership_analysis"
+        },
+        "gap_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "information_completeness + missing_data_identification + collection_priorities"
+          },
+          "required": true,
+          "type": "information_completeness + missing_data_identification + collection_priorities"
+        },
+        "image_recognition": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "reverse_image_search + facial_recognition + photo_metadata_analysis"
+          },
+          "required": true,
+          "type": "reverse_image_search + facial_recognition + photo_metadata_analysis"
+        },
+        "maritime_tracking": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "vessel_identification + shipping_routes + port_activities"
+          },
+          "required": true,
+          "type": "vessel_identification + shipping_routes + port_activities"
+        },
+        "multi_source_correlation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "cross_reference_validation + consistency_checking + conflict_resolution"
+          },
+          "required": true,
+          "type": "cross_reference_validation + consistency_checking + conflict_resolution"
+        },
+        "professional_networks": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "linkedin + industry_databases + academic_publications + patents"
+          },
+          "required": true,
+          "type": "linkedin + industry_databases + academic_publications + patents"
+        },
+        "public_records": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "court_records + property_records + business_registrations + voter_rolls"
+          },
+          "required": true,
+          "type": "court_records + property_records + business_registrations + voter_rolls"
+        },
+        "regulatory_compliance": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "sanctions_lists + compliance_violations + regulatory_actions"
+          },
+          "required": true,
+          "type": "sanctions_lists + compliance_violations + regulatory_actions"
+        },
+        "satellite_imagery": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "historical_imagery + change_detection + facility_identification"
+          },
+          "required": true,
+          "type": "historical_imagery + change_detection + facility_identification"
+        },
+        "social_media_profiling": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "cross_platform_correlation + behavioral_analysis + connection_mapping"
+          },
+          "required": true,
+          "type": "cross_platform_correlation + behavioral_analysis + connection_mapping"
+        },
+        "source_validation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "credibility_assessment + bias_detection + fact_checking"
+          },
+          "required": true,
+          "type": "credibility_assessment + bias_detection + fact_checking"
+        },
+        "street_view_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "facility_assessment + security_evaluation + activity_monitoring"
+          },
+          "required": true,
+          "type": "facility_assessment + security_evaluation + activity_monitoring"
+        },
+        "technical_verification": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "metadata_analysis + digital_signatures + blockchain_verification"
+          },
+          "required": true,
+          "type": "metadata_analysis + digital_signatures + blockchain_verification"
+        },
+        "timeline_reconstruction": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "chronological_ordering + event_correlation + causality_analysis"
+          },
+          "required": true,
+          "type": "chronological_ordering + event_correlation + causality_analysis"
+        }
+      },
+      "lookup_paths": {
+        "competitive_intelligence.id": {
+          "chain": [
+            "OSINTInvestigator.competitive_intelligence",
+            "market_position + strategic_partnerships + merger_activity.id"
+          ],
+          "valid": true
+        },
+        "confidence_scoring.id": {
+          "chain": [
+            "OSINTInvestigator.confidence_scoring",
+            "source_reliability + information_quality + verification_status.id"
+          ],
+          "valid": true
+        },
+        "corporate_filings.id": {
+          "chain": [
+            "OSINTInvestigator.corporate_filings",
+            "sec_filings + annual_reports + regulatory_submissions + patent_applications.id"
+          ],
+          "valid": true
+        },
+        "cross_validation.id": {
+          "chain": [
+            "OSINTInvestigator.cross_validation",
+            "multiple_source_confirmation + triangulation + consistency_analysis.id"
+          ],
+          "valid": true
+        },
+        "expert_validation.id": {
+          "chain": [
+            "OSINTInvestigator.expert_validation",
+            "subject_matter_expert_review + peer_verification + quality_assurance.id"
+          ],
+          "valid": true
+        },
+        "financial_analysis.id": {
+          "chain": [
+            "OSINTInvestigator.financial_analysis",
+            "revenue_analysis + ownership_structure + subsidiary_mapping + credit_ratings.id"
+          ],
+          "valid": true
+        },
+        "flight_tracking.id": {
+          "chain": [
+            "OSINTInvestigator.flight_tracking",
+            "aircraft_registration + flight_patterns + ownership_analysis.id"
+          ],
+          "valid": true
+        },
+        "gap_analysis.id": {
+          "chain": [
+            "OSINTInvestigator.gap_analysis",
+            "information_completeness + missing_data_identification + collection_priorities.id"
+          ],
+          "valid": true
+        },
+        "image_recognition.id": {
+          "chain": [
+            "OSINTInvestigator.image_recognition",
+            "reverse_image_search + facial_recognition + photo_metadata_analysis.id"
+          ],
+          "valid": true
+        },
+        "maritime_tracking.id": {
+          "chain": [
+            "OSINTInvestigator.maritime_tracking",
+            "vessel_identification + shipping_routes + port_activities.id"
+          ],
+          "valid": true
+        },
+        "multi_source_correlation.id": {
+          "chain": [
+            "OSINTInvestigator.multi_source_correlation",
+            "cross_reference_validation + consistency_checking + conflict_resolution.id"
+          ],
+          "valid": true
+        },
+        "professional_networks.id": {
+          "chain": [
+            "OSINTInvestigator.professional_networks",
+            "linkedin + industry_databases + academic_publications + patents.id"
+          ],
+          "valid": true
+        },
+        "public_records.id": {
+          "chain": [
+            "OSINTInvestigator.public_records",
+            "court_records + property_records + business_registrations + voter_rolls.id"
+          ],
+          "valid": true
+        },
+        "regulatory_compliance.id": {
+          "chain": [
+            "OSINTInvestigator.regulatory_compliance",
+            "sanctions_lists + compliance_violations + regulatory_actions.id"
+          ],
+          "valid": true
+        },
+        "satellite_imagery.id": {
+          "chain": [
+            "OSINTInvestigator.satellite_imagery",
+            "historical_imagery + change_detection + facility_identification.id"
+          ],
+          "valid": true
+        },
+        "social_media_profiling.id": {
+          "chain": [
+            "OSINTInvestigator.social_media_profiling",
+            "cross_platform_correlation + behavioral_analysis + connection_mapping.id"
+          ],
+          "valid": true
+        },
+        "source_validation.id": {
+          "chain": [
+            "OSINTInvestigator.source_validation",
+            "credibility_assessment + bias_detection + fact_checking.id"
+          ],
+          "valid": true
+        },
+        "street_view_analysis.id": {
+          "chain": [
+            "OSINTInvestigator.street_view_analysis",
+            "facility_assessment + security_evaluation + activity_monitoring.id"
+          ],
+          "valid": true
+        },
+        "technical_verification.id": {
+          "chain": [
+            "OSINTInvestigator.technical_verification",
+            "metadata_analysis + digital_signatures + blockchain_verification.id"
+          ],
+          "valid": true
+        },
+        "timeline_reconstruction.id": {
+          "chain": [
+            "OSINTInvestigator.timeline_reconstruction",
+            "chronological_ordering + event_correlation + causality_analysis.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "OSINTInvestigator"
+    },
+    "ThreatIntelligencePlatform": {
+      "fields": {
+        "attack_attribution": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "ttps_mapping + infrastructure_analysis + behavioral_profiling"
+          },
+          "required": true,
+          "type": "ttps_mapping + infrastructure_analysis + behavioral_profiling"
+        },
+        "attack_prediction": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "vulnerability_exploitation_likelihood + target_probability"
+          },
+          "required": true,
+          "type": "vulnerability_exploitation_likelihood + target_probability"
+        },
+        "attack_surface_mapping": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "exposed_assets + vulnerability_chains + entry_points"
+          },
+          "required": true,
+          "type": "exposed_assets + vulnerability_chains + entry_points"
+        },
+        "behavioral_correlation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "activity_patterns + communication_analysis + habit_identification"
+          },
+          "required": true,
+          "type": "activity_patterns + communication_analysis + habit_identification"
+        },
+        "campaign_evolution": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "attack_progression + technique_adaptation + countermeasure_evasion"
+          },
+          "required": true,
+          "type": "attack_progression + technique_adaptation + countermeasure_evasion"
+        },
+        "campaign_tracking": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "multi_stage_attacks + persistent_threats + evolution_analysis"
+          },
+          "required": true,
+          "type": "multi_stage_attacks + persistent_threats + evolution_analysis"
+        },
+        "code_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "vulnerability_detection + backdoor_identification + obfuscation_detection"
+          },
+          "required": true,
+          "type": "vulnerability_detection + backdoor_identification + obfuscation_detection"
+        },
+        "email_monitoring": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "honeypot_emails + phishing_detection + malware_attachments"
+          },
+          "required": true,
+          "type": "honeypot_emails + phishing_detection + malware_attachments"
+        },
+        "encoding_handling": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "utf8 + ascii + unicode + character_set_detection"
+          },
+          "required": true,
+          "type": "utf8 + ascii + unicode + character_set_detection"
+        },
+        "entity_correlation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "relationship_mapping + network_analysis + influence_scoring"
+          },
+          "required": true,
+          "type": "relationship_mapping + network_analysis + influence_scoring"
+        },
+        "entity_extraction": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "named_entities + geolocation + organizations + persons"
+          },
+          "required": true,
+          "type": "named_entities + geolocation + organizations + persons"
+        },
+        "file_monitoring": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "document_analysis + metadata_extraction + content_indexing"
+          },
+          "required": true,
+          "type": "document_analysis + metadata_extraction + content_indexing"
+        },
+        "format_standardization": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "json + xml + csv + database_formats"
+          },
+          "required": true,
+          "type": "json + xml + csv + database_formats"
+        },
+        "geopolitical_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "conflict_prediction + stability_assessment + influence_operations"
+          },
+          "required": true,
+          "type": "conflict_prediction + stability_assessment + influence_operations"
+        },
+        "indicator_enrichment": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "context_addition + reputation_scoring + confidence_assessment"
+          },
+          "required": true,
+          "type": "context_addition + reputation_scoring + confidence_assessment"
+        },
+        "infrastructure_mapping": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "c2_servers + hosting_providers + domain_clustering"
+          },
+          "required": true,
+          "type": "c2_servers + hosting_providers + domain_clustering"
+        },
+        "interactive_maps": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "geographic_threat_distribution + attack_origins + target_locations"
+          },
+          "required": true,
+          "type": "geographic_threat_distribution + attack_origins + target_locations"
+        },
+        "language_detection": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "automatic_language_identification + translation_services"
+          },
+          "required": true,
+          "type": "automatic_language_identification + translation_services"
+        },
+        "language_identification": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "multilingual_support + dialect_detection"
+          },
+          "required": true,
+          "type": "multilingual_support + dialect_detection"
+        },
+        "malware_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "static_analysis + dynamic_analysis + behavioral_analysis"
+          },
+          "required": true,
+          "type": "static_analysis + dynamic_analysis + behavioral_analysis"
+        },
+        "metadata_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "exif_data + document_properties + hidden_information"
+          },
+          "required": true,
+          "type": "exif_data + document_properties + hidden_information"
+        },
+        "network_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "packet_inspection + protocol_analysis + traffic_patterns"
+          },
+          "required": true,
+          "type": "packet_inspection + protocol_analysis + traffic_patterns"
+        },
+        "network_graphs": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "relationship_visualizations + influence_networks + communication_flows"
+          },
+          "required": true,
+          "type": "relationship_visualizations + influence_networks + communication_flows"
+        },
+        "network_monitoring": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "packet_capture + flow_analysis + dns_monitoring"
+          },
+          "required": true,
+          "type": "packet_capture + flow_analysis + dns_monitoring"
+        },
+        "rate_limiting": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "respectful_crawling + backoff_strategies + concurrent_limits"
+          },
+          "required": true,
+          "type": "respectful_crawling + backoff_strategies + concurrent_limits"
+        },
+        "real_time_monitoring": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "live_threat_feeds + alert_dashboards + situational_awareness"
+          },
+          "required": true,
+          "type": "live_threat_feeds + alert_dashboards + situational_awareness"
+        },
+        "risk_scoring": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "cvss_scoring + custom_metrics + business_impact_assessment"
+          },
+          "required": true,
+          "type": "cvss_scoring + custom_metrics + business_impact_assessment"
+        },
+        "rss_feeds": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "automated_monitoring + content_extraction + deduplication"
+          },
+          "required": true,
+          "type": "automated_monitoring + content_extraction + deduplication"
+        },
+        "scrapy_framework": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "distributed_crawling + proxy_rotation + user_agent_rotation"
+          },
+          "required": true,
+          "type": "distributed_crawling + proxy_rotation + user_agent_rotation"
+        },
+        "search_engines": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "google_api + bing_api + yandex_api + baidu_api + duckduckgo"
+          },
+          "required": true,
+          "type": "google_api + bing_api + yandex_api + baidu_api + duckduckgo"
+        },
+        "security_services": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "virustotal_api + shodan_api + censys_api + urlvoid_api"
+          },
+          "required": true,
+          "type": "virustotal_api + shodan_api + censys_api + urlvoid_api"
+        },
+        "selenium_automation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "javascript_rendering + dynamic_content + captcha_solving"
+          },
+          "required": true,
+          "type": "javascript_rendering + dynamic_content + captcha_solving"
+        },
+        "sentiment_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "opinion_mining + emotion_detection + bias_analysis"
+          },
+          "required": true,
+          "type": "opinion_mining + emotion_detection + bias_analysis"
+        },
+        "social_network_mapping": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "relationship_identification + influence_networks + communication_patterns"
+          },
+          "required": true,
+          "type": "relationship_identification + influence_networks + communication_patterns"
+        },
+        "social_platforms": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "twitter_api + facebook_graph + linkedin_api + instagram_basic"
+          },
+          "required": true,
+          "type": "twitter_api + facebook_graph + linkedin_api + instagram_basic"
+        },
+        "spatial_correlation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "geospatial_analysis + location_clustering + movement_patterns"
+          },
+          "required": true,
+          "type": "geospatial_analysis + location_clustering + movement_patterns"
+        },
+        "supply_chain_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "dependency_mapping + third_party_risks + vendor_assessment"
+          },
+          "required": true,
+          "type": "dependency_mapping + third_party_risks + vendor_assessment"
+        },
+        "temporal_correlation": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "time_series_analysis + event_sequencing + pattern_detection"
+          },
+          "required": true,
+          "type": "time_series_analysis + event_sequencing + pattern_detection"
+        },
+        "threat_feeds": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "misp + taxii + stix + opencti + commercial_feeds"
+          },
+          "required": true,
+          "type": "misp + taxii + stix + opencti + commercial_feeds"
+        },
+        "threat_forecasting": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "trend_analysis + seasonal_patterns + emerging_threats"
+          },
+          "required": true,
+          "type": "trend_analysis + seasonal_patterns + emerging_threats"
+        },
+        "threat_landscapes": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "sector_analysis + attack_vectors + vulnerability_distributions"
+          },
+          "required": true,
+          "type": "sector_analysis + attack_vectors + vulnerability_distributions"
+        },
+        "timeline_analysis": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "attack_chronology + campaign_evolution + incident_correlation"
+          },
+          "required": true,
+          "type": "attack_chronology + campaign_evolution + incident_correlation"
+        },
+        "timestamp_normalization": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "timezone_conversion + format_standardization"
+          },
+          "required": true,
+          "type": "timezone_conversion + format_standardization"
+        },
+        "topic_modeling": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "lda + bert_embeddings + clustering + categorization"
+          },
+          "required": true,
+          "type": "lda + bert_embeddings + clustering + categorization"
+        },
+        "tor_integration": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "anonymized_access + circuit_management + exit_node_selection"
+          },
+          "required": true,
+          "type": "anonymized_access + circuit_management + exit_node_selection"
+        }
+      },
+      "lookup_paths": {
+        "attack_attribution.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.attack_attribution",
+            "ttps_mapping + infrastructure_analysis + behavioral_profiling.id"
+          ],
+          "valid": true
+        },
+        "attack_prediction.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.attack_prediction",
+            "vulnerability_exploitation_likelihood + target_probability.id"
+          ],
+          "valid": true
+        },
+        "attack_surface_mapping.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.attack_surface_mapping",
+            "exposed_assets + vulnerability_chains + entry_points.id"
+          ],
+          "valid": true
+        },
+        "behavioral_correlation.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.behavioral_correlation",
+            "activity_patterns + communication_analysis + habit_identification.id"
+          ],
+          "valid": true
+        },
+        "campaign_evolution.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.campaign_evolution",
+            "attack_progression + technique_adaptation + countermeasure_evasion.id"
+          ],
+          "valid": true
+        },
+        "campaign_tracking.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.campaign_tracking",
+            "multi_stage_attacks + persistent_threats + evolution_analysis.id"
+          ],
+          "valid": true
+        },
+        "code_analysis.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.code_analysis",
+            "vulnerability_detection + backdoor_identification + obfuscation_detection.id"
+          ],
+          "valid": true
+        },
+        "email_monitoring.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.email_monitoring",
+            "honeypot_emails + phishing_detection + malware_attachments.id"
+          ],
+          "valid": true
+        },
+        "encoding_handling.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.encoding_handling",
+            "utf8 + ascii + unicode + character_set_detection.id"
+          ],
+          "valid": true
+        },
+        "entity_correlation.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.entity_correlation",
+            "relationship_mapping + network_analysis + influence_scoring.id"
+          ],
+          "valid": true
+        },
+        "entity_extraction.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.entity_extraction",
+            "named_entities + geolocation + organizations + persons.id"
+          ],
+          "valid": true
+        },
+        "file_monitoring.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.file_monitoring",
+            "document_analysis + metadata_extraction + content_indexing.id"
+          ],
+          "valid": true
+        },
+        "format_standardization.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.format_standardization",
+            "json + xml + csv + database_formats.id"
+          ],
+          "valid": true
+        },
+        "geopolitical_analysis.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.geopolitical_analysis",
+            "conflict_prediction + stability_assessment + influence_operations.id"
+          ],
+          "valid": true
+        },
+        "indicator_enrichment.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.indicator_enrichment",
+            "context_addition + reputation_scoring + confidence_assessment.id"
+          ],
+          "valid": true
+        },
+        "infrastructure_mapping.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.infrastructure_mapping",
+            "c2_servers + hosting_providers + domain_clustering.id"
+          ],
+          "valid": true
+        },
+        "interactive_maps.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.interactive_maps",
+            "geographic_threat_distribution + attack_origins + target_locations.id"
+          ],
+          "valid": true
+        },
+        "language_detection.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.language_detection",
+            "automatic_language_identification + translation_services.id"
+          ],
+          "valid": true
+        },
+        "language_identification.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.language_identification",
+            "multilingual_support + dialect_detection.id"
+          ],
+          "valid": true
+        },
+        "malware_analysis.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.malware_analysis",
+            "static_analysis + dynamic_analysis + behavioral_analysis.id"
+          ],
+          "valid": true
+        },
+        "metadata_analysis.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.metadata_analysis",
+            "exif_data + document_properties + hidden_information.id"
+          ],
+          "valid": true
+        },
+        "network_analysis.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.network_analysis",
+            "packet_inspection + protocol_analysis + traffic_patterns.id"
+          ],
+          "valid": true
+        },
+        "network_graphs.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.network_graphs",
+            "relationship_visualizations + influence_networks + communication_flows.id"
+          ],
+          "valid": true
+        },
+        "network_monitoring.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.network_monitoring",
+            "packet_capture + flow_analysis + dns_monitoring.id"
+          ],
+          "valid": true
+        },
+        "rate_limiting.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.rate_limiting",
+            "respectful_crawling + backoff_strategies + concurrent_limits.id"
+          ],
+          "valid": true
+        },
+        "real_time_monitoring.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.real_time_monitoring",
+            "live_threat_feeds + alert_dashboards + situational_awareness.id"
+          ],
+          "valid": true
+        },
+        "risk_scoring.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.risk_scoring",
+            "cvss_scoring + custom_metrics + business_impact_assessment.id"
+          ],
+          "valid": true
+        },
+        "rss_feeds.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.rss_feeds",
+            "automated_monitoring + content_extraction + deduplication.id"
+          ],
+          "valid": true
+        },
+        "scrapy_framework.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.scrapy_framework",
+            "distributed_crawling + proxy_rotation + user_agent_rotation.id"
+          ],
+          "valid": true
+        },
+        "search_engines.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.search_engines",
+            "google_api + bing_api + yandex_api + baidu_api + duckduckgo.id"
+          ],
+          "valid": true
+        },
+        "security_services.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.security_services",
+            "virustotal_api + shodan_api + censys_api + urlvoid_api.id"
+          ],
+          "valid": true
+        },
+        "selenium_automation.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.selenium_automation",
+            "javascript_rendering + dynamic_content + captcha_solving.id"
+          ],
+          "valid": true
+        },
+        "sentiment_analysis.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.sentiment_analysis",
+            "opinion_mining + emotion_detection + bias_analysis.id"
+          ],
+          "valid": true
+        },
+        "social_network_mapping.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.social_network_mapping",
+            "relationship_identification + influence_networks + communication_patterns.id"
+          ],
+          "valid": true
+        },
+        "social_platforms.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.social_platforms",
+            "twitter_api + facebook_graph + linkedin_api + instagram_basic.id"
+          ],
+          "valid": true
+        },
+        "spatial_correlation.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.spatial_correlation",
+            "geospatial_analysis + location_clustering + movement_patterns.id"
+          ],
+          "valid": true
+        },
+        "supply_chain_analysis.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.supply_chain_analysis",
+            "dependency_mapping + third_party_risks + vendor_assessment.id"
+          ],
+          "valid": true
+        },
+        "temporal_correlation.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.temporal_correlation",
+            "time_series_analysis + event_sequencing + pattern_detection.id"
+          ],
+          "valid": true
+        },
+        "threat_feeds.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.threat_feeds",
+            "misp + taxii + stix + opencti + commercial_feeds.id"
+          ],
+          "valid": true
+        },
+        "threat_forecasting.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.threat_forecasting",
+            "trend_analysis + seasonal_patterns + emerging_threats.id"
+          ],
+          "valid": true
+        },
+        "threat_landscapes.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.threat_landscapes",
+            "sector_analysis + attack_vectors + vulnerability_distributions.id"
+          ],
+          "valid": true
+        },
+        "timeline_analysis.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.timeline_analysis",
+            "attack_chronology + campaign_evolution + incident_correlation.id"
+          ],
+          "valid": true
+        },
+        "timestamp_normalization.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.timestamp_normalization",
+            "timezone_conversion + format_standardization.id"
+          ],
+          "valid": true
+        },
+        "topic_modeling.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.topic_modeling",
+            "lda + bert_embeddings + clustering + categorization.id"
+          ],
+          "valid": true
+        },
+        "tor_integration.id": {
+          "chain": [
+            "ThreatIntelligencePlatform.tor_integration",
+            "anonymized_access + circuit_management + exit_node_selection.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "ThreatIntelligencePlatform"
+    }
+  },
+  "views": {}
+}

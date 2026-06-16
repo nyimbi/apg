@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Any, Annotated
 from uuid_extensions import uuid7str
 
-from pydantic import BaseModel, Field, ConfigDict, AfterValidator, validator, model_validator
+from pydantic import BaseModel, Field, ConfigDict, AfterValidator, field_validator, model_validator
 from pydantic import Json
 
 
@@ -725,7 +725,7 @@ class ImportExportJob(BaseModel):
 
 	model_config = ConfigDict(extra='allow', validate_by_name=True, validate_by_alias=True)
 
-	@validator('updated_at', pre=True, always=True)
+	@field_validator('updated_at', mode='before')
 	def set_updated_at(cls, v):
 		return datetime.now(timezone.utc)
 

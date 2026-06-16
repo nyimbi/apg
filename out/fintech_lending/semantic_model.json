@@ -1,0 +1,2640 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 8,
+    "name": "fintech_lending",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "LendApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "AI-powered digital lending platform",
+        "integrations": {},
+        "name": "LendApp",
+        "policies": {},
+        "routes": [],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "fintech_lending.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fintech_lending.apg",
+      "fixes": [],
+      "message": "Application 'LendApp' should compose capabilities, components, or routes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "deployment": {
+      "edges": 8,
+      "kind": "deployment",
+      "nodes": 9
+    },
+    "er": {
+      "edges": 103,
+      "kind": "er",
+      "nodes": 105
+    },
+    "handler": {
+      "edges": 8,
+      "kind": "handler",
+      "nodes": 9
+    },
+    "lookup": {
+      "edges": 8,
+      "kind": "lookup",
+      "nodes": 9
+    },
+    "package": {
+      "edges": 8,
+      "kind": "package",
+      "nodes": 9
+    },
+    "security": {
+      "edges": 8,
+      "kind": "security",
+      "nodes": 9
+    },
+    "workflow": {
+      "edges": 8,
+      "kind": "workflow",
+      "nodes": 9
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "fintech_lending.apg"
+  ],
+  "symbols": {
+    "app.LendApp": {
+      "file": "fintech_lending.apg",
+      "id": "app.LendApp",
+      "kind": "app",
+      "name": "LendApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.applicant_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.applicant_id",
+      "kind": "field",
+      "name": "ActiveLoan.applicant_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.application_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.application_id",
+      "kind": "field",
+      "name": "ActiveLoan.application_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.collection_bucket": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.collection_bucket",
+      "kind": "field",
+      "name": "ActiveLoan.collection_bucket",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.days_past_due": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.days_past_due",
+      "kind": "field",
+      "name": "ActiveLoan.days_past_due",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.disbursed_amount": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.disbursed_amount",
+      "kind": "field",
+      "name": "ActiveLoan.disbursed_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.disbursement_date": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.disbursement_date",
+      "kind": "field",
+      "name": "ActiveLoan.disbursement_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.id": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.id",
+      "kind": "field",
+      "name": "ActiveLoan.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.interest_rate": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.interest_rate",
+      "kind": "field",
+      "name": "ActiveLoan.interest_rate",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.loan_number": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.loan_number",
+      "kind": "field",
+      "name": "ActiveLoan.loan_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.loan_status": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.loan_status",
+      "kind": "field",
+      "name": "ActiveLoan.loan_status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.maturity_date": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.maturity_date",
+      "kind": "field",
+      "name": "ActiveLoan.maturity_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.monthly_repayment": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.monthly_repayment",
+      "kind": "field",
+      "name": "ActiveLoan.monthly_repayment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.outstanding_interest": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.outstanding_interest",
+      "kind": "field",
+      "name": "ActiveLoan.outstanding_interest",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.outstanding_principal": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.outstanding_principal",
+      "kind": "field",
+      "name": "ActiveLoan.outstanding_principal",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.principal_amount": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.principal_amount",
+      "kind": "field",
+      "name": "ActiveLoan.principal_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.product_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.product_id",
+      "kind": "field",
+      "name": "ActiveLoan.product_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ActiveLoan.term_months": {
+      "file": "fintech_lending.apg",
+      "id": "field.ActiveLoan.term_months",
+      "kind": "field",
+      "name": "ActiveLoan.term_months",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.applicant_code": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.applicant_code",
+      "kind": "field",
+      "name": "Applicant.applicant_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.county": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.county",
+      "kind": "field",
+      "name": "Applicant.county",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.credit_score": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.credit_score",
+      "kind": "field",
+      "name": "Applicant.credit_score",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.date_of_birth": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.date_of_birth",
+      "kind": "field",
+      "name": "Applicant.date_of_birth",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.email": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.email",
+      "kind": "field",
+      "name": "Applicant.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.employer": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.employer",
+      "kind": "field",
+      "name": "Applicant.employer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.employment_type": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.employment_type",
+      "kind": "field",
+      "name": "Applicant.employment_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.full_name": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.full_name",
+      "kind": "field",
+      "name": "Applicant.full_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.gender": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.gender",
+      "kind": "field",
+      "name": "Applicant.gender",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.id": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.id",
+      "kind": "field",
+      "name": "Applicant.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.kyc_status": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.kyc_status",
+      "kind": "field",
+      "name": "Applicant.kyc_status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.monthly_income": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.monthly_income",
+      "kind": "field",
+      "name": "Applicant.monthly_income",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.mpesa_limit": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.mpesa_limit",
+      "kind": "field",
+      "name": "Applicant.mpesa_limit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.national_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.national_id",
+      "kind": "field",
+      "name": "Applicant.national_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.phone": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.phone",
+      "kind": "field",
+      "name": "Applicant.phone",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Applicant.risk_band": {
+      "file": "fintech_lending.apg",
+      "id": "field.Applicant.risk_band",
+      "kind": "field",
+      "name": "Applicant.risk_band",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.action_taken": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.action_taken",
+      "kind": "field",
+      "name": "Collection.action_taken",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.applicant_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.applicant_id",
+      "kind": "field",
+      "name": "Collection.applicant_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.bucket": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.bucket",
+      "kind": "field",
+      "name": "Collection.bucket",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.collector_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.collector_id",
+      "kind": "field",
+      "name": "Collection.collector_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.contact_result": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.contact_result",
+      "kind": "field",
+      "name": "Collection.contact_result",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.dpd": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.dpd",
+      "kind": "field",
+      "name": "Collection.dpd",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.id": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.id",
+      "kind": "field",
+      "name": "Collection.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.last_contact_channel": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.last_contact_channel",
+      "kind": "field",
+      "name": "Collection.last_contact_channel",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.last_contact_date": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.last_contact_date",
+      "kind": "field",
+      "name": "Collection.last_contact_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.loan_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.loan_id",
+      "kind": "field",
+      "name": "Collection.loan_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.outstanding_amount": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.outstanding_amount",
+      "kind": "field",
+      "name": "Collection.outstanding_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.promise_to_pay_amount": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.promise_to_pay_amount",
+      "kind": "field",
+      "name": "Collection.promise_to_pay_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Collection.promise_to_pay_date": {
+      "file": "fintech_lending.apg",
+      "id": "field.Collection.promise_to_pay_date",
+      "kind": "field",
+      "name": "Collection.promise_to_pay_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.account_age_score": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.account_age_score",
+      "kind": "field",
+      "name": "CreditScore.account_age_score",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.applicant_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.applicant_id",
+      "kind": "field",
+      "name": "CreditScore.applicant_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.bureau_score": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.bureau_score",
+      "kind": "field",
+      "name": "CreditScore.bureau_score",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.id": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.id",
+      "kind": "field",
+      "name": "CreditScore.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.income_stability_score": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.income_stability_score",
+      "kind": "field",
+      "name": "CreditScore.income_stability_score",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.model_version": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.model_version",
+      "kind": "field",
+      "name": "CreditScore.model_version",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.recommendation": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.recommendation",
+      "kind": "field",
+      "name": "CreditScore.recommendation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.repayment_history_score": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.repayment_history_score",
+      "kind": "field",
+      "name": "CreditScore.repayment_history_score",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.score": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.score",
+      "kind": "field",
+      "name": "CreditScore.score",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.score_band": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.score_band",
+      "kind": "field",
+      "name": "CreditScore.score_band",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.scoring_date": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.scoring_date",
+      "kind": "field",
+      "name": "CreditScore.scoring_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.CreditScore.utilisation_score": {
+      "file": "fintech_lending.apg",
+      "id": "field.CreditScore.utilisation_score",
+      "kind": "field",
+      "name": "CreditScore.utilisation_score",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.applicant_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.applicant_id",
+      "kind": "field",
+      "name": "LoanApplication.applicant_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.application_date": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.application_date",
+      "kind": "field",
+      "name": "LoanApplication.application_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.application_number": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.application_number",
+      "kind": "field",
+      "name": "LoanApplication.application_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.approved_amount": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.approved_amount",
+      "kind": "field",
+      "name": "LoanApplication.approved_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.approved_term_months": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.approved_term_months",
+      "kind": "field",
+      "name": "LoanApplication.approved_term_months",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.credit_decision": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.credit_decision",
+      "kind": "field",
+      "name": "LoanApplication.credit_decision",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.decision_by": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.decision_by",
+      "kind": "field",
+      "name": "LoanApplication.decision_by",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.decision_date": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.decision_date",
+      "kind": "field",
+      "name": "LoanApplication.decision_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.id": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.id",
+      "kind": "field",
+      "name": "LoanApplication.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.product_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.product_id",
+      "kind": "field",
+      "name": "LoanApplication.product_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.purpose": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.purpose",
+      "kind": "field",
+      "name": "LoanApplication.purpose",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.rejection_reason": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.rejection_reason",
+      "kind": "field",
+      "name": "LoanApplication.rejection_reason",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.requested_amount": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.requested_amount",
+      "kind": "field",
+      "name": "LoanApplication.requested_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.requested_term_months": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.requested_term_months",
+      "kind": "field",
+      "name": "LoanApplication.requested_term_months",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanApplication.status": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanApplication.status",
+      "kind": "field",
+      "name": "LoanApplication.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.collateral_required": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.collateral_required",
+      "kind": "field",
+      "name": "LoanProduct.collateral_required",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.id": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.id",
+      "kind": "field",
+      "name": "LoanProduct.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.insurance_fee_pct": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.insurance_fee_pct",
+      "kind": "field",
+      "name": "LoanProduct.insurance_fee_pct",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.interest_rate": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.interest_rate",
+      "kind": "field",
+      "name": "LoanProduct.interest_rate",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.max_amount": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.max_amount",
+      "kind": "field",
+      "name": "LoanProduct.max_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.max_term_months": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.max_term_months",
+      "kind": "field",
+      "name": "LoanProduct.max_term_months",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.min_amount": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.min_amount",
+      "kind": "field",
+      "name": "LoanProduct.min_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.min_term_months": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.min_term_months",
+      "kind": "field",
+      "name": "LoanProduct.min_term_months",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.processing_fee_pct": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.processing_fee_pct",
+      "kind": "field",
+      "name": "LoanProduct.processing_fee_pct",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.product_code": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.product_code",
+      "kind": "field",
+      "name": "LoanProduct.product_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.product_name": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.product_name",
+      "kind": "field",
+      "name": "LoanProduct.product_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.status": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.status",
+      "kind": "field",
+      "name": "LoanProduct.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.LoanProduct.target_segment": {
+      "file": "fintech_lending.apg",
+      "id": "field.LoanProduct.target_segment",
+      "kind": "field",
+      "name": "LoanProduct.target_segment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.amount": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.amount",
+      "kind": "field",
+      "name": "Repayment.amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.applicant_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.applicant_id",
+      "kind": "field",
+      "name": "Repayment.applicant_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.id": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.id",
+      "kind": "field",
+      "name": "Repayment.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.interest_portion": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.interest_portion",
+      "kind": "field",
+      "name": "Repayment.interest_portion",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.loan_id": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.loan_id",
+      "kind": "field",
+      "name": "Repayment.loan_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.mpesa_reference": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.mpesa_reference",
+      "kind": "field",
+      "name": "Repayment.mpesa_reference",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.payment_date": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.payment_date",
+      "kind": "field",
+      "name": "Repayment.payment_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.payment_method": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.payment_method",
+      "kind": "field",
+      "name": "Repayment.payment_method",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.penalty_portion": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.penalty_portion",
+      "kind": "field",
+      "name": "Repayment.penalty_portion",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.principal_portion": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.principal_portion",
+      "kind": "field",
+      "name": "Repayment.principal_portion",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.receipt_number": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.receipt_number",
+      "kind": "field",
+      "name": "Repayment.receipt_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Repayment.running_balance": {
+      "file": "fintech_lending.apg",
+      "id": "field.Repayment.running_balance",
+      "kind": "field",
+      "name": "Repayment.running_balance",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.fintech_lending": {
+      "file": "fintech_lending.apg",
+      "id": "module.fintech_lending",
+      "kind": "module",
+      "name": "fintech_lending",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.ActiveLoan": {
+      "file": "fintech_lending.apg",
+      "id": "table.ActiveLoan",
+      "kind": "table",
+      "name": "ActiveLoan",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Applicant": {
+      "file": "fintech_lending.apg",
+      "id": "table.Applicant",
+      "kind": "table",
+      "name": "Applicant",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Collection": {
+      "file": "fintech_lending.apg",
+      "id": "table.Collection",
+      "kind": "table",
+      "name": "Collection",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.CreditScore": {
+      "file": "fintech_lending.apg",
+      "id": "table.CreditScore",
+      "kind": "table",
+      "name": "CreditScore",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.LoanApplication": {
+      "file": "fintech_lending.apg",
+      "id": "table.LoanApplication",
+      "kind": "table",
+      "name": "LoanApplication",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.LoanProduct": {
+      "file": "fintech_lending.apg",
+      "id": "table.LoanProduct",
+      "kind": "table",
+      "name": "LoanProduct",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Repayment": {
+      "file": "fintech_lending.apg",
+      "id": "table.Repayment",
+      "kind": "table",
+      "name": "Repayment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "ActiveLoan": {
+      "fields": {
+        "applicant_id": {
+          "relationship": {
+            "alias": "applicant",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Applicant"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "application_id": {
+          "relationship": {
+            "alias": "application",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Application"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "collection_bucket": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "days_past_due": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "disbursed_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "disbursement_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "interest_rate": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "loan_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "loan_status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "maturity_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "monthly_repayment": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "outstanding_interest": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "outstanding_principal": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "principal_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "product_id": {
+          "relationship": {
+            "alias": "product",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Product"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "term_months": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {
+        "disbursement_date.id": {
+          "chain": [
+            "ActiveLoan.disbursement_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "maturity_date.id": {
+          "chain": [
+            "ActiveLoan.maturity_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "ActiveLoan"
+    },
+    "Applicant": {
+      "fields": {
+        "applicant_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "county": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "credit_score": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "date_of_birth": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "employer": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "employment_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "full_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "gender": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "kyc_status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "monthly_income": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "mpesa_limit": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "national_id": {
+          "relationship": {
+            "alias": "national",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "National"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "risk_band": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "date_of_birth.id": {
+          "chain": [
+            "Applicant.date_of_birth",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Applicant"
+    },
+    "Collection": {
+      "fields": {
+        "action_taken": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "applicant_id": {
+          "relationship": {
+            "alias": "applicant",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Applicant"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "bucket": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "collector_id": {
+          "relationship": {
+            "alias": "collector",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Collector"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "contact_result": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "dpd": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "last_contact_channel": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "last_contact_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "loan_id": {
+          "relationship": {
+            "alias": "loan",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Loan"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "outstanding_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "promise_to_pay_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "promise_to_pay_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        }
+      },
+      "lookup_paths": {
+        "last_contact_date.id": {
+          "chain": [
+            "Collection.last_contact_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "promise_to_pay_date.id": {
+          "chain": [
+            "Collection.promise_to_pay_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Collection"
+    },
+    "CreditScore": {
+      "fields": {
+        "account_age_score": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "applicant_id": {
+          "relationship": {
+            "alias": "applicant",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Applicant"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "bureau_score": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "income_stability_score": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "model_version": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "recommendation": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "repayment_history_score": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "score": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "score_band": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "scoring_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "utilisation_score": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {
+        "scoring_date.id": {
+          "chain": [
+            "CreditScore.scoring_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "CreditScore"
+    },
+    "LoanApplication": {
+      "fields": {
+        "applicant_id": {
+          "relationship": {
+            "alias": "applicant",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Applicant"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "application_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "application_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "approved_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "approved_term_months": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "credit_decision": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "decision_by": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "decision_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "product_id": {
+          "relationship": {
+            "alias": "product",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Product"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "purpose": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "rejection_reason": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "requested_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "requested_term_months": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "application_date.id": {
+          "chain": [
+            "LoanApplication.application_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "decision_date.id": {
+          "chain": [
+            "LoanApplication.decision_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "LoanApplication"
+    },
+    "LoanProduct": {
+      "fields": {
+        "collateral_required": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "insurance_fee_pct": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "interest_rate": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "max_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "max_term_months": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "min_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "min_term_months": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "processing_fee_pct": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "product_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "product_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "target_segment": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "LoanProduct"
+    },
+    "Repayment": {
+      "fields": {
+        "amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "applicant_id": {
+          "relationship": {
+            "alias": "applicant",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Applicant"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "interest_portion": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "loan_id": {
+          "relationship": {
+            "alias": "loan",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Loan"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "mpesa_reference": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "payment_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "payment_method": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "penalty_portion": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "principal_portion": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "receipt_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "running_balance": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {
+        "payment_date.id": {
+          "chain": [
+            "Repayment.payment_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Repayment"
+    }
+  },
+  "views": {}
+}

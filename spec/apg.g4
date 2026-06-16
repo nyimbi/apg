@@ -365,6 +365,7 @@ member_name
     // Workflow body fields (NOT the workflow entity keyword itself)
     | 'assignments' | 'guards' | 'timers' | 'waits' | 'retry_policy'
     | 'compensation' | 'human_tasks' | 'stages' | 'process'
+    | 'saga' | 'is_saga' | 'emit_events' | 'subscribe_events'
     // Auto-generated: all remaining parser keywords
     | 'actuator' | 'agent_handoff' | 'agent_memory' | 'agent_runtime' | 'agent_team' | 'agent_tool' | 'aggregate' | 'alert'
     | 'alert_manager' | 'analyze' | 'anomaly' | 'as' | 'auto_system' | 'benchmark' | 'biz' | 'cache'

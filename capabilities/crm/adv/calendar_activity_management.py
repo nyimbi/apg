@@ -20,9 +20,9 @@ import json
 import pytz
 from dateutil.rrule import rrule, DAILY, WEEKLY, MONTHLY, YEARLY
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
-from .database import DatabaseManager
+from, field_validator.database import DatabaseManager
 
 
 logger = logging.getLogger(__name__)
@@ -250,7 +250,7 @@ class CalendarEvent(BaseModel):
 	updated_by: str
 	version: int = 1
 	
-	@validator('end_time')
+	@field_validator('end_time')
 	def end_after_start(cls, v, values):
 		if 'start_time' in values and v <= values['start_time']:
 			raise ValueError('End time must be after start time')

@@ -130,7 +130,7 @@ def test_database_models():
 	try:
 		# Test basic SQLAlchemy functionality
 		from sqlalchemy import Column, String, Integer, Boolean, create_engine
-		from sqlalchemy.ext.declarative import declarative_base
+		from sqlalchemy.orm import declarative_base
 		
 		Base = declarative_base()
 		

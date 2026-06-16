@@ -1,0 +1,389 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 7,
+    "name": "main",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "main.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 7,
+      "kind": "deployment",
+      "nodes": 8
+    },
+    "er": {
+      "edges": 5,
+      "kind": "er",
+      "nodes": 12
+    },
+    "handler": {
+      "edges": 7,
+      "kind": "handler",
+      "nodes": 8
+    },
+    "lookup": {
+      "edges": 7,
+      "kind": "lookup",
+      "nodes": 8
+    },
+    "package": {
+      "edges": 7,
+      "kind": "package",
+      "nodes": 8
+    },
+    "security": {
+      "edges": 7,
+      "kind": "security",
+      "nodes": 8
+    },
+    "workflow": {
+      "edges": 7,
+      "kind": "workflow",
+      "nodes": 8
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "main.apg"
+  ],
+  "symbols": {
+    "entity.ElectronicsAssemblyInspection": {
+      "file": "main.apg",
+      "id": "entity.ElectronicsAssemblyInspection",
+      "kind": "entity",
+      "name": "ElectronicsAssemblyInspection",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "entity.FoodProcessingQC": {
+      "file": "main.apg",
+      "id": "entity.FoodProcessingQC",
+      "kind": "entity",
+      "name": "FoodProcessingQC",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "entity.IntegratedQualitySystem": {
+      "file": "main.apg",
+      "id": "entity.IntegratedQualitySystem",
+      "kind": "entity",
+      "name": "IntegratedQualitySystem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "entity.PharmaceuticalProduction": {
+      "file": "main.apg",
+      "id": "entity.PharmaceuticalProduction",
+      "kind": "entity",
+      "name": "PharmaceuticalProduction",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "entity.TextileQualityControl": {
+      "file": "main.apg",
+      "id": "entity.TextileQualityControl",
+      "kind": "entity",
+      "name": "TextileQualityControl",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.AutoAssemblyLine.bottleneck_detection": {
+      "file": "main.apg",
+      "id": "field.AutoAssemblyLine.bottleneck_detection",
+      "kind": "field",
+      "name": "AutoAssemblyLine.bottleneck_detection",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.AutoAssemblyLine.cycle_time": {
+      "file": "main.apg",
+      "id": "field.AutoAssemblyLine.cycle_time",
+      "kind": "field",
+      "name": "AutoAssemblyLine.cycle_time",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.AutoAssemblyLine.takt_time": {
+      "file": "main.apg",
+      "id": "field.AutoAssemblyLine.takt_time",
+      "kind": "field",
+      "name": "AutoAssemblyLine.takt_time",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.AutoAssemblyLine.throughput": {
+      "file": "main.apg",
+      "id": "field.AutoAssemblyLine.throughput",
+      "kind": "field",
+      "name": "AutoAssemblyLine.throughput",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SemiconductorWaferInspection.training_data": {
+      "file": "main.apg",
+      "id": "field.SemiconductorWaferInspection.training_data",
+      "kind": "field",
+      "name": "SemiconductorWaferInspection.training_data",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.main": {
+      "file": "main.apg",
+      "id": "module.main",
+      "kind": "module",
+      "name": "main",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.AutoAssemblyLine": {
+      "file": "main.apg",
+      "id": "table.AutoAssemblyLine",
+      "kind": "table",
+      "name": "AutoAssemblyLine",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.SemiconductorWaferInspection": {
+      "file": "main.apg",
+      "id": "table.SemiconductorWaferInspection",
+      "kind": "table",
+      "name": "SemiconductorWaferInspection",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "AutoAssemblyLine": {
+      "fields": {
+        "bottleneck_detection": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "string"
+          },
+          "required": true,
+          "type": "string"
+        },
+        "cycle_time": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "target(180s) \u00b1 tolerance(10s)"
+          },
+          "required": true,
+          "type": "target(180s) \u00b1 tolerance(10s)"
+        },
+        "takt_time": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "customer_demand(480_units/day) / operating_time(16h)"
+          },
+          "required": true,
+          "type": "customer_demand(480_units/day) / operating_time(16h)"
+        },
+        "throughput": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {
+        "bottleneck_detection.id": {
+          "chain": [
+            "AutoAssemblyLine.bottleneck_detection",
+            "string.id"
+          ],
+          "valid": true
+        },
+        "cycle_time.id": {
+          "chain": [
+            "AutoAssemblyLine.cycle_time",
+            "target(180s) \u00b1 tolerance(10s).id"
+          ],
+          "valid": true
+        },
+        "takt_time.id": {
+          "chain": [
+            "AutoAssemblyLine.takt_time",
+            "customer_demand(480_units/day) / operating_time(16h).id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "AutoAssemblyLine"
+    },
+    "SemiconductorWaferInspection": {
+      "fields": {
+        "training_data": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "string"
+          },
+          "required": true,
+          "type": "string"
+        }
+      },
+      "lookup_paths": {
+        "training_data.id": {
+          "chain": [
+            "SemiconductorWaferInspection.training_data",
+            "string.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "SemiconductorWaferInspection"
+    }
+  },
+  "views": {}
+}

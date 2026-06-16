@@ -26,7 +26,7 @@ except ModuleNotFoundError:
 	from .standalone_support import NoOpRedisModule as aioredis
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from uuid_extensions import uuid7str
 
 try:

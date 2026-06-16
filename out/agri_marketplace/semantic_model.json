@@ -1,0 +1,1821 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 7,
+    "name": "agri_marketplace",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "AgriMarketApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Farm-to-buyer produce marketplace",
+        "integrations": {},
+        "name": "AgriMarketApp",
+        "policies": {},
+        "routes": [],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "agri_marketplace.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "agri_marketplace.apg",
+      "fixes": [],
+      "message": "Application 'AgriMarketApp' should compose capabilities, components, or routes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "deployment": {
+      "edges": 7,
+      "kind": "deployment",
+      "nodes": 8
+    },
+    "er": {
+      "edges": 68,
+      "kind": "er",
+      "nodes": 70
+    },
+    "handler": {
+      "edges": 7,
+      "kind": "handler",
+      "nodes": 8
+    },
+    "lookup": {
+      "edges": 7,
+      "kind": "lookup",
+      "nodes": 8
+    },
+    "package": {
+      "edges": 7,
+      "kind": "package",
+      "nodes": 8
+    },
+    "security": {
+      "edges": 7,
+      "kind": "security",
+      "nodes": 8
+    },
+    "workflow": {
+      "edges": 7,
+      "kind": "workflow",
+      "nodes": 8
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "agri_marketplace.apg"
+  ],
+  "symbols": {
+    "app.AgriMarketApp": {
+      "file": "agri_marketplace.apg",
+      "id": "app.AgriMarketApp",
+      "kind": "app",
+      "name": "AgriMarketApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Buyer.buyer_type": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Buyer.buyer_type",
+      "kind": "field",
+      "name": "Buyer.buyer_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Buyer.company_name": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Buyer.company_name",
+      "kind": "field",
+      "name": "Buyer.company_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Buyer.contact_person": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Buyer.contact_person",
+      "kind": "field",
+      "name": "Buyer.contact_person",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Buyer.county": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Buyer.county",
+      "kind": "field",
+      "name": "Buyer.county",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Buyer.credit_limit": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Buyer.credit_limit",
+      "kind": "field",
+      "name": "Buyer.credit_limit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Buyer.email": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Buyer.email",
+      "kind": "field",
+      "name": "Buyer.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Buyer.id": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Buyer.id",
+      "kind": "field",
+      "name": "Buyer.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Buyer.payment_terms": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Buyer.payment_terms",
+      "kind": "field",
+      "name": "Buyer.payment_terms",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Buyer.phone": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Buyer.phone",
+      "kind": "field",
+      "name": "Buyer.phone",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Buyer.verified": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Buyer.verified",
+      "kind": "field",
+      "name": "Buyer.verified",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.cooperative_id": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.cooperative_id",
+      "kind": "field",
+      "name": "Farmer.cooperative_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.county": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.county",
+      "kind": "field",
+      "name": "Farmer.county",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.farm_size_acres": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.farm_size_acres",
+      "kind": "field",
+      "name": "Farmer.farm_size_acres",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.farmer_code": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.farmer_code",
+      "kind": "field",
+      "name": "Farmer.farmer_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.full_name": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.full_name",
+      "kind": "field",
+      "name": "Farmer.full_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.id": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.id",
+      "kind": "field",
+      "name": "Farmer.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.mpesa_number": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.mpesa_number",
+      "kind": "field",
+      "name": "Farmer.mpesa_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.phone": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.phone",
+      "kind": "field",
+      "name": "Farmer.phone",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.primary_crop": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.primary_crop",
+      "kind": "field",
+      "name": "Farmer.primary_crop",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.sub_county": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.sub_county",
+      "kind": "field",
+      "name": "Farmer.sub_county",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.verified": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.verified",
+      "kind": "field",
+      "name": "Farmer.verified",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Farmer.ward": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Farmer.ward",
+      "kind": "field",
+      "name": "Farmer.ward",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.agreed_price_per_kg": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.agreed_price_per_kg",
+      "kind": "field",
+      "name": "Order.agreed_price_per_kg",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.buyer_id": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.buyer_id",
+      "kind": "field",
+      "name": "Order.buyer_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.delivery_date": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.delivery_date",
+      "kind": "field",
+      "name": "Order.delivery_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.delivery_location": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.delivery_location",
+      "kind": "field",
+      "name": "Order.delivery_location",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.farmer_id": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.farmer_id",
+      "kind": "field",
+      "name": "Order.farmer_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.id": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.id",
+      "kind": "field",
+      "name": "Order.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.order_date": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.order_date",
+      "kind": "field",
+      "name": "Order.order_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.order_number": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.order_number",
+      "kind": "field",
+      "name": "Order.order_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.order_status": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.order_status",
+      "kind": "field",
+      "name": "Order.order_status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.payment_method": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.payment_method",
+      "kind": "field",
+      "name": "Order.payment_method",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.payment_status": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.payment_status",
+      "kind": "field",
+      "name": "Order.payment_status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.produce_id": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.produce_id",
+      "kind": "field",
+      "name": "Order.produce_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.quantity_kg": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.quantity_kg",
+      "kind": "field",
+      "name": "Order.quantity_kg",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.total_amount": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Order.total_amount",
+      "kind": "field",
+      "name": "Order.total_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PriceIndex.county": {
+      "file": "agri_marketplace.apg",
+      "id": "field.PriceIndex.county",
+      "kind": "field",
+      "name": "PriceIndex.county",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PriceIndex.crop_name": {
+      "file": "agri_marketplace.apg",
+      "id": "field.PriceIndex.crop_name",
+      "kind": "field",
+      "name": "PriceIndex.crop_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PriceIndex.id": {
+      "file": "agri_marketplace.apg",
+      "id": "field.PriceIndex.id",
+      "kind": "field",
+      "name": "PriceIndex.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PriceIndex.market_name": {
+      "file": "agri_marketplace.apg",
+      "id": "field.PriceIndex.market_name",
+      "kind": "field",
+      "name": "PriceIndex.market_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PriceIndex.price_per_kg": {
+      "file": "agri_marketplace.apg",
+      "id": "field.PriceIndex.price_per_kg",
+      "kind": "field",
+      "name": "PriceIndex.price_per_kg",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PriceIndex.recorded_date": {
+      "file": "agri_marketplace.apg",
+      "id": "field.PriceIndex.recorded_date",
+      "kind": "field",
+      "name": "PriceIndex.recorded_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.PriceIndex.source": {
+      "file": "agri_marketplace.apg",
+      "id": "field.PriceIndex.source",
+      "kind": "field",
+      "name": "PriceIndex.source",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.asking_price_per_kg": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.asking_price_per_kg",
+      "kind": "field",
+      "name": "Produce.asking_price_per_kg",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.available_from": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.available_from",
+      "kind": "field",
+      "name": "Produce.available_from",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.available_until": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.available_until",
+      "kind": "field",
+      "name": "Produce.available_until",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.crop_name": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.crop_name",
+      "kind": "field",
+      "name": "Produce.crop_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.description": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.description",
+      "kind": "field",
+      "name": "Produce.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.farmer_id": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.farmer_id",
+      "kind": "field",
+      "name": "Produce.farmer_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.harvest_date": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.harvest_date",
+      "kind": "field",
+      "name": "Produce.harvest_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.id": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.id",
+      "kind": "field",
+      "name": "Produce.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.location": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.location",
+      "kind": "field",
+      "name": "Produce.location",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.quality_grade": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.quality_grade",
+      "kind": "field",
+      "name": "Produce.quality_grade",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.quantity_kg": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.quantity_kg",
+      "kind": "field",
+      "name": "Produce.quantity_kg",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.status": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.status",
+      "kind": "field",
+      "name": "Produce.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Produce.variety": {
+      "file": "agri_marketplace.apg",
+      "id": "field.Produce.variety",
+      "kind": "field",
+      "name": "Produce.variety",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WeatherAlert.affected_crops": {
+      "file": "agri_marketplace.apg",
+      "id": "field.WeatherAlert.affected_crops",
+      "kind": "field",
+      "name": "WeatherAlert.affected_crops",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WeatherAlert.alert_type": {
+      "file": "agri_marketplace.apg",
+      "id": "field.WeatherAlert.alert_type",
+      "kind": "field",
+      "name": "WeatherAlert.alert_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WeatherAlert.county": {
+      "file": "agri_marketplace.apg",
+      "id": "field.WeatherAlert.county",
+      "kind": "field",
+      "name": "WeatherAlert.county",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WeatherAlert.id": {
+      "file": "agri_marketplace.apg",
+      "id": "field.WeatherAlert.id",
+      "kind": "field",
+      "name": "WeatherAlert.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WeatherAlert.issued_date": {
+      "file": "agri_marketplace.apg",
+      "id": "field.WeatherAlert.issued_date",
+      "kind": "field",
+      "name": "WeatherAlert.issued_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WeatherAlert.message": {
+      "file": "agri_marketplace.apg",
+      "id": "field.WeatherAlert.message",
+      "kind": "field",
+      "name": "WeatherAlert.message",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WeatherAlert.severity": {
+      "file": "agri_marketplace.apg",
+      "id": "field.WeatherAlert.severity",
+      "kind": "field",
+      "name": "WeatherAlert.severity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.WeatherAlert.valid_until": {
+      "file": "agri_marketplace.apg",
+      "id": "field.WeatherAlert.valid_until",
+      "kind": "field",
+      "name": "WeatherAlert.valid_until",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.agri_marketplace": {
+      "file": "agri_marketplace.apg",
+      "id": "module.agri_marketplace",
+      "kind": "module",
+      "name": "agri_marketplace",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Buyer": {
+      "file": "agri_marketplace.apg",
+      "id": "table.Buyer",
+      "kind": "table",
+      "name": "Buyer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Farmer": {
+      "file": "agri_marketplace.apg",
+      "id": "table.Farmer",
+      "kind": "table",
+      "name": "Farmer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Order": {
+      "file": "agri_marketplace.apg",
+      "id": "table.Order",
+      "kind": "table",
+      "name": "Order",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.PriceIndex": {
+      "file": "agri_marketplace.apg",
+      "id": "table.PriceIndex",
+      "kind": "table",
+      "name": "PriceIndex",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Produce": {
+      "file": "agri_marketplace.apg",
+      "id": "table.Produce",
+      "kind": "table",
+      "name": "Produce",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.WeatherAlert": {
+      "file": "agri_marketplace.apg",
+      "id": "table.WeatherAlert",
+      "kind": "table",
+      "name": "WeatherAlert",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Buyer": {
+      "fields": {
+        "buyer_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "company_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "contact_person": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "county": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "credit_limit": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "payment_terms": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "verified": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Buyer"
+    },
+    "Farmer": {
+      "fields": {
+        "cooperative_id": {
+          "relationship": {
+            "alias": "cooperative",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Cooperative"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "county": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "farm_size_acres": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "farmer_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "full_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "mpesa_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "primary_crop": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "sub_county": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "verified": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "ward": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Farmer"
+    },
+    "Order": {
+      "fields": {
+        "agreed_price_per_kg": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "buyer_id": {
+          "relationship": {
+            "alias": "buyer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Buyer"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "delivery_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "delivery_location": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "farmer_id": {
+          "relationship": {
+            "alias": "farmer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Farmer"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "order_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "order_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "order_status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "payment_method": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "payment_status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "produce_id": {
+          "relationship": {
+            "alias": "produce",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Produce"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "quantity_kg": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "total_amount": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {
+        "delivery_date.id": {
+          "chain": [
+            "Order.delivery_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "order_date.id": {
+          "chain": [
+            "Order.order_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Order"
+    },
+    "PriceIndex": {
+      "fields": {
+        "county": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "crop_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "market_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "price_per_kg": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "recorded_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "source": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "recorded_date.id": {
+          "chain": [
+            "PriceIndex.recorded_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "PriceIndex"
+    },
+    "Produce": {
+      "fields": {
+        "asking_price_per_kg": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "available_from": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "available_until": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "crop_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "farmer_id": {
+          "relationship": {
+            "alias": "farmer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Farmer"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "harvest_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "location": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "quality_grade": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "quantity_kg": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "variety": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "available_from.id": {
+          "chain": [
+            "Produce.available_from",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "available_until.id": {
+          "chain": [
+            "Produce.available_until",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "harvest_date.id": {
+          "chain": [
+            "Produce.harvest_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Produce"
+    },
+    "WeatherAlert": {
+      "fields": {
+        "affected_crops": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "alert_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "county": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "issued_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "message": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "severity": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "valid_until": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        }
+      },
+      "lookup_paths": {
+        "issued_date.id": {
+          "chain": [
+            "WeatherAlert.issued_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "valid_until.id": {
+          "chain": [
+            "WeatherAlert.valid_until",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "WeatherAlert"
+    }
+  },
+  "views": {}
+}

@@ -17,7 +17,7 @@ from uuid_extensions import uuid7str
 import json
 import re
 
-from pydantic import BaseModel, Field, ConfigDict, validator, root_validator, AfterValidator
+from pydantic import BaseModel, Field, ConfigDict, AfterValidator
 from pydantic import SecretStr
 
 

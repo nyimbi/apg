@@ -1,0 +1,383 @@
+{
+  "agents": {
+    "ConversationalAssistant": {
+      "capabilities": [],
+      "configuration": {},
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "local",
+      "name": "ConversationalAssistant",
+      "outputs": [],
+      "role": null,
+      "rules": [],
+      "runtime": null,
+      "system": null,
+      "theme": {},
+      "tools": [],
+      "ui": {}
+    },
+    "ResearchAgent": {
+      "capabilities": [],
+      "configuration": {},
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "local",
+      "name": "ResearchAgent",
+      "outputs": [],
+      "role": null,
+      "rules": [],
+      "runtime": null,
+      "system": null,
+      "theme": {},
+      "tools": [],
+      "ui": {}
+    },
+    "SoftwareDeveloper": {
+      "capabilities": [],
+      "configuration": {},
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "local",
+      "name": "SoftwareDeveloper",
+      "outputs": [],
+      "role": null,
+      "rules": [],
+      "runtime": null,
+      "system": null,
+      "theme": {},
+      "tools": [],
+      "ui": {}
+    },
+    "SystemMonitor": {
+      "capabilities": [],
+      "configuration": {},
+      "handoffs": [],
+      "inputs": [],
+      "memory": null,
+      "model": "local",
+      "name": "SystemMonitor",
+      "outputs": [],
+      "role": null,
+      "rules": [],
+      "runtime": null,
+      "system": null,
+      "theme": {},
+      "tools": [],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": null,
+    "entity_count": 5,
+    "name": "main",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {
+      "CollaborativeAgentSystem": {
+        "agents": [
+          "ResearchAgent",
+          "SoftwareDeveloper"
+        ],
+        "capabilities": [],
+        "configuration": {},
+        "flow": [],
+        "rules": [],
+        "theme": {},
+        "ui": {}
+      }
+    },
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "main.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "main.apg",
+      "fixes": [],
+      "message": "AI agent 'ResearchAgent' should declare a role or system prompt",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 20
+        },
+        "start": {
+          "character": 0,
+          "line": 20
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "main.apg",
+      "fixes": [],
+      "message": "AI agent 'ConversationalAssistant' should declare a role or system prompt",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 85
+        },
+        "start": {
+          "character": 0,
+          "line": 85
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "main.apg",
+      "fixes": [],
+      "message": "AI agent 'SoftwareDeveloper' should declare a role or system prompt",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 189
+        },
+        "start": {
+          "character": 0,
+          "line": 189
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "main.apg",
+      "fixes": [],
+      "message": "AI agent 'SystemMonitor' should declare a role or system prompt",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 252
+        },
+        "start": {
+          "character": 0,
+          "line": 252
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 2,
+      "kind": "agent",
+      "nodes": 5
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 5,
+      "kind": "deployment",
+      "nodes": 6
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 5,
+      "kind": "handler",
+      "nodes": 6
+    },
+    "lookup": {
+      "edges": 5,
+      "kind": "lookup",
+      "nodes": 6
+    },
+    "package": {
+      "edges": 5,
+      "kind": "package",
+      "nodes": 6
+    },
+    "security": {
+      "edges": 5,
+      "kind": "security",
+      "nodes": 6
+    },
+    "workflow": {
+      "edges": 5,
+      "kind": "workflow",
+      "nodes": 6
+    }
+  },
+  "llms": {
+    "ConversationalAssistant": {
+      "model": "local",
+      "runtime": null
+    },
+    "ResearchAgent": {
+      "model": "local",
+      "runtime": null
+    },
+    "SoftwareDeveloper": {
+      "model": "local",
+      "runtime": null
+    },
+    "SystemMonitor": {
+      "model": "local",
+      "runtime": null
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "main.apg"
+  ],
+  "symbols": {
+    "agent.ConversationalAssistant": {
+      "file": "main.apg",
+      "id": "agent.ConversationalAssistant",
+      "kind": "agent",
+      "name": "ConversationalAssistant",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 86
+        },
+        "start": {
+          "character": 0,
+          "line": 86
+        }
+      },
+      "references": []
+    },
+    "agent.ResearchAgent": {
+      "file": "main.apg",
+      "id": "agent.ResearchAgent",
+      "kind": "agent",
+      "name": "ResearchAgent",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 21
+        },
+        "start": {
+          "character": 0,
+          "line": 21
+        }
+      },
+      "references": []
+    },
+    "agent.SoftwareDeveloper": {
+      "file": "main.apg",
+      "id": "agent.SoftwareDeveloper",
+      "kind": "agent",
+      "name": "SoftwareDeveloper",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 190
+        },
+        "start": {
+          "character": 0,
+          "line": 190
+        }
+      },
+      "references": []
+    },
+    "agent.SystemMonitor": {
+      "file": "main.apg",
+      "id": "agent.SystemMonitor",
+      "kind": "agent",
+      "name": "SystemMonitor",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 253
+        },
+        "start": {
+          "character": 0,
+          "line": 253
+        }
+      },
+      "references": []
+    },
+    "composition.CollaborativeAgentSystem": {
+      "file": "main.apg",
+      "id": "composition.CollaborativeAgentSystem",
+      "kind": "composition",
+      "name": "CollaborativeAgentSystem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 133
+        },
+        "start": {
+          "character": 0,
+          "line": 133
+        }
+      },
+      "references": []
+    },
+    "llm.local": {
+      "file": "main.apg",
+      "id": "llm.local",
+      "kind": "llm",
+      "name": "local",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 253
+        },
+        "start": {
+          "character": 0,
+          "line": 253
+        }
+      },
+      "references": []
+    },
+    "module.main": {
+      "file": "main.apg",
+      "id": "module.main",
+      "kind": "module",
+      "name": "main",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

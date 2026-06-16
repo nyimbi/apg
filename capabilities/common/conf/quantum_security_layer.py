@@ -11,7 +11,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Union, Tuple, Callable
 from enum import Enum
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from uuid_extensions import uuid7str
 import hmac
 

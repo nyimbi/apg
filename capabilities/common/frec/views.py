@@ -424,7 +424,7 @@ class HealthCheckResponse(BaseModel, BaseConfig):
 class BatchProcessingRequest(BaseModel, BaseConfig):
     """Request model for batch operations"""
     operation_type: str = Field(..., min_length=1)
-    items: List[Dict[str, Any]] = Field(..., min_items=1, max_items=1000)
+    items: List[Dict[str, Any]] = Field(..., min_length=1, max_length=1000)
     processing_options: Optional[Dict[str, Any]] = None
     callback_url: Optional[str] = None
     priority: str = Field(default="normal", pattern="^(low|normal|high|critical)$")

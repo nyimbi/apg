@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from enum import Enum
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from uuid_extensions import uuid7str
 
 

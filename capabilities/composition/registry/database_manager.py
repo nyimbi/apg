@@ -17,8 +17,8 @@ import logging
 from enum import Enum
 import hashlib
 
-from pydantic import BaseModel, Field, ConfigDict, validator
-from sqlalchemy import (
+from pydantic import BaseModel, Field, ConfigDict
+from sqlalchemy import(
 	create_engine, MetaData, Table, Column, String, Integer, 
 	Boolean, DateTime, Text, JSON, ForeignKey, Index, inspect,
 	text

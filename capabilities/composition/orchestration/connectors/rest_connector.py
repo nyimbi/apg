@@ -18,9 +18,9 @@ from urllib.parse import urljoin, urlparse
 
 import aiohttp
 import aiofiles
-from pydantic import BaseModel, Field, ConfigDict, HttpUrl, validator
+from pydantic import BaseModel, Field, ConfigDict, HttpUrl
 
-from .base_connector import BaseConnector, ConnectorConfiguration
+from.base_connector import BaseConnector, ConnectorConfiguration
 
 logger = logging.getLogger(__name__)
 

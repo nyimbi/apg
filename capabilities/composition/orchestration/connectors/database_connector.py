@@ -17,9 +17,9 @@ import json
 import asyncpg
 import motor.motor_asyncio
 from pymongo import MongoClient
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
-from .base_connector import BaseConnector, ConnectorConfiguration
+from.base_connector import BaseConnector, ConnectorConfiguration
 
 logger = logging.getLogger(__name__)
 

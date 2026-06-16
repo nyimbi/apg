@@ -20,18 +20,12 @@ from sqlalchemy import (
 	ForeignKey, Index, UniqueConstraint, CheckConstraint, BigInteger,
 	LargeBinary, SmallInteger, Numeric
 )
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQL_UUID, JSONB, ARRAY
 
-from pydantic import BaseModel, ConfigDict, Field, validator, root_validator
-try:
-	from pydantic import field_validator
-except ImportError:  # Pydantic v1 compatibility
-	field_validator = validator
-from pydantic import UUID4
+from pydantic import BaseModel, ConfigDict, Field, UUID4, field_validator, model_validator
 from uuid_extensions import uuid7str
-
 # =============================================================================
 # Database Base and Configuration
 # =============================================================================

@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import (
     AsyncSession,
     AsyncEngine
 )
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import (
     Column, String, DateTime, Boolean, Integer, Text, JSON, ForeignKey,

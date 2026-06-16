@@ -18,7 +18,7 @@ from sqlalchemy import (
 	Column, String, Text, Integer, Float, Boolean, DateTime, JSON,
 	ForeignKey, Index, UniqueConstraint, CheckConstraint, BigInteger
 )
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 

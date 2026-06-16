@@ -20,10 +20,10 @@ from enum import Enum
 from dataclasses import dataclass
 
 import asyncpg
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic import ConfigDict
 
-from .models import (
+from, model_validator.models import (
 	APGBaseModel, BFBudgetStatus, BFApprovalStatus,
 	PositiveAmount, CurrencyCode, NonEmptyString
 )
@@ -71,7 +71,7 @@ class WorkflowTemplate(APGBaseModel):
 	template_description: Optional[str] = Field(None, max_length=1000)
 	
 	# Workflow scope and applicability
-	applies_to_budget_types: List[str] = Field(..., min_items=1)
+	applies_to_budget_types: List[str] = Field(..., min_length=1)
 	applies_to_departments: List[str] = Field(default_factory=list)
 	applies_to_amount_ranges: List[Dict[str, Any]] = Field(default_factory=list)
 	
@@ -82,7 +82,7 @@ class WorkflowTemplate(APGBaseModel):
 	version: int = Field(default=1, ge=1)
 	
 	# Workflow structure
-	workflow_steps: List[Dict[str, Any]] = Field(..., min_items=1)
+	workflow_steps: List[Dict[str, Any]] = Field(..., min_length=1)
 	approval_requirements: Dict[str, Any] = Field(default_factory=dict)
 	escalation_rules: List[Dict[str, Any]] = Field(default_factory=list)
 	
@@ -114,7 +114,7 @@ class WorkflowTemplate(APGBaseModel):
 	integration_webhooks: List[Dict[str, Any]] = Field(default_factory=list)
 	external_system_approvals: List[Dict[str, Any]] = Field(default_factory=list)
 
-	@validator('workflow_steps')
+	@field_validator('workflow_steps')
 	def validate_workflow_steps(cls, v: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 		"""Validate workflow steps structure."""
 		for i, step in enumerate(v):
@@ -126,7 +126,8 @@ class WorkflowTemplate(APGBaseModel):
 				raise ValueError(f"Step {i+1}: required_approvers is missing")
 		return v
 
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_template_consistency(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate workflow template consistency."""
 		workflow_steps = values.get('workflow_steps', [])
@@ -262,7 +263,7 @@ class ApprovalAction(APGBaseModel):
 	two_factor_verified: bool = Field(default=False)
 	authentication_method: str = Field(...)
 
-	@validator('decision_reason')
+	@field_validator('decision_reason')
 	def validate_decision_reason(cls, v: Optional[str], values: Dict[str, Any]) -> Optional[str]:
 		"""Validate decision reason is provided for rejection."""
 		action_type = values.get('action_type')

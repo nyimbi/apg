@@ -24,7 +24,7 @@ from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
 import openai
 from textblob import TextBlob
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from pydantic.config import ConfigDict
 
 # APG Framework imports

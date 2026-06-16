@@ -330,7 +330,7 @@ class Workflow(BaseModel):
 	team_id: Optional[str] = Field(None, description="Owning team identifier")
 	
 	# Workflow definition
-	tasks: List[TaskDefinition] = Field(..., min_items=1, description="Workflow tasks")
+	tasks: List[TaskDefinition] = Field(..., min_length=1, description="Workflow tasks")
 	triggers: List[WorkflowTrigger] = Field(default_factory=list, description="Workflow triggers")
 	
 	# Classification and organization

@@ -17,10 +17,10 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Set, Union, Callable
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from uuid_extensions import uuid7str
 
-logger = logging.getLogger(__name__)
+logger= logging.getLogger(__name__)
 
 
 class ConversationLanguage(str, Enum):

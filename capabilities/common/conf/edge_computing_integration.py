@@ -9,10 +9,10 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Union, Tuple
 from enum import Enum
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from uuid_extensions import uuid7str
 
-from .models import CMResource, ConfigurationDSL
+from, field_validator.models import CMResource, ConfigurationDSL
 
 
 class EdgeDeviceType(str, Enum):
@@ -70,7 +70,7 @@ class EdgeDevice(BaseModel):
     device_type: EdgeDeviceType
     location: Dict[str, Any] = Field(..., description="Geographic location and metadata")
     hardware_specs: Dict[str, Any] = Field(..., description="Hardware specifications")
-    connectivity: List[EdgeConnectivity] = Field(..., min_items=1)
+    connectivity: List[EdgeConnectivity] = Field(..., min_length=1)
     compute_capability: EdgeComputeCapability
     current_config_version: Optional[str] = None
     health_status: str = Field(default="unknown")
@@ -78,7 +78,7 @@ class EdgeDevice(BaseModel):
     configuration_state: str = Field(default="unmanaged")
     metadata: Dict[str, Any] = Field(default_factory=dict)
     
-    @validator('location')
+    @field_validator('location')
     def validate_location(cls, v):
         required_fields = ['latitude', 'longitude', 'timezone']
         for field in required_fields:
@@ -108,7 +108,7 @@ class EdgeConfiguration(BaseModel):
     
     id: str = Field(default_factory=uuid7str)
     name: str = Field(..., min_length=3, max_length=100)
-    target_devices: List[str] = Field(..., min_items=1, description="Target device IDs")
+    target_devices: List[str] = Field(..., min_length=1, description="Target device IDs")
     target_clusters: List[str] = Field(default_factory=list, description="Target cluster IDs")
     configuration_spec: Dict[str, Any] = Field(..., description="Edge-specific configuration")
     resource_constraints: Dict[str, Any] = Field(default_factory=dict)

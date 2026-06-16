@@ -16,12 +16,12 @@ import asyncio
 import json
 from pathlib import Path
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field, ConfigDict, EmailStr, validator, AfterValidator
+from pydantic import BaseModel, Field, ConfigDict, EmailStr, AfterValidator
 from annotated_types import Annotated
 import hashlib
 import secrets
 
-from .behavioral_auth import BehavioralBaseline, BehavioralEventType
+from.behavioral_auth import BehavioralBaseline, BehavioralEventType
 from .contextual_risk import AuthContext, RiskAssessment
 
 # Enhanced Enums for Revolutionary Features

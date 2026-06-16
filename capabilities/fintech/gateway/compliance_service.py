@@ -22,9 +22,9 @@ from decimal import Decimal
 import re
 import logging
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
-logger = logging.getLogger(__name__)
+logger= logging.getLogger(__name__)
 
 # Compliance models and enums
 class ComplianceFramework(str, Enum):

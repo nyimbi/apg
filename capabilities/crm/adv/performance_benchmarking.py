@@ -21,7 +21,7 @@ from uuid import uuid4
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from uuid_extensions import uuid7str
 
 try:

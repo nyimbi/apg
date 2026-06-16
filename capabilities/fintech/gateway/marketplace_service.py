@@ -20,9 +20,9 @@ from decimal import Decimal, ROUND_HALF_UP
 from collections import defaultdict, deque
 import statistics
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
-logger = logging.getLogger(__name__)
+logger= logging.getLogger(__name__)
 
 # Marketplace models and enums
 class MarketplaceRole(str, Enum):

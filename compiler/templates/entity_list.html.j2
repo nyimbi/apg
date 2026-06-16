@@ -44,22 +44,25 @@
   </div>
 </form>
 
-<div class="flex items-start gap-5 flex-col xl:flex-row">
+<div class="flex items-start gap-5 flex-col lg:flex-row">
 
   {# ── Create form ─────────────────────────────────────────────── #}
-  <aside class="w-full xl:w-72 shrink-0">
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+  <aside class="w-full lg:w-72 shrink-0">
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden sticky top-4">
       <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <h2 class="text-sm font-semibold text-gray-900">New {{ entity_name }}</h2>
         <span class="text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{{ entity_type }}</span>
       </div>
-      <form method="post" action="/ui/entities/{{ safe_entity }}/records"
-            class="p-4 space-y-3" novalidate>
-        {{ create_inputs | safe }}
-        <button type="submit"
-                class="w-full mt-1 px-3 py-2 bg-apg-primary text-white text-sm font-medium rounded-lg hover:opacity-90 active:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-apg-primary focus:ring-offset-2">
-          Create {{ entity_name }}
-        </button>
+      <form method="post" action="/ui/entities/{{ safe_entity }}/records" novalidate>
+        <div class="overflow-y-auto max-h-[55vh] px-4 pt-4 space-y-3">
+          {{ create_inputs | safe }}
+        </div>
+        <div class="px-4 pb-4 pt-3 border-t border-gray-100">
+          <button type="submit"
+                  class="w-full px-3 py-2 bg-apg-primary text-white text-sm font-medium rounded-lg hover:opacity-90 active:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-apg-primary focus:ring-offset-2">
+            Create {{ entity_name }}
+          </button>
+        </div>
       </form>
     </div>
   </aside>

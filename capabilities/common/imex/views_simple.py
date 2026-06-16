@@ -64,7 +64,7 @@ class SchemaDetectionRequest(BaseModel):
 
 class DataQualityRequest(BaseModel):
     """Request model for data quality assessment"""
-    sample_data: List[Dict[str, Any]] = Field(..., min_items=1)
+    sample_data: List[Dict[str, Any]] = Field(..., min_length=1)
     job_id: Optional[str] = Field(None)
 
 # WTForms for HTML Forms

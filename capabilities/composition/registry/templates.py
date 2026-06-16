@@ -13,10 +13,10 @@ import logging
 from enum import Enum
 from pathlib import Path
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from uuid_extensions import uuid7str
 
-logger = logging.getLogger(__name__)
+logger= logging.getLogger(__name__)
 
 class IndustryType(Enum):
 	"""Supported industry types."""

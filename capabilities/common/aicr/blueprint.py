@@ -26,7 +26,7 @@ from flask_appbuilder.security.decorators import protect
 from flask_appbuilder.widgets import ListWidget, FormWidget
 from flask_wtf import FlaskForm
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship
 from uuid_extensions import uuid7str
 from wtforms import StringField, TextAreaField, SelectField, FloatField, IntegerField, BooleanField

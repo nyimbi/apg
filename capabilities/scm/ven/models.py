@@ -12,12 +12,9 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator, root_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from pydantic import EmailStr, HttpUrl
-from uuid_extensions import uuid7str
-
-
-# ============================================================================
+from uuid_extensions import uuid7str# ============================================================================
 # BASE CONFIGURATION
 # ============================================================================
 
@@ -311,7 +308,7 @@ class VMVendor(VMBaseModel):
 	version: int = Field(default=1, description="Version number")
 	is_active: bool = Field(default=True, description="Active flag")
 	
-	@validator('vendor_code')
+	@field_validator('vendor_code')
 	def validate_vendor_code(cls, v):
 		"""Validate vendor code format"""
 		if not v or len(v.strip()) == 0:
@@ -320,14 +317,15 @@ class VMVendor(VMBaseModel):
 			raise ValueError('Vendor code must be alphanumeric with optional hyphens/underscores')
 		return v.upper()
 	
-	@validator('intelligence_score', 'performance_score', 'risk_score', 'relationship_score')
+	@field_validator('intelligence_score', 'performance_score', 'risk_score', 'relationship_score')
 	def validate_scores(cls, v):
 		"""Validate score range"""
 		if v < 0 or v > 100:
 			raise ValueError('Scores must be between 0 and 100')
 		return v
 	
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_dates(cls, values):
 		"""Validate date relationships"""
 		onboarding = values.get('onboarding_date')
@@ -474,7 +472,8 @@ class VMPerformance(VMBaseModel):
 	created_by: UUID = Field(..., description="Creator user ID")
 	updated_by: UUID = Field(..., description="Last updater user ID")
 	
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_period_dates(cls, values):
 		"""Validate performance period dates"""
 		start_date = values.get('start_date')
@@ -667,7 +666,8 @@ class VMContract(VMBaseModel):
 	created_by: UUID = Field(..., description="Creator user ID")
 	updated_by: UUID = Field(..., description="Last updater user ID")
 	
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_contract_dates(cls, values):
 		"""Validate contract date relationships"""
 		effective = values.get('effective_date')
@@ -849,7 +849,8 @@ class VMIntelligence(VMBaseModel):
 	created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
 	created_by: UUID = Field(..., description="Creator user ID")
 	
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_validity_period(cls, values):
 		"""Validate intelligence validity period"""
 		valid_from = values.get('valid_from')
@@ -977,7 +978,7 @@ class VMPortalUser(VMBaseModel):
 	created_by: UUID = Field(..., description="Creator user ID")
 	updated_by: UUID = Field(..., description="Last updater user ID")
 	
-	@validator('email')
+	@field_validator('email')
 	def validate_email_uniqueness(cls, v):
 		"""Validate email format (basic validation, uniqueness enforced at DB level)"""
 		return v.lower()
@@ -1014,7 +1015,8 @@ class VMPortalSession(VMBaseModel):
 		description="Security context data"
 	)
 	
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_session_timing(cls, values):
 		"""Validate session timing"""
 		created_at = values.get('created_at')
@@ -1154,7 +1156,8 @@ class VMCompliance(VMBaseModel):
 	created_by: UUID = Field(..., description="Creator user ID")
 	updated_by: UUID = Field(..., description="Last updater user ID")
 	
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_review_dates(cls, values):
 		"""Validate review date relationships"""
 		last_review = values.get('last_review_date')

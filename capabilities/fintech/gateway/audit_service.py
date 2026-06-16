@@ -26,9 +26,9 @@ from collections import defaultdict, deque
 import ipaddress
 import re
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
-logger = logging.getLogger(__name__)
+logger= logging.getLogger(__name__)
 
 # Audit models and enums
 class AuditEventType(str, Enum):

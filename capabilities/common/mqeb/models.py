@@ -13,7 +13,7 @@ from typing import Dict, List, Any, Optional, Set, Union
 from dataclasses import dataclass, field
 from enum import Enum
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field, ConfigDict, validator, root_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from pydantic import conint, constr, conlist
 
 
@@ -138,14 +138,14 @@ class MQMessage(BaseModel):
 	schema_id: Optional[str] = Field(None, description="Message schema identifier")
 	schema_version: Optional[str] = Field(None, description="Message schema version")
 	
-	@validator('payload')
+	@field_validator('payload')
 	def validate_payload_size(cls, v):
 		"""Validate message payload size"""
 		if len(v) > 100 * 1024 * 1024:  # 100MB limit
 			raise ValueError("Message payload exceeds maximum size of 100MB")
 		return v
 	
-	@validator('expiration')
+	@field_validator('expiration')
 	def validate_expiration(cls, v, values):
 		"""Validate expiration is in the future"""
 		if v and v <= datetime.utcnow():
@@ -224,7 +224,7 @@ class TopicConfiguration(BaseModel):
 	buffer_size: conint(ge=1024) = Field(default=65536, description="Buffer size in bytes")
 	flush_interval_ms: conint(ge=1) = Field(default=1000, description="Flush interval in milliseconds")
 	
-	@validator('min_in_sync_replicas')
+	@field_validator('min_in_sync_replicas')
 	def validate_min_in_sync_replicas(cls, v, values):
 		"""Validate min in sync replicas doesn't exceed replication factor"""
 		if 'replication_factor' in values and v > values['replication_factor']:

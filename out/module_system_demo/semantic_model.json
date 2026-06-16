@@ -1,0 +1,935 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 8,
+    "name": "InventoryManagement",
+    "version": "2.1.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "InventoryManagement.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "InventoryManagement.apg",
+      "fixes": [],
+      "message": "Database 'InventoryDB' should have connection configuration",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0401",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "InventoryManagement.apg",
+      "fixes": [],
+      "message": "Form 'ProductForm' is backed by unknown table 'Product'.",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "error",
+      "title": "Unknown view subject table"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 8,
+      "kind": "deployment",
+      "nodes": 9
+    },
+    "er": {
+      "edges": 23,
+      "kind": "er",
+      "nodes": 30
+    },
+    "handler": {
+      "edges": 8,
+      "kind": "handler",
+      "nodes": 9
+    },
+    "lookup": {
+      "edges": 8,
+      "kind": "lookup",
+      "nodes": 9
+    },
+    "package": {
+      "edges": 8,
+      "kind": "package",
+      "nodes": 9
+    },
+    "security": {
+      "edges": 8,
+      "kind": "security",
+      "nodes": 9
+    },
+    "workflow": {
+      "edges": 8,
+      "kind": "workflow",
+      "nodes": 9
+    }
+  },
+  "llms": {},
+  "ok": false,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "InventoryManagement.apg"
+  ],
+  "symbols": {
+    "database.InventoryDB": {
+      "file": "InventoryManagement.apg",
+      "id": "database.InventoryDB",
+      "kind": "database",
+      "name": "InventoryDB",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "entity.InventoryLogger": {
+      "file": "InventoryManagement.apg",
+      "id": "entity.InventoryLogger",
+      "kind": "entity",
+      "name": "InventoryLogger",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "entity.InventoryTracking": {
+      "file": "InventoryManagement.apg",
+      "id": "entity.InventoryTracking",
+      "kind": "entity",
+      "name": "InventoryTracking",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "entity.ProductManagementTests": {
+      "file": "InventoryManagement.apg",
+      "id": "entity.ProductManagementTests",
+      "kind": "entity",
+      "name": "ProductManagementTests",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.expiring_products.body_template": {
+      "file": "InventoryManagement.apg",
+      "id": "field.expiring_products.body_template",
+      "kind": "field",
+      "name": "expiring_products.body_template",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.expiring_products.condition": {
+      "file": "InventoryManagement.apg",
+      "id": "field.expiring_products.condition",
+      "kind": "field",
+      "name": "expiring_products.condition",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.expiring_products.email": {
+      "file": "InventoryManagement.apg",
+      "id": "field.expiring_products.email",
+      "kind": "field",
+      "name": "expiring_products.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.expiring_products.schedule": {
+      "file": "InventoryManagement.apg",
+      "id": "field.expiring_products.schedule",
+      "kind": "field",
+      "name": "expiring_products.schedule",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.expiring_products.severity": {
+      "file": "InventoryManagement.apg",
+      "id": "field.expiring_products.severity",
+      "kind": "field",
+      "name": "expiring_products.severity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.low_stock.condition": {
+      "file": "InventoryManagement.apg",
+      "id": "field.low_stock.condition",
+      "kind": "field",
+      "name": "low_stock.condition",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.low_stock.email": {
+      "file": "InventoryManagement.apg",
+      "id": "field.low_stock.email",
+      "kind": "field",
+      "name": "low_stock.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.low_stock.escalate_to": {
+      "file": "InventoryManagement.apg",
+      "id": "field.low_stock.escalate_to",
+      "kind": "field",
+      "name": "low_stock.escalate_to",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.low_stock.escalation_channel": {
+      "file": "InventoryManagement.apg",
+      "id": "field.low_stock.escalation_channel",
+      "kind": "field",
+      "name": "low_stock.escalation_channel",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.low_stock.if_not_acknowledged_within": {
+      "file": "InventoryManagement.apg",
+      "id": "field.low_stock.if_not_acknowledged_within",
+      "kind": "field",
+      "name": "low_stock.if_not_acknowledged_within",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.low_stock.max_per_product": {
+      "file": "InventoryManagement.apg",
+      "id": "field.low_stock.max_per_product",
+      "kind": "field",
+      "name": "low_stock.max_per_product",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.low_stock.max_total": {
+      "file": "InventoryManagement.apg",
+      "id": "field.low_stock.max_total",
+      "kind": "field",
+      "name": "low_stock.max_total",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.low_stock.severity": {
+      "file": "InventoryManagement.apg",
+      "id": "field.low_stock.severity",
+      "kind": "field",
+      "name": "low_stock.severity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.low_stock.slack": {
+      "file": "InventoryManagement.apg",
+      "id": "field.low_stock.slack",
+      "kind": "field",
+      "name": "low_stock.slack",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.system_health.email": {
+      "file": "InventoryManagement.apg",
+      "id": "field.system_health.email",
+      "kind": "field",
+      "name": "system_health.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.system_health.group_similar_alerts": {
+      "file": "InventoryManagement.apg",
+      "id": "field.system_health.group_similar_alerts",
+      "kind": "field",
+      "name": "system_health.group_similar_alerts",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.system_health.max_group_size": {
+      "file": "InventoryManagement.apg",
+      "id": "field.system_health.max_group_size",
+      "kind": "field",
+      "name": "system_health.max_group_size",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.system_health.pager": {
+      "file": "InventoryManagement.apg",
+      "id": "field.system_health.pager",
+      "kind": "field",
+      "name": "system_health.pager",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.system_health.slack": {
+      "file": "InventoryManagement.apg",
+      "id": "field.system_health.slack",
+      "kind": "field",
+      "name": "system_health.slack",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.system_health.time_window": {
+      "file": "InventoryManagement.apg",
+      "id": "field.system_health.time_window",
+      "kind": "field",
+      "name": "system_health.time_window",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "form.ProductForm": {
+      "file": "InventoryManagement.apg",
+      "id": "form.ProductForm",
+      "kind": "form",
+      "name": "ProductForm",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.InventoryManagement": {
+      "file": "InventoryManagement.apg",
+      "id": "module.InventoryManagement",
+      "kind": "module",
+      "name": "InventoryManagement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.expiring_products": {
+      "file": "InventoryManagement.apg",
+      "id": "table.expiring_products",
+      "kind": "table",
+      "name": "expiring_products",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.low_stock": {
+      "file": "InventoryManagement.apg",
+      "id": "table.low_stock",
+      "kind": "table",
+      "name": "low_stock",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.system_health": {
+      "file": "InventoryManagement.apg",
+      "id": "table.system_health",
+      "kind": "table",
+      "name": "system_health",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "expiring_products": {
+      "fields": {
+        "body_template": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "\"email/expiring_products.html\""
+          },
+          "required": true,
+          "type": "\"email/expiring_products.html\""
+        },
+        "condition": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "int && product.expiry_date <"
+          },
+          "required": true,
+          "type": "int && product.expiry_date <"
+        },
+        "email": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "[\"quality@company.com\", \"warehouse@company.com\"]"
+          },
+          "required": true,
+          "type": "[\"quality@company.com\", \"warehouse@company.com\"]"
+        },
+        "schedule": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "daily at \"09:00\""
+          },
+          "required": true,
+          "type": "daily at \"09:00\""
+        },
+        "severity": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "\"warning\""
+          },
+          "required": true,
+          "type": "\"warning\""
+        }
+      },
+      "lookup_paths": {
+        "body_template.id": {
+          "chain": [
+            "expiring_products.body_template",
+            "\"email/expiring_products.html\".id"
+          ],
+          "valid": true
+        },
+        "condition.id": {
+          "chain": [
+            "expiring_products.condition",
+            "int && product.expiry_date <.id"
+          ],
+          "valid": true
+        },
+        "email.id": {
+          "chain": [
+            "expiring_products.email",
+            "[\"quality@company.com\", \"warehouse@company.com\"].id"
+          ],
+          "valid": true
+        },
+        "schedule.id": {
+          "chain": [
+            "expiring_products.schedule",
+            "daily at \"09:00\".id"
+          ],
+          "valid": true
+        },
+        "severity.id": {
+          "chain": [
+            "expiring_products.severity",
+            "\"warning\".id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "expiring_products"
+    },
+    "low_stock": {
+      "fields": {
+        "condition": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "int <"
+          },
+          "required": true,
+          "type": "int <"
+        },
+        "email": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "[\"inventory@company.com\"]"
+          },
+          "required": true,
+          "type": "[\"inventory@company.com\"]"
+        },
+        "escalate_to": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "[\"operations@company.com\"]"
+          },
+          "required": true,
+          "type": "[\"operations@company.com\"]"
+        },
+        "escalation_channel": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "[\"phone\", \"sms\"]"
+          },
+          "required": true,
+          "type": "[\"phone\", \"sms\"]"
+        },
+        "if_not_acknowledged_within": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "2 hours"
+          },
+          "required": true,
+          "type": "2 hours"
+        },
+        "max_per_product": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "1 per hour"
+          },
+          "required": true,
+          "type": "1 per hour"
+        },
+        "max_total": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "50 per hour"
+          },
+          "required": true,
+          "type": "50 per hour"
+        },
+        "severity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "slack": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "[\"#inventory-alerts\"]"
+          },
+          "required": true,
+          "type": "[\"#inventory-alerts\"]"
+        }
+      },
+      "lookup_paths": {
+        "condition.id": {
+          "chain": [
+            "low_stock.condition",
+            "int <.id"
+          ],
+          "valid": true
+        },
+        "email.id": {
+          "chain": [
+            "low_stock.email",
+            "[\"inventory@company.com\"].id"
+          ],
+          "valid": true
+        },
+        "escalate_to.id": {
+          "chain": [
+            "low_stock.escalate_to",
+            "[\"operations@company.com\"].id"
+          ],
+          "valid": true
+        },
+        "escalation_channel.id": {
+          "chain": [
+            "low_stock.escalation_channel",
+            "[\"phone\", \"sms\"].id"
+          ],
+          "valid": true
+        },
+        "if_not_acknowledged_within.id": {
+          "chain": [
+            "low_stock.if_not_acknowledged_within",
+            "2 hours.id"
+          ],
+          "valid": true
+        },
+        "max_per_product.id": {
+          "chain": [
+            "low_stock.max_per_product",
+            "1 per hour.id"
+          ],
+          "valid": true
+        },
+        "max_total.id": {
+          "chain": [
+            "low_stock.max_total",
+            "50 per hour.id"
+          ],
+          "valid": true
+        },
+        "slack.id": {
+          "chain": [
+            "low_stock.slack",
+            "[\"#inventory-alerts\"].id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "low_stock"
+    },
+    "system_health": {
+      "fields": {
+        "email": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "[\"devops@company.com\"]"
+          },
+          "required": true,
+          "type": "[\"devops@company.com\"]"
+        },
+        "group_similar_alerts": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "max_group_size": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "pager": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "[\"on-call-engineer\"]"
+          },
+          "required": true,
+          "type": "[\"on-call-engineer\"]"
+        },
+        "slack": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "[\"#alerts\"]"
+          },
+          "required": true,
+          "type": "[\"#alerts\"]"
+        },
+        "time_window": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "5 minutes"
+          },
+          "required": true,
+          "type": "5 minutes"
+        }
+      },
+      "lookup_paths": {
+        "email.id": {
+          "chain": [
+            "system_health.email",
+            "[\"devops@company.com\"].id"
+          ],
+          "valid": true
+        },
+        "pager.id": {
+          "chain": [
+            "system_health.pager",
+            "[\"on-call-engineer\"].id"
+          ],
+          "valid": true
+        },
+        "slack.id": {
+          "chain": [
+            "system_health.slack",
+            "[\"#alerts\"].id"
+          ],
+          "valid": true
+        },
+        "time_window.id": {
+          "chain": [
+            "system_health.time_window",
+            "5 minutes.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "system_health"
+    }
+  },
+  "views": {
+    "ProductForm": {
+      "bindings": [],
+      "methods": [],
+      "name": "ProductForm",
+      "properties": {},
+      "type": "form"
+    }
+  }
+}

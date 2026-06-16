@@ -77,10 +77,45 @@ class AgentBase:
 				f"Agent '{self.name}': set {env_key} to configure the "
 				f"{self.runtime!r} runtime provider command."
 			)
-		raise NotImplementedError(
-			f"Agent '{self.name}' has no runtime wired up. "
-			f"Set {env_key} to configure."
+		import asyncio as _asyncio
+		import json as _json
+		import shlex as _shlex
+
+		payload = _json.dumps({
+			"agent": {
+				"name": self.name,
+				"role": self.role,
+				"model": self.model,
+				"runtime": self.runtime,
+				"system": self.system,
+			},
+			"input": prompt,
+			"context": {
+				"tenant_id": context.tenant_id if context else "default",
+				"user_id": context.user_id if context else "anonymous",
+				"session_id": context.session_id if context else "",
+				"metadata": context.metadata if context else {},
+			},
+		}).encode()
+
+		proc = await _asyncio.create_subprocess_exec(
+			*_shlex.split(cmd),
+			stdin=_asyncio.subprocess.PIPE,
+			stdout=_asyncio.subprocess.PIPE,
+			stderr=_asyncio.subprocess.PIPE,
 		)
+		stdout, stderr = await proc.communicate(payload)
+		if proc.returncode != 0:
+			raise RuntimeError(
+				f"Agent '{self.name}' provider command exited {proc.returncode}: "
+				f"{stderr.decode()[:300]}"
+			)
+		try:
+			return str(_json.loads(stdout.decode()).get("output", ""))
+		except _json.JSONDecodeError as exc:
+			raise RuntimeError(
+				f"Agent '{self.name}' provider returned invalid JSON: {exc}"
+			) from exc
 
 	def __repr__(self) -> str:
 		return f"<{type(self).__name__} name={self.name!r} model={self.model!r}>"

@@ -19,10 +19,10 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 import asyncpg
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic import ConfigDict
 
-from .models import (
+from, model_validator.models import (
 	APGBaseModel, BFBudgetType, BFLineType,
 	PositiveAmount, CurrencyCode, FiscalYear, NonEmptyString
 )
@@ -139,14 +139,15 @@ class BudgetTemplateModel(APGBaseModel):
 	load_time_ms: Optional[int] = Field(None, ge=0)
 	customization_complexity_score: Optional[float] = Field(None, ge=0.0, le=10.0)
 
-	@validator('parent_template_id')
+	@field_validator('parent_template_id')
 	def validate_parent_template(cls, v: Optional[str], values: Dict[str, Any]) -> Optional[str]:
 		"""Validate parent template relationship."""
 		if v and v == values.get('id'):
 			raise ValueError("Template cannot be its own parent")
 		return v
 
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_template_consistency(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate template data consistency."""
 		# Validate inheritance level
@@ -222,7 +223,7 @@ class TemplateLineItem(BaseModel):
 	historical_variance: Optional[float] = Field(None)
 	benchmark_data: Optional[Dict[str, Any]] = Field(None)
 
-	@validator('monthly_distribution')
+	@field_validator('monthly_distribution')
 	def validate_monthly_distribution(cls, v: Optional[List[float]]) -> Optional[List[float]]:
 		"""Validate monthly distribution sums to 1.0."""
 		if v is not None:

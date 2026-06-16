@@ -15,11 +15,8 @@ from enum import Enum
 from typing import Annotated, Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict, validator, AfterValidator
-from uuid_extensions import uuid7str
-
-
-# ============================================================================
+from pydantic import BaseModel, Field, ConfigDict, field_validator, AfterValidator
+from uuid_extensions import uuid7str# ============================================================================
 # CONFIGURATION AND ENUMS
 # ============================================================================
 
@@ -216,7 +213,7 @@ class GraphEntity(BaseGraphRAGModel, TenantMixin, TimestampMixin):
 	quality_score: float = Field(default=0.0, ge=0.0, le=1.0)
 	status: str = Field(default="active")
 
-	@validator('embeddings')
+	@field_validator('embeddings')
 	def validate_embeddings(cls, v):
 		if v is not None and len(v) != 1024:
 			raise ValueError('Embeddings must be 1024 dimensions for bge-m3')
@@ -241,7 +238,7 @@ class GraphRelationship(BaseGraphRAGModel, TenantMixin, TimestampMixin):
 	quality_score: float = Field(default=0.0, ge=0.0, le=1.0)
 	status: str = Field(default="active")
 
-	@validator('source_entity_id', 'target_entity_id')
+	@field_validator('source_entity_id', 'target_entity_id')
 	def validate_no_self_loops(cls, v, values):
 		if 'source_entity_id' in values and v == values['source_entity_id']:
 			raise ValueError('Self-loops not allowed in relationships')
@@ -256,7 +253,7 @@ class GraphCommunity(BaseGraphRAGModel, TenantMixin, TimestampMixin):
 	name: Optional[str] = None
 	description: Optional[str] = None
 	algorithm: str = Field(min_length=1, max_length=100)
-	members: List[str] = Field(min_items=1)  # Entity IDs
+	members: List[str] = Field(min_length=1)  # Entity IDs
 	centrality_metrics: Dict[str, Any] = Field(default_factory=dict)
 	cohesion_score: Optional[float] = Field(None, ge=0.0, le=1.0)
 	size_metrics: Dict[str, Any] = Field(default_factory=dict)
@@ -283,7 +280,7 @@ class GraphRAGQuery(BaseGraphRAGModel, TenantMixin):
 	created_at: datetime = Field(default_factory=datetime.utcnow)
 	completed_at: Optional[datetime] = None
 
-	@validator('query_embedding')
+	@field_validator('query_embedding')
 	def validate_query_embeddings(cls, v):
 		if v is not None and len(v) != 1024:
 			raise ValueError('Query embeddings must be 1024 dimensions for bge-m3')
@@ -321,7 +318,7 @@ class EntityMention(BaseGraphRAGModel):
 	position_end: int = Field(ge=0)
 	confidence: float = Field(ge=0.0, le=1.0)
 
-	@validator('position_end')
+	@field_validator('position_end')
 	def validate_position_order(cls, v, values):
 		if 'position_start' in values and v <= values['position_start']:
 			raise ValueError('Position end must be greater than position start')
@@ -407,7 +404,7 @@ class CurationWorkflow(BaseGraphRAGModel, TenantMixin, TimestampMixin):
 	name: str = Field(min_length=1, max_length=500)
 	description: Optional[str] = None
 	workflow_type: str = Field(min_length=1, max_length=100)
-	participants: List[ExpertParticipant] = Field(min_items=1)
+	participants: List[ExpertParticipant] = Field(min_length=1)
 	consensus_threshold: float = Field(default=0.80, ge=0.50, le=1.00)
 	status: str = Field(default="active")
 	metrics: Dict[str, Any] = Field(default_factory=dict)
@@ -422,7 +419,7 @@ class KnowledgeEdit(BaseGraphRAGModel, TenantMixin):
 	edit_type: str  # create, update, delete, merge, split
 	target_type: str  # entity, relationship, community, graph
 	target_id: str
-	proposed_changes: Dict[str, Any] = Field(min_items=1)
+	proposed_changes: Dict[str, Any] = Field(min_length=1)
 	justification: Optional[str] = None
 	evidence: List[str] = Field(default_factory=list)
 	status: str = Field(default="pending")
@@ -498,7 +495,7 @@ class GraphQueryRequest(BaseGraphRAGModel, TenantMixin):
 class BatchQueryRequest(BaseGraphRAGModel, TenantMixin):
 	"""Request for batch GraphRAG query processing"""
 	knowledge_graph_id: str
-	queries: List[str] = Field(min_items=1, max_items=100)
+	queries: List[str] = Field(min_length=1, max_length=100)
 	query_type: QueryType = QueryType.QUESTION_ANSWERING
 	shared_context: Optional[QueryContext] = None
 	shared_config: Optional[RetrievalConfig] = None
@@ -507,7 +504,7 @@ class BatchQueryRequest(BaseGraphRAGModel, TenantMixin):
 class GraphExplorationRequest(BaseGraphRAGModel, TenantMixin):
 	"""Request for interactive graph exploration"""
 	knowledge_graph_id: str
-	start_entities: List[str] = Field(min_items=1)
+	start_entities: List[str] = Field(min_length=1)
 	exploration_depth: int = Field(default=2, ge=1, le=5)
 	relationship_filters: List[RelationshipType] = Field(default_factory=list)
 	include_properties: bool = True

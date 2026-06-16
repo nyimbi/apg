@@ -11,9 +11,9 @@ from typing import List, Optional
 from datetime import date, datetime
 
 # Direct imports to avoid circular dependency
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from decimal import Decimal
-from .service import (
+from, field_validator.service import (
 	ARCustomerService, ARInvoiceService, ARCollectionsService,
 	ARCashApplicationService, ARAnalyticsService
 )
@@ -183,7 +183,7 @@ class CashFlowForecastRequest(BaseModel):
 	include_external_factors: bool = True
 	confidence_level: float = Field(default=0.95, ge=0.1, le=0.99)
 
-	@validator('forecast_end_date')
+	@field_validator('forecast_end_date')
 	def validate_end_date(cls, v, values):
 		if 'forecast_start_date' in values and v <= values['forecast_start_date']:
 			raise ValueError('End date must be after start date')

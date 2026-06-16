@@ -31,7 +31,7 @@ from contextlib import asynccontextmanager
 import uuid
 from uuid_extensions import uuid7str
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from pydantic import StrictStr, StrictInt, StrictFloat, StrictBool
 
 

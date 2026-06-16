@@ -33,7 +33,7 @@ from dataclasses import dataclass, asdict
 import uuid
 from uuid_extensions import uuid7str
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class SecurityLevel(str, Enum):

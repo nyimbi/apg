@@ -18,14 +18,28 @@ version = "1.0.0"
 
 # Define package requirements
 install_requires = [
+    # Core compiler / CLI
     "antlr4-python3-runtime>=4.13.0",
     "click>=8.1.0",
     "rich>=13.0.0",
-    "pydantic>=2.0.0",
     "python-dateutil>=2.8.0",
     "Jinja2>=3.1.0",
     "watchdog>=3.0.0",
     "psutil>=5.9.0",
+    # Data / validation
+    "pydantic>=2.0.0",
+    "uuid6>=0.4",
+    # Web framework & generated apps
+    "flask>=3.0.0",
+    "flask-appbuilder>=4.3.0",
+    "httpx>=0.27.0",
+    # Database
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+    # Messaging & workflow
+    "nats-py>=2.7.0",
+    "temporalio>=1.7.0",
 ]
 
 # Development dependencies

@@ -19,9 +19,9 @@ from uuid_extensions import uuid7str
 
 from sqlalchemy import select, and_, or_, func, text
 from sqlalchemy.orm import selectinload
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
-from .models import (
+from.models import (
 	MdEntity, MdEntityVersion, MdGoldenRecord, MdCrossReference,
 	MdDataQualityAssessment, MdMatchRule, MdSurvivorshipRule, MdAuditLog, MdDataLineage,
 	EntityType, EntityStatus, DataQualityStatus, MatchConfidence, SurvivorshipRule,

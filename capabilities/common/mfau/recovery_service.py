@@ -18,9 +18,9 @@ from typing import Optional, Dict, Any, List, Tuple, Union
 from datetime import datetime, timedelta
 from enum import Enum
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
-from .models import (
+from.models import (
 	MFAUserProfile, MFAMethod, MFAMethodType, AuthEvent,
 	TrustLevel, AuthenticationStatus
 )

@@ -1139,12 +1139,24 @@ def validate_mandatory_fields(fields: Dict[str, str], mti: str) -> List[str]:
 
     return errors
 
-# TODO: Add transaction replay protection
+# In-process replay window: {rrn:stan -> epoch_seconds}. Survives within a process
+# lifetime only; wire to Redis/DB for multi-instance deployments.
+_SEEN_TRANSACTIONS: dict[str, float] = {}
+_REPLAY_WINDOW_SECONDS = 3600  # 1 hour
+
 def verify_transaction_uniqueness(rrn: str, stan: str) -> bool:
-    # Implement transaction replay detection
-    # Store successful transaction references
-    # Check for duplicates within time window
-    pass
+    """Return True if the transaction is unique (not a replay), False if duplicate."""
+    import time
+    now = time.monotonic()
+    # Evict expired entries to bound memory growth
+    expired = [k for k, t in _SEEN_TRANSACTIONS.items() if now - t > _REPLAY_WINDOW_SECONDS]
+    for k in expired:
+        del _SEEN_TRANSACTIONS[k]
+    key = f"{rrn}:{stan}"
+    if key in _SEEN_TRANSACTIONS:
+        return False
+    _SEEN_TRANSACTIONS[key] = now
+    return True
 
 def validate_track2_against_pan(pan: str, track2: str) -> bool:
     """Ensure Track 2 data matches PAN"""
@@ -1153,12 +1165,16 @@ def validate_track2_against_pan(pan: str, track2: str) -> bool:
     track2_pan = track2.split("=")[0]
     return pan == track2_pan
 
-# TODO: dd amount validation
 def validate_transaction_amount(amount: str) -> bool:
-    # Check minimum/maximum amounts
-    # Verify currency and decimals
-    # Check for suspicious patterns
-    pass
+    """Validate ISO 8583 amount field (12-digit zero-padded minor-unit integer, e.g. '000000001000' = 10.00)."""
+    if not amount or not amount.strip():
+        return False
+    stripped = amount.strip()
+    if not stripped.isdigit():
+        return False
+    val = int(stripped)
+    # Must be positive; ISO 8583 field 4 is max 12 digits → 999,999,999,999 minor units
+    return 0 < val <= 999_999_999_999
 
 
 def create_bitmap(fields: Dict[str, str]) -> bytes:

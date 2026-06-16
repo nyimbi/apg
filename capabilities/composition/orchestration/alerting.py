@@ -16,7 +16,7 @@ from email.mime.multipart import MimeMultipart
 import aiohttp
 import aioredis
 import logging
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from pydantic.config import ConfigDict
 
 # APG Framework imports

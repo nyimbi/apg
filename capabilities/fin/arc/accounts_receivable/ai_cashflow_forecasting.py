@@ -14,7 +14,7 @@ from enum import Enum
 from typing import List, Dict, Optional, Any, Tuple, Union
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel, Field, validator, AfterValidator
+from pydantic import BaseModel, Field, field_validator, AfterValidator
 from uuid_extensions import uuid7str
 
 from apg.core.base import APGServiceBase
@@ -96,7 +96,7 @@ class CashFlowForecastInput(APGBaseModel):
 	include_external_factors: bool = Field(default=True, description="Include economic indicators")
 	confidence_level: float = Field(default=0.95, description="Statistical confidence level")
 	
-	@validator('forecast_end_date')
+	@field_validator('forecast_end_date')
 	def validate_forecast_dates(cls, v, values):
 		"""Validate forecast date range."""
 		if 'forecast_start_date' in values and v <= values['forecast_start_date']:
@@ -110,7 +110,7 @@ class CashFlowForecastInput(APGBaseModel):
 		
 		return v
 	
-	@validator('collection_rate_adjustment')
+	@field_validator('collection_rate_adjustment')
 	def validate_collection_rate(cls, v):
 		"""Validate collection rate adjustment."""
 		if v is not None and (v < 0.0 or v > 1.0):

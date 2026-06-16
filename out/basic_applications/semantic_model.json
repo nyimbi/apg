@@ -1,0 +1,6319 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 30,
+    "name": "basic_applications",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "BlogManagement": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "captcha_threshold": 0.5,
+        "posts_per_page": 10,
+        "rate_limit_comments": 3,
+        "spam_filter_enabled": "bool",
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "BlogManagement",
+      "provides": [
+        "post_authoring",
+        "comment_moderation",
+        "user_management"
+      ],
+      "requires": [
+        "auth",
+        "audl"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "post_requires_auth",
+          "when": "user_authenticated == false and operation == create",
+          "when_ast": {
+            "left": {
+              "field": "user_authenticated",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "right": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "create"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "comment_rate_limit",
+          "when": "comments_per_minute > 3",
+          "when_ast": {
+            "field": "comments_per_minute",
+            "op": ">",
+            "type": "compare",
+            "value": 3
+          }
+        },
+        {
+          "action": "deny",
+          "name": "comment_spam_detected",
+          "when": "spam_score > 0.8",
+          "when_ast": {
+            "field": "spam_score",
+            "op": ">",
+            "type": "compare",
+            "value": 0.8
+          }
+        },
+        {
+          "action": "deny",
+          "name": "publish_requires_admin",
+          "when": "published == true and is_admin == false",
+          "when_ast": {
+            "left": {
+              "field": "published",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "right": {
+              "field": "is_admin",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {
+        "name": "blog_theme",
+        "tokens": {
+          "accent": "#2196F3"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PostList",
+            "name": "Posts",
+            "path": "/blog",
+            "permission": "blog:view"
+          },
+          {
+            "component": "PostForm",
+            "name": "New Post",
+            "path": "/blog/new",
+            "permission": "blog:write"
+          },
+          {
+            "component": "CommentList",
+            "name": "Comments",
+            "path": "/blog/comments",
+            "permission": "blog:moderate"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "CRMCore": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "auto_assignment": "bool",
+        "high_value_threshold": 10000,
+        "lead_timeout_days": 30,
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "CRMCore",
+      "provides": [
+        "contact_management",
+        "deal_pipeline",
+        "activity_logging",
+        "lead_nurturing"
+      ],
+      "requires": [
+        "auth",
+        "ntfy",
+        "audl"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "duplicate_contact",
+          "when": "email_exists == true",
+          "when_ast": {
+            "field": "email_exists",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "high_value_escalation",
+          "when": "value > 10000",
+          "when_ast": {
+            "field": "value",
+            "op": ">",
+            "type": "compare",
+            "value": 10000
+          }
+        },
+        {
+          "action": "warn",
+          "name": "stale_lead",
+          "when": "days_since_contact > 30",
+          "when_ast": {
+            "field": "days_since_contact",
+            "op": ">",
+            "type": "compare",
+            "value": 30
+          }
+        },
+        {
+          "action": "deny",
+          "name": "probability_range",
+          "when": "probability < 0 or probability > 100",
+          "when_ast": {
+            "left": {
+              "field": "probability",
+              "op": "<",
+              "type": "compare",
+              "value": 0
+            },
+            "right": {
+              "field": "probability",
+              "op": ">",
+              "type": "compare",
+              "value": 100
+            },
+            "type": "or"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {
+        "name": "crm_theme",
+        "tokens": {
+          "accent": "#9C27B0"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "ContactList",
+            "name": "Contacts",
+            "path": "/crm/contacts",
+            "permission": "crm:view"
+          },
+          {
+            "component": "DealPipeline",
+            "name": "Pipeline",
+            "path": "/crm/pipeline",
+            "permission": "crm:deals"
+          },
+          {
+            "component": "ActivityLog",
+            "name": "Activities",
+            "path": "/crm/activities",
+            "permission": "crm:activities"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "ECommerceCore": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "currency": "KES",
+        "low_stock_threshold": 10,
+        "max_image_size_mb": 5,
+        "max_product_images": 10,
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "ECommerceCore",
+      "provides": [
+        "product_catalog",
+        "order_management",
+        "inventory_tracking",
+        "payment_processing"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "stock_check",
+          "when": "quantity > stock_quantity",
+          "when_ast": {
+            "field": "quantity",
+            "op": ">",
+            "type": "compare",
+            "value": "stock_quantity"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "price_positive",
+          "when": "price <= 0",
+          "when_ast": {
+            "field": "price",
+            "op": "<=",
+            "type": "compare",
+            "value": 0
+          }
+        },
+        {
+          "action": "deny",
+          "name": "order_requires_address",
+          "when": "shipping_address missing",
+          "when_ast": {
+            "field": "shipping_address",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "low_stock_alert",
+          "when": "stock_quantity <= low_stock_threshold",
+          "when_ast": {
+            "field": "stock_quantity",
+            "op": "<=",
+            "type": "compare",
+            "value": "low_stock_threshold"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {
+        "name": "shop_theme",
+        "tokens": {
+          "accent": "#FF6D00"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "ProductCatalog",
+            "name": "Products",
+            "path": "/shop/products",
+            "permission": "shop:view"
+          },
+          {
+            "component": "OrderList",
+            "name": "Orders",
+            "path": "/shop/orders",
+            "permission": "shop:orders"
+          },
+          {
+            "component": "InventoryView",
+            "name": "Inventory",
+            "path": "/shop/inventory",
+            "permission": "shop:inventory"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "InventoryManagement": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "approval_required": "bool",
+        "default_reorder_point": 10,
+        "large_adjustment_threshold": 100,
+        "large_value_threshold": 1000,
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "InventoryManagement",
+      "provides": [
+        "stock_tracking",
+        "movement_recording",
+        "reorder_management",
+        "audit_trail"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "negative_stock_denied",
+          "when": "quantity - adjustment_quantity < 0",
+          "when_ast": {
+            "field": "quantity",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "large_adjustment_review",
+          "when": "abs_adjustment > large_adjustment_threshold",
+          "when_ast": {
+            "field": "abs_adjustment",
+            "op": ">",
+            "type": "compare",
+            "value": "large_adjustment_threshold"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "reorder_alert",
+          "when": "available_quantity <= reorder_point",
+          "when_ast": {
+            "field": "available_quantity",
+            "op": "<=",
+            "type": "compare",
+            "value": "reorder_point"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "overstock_warning",
+          "when": "quantity > max_stock_level",
+          "when_ast": {
+            "field": "quantity",
+            "op": ">",
+            "type": "compare",
+            "value": "max_stock_level"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "InventoryDashboard": {
+          "actions": [
+            "adjust_stock",
+            "transfer_stock",
+            "export_report"
+          ],
+          "binds": [
+            "inventory_items.current",
+            "stock_movements.recent"
+          ],
+          "contains": [
+            "StockLevelWidget",
+            "ReorderAlerts",
+            "MovementSummary",
+            "ValueWidget"
+          ],
+          "layout": "dashboard",
+          "route": "/inventory"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "name": "inventory_theme",
+        "tokens": {
+          "accent": "#607D8B"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "InventoryList",
+            "name": "Inventory",
+            "path": "/inventory",
+            "permission": "inv:view"
+          },
+          {
+            "component": "MovementLog",
+            "name": "Movements",
+            "path": "/inventory/movements",
+            "permission": "inv:view"
+          },
+          {
+            "component": "AdjustmentForm",
+            "name": "Adjustments",
+            "path": "/inventory/adjust",
+            "permission": "inv:adjust"
+          },
+          {
+            "component": "InventoryReport",
+            "name": "Reports",
+            "path": "/inventory/reports",
+            "permission": "inv:report"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "TaskManagement": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "default_priority": "medium",
+        "overdue_check_interval_hours": 24,
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "TaskManagement",
+      "provides": [
+        "project_tracking",
+        "task_assignment",
+        "time_logging",
+        "progress_reporting"
+      ],
+      "requires": [
+        "auth",
+        "ntfy"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "task_requires_project",
+          "when": "project_id missing",
+          "when_ast": {
+            "field": "project_id",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "overdue_alert",
+          "when": "due_date < now and status != done",
+          "when_ast": {
+            "left": {
+              "field": "due_date",
+              "op": "<",
+              "type": "compare",
+              "value": "now"
+            },
+            "right": {
+              "field": "status",
+              "op": "!=",
+              "type": "compare",
+              "value": "done"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "time_entry_open",
+          "when": "end_time missing and start_time set"
+        },
+        {
+          "action": "warn",
+          "name": "estimate_exceeded",
+          "when": "actual_hours > estimated_hours * 1.5",
+          "when_ast": {
+            "field": "actual_hours",
+            "op": ">",
+            "type": "compare",
+            "value": "estimated_hours"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "TaskBoard": {
+          "actions": [
+            "create_task",
+            "move_task",
+            "assign_task"
+          ],
+          "binds": [
+            "tasks.by_status"
+          ],
+          "contains": [
+            "TodoColumn",
+            "InProgressColumn",
+            "ReviewColumn",
+            "DoneColumn"
+          ],
+          "layout": "grid",
+          "route": "/tasks"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "name": "tasks_theme",
+        "tokens": {
+          "accent": "#4CAF50"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "ProjectList",
+            "name": "Projects",
+            "path": "/tasks/projects",
+            "permission": "tasks:view"
+          },
+          {
+            "component": "TaskBoard",
+            "name": "My Tasks",
+            "path": "/tasks",
+            "permission": "tasks:view"
+          },
+          {
+            "component": "TimesheetView",
+            "name": "Timesheet",
+            "path": "/tasks/time",
+            "permission": "tasks:time"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "BlogSystem": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "BlogManagement"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Blog application with post authoring and comment moderation",
+        "integrations": {},
+        "name": "BlogSystem",
+        "policies": {},
+        "routes": [
+          "/blog",
+          "/blog/new",
+          "/blog/comments"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      },
+      "CRMApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "CRMCore"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Customer relationship management with deal pipeline and activity tracking",
+        "integrations": {},
+        "name": "CRMApp",
+        "policies": {},
+        "routes": [
+          "/crm",
+          "/crm/contacts",
+          "/crm/pipeline",
+          "/crm/activities"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      },
+      "ECommerceApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "ECommerceCore"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "E-commerce platform with product catalog and order management",
+        "integrations": {},
+        "name": "ECommerceApp",
+        "policies": {},
+        "routes": [
+          "/shop",
+          "/shop/products",
+          "/shop/orders",
+          "/shop/inventory"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      },
+      "InventoryApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "InventoryManagement"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Warehouse inventory management with stock movements and reorder alerts",
+        "integrations": {},
+        "name": "InventoryApp",
+        "policies": {},
+        "routes": [
+          "/inventory",
+          "/inventory/movements",
+          "/inventory/adjust",
+          "/inventory/reports"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      },
+      "TaskManagerApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [
+          "TaskManagement"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Project and task management application with time tracking",
+        "integrations": {},
+        "name": "TaskManagerApp",
+        "policies": {},
+        "routes": [
+          "/tasks",
+          "/tasks/projects",
+          "/tasks/time"
+        ],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {
+      "BlogManagement": [
+        "auth",
+        "audl"
+      ],
+      "CRMCore": [
+        "auth",
+        "ntfy",
+        "audl"
+      ],
+      "ECommerceCore": [
+        "auth",
+        "audl",
+        "ntfy"
+      ],
+      "InventoryManagement": [
+        "auth",
+        "audl",
+        "ntfy"
+      ],
+      "TaskManagement": [
+        "auth",
+        "ntfy"
+      ]
+    }
+  },
+  "contracts": {
+    "BlogManagement": {
+      "configuration": {
+        "captcha_threshold": 0.5,
+        "posts_per_page": 10,
+        "rate_limit_comments": 3,
+        "spam_filter_enabled": "bool",
+        "tenant_id": "default"
+      },
+      "id": "blog_management",
+      "provides": [
+        "post_authoring",
+        "comment_moderation",
+        "user_management"
+      ],
+      "requires": [
+        "auth",
+        "audl"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "post_requires_auth",
+          "when": "user_authenticated == false and operation == create",
+          "when_ast": {
+            "left": {
+              "field": "user_authenticated",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "right": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "create"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "comment_rate_limit",
+          "when": "comments_per_minute > 3",
+          "when_ast": {
+            "field": "comments_per_minute",
+            "op": ">",
+            "type": "compare",
+            "value": 3
+          }
+        },
+        {
+          "action": "deny",
+          "name": "comment_spam_detected",
+          "when": "spam_score > 0.8",
+          "when_ast": {
+            "field": "spam_score",
+            "op": ">",
+            "type": "compare",
+            "value": 0.8
+          }
+        },
+        {
+          "action": "deny",
+          "name": "publish_requires_admin",
+          "when": "published == true and is_admin == false",
+          "when_ast": {
+            "left": {
+              "field": "published",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "right": {
+              "field": "is_admin",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        }
+      ],
+      "theme": {
+        "name": "blog_theme",
+        "tokens": {
+          "accent": "#2196F3"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PostList",
+            "name": "Posts",
+            "path": "/blog",
+            "permission": "blog:view"
+          },
+          {
+            "component": "PostForm",
+            "name": "New Post",
+            "path": "/blog/new",
+            "permission": "blog:write"
+          },
+          {
+            "component": "CommentList",
+            "name": "Comments",
+            "path": "/blog/comments",
+            "permission": "blog:moderate"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "CRMCore": {
+      "configuration": {
+        "auto_assignment": "bool",
+        "high_value_threshold": 10000,
+        "lead_timeout_days": 30,
+        "tenant_id": "default"
+      },
+      "id": "crm_core",
+      "provides": [
+        "contact_management",
+        "deal_pipeline",
+        "activity_logging",
+        "lead_nurturing"
+      ],
+      "requires": [
+        "auth",
+        "ntfy",
+        "audl"
+      ],
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "duplicate_contact",
+          "when": "email_exists == true",
+          "when_ast": {
+            "field": "email_exists",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "high_value_escalation",
+          "when": "value > 10000",
+          "when_ast": {
+            "field": "value",
+            "op": ">",
+            "type": "compare",
+            "value": 10000
+          }
+        },
+        {
+          "action": "warn",
+          "name": "stale_lead",
+          "when": "days_since_contact > 30",
+          "when_ast": {
+            "field": "days_since_contact",
+            "op": ">",
+            "type": "compare",
+            "value": 30
+          }
+        },
+        {
+          "action": "deny",
+          "name": "probability_range",
+          "when": "probability < 0 or probability > 100",
+          "when_ast": {
+            "left": {
+              "field": "probability",
+              "op": "<",
+              "type": "compare",
+              "value": 0
+            },
+            "right": {
+              "field": "probability",
+              "op": ">",
+              "type": "compare",
+              "value": 100
+            },
+            "type": "or"
+          }
+        }
+      ],
+      "theme": {
+        "name": "crm_theme",
+        "tokens": {
+          "accent": "#9C27B0"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "ContactList",
+            "name": "Contacts",
+            "path": "/crm/contacts",
+            "permission": "crm:view"
+          },
+          {
+            "component": "DealPipeline",
+            "name": "Pipeline",
+            "path": "/crm/pipeline",
+            "permission": "crm:deals"
+          },
+          {
+            "component": "ActivityLog",
+            "name": "Activities",
+            "path": "/crm/activities",
+            "permission": "crm:activities"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "ECommerceCore": {
+      "configuration": {
+        "currency": "KES",
+        "low_stock_threshold": 10,
+        "max_image_size_mb": 5,
+        "max_product_images": 10,
+        "tenant_id": "default"
+      },
+      "id": "ecommerce_core",
+      "provides": [
+        "product_catalog",
+        "order_management",
+        "inventory_tracking",
+        "payment_processing"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "stock_check",
+          "when": "quantity > stock_quantity",
+          "when_ast": {
+            "field": "quantity",
+            "op": ">",
+            "type": "compare",
+            "value": "stock_quantity"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "price_positive",
+          "when": "price <= 0",
+          "when_ast": {
+            "field": "price",
+            "op": "<=",
+            "type": "compare",
+            "value": 0
+          }
+        },
+        {
+          "action": "deny",
+          "name": "order_requires_address",
+          "when": "shipping_address missing",
+          "when_ast": {
+            "field": "shipping_address",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "low_stock_alert",
+          "when": "stock_quantity <= low_stock_threshold",
+          "when_ast": {
+            "field": "stock_quantity",
+            "op": "<=",
+            "type": "compare",
+            "value": "low_stock_threshold"
+          }
+        }
+      ],
+      "theme": {
+        "name": "shop_theme",
+        "tokens": {
+          "accent": "#FF6D00"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "ProductCatalog",
+            "name": "Products",
+            "path": "/shop/products",
+            "permission": "shop:view"
+          },
+          {
+            "component": "OrderList",
+            "name": "Orders",
+            "path": "/shop/orders",
+            "permission": "shop:orders"
+          },
+          {
+            "component": "InventoryView",
+            "name": "Inventory",
+            "path": "/shop/inventory",
+            "permission": "shop:inventory"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "InventoryManagement": {
+      "configuration": {
+        "approval_required": "bool",
+        "default_reorder_point": 10,
+        "large_adjustment_threshold": 100,
+        "large_value_threshold": 1000,
+        "tenant_id": "default"
+      },
+      "id": "inventory_management",
+      "provides": [
+        "stock_tracking",
+        "movement_recording",
+        "reorder_management",
+        "audit_trail"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "negative_stock_denied",
+          "when": "quantity - adjustment_quantity < 0",
+          "when_ast": {
+            "field": "quantity",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "large_adjustment_review",
+          "when": "abs_adjustment > large_adjustment_threshold",
+          "when_ast": {
+            "field": "abs_adjustment",
+            "op": ">",
+            "type": "compare",
+            "value": "large_adjustment_threshold"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "reorder_alert",
+          "when": "available_quantity <= reorder_point",
+          "when_ast": {
+            "field": "available_quantity",
+            "op": "<=",
+            "type": "compare",
+            "value": "reorder_point"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "overstock_warning",
+          "when": "quantity > max_stock_level",
+          "when_ast": {
+            "field": "quantity",
+            "op": ">",
+            "type": "compare",
+            "value": "max_stock_level"
+          }
+        }
+      ],
+      "theme": {
+        "name": "inventory_theme",
+        "tokens": {
+          "accent": "#607D8B"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "InventoryList",
+            "name": "Inventory",
+            "path": "/inventory",
+            "permission": "inv:view"
+          },
+          {
+            "component": "MovementLog",
+            "name": "Movements",
+            "path": "/inventory/movements",
+            "permission": "inv:view"
+          },
+          {
+            "component": "AdjustmentForm",
+            "name": "Adjustments",
+            "path": "/inventory/adjust",
+            "permission": "inv:adjust"
+          },
+          {
+            "component": "InventoryReport",
+            "name": "Reports",
+            "path": "/inventory/reports",
+            "permission": "inv:report"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "TaskManagement": {
+      "configuration": {
+        "default_priority": "medium",
+        "overdue_check_interval_hours": 24,
+        "tenant_id": "default"
+      },
+      "id": "task_management",
+      "provides": [
+        "project_tracking",
+        "task_assignment",
+        "time_logging",
+        "progress_reporting"
+      ],
+      "requires": [
+        "auth",
+        "ntfy"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "task_requires_project",
+          "when": "project_id missing",
+          "when_ast": {
+            "field": "project_id",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "overdue_alert",
+          "when": "due_date < now and status != done",
+          "when_ast": {
+            "left": {
+              "field": "due_date",
+              "op": "<",
+              "type": "compare",
+              "value": "now"
+            },
+            "right": {
+              "field": "status",
+              "op": "!=",
+              "type": "compare",
+              "value": "done"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "time_entry_open",
+          "when": "end_time missing and start_time set"
+        },
+        {
+          "action": "warn",
+          "name": "estimate_exceeded",
+          "when": "actual_hours > estimated_hours * 1.5",
+          "when_ast": {
+            "field": "actual_hours",
+            "op": ">",
+            "type": "compare",
+            "value": "estimated_hours"
+          }
+        }
+      ],
+      "theme": {
+        "name": "tasks_theme",
+        "tokens": {
+          "accent": "#4CAF50"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "ProjectList",
+            "name": "Projects",
+            "path": "/tasks/projects",
+            "permission": "tasks:view"
+          },
+          {
+            "component": "TaskBoard",
+            "name": "My Tasks",
+            "path": "/tasks",
+            "permission": "tasks:view"
+          },
+          {
+            "component": "TimesheetView",
+            "name": "Timesheet",
+            "path": "/tasks/time",
+            "permission": "tasks:time"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "basic_applications.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {
+    "LeadNurturing": {
+      "assignments": {
+        "qualify_lead": "sales_rep"
+      },
+      "compensation": {},
+      "guards": {
+        "assign_salesperson": "lead_score > 0",
+        "create_opportunity": "qualification_complete == true\";",
+        "qualify_lead": "welcome_sent == true"
+      },
+      "human_tasks": [
+        "qualify_lead"
+      ],
+      "methods": [],
+      "name": "LeadNurturing",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "new_lead",
+        "score_lead",
+        "assign_salesperson",
+        "send_welcome",
+        "qualify_lead",
+        "create_opportunity"
+      ],
+      "steps": [
+        "new_lead",
+        "score_lead",
+        "assign_salesperson",
+        "send_welcome",
+        "qualify_lead",
+        "create_opportunity"
+      ],
+      "steps_raw": "new_lead -> score_lead -> assign_salesperson -> send_welcome -> qualify_lead -> create_opportunity",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "new_lead",
+          "target": "score_lead"
+        },
+        {
+          "guard": "lead_score > 0",
+          "source": "score_lead",
+          "target": "assign_salesperson"
+        },
+        {
+          "guard": null,
+          "source": "assign_salesperson",
+          "target": "send_welcome"
+        },
+        {
+          "guard": "welcome_sent == true",
+          "source": "send_welcome",
+          "target": "qualify_lead"
+        },
+        {
+          "guard": "qualification_complete == true\";",
+          "source": "qualify_lead",
+          "target": "create_opportunity"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "OrderProcessing": {
+      "assignments": {
+        "ship_order": "warehouse_staff"
+      },
+      "compensation": {
+        "process_payment": "refund_payment"
+      },
+      "guards": {
+        "process_payment": "inventory_reserved == true",
+        "ship_order": "payment_confirmed == true\";",
+        "validate_inventory": "stock_available == true"
+      },
+      "human_tasks": [
+        "ship_order"
+      ],
+      "methods": [],
+      "name": "OrderProcessing",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "order_received",
+        "validate_inventory",
+        "process_payment",
+        "update_inventory",
+        "ship_order",
+        "deliver",
+        "complete"
+      ],
+      "steps": [
+        "order_received",
+        "validate_inventory",
+        "process_payment",
+        "update_inventory",
+        "ship_order",
+        "deliver",
+        "complete"
+      ],
+      "steps_raw": "order_received -> validate_inventory -> process_payment -> update_inventory -> ship_order -> deliver -> complete",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": "stock_available == true",
+          "source": "order_received",
+          "target": "validate_inventory"
+        },
+        {
+          "guard": "inventory_reserved == true",
+          "source": "validate_inventory",
+          "target": "process_payment"
+        },
+        {
+          "guard": null,
+          "source": "process_payment",
+          "target": "update_inventory"
+        },
+        {
+          "guard": "payment_confirmed == true\";",
+          "source": "update_inventory",
+          "target": "ship_order"
+        },
+        {
+          "guard": null,
+          "source": "ship_order",
+          "target": "deliver"
+        },
+        {
+          "guard": null,
+          "source": "deliver",
+          "target": "complete"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "PostPublishing": {
+      "assignments": {
+        "review": "editor"
+      },
+      "compensation": {},
+      "guards": {
+        "published": "review_approved == true\";",
+        "review": "title_length > 5 and content_length > 10"
+      },
+      "human_tasks": [
+        "review"
+      ],
+      "methods": [],
+      "name": "PostPublishing",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "draft",
+        "review",
+        "published"
+      ],
+      "steps": [
+        "draft",
+        "review",
+        "published"
+      ],
+      "steps_raw": "draft -> review -> published",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": "title_length > 5 and content_length > 10",
+          "source": "draft",
+          "target": "review"
+        },
+        {
+          "guard": "review_approved == true\";",
+          "source": "review",
+          "target": "published"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "StockAdjustment": {
+      "assignments": {
+        "approved": "warehouse_manager"
+      },
+      "compensation": {
+        "applied": "reverse_adjustment"
+      },
+      "guards": {
+        "applied": "approval_granted == true or abs_adjustment <= large_adjustment_threshold\";",
+        "approved": "abs_adjustment > large_adjustment_threshold",
+        "validated": "reason not missing and quantity not zero"
+      },
+      "human_tasks": [
+        "approved"
+      ],
+      "methods": [],
+      "name": "StockAdjustment",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "initiated",
+        "validated",
+        "approved",
+        "applied",
+        "logged"
+      ],
+      "steps": [
+        "initiated",
+        "validated",
+        "approved",
+        "applied",
+        "logged"
+      ],
+      "steps_raw": "initiated -> validated -> approved -> applied -> logged",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": "reason not missing and quantity not zero",
+          "source": "initiated",
+          "target": "validated"
+        },
+        {
+          "guard": "abs_adjustment > large_adjustment_threshold",
+          "source": "validated",
+          "target": "approved"
+        },
+        {
+          "guard": "approval_granted == true or abs_adjustment <= large_adjustment_threshold\";",
+          "source": "approved",
+          "target": "applied"
+        },
+        {
+          "guard": null,
+          "source": "applied",
+          "target": "logged"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 18,
+      "kind": "capability",
+      "nodes": 13
+    },
+    "deployment": {
+      "edges": 30,
+      "kind": "deployment",
+      "nodes": 31
+    },
+    "er": {
+      "edges": 152,
+      "kind": "er",
+      "nodes": 158
+    },
+    "handler": {
+      "edges": 30,
+      "kind": "handler",
+      "nodes": 31
+    },
+    "lookup": {
+      "edges": 30,
+      "kind": "lookup",
+      "nodes": 31
+    },
+    "package": {
+      "edges": 30,
+      "kind": "package",
+      "nodes": 31
+    },
+    "security": {
+      "edges": 30,
+      "kind": "security",
+      "nodes": 31
+    },
+    "workflow": {
+      "edges": 30,
+      "kind": "workflow",
+      "nodes": 31
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "BlogManagement.comment_rate_limit": {
+      "action": "deny",
+      "name": "comment_rate_limit",
+      "when": "comments_per_minute > 3",
+      "when_ast": {
+        "field": "comments_per_minute",
+        "op": ">",
+        "type": "compare",
+        "value": 3
+      }
+    },
+    "BlogManagement.comment_spam_detected": {
+      "action": "deny",
+      "name": "comment_spam_detected",
+      "when": "spam_score > 0.8",
+      "when_ast": {
+        "field": "spam_score",
+        "op": ">",
+        "type": "compare",
+        "value": 0.8
+      }
+    },
+    "BlogManagement.post_requires_auth": {
+      "action": "deny",
+      "name": "post_requires_auth",
+      "when": "user_authenticated == false and operation == create",
+      "when_ast": {
+        "left": {
+          "field": "user_authenticated",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "right": {
+          "field": "operation",
+          "op": "==",
+          "type": "compare",
+          "value": "create"
+        },
+        "type": "and"
+      }
+    },
+    "BlogManagement.publish_requires_admin": {
+      "action": "deny",
+      "name": "publish_requires_admin",
+      "when": "published == true and is_admin == false",
+      "when_ast": {
+        "left": {
+          "field": "published",
+          "op": "==",
+          "type": "compare",
+          "value": true
+        },
+        "right": {
+          "field": "is_admin",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "CRMCore.duplicate_contact": {
+      "action": "require_review",
+      "name": "duplicate_contact",
+      "when": "email_exists == true",
+      "when_ast": {
+        "field": "email_exists",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
+    },
+    "CRMCore.high_value_escalation": {
+      "action": "require_review",
+      "name": "high_value_escalation",
+      "when": "value > 10000",
+      "when_ast": {
+        "field": "value",
+        "op": ">",
+        "type": "compare",
+        "value": 10000
+      }
+    },
+    "CRMCore.probability_range": {
+      "action": "deny",
+      "name": "probability_range",
+      "when": "probability < 0 or probability > 100",
+      "when_ast": {
+        "left": {
+          "field": "probability",
+          "op": "<",
+          "type": "compare",
+          "value": 0
+        },
+        "right": {
+          "field": "probability",
+          "op": ">",
+          "type": "compare",
+          "value": 100
+        },
+        "type": "or"
+      }
+    },
+    "CRMCore.stale_lead": {
+      "action": "warn",
+      "name": "stale_lead",
+      "when": "days_since_contact > 30",
+      "when_ast": {
+        "field": "days_since_contact",
+        "op": ">",
+        "type": "compare",
+        "value": 30
+      }
+    },
+    "ECommerceCore.low_stock_alert": {
+      "action": "warn",
+      "name": "low_stock_alert",
+      "when": "stock_quantity <= low_stock_threshold",
+      "when_ast": {
+        "field": "stock_quantity",
+        "op": "<=",
+        "type": "compare",
+        "value": "low_stock_threshold"
+      }
+    },
+    "ECommerceCore.order_requires_address": {
+      "action": "deny",
+      "name": "order_requires_address",
+      "when": "shipping_address missing",
+      "when_ast": {
+        "field": "shipping_address",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "ECommerceCore.price_positive": {
+      "action": "deny",
+      "name": "price_positive",
+      "when": "price <= 0",
+      "when_ast": {
+        "field": "price",
+        "op": "<=",
+        "type": "compare",
+        "value": 0
+      }
+    },
+    "ECommerceCore.stock_check": {
+      "action": "deny",
+      "name": "stock_check",
+      "when": "quantity > stock_quantity",
+      "when_ast": {
+        "field": "quantity",
+        "op": ">",
+        "type": "compare",
+        "value": "stock_quantity"
+      }
+    },
+    "InventoryManagement.large_adjustment_review": {
+      "action": "require_review",
+      "name": "large_adjustment_review",
+      "when": "abs_adjustment > large_adjustment_threshold",
+      "when_ast": {
+        "field": "abs_adjustment",
+        "op": ">",
+        "type": "compare",
+        "value": "large_adjustment_threshold"
+      }
+    },
+    "InventoryManagement.negative_stock_denied": {
+      "action": "deny",
+      "name": "negative_stock_denied",
+      "when": "quantity - adjustment_quantity < 0",
+      "when_ast": {
+        "field": "quantity",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
+    },
+    "InventoryManagement.overstock_warning": {
+      "action": "warn",
+      "name": "overstock_warning",
+      "when": "quantity > max_stock_level",
+      "when_ast": {
+        "field": "quantity",
+        "op": ">",
+        "type": "compare",
+        "value": "max_stock_level"
+      }
+    },
+    "InventoryManagement.reorder_alert": {
+      "action": "warn",
+      "name": "reorder_alert",
+      "when": "available_quantity <= reorder_point",
+      "when_ast": {
+        "field": "available_quantity",
+        "op": "<=",
+        "type": "compare",
+        "value": "reorder_point"
+      }
+    },
+    "TaskManagement.estimate_exceeded": {
+      "action": "warn",
+      "name": "estimate_exceeded",
+      "when": "actual_hours > estimated_hours * 1.5",
+      "when_ast": {
+        "field": "actual_hours",
+        "op": ">",
+        "type": "compare",
+        "value": "estimated_hours"
+      }
+    },
+    "TaskManagement.overdue_alert": {
+      "action": "warn",
+      "name": "overdue_alert",
+      "when": "due_date < now and status != done",
+      "when_ast": {
+        "left": {
+          "field": "due_date",
+          "op": "<",
+          "type": "compare",
+          "value": "now"
+        },
+        "right": {
+          "field": "status",
+          "op": "!=",
+          "type": "compare",
+          "value": "done"
+        },
+        "type": "and"
+      }
+    },
+    "TaskManagement.task_requires_project": {
+      "action": "deny",
+      "name": "task_requires_project",
+      "when": "project_id missing",
+      "when_ast": {
+        "field": "project_id",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "TaskManagement.time_entry_open": {
+      "action": "warn",
+      "name": "time_entry_open",
+      "when": "end_time missing and start_time set"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "basic_applications.apg"
+  ],
+  "symbols": {
+    "app.BlogSystem": {
+      "file": "basic_applications.apg",
+      "id": "app.BlogSystem",
+      "kind": "app",
+      "name": "BlogSystem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.CRMApp": {
+      "file": "basic_applications.apg",
+      "id": "app.CRMApp",
+      "kind": "app",
+      "name": "CRMApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.ECommerceApp": {
+      "file": "basic_applications.apg",
+      "id": "app.ECommerceApp",
+      "kind": "app",
+      "name": "ECommerceApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.InventoryApp": {
+      "file": "basic_applications.apg",
+      "id": "app.InventoryApp",
+      "kind": "app",
+      "name": "InventoryApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.TaskManagerApp": {
+      "file": "basic_applications.apg",
+      "id": "app.TaskManagerApp",
+      "kind": "app",
+      "name": "TaskManagerApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.BlogManagement": {
+      "file": "basic_applications.apg",
+      "id": "capability.BlogManagement",
+      "kind": "capability",
+      "name": "BlogManagement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.CRMCore": {
+      "file": "basic_applications.apg",
+      "id": "capability.CRMCore",
+      "kind": "capability",
+      "name": "CRMCore",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.ECommerceCore": {
+      "file": "basic_applications.apg",
+      "id": "capability.ECommerceCore",
+      "kind": "capability",
+      "name": "ECommerceCore",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.InventoryManagement": {
+      "file": "basic_applications.apg",
+      "id": "capability.InventoryManagement",
+      "kind": "capability",
+      "name": "InventoryManagement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.TaskManagement": {
+      "file": "basic_applications.apg",
+      "id": "capability.TaskManagement",
+      "kind": "capability",
+      "name": "TaskManagement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.activity_type": {
+      "file": "basic_applications.apg",
+      "id": "field.Activity.activity_type",
+      "kind": "field",
+      "name": "Activity.activity_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.completed_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Activity.completed_at",
+      "kind": "field",
+      "name": "Activity.completed_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.contact_id": {
+      "file": "basic_applications.apg",
+      "id": "field.Activity.contact_id",
+      "kind": "field",
+      "name": "Activity.contact_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.created_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Activity.created_at",
+      "kind": "field",
+      "name": "Activity.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.created_by": {
+      "file": "basic_applications.apg",
+      "id": "field.Activity.created_by",
+      "kind": "field",
+      "name": "Activity.created_by",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.description": {
+      "file": "basic_applications.apg",
+      "id": "field.Activity.description",
+      "kind": "field",
+      "name": "Activity.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.id": {
+      "file": "basic_applications.apg",
+      "id": "field.Activity.id",
+      "kind": "field",
+      "name": "Activity.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.scheduled_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Activity.scheduled_at",
+      "kind": "field",
+      "name": "Activity.scheduled_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Activity.subject": {
+      "file": "basic_applications.apg",
+      "id": "field.Activity.subject",
+      "kind": "field",
+      "name": "Activity.subject",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogComment.approved": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogComment.approved",
+      "kind": "field",
+      "name": "BlogComment.approved",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogComment.author_email": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogComment.author_email",
+      "kind": "field",
+      "name": "BlogComment.author_email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogComment.author_name": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogComment.author_name",
+      "kind": "field",
+      "name": "BlogComment.author_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogComment.content": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogComment.content",
+      "kind": "field",
+      "name": "BlogComment.content",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogComment.created_at": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogComment.created_at",
+      "kind": "field",
+      "name": "BlogComment.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogComment.id": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogComment.id",
+      "kind": "field",
+      "name": "BlogComment.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogComment.post_id": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogComment.post_id",
+      "kind": "field",
+      "name": "BlogComment.post_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogPost.author": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogPost.author",
+      "kind": "field",
+      "name": "BlogPost.author",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogPost.content": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogPost.content",
+      "kind": "field",
+      "name": "BlogPost.content",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogPost.created_at": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogPost.created_at",
+      "kind": "field",
+      "name": "BlogPost.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogPost.id": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogPost.id",
+      "kind": "field",
+      "name": "BlogPost.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogPost.published": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogPost.published",
+      "kind": "field",
+      "name": "BlogPost.published",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogPost.tags": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogPost.tags",
+      "kind": "field",
+      "name": "BlogPost.tags",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogPost.title": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogPost.title",
+      "kind": "field",
+      "name": "BlogPost.title",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogPost.updated_at": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogPost.updated_at",
+      "kind": "field",
+      "name": "BlogPost.updated_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogPost.view_count": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogPost.view_count",
+      "kind": "field",
+      "name": "BlogPost.view_count",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogUser.created_at": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogUser.created_at",
+      "kind": "field",
+      "name": "BlogUser.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogUser.email": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogUser.email",
+      "kind": "field",
+      "name": "BlogUser.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogUser.id": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogUser.id",
+      "kind": "field",
+      "name": "BlogUser.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogUser.is_admin": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogUser.is_admin",
+      "kind": "field",
+      "name": "BlogUser.is_admin",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogUser.last_login": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogUser.last_login",
+      "kind": "field",
+      "name": "BlogUser.last_login",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogUser.password_hash": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogUser.password_hash",
+      "kind": "field",
+      "name": "BlogUser.password_hash",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.BlogUser.username": {
+      "file": "basic_applications.apg",
+      "id": "field.BlogUser.username",
+      "kind": "field",
+      "name": "BlogUser.username",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Category.description": {
+      "file": "basic_applications.apg",
+      "id": "field.Category.description",
+      "kind": "field",
+      "name": "Category.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Category.id": {
+      "file": "basic_applications.apg",
+      "id": "field.Category.id",
+      "kind": "field",
+      "name": "Category.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Category.is_active": {
+      "file": "basic_applications.apg",
+      "id": "field.Category.is_active",
+      "kind": "field",
+      "name": "Category.is_active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Category.name": {
+      "file": "basic_applications.apg",
+      "id": "field.Category.name",
+      "kind": "field",
+      "name": "Category.name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Category.parent_id": {
+      "file": "basic_applications.apg",
+      "id": "field.Category.parent_id",
+      "kind": "field",
+      "name": "Category.parent_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.address": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.address",
+      "kind": "field",
+      "name": "Contact.address",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.assigned_to": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.assigned_to",
+      "kind": "field",
+      "name": "Contact.assigned_to",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.company": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.company",
+      "kind": "field",
+      "name": "Contact.company",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.created_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.created_at",
+      "kind": "field",
+      "name": "Contact.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.email": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.email",
+      "kind": "field",
+      "name": "Contact.email",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.first_name": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.first_name",
+      "kind": "field",
+      "name": "Contact.first_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.id": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.id",
+      "kind": "field",
+      "name": "Contact.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.last_contact": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.last_contact",
+      "kind": "field",
+      "name": "Contact.last_contact",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.last_name": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.last_name",
+      "kind": "field",
+      "name": "Contact.last_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.lead_source": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.lead_source",
+      "kind": "field",
+      "name": "Contact.lead_source",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.phone": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.phone",
+      "kind": "field",
+      "name": "Contact.phone",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.status": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.status",
+      "kind": "field",
+      "name": "Contact.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Contact.title": {
+      "file": "basic_applications.apg",
+      "id": "field.Contact.title",
+      "kind": "field",
+      "name": "Contact.title",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Deal.actual_close_date": {
+      "file": "basic_applications.apg",
+      "id": "field.Deal.actual_close_date",
+      "kind": "field",
+      "name": "Deal.actual_close_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Deal.contact_id": {
+      "file": "basic_applications.apg",
+      "id": "field.Deal.contact_id",
+      "kind": "field",
+      "name": "Deal.contact_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Deal.created_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Deal.created_at",
+      "kind": "field",
+      "name": "Deal.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Deal.expected_close_date": {
+      "file": "basic_applications.apg",
+      "id": "field.Deal.expected_close_date",
+      "kind": "field",
+      "name": "Deal.expected_close_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Deal.id": {
+      "file": "basic_applications.apg",
+      "id": "field.Deal.id",
+      "kind": "field",
+      "name": "Deal.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Deal.name": {
+      "file": "basic_applications.apg",
+      "id": "field.Deal.name",
+      "kind": "field",
+      "name": "Deal.name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Deal.notes": {
+      "file": "basic_applications.apg",
+      "id": "field.Deal.notes",
+      "kind": "field",
+      "name": "Deal.notes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Deal.probability": {
+      "file": "basic_applications.apg",
+      "id": "field.Deal.probability",
+      "kind": "field",
+      "name": "Deal.probability",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Deal.stage": {
+      "file": "basic_applications.apg",
+      "id": "field.Deal.stage",
+      "kind": "field",
+      "name": "Deal.stage",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Deal.value": {
+      "file": "basic_applications.apg",
+      "id": "field.Deal.value",
+      "kind": "field",
+      "name": "Deal.value",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.cost_per_unit": {
+      "file": "basic_applications.apg",
+      "id": "field.InventoryItem.cost_per_unit",
+      "kind": "field",
+      "name": "InventoryItem.cost_per_unit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.id": {
+      "file": "basic_applications.apg",
+      "id": "field.InventoryItem.id",
+      "kind": "field",
+      "name": "InventoryItem.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.last_counted": {
+      "file": "basic_applications.apg",
+      "id": "field.InventoryItem.last_counted",
+      "kind": "field",
+      "name": "InventoryItem.last_counted",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.location": {
+      "file": "basic_applications.apg",
+      "id": "field.InventoryItem.location",
+      "kind": "field",
+      "name": "InventoryItem.location",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.max_stock_level": {
+      "file": "basic_applications.apg",
+      "id": "field.InventoryItem.max_stock_level",
+      "kind": "field",
+      "name": "InventoryItem.max_stock_level",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.product_id": {
+      "file": "basic_applications.apg",
+      "id": "field.InventoryItem.product_id",
+      "kind": "field",
+      "name": "InventoryItem.product_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.quantity": {
+      "file": "basic_applications.apg",
+      "id": "field.InventoryItem.quantity",
+      "kind": "field",
+      "name": "InventoryItem.quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.reorder_point": {
+      "file": "basic_applications.apg",
+      "id": "field.InventoryItem.reorder_point",
+      "kind": "field",
+      "name": "InventoryItem.reorder_point",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.reserved_quantity": {
+      "file": "basic_applications.apg",
+      "id": "field.InventoryItem.reserved_quantity",
+      "kind": "field",
+      "name": "InventoryItem.reserved_quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.warehouse_id": {
+      "file": "basic_applications.apg",
+      "id": "field.InventoryItem.warehouse_id",
+      "kind": "field",
+      "name": "InventoryItem.warehouse_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.billing_address": {
+      "file": "basic_applications.apg",
+      "id": "field.Order.billing_address",
+      "kind": "field",
+      "name": "Order.billing_address",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.created_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Order.created_at",
+      "kind": "field",
+      "name": "Order.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.delivered_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Order.delivered_at",
+      "kind": "field",
+      "name": "Order.delivered_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.id": {
+      "file": "basic_applications.apg",
+      "id": "field.Order.id",
+      "kind": "field",
+      "name": "Order.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.payment_method": {
+      "file": "basic_applications.apg",
+      "id": "field.Order.payment_method",
+      "kind": "field",
+      "name": "Order.payment_method",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.shipped_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Order.shipped_at",
+      "kind": "field",
+      "name": "Order.shipped_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.shipping_address": {
+      "file": "basic_applications.apg",
+      "id": "field.Order.shipping_address",
+      "kind": "field",
+      "name": "Order.shipping_address",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.status": {
+      "file": "basic_applications.apg",
+      "id": "field.Order.status",
+      "kind": "field",
+      "name": "Order.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.total_amount": {
+      "file": "basic_applications.apg",
+      "id": "field.Order.total_amount",
+      "kind": "field",
+      "name": "Order.total_amount",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Order.user_id": {
+      "file": "basic_applications.apg",
+      "id": "field.Order.user_id",
+      "kind": "field",
+      "name": "Order.user_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderItem.id": {
+      "file": "basic_applications.apg",
+      "id": "field.OrderItem.id",
+      "kind": "field",
+      "name": "OrderItem.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderItem.order_id": {
+      "file": "basic_applications.apg",
+      "id": "field.OrderItem.order_id",
+      "kind": "field",
+      "name": "OrderItem.order_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderItem.product_id": {
+      "file": "basic_applications.apg",
+      "id": "field.OrderItem.product_id",
+      "kind": "field",
+      "name": "OrderItem.product_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderItem.quantity": {
+      "file": "basic_applications.apg",
+      "id": "field.OrderItem.quantity",
+      "kind": "field",
+      "name": "OrderItem.quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderItem.total_price": {
+      "file": "basic_applications.apg",
+      "id": "field.OrderItem.total_price",
+      "kind": "field",
+      "name": "OrderItem.total_price",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.OrderItem.unit_price": {
+      "file": "basic_applications.apg",
+      "id": "field.OrderItem.unit_price",
+      "kind": "field",
+      "name": "OrderItem.unit_price",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.brand": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.brand",
+      "kind": "field",
+      "name": "Product.brand",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.category_id": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.category_id",
+      "kind": "field",
+      "name": "Product.category_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.created_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.created_at",
+      "kind": "field",
+      "name": "Product.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.description": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.description",
+      "kind": "field",
+      "name": "Product.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.dimensions": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.dimensions",
+      "kind": "field",
+      "name": "Product.dimensions",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.id": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.id",
+      "kind": "field",
+      "name": "Product.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.images": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.images",
+      "kind": "field",
+      "name": "Product.images",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.is_active": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.is_active",
+      "kind": "field",
+      "name": "Product.is_active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.max_images": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.max_images",
+      "kind": "field",
+      "name": "Product.max_images",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.name": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.name",
+      "kind": "field",
+      "name": "Product.name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.price": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.price",
+      "kind": "field",
+      "name": "Product.price",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.sku": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.sku",
+      "kind": "field",
+      "name": "Product.sku",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.stock_quantity": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.stock_quantity",
+      "kind": "field",
+      "name": "Product.stock_quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Product.weight": {
+      "file": "basic_applications.apg",
+      "id": "field.Product.weight",
+      "kind": "field",
+      "name": "Product.weight",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Project.created_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Project.created_at",
+      "kind": "field",
+      "name": "Project.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Project.description": {
+      "file": "basic_applications.apg",
+      "id": "field.Project.description",
+      "kind": "field",
+      "name": "Project.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Project.end_date": {
+      "file": "basic_applications.apg",
+      "id": "field.Project.end_date",
+      "kind": "field",
+      "name": "Project.end_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Project.id": {
+      "file": "basic_applications.apg",
+      "id": "field.Project.id",
+      "kind": "field",
+      "name": "Project.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Project.name": {
+      "file": "basic_applications.apg",
+      "id": "field.Project.name",
+      "kind": "field",
+      "name": "Project.name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Project.owner_id": {
+      "file": "basic_applications.apg",
+      "id": "field.Project.owner_id",
+      "kind": "field",
+      "name": "Project.owner_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Project.start_date": {
+      "file": "basic_applications.apg",
+      "id": "field.Project.start_date",
+      "kind": "field",
+      "name": "Project.start_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Project.status": {
+      "file": "basic_applications.apg",
+      "id": "field.Project.status",
+      "kind": "field",
+      "name": "Project.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.created_at": {
+      "file": "basic_applications.apg",
+      "id": "field.StockMovement.created_at",
+      "kind": "field",
+      "name": "StockMovement.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.created_by": {
+      "file": "basic_applications.apg",
+      "id": "field.StockMovement.created_by",
+      "kind": "field",
+      "name": "StockMovement.created_by",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.id": {
+      "file": "basic_applications.apg",
+      "id": "field.StockMovement.id",
+      "kind": "field",
+      "name": "StockMovement.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.inventory_item_id": {
+      "file": "basic_applications.apg",
+      "id": "field.StockMovement.inventory_item_id",
+      "kind": "field",
+      "name": "StockMovement.inventory_item_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.movement_type": {
+      "file": "basic_applications.apg",
+      "id": "field.StockMovement.movement_type",
+      "kind": "field",
+      "name": "StockMovement.movement_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.notes": {
+      "file": "basic_applications.apg",
+      "id": "field.StockMovement.notes",
+      "kind": "field",
+      "name": "StockMovement.notes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.quantity": {
+      "file": "basic_applications.apg",
+      "id": "field.StockMovement.quantity",
+      "kind": "field",
+      "name": "StockMovement.quantity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.reference_id": {
+      "file": "basic_applications.apg",
+      "id": "field.StockMovement.reference_id",
+      "kind": "field",
+      "name": "StockMovement.reference_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.StockMovement.reference_type": {
+      "file": "basic_applications.apg",
+      "id": "field.StockMovement.reference_type",
+      "kind": "field",
+      "name": "StockMovement.reference_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.actual_hours": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.actual_hours",
+      "kind": "field",
+      "name": "Task.actual_hours",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.assignee_id": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.assignee_id",
+      "kind": "field",
+      "name": "Task.assignee_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.completed_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.completed_at",
+      "kind": "field",
+      "name": "Task.completed_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.created_at": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.created_at",
+      "kind": "field",
+      "name": "Task.created_at",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.description": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.description",
+      "kind": "field",
+      "name": "Task.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.due_date": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.due_date",
+      "kind": "field",
+      "name": "Task.due_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.estimated_hours": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.estimated_hours",
+      "kind": "field",
+      "name": "Task.estimated_hours",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.id": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.id",
+      "kind": "field",
+      "name": "Task.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.priority": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.priority",
+      "kind": "field",
+      "name": "Task.priority",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.project_id": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.project_id",
+      "kind": "field",
+      "name": "Task.project_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.status": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.status",
+      "kind": "field",
+      "name": "Task.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Task.title": {
+      "file": "basic_applications.apg",
+      "id": "field.Task.title",
+      "kind": "field",
+      "name": "Task.title",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.TimeEntry.billable": {
+      "file": "basic_applications.apg",
+      "id": "field.TimeEntry.billable",
+      "kind": "field",
+      "name": "TimeEntry.billable",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.TimeEntry.description": {
+      "file": "basic_applications.apg",
+      "id": "field.TimeEntry.description",
+      "kind": "field",
+      "name": "TimeEntry.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.TimeEntry.duration": {
+      "file": "basic_applications.apg",
+      "id": "field.TimeEntry.duration",
+      "kind": "field",
+      "name": "TimeEntry.duration",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.TimeEntry.end_time": {
+      "file": "basic_applications.apg",
+      "id": "field.TimeEntry.end_time",
+      "kind": "field",
+      "name": "TimeEntry.end_time",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.TimeEntry.id": {
+      "file": "basic_applications.apg",
+      "id": "field.TimeEntry.id",
+      "kind": "field",
+      "name": "TimeEntry.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.TimeEntry.start_time": {
+      "file": "basic_applications.apg",
+      "id": "field.TimeEntry.start_time",
+      "kind": "field",
+      "name": "TimeEntry.start_time",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.TimeEntry.task_id": {
+      "file": "basic_applications.apg",
+      "id": "field.TimeEntry.task_id",
+      "kind": "field",
+      "name": "TimeEntry.task_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.TimeEntry.user_id": {
+      "file": "basic_applications.apg",
+      "id": "field.TimeEntry.user_id",
+      "kind": "field",
+      "name": "TimeEntry.user_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Warehouse.address": {
+      "file": "basic_applications.apg",
+      "id": "field.Warehouse.address",
+      "kind": "field",
+      "name": "Warehouse.address",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Warehouse.id": {
+      "file": "basic_applications.apg",
+      "id": "field.Warehouse.id",
+      "kind": "field",
+      "name": "Warehouse.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Warehouse.is_active": {
+      "file": "basic_applications.apg",
+      "id": "field.Warehouse.is_active",
+      "kind": "field",
+      "name": "Warehouse.is_active",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Warehouse.manager_id": {
+      "file": "basic_applications.apg",
+      "id": "field.Warehouse.manager_id",
+      "kind": "field",
+      "name": "Warehouse.manager_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Warehouse.name": {
+      "file": "basic_applications.apg",
+      "id": "field.Warehouse.name",
+      "kind": "field",
+      "name": "Warehouse.name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.basic_applications": {
+      "file": "basic_applications.apg",
+      "id": "module.basic_applications",
+      "kind": "module",
+      "name": "basic_applications",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Activity": {
+      "file": "basic_applications.apg",
+      "id": "table.Activity",
+      "kind": "table",
+      "name": "Activity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.BlogComment": {
+      "file": "basic_applications.apg",
+      "id": "table.BlogComment",
+      "kind": "table",
+      "name": "BlogComment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.BlogPost": {
+      "file": "basic_applications.apg",
+      "id": "table.BlogPost",
+      "kind": "table",
+      "name": "BlogPost",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.BlogUser": {
+      "file": "basic_applications.apg",
+      "id": "table.BlogUser",
+      "kind": "table",
+      "name": "BlogUser",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Category": {
+      "file": "basic_applications.apg",
+      "id": "table.Category",
+      "kind": "table",
+      "name": "Category",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Contact": {
+      "file": "basic_applications.apg",
+      "id": "table.Contact",
+      "kind": "table",
+      "name": "Contact",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Deal": {
+      "file": "basic_applications.apg",
+      "id": "table.Deal",
+      "kind": "table",
+      "name": "Deal",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.InventoryItem": {
+      "file": "basic_applications.apg",
+      "id": "table.InventoryItem",
+      "kind": "table",
+      "name": "InventoryItem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Order": {
+      "file": "basic_applications.apg",
+      "id": "table.Order",
+      "kind": "table",
+      "name": "Order",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.OrderItem": {
+      "file": "basic_applications.apg",
+      "id": "table.OrderItem",
+      "kind": "table",
+      "name": "OrderItem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Product": {
+      "file": "basic_applications.apg",
+      "id": "table.Product",
+      "kind": "table",
+      "name": "Product",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Project": {
+      "file": "basic_applications.apg",
+      "id": "table.Project",
+      "kind": "table",
+      "name": "Project",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.StockMovement": {
+      "file": "basic_applications.apg",
+      "id": "table.StockMovement",
+      "kind": "table",
+      "name": "StockMovement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Task": {
+      "file": "basic_applications.apg",
+      "id": "table.Task",
+      "kind": "table",
+      "name": "Task",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.TimeEntry": {
+      "file": "basic_applications.apg",
+      "id": "table.TimeEntry",
+      "kind": "table",
+      "name": "TimeEntry",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Warehouse": {
+      "file": "basic_applications.apg",
+      "id": "table.Warehouse",
+      "kind": "table",
+      "name": "Warehouse",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.LeadNurturing": {
+      "file": "basic_applications.apg",
+      "id": "workflow.LeadNurturing",
+      "kind": "workflow",
+      "name": "LeadNurturing",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.OrderProcessing": {
+      "file": "basic_applications.apg",
+      "id": "workflow.OrderProcessing",
+      "kind": "workflow",
+      "name": "OrderProcessing",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.PostPublishing": {
+      "file": "basic_applications.apg",
+      "id": "workflow.PostPublishing",
+      "kind": "workflow",
+      "name": "PostPublishing",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.StockAdjustment": {
+      "file": "basic_applications.apg",
+      "id": "workflow.StockAdjustment",
+      "kind": "workflow",
+      "name": "StockAdjustment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Activity": {
+      "fields": {
+        "activity_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "completed_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "contact_id": {
+          "relationship": {
+            "alias": "contact",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Contact"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "created_by": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "description": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "scheduled_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "subject": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "completed_at.id": {
+          "chain": [
+            "Activity.completed_at",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "created_at.id": {
+          "chain": [
+            "Activity.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "description.id": {
+          "chain": [
+            "Activity.description",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "scheduled_at.id": {
+          "chain": [
+            "Activity.scheduled_at",
+            "datetime?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Activity"
+    },
+    "BlogComment": {
+      "fields": {
+        "approved": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "author_email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "author_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "content": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "post_id": {
+          "relationship": {
+            "alias": "post",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Post"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "created_at.id": {
+          "chain": [
+            "BlogComment.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "BlogComment"
+    },
+    "BlogPost": {
+      "fields": {
+        "author": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "content": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "published": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "tags": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        },
+        "title": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "updated_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "view_count": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {
+        "created_at.id": {
+          "chain": [
+            "BlogPost.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "tags.id": {
+          "chain": [
+            "BlogPost.tags",
+            "List.id"
+          ],
+          "valid": true
+        },
+        "updated_at.id": {
+          "chain": [
+            "BlogPost.updated_at",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "BlogPost"
+    },
+    "BlogUser": {
+      "fields": {
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "is_admin": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "last_login": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "password_hash": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "username": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "created_at.id": {
+          "chain": [
+            "BlogUser.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "last_login.id": {
+          "chain": [
+            "BlogUser.last_login",
+            "datetime?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "BlogUser"
+    },
+    "Category": {
+      "fields": {
+        "description": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "is_active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "parent_id": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        }
+      },
+      "lookup_paths": {
+        "description.id": {
+          "chain": [
+            "Category.description",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "parent_id.id": {
+          "chain": [
+            "Category.parent_id",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Category"
+    },
+    "Contact": {
+      "fields": {
+        "address": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "assigned_to": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "company": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "first_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "last_contact": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "last_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "lead_source": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "phone": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "title": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        }
+      },
+      "lookup_paths": {
+        "address.id": {
+          "chain": [
+            "Contact.address",
+            "Dict.id"
+          ],
+          "valid": true
+        },
+        "assigned_to.id": {
+          "chain": [
+            "Contact.assigned_to",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "company.id": {
+          "chain": [
+            "Contact.company",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "created_at.id": {
+          "chain": [
+            "Contact.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "last_contact.id": {
+          "chain": [
+            "Contact.last_contact",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "lead_source.id": {
+          "chain": [
+            "Contact.lead_source",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "phone.id": {
+          "chain": [
+            "Contact.phone",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "title.id": {
+          "chain": [
+            "Contact.title",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Contact"
+    },
+    "Deal": {
+      "fields": {
+        "actual_close_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date?"
+          },
+          "required": true,
+          "type": "date?"
+        },
+        "contact_id": {
+          "relationship": {
+            "alias": "contact",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Contact"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "expected_close_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "notes": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "probability": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "stage": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "value": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        }
+      },
+      "lookup_paths": {
+        "actual_close_date.id": {
+          "chain": [
+            "Deal.actual_close_date",
+            "date?.id"
+          ],
+          "valid": true
+        },
+        "created_at.id": {
+          "chain": [
+            "Deal.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "expected_close_date.id": {
+          "chain": [
+            "Deal.expected_close_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "notes.id": {
+          "chain": [
+            "Deal.notes",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "value.id": {
+          "chain": [
+            "Deal.value",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Deal"
+    },
+    "InventoryItem": {
+      "fields": {
+        "cost_per_unit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "last_counted": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "location": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "max_stock_level": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "product_id": {
+          "relationship": {
+            "alias": "product",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Product"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reorder_point": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reserved_quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "warehouse_id": {
+          "relationship": {
+            "alias": "warehouse",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Warehouse"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "cost_per_unit.id": {
+          "chain": [
+            "InventoryItem.cost_per_unit",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "last_counted.id": {
+          "chain": [
+            "InventoryItem.last_counted",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "location.id": {
+          "chain": [
+            "InventoryItem.location",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "InventoryItem"
+    },
+    "Order": {
+      "fields": {
+        "billing_address": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "delivered_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "payment_method": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "shipped_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "shipping_address": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total_amount": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "user_id": {
+          "relationship": {
+            "alias": "user",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "User"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "billing_address.id": {
+          "chain": [
+            "Order.billing_address",
+            "Dict.id"
+          ],
+          "valid": true
+        },
+        "created_at.id": {
+          "chain": [
+            "Order.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "delivered_at.id": {
+          "chain": [
+            "Order.delivered_at",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "shipped_at.id": {
+          "chain": [
+            "Order.shipped_at",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "shipping_address.id": {
+          "chain": [
+            "Order.shipping_address",
+            "Dict.id"
+          ],
+          "valid": true
+        },
+        "total_amount.id": {
+          "chain": [
+            "Order.total_amount",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Order"
+    },
+    "OrderItem": {
+      "fields": {
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "order_id": {
+          "relationship": {
+            "alias": "order",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Order"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "product_id": {
+          "relationship": {
+            "alias": "product",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Product"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "total_price": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "unit_price": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        }
+      },
+      "lookup_paths": {
+        "total_price.id": {
+          "chain": [
+            "OrderItem.total_price",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "unit_price.id": {
+          "chain": [
+            "OrderItem.unit_price",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "OrderItem"
+    },
+    "Product": {
+      "fields": {
+        "brand": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "category_id": {
+          "relationship": {
+            "alias": "category",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Category"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "description": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "dimensions": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "images": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        },
+        "is_active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "max_images": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "price": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "sku": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "stock_quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "weight": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {
+        "brand.id": {
+          "chain": [
+            "Product.brand",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "created_at.id": {
+          "chain": [
+            "Product.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "description.id": {
+          "chain": [
+            "Product.description",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "dimensions.id": {
+          "chain": [
+            "Product.dimensions",
+            "Dict.id"
+          ],
+          "valid": true
+        },
+        "images.id": {
+          "chain": [
+            "Product.images",
+            "List.id"
+          ],
+          "valid": true
+        },
+        "price.id": {
+          "chain": [
+            "Product.price",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Product"
+    },
+    "Project": {
+      "fields": {
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "description": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "end_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date?"
+          },
+          "required": true,
+          "type": "date?"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "owner_id": {
+          "relationship": {
+            "alias": "owner",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Owner"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "start_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "created_at.id": {
+          "chain": [
+            "Project.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "description.id": {
+          "chain": [
+            "Project.description",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "end_date.id": {
+          "chain": [
+            "Project.end_date",
+            "date?.id"
+          ],
+          "valid": true
+        },
+        "start_date.id": {
+          "chain": [
+            "Project.start_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Project"
+    },
+    "StockMovement": {
+      "fields": {
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "created_by": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "inventory_item_id": {
+          "relationship": {
+            "alias": "inventory_item",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "InventoryItem"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "movement_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "notes": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "quantity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reference_id": {
+          "relationship": {
+            "alias": "reference",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Reference"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "reference_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "created_at.id": {
+          "chain": [
+            "StockMovement.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "notes.id": {
+          "chain": [
+            "StockMovement.notes",
+            "str?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "StockMovement"
+    },
+    "Task": {
+      "fields": {
+        "actual_hours": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "float?"
+          },
+          "required": true,
+          "type": "float?"
+        },
+        "assignee_id": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "completed_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "created_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "description": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "due_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "estimated_hours": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "float?"
+          },
+          "required": true,
+          "type": "float?"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "priority": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "project_id": {
+          "relationship": {
+            "alias": "project",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Project"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "title": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "actual_hours.id": {
+          "chain": [
+            "Task.actual_hours",
+            "float?.id"
+          ],
+          "valid": true
+        },
+        "assignee_id.id": {
+          "chain": [
+            "Task.assignee_id",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "completed_at.id": {
+          "chain": [
+            "Task.completed_at",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "created_at.id": {
+          "chain": [
+            "Task.created_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "description.id": {
+          "chain": [
+            "Task.description",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "due_date.id": {
+          "chain": [
+            "Task.due_date",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "estimated_hours.id": {
+          "chain": [
+            "Task.estimated_hours",
+            "float?.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Task"
+    },
+    "TimeEntry": {
+      "fields": {
+        "billable": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "description": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "str?"
+          },
+          "required": true,
+          "type": "str?"
+        },
+        "duration": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "end_time": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime?"
+          },
+          "required": true,
+          "type": "datetime?"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "start_time": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "task_id": {
+          "relationship": {
+            "alias": "task",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Task"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "user_id": {
+          "relationship": {
+            "alias": "user",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "User"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "description.id": {
+          "chain": [
+            "TimeEntry.description",
+            "str?.id"
+          ],
+          "valid": true
+        },
+        "end_time.id": {
+          "chain": [
+            "TimeEntry.end_time",
+            "datetime?.id"
+          ],
+          "valid": true
+        },
+        "start_time.id": {
+          "chain": [
+            "TimeEntry.start_time",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "TimeEntry"
+    },
+    "Warehouse": {
+      "fields": {
+        "address": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Dict"
+          },
+          "required": true,
+          "type": "Dict"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "is_active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "manager_id": {
+          "relationship": {
+            "alias": "manager",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Manager"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "address.id": {
+          "chain": [
+            "Warehouse.address",
+            "Dict.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Warehouse"
+    }
+  },
+  "views": {}
+}

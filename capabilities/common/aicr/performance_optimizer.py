@@ -19,12 +19,10 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union, Tuple, Callable
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 import logging
 import threading
-from collections import deque, defaultdict
-
-# Configure logging
+from collections import deque, defaultdict# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

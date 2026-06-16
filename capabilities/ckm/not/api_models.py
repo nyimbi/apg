@@ -13,11 +13,9 @@ Website: www.datacraft.co.ke
 from typing import Dict, List, Any, Optional, Union, Literal
 from datetime import datetime, timedelta
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict, validator, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from pydantic import EmailStr, HttpUrl
 from uuid_extensions import uuid7str
-
-
 # Configuration for all Pydantic models
 model_config = ConfigDict(
 	extra='forbid',
@@ -226,9 +224,9 @@ class CampaignBase(BaseModel):
 
 class CampaignCreate(CampaignBase):
 	"""Campaign creation model"""
-	template_ids: List[str] = Field(..., min_items=1, description="Template IDs to use")
-	audience_segments: List[Dict[str, Any]] = Field(..., min_items=1, description="Target audience segments")
-	channels: List[DeliveryChannel] = Field(..., min_items=1, description="Delivery channels")
+	template_ids: List[str] = Field(..., min_length=1, description="Template IDs to use")
+	audience_segments: List[Dict[str, Any]] = Field(..., min_length=1, description="Target audience segments")
+	channels: List[DeliveryChannel] = Field(..., min_length=1, description="Delivery channels")
 	scheduled_at: Optional[datetime] = Field(None, description="Scheduled execution time")
 	priority: NotificationPriority = Field(NotificationPriority.NORMAL, description="Campaign priority")
 
@@ -332,7 +330,7 @@ class DeliveryRequest(BaseModel):
 	
 	recipient_id: str = Field(..., description="Recipient user ID")
 	template_id: str = Field(..., description="Template ID to use")
-	channels: List[DeliveryChannel] = Field(..., min_items=1, description="Delivery channels")
+	channels: List[DeliveryChannel] = Field(..., min_length=1, description="Delivery channels")
 	variables: Dict[str, Any] = Field(default_factory=dict, description="Template variables")
 	priority: NotificationPriority = Field(NotificationPriority.NORMAL, description="Delivery priority")
 	scheduled_at: Optional[datetime] = Field(None, description="Scheduled delivery time")

@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 from pydantic import AfterValidator
 from annotated_types import Annotated
 from sqlalchemy import Column, String, Integer, DateTime, Text, Numeric, Boolean, JSON, Index
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.dialects.postgresql import UUID
 
 Base = declarative_base()

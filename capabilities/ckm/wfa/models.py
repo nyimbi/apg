@@ -14,10 +14,10 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic import ConfigDict
 from pydantic import EmailStr, PositiveFloat, PositiveInt
-from pydantic.functional_validators import AfterValidator
+from pydantic, model_validator.functional_validators import AfterValidator
 from typing_extensions import Annotated
 
 from uuid_extensions import uuid7str
@@ -265,7 +265,7 @@ class WBPMProcessDefinition(APGBaseModel):
 	version_notes: Optional[str] = Field(None, description="Version change notes")
 	deployment_time: Optional[datetime] = Field(None, description="Deployment timestamp")
 	
-	@validator('bpmn_xml')
+	@field_validator('bpmn_xml')
 	def validate_bpmn_xml(cls, v):
 		"""Validate BPMN XML format."""
 		if not v or not v.strip():
@@ -273,7 +273,7 @@ class WBPMProcessDefinition(APGBaseModel):
 		# Additional BPMN validation could be added here
 		return v.strip()
 	
-	@validator('tags')
+	@field_validator('tags')
 	def validate_tags(cls, v):
 		"""Validate and normalize tags."""
 		return [tag.strip().lower() for tag in v if tag.strip()]
@@ -314,14 +314,15 @@ class WBPMProcessInstance(APGBaseModel):
 	priority: TaskPriority = Field(default=TaskPriority.MEDIUM, description="Instance priority")
 	due_date: Optional[datetime] = Field(None, description="Due date for completion")
 	
-	@validator('end_time')
+	@field_validator('end_time')
 	def validate_end_time(cls, v, values):
 		"""Validate end time is after start time."""
 		if v and 'start_time' in values and v < values['start_time']:
 			raise ValueError("End time must be after start time")
 		return v
 	
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_duration_calculation(cls, values):
 		"""Validate duration calculation consistency."""
 		start_time = values.get('start_time')
@@ -387,14 +388,15 @@ class WBPMProcessFlow(APGBaseModel):
 	is_default_flow: bool = Field(default=False, description="Whether this is a default flow")
 	flow_properties: Dict[str, Any] = Field(default_factory=dict, description="Additional flow properties")
 	
-	@validator('source_activity_id', 'target_activity_id')
+	@field_validator('source_activity_id', 'target_activity_id')
 	def validate_activity_ids(cls, v):
 		"""Validate activity IDs are not empty."""
 		if not v or not v.strip():
 			raise ValueError("Activity ID cannot be empty")
 		return v.strip()
 	
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_no_self_flow(cls, values):
 		"""Validate flow doesn't connect activity to itself."""
 		source = values.get('source_activity_id')
@@ -452,7 +454,7 @@ class WBPMTask(APGBaseModel):
 	suspension_state: Optional[str] = Field(None, description="Suspension state (active, suspended)")
 	suspension_reason: Optional[str] = Field(None, description="Reason for suspension")
 	
-	@validator('completion_time')
+	@field_validator('completion_time')
 	def validate_completion_time(cls, v, values):
 		"""Validate completion time consistency with task status."""
 		task_status = values.get('task_status')
@@ -462,7 +464,7 @@ class WBPMTask(APGBaseModel):
 			raise ValueError("Only completed tasks can have completion time")
 		return v
 	
-	@validator('claim_time')
+	@field_validator('claim_time')
 	def validate_claim_time(cls, v, values):
 		"""Validate claim time consistency with assignee."""
 		assignee = values.get('assignee')
@@ -509,7 +511,7 @@ class WBPMTaskComment(APGBaseModel):
 	# Attachments
 	attachments: List[Dict[str, Any]] = Field(default_factory=list, description="File attachments")
 	
-	@validator('thread_level')
+	@field_validator('thread_level')
 	def validate_thread_level(cls, v):
 		"""Validate thread nesting level."""
 		if v < 0 or v > 10:
@@ -544,14 +546,14 @@ class WBPMProcessTemplate(APGBaseModel):
 	template_version: ProcessVersion = Field(default="1.0.0", description="Template version")
 	parent_template_id: Optional[str] = Field(None, description="Parent template ID")
 	
-	@validator('rating_average')
+	@field_validator('rating_average')
 	def validate_rating_average(cls, v):
 		"""Validate rating average range."""
 		if v < 0 or v > 5:
 			raise ValueError("Rating average must be between 0.0 and 5.0")
 		return v
 	
-	@validator('usage_count', 'rating_count')
+	@field_validator('usage_count', 'rating_count')
 	def validate_counts(cls, v):
 		"""Validate count fields are non-negative."""
 		if v < 0:
@@ -580,14 +582,14 @@ class WBPMCollaborationSession(APGBaseModel):
 	# Host Information
 	session_host: str = Field(..., description="Session host user ID")
 	
-	@validator('max_participants')
+	@field_validator('max_participants')
 	def validate_max_participants(cls, v):
 		"""Validate maximum participants range."""
 		if v < 1 or v > 100:
 			raise ValueError("Maximum participants must be between 1 and 100")
 		return v
 	
-	@validator('session_duration_minutes')
+	@field_validator('session_duration_minutes')
 	def validate_session_duration(cls, v):
 		"""Validate session duration."""
 		if v is not None and v <= 0:
@@ -617,7 +619,7 @@ class WBPMCollaborationParticipant(APGBaseModel):
 	# Permissions
 	permissions: List[str] = Field(default_factory=list, description="Participant permissions")
 	
-	@validator('participant_color')
+	@field_validator('participant_color')
 	def validate_participant_color(cls, v):
 		"""Validate hex color format."""
 		if v and not v.startswith('#') or len(v) != 7:
@@ -677,7 +679,7 @@ class WBPMProcessBottleneck(APGBaseModel):
 	resolved_at: Optional[datetime] = Field(None, description="Resolution timestamp")
 	resolved_by: Optional[str] = Field(None, description="User who resolved")
 	
-	@validator('impact_score')
+	@field_validator('impact_score')
 	def validate_impact_score(cls, v):
 		"""Validate impact score range."""
 		if v < 0 or v > 100:
@@ -750,7 +752,7 @@ class WBPMProcessRule(APGBaseModel):
 	last_execution: Optional[datetime] = Field(None, description="Last execution timestamp")
 	average_execution_time_ms: Optional[Decimal] = Field(None, description="Average execution time")
 	
-	@validator('deactivation_date')
+	@field_validator('deactivation_date')
 	def validate_deactivation_date(cls, v, values):
 		"""Validate deactivation date is after activation date."""
 		activation_date = values.get('activation_date')

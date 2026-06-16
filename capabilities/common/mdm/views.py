@@ -12,11 +12,11 @@ from typing import Dict, List, Any, Optional, Union
 from enum import Enum
 import re
 
-from pydantic import BaseModel, Field, ConfigDict, validator, root_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from pydantic import EmailStr, UUID4
 from uuid_extensions import uuid7str
 
-from .models import EntityType, EntityStatus, DataQualityStatus, MatchConfidence
+from.models import EntityType, EntityStatus, DataQualityStatus, MatchConfidence
 
 
 # Base Response Models
@@ -49,14 +49,14 @@ class PaginationMeta(BaseModel):
     total_pages: Optional[int] = None
     current_page: Optional[int] = None
     
-    @validator('total_pages', always=True)
+    @field_validator('total_pages')
     def calculate_total_pages(cls, v, values):
         if 'limit' in values and 'total_count' in values:
             import math
             return math.ceil(values['total_count'] / values['limit'])
         return v
     
-    @validator('current_page', always=True)
+    @field_validator('current_page')
     def calculate_current_page(cls, v, values):
         if 'limit' in values and 'offset' in values:
             import math
@@ -81,7 +81,7 @@ class EntitySummaryView(BaseModel):
     data_classification: str
     created_at: datetime
     updated_at: datetime
-    tags: List[str] = Field(default_factory=list, max_items=10)
+    tags: List[str] = Field(default_factory=list, max_length=10)
 
 
 class EntityDetailView(BaseModel):
@@ -156,7 +156,7 @@ class QualityIssueView(BaseModel):
     recommendation: Optional[str] = None
     auto_fixable: bool = False
     
-    @validator('severity')
+    @field_validator('severity')
     def validate_severity(cls, v):
         allowed = ['low', 'medium', 'high', 'critical']
         if v not in allowed:
@@ -229,7 +229,7 @@ class DuplicateCandidateView(BaseModel):
     match_explanation: Optional[str] = None
     last_updated: Optional[datetime] = None
     
-    @validator('recommended_action')
+    @field_validator('recommended_action')
     def validate_action(cls, v):
         allowed = ['merge', 'review', 'ignore', 'investigate']
         if v not in allowed:
@@ -318,7 +318,7 @@ class CrossReferenceView(BaseModel):
     is_active: bool = True
     verification_method: Optional[str] = None
     
-    @validator('reference_quality')
+    @field_validator('reference_quality')
     def validate_quality(cls, v):
         allowed = ['low', 'medium', 'high', 'excellent']
         if v not in allowed:

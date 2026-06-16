@@ -14,10 +14,10 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic import ConfigDict
 from pydantic import EmailStr, PositiveFloat, PositiveInt
-from pydantic.functional_validators import AfterValidator
+from pydantic, model_validator.functional_validators import AfterValidator
 from typing_extensions import Annotated
 
 from uuid_extensions import uuid7str
@@ -221,7 +221,8 @@ class APGBaseModel(BaseModel):
 		"""Log model validation actions."""
 		return f"Model {self.__class__.__name__} {action}: {self.id}"
 
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_apg_integration(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate APG integration requirements."""
 		assert values.get('tenant_id'), "tenant_id required for APG multi-tenancy"
@@ -318,7 +319,7 @@ class BFBudgetLine(BaseModel):
 	business_justification: Optional[str] = Field(None)
 	assumptions: Optional[str] = Field(None)
 
-	@validator('period_end')
+	@field_validator('period_end')
 	def validate_period_end(cls, v: date, values: Dict[str, Any]) -> date:
 		"""Validate period end is after period start."""
 		period_start = values.get('period_start')
@@ -326,7 +327,8 @@ class BFBudgetLine(BaseModel):
 			raise ValueError(_log_validation_error("period_end", v, "must be after period start"))
 		return v
 
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_monthly_quarterly_totals(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate monthly amounts sum to budgeted amount."""
 		budgeted = values.get('budgeted_amount', Decimal('0.00'))
@@ -420,14 +422,14 @@ class BFBudget(APGBaseModel):
 	workflow_instance_id: Optional[str] = Field(None, description="Workflow engine instance")
 	ai_job_id: Optional[str] = Field(None, description="AI orchestration job")
 
-	@validator('budget_code')
+	@field_validator('budget_code')
 	def validate_budget_code(cls, v: Optional[str]) -> Optional[str]:
 		"""Validate budget code format."""
 		if v and not v.replace('-', '').replace('_', '').isalnum():
 			raise ValueError(_log_validation_error("budget_code", v, "must be alphanumeric"))
 		return v.upper() if v else None
 
-	@validator('budget_period_end')
+	@field_validator('budget_period_end')
 	def validate_budget_period_end(cls, v: date, values: Dict[str, Any]) -> date:
 		"""Validate budget period end is after start."""
 		budget_period_start = values.get('budget_period_start')
@@ -435,7 +437,8 @@ class BFBudget(APGBaseModel):
 			raise ValueError(_log_validation_error("budget_period_end", v, "must be after budget period start"))
 		return v
 
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_budget_consistency(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate budget data consistency."""
 		# Validate template usage
@@ -517,7 +520,7 @@ class BFForecastDataPoint(BaseModel):
 	assumptions: Optional[str] = Field(None)
 	risk_factors: Optional[str] = Field(None)
 
-	@validator('confidence_upper')
+	@field_validator('confidence_upper')
 	def validate_confidence_interval(cls, v: Optional[Decimal], values: Dict[str, Any]) -> Optional[Decimal]:
 		"""Validate confidence interval consistency."""
 		if v is not None:
@@ -610,14 +613,15 @@ class BFForecast(APGBaseModel):
 	review_notes: Optional[str] = Field(None)
 	approved_for_planning: bool = Field(default=False)
 
-	@validator('forecast_code')
+	@field_validator('forecast_code')
 	def validate_forecast_code(cls, v: Optional[str]) -> Optional[str]:
 		"""Validate forecast code format."""
 		if v and not v.replace('-', '').replace('_', '').isalnum():
 			raise ValueError(_log_validation_error("forecast_code", v, "must be alphanumeric"))
 		return v.upper() if v else None
 
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_forecast_periods(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate forecast period relationships."""
 		base_start = values.get('base_period_start')
@@ -729,7 +733,7 @@ class BFVarianceAnalysis(APGBaseModel):
 	notification_sent: bool = Field(default=False)
 	workflow_triggered: bool = Field(default=False)
 
-	@validator('analysis_period_end')
+	@field_validator('analysis_period_end')
 	def validate_analysis_period_end(cls, v: date, values: Dict[str, Any]) -> date:
 		"""Validate analysis period end is after start."""
 		analysis_period_start = values.get('analysis_period_start')
@@ -737,7 +741,8 @@ class BFVarianceAnalysis(APGBaseModel):
 			raise ValueError(_log_validation_error("analysis_period_end", v, "must be after analysis period start"))
 		return v
 
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_variance_calculations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate variance calculation consistency."""
 		baseline = values.get('baseline_amount', Decimal('0'))
@@ -849,7 +854,7 @@ class BFScenario(APGBaseModel):
 	ai_modeling_job_id: Optional[str] = Field(None)
 	document_folder_id: Optional[str] = Field(None)
 
-	@validator('scenario_end_date')
+	@field_validator('scenario_end_date')
 	def validate_scenario_end_date(cls, v: date, values: Dict[str, Any]) -> date:
 		"""Validate scenario end date is after start date."""
 		scenario_start_date = values.get('scenario_start_date')
@@ -857,7 +862,8 @@ class BFScenario(APGBaseModel):
 			raise ValueError(_log_validation_error("scenario_end_date", v, "must be after scenario start date"))
 		return v
 
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_scenario_consistency(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate scenario data consistency."""
 		# Validate probability weights for multiple scenarios

@@ -20,9 +20,9 @@ from enum import Enum
 from uuid_extensions import uuid7str
 from urllib.parse import urlparse, parse_qs
 
-from pydantic import BaseModel, Field, ValidationError, validator, HttpUrl
+from pydantic import BaseModel, Field, ValidationError, field_validator, HttpUrl
 
-from .models import CRMContact, CRMLead, ContactType, LeadSource, LeadStatus
+from.models import CRMContact, CRMLead, ContactType, LeadSource, LeadStatus
 from .database import DatabaseManager
 from .lead_scoring import LeadScoringManager
 
@@ -154,7 +154,7 @@ class WebForm(BaseModel):
 	updated_by: str
 	version: int = 1
 	
-	@validator('fields')
+	@field_validator('fields')
 	def validate_fields(cls, v):
 		if not v:
 			raise ValueError("Form must have at least one field")

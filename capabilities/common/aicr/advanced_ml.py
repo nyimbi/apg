@@ -19,10 +19,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Tuple, Callable
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field, ConfigDict, validator
-import logging
-
-# Configure logging
+from pydantic import BaseModel, Field, ConfigDict
+import logging# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

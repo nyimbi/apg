@@ -26,7 +26,7 @@ except ModuleNotFoundError:
 	from .standalone_support import NoOpAiohttpModule as aiohttp, NoOpClientTimeout as ClientTimeout
 import jinja2
 
-from pydantic import BaseModel, Field, validator, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 from uuid_extensions import uuid7str
 
 try:

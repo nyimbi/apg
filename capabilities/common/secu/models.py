@@ -14,9 +14,7 @@ from enum import Enum
 import hashlib
 import json
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field, ConfigDict, AfterValidator, validator
-
-# Import enums from __init__.py
+from pydantic import BaseModel, Field, ConfigDict, AfterValidator# Import enums from __init__.py
 try:
 	from . import (
 		SecurityLevel, RiskLevel, ThreatType, ComplianceFramework,

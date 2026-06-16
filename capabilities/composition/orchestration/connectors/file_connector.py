@@ -30,9 +30,9 @@ from asyncssh.sftp import SFTPError
 import aiobotocore.session
 from botocore.exceptions import ClientError
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
-from .base_connector import BaseConnector, ConnectorConfiguration
+from.base_connector import BaseConnector, ConnectorConfiguration
 
 logger = logging.getLogger(__name__)
 

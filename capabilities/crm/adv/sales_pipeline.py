@@ -18,9 +18,9 @@ from enum import Enum
 from decimal import Decimal
 from uuid_extensions import uuid7str
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
-from .models import CRMOpportunity, OpportunityStage, Priority
+from.models import CRMOpportunity, OpportunityStage, Priority
 from .database import DatabaseManager
 
 

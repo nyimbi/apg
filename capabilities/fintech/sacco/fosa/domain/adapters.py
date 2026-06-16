@@ -1,6 +1,7 @@
 """Domain adapters for SACCO FOSA — event emission, M-PESA, card issuance."""
 from __future__ import annotations
 
+import base64
 import logging
 import os
 
@@ -58,8 +59,41 @@ class MpesaAdapter:
 				"ResponseCode": "0",
 				"ResponseDescription": "Accept the service request successfully.",
 			}
-		# Production: call Safaricom Daraja B2C endpoint
-		raise NotImplementedError("Wire up Safaricom Daraja B2C integration")
+		import httpx
+		base_url = (
+			"https://sandbox.safaricom.co.ke"
+			if self.env == "sandbox"
+			else "https://api.safaricom.co.ke"
+		)
+		creds = base64.b64encode(
+			f"{self.consumer_key}:{self.consumer_secret}".encode()
+		).decode()
+		async with httpx.AsyncClient(timeout=30) as client:
+			token_resp = await client.get(
+				f"{base_url}/oauth/v1/generate",
+				params={"grant_type": "client_credentials"},
+				headers={"Authorization": f"Basic {creds}"},
+			)
+			token_resp.raise_for_status()
+			access_token = token_resp.json()["access_token"]
+			b2c_resp = await client.post(
+				f"{base_url}/mpesa/b2c/v1/paymentrequest",
+				headers={"Authorization": f"Bearer {access_token}"},
+				json={
+					"InitiatorName": os.environ.get("MPESA_INITIATOR_NAME", "testapi"),
+					"SecurityCredential": os.environ.get("MPESA_SECURITY_CREDENTIAL", ""),
+					"CommandID": "BusinessPayment",
+					"Amount": amount,
+					"PartyA": self.shortcode,
+					"PartyB": phone_number,
+					"Remarks": remarks,
+					"QueueTimeOutURL": os.environ.get("MPESA_TIMEOUT_URL", ""),
+					"ResultURL": os.environ.get("MPESA_RESULT_URL", ""),
+					"Occassion": reference,
+				},
+			)
+			b2c_resp.raise_for_status()
+			return b2c_resp.json()
 
 	async def validate_c2b(self, mpesa_reference: str, amount: str, phone_number: str) -> bool:
 		"""Validate incoming C2B payment (called by Daraja validation URL)."""
@@ -101,7 +135,23 @@ class CardIssuanceAdapter:
 				"status": "submitted",
 				"estimated_delivery_days": 7,
 			}
-		raise NotImplementedError("Wire up card bureau API")
+		import httpx
+		async with httpx.AsyncClient(timeout=30) as client:
+			resp = await client.post(
+				f"{self.bureau_url}/api/v1/cards/issue",
+				headers={
+					"Authorization": f"Bearer {self.api_key}",
+					"Content-Type": "application/json",
+				},
+				json={
+					"card_type": card_type,
+					"card_name": card_name,
+					"account_number": account_number,
+					"member_id": member_id,
+				},
+			)
+			resp.raise_for_status()
+			return resp.json()
 
 	async def get_card_status(self, bureau_reference: str) -> dict:
 		"""Check card production status."""

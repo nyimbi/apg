@@ -21,7 +21,7 @@ from flask_appbuilder.fieldwidgets import BS3TextFieldWidget, BS3TextAreaFieldWi
 from wtforms import StringField, TextAreaField, SelectField, IntegerField, FloatField, BooleanField, HiddenField
 from wtforms.validators import DataRequired, Optional as OptionalValidator, NumberRange
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 import plotly.graph_objs as go
 import plotly.utils
 

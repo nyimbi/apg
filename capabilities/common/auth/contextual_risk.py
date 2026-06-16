@@ -19,11 +19,11 @@ import ipaddress
 import re
 from pathlib import Path
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from dataclasses import dataclass
 import numpy as np
 
-from .behavioral_auth import BehavioralRiskLevel, AuthScore
+from.behavioral_auth import BehavioralRiskLevel, AuthScore
 
 class RiskFactor(str, Enum):
 	"""Types of risk factors considered in assessment"""

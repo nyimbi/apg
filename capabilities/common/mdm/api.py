@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from starlette.status import HTTP_429_TOO_MANY_REQUESTS
 import strawberry
 from strawberry.fastapi import GraphQLRouter
@@ -186,7 +186,7 @@ class BulkOperationRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', validate_by_name=True)
     
     operation_type: str = Field(..., regex="^(create|update|delete)$")
-    entities: List[Dict[str, Any]] = Field(..., min_items=1, max_items=1000)
+    entities: List[Dict[str, Any]] = Field(..., min_length=1, max_length=1000)
     batch_options: Optional[Dict[str, Any]] = None
 
 
@@ -194,7 +194,7 @@ class QualityAssessmentRequest(BaseModel):
     """Quality assessment API request"""
     model_config = ConfigDict(extra='forbid', validate_by_name=True)
     
-    entity_ids: List[str] = Field(..., min_items=1, max_items=100)
+    entity_ids: List[str] = Field(..., min_length=1, max_length=100)
     include_recommendations: bool = Field(True)
     include_issues: bool = Field(True)
 

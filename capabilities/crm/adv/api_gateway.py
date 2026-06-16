@@ -27,7 +27,7 @@ except ModuleNotFoundError:
 from fastapi import FastAPI, Request, Response, HTTPException, Depends
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from uuid_extensions import uuid7str
 
 try:

@@ -17,7 +17,7 @@ import json
 from datetime import datetime, timezone
 from functools import wraps
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart

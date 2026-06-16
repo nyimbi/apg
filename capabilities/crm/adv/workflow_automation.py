@@ -17,9 +17,9 @@ from enum import Enum
 from uuid_extensions import uuid7str
 import json
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
-from .models import CRMContact, CRMLead, CRMOpportunity, Priority
+from.models import CRMContact, CRMLead, CRMOpportunity, Priority
 from .database import DatabaseManager
 
 

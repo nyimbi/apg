@@ -2305,10 +2305,10 @@ class GNewsCompatibilityWrapper:
                     self.summary = content_data.get('description', '')
 
                 def download(self):
-                    pass  # Already downloaded
+                    self._is_downloaded = True  # Content pre-loaded in __init__
 
                 def parse(self):
-                    pass  # Already parsed
+                    self._is_parsed = True  # Content pre-loaded in __init__
 
             return Article(scraped_articles[0])
 

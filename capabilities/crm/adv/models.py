@@ -15,7 +15,7 @@ from enum import Enum
 from typing import Dict, List, Any, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, EmailStr, validator, root_validator
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from pydantic.config import ConfigDict
 from uuid_extensions import uuid7str
 
@@ -346,7 +346,7 @@ class CRMOpportunity(BaseAuditModel):
 	notes: Optional[str] = Field(None, description="Opportunity notes")
 	tags: List[str] = Field(default_factory=list, description="Opportunity tags")
 	
-	@validator('expected_revenue', always=True)
+	@field_validator('expected_revenue')
 	def calculate_expected_revenue(cls, v, values):
 		"""Calculate expected revenue if not provided"""
 		if v is None and 'amount' in values and 'probability' in values:

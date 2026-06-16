@@ -20,7 +20,7 @@ from sqlalchemy import (
 	Index, func
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import expression
 from uuid_extensions import uuid7str

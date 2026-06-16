@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 import psutil
 import aioredis
 import logging
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from pydantic.config import ConfigDict
 
 # APG Framework imports

@@ -16,12 +16,12 @@ from datetime import datetime
 import logging
 from enum import Enum
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from flask import Flask, Blueprint
 from flask_appbuilder import AppBuilder
 from uuid_extensions import uuid7str
 
-from .registry import CapabilityRegistry, CapabilityMetadata, SubCapabilityMetadata, get_registry
+from.registry import CapabilityRegistry, CapabilityMetadata, SubCapabilityMetadata, get_registry
 
 logger = logging.getLogger(__name__)
 

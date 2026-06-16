@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Any, Union
 from enum import Enum
 from pathlib import Path
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 try:
 	from pydantic_settings import BaseSettings
 except ImportError:  # pragma: no cover - dependency-light fallback
@@ -145,7 +145,7 @@ class GatewayConfig(BaseModel):
 	health_check_enabled: bool = True
 	tracing_enabled: bool = False
 
-	@validator('workers')
+	@field_validator('workers')
 	def validate_workers(cls, v):
 		if v < 1:
 			raise ValueError('Workers must be at least 1')
@@ -184,7 +184,7 @@ class SecurityConfig(BaseModel):
 	hsts_max_age: int = 31536000
 	content_security_policy: str = "default-src 'self'"
 
-	@validator('jwt_secret_key')
+	@field_validator('jwt_secret_key')
 	def validate_jwt_secret(cls, v):
 		if len(v) < 32:
 			raise ValueError('JWT secret key must be at least 32 characters')

@@ -17,10 +17,10 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 import yaml
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from pydantic_settings import BaseSettings
 
-from apg.framework.base_service import APGBaseService
+from apg, field_validator.framework.base_service import APGBaseService
 from apg.framework.config import APGConfig
 from apg.framework.security import APGSecurity
 
@@ -235,21 +235,21 @@ class WorkflowOrchestrationConfig(BaseSettings):
 	integration: IntegrationConfig = field(default_factory=IntegrationConfig)
 	workflow: WorkflowConfig = field(default_factory=WorkflowConfig)
 	
-	@validator('environment')
+	@field_validator('environment')
 	def validate_environment(cls, v):
 		"""Validate environment setting."""
 		if isinstance(v, str):
 			return Environment(v.lower())
 		return v
 	
-	@validator('database')
+	@field_validator('database')
 	def validate_database_config(cls, v):
 		"""Validate database configuration."""
 		if isinstance(v, dict):
 			return DatabaseConfig(**v)
 		return v
 	
-	@validator('redis')
+	@field_validator('redis')
 	def validate_redis_config(cls, v):
 		"""Validate Redis configuration."""
 		if isinstance(v, dict):

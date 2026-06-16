@@ -27,9 +27,9 @@ import zipfile
 from xml.sax.saxutils import escape as xml_escape
 
 import stripe
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
-logger = logging.getLogger(__name__)
+logger= logging.getLogger(__name__)
 
 
 class ReportPeriod(str, Enum):

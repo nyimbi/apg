@@ -22,10 +22,10 @@ from dataclasses import dataclass
 import difflib
 
 import asyncpg
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic import ConfigDict
 
-from .models import (
+from, model_validator.models import (
 	APGBaseModel, BFBudgetStatus, BFApprovalStatus,
 	PositiveAmount, CurrencyCode, NonEmptyString
 )
@@ -134,7 +134,7 @@ class BudgetVersion(APGBaseModel):
 	compression_ratio: Optional[float] = Field(None, ge=0.0, le=1.0)
 	storage_location: Optional[str] = Field(None)
 
-	@validator('data_hash')
+	@field_validator('data_hash')
 	def validate_data_hash(cls, v: str, values: Dict[str, Any]) -> str:
 		"""Validate and ensure data hash is computed correctly."""
 		budget_data = values.get('budget_data_snapshot', {})
@@ -150,7 +150,8 @@ class BudgetVersion(APGBaseModel):
 		
 		return v
 
-	@root_validator
+	@model_validator(mode='before')
+ @classmethod
 	def validate_version_consistency(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate version data consistency."""
 		is_current = values.get('is_current', True)

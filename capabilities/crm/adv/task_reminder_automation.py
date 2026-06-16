@@ -18,9 +18,9 @@ from decimal import Decimal
 from uuid_extensions import uuid7str
 import json
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
-from .database import DatabaseManager
+from.database import DatabaseManager
 
 
 logger = logging.getLogger(__name__)

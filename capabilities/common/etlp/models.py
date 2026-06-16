@@ -12,7 +12,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 from uuid_extensions import uuid7str
-from pydantic import BaseModel, Field, ConfigDict, validator, AfterValidator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, AfterValidator
 from dataclasses import dataclass
 
 
@@ -162,7 +162,7 @@ class Pipeline(BaseModel):
 	deleted_at: Optional[datetime] = Field(None, description="Deletion timestamp")
 	deleted_by: Optional[str] = Field(None, description="User who deleted")
 	
-	@validator('name')
+	@field_validator('name')
 	def validate_name(cls, v: str) -> str:
 		"""Validate pipeline name format"""
 		if not v or not v.strip():
@@ -171,14 +171,14 @@ class Pipeline(BaseModel):
 			raise ValueError("Pipeline name too short")
 		return v.strip()
 	
-	@validator('schedule_cron')
+	@field_validator('schedule_cron')
 	def validate_cron(cls, v: Optional[str]) -> Optional[str]:
 		"""Validate cron expression format"""
 		if v and len(v.split()) != 5:
 			raise ValueError("Invalid cron expression format")
 		return v
 	
-	@validator('version')
+	@field_validator('version')
 	def validate_version(cls, v: str) -> str:
 		"""Validate semantic version format"""
 		parts = v.split('.')

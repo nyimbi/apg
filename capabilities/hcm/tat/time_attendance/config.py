@@ -16,7 +16,7 @@ from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass, field
 from enum import Enum
 from decimal import Decimal
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class EnvironmentType(str, Enum):

@@ -40,9 +40,9 @@ except ModuleNotFoundError:
 	class html2text:
 		HTML2Text = _SimpleHTMLToText
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
-from .database import DatabaseManager
+from.database import DatabaseManager
 
 
 logger = logging.getLogger(__name__)

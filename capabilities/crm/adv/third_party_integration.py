@@ -30,7 +30,7 @@ except ModuleNotFoundError:
 	)
 import jwt
 
-from pydantic import BaseModel, Field, validator, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 from uuid_extensions import uuid7str
 
 try:

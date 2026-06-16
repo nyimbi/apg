@@ -10,7 +10,7 @@ from typing import Optional, List
 from uuid_extensions import uuid7str
 from sqlalchemy import Column, String, Integer, DateTime, Text, Boolean, Numeric, Date, JSON, ForeignKey, Index, CheckConstraint
 from sqlalchemy.orm import relationship, Mapped
-from pydantic import BaseModel, Field, validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from flask_appbuilder import Model
 
 class SCDPForecast(Model):
@@ -272,7 +272,7 @@ class ForecastCreate(BaseModel):
 	period_end: date = Field(...)
 	period_type: str = Field(default='daily')
 	
-	@validator('period_end')
+	@field_validator('period_end')
 	def validate_period_end(cls, v, values):
 		if 'period_start' in values and v < values['period_start']:
 			raise ValueError('period_end must be after period_start')

@@ -17,9 +17,9 @@ from flask_appbuilder.actions import action
 from flask_appbuilder.charts.views import DirectByChartView
 from flask_appbuilder.widgets import ListWidget, ShowWidget
 from flask_appbuilder.security.decorators import protect
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
-from models import (
+from models import(
 	ImportExportJob, JobExecution, JobStatus, JobType, ProcessingMetrics,
 	DataQualityReport, Workflow, SchemaMapping, ValidationRule,
 	SourceConfig, TargetConfig, DataFormat, SourceType
@@ -104,7 +104,7 @@ class WorkflowCreateRequest(BaseModel):
 class DataQualityRequest(BaseModel):
 	"""Request model for data quality validation"""
 	job_id: str
-	sample_data: list[dict[str, Any]] = Field(min_items=1, max_items=10000)
+	sample_data: list[dict[str, Any]] = Field(min_length=1, max_length=10000)
 	include_anomaly_detection: bool = True
 	quality_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
 

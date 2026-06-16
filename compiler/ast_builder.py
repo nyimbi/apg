@@ -256,7 +256,7 @@ class PropertyDeclaration(ASTNode):
 	name: str
 	type_annotation: 'TypeAnnotation'
 	default_value: Optional['Expression'] = None
-	is_required: bool = True
+	is_required: bool = False
 	validation_rules: List['ValidationRule'] = field(default_factory=list)
 
 

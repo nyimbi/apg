@@ -20,11 +20,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB, INET
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from pydantic import Json
-from uuid_extensions import uuid7str
-
-# SQLAlchemy Base
+from uuid_extensions import uuid7str# SQLAlchemy Base
 Base = declarative_base()
 
 # =============================================================================
@@ -1053,7 +1051,7 @@ class RouteConfig(BaseModel):
 	match_value: str = Field(..., min_length=1, max_length=1000)
 	match_headers: Dict[str, str] = Field(default_factory=dict)
 	match_query: Dict[str, str] = Field(default_factory=dict)
-	destination_services: List[Dict[str, Any]] = Field(..., min_items=1)
+	destination_services: List[Dict[str, Any]] = Field(..., min_length=1)
 	timeout_ms: int = Field(30000, gt=0)
 	retry_attempts: int = Field(3, ge=0)
 	priority: int = Field(1000, gt=0)
@@ -1079,7 +1077,7 @@ class PolicyConfig(BaseModel):
 	
 	policy_name: str = Field(..., min_length=1, max_length=255)
 	policy_type: PolicyType
-	configuration: Dict[str, Any] = Field(..., min_items=1)
+	configuration: Dict[str, Any] = Field(..., min_length=1)
 	enabled: bool = True
 	priority: int = Field(1000, gt=0)
 	description: Optional[str] = None
@@ -1111,7 +1109,7 @@ class CollaborativeSessionRequest(BaseModel):
 	
 	session_name: str = Field(..., min_length=1, max_length=255)
 	problem_description: str = Field(..., min_length=10, max_length=5000)
-	affected_services: List[str] = Field(..., min_items=1)
+	affected_services: List[str] = Field(..., min_length=1)
 	session_type: str = Field("troubleshooting", pattern=r'^(troubleshooting|optimization|planning)$')
 	invite_participants: List[str] = Field(default_factory=list)
 	ai_assistance_level: str = Field("standard", pattern=r'^(minimal|standard|advanced)$')

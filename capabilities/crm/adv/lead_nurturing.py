@@ -18,9 +18,9 @@ from decimal import Decimal
 from uuid_extensions import uuid7str
 import json
 
-from pydantic import BaseModel, Field, validator, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
-from .database import DatabaseManager
+from.database import DatabaseManager
 
 
 logger = logging.getLogger(__name__)
@@ -156,7 +156,7 @@ class NurturingWorkflow(BaseModel):
 	exit_criteria: List[NurturingCondition] = Field(default_factory=list, description="Exit criteria")
 	
 	# Actions and flow
-	actions: List[NurturingAction] = Field(..., min_items=1, description="Workflow actions")
+	actions: List[NurturingAction] = Field(..., min_length=1, description="Workflow actions")
 	start_action_id: str = Field(..., description="First action to execute")
 	
 	# Settings

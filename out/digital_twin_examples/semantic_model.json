@@ -1,0 +1,870 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 6,
+    "name": "main",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "main.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "main.apg",
+      "fixes": [],
+      "message": "Digital twin 'ManufacturingLine' should have state-related properties",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "main.apg",
+      "fixes": [],
+      "message": "Digital twin 'SmartFactoryDigitalTwin' should have state-related properties",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 6,
+      "kind": "deployment",
+      "nodes": 7
+    },
+    "er": {
+      "edges": 22,
+      "kind": "er",
+      "nodes": 26
+    },
+    "handler": {
+      "edges": 6,
+      "kind": "handler",
+      "nodes": 7
+    },
+    "lookup": {
+      "edges": 6,
+      "kind": "lookup",
+      "nodes": 7
+    },
+    "package": {
+      "edges": 6,
+      "kind": "package",
+      "nodes": 7
+    },
+    "security": {
+      "edges": 6,
+      "kind": "security",
+      "nodes": 7
+    },
+    "workflow": {
+      "edges": 6,
+      "kind": "workflow",
+      "nodes": 7
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "main.apg"
+  ],
+  "symbols": {
+    "digital_twin.ManufacturingLine": {
+      "file": "main.apg",
+      "id": "digital_twin.ManufacturingLine",
+      "kind": "digital_twin",
+      "name": "ManufacturingLine",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "digital_twin.SmartFactoryDigitalTwin": {
+      "file": "main.apg",
+      "id": "digital_twin.SmartFactoryDigitalTwin",
+      "kind": "digital_twin",
+      "name": "SmartFactoryDigitalTwin",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "entity.DigitalTwinInfrastructure": {
+      "file": "main.apg",
+      "id": "entity.DigitalTwinInfrastructure",
+      "kind": "entity",
+      "name": "DigitalTwinInfrastructure",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.MaintenancePredictor.confidence_intervals": {
+      "file": "main.apg",
+      "id": "field.MaintenancePredictor.confidence_intervals",
+      "kind": "field",
+      "name": "MaintenancePredictor.confidence_intervals",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.MaintenancePredictor.cost_function": {
+      "file": "main.apg",
+      "id": "field.MaintenancePredictor.cost_function",
+      "kind": "field",
+      "name": "MaintenancePredictor.cost_function",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.MaintenancePredictor.current_clamps": {
+      "file": "main.apg",
+      "id": "field.MaintenancePredictor.current_clamps",
+      "kind": "field",
+      "name": "MaintenancePredictor.current_clamps",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.MaintenancePredictor.model": {
+      "file": "main.apg",
+      "id": "field.MaintenancePredictor.model",
+      "kind": "field",
+      "name": "MaintenancePredictor.model",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.MaintenancePredictor.prediction_horizon": {
+      "file": "main.apg",
+      "id": "field.MaintenancePredictor.prediction_horizon",
+      "kind": "field",
+      "name": "MaintenancePredictor.prediction_horizon",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.MaintenancePredictor.strategy": {
+      "file": "main.apg",
+      "id": "field.MaintenancePredictor.strategy",
+      "kind": "field",
+      "name": "MaintenancePredictor.strategy",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.MaintenancePredictor.uncertainty_quantification": {
+      "file": "main.apg",
+      "id": "field.MaintenancePredictor.uncertainty_quantification",
+      "kind": "field",
+      "name": "MaintenancePredictor.uncertainty_quantification",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionAnomalyDetector.autoencoder": {
+      "file": "main.apg",
+      "id": "field.ProductionAnomalyDetector.autoencoder",
+      "kind": "field",
+      "name": "ProductionAnomalyDetector.autoencoder",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionAnomalyDetector.buffer_size": {
+      "file": "main.apg",
+      "id": "field.ProductionAnomalyDetector.buffer_size",
+      "kind": "field",
+      "name": "ProductionAnomalyDetector.buffer_size",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionAnomalyDetector.confidence_weighting": {
+      "file": "main.apg",
+      "id": "field.ProductionAnomalyDetector.confidence_weighting",
+      "kind": "field",
+      "name": "ProductionAnomalyDetector.confidence_weighting",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionAnomalyDetector.critical": {
+      "file": "main.apg",
+      "id": "field.ProductionAnomalyDetector.critical",
+      "kind": "field",
+      "name": "ProductionAnomalyDetector.critical",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionAnomalyDetector.high": {
+      "file": "main.apg",
+      "id": "field.ProductionAnomalyDetector.high",
+      "kind": "field",
+      "name": "ProductionAnomalyDetector.high",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionAnomalyDetector.medium": {
+      "file": "main.apg",
+      "id": "field.ProductionAnomalyDetector.medium",
+      "kind": "field",
+      "name": "ProductionAnomalyDetector.medium",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionAnomalyDetector.processing_latency": {
+      "file": "main.apg",
+      "id": "field.ProductionAnomalyDetector.processing_latency",
+      "kind": "field",
+      "name": "ProductionAnomalyDetector.processing_latency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionAnomalyDetector.slide_interval": {
+      "file": "main.apg",
+      "id": "field.ProductionAnomalyDetector.slide_interval",
+      "kind": "field",
+      "name": "ProductionAnomalyDetector.slide_interval",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionAnomalyDetector.voting_strategy": {
+      "file": "main.apg",
+      "id": "field.ProductionAnomalyDetector.voting_strategy",
+      "kind": "field",
+      "name": "ProductionAnomalyDetector.voting_strategy",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ProductionAnomalyDetector.window_size": {
+      "file": "main.apg",
+      "id": "field.ProductionAnomalyDetector.window_size",
+      "kind": "field",
+      "name": "ProductionAnomalyDetector.window_size",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.QualityInspectionSystem.color_tolerance": {
+      "file": "main.apg",
+      "id": "field.QualityInspectionSystem.color_tolerance",
+      "kind": "field",
+      "name": "QualityInspectionSystem.color_tolerance",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.QualityInspectionSystem.defect_classification_accuracy": {
+      "file": "main.apg",
+      "id": "field.QualityInspectionSystem.defect_classification_accuracy",
+      "kind": "field",
+      "name": "QualityInspectionSystem.defect_classification_accuracy",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.QualityInspectionSystem.dimensional_accuracy": {
+      "file": "main.apg",
+      "id": "field.QualityInspectionSystem.dimensional_accuracy",
+      "kind": "field",
+      "name": "QualityInspectionSystem.dimensional_accuracy",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.QualityInspectionSystem.false_positive_rate": {
+      "file": "main.apg",
+      "id": "field.QualityInspectionSystem.false_positive_rate",
+      "kind": "field",
+      "name": "QualityInspectionSystem.false_positive_rate",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.QualityInspectionSystem.surface_roughness": {
+      "file": "main.apg",
+      "id": "field.QualityInspectionSystem.surface_roughness",
+      "kind": "field",
+      "name": "QualityInspectionSystem.surface_roughness",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.main": {
+      "file": "main.apg",
+      "id": "module.main",
+      "kind": "module",
+      "name": "main",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.MaintenancePredictor": {
+      "file": "main.apg",
+      "id": "table.MaintenancePredictor",
+      "kind": "table",
+      "name": "MaintenancePredictor",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.ProductionAnomalyDetector": {
+      "file": "main.apg",
+      "id": "table.ProductionAnomalyDetector",
+      "kind": "table",
+      "name": "ProductionAnomalyDetector",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.QualityInspectionSystem": {
+      "file": "main.apg",
+      "id": "table.QualityInspectionSystem",
+      "kind": "table",
+      "name": "QualityInspectionSystem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "MaintenancePredictor": {
+      "fields": {
+        "confidence_intervals": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "[80%, 95%]"
+          },
+          "required": true,
+          "type": "[80%, 95%]"
+        },
+        "cost_function": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "minimize(maintenance_cost + downtime_cost + failure_risk)"
+          },
+          "required": true,
+          "type": "minimize(maintenance_cost + downtime_cost + failure_risk)"
+        },
+        "current_clamps": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "string"
+          },
+          "required": true,
+          "type": "string"
+        },
+        "model": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "particle_filter + kalman_filter"
+          },
+          "required": true,
+          "type": "particle_filter + kalman_filter"
+        },
+        "prediction_horizon": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "[7_days, 30_days, 90_days]"
+          },
+          "required": true,
+          "type": "[7_days, 30_days, 90_days]"
+        },
+        "strategy": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "condition_based + predictive"
+          },
+          "required": true,
+          "type": "condition_based + predictive"
+        },
+        "uncertainty_quantification": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {
+        "confidence_intervals.id": {
+          "chain": [
+            "MaintenancePredictor.confidence_intervals",
+            "[80%, 95%].id"
+          ],
+          "valid": true
+        },
+        "cost_function.id": {
+          "chain": [
+            "MaintenancePredictor.cost_function",
+            "minimize(maintenance_cost + downtime_cost + failure_risk).id"
+          ],
+          "valid": true
+        },
+        "current_clamps.id": {
+          "chain": [
+            "MaintenancePredictor.current_clamps",
+            "string.id"
+          ],
+          "valid": true
+        },
+        "model.id": {
+          "chain": [
+            "MaintenancePredictor.model",
+            "particle_filter + kalman_filter.id"
+          ],
+          "valid": true
+        },
+        "prediction_horizon.id": {
+          "chain": [
+            "MaintenancePredictor.prediction_horizon",
+            "[7_days, 30_days, 90_days].id"
+          ],
+          "valid": true
+        },
+        "strategy.id": {
+          "chain": [
+            "MaintenancePredictor.strategy",
+            "condition_based + predictive.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "MaintenancePredictor"
+    },
+    "ProductionAnomalyDetector": {
+      "fields": {
+        "autoencoder": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "buffer_size": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "confidence_weighting": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "[0.2, 0.3, 0.25, 0.25]"
+          },
+          "required": true,
+          "type": "[0.2, 0.3, 0.25, 0.25]"
+        },
+        "critical": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "string"
+          },
+          "required": true,
+          "type": "string"
+        },
+        "high": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "string"
+          },
+          "required": true,
+          "type": "string"
+        },
+        "medium": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "string"
+          },
+          "required": true,
+          "type": "string"
+        },
+        "processing_latency": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "slide_interval": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "voting_strategy": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "string"
+          },
+          "required": true,
+          "type": "string"
+        },
+        "window_size": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {
+        "confidence_weighting.id": {
+          "chain": [
+            "ProductionAnomalyDetector.confidence_weighting",
+            "[0.2, 0.3, 0.25, 0.25].id"
+          ],
+          "valid": true
+        },
+        "critical.id": {
+          "chain": [
+            "ProductionAnomalyDetector.critical",
+            "string.id"
+          ],
+          "valid": true
+        },
+        "high.id": {
+          "chain": [
+            "ProductionAnomalyDetector.high",
+            "string.id"
+          ],
+          "valid": true
+        },
+        "medium.id": {
+          "chain": [
+            "ProductionAnomalyDetector.medium",
+            "string.id"
+          ],
+          "valid": true
+        },
+        "voting_strategy.id": {
+          "chain": [
+            "ProductionAnomalyDetector.voting_strategy",
+            "string.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "ProductionAnomalyDetector"
+    },
+    "QualityInspectionSystem": {
+      "fields": {
+        "color_tolerance": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "defect_classification_accuracy": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "dimensional_accuracy": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "false_positive_rate": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "surface_roughness": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {},
+      "name": "QualityInspectionSystem"
+    }
+  },
+  "views": {}
+}

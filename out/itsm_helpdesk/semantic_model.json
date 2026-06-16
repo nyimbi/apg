@@ -1,0 +1,2218 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 7,
+    "name": "itsm_helpdesk",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "ITSMApp": {
+        "agent_teams": [],
+        "agents": [],
+        "capabilities": [],
+        "components": {},
+        "configuration": {},
+        "deployments": {},
+        "description": "Enterprise IT service management",
+        "integrations": {},
+        "name": "ITSMApp",
+        "policies": {},
+        "routes": [],
+        "runtime": {},
+        "screens": {},
+        "theme": {},
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "itsm_helpdesk.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "itsm_helpdesk.apg",
+      "fixes": [],
+      "message": "Application 'ITSMApp' should compose capabilities, components, or routes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "deployment": {
+      "edges": 7,
+      "kind": "deployment",
+      "nodes": 8
+    },
+    "er": {
+      "edges": 81,
+      "kind": "er",
+      "nodes": 87
+    },
+    "handler": {
+      "edges": 7,
+      "kind": "handler",
+      "nodes": 8
+    },
+    "lookup": {
+      "edges": 7,
+      "kind": "lookup",
+      "nodes": 8
+    },
+    "package": {
+      "edges": 7,
+      "kind": "package",
+      "nodes": 8
+    },
+    "security": {
+      "edges": 7,
+      "kind": "security",
+      "nodes": 8
+    },
+    "workflow": {
+      "edges": 7,
+      "kind": "workflow",
+      "nodes": 8
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "itsm_helpdesk.apg"
+  ],
+  "symbols": {
+    "app.ITSMApp": {
+      "file": "itsm_helpdesk.apg",
+      "id": "app.ITSMApp",
+      "kind": "app",
+      "name": "ITSMApp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.asset_name": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.asset_name",
+      "kind": "field",
+      "name": "Asset.asset_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.asset_tag": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.asset_tag",
+      "kind": "field",
+      "name": "Asset.asset_tag",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.asset_type": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.asset_type",
+      "kind": "field",
+      "name": "Asset.asset_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.assigned_to": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.assigned_to",
+      "kind": "field",
+      "name": "Asset.assigned_to",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.cost": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.cost",
+      "kind": "field",
+      "name": "Asset.cost",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.department": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.department",
+      "kind": "field",
+      "name": "Asset.department",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.id": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.id",
+      "kind": "field",
+      "name": "Asset.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.ip_address": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.ip_address",
+      "kind": "field",
+      "name": "Asset.ip_address",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.location": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.location",
+      "kind": "field",
+      "name": "Asset.location",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.manufacturer": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.manufacturer",
+      "kind": "field",
+      "name": "Asset.manufacturer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.model": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.model",
+      "kind": "field",
+      "name": "Asset.model",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.operating_system": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.operating_system",
+      "kind": "field",
+      "name": "Asset.operating_system",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.purchase_date": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.purchase_date",
+      "kind": "field",
+      "name": "Asset.purchase_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.serial_number": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.serial_number",
+      "kind": "field",
+      "name": "Asset.serial_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.status": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.status",
+      "kind": "field",
+      "name": "Asset.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Asset.warranty_expiry": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Asset.warranty_expiry",
+      "kind": "field",
+      "name": "Asset.warranty_expiry",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.affected_systems": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.affected_systems",
+      "kind": "field",
+      "name": "ChangeRequest.affected_systems",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.business_justification": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.business_justification",
+      "kind": "field",
+      "name": "ChangeRequest.business_justification",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.cab_approval": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.cab_approval",
+      "kind": "field",
+      "name": "ChangeRequest.cab_approval",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.change_number": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.change_number",
+      "kind": "field",
+      "name": "ChangeRequest.change_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.change_type": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.change_type",
+      "kind": "field",
+      "name": "ChangeRequest.change_type",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.description": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.description",
+      "kind": "field",
+      "name": "ChangeRequest.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.id": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.id",
+      "kind": "field",
+      "name": "ChangeRequest.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.implementation_date": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.implementation_date",
+      "kind": "field",
+      "name": "ChangeRequest.implementation_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.implementer_id": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.implementer_id",
+      "kind": "field",
+      "name": "ChangeRequest.implementer_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.post_implementation_review": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.post_implementation_review",
+      "kind": "field",
+      "name": "ChangeRequest.post_implementation_review",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.requester_id": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.requester_id",
+      "kind": "field",
+      "name": "ChangeRequest.requester_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.risk_level": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.risk_level",
+      "kind": "field",
+      "name": "ChangeRequest.risk_level",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.rollback_plan": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.rollback_plan",
+      "kind": "field",
+      "name": "ChangeRequest.rollback_plan",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.scheduled_date": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.scheduled_date",
+      "kind": "field",
+      "name": "ChangeRequest.scheduled_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.status": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.status",
+      "kind": "field",
+      "name": "ChangeRequest.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChangeRequest.title": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.ChangeRequest.title",
+      "kind": "field",
+      "name": "ChangeRequest.title",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.article_number": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.article_number",
+      "kind": "field",
+      "name": "KnowledgeArticle.article_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.author_id": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.author_id",
+      "kind": "field",
+      "name": "KnowledgeArticle.author_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.category": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.category",
+      "kind": "field",
+      "name": "KnowledgeArticle.category",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.content": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.content",
+      "kind": "field",
+      "name": "KnowledgeArticle.content",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.helpful_votes": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.helpful_votes",
+      "kind": "field",
+      "name": "KnowledgeArticle.helpful_votes",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.id": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.id",
+      "kind": "field",
+      "name": "KnowledgeArticle.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.last_updated": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.last_updated",
+      "kind": "field",
+      "name": "KnowledgeArticle.last_updated",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.published_date": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.published_date",
+      "kind": "field",
+      "name": "KnowledgeArticle.published_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.status": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.status",
+      "kind": "field",
+      "name": "KnowledgeArticle.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.tags": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.tags",
+      "kind": "field",
+      "name": "KnowledgeArticle.tags",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.title": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.title",
+      "kind": "field",
+      "name": "KnowledgeArticle.title",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.KnowledgeArticle.views": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.KnowledgeArticle.views",
+      "kind": "field",
+      "name": "KnowledgeArticle.views",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.description": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.description",
+      "kind": "field",
+      "name": "Problem.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.id": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.id",
+      "kind": "field",
+      "name": "Problem.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.identified_date": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.identified_date",
+      "kind": "field",
+      "name": "Problem.identified_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.linked_incidents": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.linked_incidents",
+      "kind": "field",
+      "name": "Problem.linked_incidents",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.permanent_fix": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.permanent_fix",
+      "kind": "field",
+      "name": "Problem.permanent_fix",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.priority": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.priority",
+      "kind": "field",
+      "name": "Problem.priority",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.problem_manager": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.problem_manager",
+      "kind": "field",
+      "name": "Problem.problem_manager",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.problem_number": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.problem_number",
+      "kind": "field",
+      "name": "Problem.problem_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.resolved_date": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.resolved_date",
+      "kind": "field",
+      "name": "Problem.resolved_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.root_cause": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.root_cause",
+      "kind": "field",
+      "name": "Problem.root_cause",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.status": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.status",
+      "kind": "field",
+      "name": "Problem.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.title": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.title",
+      "kind": "field",
+      "name": "Problem.title",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Problem.workaround": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Problem.workaround",
+      "kind": "field",
+      "name": "Problem.workaround",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SLAPolicy.applicable_categories": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.SLAPolicy.applicable_categories",
+      "kind": "field",
+      "name": "SLAPolicy.applicable_categories",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SLAPolicy.business_hours_only": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.SLAPolicy.business_hours_only",
+      "kind": "field",
+      "name": "SLAPolicy.business_hours_only",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SLAPolicy.escalation_time_hours": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.SLAPolicy.escalation_time_hours",
+      "kind": "field",
+      "name": "SLAPolicy.escalation_time_hours",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SLAPolicy.id": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.SLAPolicy.id",
+      "kind": "field",
+      "name": "SLAPolicy.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SLAPolicy.policy_name": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.SLAPolicy.policy_name",
+      "kind": "field",
+      "name": "SLAPolicy.policy_name",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SLAPolicy.priority": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.SLAPolicy.priority",
+      "kind": "field",
+      "name": "SLAPolicy.priority",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SLAPolicy.resolution_time_hours": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.SLAPolicy.resolution_time_hours",
+      "kind": "field",
+      "name": "SLAPolicy.resolution_time_hours",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.SLAPolicy.response_time_hours": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.SLAPolicy.response_time_hours",
+      "kind": "field",
+      "name": "SLAPolicy.response_time_hours",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.assignee_id": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.assignee_id",
+      "kind": "field",
+      "name": "Ticket.assignee_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.category": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.category",
+      "kind": "field",
+      "name": "Ticket.category",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.created_date": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.created_date",
+      "kind": "field",
+      "name": "Ticket.created_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.department": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.department",
+      "kind": "field",
+      "name": "Ticket.department",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.description": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.description",
+      "kind": "field",
+      "name": "Ticket.description",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.id": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.id",
+      "kind": "field",
+      "name": "Ticket.id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.impact": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.impact",
+      "kind": "field",
+      "name": "Ticket.impact",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.priority": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.priority",
+      "kind": "field",
+      "name": "Ticket.priority",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.reporter_id": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.reporter_id",
+      "kind": "field",
+      "name": "Ticket.reporter_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.resolution": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.resolution",
+      "kind": "field",
+      "name": "Ticket.resolution",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.resolved_date": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.resolved_date",
+      "kind": "field",
+      "name": "Ticket.resolved_date",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.sla_breach": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.sla_breach",
+      "kind": "field",
+      "name": "Ticket.sla_breach",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.status": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.status",
+      "kind": "field",
+      "name": "Ticket.status",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.ticket_number": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.ticket_number",
+      "kind": "field",
+      "name": "Ticket.ticket_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.title": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.title",
+      "kind": "field",
+      "name": "Ticket.title",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Ticket.urgency": {
+      "file": "itsm_helpdesk.apg",
+      "id": "field.Ticket.urgency",
+      "kind": "field",
+      "name": "Ticket.urgency",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.itsm_helpdesk": {
+      "file": "itsm_helpdesk.apg",
+      "id": "module.itsm_helpdesk",
+      "kind": "module",
+      "name": "itsm_helpdesk",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Asset": {
+      "file": "itsm_helpdesk.apg",
+      "id": "table.Asset",
+      "kind": "table",
+      "name": "Asset",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.ChangeRequest": {
+      "file": "itsm_helpdesk.apg",
+      "id": "table.ChangeRequest",
+      "kind": "table",
+      "name": "ChangeRequest",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.KnowledgeArticle": {
+      "file": "itsm_helpdesk.apg",
+      "id": "table.KnowledgeArticle",
+      "kind": "table",
+      "name": "KnowledgeArticle",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Problem": {
+      "file": "itsm_helpdesk.apg",
+      "id": "table.Problem",
+      "kind": "table",
+      "name": "Problem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.SLAPolicy": {
+      "file": "itsm_helpdesk.apg",
+      "id": "table.SLAPolicy",
+      "kind": "table",
+      "name": "SLAPolicy",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Ticket": {
+      "file": "itsm_helpdesk.apg",
+      "id": "table.Ticket",
+      "kind": "table",
+      "name": "Ticket",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Asset": {
+      "fields": {
+        "asset_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "asset_tag": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "asset_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "assigned_to": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "cost": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "department": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "ip_address": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "location": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "manufacturer": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "model": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "operating_system": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "purchase_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "serial_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "warranty_expiry": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        }
+      },
+      "lookup_paths": {
+        "purchase_date.id": {
+          "chain": [
+            "Asset.purchase_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "warranty_expiry.id": {
+          "chain": [
+            "Asset.warranty_expiry",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Asset"
+    },
+    "ChangeRequest": {
+      "fields": {
+        "affected_systems": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "business_justification": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "cab_approval": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "change_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "change_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "implementation_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "implementer_id": {
+          "relationship": {
+            "alias": "implementer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Implementer"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "post_implementation_review": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "requester_id": {
+          "relationship": {
+            "alias": "requester",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Requester"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "risk_level": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "rollback_plan": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "scheduled_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "title": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "implementation_date.id": {
+          "chain": [
+            "ChangeRequest.implementation_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "scheduled_date.id": {
+          "chain": [
+            "ChangeRequest.scheduled_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "ChangeRequest"
+    },
+    "KnowledgeArticle": {
+      "fields": {
+        "article_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "author_id": {
+          "relationship": {
+            "alias": "author",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Author"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "category": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "content": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "helpful_votes": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "last_updated": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "published_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "tags": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "title": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "views": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {
+        "last_updated.id": {
+          "chain": [
+            "KnowledgeArticle.last_updated",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "published_date.id": {
+          "chain": [
+            "KnowledgeArticle.published_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "KnowledgeArticle"
+    },
+    "Problem": {
+      "fields": {
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "identified_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "linked_incidents": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "permanent_fix": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "priority": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "problem_manager": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "problem_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "resolved_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "root_cause": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "title": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "workaround": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "identified_date.id": {
+          "chain": [
+            "Problem.identified_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "resolved_date.id": {
+          "chain": [
+            "Problem.resolved_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Problem"
+    },
+    "SLAPolicy": {
+      "fields": {
+        "applicable_categories": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "business_hours_only": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "escalation_time_hours": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "policy_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "priority": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "resolution_time_hours": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "response_time_hours": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        }
+      },
+      "lookup_paths": {},
+      "name": "SLAPolicy"
+    },
+    "Ticket": {
+      "fields": {
+        "assignee_id": {
+          "relationship": {
+            "alias": "assignee",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Assignee"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "category": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "created_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "department": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "id": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "impact": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "priority": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "reporter_id": {
+          "relationship": {
+            "alias": "reporter",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Reporter"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "resolution": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "resolved_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "sla_breach": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "ticket_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "title": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "urgency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "created_date.id": {
+          "chain": [
+            "Ticket.created_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "resolved_date.id": {
+          "chain": [
+            "Ticket.resolved_date",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Ticket"
+    }
+  },
+  "views": {}
+}

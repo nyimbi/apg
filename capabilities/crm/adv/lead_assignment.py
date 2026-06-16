@@ -19,9 +19,9 @@ from decimal import Decimal
 from uuid_extensions import uuid7str
 import json
 
-from pydantic import BaseModel, Field, validator, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
-from .database import DatabaseManager
+from.database import DatabaseManager
 
 
 logger = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ class LeadAssignmentRule(BaseModel):
 	
 	# Rule configuration
 	conditions: List[AssignmentCondition] = Field(default_factory=list, description="Assignment conditions")
-	targets: List[AssignmentTarget] = Field(..., min_items=1, description="Assignment targets")
+	targets: List[AssignmentTarget] = Field(..., min_length=1, description="Assignment targets")
 	
 	# Assignment settings
 	round_robin_position: int = Field(default=0, ge=0, description="Current round-robin position")

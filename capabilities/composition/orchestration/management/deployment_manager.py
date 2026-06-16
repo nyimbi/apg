@@ -16,7 +16,7 @@ from enum import Enum
 import logging
 import hashlib
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from uuid_extensions import uuid7str
 import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession

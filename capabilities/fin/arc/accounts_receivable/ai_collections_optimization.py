@@ -14,10 +14,10 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from uuid_extensions import uuid7str
 
-from .models import (
+from, field_validator.models import (
 	ARCustomer, ARInvoice, ARPayment, ARCollectionActivity, ARDispute,
 	ARCustomerStatus, ARInvoiceStatus, ARCollectionPriority, CurrencyCode
 )
@@ -101,7 +101,7 @@ class CustomerCollectionProfile(BaseModel):
 	economic_stress_indicator: float = Field(default=0.0, ge=0, le=1, description="Economic pressure level")
 	geographic_risk_factor: float = Field(default=0.0, ge=0, le=1, description="Location-based risk")
 	
-	@validator('paid_invoices')
+	@field_validator('paid_invoices')
 	def validate_paid_invoices(cls, v, values):
 		if 'total_invoices' in values and v > values['total_invoices']:
 			raise ValueError("Paid invoices cannot exceed total invoices")

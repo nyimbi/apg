@@ -29,9 +29,9 @@ except ImportError:  # pragma: no cover - exercised in dependency-light test env
 	class _AioRedisModule:
 		Redis = Any
 	aioredis = _AioRedisModule()
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
-from .models import AMAPI, AMEndpoint, APIStatus, ProtocolType
+from, field_validator.models import AMAPI, AMEndpoint, APIStatus, ProtocolType
 from .service import APILifecycleService
 
 # =============================================================================
@@ -112,7 +112,7 @@ class APGCapabilityInfo(BaseModel):
 	tags: List[str] = Field(default_factory=list, description="Service tags")
 	metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
-	@validator('capability_id')
+	@field_validator('capability_id')
 	def validate_capability_id(cls, v):
 		if not v or len(v.strip()) == 0:
 			raise ValueError('Capability ID cannot be empty')

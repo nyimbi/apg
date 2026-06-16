@@ -25,9 +25,9 @@ import pandas as pd
 import hashlib
 import base64
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 
-logger = logging.getLogger(__name__)
+logger= logging.getLogger(__name__)
 
 # Business Intelligence models and enums
 class ReportType(str, Enum):

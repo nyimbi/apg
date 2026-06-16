@@ -1,0 +1,173 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 3,
+    "name": "main",
+    "version": "1.0.0"
+  },
+  "capabilities": {},
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {}
+  },
+  "contracts": {},
+  "deployment": {
+    "source": "main.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "main.apg",
+      "fixes": [],
+      "message": "Digital twin 'PredictiveDigitalTwin' should have state-related properties",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 0
+    },
+    "deployment": {
+      "edges": 3,
+      "kind": "deployment",
+      "nodes": 4
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 2
+    },
+    "handler": {
+      "edges": 3,
+      "kind": "handler",
+      "nodes": 4
+    },
+    "lookup": {
+      "edges": 3,
+      "kind": "lookup",
+      "nodes": 4
+    },
+    "package": {
+      "edges": 3,
+      "kind": "package",
+      "nodes": 4
+    },
+    "security": {
+      "edges": 3,
+      "kind": "security",
+      "nodes": 4
+    },
+    "workflow": {
+      "edges": 3,
+      "kind": "workflow",
+      "nodes": 4
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {},
+  "security": {},
+  "source_files": [
+    "main.apg"
+  ],
+  "symbols": {
+    "digital_twin.PredictiveDigitalTwin": {
+      "file": "main.apg",
+      "id": "digital_twin.PredictiveDigitalTwin",
+      "kind": "digital_twin",
+      "name": "PredictiveDigitalTwin",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "entity.FactoryDataSynchronization": {
+      "file": "main.apg",
+      "id": "entity.FactoryDataSynchronization",
+      "kind": "entity",
+      "name": "FactoryDataSynchronization",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "entity.IndustrialMaintenanceSystem": {
+      "file": "main.apg",
+      "id": "entity.IndustrialMaintenanceSystem",
+      "kind": "entity",
+      "name": "IndustrialMaintenanceSystem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.main": {
+      "file": "main.apg",
+      "id": "module.main",
+      "kind": "module",
+      "name": "main",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

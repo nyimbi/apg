@@ -24,10 +24,10 @@ import zipfile
 import tempfile
 import shutil
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from uuid_extensions import uuid7str
 
-from .base_connector import BaseConnector, ConnectorConfiguration, ConnectorStatus
+from.base_connector import BaseConnector, ConnectorConfiguration, ConnectorStatus
 
 logger = logging.getLogger(__name__)
 

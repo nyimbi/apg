@@ -17,7 +17,7 @@ import math
 import random
 from abc import ABC, abstractmethod
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from pydantic.config import ConfigDict
 
 # APG Framework imports

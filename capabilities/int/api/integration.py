@@ -24,9 +24,9 @@ except ImportError:  # pragma: no cover - exercised in dependency-light test env
 	class _AioRedisModule:
 		Redis = Any
 	aioredis = _AioRedisModule()
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
-from .discovery import ServiceDiscovery, APGCapabilityInfo, ServiceHealth
+from.discovery import ServiceDiscovery, APGCapabilityInfo, ServiceHealth
 from .service import APILifecycleService, ConsumerManagementService, AnalyticsService
 from .monitoring import MetricsCollector, HealthMonitor
 
