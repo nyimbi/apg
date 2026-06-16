@@ -98,6 +98,23 @@ CONNECTORS_MANIFEST: dict[str, dict[str, Any]] = {
 		"optional_env": ["AIRTEL_ENV", "AIRTEL_CALLBACK_URL_BASE"],
 		"docs_url": "https://developers.airtel.africa/documentation",
 	},
+	"airtel_money_v2": {
+		"display_name": "Airtel Money v2 (AirtelMoneyConnector)",
+		"description": (
+			"Production-quality Airtel Africa connector — send_money (B2C), request_payment (C2B), "
+			"check_balance, transaction_status. Markets: KE, UG, TZ, RW, ZM. "
+			"All calls wrapped in ConnectorError; OAuth2 token auto-refreshed."
+		),
+		"category": "payment",
+		"regions": ["KE", "UG", "TZ", "RW", "ZM"],
+		"module": "capabilities.composition.orchestration.connectors.airtel_connector",
+		"class": "AirtelMoneyConnector",
+		"config_class": "AirtelMoneyConfiguration",
+		"env_factory": "airtel_money_connector_from_env",
+		"required_env": ["AIRTEL_CLIENT_ID", "AIRTEL_CLIENT_SECRET", "AIRTEL_COUNTRY", "AIRTEL_CURRENCY"],
+		"optional_env": ["AIRTEL_ENV", "AIRTEL_CALLBACK_URL_BASE"],
+		"docs_url": "https://developers.airtel.africa/documentation",
+	},
 	"orange_money": {
 		"display_name": "Orange Money",
 		"description": "Orange Money Web Payment & Cashout — Francophone West Africa. CI, SN, CM, ML, BF, MG, NE.",
@@ -110,6 +127,72 @@ CONNECTORS_MANIFEST: dict[str, dict[str, Any]] = {
 		"required_env": ["ORANGE_CLIENT_ID", "ORANGE_CLIENT_SECRET", "ORANGE_MERCHANT_KEY", "ORANGE_COUNTRY"],
 		"optional_env": ["ORANGE_ENV", "ORANGE_CALLBACK_URL_BASE"],
 		"docs_url": "https://developer.orange.com/apis/om-webpay-prod/getting-started",
+	},
+	"orange_money_v2": {
+		"display_name": "Orange Money (OrangeMoneyConnector)",
+		"description": "Orange Money send_money, request_payment, check_balance, transaction_status. Francophone West Africa: CI, SN, CM, ML, BF.",
+		"category": "payment",
+		"regions": ["CI", "SN", "CM", "ML", "BF"],
+		"module": "capabilities.composition.orchestration.connectors.orange_connector",
+		"class": "OrangeMoneyConnector",
+		"config_class": "OrangeMoneyConfiguration",
+		"env_factory": "orange_money_connector_from_env",
+		"required_env": ["ORANGE_MONEY_CLIENT_ID", "ORANGE_MONEY_CLIENT_SECRET", "ORANGE_MONEY_MERCHANT_KEY", "ORANGE_MONEY_COUNTRY"],
+		"optional_env": ["ORANGE_MONEY_ENV", "ORANGE_MONEY_CALLBACK_URL"],
+		"docs_url": "https://developer.orange.com/apis/om-webpay-prod/getting-started",
+	},
+	"mtn_momo_v2": {
+		"display_name": "MTN MoMo (MTNMoMoConnector)",
+		"description": (
+			"Production-quality MTN Mobile Money connector — send_money (B2C), request_payment (C2B), "
+			"check_balance, transaction_status. Markets: NG, GH, UG, CM, CI, ZM. "
+			"Three-part credential scheme (subscription key + API user + API key). "
+			"OAuth2 Basic Auth token auto-refreshed."
+		),
+		"category": "payment",
+		"regions": ["NG", "GH", "UG", "CM", "CI", "ZM"],
+		"module": "capabilities.composition.orchestration.connectors.mtn_connector",
+		"class": "MTNMoMoConnector",
+		"config_class": "MTNMoMoConfiguration",
+		"env_factory": "mtn_momo_connector_from_env",
+		"required_env": ["MTN_SUBSCRIPTION_KEY", "MTN_API_USER", "MTN_API_KEY", "MTN_COUNTRY"],
+		"optional_env": ["MTN_ENV", "MTN_CALLBACK_URL_BASE", "MTN_CURRENCY"],
+		"docs_url": "https://momodeveloper.mtn.com/docs/services/collection",
+	},
+	"wave_v2": {
+		"display_name": "Wave Mobile Money (WaveConnector)",
+		"description": (
+			"Production-quality Wave connector — send_money (B2C payout), request_payment (C2B checkout), "
+			"check_balance, transaction_status. Markets: SN, CI, ML, BF, GN. API-key auth, no OAuth2 flow."
+		),
+		"category": "payment",
+		"regions": ["SN", "CI", "ML", "BF", "GN"],
+		"module": "capabilities.composition.orchestration.connectors.wave_connector",
+		"class": "WaveConnector",
+		"config_class": "WaveConfiguration",
+		"env_factory": "wave_connector_from_env",
+		"required_env": ["WAVE_API_KEY", "WAVE_COUNTRY"],
+		"optional_env": ["WAVE_ENV", "WAVE_CALLBACK_URL_BASE", "WAVE_CURRENCY"],
+		"docs_url": "https://docs.wave.com/",
+	},
+	"mshwari_v2": {
+		"display_name": "M-Shwari (MShwariConnector)",
+		"description": (
+			"Production-quality M-Shwari connector (CBA/Safaricom) — lock_savings, loan_apply, loan_repay, "
+			"check_balance. Kenya only. Uses Daraja B2C + STK Push APIs."
+		),
+		"category": "payment",
+		"regions": ["KE"],
+		"module": "capabilities.composition.orchestration.connectors.mshwari_connector",
+		"class": "MShwariConnector",
+		"config_class": "MShwariConfiguration",
+		"env_factory": "mshwari_connector_from_env",
+		"required_env": [
+			"MSHWARI_CONSUMER_KEY", "MSHWARI_CONSUMER_SECRET", "MSHWARI_SHORTCODE",
+			"MSHWARI_INITIATOR_NAME", "MSHWARI_SECURITY_CREDENTIAL",
+		],
+		"optional_env": ["MSHWARI_ENV", "MSHWARI_CALLBACK_URL_BASE"],
+		"docs_url": "https://developer.safaricom.co.ke/APIs",
 	},
 	"wave": {
 		"display_name": "Wave Mobile Money",

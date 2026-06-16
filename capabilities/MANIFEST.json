@@ -1,7 +1,7 @@
 {
   "format": "apg.capability-manifest.v1",
-  "generated": "2026-06-04",
-  "capability_count": 350,
+  "generated": "2026-06-16",
+  "capability_count": 356,
   "capabilities": {
     "bia_anl": {
       "id": "bia_anl",
@@ -81479,6 +81479,365 @@
       "install": "pip install apg-common-auth-hub",
       "import_as": "import apg_common_auth_hub",
       "run_server": "apg-common-auth-hub --port 8080"
+    },
+    "mtn_connector": {
+      "id": "mtn_connector",
+      "display_name": "MTN Mobile Money Connector",
+      "version": "1.0.0",
+      "domain": "connectors",
+      "code": "mtn_connector",
+      "path": "capabilities/composition/orchestration/connectors/africa/mtn_connector.py",
+      "package": "apg-connectors-mtn",
+      "module": "apg_connectors_mtn",
+      "description": "MTN MoMo API connector for Collections (RequestToPay), Disbursements (Transfer), account balance, transaction status, and KYC lookups across 17 African markets.",
+      "provides": [
+        "mtn_collections",
+        "mtn_disbursements",
+        "mtn_balance",
+        "mtn_transaction_status",
+        "mtn_kyc"
+      ],
+      "requires": [
+        "auth",
+        "conf",
+        "audl"
+      ],
+      "service_methods": [
+        "request_to_pay",
+        "get_account_balance",
+        "get_transaction_status",
+        "transfer",
+        "get_account_holder_info",
+        "_connect",
+        "_disconnect",
+        "_health_check",
+        "_refresh_token"
+      ],
+      "service_method_count": 9,
+      "governance_rules": [
+        "tenant_context_required",
+        "actor_id_required",
+        "audit_required",
+        "rate_limit_enforced"
+      ],
+      "rule_count": 4,
+      "ui_routes": [],
+      "route_count": 0,
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.connectors.mtn.events",
+      "streaming_events": [
+        "payment_requested",
+        "payment_completed",
+        "disbursement_sent",
+        "balance_checked"
+      ],
+      "streaming_guardrails": [
+        "tenant_context_required",
+        "unauthorized_access_denied",
+        "rate_limit_enforced"
+      ],
+      "theme_name": "mtn_connector_theme",
+      "theme_tokens": [
+        "color.primary",
+        "color.accent"
+      ],
+      "configuration_keys": [
+        "MTN_API_USER_ID",
+        "MTN_API_KEY",
+        "MTN_SUBSCRIPTION_KEY",
+        "MTN_ENVIRONMENT",
+        "MTN_CALLBACK_URL_BASE"
+      ],
+      "install": "pip install apg-connectors-mtn",
+      "import_as": "from capabilities.composition.orchestration.connectors.africa.mtn_connector import MTNConnector",
+      "run_server": null,
+      "status": "production"
+    },
+    "airtel_connector": {
+      "id": "airtel_connector",
+      "display_name": "Airtel Money Connector",
+      "version": "1.0.0",
+      "domain": "connectors",
+      "code": "airtel_connector",
+      "path": "capabilities/composition/orchestration/connectors/africa/airtel_connector.py",
+      "package": "apg-connectors-airtel",
+      "module": "apg_connectors_airtel",
+      "description": "Airtel Africa payment connector covering C2B collections, B2C disbursements, balance enquiry, and transaction status polling across KE, UG, TZ, RW, ZM.",
+      "provides": [
+        "airtel_collections",
+        "airtel_disbursements",
+        "airtel_balance",
+        "airtel_transaction_status",
+        "airtel_kyc"
+      ],
+      "requires": [
+        "auth",
+        "conf",
+        "audl"
+      ],
+      "service_methods": [
+        "request_payment",
+        "get_transaction_status",
+        "disburse",
+        "check_balance",
+        "get_user_info",
+        "_connect",
+        "_disconnect",
+        "_health_check",
+        "_refresh_token"
+      ],
+      "service_method_count": 9,
+      "governance_rules": [
+        "tenant_context_required",
+        "actor_id_required",
+        "audit_required",
+        "rate_limit_enforced"
+      ],
+      "rule_count": 4,
+      "ui_routes": [],
+      "route_count": 0,
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.connectors.airtel.events",
+      "streaming_events": [
+        "payment_requested",
+        "payment_completed",
+        "disbursement_sent",
+        "balance_checked"
+      ],
+      "streaming_guardrails": [
+        "tenant_context_required",
+        "unauthorized_access_denied",
+        "rate_limit_enforced"
+      ],
+      "theme_name": "airtel_connector_theme",
+      "theme_tokens": [
+        "color.primary",
+        "color.accent"
+      ],
+      "configuration_keys": [
+        "AIRTEL_CLIENT_ID",
+        "AIRTEL_CLIENT_SECRET",
+        "AIRTEL_ENVIRONMENT",
+        "AIRTEL_COUNTRY",
+        "AIRTEL_CURRENCY"
+      ],
+      "install": "pip install apg-connectors-airtel",
+      "import_as": "from capabilities.composition.orchestration.connectors.africa.airtel_connector import AirtelConnector",
+      "run_server": null,
+      "status": "production"
+    },
+    "orange_connector": {
+      "id": "orange_connector",
+      "display_name": "Orange Money Connector",
+      "version": "1.0.0",
+      "domain": "connectors",
+      "code": "orange_connector",
+      "path": "capabilities/composition/orchestration/connectors/africa/orange_connector.py",
+      "package": "apg-connectors-orange",
+      "module": "apg_connectors_orange",
+      "description": "Orange Money Web Payment & Cashout API connector for Francophone West Africa. Covers OAuth2 token management, C2B payment initiation, B2C cashout, balance, and user lookup.",
+      "provides": [
+        "orange_payments",
+        "orange_cashout",
+        "orange_balance",
+        "orange_payment_status",
+        "orange_user_check"
+      ],
+      "requires": [
+        "auth",
+        "conf",
+        "audl"
+      ],
+      "service_methods": [
+        "initiate_payment",
+        "check_payment_status",
+        "cashout",
+        "get_balance",
+        "check_user",
+        "_connect",
+        "_disconnect",
+        "_health_check",
+        "_refresh_token"
+      ],
+      "service_method_count": 9,
+      "governance_rules": [
+        "tenant_context_required",
+        "actor_id_required",
+        "audit_required",
+        "rate_limit_enforced"
+      ],
+      "rule_count": 4,
+      "ui_routes": [],
+      "route_count": 0,
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.connectors.orange.events",
+      "streaming_events": [
+        "payment_initiated",
+        "payment_status_checked",
+        "cashout_sent",
+        "balance_checked"
+      ],
+      "streaming_guardrails": [
+        "tenant_context_required",
+        "unauthorized_access_denied",
+        "rate_limit_enforced"
+      ],
+      "theme_name": "orange_connector_theme",
+      "theme_tokens": [
+        "color.primary",
+        "color.accent"
+      ],
+      "configuration_keys": [
+        "ORANGE_CLIENT_ID",
+        "ORANGE_CLIENT_SECRET",
+        "ORANGE_MERCHANT_KEY",
+        "ORANGE_COUNTRY",
+        "ORANGE_ENVIRONMENT"
+      ],
+      "install": "pip install apg-connectors-orange",
+      "import_as": "from capabilities.composition.orchestration.connectors.africa.orange_connector import OrangeConnector",
+      "run_server": null,
+      "status": "production"
+    },
+    "wave_connector": {
+      "id": "wave_connector",
+      "display_name": "Wave Mobile Money Connector",
+      "version": "1.0.0",
+      "domain": "connectors",
+      "code": "wave_connector",
+      "path": "capabilities/composition/orchestration/connectors/africa/wave_connector.py",
+      "package": "apg-connectors-wave",
+      "module": "apg_connectors_wave",
+      "description": "Wave mobile money Business Payments API connector for Francophone West Africa. Covers send_money (B2C), request_payment (C2B), balance, and transaction status using Bearer-token auth.",
+      "provides": [
+        "wave_send_money",
+        "wave_request_payment",
+        "wave_balance",
+        "wave_transaction_status"
+      ],
+      "requires": [
+        "auth",
+        "conf",
+        "audl"
+      ],
+      "service_methods": [
+        "send_money",
+        "request_payment",
+        "check_balance",
+        "transaction_status",
+        "_connect",
+        "_disconnect",
+        "_health_check"
+      ],
+      "service_method_count": 7,
+      "governance_rules": [
+        "tenant_context_required",
+        "actor_id_required",
+        "audit_required",
+        "rate_limit_enforced"
+      ],
+      "rule_count": 4,
+      "ui_routes": [],
+      "route_count": 0,
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.connectors.wave.events",
+      "streaming_events": [
+        "money_sent",
+        "payment_requested",
+        "balance_checked",
+        "transaction_status_checked"
+      ],
+      "streaming_guardrails": [
+        "tenant_context_required",
+        "unauthorized_access_denied",
+        "rate_limit_enforced"
+      ],
+      "theme_name": "wave_connector_theme",
+      "theme_tokens": [
+        "color.primary",
+        "color.accent"
+      ],
+      "configuration_keys": [
+        "WAVE_API_KEY",
+        "WAVE_ENVIRONMENT",
+        "WAVE_COUNTRY",
+        "WAVE_CALLBACK_URL"
+      ],
+      "install": "pip install apg-connectors-wave",
+      "import_as": "from capabilities.composition.orchestration.connectors.africa.wave_connector import WaveConnector",
+      "run_server": null,
+      "status": "production"
+    },
+    "mshwari_connector": {
+      "id": "mshwari_connector",
+      "display_name": "M-Shwari Connector",
+      "version": "1.0.0",
+      "domain": "connectors",
+      "code": "mshwari_connector",
+      "path": "capabilities/composition/orchestration/connectors/africa/mshwari_connector.py",
+      "package": "apg-connectors-mshwari",
+      "module": "apg_connectors_mshwari",
+      "description": "M-Shwari (NCBA + Safaricom) connector via Safaricom Daraja 2.0 API. Covers savings lock, micro-loan application, loan repayment, and balance checks for Kenya market.",
+      "provides": [
+        "mshwari_savings_lock",
+        "mshwari_loan_apply",
+        "mshwari_loan_repay",
+        "mshwari_balance"
+      ],
+      "requires": [
+        "auth",
+        "conf",
+        "audl"
+      ],
+      "service_methods": [
+        "lock_savings",
+        "loan_apply",
+        "loan_repay",
+        "check_balance",
+        "_connect",
+        "_disconnect",
+        "_health_check",
+        "_refresh_token"
+      ],
+      "service_method_count": 8,
+      "governance_rules": [
+        "tenant_context_required",
+        "actor_id_required",
+        "audit_required",
+        "rate_limit_enforced"
+      ],
+      "rule_count": 4,
+      "ui_routes": [],
+      "route_count": 0,
+      "streaming_processor": "bytewax",
+      "streaming_stream": "apg.connectors.mshwari.events",
+      "streaming_events": [
+        "savings_locked",
+        "loan_applied",
+        "loan_repaid",
+        "balance_checked"
+      ],
+      "streaming_guardrails": [
+        "tenant_context_required",
+        "unauthorized_access_denied",
+        "rate_limit_enforced"
+      ],
+      "theme_name": "mshwari_connector_theme",
+      "theme_tokens": [
+        "color.primary",
+        "color.accent"
+      ],
+      "configuration_keys": [
+        "MSHWARI_CONSUMER_KEY",
+        "MSHWARI_CONSUMER_SECRET",
+        "MSHWARI_SHORTCODE",
+        "MSHWARI_PASSKEY",
+        "MSHWARI_ENVIRONMENT"
+      ],
+      "install": "pip install apg-connectors-mshwari",
+      "import_as": "from capabilities.composition.orchestration.connectors.africa.mshwari_connector import MShwariConnector",
+      "run_server": null,
+      "status": "production"
     }
   },
   "by_domain": {
