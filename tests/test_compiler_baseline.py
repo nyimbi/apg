@@ -280,13 +280,24 @@ def test_documented_python_target_generates_executable_application_files():
 	readme = result.generated_files["README.md"]
 	smoke_test = result.generated_files["smoke_test.py"]
 	semantic_artifact = json.loads(result.generated_files["semantic_model.json"])
-	assert "APG Python Application" in app
+	# Negative contract: no legacy framework bleed into generated code
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in app
 	assert "django" not in app.lower()
-	assert "_FlaskApp" in app
-	assert "run_server" in app
-	assert "openapi_document" in app
+	# Generated files are syntactically valid Python
+	code = compile(app, "app.py", "exec")
+	compile(smoke_test, "smoke_test.py", "exec")
+	# Behavioral: exec the app and verify core callables are present and functional
+	ns: dict = {"__name__": "generated_app"}
+	exec(code, ns)
+	assert callable(ns["run_server"]), "generated app must export run_server()"
+	assert callable(ns["openapi_document"]), "generated app must export openapi_document()"
+	openapi = ns["openapi_document"]()
+	assert openapi["openapi"] == "3.1.0"
+	assert "info" in openapi
+	describe = ns["describe_application"]()
+	assert "name" in describe and "version" in describe and "entities" in describe
+	# Dockerfile / .env.example / README are compiler contract surfaces (not internal names)
 	assert "python:3.11-slim" in dockerfile
 	assert "python app.py --self-test" in dockerfile
 	assert "APG_PORT=8080" in env_example
@@ -303,10 +314,9 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "openapi_contract" in smoke_test
 	assert "route_dispatch" in smoke_test
 	assert "capability_health" in smoke_test
+	# semantic_model.json is a static artifact — verify via the running module export
 	assert semantic_artifact["format"] == "apg.semantic-model.v1"
 	assert semantic_artifact["agents"]["Planner"]["runtime"] == "codex"
-	compile(app, "app.py", "exec")
-	compile(smoke_test, "smoke_test.py", "exec")
 
 
 def test_generated_capability_runtime_has_no_bare_pass_stubs():
@@ -1451,8 +1461,19 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	readme = (output / "README.md").read_text(encoding="utf-8")
 	requirements = (output / "requirements.txt").read_text(encoding="utf-8")
 	smoke_test = (output / "smoke_test.py").read_text(encoding="utf-8")
-	assert "APG Python Application" in app
-	assert "_FlaskApp" in app
+	# Behavioral: exec and verify core exports rather than internal names
+	code = compile(app, "app.py", "exec")
+	ns: dict = {"__name__": "generated_app"}
+	exec(code, ns)
+	describe = ns["describe_application"]()
+	assert "name" in describe and "version" in describe and "entities" in describe
+	assert callable(ns["run_server"])
+	assert callable(ns["openapi_document"])
+	# Negative contract: no legacy framework bleed
+	assert "Flask-AppBuilder" not in app
+	assert "flask_appbuilder" not in requirements
+	assert "flask" in requirements
+	# Compiler output contract surfaces (not internal names)
 	assert "HEALTHCHECK" in dockerfile
 	assert "APG_HOST=127.0.0.1" in env_example
 	assert "python app.py --self-test" in readme
@@ -1461,9 +1482,6 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "Dockerfile" in readme
 	assert "GET /openapi.json" in readme
 	assert "Typed APG fields render as matching HTML controls" in readme
-	assert "Flask-AppBuilder" not in app
-	assert "flask_appbuilder" not in requirements
-	assert "flask" in requirements
 	assert "openapi_contract" in smoke_test
 	assert "component_manifest" in smoke_test
 	assert "route_dispatch" in smoke_test
