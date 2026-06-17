@@ -759,12 +759,12 @@
         },
         "priority": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "total": {
@@ -792,7 +792,7 @@
       "fields": {
         "attempt": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "order_id": {
@@ -817,7 +817,7 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         }
       },
@@ -847,7 +847,7 @@
             "target_field": "id",
             "target_table": "decimal"
           },
-          "required": true,
+          "required": false,
           "type": "decimal"
         },
         "return_id": {
@@ -862,7 +862,7 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         }
       },
@@ -924,7 +924,7 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "tracking_number": {

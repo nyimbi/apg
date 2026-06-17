@@ -905,12 +905,12 @@
       "fields": {
         "defect_count": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "defect_rate": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "float"
         },
         "inspected_at": {
@@ -1029,12 +1029,12 @@
         },
         "quantity_produced": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "quantity_rejected": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "started_at": {
@@ -1048,7 +1048,7 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "work_order_id": {

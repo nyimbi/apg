@@ -7,6 +7,7 @@ ENV APG_PORT=8080
 
 WORKDIR /app
 COPY . /app
+RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \

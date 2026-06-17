@@ -399,7 +399,7 @@ def _show_next_steps(config: ProjectConfig, project_path: Path):
 	for i, step in enumerate(steps, 1):
 		console.print(f"{i}. [cyan]{step}[/cyan]")
 	
-	console.print("\n[green]The generated Python app starts a standard-library HTTP server. Use --describe for JSON metadata.[/green]")
+	console.print("\n[green]The generated Python app is a Flask 3.x service. Use --describe for JSON metadata.[/green]")
 	
 	if config.template_type != TemplateType.BASIC_AGENT:
 		console.print(f"\n[yellow]📚 Check the README.md for template-specific usage instructions[/yellow]")

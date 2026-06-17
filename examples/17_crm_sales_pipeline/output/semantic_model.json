@@ -1117,17 +1117,17 @@
         },
         "score": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "float"
         },
         "source": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         }
       },
@@ -1232,12 +1232,12 @@
         },
         "probability": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "float"
         },
         "stage": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         }
       },

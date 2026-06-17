@@ -1033,12 +1033,12 @@
         },
         "current_count": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "is_active": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "max_capacity": {
@@ -1097,17 +1097,17 @@
         },
         "quantity_on_hand": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "quantity_reserved": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "reorder_point": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "sku": {
@@ -1117,12 +1117,12 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "unit_of_measure": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         }
       },

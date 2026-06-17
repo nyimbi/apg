@@ -785,7 +785,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	assert "/self-test" in ui_index
 	assert "/openapi.json" in ui_index
 	assert 'action="/ui/entities/Customer/records"' in entity_ui
-	assert "<pre>" in entity_ui
+	assert "<pre" in entity_ui
 	assert "asha@example.com" in entity_ui
 	assert openapi_content_type.startswith("application/json")
 	assert openapi["openapi"] == "3.1.0"
@@ -1171,7 +1171,7 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 	assert 'role="alert"' in invalid_ui
 	assert "quantity must be integer" in invalid_ui
 	assert 'action="/ui/entities/InventoryItem/records"' in invalid_ui
-	assert "<table>" in created_ui
+	assert "<table" in created_ui
 	assert "Widget" in created_ui
 	assert 'action="/ui/entities/InventoryItem/records/1"' in created_ui
 	assert 'action="/ui/entities/InventoryItem/records/1/delete"' in created_ui
@@ -1415,7 +1415,7 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert f"python {output}/app.py --describe" in result.output
 	assert f"python {output}/app.py --self-test" in result.output
 	assert f"apg compile {source} --output {output} --verify" in result.output
-	assert "standard-library HTTP server" in result.output
+	assert "Flask 3.x service" in result.output
 	assert "Generated verification passed" in result.output
 	assert (output / "app.py").exists()
 	assert (output / "ai_agents.py").exists()
@@ -2540,7 +2540,9 @@ def test_checked_in_example_outputs_match_current_compiler():
 			for path in output_dir.rglob("*")
 			if path.is_file()
 			and "__pycache__" not in path.relative_to(output_dir).parts
+			and ".omc" not in path.relative_to(output_dir).parts
 			and not path.name.endswith(".pyc")
+			and path.name != ".DS_Store"
 		}
 		for missing in sorted(expected_files - actual_files):
 			mismatches.append(f"{source_file.parent.name}: missing {missing}")

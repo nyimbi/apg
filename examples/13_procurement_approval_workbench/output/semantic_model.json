@@ -1059,7 +1059,7 @@
         },
         "currency": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "department": {
@@ -1083,7 +1083,7 @@
         },
         "priority": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "request_id": {
@@ -1108,7 +1108,7 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         }
       },
@@ -1177,7 +1177,7 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "submitted_at": {
@@ -1201,7 +1201,7 @@
         },
         "validity_days": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         }
       },

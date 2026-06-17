@@ -246,7 +246,7 @@ def _compile_single(
 			console.print(f"  4. python {config.output_directory}/app.py --describe", soft_wrap=True)
 			console.print(f"  5. python {config.output_directory}/app.py --self-test", soft_wrap=True)
 			console.print(f"  6. apg compile {source_path} --output {config.output_directory} --verify", soft_wrap=True)
-			console.print("\n[green]The generated Python app starts a standard-library HTTP server. Use --self-test for a local health contract.[/green]")
+			console.print("\n[green]The generated Python app is a Flask 3.x service. Use --self-test for a local health contract.[/green]")
 			
 		else:
 			progress.update(task, description="❌ Compilation failed")

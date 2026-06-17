@@ -12,7 +12,7 @@ import html
 import json
 import os
 import sys
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, quote
@@ -21,6 +21,7 @@ from urllib.parse import parse_qs, quote
 MODULE_NAME = 'support_team'
 MODULE_VERSION = '1.0.0'
 MODULE_DESCRIPTION = None
+LANDING_STYLE = 'default'
 ENTITIES = [{'name': 'Planner', 'type': 'agent', 'properties': [], 'fields': [], 'methods': []}, {'name': 'Writer', 'type': 'agent', 'properties': [], 'fields': [], 'methods': []}, {'name': 'Reviewer', 'type': 'agent', 'properties': [], 'fields': [], 'methods': []}, {'name': 'SupportCrew', 'type': 'agent_team', 'properties': ['agents', 'flow', 'capabilities'], 'fields': [{'name': 'agents', 'type': '[Planner, Writer, Reviewer]', 'required': True}, {'name': 'flow', 'type': 'Planner -> Writer, Writer -> Reviewer', 'required': True}, {'name': 'capabilities', 'type': '[support_response, ticket_management]', 'required': True}], 'methods': []}, {'name': 'SupportTeamApp', 'type': 'app', 'properties': [], 'fields': [], 'methods': []}]
 ENTITY_NAMES = {entity["name"] for entity in ENTITIES}
 RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {entity["name"]: [] for entity in ENTITIES}
@@ -29,7 +30,18 @@ EVENT_LOG: list[Dict[str, Any]] = []
 NEXT_EVENT_ID = 1
 WORKFLOW_RUNS: Dict[str, Dict[str, Any]] = {}
 NEXT_WORKFLOW_RUN_ID = 1
+CIRCUIT_BREAKERS: Dict[str, Dict[str, Any]] = {}
+APG_EVENT_SUBSCRIPTIONS: Dict[str, list[str]] = {}
+APG_CONNECTOR_REGISTRY: list[Dict[str, Any]] = []
+APG_ACTIVITY_LOG: Dict[str, list[Dict[str, Any]]] = {}
+WORKFLOW_EVENT_JOURNAL: Dict[str, list[Dict[str, Any]]] = {}
+WORKFLOW_SIGNALS: Dict[str, list[str]] = {}
+TENANT_SCOPED_ENTITIES: set[str] = {
+    e["name"] for e in ENTITIES
+    if any(str(f.get("name")) == "tenant_id" for f in e.get("fields", []))
+}
 SEMANTIC_MODEL: Dict[str, Any] = {'format': 'apg.semantic-model.v1', 'ok': True, 'source_files': ['support_team.apg'], 'app': {'name': 'support_team', 'version': '1.0.0', 'description': None, 'entity_count': 5}, 'symbols': {'module.support_team': {'id': 'module.support_team', 'kind': 'module', 'name': 'support_team', 'file': 'support_team.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'agent.Planner': {'id': 'agent.Planner', 'kind': 'agent', 'name': 'Planner', 'file': 'support_team.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'llm.openai:gpt-4.1-mini': {'id': 'llm.openai:gpt-4.1-mini', 'kind': 'llm', 'name': 'openai:gpt-4.1-mini', 'file': 'support_team.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'agent.Writer': {'id': 'agent.Writer', 'kind': 'agent', 'name': 'Writer', 'file': 'support_team.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'agent.Reviewer': {'id': 'agent.Reviewer', 'kind': 'agent', 'name': 'Reviewer', 'file': 'support_team.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'agent_team.SupportCrew': {'id': 'agent_team.SupportCrew', 'kind': 'agent_team', 'name': 'SupportCrew', 'file': 'support_team.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'app.SupportTeamApp': {'id': 'app.SupportTeamApp', 'kind': 'app', 'name': 'SupportTeamApp', 'file': 'support_team.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}}, 'tables': {}, 'views': {}, 'flows': {}, 'operations': {}, 'rules': {}, 'roles': {}, 'security': {}, 'agents': {'Planner': {'name': 'Planner', 'role': 'support planner', 'model': 'openai:gpt-4.1-mini', 'runtime': None, 'system': "Break the customer's support request into a concrete resolution plan.", 'capabilities': [], 'tools': ['tickets.read', 'docs.search', 'product.lookup'], 'memory': {'kind': 'vector', 'name': 'planner_memory'}, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {'temperature': 0.1, 'max_turns': 5}, 'rules': [], 'ui': {}, 'theme': {}}, 'Writer': {'name': 'Writer', 'role': 'support writer', 'model': 'openai:gpt-4.1-mini', 'runtime': None, 'system': 'Write concise, empathetic customer-facing replies based on the resolution plan.', 'capabilities': [], 'tools': ['tickets.update', 'templates.fetch'], 'memory': None, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {'temperature': 0.3, 'max_turns': 4}, 'rules': [], 'ui': {}, 'theme': {}}, 'Reviewer': {'name': 'Reviewer', 'role': 'quality reviewer', 'model': 'openai:gpt-4.1-mini', 'runtime': None, 'system': 'Review the draft reply for accuracy, tone, and completeness. Flag any issues.', 'capabilities': [], 'tools': ['knowledge.verify', 'compliance.check'], 'memory': None, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {'temperature': 0.0, 'max_turns': 3}, 'rules': [], 'ui': {}, 'theme': {}}}, 'llms': {'Planner': {'model': 'openai:gpt-4.1-mini', 'runtime': None}, 'Writer': {'model': 'openai:gpt-4.1-mini', 'runtime': None}, 'Reviewer': {'model': 'openai:gpt-4.1-mini', 'runtime': None}}, 'capabilities': {}, 'composition': {'applications': {'SupportTeamApp': {'name': 'SupportTeamApp', 'description': 'Multi-agent support response platform', 'capabilities': [], 'agents': [], 'agent_teams': ['SupportCrew'], 'components': {}, 'screens': {}, 'routes': ['/support', '/agent-teams/support'], 'workflows': [], 'policies': {}, 'configuration': {}, 'theme': {}, 'runtime': {}, 'integrations': {}, 'deployments': {}}}, 'agent_teams': {}, 'capability_dependencies': {}}, 'contracts': {}, 'deployment': {'target': 'python', 'source': 'support_team.apg'}, 'packages': {}, 'graphs': {'er': {'kind': 'er', 'nodes': 0, 'edges': 0}, 'lookup': {'kind': 'lookup', 'nodes': 6, 'edges': 5}, 'workflow': {'kind': 'workflow', 'nodes': 6, 'edges': 5}, 'handler': {'kind': 'handler', 'nodes': 6, 'edges': 5}, 'capability': {'kind': 'capability', 'nodes': 1, 'edges': 0}, 'security': {'kind': 'security', 'nodes': 6, 'edges': 5}, 'agent': {'kind': 'agent', 'nodes': 4, 'edges': 0}, 'deployment': {'kind': 'deployment', 'nodes': 6, 'edges': 5}, 'package': {'kind': 'package', 'nodes': 6, 'edges': 5}}, 'diagnostics': []}
+APG_UI_TEMPLATES: Dict[str, str] = {'entity_list.html.j2': '{# entity_list.html.j2 — APG entity list + create form\n   Variables: entity_name, entity_type, safe_entity, fields, records,\n              total, count, records_table, create_inputs, notice, query,\n              has_kanban (bool), q (search term) #}\n\n{# Breadcrumb + view toggle #}\n<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">\n  <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>\n  <span>/</span>\n  <span class="font-semibold text-gray-900">{{ entity_name }}</span>\n  <div class="ml-auto flex items-center gap-1">\n    {% if has_kanban %}\n    <span class="px-3 py-1 text-xs bg-apg-primary text-white rounded-lg font-medium">≡ List</span>\n    <a href="/ui/entities/{{ safe_entity }}?view=kanban"\n       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">\n      ⊞ Kanban\n    </a>\n    {% endif %}\n    <a href="/entities/{{ safe_entity }}/records"\n       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-500 hover:border-gray-300 transition-colors">\n      API JSON ↗\n    </a>\n  </div>\n</nav>\n\n{% if notice %}\n<div role="alert"\n     class="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">\n  ⚠ {{ notice }}\n</div>\n{% endif %}\n\n{# Search bar #}\n<form method="get" action="/ui/entities/{{ safe_entity }}" class="mb-5">\n  <div class="relative max-w-sm">\n    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">🔍</span>\n    <input type="text" name="q" value="{{ q or \'\' }}"\n           placeholder="Search {{ entity_name }} records…"\n           class="w-full pl-8 pr-8 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">\n    {% if q %}\n    <a href="/ui/entities/{{ safe_entity }}"\n       class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs leading-none">✕</a>\n    {% endif %}\n  </div>\n</form>\n\n<div class="flex items-start gap-5 flex-col lg:flex-row">\n\n  {# ── Create form ─────────────────────────────────────────────── #}\n  <aside class="w-full lg:w-72 shrink-0">\n    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden sticky top-4">\n      <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">\n        <h2 class="text-sm font-semibold text-gray-900">New {{ entity_name }}</h2>\n        <span class="text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{{ entity_type }}</span>\n      </div>\n      <form method="post" action="/ui/entities/{{ safe_entity }}/records" novalidate>\n        <div class="overflow-y-auto max-h-[55vh] px-4 pt-4 space-y-3">\n          {{ create_inputs | safe }}\n        </div>\n        <div class="px-4 pb-4 pt-3 border-t border-gray-100">\n          <button type="submit"\n                  class="w-full px-3 py-2 bg-apg-primary text-white text-sm font-medium rounded-lg hover:opacity-90 active:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-apg-primary focus:ring-offset-2">\n            Create {{ entity_name }}\n          </button>\n        </div>\n      </form>\n    </div>\n  </aside>\n\n  {# ── Records section ─────────────────────────────────────────── #}\n  <section class="flex-1 min-w-0">\n    <div class="flex items-center gap-3 mb-3 flex-wrap">\n      <h1 class="text-lg font-semibold text-gray-900">{{ entity_name }}</h1>\n      <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">\n        {{ total }} record{{ \'s\' if total != 1 else \'\' }}\n      </span>\n      {% if count != total %}\n      <span class="text-xs text-apg-primary bg-blue-50 px-2 py-0.5 rounded-full">\n        {{ count }} match{% if q %} for "{{ q }}"{% endif %}\n      </span>\n      {% endif %}\n    </div>\n\n    <p class="text-xs text-gray-500 mb-2">Showing {{ count }} of {{ total }} matching records.</p>\n\n    {% if records %}\n      {{ records_table | safe }}\n    {% else %}\n      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">\n        <div class="text-3xl mb-3 opacity-30">📋</div>\n        {% if q %}\n        <p class="text-sm font-medium text-gray-500">No {{ entity_name }} records match "{{ q }}".</p>\n        <p class="text-xs text-gray-400 mt-1">\n          <a href="/ui/entities/{{ safe_entity }}" class="text-apg-primary hover:underline">Clear search</a>\n        </p>\n        {% else %}\n        <p class="text-sm font-medium text-gray-500">No {{ entity_name }} records yet.</p>\n        <p class="text-xs text-gray-400 mt-1">Use the form on the left to create the first one.</p>\n        {% endif %}\n      </div>\n    {% endif %}\n  </section>\n\n</div>\n\n<details class="mt-4">\n  <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">Advanced filter</summary>\n  <div class="mt-2">{{ query_form | safe }}</div>\n</details>\n\n<details class="mt-2">\n  <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">Record JSON</summary>\n  <pre class="mt-2 text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-auto max-h-64 font-mono">{{ records_json }}</pre>\n</details>\n', 'kanban_view.html.j2': '{# kanban_view.html.j2 — Kanban board view for status-field entities\n   Variables: entity_name, safe_entity, columns, display_field, status_field, fields\n   columns: [{"label": str, "records": [dict]}]\n#}\n\n{# Breadcrumb + view toggle #}\n<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">\n  <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>\n  <span>/</span>\n  <a href="/ui/entities/{{ safe_entity }}" class="hover:text-apg-primary transition-colors">{{ entity_name }}</a>\n  <span>/</span>\n  <span class="font-semibold text-gray-900">Kanban</span>\n  <div class="ml-auto flex items-center gap-1">\n    <a href="/ui/entities/{{ safe_entity }}"\n       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">\n      ≡ List\n    </a>\n    <span class="px-3 py-1 text-xs bg-apg-primary text-white rounded-lg font-medium">⊞ Kanban</span>\n  </div>\n</nav>\n\n<div class="flex items-center gap-4 mb-5">\n  <h1 class="text-xl font-bold text-gray-900">{{ entity_name }}</h1>\n  <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">\n    by {{ status_field | replace(\'_\', \' \') }}\n  </span>\n  <span class="text-xs text-gray-400">\n    {{ columns | sum(attribute=\'records\') | length }} total\n  </span>\n</div>\n\n{# Kanban board — horizontal scroll #}\n<div class="flex gap-4 overflow-x-auto pb-6 items-start -mx-1 px-1">\n  {% for col in columns %}\n  <div class="flex-shrink-0 w-72">\n    {# Column header #}\n    <div class="flex items-center justify-between mb-3 px-1">\n      <div class="flex items-center gap-2">\n        <span class="w-2.5 h-2.5 rounded-full\n          {% if col.label | lower in [\'active\', \'approved\', \'paid\', \'open\', \'complete\', \'completed\', \'success\', \'done\'] %}bg-green-400\n          {% elif col.label | lower in [\'inactive\', \'rejected\', \'closed\', \'cancelled\', \'canceled\', \'failed\', \'expired\'] %}bg-red-400\n          {% elif col.label | lower in [\'pending\', \'draft\', \'processing\', \'review\', \'in_progress\', \'waiting\'] %}bg-yellow-400\n          {% else %}bg-gray-300{% endif %}"></span>\n        <h2 class="text-sm font-semibold text-gray-900">{{ col.label }}</h2>\n        <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">{{ col.records | length }}</span>\n      </div>\n    </div>\n\n    {# Card list #}\n    <div class="space-y-2.5">\n      {% for record in col.records %}\n      {% set rec_id = record.get(\'id\', \'\') | string %}\n      <a href="/ui/entities/{{ safe_entity }}/{{ rec_id | urlencode }}"\n         class="block bg-white rounded-xl border border-gray-200 p-4 hover:border-apg-primary hover:shadow-md transition-all group/card">\n        <div class="flex items-start justify-between gap-2 mb-2.5">\n          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0"\n               style="background: var(--apg-primary, #0ea5e9)">\n            {{ (record.get(display_field, \'\') | string)[:1] | upper or \'?\' }}\n          </div>\n          <span class="text-xs text-gray-300 font-mono mt-1">{{ rec_id[:8] }}</span>\n        </div>\n        <p class="text-sm font-semibold text-gray-900 group-hover/card:text-apg-primary transition-colors leading-tight mb-2">\n          {{ record.get(display_field, \'—\') | string | truncate(50) }}\n        </p>\n        {% for f in fields %}\n        {% if f.name not in [\'id\', \'_revision\', display_field, status_field] %}\n        {% set fval = record.get(f.name, \'\') %}\n        {% if fval and fval != \'\' and fval != \'None\' %}\n        <p class="text-xs text-gray-400 truncate mt-0.5">\n          <span class="font-medium text-gray-500">{{ (f.name[:-3] | replace(\'_\', \' \') | title ~ \' ID\') if f.name.endswith(\'_id\') else (f.name | replace(\'_\', \' \') | title) }}:</span>\n          {{ fval | string | truncate(35) }}\n        </p>\n        {% if loop.index >= 2 %}{% break %}{% endif %}\n        {% endif %}\n        {% endif %}\n        {% endfor %}\n      </a>\n      {% endfor %}\n\n      {% if not col.records %}\n      <div class="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-6 text-center">\n        <p class="text-xs text-gray-300">Empty</p>\n      </div>\n      {% endif %}\n    </div>\n  </div>\n  {% endfor %}\n\n  {% if not columns %}\n  <div class="flex-1 text-center py-16 text-gray-400">\n    <div class="text-4xl mb-3 opacity-20">⊞</div>\n    <p class="text-sm">No records to display.</p>\n  </div>\n  {% endif %}\n</div>\n', 'landing.html.j2': '{# landing.html.j2 — APG application landing page\n   Variables: module_name, module_description, entities, capabilities,\n              theme_primary, theme_accent, landing_style, api_links\n   landing_style: "default" | "minimal" | "corporate" | "africa"\n#}\n<!doctype html>\n<html lang="en" class="h-full">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>{{ module_name | replace(\'_\', \' \') | title }}</title>\n  <link rel="preconnect" href="https://fonts.googleapis.com">\n  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">\n  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>\n  <script>\n    tailwind.config = {\n      theme: {\n        extend: {\n          fontFamily: { sans: [\'Inter\', \'system-ui\', \'sans-serif\'] },\n          colors: {\n            brand: { DEFAULT: \'{{ theme_primary }}\', light: \'{{ theme_accent }}\' }\n          }\n        }\n      }\n    }\n  </script>\n  <style>\n    :root {\n      --brand: {{ theme_primary }};\n      --accent: {{ theme_accent }};\n    }\n    .hero-gradient {\n      background: linear-gradient(135deg, {{ theme_primary }} 0%, {{ theme_accent }} 100%);\n    }\n    {% if landing_style == \'minimal\' %}\n    .hero-gradient { background: {{ theme_primary }}; }\n    {% elif landing_style == \'africa\' %}\n    .hero-gradient {\n      background: linear-gradient(135deg, #8B1A1A 0%, {{ theme_primary }} 50%, #E9A84B 100%);\n    }\n    {% elif landing_style == \'corporate\' %}\n    .hero-gradient { background: linear-gradient(180deg, #0F172A 0%, {{ theme_primary }} 100%); }\n    {% endif %}\n  </style>\n</head>\n<body class="min-h-full bg-gray-50 font-sans antialiased">\n\n  {# ── Hero ──────────────────────────────────────────────────────── #}\n  <div class="hero-gradient text-white">\n    <div class="max-w-6xl mx-auto px-6">\n      {# Topnav #}\n      <nav class="flex items-center justify-between py-5">\n        <span class="text-lg font-bold tracking-tight">\n          {{ module_name | replace(\'_\', \' \') | title }}\n        </span>\n        <div class="flex items-center gap-3">\n          <a href="/ui"\n             class="px-4 py-2 text-sm font-medium bg-white/15 hover:bg-white/25 rounded-lg transition-colors">\n            Open App\n          </a>\n          <a href="/openapi.json"\n             class="px-4 py-2 text-sm font-medium border border-white/30 hover:bg-white/10 rounded-lg transition-colors">\n            API Docs\n          </a>\n        </div>\n      </nav>\n\n      {# Hero content #}\n      <div class="py-20 text-center max-w-3xl mx-auto">\n        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 text-xs font-medium mb-6">\n          <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>\n          Powered by APG · Datacraft\n        </div>\n        <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-5">\n          {{ module_name | replace(\'_\', \' \') | title }}\n        </h1>\n        <p class="text-lg text-white/80 mb-8 leading-relaxed">\n          {{ module_description or \'A fully generated application by Datacraft APG.\' }}\n        </p>\n        <div class="flex items-center justify-center gap-3 flex-wrap">\n          <a href="/ui"\n             class="px-6 py-3 bg-white text-gray-900 font-semibold rounded-xl hover:bg-white/90 transition-colors shadow-lg">\n            Open Application →\n          </a>\n          <a href="/manifest"\n             class="px-6 py-3 border border-white/40 text-white font-medium rounded-xl hover:bg-white/10 transition-colors">\n            View Manifest\n          </a>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  {# ── Stats strip ────────────────────────────────────────────────── #}\n  <div class="bg-white border-b border-gray-200 shadow-sm">\n    <div class="max-w-6xl mx-auto px-6 py-5 grid grid-cols-2 sm:grid-cols-4 gap-6 divide-x divide-gray-100">\n      {% for stat in stats %}\n      <div class="px-6 first:pl-0 last:pr-0 text-center">\n        <p class="text-2xl font-bold text-gray-900">{{ stat.value }}</p>\n        <p class="text-xs font-medium uppercase tracking-wide text-gray-400 mt-0.5">{{ stat.label }}</p>\n      </div>\n      {% endfor %}\n    </div>\n  </div>\n\n  {# ── Entity cards ───────────────────────────────────────────────── #}\n  <main class="max-w-6xl mx-auto px-6 py-12">\n    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-5">Data Entities</h2>\n    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">\n      {% for entity in entities %}\n      {% if entity.type != \'application\' %}\n      <a href="/ui/entities/{{ entity.name }}"\n         class="group bg-white rounded-xl border border-gray-200 p-5 hover:border-brand hover:shadow-md transition-all">\n        <div class="flex items-start justify-between mb-3">\n          <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white text-sm font-bold"\n               style="background: var(--brand)">\n            {{ entity.name[0] | upper }}\n          </div>\n          <span class="text-xs font-medium text-gray-400 bg-gray-50 px-2 py-0.5 rounded uppercase tracking-wide">\n            {{ entity.type }}\n          </span>\n        </div>\n        <h3 class="font-semibold text-gray-900 group-hover:text-brand transition-colors">\n          {{ entity.name }}\n        </h3>\n        <p class="text-xs text-gray-400 mt-1">\n          {{ entity.fields | length if entity.fields else entity.properties | length }} fields\n        </p>\n      </a>\n      {% endif %}\n      {% endfor %}\n    </div>\n\n    {# ── API quick links ──────────────────────────────────────────── #}\n    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-4">API Endpoints</h2>\n    <div class="flex flex-wrap gap-2">\n      {% for link in api_links %}\n      <a href="{{ link.url }}"\n         class="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:border-brand hover:text-brand transition-colors">\n        {{ link.label }}\n      </a>\n      {% endfor %}\n    </div>\n  </main>\n\n  {# ── Footer ─────────────────────────────────────────────────────── #}\n  <footer class="border-t border-gray-200 py-6 text-center text-xs text-gray-400">\n    Generated by <span class="font-medium text-gray-600">APG</span> ·\n    <a href="https://www.datacraft.co.ke" class="hover:underline">Datacraft</a> ·\n    © 2025\n  </footer>\n\n</body>\n</html>\n', 'record_detail.html.j2': '{# record_detail.html.j2 — Salesforce-quality record detail page\n   Variables: entity_name, entity_type, safe_entity, safe_record_id,\n              record, fields, field_semantics, title, status_val, revision,\n              related_lists, has_kanban (bool)\n   related_lists: [{"entity": str, "fk_field": str, "records": [dict], "cols": [str]}]\n   field_semantics: {field_name: semantic_type}\n#}\n\n{# Breadcrumb #}\n<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">\n  <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>\n  <span>/</span>\n  <a href="/ui/entities/{{ safe_entity }}" class="hover:text-apg-primary transition-colors">{{ entity_name }}</a>\n  <span>/</span>\n  <span class="font-semibold text-gray-900 truncate max-w-xs">{{ title }}</span>\n</nav>\n\n{# Record header card #}\n<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5 overflow-hidden">\n  <div class="h-1 bg-apg-primary"></div>\n  <div class="px-6 py-5 flex items-start gap-4">\n    <div class="w-14 h-14 rounded-xl flex items-center justify-center text-white text-2xl font-bold flex-shrink-0"\n         style="background: var(--apg-primary, #0ea5e9)">\n      {{ (title[:1] | upper) if title else (entity_name[:1] | upper) }}\n    </div>\n    <div class="flex-1 min-w-0">\n      <div class="flex items-center gap-3 flex-wrap">\n        <h1 class="text-xl font-bold text-gray-900 break-all">{{ title }}</h1>\n        {% if status_val %}\n        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold\n          {% if status_val | lower in [\'active\', \'approved\', \'paid\', \'open\', \'enabled\', \'complete\', \'completed\', \'success\'] %}bg-green-100 text-green-800\n          {% elif status_val | lower in [\'inactive\', \'rejected\', \'closed\', \'disabled\', \'cancelled\', \'canceled\', \'failed\', \'expired\'] %}bg-red-100 text-red-800\n          {% elif status_val | lower in [\'pending\', \'draft\', \'processing\', \'review\', \'in_progress\', \'waiting\'] %}bg-yellow-100 text-yellow-800\n          {% else %}bg-gray-100 text-gray-600{% endif %}">\n          {{ status_val }}\n        </span>\n        {% endif %}\n        <span class="text-xs font-medium text-gray-400 bg-gray-50 px-2 py-0.5 rounded uppercase tracking-wide">{{ entity_type }}</span>\n      </div>\n      {% set id_val = record.get(\'id\', \'\') %}\n      {% if id_val %}\n      <p class="text-xs text-gray-400 mt-1 font-mono truncate">{{ id_val | string }}</p>\n      {% endif %}\n    </div>\n    <div class="flex items-center gap-2 flex-shrink-0 flex-wrap">\n      <a href="/ui/workflows/{{ safe_entity }}/create_{{ safe_entity }}"\n         class="px-3 py-1.5 text-sm font-medium bg-apg-primary text-white rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap">\n        ⚡ Workflow\n      </a>\n      <form method="post"\n            action="/ui/entities/{{ safe_entity }}/records/{{ safe_record_id }}/delete"\n            class="inline"\n            onsubmit="return confirm(\'Delete this record? This cannot be undone.\')">\n        <input type="hidden" name="expected_revision" value="{{ revision }}">\n        <button type="submit"\n                class="px-3 py-1.5 text-sm font-medium border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors">\n          Delete\n        </button>\n      </form>\n    </div>\n  </div>\n{# Highlights panel — top fields at a glance #}\n{% set highlight_fields = [] %}\n{% for f in fields %}\n  {% if f.name not in [\'id\', \'_revision\'] and not f.name.endswith(\'_id\') %}\n    {% if highlight_fields | length < 4 %}\n      {% set _ = highlight_fields.append(f) %}\n    {% endif %}\n  {% endif %}\n{% endfor %}\n{% if highlight_fields %}\n<div class="border-t border-gray-100 px-6 py-3 grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50/50">\n  {% for f in highlight_fields %}\n  {% set fv = record.get(f.name, \'\') %}\n  {% set sem = field_semantics.get(f.name, \'text\') if field_semantics else \'text\' %}\n  <div class="min-w-0">\n    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5 truncate">\n      {{ (f.name[:-3] | replace(\'_\',\' \') | title ~ \' ID\') if f.name.endswith(\'_id\') else (f.name | replace(\'_\',\' \') | title) }}\n    </p>\n    <p class="text-sm font-medium text-gray-900 truncate">\n      {% if fv is none or fv == \'\' or fv | string == \'None\' %}\n      <span class="text-gray-300 italic text-xs">—</span>\n      {% elif sem == \'currency\' %}\n      <span class="tabular-nums">{{ fv | string }}</span>\n      {% elif sem == \'status\' %}\n      <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-semibold\n        {% if fv | string | lower in [\'active\',\'approved\',\'paid\',\'open\',\'enabled\',\'complete\',\'completed\',\'success\',\'done\'] %}bg-green-100 text-green-800\n        {% elif fv | string | lower in [\'inactive\',\'rejected\',\'closed\',\'disabled\',\'cancelled\',\'canceled\',\'failed\',\'expired\'] %}bg-red-100 text-red-800\n        {% else %}bg-yellow-100 text-yellow-800{% endif %}">{{ fv }}</span>\n      {% else %}\n      {{ fv | string | truncate(30) }}\n      {% endif %}\n    </p>\n  </div>\n  {% endfor %}\n</div>\n{% endif %}\n</div>\n\n{# Tab bar #}\n<div class="flex items-center gap-1 border-b border-gray-200 mb-6">\n  <button onclick="apgTab(\'details\')" id="apg-tab-details"\n          class="apg-tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-apg-primary text-apg-primary -mb-px transition-colors">\n    Details\n  </button>\n  <button onclick="apgTab(\'related\')" id="apg-tab-related"\n          class="apg-tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 -mb-px transition-colors">\n    Related\n    {% if related_lists %}\n    <span class="ml-1 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">\n      {{ related_lists | sum(attribute=\'records\') | length if related_lists else 0 }}\n    </span>\n    {% endif %}\n  </button>\n  <button onclick="apgTab(\'activity\')" id="apg-tab-activity"\n          class="apg-tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 -mb-px transition-colors">\n    Activity\n  </button>\n</div>\n\n{# Details panel #}\n<div id="apg-panel-details">\n  <div class="bg-white rounded-xl border border-gray-200 shadow-sm">\n    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">\n      <h2 class="text-sm font-semibold text-gray-900">Record Details</h2>\n      <span class="text-xs text-gray-400 font-mono">rev. {{ revision }}</span>\n    </div>\n    <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-8">\n      {% for field in fields %}\n      {% if field.name != \'_revision\' %}\n      {% set field_val = record.get(field.name, \'\') %}\n      {% set fld_id = \'fld-\' ~ safe_entity ~ \'-\' ~ safe_record_id ~ \'-\' ~ field.name %}\n      <div id="{{ fld_id }}" class="py-3 border-b border-gray-50 last:border-0 group/field">\n        <dt class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">\n          {{ (field.name[:-3] | replace(\'_\', \' \') | title ~ \' ID\') if field.name.endswith(\'_id\') else (field.name | replace(\'_\', \' \') | title) }}\n        </dt>\n        <dd class="flex items-center justify-between gap-2 min-h-6">\n          <span class="text-sm text-gray-900 break-words">\n            {% set semantic = field_semantics.get(field.name, \'text\') if field_semantics else \'text\' %}\n            {% include \'widgets/field_display.html.j2\' %}\n          </span>\n          <button\n            hx-get="/ui/entities/{{ safe_entity }}/{{ safe_record_id }}/fields/{{ field.name }}/edit"\n            hx-target="#{{ fld_id }}"\n            hx-swap="outerHTML"\n            class="opacity-0 group-hover/field:opacity-100 flex-shrink-0 p-1 text-gray-300 hover:text-apg-primary rounded transition-all"\n            title="Edit {{ field.name }}">\n            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">\n              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zm-2.207 2.207L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>\n            </svg>\n          </button>\n        </dd>\n      </div>\n      {% endif %}\n      {% endfor %}\n    </div>\n  </div>\n</div>\n\n{# Related panel #}\n<div id="apg-panel-related" class="hidden">\n  {% if related_lists %}\n    {% for rel in related_lists %}\n    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-4">\n      <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">\n        <div class="flex items-center gap-2">\n          <h2 class="text-sm font-semibold text-gray-900">{{ rel.entity }}</h2>\n          <span class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">{{ rel.records | length }}</span>\n        </div>\n        <a href="/ui/entities/{{ rel.entity | urlencode }}"\n           class="text-xs text-apg-primary hover:underline">View all →</a>\n      </div>\n      {% if rel.records %}\n      <div class="overflow-x-auto">\n        <table class="w-full text-sm">\n          <thead>\n            <tr class="bg-gray-50 border-b border-gray-100">\n              {% for col in rel.cols %}\n              <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">\n                {{ (col[:-3] | replace(\'_\', \' \') | title ~ \' ID\') if col.endswith(\'_id\') else (col | replace(\'_\', \' \') | title) }}\n              </th>\n              {% endfor %}\n              <th class="px-4 py-2 w-16"></th>\n            </tr>\n          </thead>\n          <tbody class="divide-y divide-gray-50">\n            {% for row in rel.records[:5] %}\n            <tr class="hover:bg-gray-50 transition-colors">\n              {% for col in rel.cols %}\n              <td class="px-4 py-2.5 text-gray-700 max-w-xs truncate">\n                {{ row.get(col, \'\') | string | truncate(40) }}\n              </td>\n              {% endfor %}\n              <td class="px-4 py-2.5 text-right">\n                <a href="/ui/entities/{{ rel.entity | urlencode }}/{{ row.get(\'id\', \'\') | string | urlencode }}"\n                   class="text-xs text-apg-primary hover:underline font-medium">View →</a>\n              </td>\n            </tr>\n            {% endfor %}\n            {% if rel.records | length > 5 %}\n            <tr>\n              <td colspan="{{ rel.cols | length + 1 }}" class="px-4 py-2.5 text-center text-xs text-gray-400">\n                + {{ rel.records | length - 5 }} more —\n                <a href="/ui/entities/{{ rel.entity | urlencode }}" class="text-apg-primary hover:underline">view all</a>\n              </td>\n            </tr>\n            {% endif %}\n          </tbody>\n        </table>\n      </div>\n      {% else %}\n      <div class="px-4 py-8 text-center text-sm text-gray-400">No related {{ rel.entity }} records.</div>\n      {% endif %}\n    </div>\n    {% endfor %}\n  {% else %}\n  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">\n    <div class="text-4xl mb-3 opacity-20">🔗</div>\n    <p class="text-sm font-medium text-gray-500">No related records found.</p>\n    <p class="text-xs text-gray-400 mt-1">Other entities with FK fields pointing to {{ entity_name }} appear here.</p>\n  </div>\n  {% endif %}\n</div>\n\n{# Activity panel #}\n<div id="apg-panel-activity" class="hidden">\n  <div class="bg-white rounded-xl border border-gray-200 shadow-sm">\n    <div class="px-4 py-3 border-b border-gray-100">\n      <h2 class="text-sm font-semibold text-gray-900">Activity</h2>\n    </div>\n    <div class="p-5">\n      <ol class="relative border-l-2 border-gray-100 ml-4 space-y-5">\n        <li class="ml-6">\n          <span class="absolute flex items-center justify-center w-8 h-8 bg-blue-50 rounded-full -left-4 text-sm ring-4 ring-white">📋</span>\n          <div class="pl-2">\n            <p class="text-sm font-medium text-gray-900">Record created</p>\n            <p class="text-xs text-gray-400 mt-0.5">Revision {{ revision }} · via APG</p>\n          </div>\n        </li>\n      </ol>\n      <div class="mt-8 flex gap-3">\n        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"\n             style="background: var(--apg-primary, #0ea5e9)">A</div>\n        <div class="flex-1">\n          <textarea placeholder="Add a note…" rows="2"\n                    class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent placeholder-gray-300"></textarea>\n          <button class="mt-1.5 px-3 py-1.5 bg-apg-primary text-white text-xs font-medium rounded-lg hover:opacity-90 transition-opacity">\n            Save Note\n          </button>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n\n<script>\nfunction apgTab(name) {\n  document.querySelectorAll(\'.apg-tab-btn\').forEach(function(b) {\n    b.classList.remove(\'border-apg-primary\', \'text-apg-primary\');\n    b.classList.add(\'border-transparent\', \'text-gray-500\');\n  });\n  document.querySelectorAll(\'[id^="apg-panel-"]\').forEach(function(p) { p.classList.add(\'hidden\'); });\n  var btn = document.getElementById(\'apg-tab-\' + name);\n  if (btn) {\n    btn.classList.remove(\'border-transparent\', \'text-gray-500\');\n    btn.classList.add(\'border-apg-primary\', \'text-apg-primary\');\n  }\n  var panel = document.getElementById(\'apg-panel-\' + name);\n  if (panel) panel.classList.remove(\'hidden\');\n}\n</script>\n', 'marketplace.html.j2': '{# marketplace.html.j2 — APG Connector Marketplace\n   Variables: connectors (list of manifest dicts), installed_count\n#}\n\n<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">\n  <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>\n  <span>/</span>\n  <span class="font-semibold text-gray-900">Connector Marketplace</span>\n</nav>\n\n<div class="flex items-center gap-4 mb-6">\n  <h1 class="text-xl font-bold text-gray-900">Connector Marketplace</h1>\n  <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">\n    {{ connectors | length }} connector{{ \'s\' if connectors | length != 1 else \'\' }}\n  </span>\n</div>\n\n{% if connectors %}\n<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">\n  {% for conn in connectors %}\n  <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:border-apg-primary hover:shadow-md transition-all p-5 group">\n    <div class="flex items-start gap-4 mb-3">\n      <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold flex-shrink-0"\n           style="background: var(--apg-primary, #0ea5e9)">\n        {{ (conn.title or conn.name or \'?\')[:1] | upper }}\n      </div>\n      <div class="flex-1 min-w-0">\n        <h2 class="text-sm font-bold text-gray-900 group-hover:text-apg-primary transition-colors truncate">\n          {{ conn.title or conn.name }}\n        </h2>\n        <p class="text-xs text-gray-400 truncate">{{ conn.base_url or \'Custom connector\' }}</p>\n      </div>\n    </div>\n    <div class="flex items-center gap-3 text-xs text-gray-500 mb-4">\n      <span class="flex items-center gap-1">\n        <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>\n        {{ (conn.operations or []) | length }} operations\n      </span>\n      {% if conn.version %}\n      <span class="text-gray-300">·</span>\n      <span>v{{ conn.version }}</span>\n      {% endif %}\n    </div>\n    <div class="flex items-center gap-2">\n      <span class="flex-1 text-xs text-gray-400 font-mono truncate">{{ conn.file or conn.name }}</span>\n      <a href="/entities/connectors/{{ conn.name | urlencode }}"\n         class="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">\n        View API ↗\n      </a>\n    </div>\n  </div>\n  {% endfor %}\n</div>\n{% else %}\n<div class="bg-white rounded-xl border border-gray-200 shadow-sm p-16 text-center">\n  <div class="text-5xl mb-4 opacity-20">🔌</div>\n  <p class="text-sm font-medium text-gray-500 mb-1">No connectors installed</p>\n  <p class="text-xs text-gray-400 mb-6">Generate a connector from an OpenAPI spec to get started.</p>\n  <div class="bg-gray-50 rounded-lg border border-gray-200 px-4 py-3 text-left max-w-sm mx-auto">\n    <p class="text-xs font-mono text-gray-600">apg connector generate --spec openapi.yaml</p>\n  </div>\n</div>\n{% endif %}\n', 'app_index.html.j2': '<!--- app_index.html.j2 — APG application home page --->\n{# Variables: module_name, module_description, entities, capabilities, databases,\n              application_routes, ui_routes, agents, agent_teams #}\n<div class="mb-6">\n  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ module_name }}</h1>\n  <p class="text-gray-500 mt-1">{{ module_description or \'Generated APG application\' }}</p>\n</div>\n\n{# Quick nav #}\n<nav class="flex flex-wrap gap-2 mb-8 text-sm" aria-label="API navigation">\n  <a href="/ui/workflows"\n     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-apg-primary text-white hover:opacity-90 transition-opacity font-medium">\n    ⚡ Workflows\n  </a>\n  {% for link in api_links %}\n  <a href="{{ link.url }}"\n     class="inline-flex items-center px-3 py-1.5 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-apg-primary transition-colors">\n    {{ link.label }}\n  </a>\n  {% endfor %}\n</nav>\n\n{# Stats row #}\n<div class="apg-grid-4 mb-8">\n  <div class="apg-card">\n    <div class="apg-stat">\n      <span class="apg-stat-value">{{ entities | length }}</span>\n      <span class="apg-stat-label">Entities</span>\n    </div>\n  </div>\n  <div class="apg-card">\n    <div class="apg-stat">\n      <span class="apg-stat-value">{{ capabilities | length }}</span>\n      <span class="apg-stat-label">Capabilities</span>\n    </div>\n  </div>\n  <div class="apg-card">\n    <div class="apg-stat">\n      <span class="apg-stat-value">{{ agents | length }}</span>\n      <span class="apg-stat-label">AI Agents</span>\n    </div>\n  </div>\n  <div class="apg-card">\n    <div class="apg-stat">\n      <span class="apg-stat-value">{{ ui_routes | length }}</span>\n      <span class="apg-stat-label">Screens</span>\n    </div>\n  </div>\n</div>\n\n<div class="apg-grid-2 gap-6">\n  {% if entities %}\n  <div class="apg-card">\n    <div class="apg-card-header">\n      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Entities</h2>\n    </div>\n    <ul class="divide-y divide-gray-100 dark:divide-gray-700">\n      {% for entity in entities %}\n      <li class="py-2 flex items-center justify-between">\n        <a href="/ui/entities/{{ entity.name | urlencode }}"\n           class="text-sm text-apg-primary hover:underline font-medium">\n          {{ entity.name }}\n        </a>\n        <span class="apg-badge apg-badge-neutral">{{ entity.type }}</span>\n      </li>\n      {% endfor %}\n    </ul>\n  </div>\n  {% endif %}\n\n  {% if capabilities %}\n  <div class="apg-card">\n    <div class="apg-card-header">\n      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Capabilities</h2>\n    </div>\n    <ul class="divide-y divide-gray-100 dark:divide-gray-700">\n      {% for cap in capabilities %}\n      <li class="py-2">\n        <a href="/ui/capabilities/{{ cap | urlencode }}"\n           class="text-sm text-apg-primary hover:underline font-medium">\n          {{ cap }}\n        </a>\n      </li>\n      {% endfor %}\n    </ul>\n  </div>\n  {% endif %}\n\n  {% if ui_routes %}\n  <div class="apg-card">\n    <div class="apg-card-header">\n      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Application Screens</h2>\n    </div>\n    <ul class="divide-y divide-gray-100 dark:divide-gray-700">\n      {% for route, screen in ui_routes.items() %}\n      <li class="py-2 flex items-center justify-between">\n        <a href="{{ route }}" class="text-sm text-apg-primary hover:underline">{{ route }}</a>\n        <span class="text-xs text-gray-400">{{ screen.get(\'application\', \'\') }}</span>\n      </li>\n      {% endfor %}\n    </ul>\n  </div>\n  {% endif %}\n\n  {% if agents %}\n  <div class="apg-card">\n    <div class="apg-card-header">\n      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Agents</h2>\n    </div>\n    <ul class="divide-y divide-gray-100 dark:divide-gray-700">\n      {% for agent_name in agents %}\n      <li class="py-2">\n        <a href="/ui/agents/{{ agent_name | urlencode }}"\n           class="text-sm text-apg-primary hover:underline font-medium">\n          {{ agent_name }}\n        </a>\n      </li>\n      {% endfor %}\n    </ul>\n  </div>\n  {% endif %}\n</div>\n', 'widgets/field_display.html.j2': '{# field_display.html.j2 — semantic field rendering for record detail\n   Included by record_detail.html.j2 for individual field value rendering.\n   Variables: field (dict), field_val (any), semantic (str)\n#}\n{% if semantic == \'email\' and field_val %}\n  <a href="mailto:{{ field_val }}" class="text-apg-primary hover:underline text-sm">{{ field_val }}</a>\n{% elif semantic == \'phone\' and field_val %}\n  <a href="tel:{{ field_val }}" class="text-apg-primary hover:underline text-sm inline-flex items-center gap-1">\n    <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>\n    {{ field_val }}\n  </a>\n{% elif semantic == \'url\' and field_val %}\n  <a href="{{ field_val }}" target="_blank" rel="noopener" class="text-apg-primary hover:underline text-sm inline-flex items-center gap-1 truncate max-w-xs">\n    <svg class="w-3 h-3 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>\n    {{ field_val | string | truncate(40) }}\n  </a>\n{% elif semantic == \'image_url\' and field_val %}\n  <img src="{{ field_val }}" alt="{{ field.name }}" class="w-12 h-12 rounded-lg object-cover border border-gray-100">\n{% elif semantic == \'currency\' and field_val %}\n  <span class="text-sm font-semibold text-gray-900 tabular-nums">{{ field_val | string | float | round(2) }}</span>\n{% elif semantic == \'percent\' and field_val %}\n  <div class="flex items-center gap-2">\n    <div class="flex-1 bg-gray-100 rounded-full h-1.5 max-w-24">\n      <div class="bg-apg-primary h-1.5 rounded-full" style="width: {{ [field_val | float, 100] | min }}%"></div>\n    </div>\n    <span class="text-sm text-gray-700 tabular-nums">{{ field_val }}%</span>\n  </div>\n{% elif semantic == \'rating\' and field_val %}\n  <div class="flex items-center gap-0.5">\n    {% set stars = field_val | float | round | int %}\n    {% for i in range(5) %}\n    <svg class="w-4 h-4 {{ \'text-amber-400\' if i < stars else \'text-gray-200\' }}" viewBox="0 0 20 20" fill="currentColor">\n      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>\n    </svg>\n    {% endfor %}\n    <span class="text-xs text-gray-400 ml-1">{{ field_val }}/5</span>\n  </div>\n{% elif semantic == \'color\' and field_val %}\n  <div class="flex items-center gap-2">\n    <div class="w-5 h-5 rounded-full border border-gray-200 flex-shrink-0" style="background-color: {{ field_val }}"></div>\n    <span class="text-sm text-gray-700 font-mono">{{ field_val }}</span>\n  </div>\n{% elif semantic == \'json\' and field_val %}\n  <details class="max-w-xs">\n    <summary class="text-xs text-apg-primary cursor-pointer hover:underline">View JSON</summary>\n    <pre class="mt-1 text-xs bg-gray-50 rounded-lg p-2 overflow-auto max-h-40 border border-gray-100">{{ field_val | string }}</pre>\n  </details>\n{% elif semantic == \'status\' and field_val %}\n  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold\n    {% if field_val | lower in [\'active\', \'approved\', \'paid\', \'open\', \'enabled\', \'complete\', \'completed\', \'success\', \'done\'] %}bg-green-100 text-green-800\n    {% elif field_val | lower in [\'inactive\', \'rejected\', \'closed\', \'disabled\', \'cancelled\', \'canceled\', \'failed\', \'expired\'] %}bg-red-100 text-red-800\n    {% elif field_val | lower in [\'pending\', \'draft\', \'processing\', \'review\', \'in_progress\', \'waiting\'] %}bg-yellow-100 text-yellow-800\n    {% else %}bg-gray-100 text-gray-600{% endif %}">\n    {{ field_val }}\n  </span>\n{% elif semantic == \'boolean\' %}\n  {% if field_val | string | lower in [\'true\', \'1\', \'yes\'] %}\n  <span class="inline-flex items-center gap-1 text-green-600 text-sm"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>Yes</span>\n  {% else %}\n  <span class="inline-flex items-center gap-1 text-gray-400 text-sm"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>No</span>\n  {% endif %}\n{% else %}\n  {% if field_val is none or field_val == \'\' or field_val | string == \'None\' %}\n  <span class="text-gray-300 italic text-xs">—</span>\n  {% else %}\n  {{ field_val | string | truncate(200) }}\n  {% endif %}\n{% endif %}\n'}
 
 
 def _optional_module(name: str) -> Optional[Any]:
@@ -44,9 +56,92 @@ def _optional_module(name: str) -> Optional[Any]:
         return None
 
 
+def _log_activity(entity_name: str, record_id: str, event_type: str, actor: str = "system", detail: str = "") -> None:
+    key = f"{entity_name}:{record_id}"
+    if key not in APG_ACTIVITY_LOG:
+        APG_ACTIVITY_LOG[key] = []
+    import datetime
+    APG_ACTIVITY_LOG[key].append({
+        "type": event_type,
+        "actor": actor,
+        "detail": detail,
+        "ts": datetime.datetime.utcnow().isoformat() + "Z",
+    })
+    if len(APG_ACTIVITY_LOG[key]) > 50:
+        APG_ACTIVITY_LOG[key] = APG_ACTIVITY_LOG[key][-50:]
+
+
+def _get_activity(entity_name: str, record_id: str) -> list[Dict[str, Any]]:
+    return list(reversed(APG_ACTIVITY_LOG.get(f"{entity_name}:{record_id}", [])))
+
+
 AI_AGENTS = _optional_module("ai_agents")
 APG_APPLICATIONS = _optional_module("apg_application")
 APG_CAPABILITIES = _optional_module("apg_capabilities")
+
+import hashlib as _hashlib
+
+
+def _journal_append(run_id: str, event_type: str, step: str, data: Dict[str, Any]) -> None:
+    import datetime
+    if run_id not in WORKFLOW_EVENT_JOURNAL:
+        WORKFLOW_EVENT_JOURNAL[run_id] = []
+    prev_hash = WORKFLOW_EVENT_JOURNAL[run_id][-1]["hash"] if WORKFLOW_EVENT_JOURNAL[run_id] else "0" * 64
+    entry = {
+        "seq": len(WORKFLOW_EVENT_JOURNAL[run_id]),
+        "run_id": run_id,
+        "event_type": event_type,
+        "step": step,
+        "ts": datetime.datetime.utcnow().isoformat() + "Z",
+        "data": data,
+    }
+    raw = f"{prev_hash}{entry['seq']}{entry['event_type']}{entry['step']}{entry['ts']}"
+    entry["hash"] = _hashlib.sha256(raw.encode()).hexdigest()
+    WORKFLOW_EVENT_JOURNAL[run_id].append(entry)
+    if _APG_PG_URL:
+        _pg_save_journal_entry(entry)
+
+
+def _pg_save_journal_entry(entry: Dict[str, Any]) -> None:
+    conn = _pg_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS apg_workflow_journal ("
+                "  id SERIAL PRIMARY KEY,"
+                "  run_id TEXT NOT NULL,"
+                "  seq INTEGER NOT NULL,"
+                "  module_name TEXT NOT NULL,"
+                "  event_type TEXT NOT NULL,"
+                "  step TEXT NOT NULL,"
+                "  ts TIMESTAMPTZ NOT NULL,"
+                "  data TEXT NOT NULL,"
+                "  hash TEXT NOT NULL,"
+                "  UNIQUE(run_id, seq)"
+                ")"
+            )
+            cur.execute(
+                "INSERT INTO apg_workflow_journal (run_id, seq, module_name, event_type, step, ts, data, hash)"
+                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                " ON CONFLICT DO NOTHING",
+                (
+                    entry["run_id"], entry["seq"], MODULE_NAME,
+                    entry["event_type"], entry["step"],
+                    entry["ts"], json.dumps(entry.get("data", {}), default=str),
+                    entry["hash"]
+                )
+            )
+        conn.commit()
+    except Exception:
+        pass  # best-effort
+    finally:
+        conn.close()
+
+
+def _get_journal(run_id: str) -> list[Dict[str, Any]]:
+    return WORKFLOW_EVENT_JOURNAL.get(run_id, [])
 
 
 def list_agents() -> list[str]:
@@ -513,6 +608,19 @@ def describe_workflows() -> Dict[str, Dict[str, Any]]:
     }
 
 
+def _trigger_saga_compensation(workflow: Dict[str, Any], completed_steps: list[str]) -> None:
+    comp = workflow.get("compensation", {})
+    if not isinstance(comp, dict):
+        return
+    for step in reversed(completed_steps):
+        action = comp.get(step)
+        if action:
+            try:
+                _record_event("saga.compensate", str(workflow.get("name", "workflow")), after={"step": step, "action": str(action)})
+            except Exception:
+                pass  # best-effort
+
+
 def _execute_workflow_steps(
     workflow: Dict[str, Any],
     steps: list[str],
@@ -521,6 +629,7 @@ def _execute_workflow_steps(
     pause_at: str | None = None,
     existing_trace: list[Dict[str, Any]] | None = None,
     existing_completed_steps: list[str] | None = None,
+    run_id: str = "",
 ) -> Dict[str, Any]:
     selected_steps = steps[start_index:]
     if pause_at is not None and pause_at not in selected_steps:
@@ -544,6 +653,8 @@ def _execute_workflow_steps(
             "step": step,
             **_workflow_step_metadata(workflow, step),
         }
+        if run_id:
+            _journal_append(run_id, "step_started", step, {})
         guard = guards.get(step)
         if guard is not None:
             guard_passed = _evaluate_workflow_condition(guard, payload)
@@ -589,6 +700,35 @@ def _execute_workflow_steps(
             entry["event_received"] = event_name
         failure_budget = _step_failure_budget(step, payload)
         retry_limit = _retry_limit(retry_policy.get(step)) if isinstance(retry_policy, dict) and step in retry_policy else 1
+        # Circuit breaker: fail fast if open
+        cb_k = _cb_key(workflow.get("name", "wf"), step)
+        # Check workflow-level circuit_breaker config for this step
+        wf_circuit_breakers = workflow.get("circuit_breakers", {})
+        step_cb_spec = wf_circuit_breakers.get(step, {}) if isinstance(wf_circuit_breakers, dict) else {}
+        _raw_step_policy = retry_policy.get(step) if isinstance(retry_policy, dict) else None
+        step_policy = _raw_step_policy if isinstance(_raw_step_policy, dict) else {}
+        cb_threshold = int(step_cb_spec.get("threshold", step_policy.get("circuit_threshold", 5)) if isinstance(step_cb_spec, dict) else step_policy.get("circuit_threshold", 5))
+        cb_reset = int(step_cb_spec.get("reset_timeout", step_policy.get("reset_timeout", 60)) if isinstance(step_cb_spec, dict) else step_policy.get("reset_timeout", 60))
+        if _cb_is_open(cb_k, cb_threshold, cb_reset):
+            entry["status"] = "circuit_open"
+            trace.append(entry)
+            return {
+                "status": "failed",
+                "current_step": step,
+                "completed_at": None,
+                "steps": selected_steps,
+                "completed_steps": completed_steps,
+                "pending_steps": selected_steps[offset:],
+                "trace": trace,
+                "payload": payload,
+                "failed_at": step,
+                "failure_reason": "circuit_open",
+                "compensations": _compensation_actions(workflow, completed_steps),
+            }
+        # Step timeout metadata (from timers dict)
+        timers = workflow.get("timers", {})
+        if isinstance(timers, dict) and step in timers:
+            entry["timeout_spec"] = timers[step]
         attempts: list[Dict[str, Any]] = []
         for attempt_number in range(1, retry_limit + 1):
             failed = failure_budget >= attempt_number
@@ -600,6 +740,17 @@ def _execute_workflow_steps(
                 break
         entry["attempts"] = attempts
         if attempts and attempts[-1]["status"] == "failed":
+            _cb_fail(cb_k, cb_threshold, cb_reset)
+            # Saga: auto-trigger compensation for completed steps
+            is_saga = bool(workflow.get("is_saga", False))
+            if is_saga and completed_steps:
+                _trigger_saga_compensation(workflow, completed_steps)
+                if run_id:
+                    comp = workflow.get("compensation", {})
+                    comp_action = str(comp.get(step, "")) if isinstance(comp, dict) else ""
+                    _journal_append(run_id, "saga_compensating", step, {"compensation": comp_action})
+            if run_id:
+                _journal_append(run_id, "step_failed", step, {"error": "step_failed_after_retries"})
             entry["status"] = "failed"
             trace.append(entry)
             return {
@@ -616,9 +767,12 @@ def _execute_workflow_steps(
                 "attempts": attempts,
                 "compensations": _compensation_actions(workflow, completed_steps),
             }
+        _cb_success(cb_k)
         entry["status"] = "completed"
         trace.append(entry)
         completed_steps.append(step)
+        if run_id:
+            _journal_append(run_id, "step_completed", step, {"attempts": len(attempts)})
         if pause_at == step and offset < len(selected_steps) - 1:
             return {
                 "status": "paused",
@@ -669,14 +823,14 @@ def run_workflow(workflow_name: str, payload: Dict[str, Any] | None = None) -> D
     selected_steps = steps[start_index:]
     pause_at = payload.get("pause_at", payload.get("stop_after"))
     pause_at = str(pause_at) if pause_at is not None else None
-    execution = _execute_workflow_steps(workflow, steps, start_index, payload, pause_at)
+    run_id = f"workflow-run-{NEXT_WORKFLOW_RUN_ID}"
+    NEXT_WORKFLOW_RUN_ID += 1
+    execution = _execute_workflow_steps(workflow, steps, start_index, payload, pause_at, run_id=run_id)
     if execution.get("status") == "error":
         return {
             "workflow": workflow_name,
             **execution,
         }
-    run_id = f"workflow-run-{NEXT_WORKFLOW_RUN_ID}"
-    NEXT_WORKFLOW_RUN_ID += 1
     result = {
         "id": run_id,
         "workflow": workflow_name,
@@ -686,10 +840,28 @@ def run_workflow(workflow_name: str, payload: Dict[str, Any] | None = None) -> D
     event = _record_event("workflow.run", workflow_name, after=result)
     result["event_id"] = event["id"]
     WORKFLOW_RUNS[run_id] = dict(result)
+    # PostgreSQL persistence for durable workflows
+    if _APG_PG_URL:
+        _pg_save_workflow_run(result)
     persistence_error = _persist_record_store()
     if persistence_error:
         result["persistence_error"] = persistence_error
         WORKFLOW_RUNS[run_id] = dict(result)
+    # Emit declared completion events
+    emit_events = workflow.get("emit_events") or workflow.get("events", {}).get("emit", [])
+    if isinstance(emit_events, str):
+        emit_events = [emit_events]
+    for ev_name in (emit_events or []):
+        try:
+            emit_apg_event(str(ev_name), {"workflow": workflow_name, "run_id": run_id, "status": execution.get("status")})
+        except Exception:
+            pass  # best-effort
+    # Register subscriptions declared on this workflow
+    subscribe_events = workflow.get("subscribe_events") or workflow.get("events", {}).get("subscribe", [])
+    if isinstance(subscribe_events, str):
+        subscribe_events = [subscribe_events]
+    for ev_name in (subscribe_events or []):
+        _subscribe_workflow_event(str(ev_name), workflow_name)
     return dict(result)
 
 
@@ -749,6 +921,7 @@ def resume_workflow(run_id: str, payload: Dict[str, Any] | None = None) -> Dict[
         pause_at,
         existing_trace=list(existing.get("trace", [])),
         existing_completed_steps=list(existing.get("completed_steps", [])),
+        run_id=run_id,
     )
     if execution.get("status") == "error":
         return {
@@ -828,6 +1001,92 @@ def execute_workflow_compensations(
     }
 
 
+import threading as _apg_threading
+_CB_LOCK = _apg_threading.Lock()
+_ES_LOCK = _apg_threading.Lock()
+try:
+    import jwt as _jwt_lib
+except ImportError:
+    _jwt_lib = None
+
+
+def _cb_key(workflow_name: str, step: str) -> str:
+    return f"{workflow_name}:{step}"
+
+
+def _cb_is_open(key: str, threshold: int = 5, reset: int = 60) -> bool:
+    import time as _t
+    with _CB_LOCK:
+        cb = CIRCUIT_BREAKERS.get(key)
+        if cb is None:
+            return False
+        if cb["state"] == "open":
+            if _t.time() - cb.get("opened_at", 0.0) > reset:
+                cb["state"] = "half_open"
+                return False
+            return True
+        return False
+
+
+def _cb_fail(key: str, threshold: int = 5, reset: int = 60) -> None:
+    import time as _t
+    with _CB_LOCK:
+        cb = CIRCUIT_BREAKERS.setdefault(key, {"state": "closed", "failures": 0, "opened_at": 0.0})
+        cb["failures"] += 1
+        if cb["failures"] >= threshold:
+            cb["state"] = "open"
+            cb["opened_at"] = _t.time()
+
+
+def _cb_success(key: str) -> None:
+    with _CB_LOCK:
+        cb = CIRCUIT_BREAKERS.get(key)
+        if cb:
+            cb.update({"state": "closed", "failures": 0, "opened_at": 0.0})
+
+
+def circuit_breaker_status() -> Dict[str, Any]:
+    with _CB_LOCK:
+        return {k: dict(v) for k, v in CIRCUIT_BREAKERS.items()}
+
+
+_TENANT_LOCAL = _apg_threading.local()
+
+
+def _tenant_id() -> str | None:
+    return getattr(_TENANT_LOCAL, "tenant_id", None)
+
+
+def _subscribe_workflow_event(event_name: str, workflow_name: str) -> None:
+    with _ES_LOCK:
+        APG_EVENT_SUBSCRIPTIONS.setdefault(event_name, [])
+        if workflow_name not in APG_EVENT_SUBSCRIPTIONS[event_name]:
+            APG_EVENT_SUBSCRIPTIONS[event_name].append(workflow_name)
+
+
+def emit_apg_event(event_name: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    global NEXT_EVENT_ID
+    import time as _t
+    ev: Dict[str, Any] = {
+        "id": NEXT_EVENT_ID,
+        "name": event_name,
+        "payload": payload or {},
+        "ts": _t.time(),
+        "triggered": [],
+    }
+    with _ES_LOCK:
+        NEXT_EVENT_ID += 1
+        EVENT_LOG.append(ev)
+    subs = list(APG_EVENT_SUBSCRIPTIONS.get(event_name, []))
+    for wf_name in subs:
+        try:
+            run_workflow(wf_name, {"trigger_event": event_name, **(payload or {})})
+            ev["triggered"].append(wf_name)
+        except Exception:
+            pass  # best-effort
+    return dict(ev)
+
+
 def semantic_model() -> Dict[str, Any]:
     return json.loads(json.dumps(SEMANTIC_MODEL))
 
@@ -876,6 +1135,10 @@ def query_records(entity_name: str, query: Dict[str, list[str]] | None = None) -
         for key, values in query.items()
         if values and key not in {"limit", "offset", "sort", "order"}
     }
+    # Tenant routing: auto-scope to current tenant when entity has tenant_id field
+    tid = _tenant_id()
+    if tid and entity_name in TENANT_SCOPED_ENTITIES and "tenant_id" not in filters:
+        filters["tenant_id"] = tid
     records = [
         record
         for record in records
@@ -1046,9 +1309,22 @@ def _load_record_store() -> None:
     _sync_next_record_ids()
     _sync_next_event_id()
     _sync_next_workflow_run_id()
+    # Merge from PostgreSQL if available
+    if _APG_PG_URL:
+        for run in _pg_load_workflow_runs():
+            rid = str(run.get("id", ""))
+            if rid and rid not in WORKFLOW_RUNS:
+                WORKFLOW_RUNS[rid] = run
+        for entity_name in list(RECORD_STORE.keys()):
+            pg_records = _pg_load_entity_records(entity_name)
+            if pg_records:
+                RECORD_STORE[entity_name] = pg_records
 
 
 def _persist_record_store() -> str | None:
+    if _APG_PG_URL:
+        for entity_name, records in list_records().items():
+            _pg_save_entity_records(entity_name, records)
     path = _data_path()
     if path is None:
         return None
@@ -1258,14 +1534,25 @@ def auth_status() -> Dict[str, Any]:
 
 
 def _authorized(headers: Any) -> bool:
-    required_key = os.environ.get("APG_API_KEY")
-    if not required_key:
-        return True
-    supplied_key = headers.get("X-APG-API-Key")
     authorization = headers.get("Authorization", "")
+    supplied_key = headers.get("X-APG-API-Key")
     if authorization.startswith("Bearer "):
-        supplied_key = authorization.removeprefix("Bearer ").strip()
-    return supplied_key == required_key
+        token = authorization.removeprefix("Bearer ").strip()
+        jwt_secret = os.environ.get("APG_JWT_SECRET")
+        jwt_pubkey = os.environ.get("APG_JWT_PUBLIC_KEY")
+        if (jwt_secret or jwt_pubkey) and _jwt_lib is not None:
+            try:
+                key = jwt_pubkey or jwt_secret
+                alg = "RS256" if jwt_pubkey else "HS256"
+                _jwt_lib.decode(token, key, algorithms=[alg])
+                return True
+            except Exception:
+                return False
+        supplied_key = token
+    required_key = os.environ.get("APG_API_KEY")
+    if required_key:
+        return supplied_key == required_key
+    return True
 
 
 def _auth_failure_payload() -> tuple[int, Dict[str, Any]]:
@@ -1305,9 +1592,13 @@ def _record_event(
     return dict(event)
 
 
-def _prepare_new_record(record: Dict[str, Any]) -> Dict[str, Any]:
+def _prepare_new_record(record: Dict[str, Any], entity_name: str = "") -> Dict[str, Any]:
     prepared = dict(record)
     prepared.setdefault("_revision", 1)
+    # Auto-inject tenant_id for tenant-scoped entities
+    tid = _tenant_id()
+    if tid and entity_name in TENANT_SCOPED_ENTITIES:
+        prepared.setdefault("tenant_id", tid)
     return prepared
 
 
@@ -1345,7 +1636,7 @@ def _record_schema(entity: Dict[str, Any], partial: bool = False) -> Dict[str, A
     for field in fields:
         field_name = str(field["name"])
         schema_properties[field_name] = {"type": _json_schema_type(str(field.get("type", "any")))}
-        if not partial and field.get("required", True):
+        if not partial and field.get("required", False):
             required_fields.append(field_name)
     schema: Dict[str, Any] = {
         "type": "object",
@@ -2801,36 +3092,201 @@ def theme_stylesheet() -> str:
                     if str(token_name).lower() in {"accent", "primary", "brand"}:
                         lines.append(":root { --apg-accent: var(" + css_var + "); }")
     lines.extend([
-        "body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--apg-text); background: #f6f8fa; line-height: 1.5; }",
-        "body > * { max-width: 1100px; margin-left: auto; margin-right: auto; }",
-        "h1 { margin-top: 24px; color: var(--apg-text); }",
-        "h2 { margin-top: 24px; color: var(--apg-text); }",
-        "nav { margin: 16px auto; padding: 10px 0; border-bottom: 1px solid var(--apg-border); }",
-        "a { color: var(--apg-accent); text-decoration: none; }",
-        "a:hover { text-decoration: underline; }",
-        "form { padding: 16px; background: var(--apg-surface); border: 1px solid var(--apg-border); border-radius: 8px; }",
-        "label { display: block; margin: 8px 0; color: var(--apg-muted); }",
-        "input { min-width: 280px; padding: 8px; border: 1px solid var(--apg-border); border-radius: 6px; }",
-        "button { padding: 8px 12px; border: 1px solid var(--apg-accent); border-radius: 6px; background: var(--apg-accent); color: white; cursor: pointer; }",
-        "pre { padding: 16px; overflow: auto; background: var(--apg-surface); border: 1px solid var(--apg-border); border-left: 4px solid var(--apg-accent); border-radius: 8px; }",
-        "code { color: var(--apg-accent); }",
+        # Extended spacing + radius + shadow tokens
+        ":root { --apg-radius: 8px; --apg-radius-sm: 4px; --apg-radius-full: 9999px; }",
+        ":root { --apg-shadow-sm: 0 1px 2px rgba(0,0,0,0.08); --apg-shadow-md: 0 4px 6px rgba(0,0,0,0.10); --apg-shadow-lg: 0 10px 15px rgba(0,0,0,0.12); }",
+        ":root { --apg-sidebar-width: 240px; --apg-topbar-height: 56px; }",
+        ":root { --apg-font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --apg-font-mono: 'JetBrains Mono', ui-monospace, monospace; }",
+        ":root { --apg-space-1: 4px; --apg-space-2: 8px; --apg-space-3: 12px; --apg-space-4: 16px; --apg-space-6: 24px; --apg-space-8: 32px; }",
+        ":root { --apg-duration-fast: 150ms; --apg-duration-base: 200ms; }",
+        ":root { --apg-bg-canvas: #f6f8fa; --apg-bg-card: var(--apg-surface); --apg-bg-hover: rgba(0,0,0,0.04); }",
+        # Dark mode
+        "@media (prefers-color-scheme: dark) { :root { --apg-surface: #1e2028; --apg-border: #30363d; --apg-text: #e6edf3; --apg-muted: #8b949e; --apg-bg-canvas: #0d1117; --apg-bg-card: #161b22; --apg-bg-hover: rgba(255,255,255,0.06); } }",
+        # Base styles
+        "*, *::before, *::after { box-sizing: border-box; }",
+        "body { margin: 0; font-family: var(--apg-font-sans); color: var(--apg-text); background: var(--apg-bg-canvas); line-height: 1.5; font-size: 14px; }",
+        "h1 { margin: 0 0 var(--apg-space-4); font-size: 1.5rem; font-weight: 600; color: var(--apg-text); }",
+        "h2 { margin: var(--apg-space-6) 0 var(--apg-space-3); font-size: 1.125rem; font-weight: 600; color: var(--apg-text); }",
+        "h3 { margin: var(--apg-space-4) 0 var(--apg-space-2); font-size: 1rem; font-weight: 600; color: var(--apg-text); }",
+        "a { color: var(--apg-accent); text-decoration: none; transition: opacity var(--apg-duration-fast); }",
+        "a:hover { text-decoration: underline; opacity: 0.85; }",
+        "p { margin: 0 0 var(--apg-space-3); }",
+        # Topbar layout shell
+        ".apg-topbar { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: var(--apg-space-4); height: var(--apg-topbar-height); padding: 0 var(--apg-space-6); border-bottom: 1px solid var(--apg-border); background: var(--apg-surface); box-shadow: var(--apg-shadow-sm); }",
+        ".apg-logo { font-weight: 700; font-size: 1rem; color: var(--apg-accent) !important; text-decoration: none !important; letter-spacing: -0.02em; }",
+        ".apg-topnav { display: flex; align-items: center; gap: var(--apg-space-1); flex: 1; }",
+        ".apg-content { max-width: 1280px; margin: 0 auto; padding: var(--apg-space-6); }",
+        # Nav links
+        ".apg-nav-link { display: inline-flex; align-items: center; padding: var(--apg-space-2) var(--apg-space-3); border-radius: var(--apg-radius-sm); font-size: 0.875rem; color: var(--apg-text); text-decoration: none !important; transition: background var(--apg-duration-fast); white-space: nowrap; }",
+        ".apg-nav-link:hover { background: var(--apg-bg-hover); text-decoration: none !important; opacity: 1; }",
+        ".apg-nav-link.active { background: var(--apg-bg-hover); font-weight: 500; }",
+        # Card
+        ".apg-card { background: var(--apg-bg-card); border: 1px solid var(--apg-border); border-radius: var(--apg-radius); box-shadow: var(--apg-shadow-sm); padding: var(--apg-space-4); margin-bottom: var(--apg-space-4); }",
+        ".apg-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--apg-space-3); padding-bottom: var(--apg-space-3); border-bottom: 1px solid var(--apg-border); }",
+        # Table
+        ".apg-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }",
+        ".apg-table thead { background: var(--apg-bg-canvas); }",
+        ".apg-table th { padding: var(--apg-space-2) var(--apg-space-3); text-align: left; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--apg-muted); border-bottom: 2px solid var(--apg-border); white-space: nowrap; }",
+        ".apg-table td { padding: var(--apg-space-2) var(--apg-space-3); border-bottom: 1px solid var(--apg-border); vertical-align: middle; }",
+        ".apg-table tbody tr:hover { background: var(--apg-bg-hover); }",
+        ".apg-table-wrap { overflow-x: auto; border: 1px solid var(--apg-border); border-radius: var(--apg-radius); background: var(--apg-bg-card); }",
+        # Badge
+        ".apg-badge { display: inline-flex; align-items: center; padding: 2px var(--apg-space-2); border-radius: var(--apg-radius-full); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; line-height: 1.6; }",
+        ".apg-badge-success { background: #dcfce7; color: #166534; }",
+        ".apg-badge-warning { background: #fef9c3; color: #854d0e; }",
+        ".apg-badge-danger { background: #fee2e2; color: #991b1b; }",
+        ".apg-badge-info { background: #dbeafe; color: #1e40af; }",
+        ".apg-badge-neutral { background: var(--apg-bg-hover); color: var(--apg-muted); }",
+        # Form
+        "form, .apg-form { padding: var(--apg-space-4); background: var(--apg-bg-card); border: 1px solid var(--apg-border); border-radius: var(--apg-radius); box-shadow: var(--apg-shadow-sm); }",
+        "label { display: block; margin-bottom: var(--apg-space-1); font-size: 0.875rem; font-weight: 500; color: var(--apg-text); }",
+        "input, select, textarea { width: 100%; max-width: 480px; padding: var(--apg-space-2) var(--apg-space-3); border: 1px solid var(--apg-border); border-radius: var(--apg-radius-sm); background: var(--apg-surface); color: var(--apg-text); font-family: var(--apg-font-sans); font-size: 0.875rem; transition: border-color var(--apg-duration-fast); outline: none; }",
+        "input:focus, select:focus, textarea:focus { border-color: var(--apg-accent); box-shadow: 0 0 0 3px rgba(18,110,130,0.12); }",
+        ".apg-field { margin-bottom: var(--apg-space-4); }",
+        # Button
+        "button, .apg-btn { display: inline-flex; align-items: center; gap: var(--apg-space-2); padding: var(--apg-space-2) var(--apg-space-4); border: 1px solid var(--apg-accent); border-radius: var(--apg-radius-sm); background: var(--apg-accent); color: white; font-family: var(--apg-font-sans); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: opacity var(--apg-duration-fast); line-height: 1.5; }",
+        "button:hover, .apg-btn:hover { opacity: 0.88; }",
+        ".apg-btn-secondary { background: var(--apg-surface); color: var(--apg-text); border-color: var(--apg-border); }",
+        ".apg-btn-danger { background: #dc2626; border-color: #dc2626; }",
+        # Alert / notice
+        "[role=alert] { padding: var(--apg-space-3) var(--apg-space-4); background: #fef9c3; border: 1px solid #fde68a; border-radius: var(--apg-radius-sm); margin-bottom: var(--apg-space-4); font-size: 0.875rem; }",
+        # Code / pre
+        "pre { padding: var(--apg-space-4); overflow: auto; background: var(--apg-bg-canvas); border: 1px solid var(--apg-border); border-left: 3px solid var(--apg-accent); border-radius: var(--apg-radius); font-family: var(--apg-font-mono); font-size: 0.8rem; line-height: 1.6; }",
+        "code { font-family: var(--apg-font-mono); font-size: 0.85em; color: var(--apg-accent); background: var(--apg-bg-hover); padding: 1px 5px; border-radius: 3px; }",
+        "pre code { background: transparent; padding: 0; color: inherit; }",
+        # Stat card
+        ".apg-stat { display: flex; flex-direction: column; gap: var(--apg-space-1); }",
+        ".apg-stat-value { font-size: 1.75rem; font-weight: 700; color: var(--apg-text); line-height: 1; }",
+        ".apg-stat-label { font-size: 0.75rem; color: var(--apg-muted); text-transform: uppercase; letter-spacing: 0.05em; }",
+        ".apg-stat-delta { font-size: 0.8rem; font-weight: 500; }",
+        ".apg-stat-delta.up { color: #16a34a; } .apg-stat-delta.down { color: #dc2626; }",
+        # Grid helpers
+        ".apg-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--apg-space-4); }",
+        ".apg-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--apg-space-4); }",
+        ".apg-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--apg-space-4); }",
+        "@media (max-width: 768px) { .apg-grid-2, .apg-grid-3, .apg-grid-4 { grid-template-columns: 1fr; } }",
+        # Utility
+        ".apg-flex { display: flex; align-items: center; } .apg-flex-between { justify-content: space-between; }",
+        ".apg-mt-4 { margin-top: var(--apg-space-4); } .apg-mb-4 { margin-bottom: var(--apg-space-4); }",
+        ".apg-text-muted { color: var(--apg-muted); } .apg-text-sm { font-size: 0.875rem; }",
+        ".apg-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }",
     ])
     return "\n".join(lines) + "\n"
 
 
 def _html_page(title: str, body: str) -> str:
     safe_title = html.escape(title)
+    safe_module = html.escape(MODULE_NAME)
+    head_extras = (
+        # Inter font
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">'
+        # Tailwind CDN — enables utility classes in Jinja2 templates
+        '<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>'
+        '<script>tailwind.config={theme:{extend:{fontFamily:{sans:["Inter","system-ui","sans-serif"],mono:["JetBrains Mono","ui-monospace","monospace"]},colors:{apg:{primary:"#1E5B5A",accent:"#D97706"}}}}}</script>'
+        # htmx — progressive enhancement for partial updates
+        '<script defer src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>'
+        # SortableJS — drag-and-drop for kanban
+        '<script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>'
+    )
+    toast_js = (
+        '<div id="apg-toast-root" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>'
+        '<script>'
+        'function apgToast(m,t){'
+        'var c=t==="error"?"bg-red-600":"bg-gray-900";'
+        'var el=document.createElement("div");'
+        'el.className=c+" text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto transition-all duration-300 opacity-0 translate-y-2";'
+        'el.textContent=m;'
+        'document.getElementById("apg-toast-root").appendChild(el);'
+        'requestAnimationFrame(function(){el.classList.remove("opacity-0","translate-y-2");});'
+        'setTimeout(function(){el.classList.add("opacity-0");setTimeout(function(){el.remove();},300);},3000);'
+        '}'
+        'document.addEventListener("htmx:afterOnLoad",function(e){'
+        'var t=e.detail.xhr.getResponseHeader("HX-Trigger");'
+        'if(!t)return;'
+        'try{var d=JSON.parse(t);if(d.apgToast)apgToast(d.apgToast.msg,d.apgToast.type||"success");}catch(ex){}'
+        '});'
+        '</script>'
+    )
+    skeleton_css = (
+        '<style>'
+        '.apg-skeleton{'
+        '  background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);'
+        '  background-size:200% 100%;'
+        '  animation:apg-shimmer 1.5s infinite;'
+        '  border-radius:4px;'
+        '}'
+        '@keyframes apg-shimmer{'
+        '  0%{background-position:200% 0}'
+        '  100%{background-position:-200% 0}'
+        '}'
+        '.apg-loading .apg-skeleton-row{height:40px;margin-bottom:8px;}'
+        '.htmx-request .apg-content-area{opacity:0.6;transition:opacity 0.2s;}'
+        '</style>'
+    )
+    cmd_palette_html = '<div id="apg-cmd" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onclick="if(event.target===this)apgCmdClose()"><div class="mx-auto mt-[15vh] max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"><div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100"><svg class="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9 a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg><input id="apg-cmd-input" type="text" placeholder="Search records, entities..." autocomplete="off" class="flex-1 text-sm outline-none placeholder-gray-400" oninput="apgCmdSearch(this.value)"><kbd class="text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">Esc</kbd></div><div id="apg-cmd-results" class="max-h-80 overflow-y-auto py-2"><p class="text-xs text-gray-400 text-center py-8">Type to search...</p></div></div></div><script>document.addEventListener("keydown",function(e){if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();apgCmdOpen();}if(e.key==="Escape")apgCmdClose();});function apgCmdOpen(){document.getElementById("apg-cmd").classList.remove("hidden");document.getElementById("apg-cmd-input").focus();}function apgCmdClose(){document.getElementById("apg-cmd").classList.add("hidden");document.getElementById("apg-cmd-input").value="";document.getElementById("apg-cmd-results").innerHTML=\'<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>\';}var _cmdTimer;function apgCmdSearch(q){clearTimeout(_cmdTimer);if(!q.trim()){document.getElementById("apg-cmd-results").innerHTML=\'<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>\';return;}_cmdTimer=setTimeout(function(){fetch("/api/search?q="+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(d){var el=document.getElementById("apg-cmd-results");if(!d.results||!d.results.length){el.innerHTML=\'<p class="text-xs text-gray-400 text-center py-8">No results</p>\';return;}el.innerHTML=d.results.map(function(r){return \'<a href="/ui/entities/\'+encodeURIComponent(r.entity)+\'/\'+encodeURIComponent(r.id)+\'"\'+\'  onclick="apgCmdClose()"\'+\'  class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group">\'+\'<span class="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center text-xs font-bold text-blue-600 flex-shrink-0">\'+r.entity.charAt(0).toUpperCase()+\'</span>\'+\'<div class="min-w-0"><p class="text-sm font-medium text-gray-900 truncate">\'+r.label+\'</p>\'+\'<p class="text-xs text-gray-400 truncate">\'+r.entity+\'</p></div>\'+\'</a>\';}).join("");});},200);}</script>'
     return (
         "<!doctype html>"
-        "<html><head>"
+        '<html lang="en" class="h-full"><head>'
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"{head_extras}"
+        f"{skeleton_css}"
         '<link rel="stylesheet" href="/theme.css">'
-        f"<title>{safe_title}</title>"
-        "</head><body>"
-        f"{body}"
+        f"<title>{safe_title} — {safe_module}</title>"
+        "</head>"
+        '<body class="min-h-full bg-gray-50 text-gray-900">'
+        f'<header class="apg-topbar sticky top-0 z-50" role="banner">'
+        f'  <a class="apg-logo" href="/ui">{safe_module}</a>'
+        f'  <nav class="apg-topnav ml-4">'
+        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui">Home</a>'
+        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/workflows">⚡ Workflows</a>'
+        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/marketplace">Marketplace</a>'
+        f'  </nav>'
+        f'</header>'
+        f'<main class="apg-content" id="main-content">{body}</main>'
+        f"{toast_js}"
+        f"{cmd_palette_html}"
         "</body></html>"
     )
+
+
+def _render_template(template_name: str, **context: Any) -> str | None:
+    """Render a Jinja2 template from APG_UI_TEMPLATES dict if Jinja2 is available.
+
+    Returns None when Jinja2 is not installed — callers fall back to the existing
+    f-string builder so the generated app works with zero extra dependencies.
+
+    APG_UI_TEMPLATES is injected at module level when the compiler embeds templates
+    as string literals. In standalone mode (running code_generator.py directly),
+    templates are loaded from compiler/templates/*.j2 relative to this file.
+    """
+    try:
+        from jinja2 import Environment, DictLoader, BaseLoader, FileSystemLoader, ChoiceLoader  # type: ignore[import]
+    except ImportError:
+        return None
+    try:
+        # APG_UI_TEMPLATES injected at compile time takes priority
+        templates: dict[str, str] = globals().get("APG_UI_TEMPLATES", {})
+        if templates:
+            env = Environment(loader=DictLoader(templates), autoescape=True)
+        else:
+            # Standalone: load from compiler/templates/ directory
+            import pathlib
+            tmpl_dir = pathlib.Path(__file__).parent / "templates"
+            if not tmpl_dir.exists():
+                return None
+            env = Environment(loader=FileSystemLoader(str(tmpl_dir)), autoescape=True)
+            # Adjust template name for standalone (files have .j2 extension, no nested path)
+            if not template_name.endswith(".j2"):
+                template_name = template_name.replace(".html", ".html.j2") if ".html" in template_name else template_name + ".j2"
+        # Add url encode filter
+        env.filters["urlencode"] = lambda s: __import__("urllib.parse", fromlist=["quote"]).quote(str(s), safe="")
+        tmpl = env.get_template(template_name)
+        return tmpl.render(**context)
+    except Exception:
+        return None
 
 
 def _entity_spec(entity_name: str) -> Dict[str, Any] | None:
@@ -2929,7 +3385,7 @@ def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = Fa
     fields = _field_specs(entity_name)
     for field in fields:
         field_name = str(field["name"])
-        if not partial and field.get("required", True) and field_name not in record:
+        if not partial and field.get("required", False) and field_name not in record:
             errors.append(f"{field_name} is required")
             continue
         if field_name in record and not _value_matches_type(record[field_name], str(field.get("type", "any"))):
@@ -3044,6 +3500,316 @@ def relationship_graph() -> Dict[str, Any]:
     return {"nodes": nodes, "edges": edges}
 
 
+# ── Workflow engine ─────────────────────────────────────────────────────────
+
+_WORKFLOW_PATTERNS: list[tuple[list[str], str, str, str]] = [
+    # (name_keywords, workflow_name_fmt, description_fmt, icon)
+    (["loan", "credit", "lending"], "Apply for {entity_name}", "Step-by-step {entity_name} application and approval", "💳"),
+    (["repayment", "payment", "installment"], "Record {entity_name}", "Capture payment details and update balances", "💰"),
+    (["member", "customer", "client", "subscriber"], "Register {entity_name}", "Complete {entity_name} onboarding and KYC", "👤"),
+    (["patient", "beneficiary", "recipient"], "Enroll {entity_name}", "Register and profile the {entity_name}", "🏥"),
+    (["ticket", "incident", "issue", "fault"], "Log {entity_name}", "Capture incident details and assign for resolution", "🎫"),
+    (["change", "request", "order"], "Submit {entity_name}", "Prepare and route the {entity_name} for approval", "📋"),
+    (["asset", "equipment", "device"], "Register {entity_name}", "Record asset details, location and assignment", "🖥️"),
+    (["grant", "award", "fund"], "Register {entity_name}", "Document {entity_name} details and donor linkage", "🌍"),
+    (["contribution", "deposit", "saving"], "Record {entity_name}", "Capture and confirm the {entity_name}", "🏦"),
+    (["farmer", "supplier", "vendor"], "Onboard {entity_name}", "Complete {entity_name} registration and verification", "🌱"),
+    (["produce", "product", "item", "listing"], "List {entity_name}", "Create a new {entity_name} listing with pricing", "📦"),
+    (["appointment", "booking", "schedule"], "Book {entity_name}", "Select date, time and details for the {entity_name}", "📅"),
+    (["prescription", "medication", "drug"], "Issue {entity_name}", "Document prescribed treatment and dosage", "💊"),
+    (["invoice", "bill", "charge"], "Generate {entity_name}", "Prepare and issue the {entity_name}", "🧾"),
+    (["score", "assessment", "evaluation", "rating"], "Run {entity_name}", "Collect inputs and compute the {entity_name}", "📊"),
+]
+_DEFAULT_WORKFLOW = ("Create {entity_name}", "Fill in all required fields to create a new {entity_name}", "➕")
+
+def _workflow_meta(entity_name: str) -> tuple[str, str, str]:
+    lower = entity_name.lower()
+    for keywords, name_fmt, desc_fmt, icon in _WORKFLOW_PATTERNS:
+        if any(kw in lower for kw in keywords):
+            return name_fmt.format(entity_name=entity_name), desc_fmt.format(entity_name=entity_name), icon
+    name_fmt, desc_fmt, icon = _DEFAULT_WORKFLOW
+    return name_fmt.format(entity_name=entity_name), desc_fmt.format(entity_name=entity_name), icon
+
+
+def _group_fields_into_steps(entity_name: str, fields: list[dict]) -> list[dict]:
+    """Group entity fields into logical wizard steps."""
+    # Categorise fields
+    id_fields, ref_fields, core_fields, numeric_fields, date_fields, other_fields = [], [], [], [], [], []
+    tables = SEMANTIC_MODEL.get("tables", {})
+    table_fields = tables.get(entity_name, {}).get("fields", {})
+
+    for f in fields:
+        fname = str(f["name"])
+        ftype = str(f.get("type", "")).lower()
+        rel = table_fields.get(fname, {}).get("relationship")
+        real_rel = rel and rel.get("target_table") and rel["target_table"] in {e["name"] for e in ENTITIES}
+
+        if fname in {"id", "_revision"}:
+            id_fields.append(f)
+        elif real_rel:
+            ref_fields.append(f)
+        elif ftype in {"float", "double", "decimal", "money", "int", "integer", "number"}:
+            numeric_fields.append(f)
+        elif ftype in {"date", "datetime", "timestamp"}:
+            date_fields.append(f)
+        elif any(fname.endswith(sfx) for sfx in ("_id", "_code", "_number", "_ref", "_key")):
+            core_fields.append(f)
+        else:
+            other_fields.append(f)
+
+    steps = []
+    # Step 1: Identity (own ID + code/number fields)
+    s1 = id_fields + core_fields
+    if s1:
+        steps.append({"title": "Identity", "subtitle": f"Enter the unique identifiers for this {entity_name}", "fields": s1})
+    # Step 2: Core details (name/title/description/type/status/category)
+    priority = ["name", "full_name", "title", "description", "type", "category", "status",
+                "gender", "email", "phone", "nationality", "country"]
+    prio_fields = [f for f in other_fields if str(f["name"]) in priority]
+    rest_other = [f for f in other_fields if str(f["name"]) not in priority]
+    if prio_fields:
+        steps.append({"title": "Core Details", "subtitle": "Enter the primary descriptive information", "fields": prio_fields})
+    # Step 3: Relationships (FK dropdowns)
+    if ref_fields:
+        steps.append({"title": "Relationships", "subtitle": "Link to related records", "fields": ref_fields})
+    # Step 4: Financial / numeric
+    if numeric_fields:
+        steps.append({"title": "Amounts & Rates", "subtitle": "Enter financial and numeric values", "fields": numeric_fields})
+    # Step 5: Dates
+    if date_fields:
+        steps.append({"title": "Dates & Schedule", "subtitle": "Set relevant dates and deadlines", "fields": date_fields})
+    # Step 6: Remaining details
+    if rest_other:
+        # Split into chunks of max 5 fields per step
+        for i in range(0, len(rest_other), 5):
+            chunk = rest_other[i:i+5]
+            steps.append({"title": "Additional Details" if i == 0 else "More Details", "subtitle": "Provide any additional information", "fields": chunk})
+    # Ensure at least one step
+    if not steps:
+        steps.append({"title": "Details", "subtitle": f"Enter information for this {entity_name}", "fields": fields})
+    return steps
+
+
+def _build_app_workflows() -> dict[str, list[dict]]:
+    result = {}
+    for entity in ENTITIES:
+        if entity.get("type") in {"application"}:
+            continue
+        name = entity["name"]
+        fields = entity.get("fields") or []
+        wf_name, wf_desc, wf_icon = _workflow_meta(name)
+        steps = _group_fields_into_steps(name, fields)
+        result[name] = [{
+            "id": f"create_{name.lower()}",
+            "name": wf_name,
+            "description": wf_desc,
+            "icon": wf_icon,
+            "entity": name,
+            "action": "create",
+            "steps": steps,
+        }]
+    return result
+
+APP_WORKFLOWS: dict[str, list[dict]] = _build_app_workflows()
+
+
+def _ui_workflow_list_html() -> tuple[int, str]:
+    """Render the list of all available workflows across all entities."""
+    total = sum(len(wfs) for wfs in APP_WORKFLOWS.values())
+    cards = []
+    for entity_name, workflows in APP_WORKFLOWS.items():
+        for wf in workflows:
+            safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+            safe_wf_id = html.escape(quote(wf["id"], safe=""), quote=True)
+            cards.append(
+                f'<a href="/ui/workflows/{safe_entity}/{safe_wf_id}"'
+                f'   class="group block bg-white rounded-xl border border-gray-200 p-5 hover:border-blue-400 hover:shadow-md transition-all">'
+                f'<div class="flex items-start gap-3 mb-3">'
+                f'  <span class="text-2xl" aria-hidden="true">{html.escape(wf["icon"])}</span>'
+                f'  <div>'
+                f'    <h3 class="font-semibold text-gray-900 group-hover:text-blue-600 text-sm">{html.escape(wf["name"])}</h3>'
+                f'    <p class="text-xs text-gray-400 mt-0.5">{html.escape(entity_name)} · {len(wf["steps"])} steps</p>'
+                f'  </div>'
+                f'</div>'
+                f'<p class="text-xs text-gray-500 leading-relaxed">{html.escape(wf["description"])}</p>'
+                f'<div class="mt-3 flex items-center gap-1">'
+                + "".join(
+                    f'<div class="h-1.5 flex-1 rounded-full bg-gray-100 first:bg-blue-400"></div>'
+                    for _ in wf["steps"]
+                )
+                + f'</div>'
+                f'</a>'
+            )
+    grid = f'<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{"".join(cards)}</div>' if cards else "<p>No workflows available.</p>"
+    body = (
+        '<nav class="flex items-center gap-2 text-sm mb-6 text-gray-500">'
+        '<a href="/ui" class="hover:text-blue-600">Application</a>'
+        '<span>/</span><span class="font-semibold text-gray-900">Workflows</span></nav>'
+        f'<div class="flex items-center justify-between mb-6">'
+        f'<div><h1 class="text-xl font-bold text-gray-900">Workflows</h1>'
+        f'<p class="text-sm text-gray-500 mt-1">{total} guided workflows across {len(APP_WORKFLOWS)} entities</p></div>'
+        f'</div>'
+        + grid
+    )
+    return 200, _html_page("Workflows", body)
+
+
+def _ui_workflow_wizard_html(
+    entity_name: str,
+    workflow_id: str,
+    step_index: int = 0,
+    accumulated: dict | None = None,
+    error: str = "",
+) -> tuple[int, str]:
+    """Render one step of the multi-step workflow wizard."""
+    entity_workflows = APP_WORKFLOWS.get(entity_name, [])
+    wf = next((w for w in entity_workflows if w["id"] == workflow_id), None)
+    if wf is None:
+        return 404, _html_page("Workflow not found", f"<h1>Workflow not found</h1>")
+
+    steps = wf["steps"]
+    total_steps = len(steps)
+    accumulated = accumulated or {}
+
+    # Final step: show summary and create record
+    if step_index >= total_steps:
+        record_data = dict(accumulated)
+        result = create_record(entity_name, record_data)
+        if result.get("ok"):
+            record_id = result.get("record", {}).get("id", "")
+            safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+            body = (
+                f'<div class="max-w-lg mx-auto text-center py-12">'
+                f'<div class="text-5xl mb-4">✅</div>'
+                f'<h1 class="text-xl font-bold text-gray-900 mb-2">{html.escape(wf["name"])} complete!</h1>'
+                f'<p class="text-gray-500 text-sm mb-6">Your {html.escape(entity_name)} record has been created successfully.</p>'
+                f'<div class="flex items-center justify-center gap-3 flex-wrap">'
+                f'<a href="/ui/entities/{safe_entity}" class="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">View all {html.escape(entity_name)} records →</a>'
+                f'<a href="/ui/workflows/{safe_entity}/{html.escape(quote(workflow_id, safe=""), quote=True)}" class="px-5 py-2.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">Start again</a>'
+                f'<a href="/ui/workflows" class="px-5 py-2.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">All workflows</a>'
+                f'</div></div>'
+            )
+            return 200, _html_page(wf["name"], body)
+        else:
+            error = result.get("error") or "Failed to create record"
+            step_index = total_steps - 1  # Stay on last step
+
+    step = steps[min(step_index, total_steps - 1)]
+    step_fields = step.get("fields", [])
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    safe_wf_id = html.escape(quote(workflow_id, safe=""), quote=True)
+
+    # Progress bar
+    pct = int((step_index / total_steps) * 100)
+    step_indicators = "".join(
+        f'<div class="flex items-center gap-1.5 text-xs font-medium '
+        f'{("text-blue-600" if i == step_index else "text-gray-400 opacity-60")}">'
+        f'<span class="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs '
+        f'{("bg-blue-600" if i < step_index else "bg-blue-600" if i == step_index else "bg-gray-200 text-gray-500")}">'
+        f'{("✓" if i < step_index else str(i + 1))}</span>'
+        f'<span class="hidden sm:block">{html.escape(steps[i]["title"])}</span></div>'
+        + (f'<div class="flex-1 h-px bg-gray-200 mx-1"><div class="h-px bg-blue-600 transition-all" style="width:{("100%" if i < step_index else "0%")}"></div></div>'
+           if i < total_steps - 1 else "")
+        for i in range(total_steps)
+    )
+
+    # Hidden fields to carry accumulated data through steps
+    hidden_fields = "".join(
+        f'<input type="hidden" name="__acc_{html.escape(k, quote=True)}" value="{html.escape(str(v), quote=True)}">'
+        for k, v in accumulated.items()
+    )
+
+    # Current step fields
+    step_inputs = "".join(_ui_field_input_html(f, entity_name) for f in step_fields)
+
+    # Navigation buttons
+    is_last = step_index == total_steps - 1
+    next_label = "Create Record ✓" if is_last else "Next →"
+    next_url = f"/ui/workflows/{safe_entity}/{safe_wf_id}/step/{step_index + 1}"
+
+    error_html = (
+        f'<div role="alert" class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">⚠ {html.escape(error)}</div>'
+        if error else ""
+    )
+
+    body = (
+        # Breadcrumb
+        f'<nav class="flex items-center gap-2 text-sm mb-6 text-gray-500">'
+        f'<a href="/ui" class="hover:text-blue-600">Application</a><span>/</span>'
+        f'<a href="/ui/workflows" class="hover:text-blue-600">Workflows</a><span>/</span>'
+        f'<span class="font-semibold text-gray-900">{html.escape(wf["name"])}</span></nav>'
+        # Header
+        f'<div class="max-w-2xl mx-auto">'
+        f'<div class="text-center mb-8">'
+        f'<div class="text-4xl mb-3">{html.escape(wf["icon"])}</div>'
+        f'<h1 class="text-xl font-bold text-gray-900">{html.escape(wf["name"])}</h1>'
+        f'<p class="text-sm text-gray-500 mt-1">{html.escape(wf["description"])}</p>'
+        f'</div>'
+        # Step progress
+        f'<div class="flex items-center gap-0 mb-8 px-2">{step_indicators}</div>'
+        # Step card
+        f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">'
+        f'<div class="px-6 py-4 border-b border-gray-100 bg-gray-50">'
+        f'<h2 class="font-semibold text-gray-900">Step {step_index + 1} of {total_steps}: {html.escape(step["title"])}</h2>'
+        f'<p class="text-sm text-gray-500 mt-0.5">{html.escape(step.get("subtitle", ""))}</p>'
+        f'</div>'
+        f'<div class="p-6">'
+        f'{error_html}'
+        f'<form method="post" action="{next_url}" class="space-y-4">'
+        f'{hidden_fields}'
+        f'{step_inputs}'
+        f'<div class="flex items-center justify-between pt-4 border-t border-gray-100 mt-6">'
+        + (f'<a href="/ui/workflows/{safe_entity}/{safe_wf_id}/step/{step_index - 1}" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">← Back</a>'
+           if step_index > 0 else f'<a href="/ui/workflows" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">← Cancel</a>')
+        + f'<button type="submit" class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">{next_label}</button>'
+        f'</div></form></div></div></div>'
+    )
+    return 200, _html_page(wf["name"], body)
+
+
+def _landing_page_html() -> str:
+    """Render the application landing page using landing.html.j2."""
+    theme = APG_CAPABILITIES.capability_theme(MODULE_NAME) if APG_CAPABILITIES and hasattr(APG_CAPABILITIES, "capability_theme") else {}
+    tokens = theme.get("tokens", {}) if isinstance(theme, dict) else {}
+    theme_primary = tokens.get("color.primary") or "#1E5B5A"
+    theme_accent = tokens.get("color.accent") or "#D97706"
+    landing_style = os.environ.get("APG_LANDING_STYLE", LANDING_STYLE)
+    api_links = [
+        {"url": "/ui",            "label": "Open App"},
+        {"url": "/manifest",      "label": "Manifest"},
+        {"url": "/openapi.json",  "label": "OpenAPI"},
+        {"url": "/capabilities",  "label": "Capabilities"},
+        {"url": "/metrics",       "label": "Metrics"},
+        {"url": "/self-test",     "label": "Self-Test"},
+    ]
+    stats = [
+        {"value": len([e for e in ENTITIES if e.get("type") not in {"application"}]), "label": "Entities"},
+        {"value": len(describe_application().get("capabilities", [])), "label": "Capabilities"},
+        {"value": len(describe_application().get("ai_agents", [])), "label": "AI Agents"},
+        {"value": sum(len(list_records(e["name"])) for e in ENTITIES if e.get("type") not in {"application"}), "label": "Records"},
+    ]
+    rendered = _render_template(
+        "landing.html.j2",
+        module_name=MODULE_NAME,
+        module_description=MODULE_DESCRIPTION or "",
+        entities=ENTITIES,
+        theme_primary=theme_primary,
+        theme_accent=theme_accent,
+        landing_style=landing_style,
+        api_links=api_links,
+        stats=stats,
+    )
+    if rendered is not None:
+        return rendered
+    # Fallback: redirect to /ui
+    return (
+        "<!doctype html><html><head>"
+        f'<meta http-equiv="refresh" content="0; url=/ui">'
+        f"<title>{html.escape(MODULE_NAME)}</title>"
+        "</head><body></body></html>"
+    )
+
+
 def _ui_index_html() -> str:
     app = describe_application()
     entity_links = "".join(
@@ -3093,20 +3859,47 @@ def _ui_index_html() -> str:
     )
     if not team_links:
         team_links = "<li>No AI agent teams declared.</li>"
+
+    # Prefer Jinja2 template; fall back to f-string for zero-dep mode
+    api_links = [
+        {"url": "/manifest",       "label": "Manifest JSON"},
+        {"url": "/component.json", "label": "Component JSON"},
+        {"url": "/capabilities",   "label": "Capabilities"},
+        {"url": "/agents",         "label": "Agents"},
+        {"url": "/events",         "label": "Events"},
+        {"url": "/metrics",        "label": "Metrics"},
+        {"url": "/self-test",      "label": "Self-Test"},
+        {"url": "/openapi.json",   "label": "API Contract"},
+        {"url": "/ui/databases",   "label": "Databases"},
+    ]
+    tmpl_body = _render_template(
+        "app_index.html.j2",
+        module_name=html.escape(MODULE_NAME),
+        module_description=html.escape(MODULE_DESCRIPTION or "Generated APG application"),
+        entities=ENTITIES,
+        capabilities=app.get("capabilities", []),
+        databases=app.get("databases", []),
+        application_routes=app.get("application_routes", {}),
+        ui_routes=app.get("ui_routes", {}),
+        agents=app.get("ai_agents", []),
+        agent_teams=app.get("ai_agent_teams", []),
+        api_links=api_links,
+    )
+    if tmpl_body is not None:
+        return _html_page(MODULE_NAME, tmpl_body)
+
+    # Fallback: original f-string builder
     body = (
         f"<h1>{html.escape(MODULE_NAME)}</h1>"
         f"<p>{html.escape(MODULE_DESCRIPTION or 'Generated APG application')}</p>"
         '<nav><a href="/manifest">Manifest JSON</a> | '
         '<a href="/component.json">Component JSON</a> | '
-        '<a href="/applications">Applications</a> | '
         '<a href="/capabilities">Capabilities</a> | '
         '<a href="/agents">Agents</a> | '
         '<a href="/events">Events</a> | '
         '<a href="/metrics">Metrics</a> | '
         '<a href="/self-test">Self-Test</a> | '
-        '<a href="/records">Record JSON</a> | '
         '<a href="/ui/databases">Databases</a> | '
-        '<a href="/relationships">Relationships</a> | '
         '<a href="/openapi.json">API Contract</a></nav>'
         "<h2>Application Routes</h2>"
         f"<ul>{application_route_links}</ul>"
@@ -3169,24 +3962,124 @@ def _ui_database_catalog_html() -> tuple[int, str]:
     return status_code, _html_page("Databases", body)
 
 
-def _ui_field_input_html(field: Dict[str, Any]) -> str:
+def _field_relationship(entity_name: str, field_name: str) -> Dict[str, Any] | None:
+    """Return relationship metadata for a field from SEMANTIC_MODEL, or None."""
+    tables = SEMANTIC_MODEL.get("tables", {})
+    table = tables.get(entity_name, {})
+    field_info = table.get("fields", {}).get(field_name, {})
+    rel = field_info.get("relationship")
+    if not rel or not rel.get("target_table"):
+        return None
+    # Skip relationships to synthetic types like 'date' that aren't real entities
+    target = rel["target_table"]
+    if target not in {e["name"] for e in ENTITIES}:
+        return None
+    return rel
+
+
+def _best_display_field(target_entity: str) -> str:
+    """Return the best human-readable field name for a FK select option label."""
+    priority = ["name", "full_name", "title", "label", "description",
+                "company_name", "display_name", "username", "email",
+                "first_name", "code", "number", "reference"]
+    fields = _field_specs(target_entity)
+    field_names = [str(f["name"]) for f in fields]
+    for candidate in priority:
+        if candidate in field_names:
+            return candidate
+    # Fall back to first non-id string field
+    for f in fields:
+        if str(f["name"]) not in {"id", "_revision", "_created_at"} and _json_schema_type(str(f.get("type", ""))) == "string":
+            return str(f["name"])
+    return "id"
+
+
+def _fk_select_options(target_entity: str, current_value: str = "", form_id: str = "") -> str:
+    """Render <option> elements for a foreign key select, populated from live records."""
+    records = list_records(target_entity)
+    display_field = _best_display_field(target_entity)
+    blank_label = html.escape(f"— select {target_entity} —")
+    options = [f'<option value="">{blank_label}</option>']
+    for rec in records:
+        val = str(rec.get("id", ""))
+        label_val = rec.get(display_field) or val
+        display = html.escape(str(label_val))
+        sel = ' selected' if val == current_value else ''
+        options.append(f'<option value="{html.escape(val, quote=True)}"{sel}>{display}</option>')
+    return "".join(options)
+
+
+def _ui_field_semantic(field_name: str, field_type: str) -> str:
+    name = field_name.lower()
+    ft = field_type.lower()
+    if "email" in name: return "email"
+    if any(x in name for x in ("phone", "mobile", "tel")): return "phone"
+    if any(x in name for x in ("url", "website", "link", "href")): return "url"
+    if any(x in name for x in ("avatar", "photo", "image", "thumbnail", "picture", "logo")): return "image_url"
+    if any(x in name for x in ("amount", "price", "cost", "fee", "salary", "balance", "revenue", "total")): return "currency"
+    if any(x in name for x in ("percent", "progress", "completion")): return "percent"
+    if any(x in name for x in ("rating", "score", "stars", "grade")): return "rating"
+    if any(x in name for x in ("color", "colour", "hex")): return "color"
+    if any(x in name for x in ("config", "metadata", "settings", "payload", "extra")) or ft in ("json", "jsonb"): return "json"
+    if any(x in name for x in ("status", "state", "stage", "phase")): return "status"
+    if ft in ("bool", "boolean"): return "boolean"
+    return "text"
+
+
+_INPUT_CLS = 'class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white placeholder-gray-300"'
+_LABEL_CLS = 'class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1"'
+_SELECT_CLS = 'class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary bg-white"'
+_CHECKBOX_CLS = 'class="w-4 h-4 text-apg-primary rounded border-gray-300"'
+
+
+def _humanize_label(field_name: str) -> str:
+    if field_name.endswith("_id"):
+        base = field_name[:-3].replace("_", " ").strip()
+        return " ".join(w.capitalize() for w in base.split()) + " ID"
+    return " ".join(w.capitalize() for w in field_name.replace("_", " ").split())
+
+
+def _ui_field_input_html(field: Dict[str, Any], entity_name: str = "") -> str:
     field_name = str(field["name"])
     safe_name = html.escape(field_name, quote=True)
-    safe_label = html.escape(field_name)
+    human_label = html.escape(_humanize_label(field_name))
     expected = _json_schema_type(str(field.get("type", "any")))
+
+    # Foreign key → styled dropdown
+    rel = _field_relationship(entity_name, field_name) if entity_name else None
+    if rel:
+        target = rel["target_table"]
+        opts = _fk_select_options(target)
+        return (
+            f'<div class="space-y-1">'
+            f'<label {_LABEL_CLS}>{human_label}</label>'
+            f'<select name="{safe_name}" {_SELECT_CLS}>{opts}</select>'
+            f'</div>'
+        )
+
     if expected == "boolean":
         return (
+            f'<div class="flex items-center gap-2">'
             f'<input type="hidden" name="{safe_name}" value="false">'
-            f'<label>{safe_label} '
-            f'<input type="checkbox" name="{safe_name}" value="true"></label><br>'
+            f'<input type="checkbox" name="{safe_name}" value="true" {_CHECKBOX_CLS}>'
+            f'<label {_LABEL_CLS} style="margin-bottom:0">{human_label}</label>'
+            f'</div>'
         )
     if expected == "integer":
-        attributes = 'type="number" step="1"'
+        type_attr = 'type="number" step="1"'
     elif expected == "number":
-        attributes = 'type="number" step="any"'
+        type_attr = 'type="number" step="any"'
+    elif field.get("type", "").lower() in {"date", "datetime", "timestamp"}:
+        type_attr = 'type="date"'
     else:
-        attributes = 'type="text"'
-    return f'<label>{safe_label} <input name="{safe_name}" {attributes}></label><br>'
+        type_attr = 'type="text"'
+    placeholder = f'placeholder="{human_label}"'
+    return (
+        f'<div class="space-y-1">'
+        f'<label {_LABEL_CLS}>{human_label}</label>'
+        f'<input name="{safe_name}" {type_attr} {placeholder} {_INPUT_CLS}>'
+        f'</div>'
+    )
 
 
 def _ui_entity_location(entity_name: str) -> str:
@@ -3201,12 +4094,22 @@ def _ui_record_display_value(value: Any) -> str:
     return str(value)
 
 
-def _ui_record_editor_input_html(field: Dict[str, Any], record: Dict[str, Any], form_id: str) -> str:
+def _ui_record_editor_input_html(
+    field: Dict[str, Any], record: Dict[str, Any], form_id: str, entity_name: str = ""
+) -> str:
     field_name = str(field["name"])
     safe_name = html.escape(field_name, quote=True)
     safe_form_id = html.escape(form_id, quote=True)
     expected = _json_schema_type(str(field.get("type", "any")))
     value = record.get(field_name)
+
+    # Foreign key → dropdown showing related entity records
+    rel = _field_relationship(entity_name, field_name) if entity_name else None
+    if rel:
+        target = rel["target_table"]
+        opts = _fk_select_options(target, current_value=str(value or ""), form_id=form_id)
+        return f'<select form="{safe_form_id}" name="{safe_name}">{opts}</select>'
+
     if expected == "boolean":
         checked = " checked" if value is True else ""
         return (
@@ -3217,6 +4120,8 @@ def _ui_record_editor_input_html(field: Dict[str, Any], record: Dict[str, Any], 
         attributes = 'type="number" step="1"'
     elif expected == "number":
         attributes = 'type="number" step="any"'
+    elif field.get("type", "").lower() in {"date", "datetime", "timestamp"}:
+        attributes = 'type="date"'
     else:
         attributes = 'type="text"'
     safe_value = html.escape(_ui_record_display_value(value), quote=True)
@@ -3272,43 +4177,149 @@ def _ui_records_query_form_html(entity_name: str, query: Dict[str, list[str]]) -
     )
 
 
-def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | None = None) -> str:
+def _ui_create_form_html(entity_name: str, fields: list[Dict[str, Any]]) -> str:
+    """Return the HTML for the create-record form fields (used by the Jinja2 template)."""
+    _SKIP = {"id", "_revision"}
+    parts = []
+    for field in fields:
+        if str(field.get("name", "")) in _SKIP:
+            continue
+        parts.append(_ui_field_input_html(field, entity_name))
+    return '<div class="space-y-3">' + "".join(parts) + "</div>"
+
+
+def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | None = None, sort_field: str = "", sort_dir: str = "asc", q: str = "") -> str:
     records = records if records is not None else list_records(entity_name)
     if not records:
         return "<p>No records yet.</p>"
     fields = _field_specs(entity_name)
-    field_by_name = {str(field["name"]): field for field in fields}
-    field_names = list(field_by_name)
-    columns = ["id", "_revision"] + [
-        field_name for field_name in field_names if field_name not in {"id", "_revision"}
-    ]
-    header = "".join(f"<th>{html.escape(column)}</th>" for column in columns)
+    field_names = [str(f["name"]) for f in fields if str(f["name"]) not in {"_revision"}]
+    # Show at most 6 columns to keep table readable; id always first
+    display_cols = ["id"] + [c for c in field_names if c != "id"][:5]
     safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    q_part = f"&q={html.escape(quote(q, safe=''), quote=True)}" if q else ""
+    header_cells = []
+    for col in display_cols:
+        label = html.escape((col[:-3].replace("_", " ").title() + " ID") if col.endswith("_id") else col.replace("_", " ").title())
+        next_dir = "desc" if sort_field == col and sort_dir == "asc" else "asc"
+        sort_icon = ""
+        if sort_field == col:
+            sort_icon = " ▼" if sort_dir == "desc" else " ▲"
+        header_cells.append(
+            f'<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">'
+            f'<a href="/ui/entities/{safe_entity}?sort={html.escape(col)}&dir={next_dir}{q_part}"'
+            f' class="hover:text-gray-900 transition-colors">{label}{sort_icon}</a>'
+            f'</th>'
+        )
+    header = "".join(header_cells)
     rows: list[str] = []
     for record in records:
         raw_record_id = str(record.get("id", ""))
         record_id = html.escape(quote(raw_record_id, safe=""), quote=True)
-        form_id = f"apg-update-{entity_name}-{raw_record_id}"
-        safe_form_id = html.escape(form_id, quote=True)
-        cells = []
-        for column in columns:
-            if column in field_by_name:
-                cell_value = _ui_record_editor_input_html(field_by_name[column], record, form_id)
-            else:
-                cell_value = html.escape(_ui_record_display_value(record.get(column)))
-            cells.append(f"<td>{cell_value}</td>")
         revision = html.escape(str(record.get("_revision", "")), quote=True)
-        action = (
-            f'<form id="{safe_form_id}" method="post" action="/ui/entities/{safe_entity}/records/{record_id}"></form>'
-            f'<input form="{safe_form_id}" type="hidden" name="expected_revision" value="{revision}">'
-            f'<button form="{safe_form_id}" type="submit">Save</button> '
-            f'<form method="post" action="/ui/entities/{safe_entity}/records/{record_id}/delete">'
-            f'<input type="hidden" name="expected_revision" value="{revision}">'
-            '<button type="submit">Delete</button>'
-            '</form>'
+        cb_cell = (
+            f'<td class="pl-3 pr-1 py-2.5 w-8">'
+            f'<input type="checkbox" class="apg-row-cb w-4 h-4 rounded border-gray-300 text-apg-primary"'
+            f' data-row-id="{raw_record_id}" data-rev="{revision}">'
+            f'</td>'
         )
-        rows.append(f"<tr>{''.join(cells)}<td>{action}</td></tr>")
-    return f"<table><thead><tr>{header}<th>Actions</th></tr></thead><tbody>{''.join(rows)}</tbody></table>"
+        cells = [cb_cell]
+        for col in display_cols:
+            val = html.escape(_ui_record_display_value(record.get(col)))
+            if col == "id":
+                cells.append(
+                    f'<td class="px-4 py-2.5">'
+                    f'<a href="/ui/entities/{safe_entity}/{record_id}"'
+                    f' class="text-xs font-mono text-apg-primary hover:underline truncate block max-w-24">{val[:16]}</a>'
+                    f'</td>'
+                )
+            else:
+                cells.append(f'<td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">{val}</td>')
+        edit_hidden = "".join(
+            f'<input type="hidden" name="{html.escape(str(f["name"]), quote=True)}" value="{html.escape(str(record.get(str(f["name"]), "") or ""), quote=True)}">'
+            for f in fields if str(f.get("name")) not in {"id", "_revision"}
+        )
+        action = (
+            f'<div class="flex items-center gap-3 justify-end opacity-0 group-hover/row:opacity-100 transition-opacity">'
+            f'<form method="post" action="/ui/entities/{safe_entity}/records/{record_id}" class="inline">'
+            f'<input type="hidden" name="expected_revision" value="{revision}">'
+            f'{edit_hidden}'
+            f'<button type="submit"'
+            f' class="text-xs font-medium text-apg-primary hover:underline whitespace-nowrap">Edit</button>'
+            f'</form>'
+            f'<form method="post" action="/ui/entities/{safe_entity}/records/{record_id}/delete" class="inline">'
+            f'<input type="hidden" name="expected_revision" value="{revision}">'
+            f'<button type="submit" onclick="return confirm(this.dataset.msg)" data-msg="Delete this record?"'
+            f' class="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>'
+            f'</form>'
+            f'</div>'
+        )
+        rows.append(
+            f'<tr class="hover:bg-gray-50 transition-colors group/row border-b border-gray-50 last:border-0">'
+            f'{"".join(cells)}'
+            f'<td class="px-4 py-2.5 text-right">{action}</td>'
+            f'</tr>'
+        )
+    bulk_bar = (
+        f'<div id="apg-bulk-bar" data-entity="{safe_entity}"'
+        f' class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50'
+        f' bg-gray-900 text-white rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-3 text-sm">'
+        f'<span id="apg-bulk-cnt" class="font-semibold tabular-nums"></span>'
+        f'<button onclick="apgBulkDelete()"'
+        f' class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors">Delete</button>'
+        f'<a id="apg-csv-link" href="/entities/{safe_entity}/records.csv"'
+        f' class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition-colors">Export CSV</a>'
+        f'<button onclick="apgBulkClear()" class="ml-1 text-gray-400 hover:text-white leading-none text-base">✕</button>'
+        f'</div>'
+    )
+    bulk_js = (
+        '<script>'
+        '(function(){'
+        'function upd(){'
+        'var cc=document.querySelectorAll(".apg-row-cb:checked");'
+        'var bar=document.getElementById("apg-bulk-bar");'
+        'if(!bar)return;'
+        'var cnt=document.getElementById("apg-bulk-cnt");'
+        'if(cc.length>0){bar.classList.remove("hidden");cnt.textContent=cc.length+" selected";}else{bar.classList.add("hidden");}'
+        '}'
+        'window.apgBulkClear=function(){'
+        'document.querySelectorAll(".apg-row-cb").forEach(function(c){c.checked=false;});'
+        'upd();'
+        '};'
+        'window.apgBulkDelete=function(){'
+        'var cc=document.querySelectorAll(".apg-row-cb:checked");'
+        'if(!cc.length)return;'
+        'if(!confirm("Delete "+cc.length+" record(s)? This cannot be undone."))return;'
+        'var ids=Array.from(cc).map(function(c){return c.dataset.rowId;}).join(",");'
+        'var entity=document.getElementById("apg-bulk-bar").dataset.entity;'
+        'var fd=new FormData();fd.append("ids",ids);'
+        'fetch("/ui/entities/"+entity+"/records/bulk_delete",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"ids="+encodeURIComponent(ids)})'
+        '.then(function(r){if(r.redirected||r.ok)window.location.reload();});'
+        '};'
+        'document.addEventListener("change",function(e){if(e.target.classList.contains("apg-row-cb"))upd();});'
+        'document.addEventListener("click",function(e){'
+        'var allCb=e.target.closest(".apg-select-all");'
+        'if(allCb){document.querySelectorAll(".apg-row-cb").forEach(function(c){c.checked=allCb.checked;});upd();}'
+        '});'
+        '})()'
+        '</script>'
+    )
+    return (
+        bulk_bar
+        + f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">'
+        + f'<div class="overflow-x-auto">'
+        + f'<table class="w-full">'
+        + f'<thead class="bg-gray-50 border-b border-gray-100">'
+        + f'<tr>'
+        + f'<th class="pl-3 pr-1 py-2.5 w-8"><input type="checkbox" class="apg-select-all w-4 h-4 rounded border-gray-300"></th>'
+        + f'{header}<th class="px-4 py-2.5 w-28"></th></tr>'
+        + f'</thead>'
+        + f'<tbody>{"".join(rows)}</tbody>'
+        + f'</table>'
+        + f'</div>'
+        + f'</div>'
+        + bulk_js
+    )
 
 
 def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[str]] | None = None) -> tuple[int, str]:
@@ -3316,16 +4327,91 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
     if entity is None:
         return 404, _html_page("Unknown entity", f"<h1>Unknown entity: {html.escape(entity_name)}</h1>")
     query = query or {}
-    query_result = query_records(entity_name, query)
     safe_entity = html.escape(entity_name, quote=True)
     fields = _field_specs(entity_name) or [{"name": "value", "type": "string", "required": True}]
-    inputs = "".join(_ui_field_input_html(field) for field in fields)
+
+    # Full-text search: filter records where any string field contains q
+    q = query.get("q", [""])[0].strip() if "q" in query else ""
+    sort_field = query.get("sort", [""])[0].strip()
+    sort_dir = query.get("dir", ["asc"])[0].strip().lower()
+    if sort_dir not in ("asc", "desc"):
+        sort_dir = "asc"
+    # Pagination
+    try:
+        page = max(1, int(query.get("page", ["1"])[0]))
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        per = max(5, min(200, int(query.get("per", ["50"])[0])))
+    except (ValueError, TypeError):
+        per = 50
+
+    # Build query for sort/pagination and field filters
+    base_query: Dict[str, list[str]] = {}
+    if sort_field:
+        base_query["sort"] = [sort_field]
+        base_query["order"] = [sort_dir]
+    for _k, _v in query.items():
+        if _k.startswith("filter."):
+            base_query[_k] = _v
+    query_result = query_records(entity_name, base_query)
+    all_records = query_result["records"]
+
+    # Full-text search filter
+    if q:
+        q_low = q.lower()
+        filtered = [
+            r for r in all_records
+            if any(q_low in str(v).lower() for v in r.values() if v is not None)
+        ]
+    else:
+        filtered = all_records
+
+    total_filtered = len(filtered)
+    total_pages = max(1, (total_filtered + per - 1) // per)
+    page = min(page, total_pages)
+    offset = (page - 1) * per
+    paginated = filtered[offset:offset + per]
+
+    # Detect kanban-eligible status field
+    status_field_names = {"status", "state", "stage", "phase"}
+    has_kanban = any(str(f.get("name", "")).lower() in status_field_names for f in fields)
+
+    records_table = _ui_records_table_html(entity_name, paginated, sort_field=sort_field, sort_dir=sort_dir, q=q)
+
+    # Prefer Jinja2 template for rich UI; fall back to f-string builder for zero-dep mode
+    create_inputs = _ui_create_form_html(entity_name, fields)
     query_form = _ui_records_query_form_html(entity_name, query)
-    records_table = _ui_records_table_html(entity_name, query_result["records"])
-    records_json = html.escape(json.dumps(query_result["records"], indent=2, sort_keys=True))
-    result_summary = (
-        f'<p>Showing {query_result["count"]} of {query_result["total"]} matching records.</p>'
+    tmpl_body = _render_template(
+        "entity_list.html.j2",
+        entity_name=html.escape(entity_name),
+        entity_type=html.escape(entity.get("type", "entity")),
+        safe_entity=safe_entity,
+        fields=fields,
+        records=paginated,
+        total=query_result["total"],
+        count=total_filtered,
+        records_table=records_table,
+        create_inputs=create_inputs,
+        notice=html.escape(notice) if notice else "",
+        query=query,
+        has_kanban=has_kanban,
+        q=html.escape(q) if q else "",
+        sort_field=sort_field,
+        sort_dir=sort_dir,
+        page=page,
+        per=per,
+        total_pages=total_pages,
+        records_json=html.escape(json.dumps(paginated, indent=2, sort_keys=True)),
+        query_form=query_form,
     )
+    if tmpl_body is not None:
+        return 200, _html_page(entity_name, tmpl_body)
+
+    # Fallback: original f-string builder
+    inputs = _ui_create_form_html(entity_name, fields)
+    query_form = _ui_records_query_form_html(entity_name, query)
+    result_summary = f'<p>Showing {query_result["count"]} of {query_result["total"]} matching records.</p>'
     notice_html = f'<section role="alert"><strong>{html.escape(notice)}</strong></section>' if notice else ""
     body = (
         f'<nav><a href="/ui">Application</a> | '
@@ -3374,20 +4460,480 @@ def _ui_error_payload(path: str, response: Dict[str, Any]) -> str:
     return _html_page("Form error", f"<h1>Form error</h1><p>{html.escape(message)}</p><pre>{details}</pre>")
 
 
+def _extract_accumulated(form: dict) -> dict:
+    """Pull __acc_FIELD hidden fields from a step POST into an accumulated dict."""
+    return {
+        k[6:]: v  # strip '__acc_' prefix
+        for k, v in form.items()
+        if k.startswith("__acc_")
+    }
+
+
+def _ui_workflow_step_post(
+    entity_name: str, workflow_id: str, step_index: int, form: dict
+) -> tuple[int, str]:
+    """Handle POST to a workflow step: accumulate data and advance."""
+    accumulated = _extract_accumulated(form)
+    step_fields_data = {k: v for k, v in form.items() if not k.startswith("__acc_") and k != "expected_revision"}
+    accumulated.update(step_fields_data)
+
+    entity_workflows = APP_WORKFLOWS.get(entity_name, [])
+    wf = next((w for w in entity_workflows if w["id"] == workflow_id), None)
+    if wf is None:
+        return 404, _html_page("Workflow not found", "<h1>Workflow not found</h1>")
+
+    next_step = step_index + 1
+    return _ui_workflow_wizard_html(entity_name, workflow_id, next_step, accumulated)
+
+
+def _ui_field_view_fragment(entity_name: str, record_id: str, field: Dict[str, Any], record: Dict[str, Any]) -> str:
+    """Return the view-mode div for one field (used after save or cancel)."""
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    safe_record_id = html.escape(quote(record_id, safe=""), quote=True)
+    field_name = str(field.get("name", ""))
+    fld_id = f"fld-{safe_entity}-{safe_record_id}-{field_name}"
+    field_val = record.get(field_name, "")
+    if field_val is None or field_val == "" or str(field_val) == "None":
+        display = '<span class="text-gray-300 italic text-xs">—</span>'
+    elif str(field_val).lower() == "true":
+        display = '<span class="inline-flex items-center gap-1 text-green-600"><span class="text-xs">✓</span> Yes</span>'
+    elif str(field_val).lower() == "false":
+        display = '<span class="inline-flex items-center gap-1 text-gray-400"><span class="text-xs">✕</span> No</span>'
+    else:
+        display = html.escape(str(field_val)[:200])
+    label = html.escape((field_name[:-3].replace("_", " ").title() + " ID") if field_name.endswith("_id") else field_name.replace("_", " ").title())
+    edit_url = f"/ui/entities/{safe_entity}/{safe_record_id}/fields/{html.escape(field_name)}/edit"
+    return (
+        f'<div id="{fld_id}" class="py-3 border-b border-gray-50 last:border-0 group/field">'
+        f'<dt class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</dt>'
+        f'<dd class="flex items-center justify-between gap-2 min-h-6">'
+        f'<span class="text-sm text-gray-900 break-words">{display}</span>'
+        f'<button hx-get="{edit_url}" hx-target="#{fld_id}" hx-swap="outerHTML"'
+        f' class="opacity-0 group-hover/field:opacity-100 flex-shrink-0 p-1 text-gray-300 hover:text-apg-primary rounded transition-all"'
+        f' title="Edit {html.escape(field_name)}">'
+        f'<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">'
+        f'<path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zm-2.207 2.207L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>'
+        f'</svg></button>'
+        f'</dd></div>'
+    )
+
+
+def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
+    status, response = get_record(entity_name, record_id)
+    if status != 200 or not isinstance(response, dict):
+        return 404, _html_page("Not found", f"<h1>Record not found</h1><p>{html.escape(entity_name)}/{html.escape(record_id)}</p>")
+    record = response.get("record", response)
+    entity = _entity_spec(entity_name)
+    if entity is None:
+        return 404, _html_page("Not found", f"<h1>Unknown entity: {html.escape(entity_name)}</h1>")
+    fields = _field_specs(entity_name) or []
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    safe_record_id = html.escape(quote(record_id, safe=""), quote=True)
+
+    # Pick a good display title (first non-id string field value, or id prefix)
+    title_field = next(
+        (f for f in fields if str(f.get("type", "")).lower() in {"str", "string", "text", "email", "varchar"} and str(f.get("name")) not in {"id", "_revision"}),
+        None,
+    )
+    title = str(record.get(title_field["name"], record_id) if title_field else record_id)[:80]
+
+    # Status badge value
+    status_field = next(
+        (f for f in fields if str(f.get("name", "")).lower() in {"status", "state", "stage", "phase"}),
+        None,
+    )
+    status_val = str(record.get(status_field["name"], "")) if status_field else ""
+
+    # Related lists: find entities with FK fields pointing to this entity
+    related_lists: list[Dict[str, Any]] = []
+    for ent in sorted(ENTITY_NAMES):
+        if ent == entity_name:
+            continue
+        ent_fields = _field_specs(ent) or []
+        fk_field = next(
+            (f for f in ent_fields if str(f.get("name", "")).endswith("_id") and str(f.get("name", ""))[:-3] == entity_name.lower()),
+            None,
+        )
+        if fk_field is None:
+            # Try FK by entity name convention: field name == entity_name + "_id"
+            fk_candidates = [f for f in ent_fields if str(f.get("name", "")).lower().replace("_id", "") == entity_name.lower()]
+            fk_field = fk_candidates[0] if fk_candidates else None
+        if fk_field:
+            fk_name = str(fk_field["name"])
+            rel_result = query_records(ent, {f"filter.{fk_name}": [record_id]})
+            if rel_result.get("records"):
+                rel_cols = ["id"] + [str(f["name"]) for f in ent_fields if str(f.get("name")) not in {"id", "_revision", fk_name}][:4]
+                related_lists.append({"entity": ent, "fk_field": fk_name, "records": rel_result["records"], "cols": rel_cols})
+
+    has_kanban = any(str(f.get("name", "")).lower() in {"status", "state", "stage", "phase"} for f in fields)
+    revision = html.escape(str(record.get("_revision", "")))
+
+    display_fields = [f for f in fields if str(f.get("name")) != "_revision"]
+    field_semantics = {
+        str(f.get("name", "")): _ui_field_semantic(str(f.get("name", "")), str(f.get("type", "")))
+        for f in display_fields
+    }
+    tmpl_body = _render_template(
+        "record_detail.html.j2",
+        entity_name=html.escape(entity_name),
+        entity_type=html.escape(entity.get("type", "entity")),
+        safe_entity=safe_entity,
+        safe_record_id=safe_record_id,
+        record=record,
+        fields=display_fields,
+        field_semantics=field_semantics,
+        title=html.escape(title),
+        status_val=html.escape(status_val),
+        revision=revision,
+        related_lists=related_lists,
+        has_kanban=has_kanban,
+        activity_events=_get_activity(entity_name, record_id),
+    )
+    if tmpl_body is not None:
+        return 200, _html_page(title or entity_name, tmpl_body)
+    return 200, _html_page(entity_name, f"<h1>{html.escape(title)}</h1><pre>{html.escape(json.dumps(record, indent=2))}</pre>")
+
+
+def _ui_field_edit_html(entity_name: str, record_id: str, field_name: str) -> tuple[int, str]:
+    status, response = get_record(entity_name, record_id)
+    if status != 200 or not isinstance(response, dict):
+        return 404, "{}"
+    record = response.get("record", response)
+    fields = _field_specs(entity_name) or []
+    field = next((f for f in fields if str(f.get("name")) == field_name), None)
+    if field is None:
+        return 404, "{}"
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    safe_record_id = html.escape(quote(record_id, safe=""), quote=True)
+    safe_field_name = html.escape(field_name)
+    fld_id = f"fld-{safe_entity}-{safe_record_id}-{safe_field_name}"
+    current_val = html.escape(str(record.get(field_name, "") or ""), quote=True)
+    label = html.escape((field_name[:-3].replace("_", " ").title() + " ID") if field_name.endswith("_id") else field_name.replace("_", " ").title())
+    patch_url = f"/ui/entities/{safe_entity}/{safe_record_id}/fields/{safe_field_name}/patch"
+    cancel_url = f"/ui/entities/{safe_entity}/{safe_record_id}/fields/{safe_field_name}/view"
+    field_type = str(field.get("type", "string"))
+    if field_type in {"text", "markdown"}:
+        input_html = (
+            f'<textarea name="{safe_field_name}" rows="3"'
+            f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary resize-none">'
+            f'{current_val}</textarea>'
+        )
+    elif field_type == "boolean":
+        checked = "checked" if str(record.get(field_name, "")).lower() == "true" else ""
+        input_html = f'<input type="checkbox" name="{safe_field_name}" value="true" {checked} class="w-4 h-4 text-apg-primary rounded">'
+    elif field_type in {"integer", "number", "float"}:
+        input_html = (
+            f'<input type="number" name="{safe_field_name}" value="{current_val}"'
+            f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary">'
+        )
+    else:
+        input_html = (
+            f'<input type="text" name="{safe_field_name}" value="{current_val}"'
+            f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary">'
+        )
+    revision = html.escape(str(record.get("_revision", "")), quote=True)
+    fragment = (
+        f'<div id="{fld_id}" class="py-3 border-b border-gray-50 last:border-0">'
+        f'<dt class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</dt>'
+        f'<dd>'
+        f'<form hx-post="{patch_url}" hx-target="#{fld_id}" hx-swap="outerHTML" class="flex flex-col gap-1.5">'
+        f'<input type="hidden" name="expected_revision" value="{revision}">'
+        f'{input_html}'
+        f'<div class="flex gap-2">'
+        f'<button type="submit" class="px-2.5 py-1 bg-apg-primary text-white text-xs font-medium rounded-lg hover:opacity-90">Save</button>'
+        f'<button type="button" hx-get="{cancel_url}" hx-target="#{fld_id}" hx-swap="outerHTML"'
+        f' class="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg">Cancel</button>'
+        f'</div>'
+        f'</form>'
+        f'</dd></div>'
+    )
+    return 200, fragment
+
+
+def _ui_field_view_html(entity_name: str, record_id: str, field_name: str) -> tuple[int, str]:
+    status, response = get_record(entity_name, record_id)
+    if status != 200 or not isinstance(response, dict):
+        return 404, "{}"
+    record = response.get("record", response)
+    fields = _field_specs(entity_name) or []
+    field = next((f for f in fields if str(f.get("name")) == field_name), None)
+    if field is None:
+        return 404, "{}"
+    return 200, _ui_field_view_fragment(entity_name, record_id, field, record)
+
+
+def _ui_field_patch_post(entity_name: str, record_id: str, field_name: str, form: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    status, response = get_record(entity_name, record_id)
+    if status != 200 or not isinstance(response, dict):
+        return 404, {"error": "record not found"}
+    current = response.get("record", response)
+    fields = _field_specs(entity_name) or []
+    field = next((f for f in fields if str(f.get("name")) == field_name), None)
+    if field is None:
+        return 404, {"error": "field not found"}
+    new_val = form.get(field_name, "")
+    field_type = str(field.get("type", "string"))
+    if field_type == "boolean":
+        new_val = "true" if new_val == "true" else "false"
+    elif field_type == "integer":
+        try:
+            new_val = str(int(new_val))
+        except (ValueError, TypeError):
+            new_val = "0"
+    updated = dict(current)
+    updated[field_name] = new_val
+    expected_revision_raw = form.get("expected_revision")
+    try:
+        expected_revision_int: int | None = int(expected_revision_raw) if expected_revision_raw is not None else None
+    except (TypeError, ValueError):
+        expected_revision_int = None
+    save_status, save_result = update_record(entity_name, record_id, updated, expected_revision_int)
+    if save_status not in (200, 201, 204):
+        err_msg = html.escape(str(save_result.get("error") or save_result.get("message") or "Save failed"))
+        fragment = (
+            f'<div class="py-3 border-b border-gray-50">'
+            f'<p class="text-xs text-red-500">{err_msg}</p>'
+            f'</div>'
+        )
+        return save_status, {"html": fragment}
+    _status2, refreshed_resp = get_record(entity_name, record_id)
+    refreshed = refreshed_resp.get("record", refreshed_resp) if isinstance(refreshed_resp, dict) else {}
+    rec = refreshed if refreshed else updated
+    label = str(field.get("name", "")).replace("_", " ").title()
+    return 200, {"html": _ui_field_view_fragment(entity_name, record_id, field, rec), "hx_trigger": {"apgToast": {"msg": f"{label} saved", "type": "success"}}}
+
+
+def _ui_kanban_html(entity_name: str) -> tuple[int, str]:
+    entity = _entity_spec(entity_name)
+    if entity is None:
+        return 404, _html_page("Not found", f"<h1>Unknown entity: {html.escape(entity_name)}</h1>")
+    fields = _field_specs(entity_name) or []
+    status_field_names = {"status", "state", "stage", "phase"}
+    status_field = next((f for f in fields if str(f.get("name", "")).lower() in status_field_names), None)
+    if status_field is None:
+        return _ui_entity_html(entity_name)
+    status_fname = str(status_field["name"])
+    all_records = query_records(entity_name, {}).get("records", [])
+    # Gather unique status values preserving insertion order
+    seen: list[str] = []
+    for r in all_records:
+        v = str(r.get(status_fname, "") or "")
+        if v and v not in seen:
+            seen.append(v)
+    if not seen:
+        seen = ["active", "inactive"]
+    columns = [{"label": v, "records": [r for r in all_records if str(r.get(status_fname, "")) == v]} for v in seen]
+    # Choose display field: first non-id, non-status string field
+    display_field_obj = next(
+        (f for f in fields if str(f.get("type", "")).lower() in {"str", "string", "text", "email", "varchar"} and str(f.get("name")) not in {"id", "_revision", status_fname}),
+        None,
+    )
+    display_field = str(display_field_obj["name"]) if display_field_obj else "id"
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    tmpl_body = _render_template(
+        "kanban_view.html.j2",
+        entity_name=html.escape(entity_name),
+        safe_entity=safe_entity,
+        columns=columns,
+        display_field=display_field,
+        status_field=status_fname,
+        fields=fields,
+    )
+    if tmpl_body is not None:
+        return 200, _html_page(f"{entity_name} — Kanban", tmpl_body)
+    return _ui_entity_html(entity_name)
+
+
+def _ui_debug_html(run_id: str | None = None) -> tuple[int, str]:
+    runs = list_workflow_runs()
+    cb_status = circuit_breaker_status()
+    subs = dict(APG_EVENT_SUBSCRIPTIONS)
+    # Run detail
+    detail_html = ""
+    if run_id:
+        try:
+            run = get_workflow_run(run_id)
+        except KeyError:
+            run = None
+        if run:
+            trace = run.get("trace", [])
+            trace_rows = []
+            for t in trace:
+                status_cls = (
+                    "bg-green-100 text-green-800" if t.get("status") == "completed"
+                    else "bg-red-100 text-red-800" if t.get("status") in {"failed", "circuit_open"}
+                    else "bg-yellow-100 text-yellow-800"
+                )
+                attempts = t.get("attempts", [])
+                attempts_html = f', {len(attempts)} attempt(s)' if len(attempts) > 1 else ""
+                trace_rows.append(
+                    f'<tr class="border-b border-gray-50">'
+                    f'<td class="px-4 py-2 text-xs font-mono text-gray-500">{t.get("index", "")}</td>'
+                    f'<td class="px-4 py-2 text-sm font-medium">{html.escape(str(t.get("step", "")))}</td>'
+                    f'<td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold {status_cls}">{html.escape(str(t.get("status", "")))}</span></td>'
+                    f'<td class="px-4 py-2 text-xs text-gray-500">{html.escape(str(t.get("timeout_spec", "")))}{attempts_html}</td>'
+                    f'</tr>'
+                )
+            # Journal timeline
+            journal = _get_journal(run_id)
+            ev_color_map = {"step_completed": "bg-green-400", "step_failed": "bg-red-400", "saga_compensating": "bg-orange-400", "signal_received": "bg-purple-400"}
+            journal_items = []
+            for ev in journal:
+                ev_color = ev_color_map.get(ev["event_type"], "bg-gray-400")
+                journal_items.append(
+                    f'<li class="ml-6 mb-3 relative">'
+                    f'<span class="absolute flex items-center justify-center w-6 h-6 rounded-full -left-3 ring-2 ring-white {ev_color}"></span>'
+                    f'<div class="pl-1">'
+                    f'<p class="text-xs font-semibold text-gray-900">#{ev["seq"]} {html.escape(ev["event_type"].replace("_"," ").title())}</p>'
+                    f'<p class="text-xs text-gray-500">Step: {html.escape(str(ev["step"]))} · {html.escape(ev["ts"][:19].replace("T"," "))} UTC</p>'
+                    f'<p class="text-xs font-mono text-gray-300 truncate">{html.escape(ev["hash"][:16])}...</p>'
+                    f'</div></li>'
+                )
+            journal_html = (
+                f'<div class="px-4 py-3 border-t border-gray-100">'
+                f'<h3 class="text-xs font-semibold text-gray-700 mb-2">Event Journal</h3>'
+                f'<ol class="relative border-l border-gray-200 ml-3">'
+                + ("".join(journal_items) if journal_items else '<li class="ml-6"><p class="text-xs text-gray-400">No journal events yet.</p></li>')
+                + f'</ol></div>'
+            )
+            detail_html = (
+                f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
+                f'<div class="px-4 py-3 border-b border-gray-100"><h2 class="text-sm font-semibold">Run: {html.escape(str(run_id))}'
+                f' <span class="ml-2 text-xs text-gray-400">{html.escape(str(run.get("workflow","")))}</span></h2></div>'
+                f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
+                f'<tr><th class="px-4 py-2 text-left">#</th><th class="px-4 py-2 text-left">Step</th>'
+                f'<th class="px-4 py-2 text-left">Status</th><th class="px-4 py-2 text-left">Notes</th></tr></thead>'
+                f'<tbody>{" ".join(trace_rows)}</tbody></table>'
+                + journal_html
+                + f'</div>'
+            )
+    # Run list
+    run_rows = []
+    for r in sorted(runs, key=lambda x: str(x.get("id", "")), reverse=True)[:50]:
+        rid = html.escape(str(r.get("id", "")))
+        wf = html.escape(str(r.get("workflow", "")))
+        st = html.escape(str(r.get("status", "")))
+        sc = "bg-green-100 text-green-800" if st == "completed" else "bg-red-100 text-red-800" if st == "failed" else "bg-yellow-100 text-yellow-800"
+        run_rows.append(
+            f'<tr class="hover:bg-gray-50 border-b border-gray-50">'
+            f'<td class="px-4 py-2 text-xs font-mono"><a href="/ui/debug/{rid}" class="text-apg-primary hover:underline">{rid}</a></td>'
+            f'<td class="px-4 py-2 text-sm">{wf}</td>'
+            f'<td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold {sc}">{st}</span></td>'
+            f'<td class="px-4 py-2 text-xs text-gray-400">{len(r.get("trace", []))} steps</td>'
+            f'</tr>'
+        )
+    # Circuit breakers section
+    cb_rows = []
+    for k, v in cb_status.items():
+        st = v.get("state", "closed")
+        sc = "bg-green-100 text-green-800" if st == "closed" else "bg-red-100 text-red-800" if st == "open" else "bg-yellow-100 text-yellow-800"
+        cb_rows.append(
+            f'<tr class="border-b border-gray-50">'
+            f'<td class="px-4 py-2 text-xs font-mono">{html.escape(k)}</td>'
+            f'<td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold {sc}">{st}</span></td>'
+            f'<td class="px-4 py-2 text-xs tabular-nums">{v.get("failures", 0)}</td>'
+            f'</tr>'
+        )
+    cb_section = (
+        f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
+        f'<div class="px-4 py-3 border-b border-gray-100"><h2 class="text-sm font-semibold text-gray-900">Circuit Breakers</h2></div>'
+        + (f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
+           f'<tr><th class="px-4 py-2 text-left">Key</th><th class="px-4 py-2 text-left">State</th><th class="px-4 py-2 text-left">Failures</th></tr></thead>'
+           f'<tbody>{" ".join(cb_rows)}</tbody></table>' if cb_rows else
+           f'<p class="px-4 py-6 text-sm text-gray-400 text-center">No circuit breakers tripped.</p>')
+        + f'</div>'
+    )
+    # Event subscriptions section
+    sub_rows = [
+        f'<tr class="border-b border-gray-50"><td class="px-4 py-2 text-xs font-mono">{html.escape(ev)}</td>'
+        f'<td class="px-4 py-2 text-xs text-gray-600">{html.escape(", ".join(wfs))}</td></tr>'
+        for ev, wfs in subs.items()
+    ]
+    sub_section = (
+        f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
+        f'<div class="px-4 py-3 border-b border-gray-100"><h2 class="text-sm font-semibold text-gray-900">Event Subscriptions</h2></div>'
+        + (f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
+           f'<tr><th class="px-4 py-2 text-left">Event</th><th class="px-4 py-2 text-left">Subscribed Workflows</th></tr></thead>'
+           f'<tbody>{" ".join(sub_rows)}</tbody></table>' if sub_rows else
+           f'<p class="px-4 py-6 text-sm text-gray-400 text-center">No active subscriptions.</p>')
+        + f'</div>'
+    )
+    body = (
+        f'<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500">'
+        f'<a href="/ui" class="hover:text-apg-primary">Application</a><span>/</span>'
+        f'<span class="font-semibold text-gray-900">Flow Debugger</span></nav>'
+        + detail_html
+        + f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
+        + f'<div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">'
+        + f'<h2 class="text-sm font-semibold text-gray-900">Workflow Runs</h2>'
+        + f'<span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{len(runs)} total</span></div>'
+        + (f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
+           f'<tr><th class="px-4 py-2 text-left">Run ID</th><th class="px-4 py-2 text-left">Workflow</th>'
+           f'<th class="px-4 py-2 text-left">Status</th><th class="px-4 py-2 text-left">Steps</th></tr></thead>'
+           f'<tbody>{" ".join(run_rows)}</tbody></table>' if run_rows else
+           f'<p class="px-4 py-10 text-sm text-gray-400 text-center">No workflow runs yet.</p>')
+        + f'</div>'
+        + cb_section
+        + sub_section
+    )
+    return 200, _html_page("Flow Debugger", body)
+
+
 def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, str]:
     parts = [part for part in path.split("/") if part]
     if parts == ["ui"]:
         return 200, _ui_index_html()
     if parts == ["ui", "databases"]:
         return _ui_database_catalog_html()
+    if parts == ["ui", "workflows"]:
+        return _ui_workflow_list_html()
+    # /ui/workflows/ENTITY/WORKFLOW_ID  or  /ui/workflows/ENTITY/WORKFLOW_ID/step/N
+    if len(parts) >= 4 and parts[0] == "ui" and parts[1] == "workflows":
+        entity_name = parts[2]
+        workflow_id = parts[3]
+        step_index = 0
+        if len(parts) == 6 and parts[4] == "step":
+            try:
+                step_index = int(parts[5])
+            except ValueError:
+                step_index = 0
+        return _ui_workflow_wizard_html(entity_name, workflow_id, step_index)
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "entities":
+        if query and query.get("view", [""])[0] == "kanban":
+            return _ui_kanban_html(parts[2])
         return _ui_entity_html(parts[2], query=query)
+    # /ui/entities/ENTITY/RECORD_ID
+    if len(parts) == 4 and parts[0] == "ui" and parts[1] == "entities":
+        return _ui_record_detail_html(parts[2], parts[3])
+    # /ui/entities/ENTITY/RECORD_ID/fields/FIELD_NAME/edit|view
+    if (len(parts) == 7 and parts[0] == "ui" and parts[1] == "entities"
+            and parts[4] == "fields" and parts[6] in {"edit", "view"}):
+        if parts[6] == "edit":
+            status, fragment = _ui_field_edit_html(parts[2], parts[3], parts[5])
+        else:
+            status, fragment = _ui_field_view_html(parts[2], parts[3], parts[5])
+        return status, fragment
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "agents":
         return _ui_agent_console_html(parts[2])
     if len(parts) == 3 and parts[0] == "ui" and parts[1] in {"agent-teams", "teams"}:
         return _ui_agent_console_html(parts[2], team=True)
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "capabilities":
         return _ui_capability_console_html(parts[2])
+    if parts[:2] == ["ui", "debug"]:
+        return _ui_debug_html(parts[2] if len(parts) > 2 else None)
+    if parts == ["ui", "marketplace"]:
+        try:
+            from compiler.connector_generator import scan_connectors
+            connectors = scan_connectors("connectors")
+        except Exception:
+            connectors = list(APG_CONNECTOR_REGISTRY)
+        tmpl_body = _render_template("marketplace.html.j2",
+            connectors=connectors,
+            installed_count=len(connectors),
+        )
+        if tmpl_body is not None:
+            return 200, _html_page("Connector Marketplace", tmpl_body)
+        return 200, _html_page("Connector Marketplace", "<h1>Connector Marketplace</h1>")
     return 404, _html_page("Not found", f"<h1>Not found</h1><p>{html.escape(path)}</p>")
 
 
@@ -3470,6 +5016,22 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
     parts = [part for part in path.split("/") if part]
     raw_form_record = payload.get("record", payload)
     form_record = dict(raw_form_record) if isinstance(raw_form_record, dict) else {}
+
+    # Field patch POST: /ui/entities/ENTITY/RECORD_ID/fields/FIELD_NAME/patch
+    if (len(parts) == 7 and parts[0] == "ui" and parts[1] == "entities"
+            and parts[4] == "fields" and parts[6] == "patch"):
+        return _ui_field_patch_post(parts[2], parts[3], parts[5], form_record)
+
+    # Workflow step POST: /ui/workflows/ENTITY/WORKFLOW_ID/step/N
+    if (len(parts) == 6 and parts[0] == "ui" and parts[1] == "workflows" and parts[4] == "step"):
+        entity_name, workflow_id = parts[2], parts[3]
+        try:
+            step_index = int(parts[5])
+        except ValueError:
+            step_index = 0
+        _status, html_payload = _ui_workflow_step_post(entity_name, workflow_id, step_index, form_record)
+        return _status, {"html": html_payload}
+
     if len(parts) == 4 and parts[0] == "ui" and parts[1] == "agents" and parts[3] == "invoke":
         request_payload, error = _parse_json_object_field(form_record, "payload_json")
         if error:
@@ -3527,6 +5089,17 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
         if status == 201:
             return 303, {"location": _ui_entity_location(entity_name)}
         return status, response
+    if (len(parts) == 5 and parts[0] == "ui" and parts[1] == "entities"
+            and parts[3] == "records" and parts[4] == "bulk_delete"):
+        entity_name = parts[2]
+        ids_raw = form_record.get("ids", "")
+        ids = [i.strip() for i in ids_raw.split(",") if i.strip()]
+        for rid in ids:
+            try:
+                delete_record(entity_name, rid)
+            except Exception:
+                pass  # best-effort
+        return 303, {"location": _ui_entity_location(entity_name)}
     if len(parts) == 5 and parts[0] == "ui" and parts[1] == "entities" and parts[3] == "records":
         entity_name = parts[2]
         record_id = parts[4]
@@ -3555,6 +5128,14 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
         if status == 200:
             return 303, {"location": _ui_entity_location(entity_name)}
         return status, response
+    if (len(parts) == 6 and parts[0] == "ui" and parts[1] == "entities"
+            and parts[3] == "records" and parts[5] == "note"):
+        entity_name = parts[2]
+        record_id = parts[4]
+        note = str(form_record.get("note", "")).strip()
+        if note:
+            _log_activity(entity_name, record_id, "note", detail=note[:200])
+        return 303, {"location": f"/ui/entities/{entity_name}/{record_id}"}
     return 404, {"error": "not_found", "path": path}
 
 
@@ -3732,6 +5313,8 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, {"runs": list_workflow_runs()}
     if path.startswith("/workflows/runs/"):
         parts = [part for part in path.split("/") if part]
+        if len(parts) == 4 and parts[3] == "journal":
+            return 200, {"run_id": parts[2], "events": _get_journal(parts[2])}
         if len(parts) == 3:
             try:
                 return 200, get_workflow_run(parts[2])
@@ -3762,6 +5345,34 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, auth_status()
     if path == "/events":
         return 200, {"events": list_events()}
+    if path == "/events/subscriptions":
+        return 200, {"subscriptions": dict(APG_EVENT_SUBSCRIPTIONS)}
+    if path == "/api/search":
+        q = str((query or {}).get("q", [""])[0]).strip().lower() if query else ""
+        results: list[Dict[str, Any]] = []
+        if q:
+            for ent in ENTITIES:
+                ename = str(ent["name"])
+                for rec in list_records(ename)[:200]:
+                    for v in rec.values():
+                        if q in str(v).lower():
+                            label_field = next(
+                                (f["name"] for f in ent.get("fields", [])
+                                 if f["name"] not in ["id", "_revision"]),
+                                "id",
+                            )
+                            results.append({
+                                "entity": ename,
+                                "id": str(rec.get("id", "")),
+                                "label": str(rec.get(label_field, rec.get("id", "")))[:60],
+                            })
+                            break
+        results = results[:20]
+        return 200, {"results": results, "query": q, "count": len(results)}
+    if path == "/circuit-breakers":
+        return 200, {"circuit_breakers": circuit_breaker_status()}
+    if path == "/connectors":
+        return 200, {"connectors": APG_CONNECTOR_REGISTRY}
     if path == "/metrics":
         return 200, metrics_snapshot()
     if path == "/self-test":
@@ -4012,9 +5623,10 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
         NEXT_RECORD_IDS[entity_name] += 1
     elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
         return 409, {"error": "duplicate_record_id", "entity": entity_name, "id": record["id"]}
-    record = _prepare_new_record(record)
+    record = _prepare_new_record(record, entity_name)
     RECORD_STORE[entity_name].append(record)
     event = _record_event("create", entity_name, after=record)
+    _log_activity(entity_name, str(record.get("id", "")), "created", detail=f"Record created with {len(record)} fields")
     persistence_error = _persist_record_store()
     if persistence_error:
         return 500, {"error": "persistence_failed", "message": persistence_error}
@@ -4093,6 +5705,7 @@ def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
             updated["_revision"] = int(existing.get("_revision", 1)) + 1
             RECORD_STORE[entity_name][index] = updated
             event = _record_event("update", entity_name, before=existing, after=updated)
+            _log_activity(entity_name, str(record_id), "updated", detail="Fields updated")
             persistence_error = _persist_record_store()
             if persistence_error:
                 return 500, {"error": "persistence_failed", "message": persistence_error}
@@ -4123,6 +5736,7 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
             conflict = _revision_conflict(existing, expected_revision)
             if conflict is not None:
                 return 409, conflict
+            _log_activity(entity_name, str(record_id), "deleted", detail="Record deleted")
             deleted = RECORD_STORE[entity_name].pop(index)
             event = _record_event("delete", entity_name, before=deleted)
             persistence_error = _persist_record_store()
@@ -4139,6 +5753,12 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
 
 def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     path = path.rstrip("/") or "/"
+    if path == "/events/emit":
+        event_name = payload.get("name") or payload.get("event") or ""
+        if not event_name:
+            return 422, {"error": "missing_field", "field": "name"}
+        ev = emit_apg_event(str(event_name), payload.get("payload") or {})
+        return 200, {"event": ev}
     if (
         path.startswith("/agents/") and path.endswith(("/invoke", "/run"))
     ) or (
@@ -4165,6 +5785,16 @@ def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, An
         path.startswith("/capabilities/") and path.endswith("/approval/plan")
     ):
         return _approval_plan_payload(path, payload)
+    if path.startswith("/workflows/runs/") and "/signal/" in path:
+        parts = [part for part in path.split("/") if part]
+        if len(parts) == 5 and parts[0] == "workflows" and parts[1] == "runs" and parts[3] == "signal":
+            sig_run_id = parts[2]
+            signal_name = parts[4]
+            if sig_run_id not in WORKFLOW_SIGNALS:
+                WORKFLOW_SIGNALS[sig_run_id] = []
+            WORKFLOW_SIGNALS[sig_run_id].append(signal_name)
+            _journal_append(sig_run_id, "signal_received", signal_name, {"from": "external"})
+            return 200, {"status": "signal_received", "run_id": sig_run_id, "signal": signal_name}
     if path.startswith("/workflows/runs/") and path.endswith("/compensate"):
         return _workflow_compensation_payload(path, payload)
     if path.startswith("/workflows/runs/") and path.endswith("/resume"):
@@ -4183,124 +5813,298 @@ def _put_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any
     return 404, {"error": "not_found", "path": path}
 
 
+def _csv_export_body(entity_name: str) -> bytes:
+    records = list_records(entity_name)
+    if not records:
+        return b""
+    import io, csv as _csv
+    fields = _field_specs(entity_name)
+    cols = [str(f["name"]) for f in fields if str(f["name"]) != "_revision"] or list(records[0].keys())
+    buf = io.StringIO()
+    w = _csv.writer(buf)
+    w.writerow(cols)
+    for rec in records:
+        w.writerow([str(rec.get(c, "")) for c in cols])
+    return buf.getvalue().encode("utf-8")
+
+
+import os as _os_env
+_APG_PG_URL: str | None = _os_env.environ.get("APG_DATABASE_URL") or _os_env.environ.get("APG_PG_URL") or _os_env.environ.get("DATABASE_URL") or None
+
+
+def _pg_connection():
+    if not _APG_PG_URL:
+        return None
+    try:
+        import psycopg2  # type: ignore
+        return psycopg2.connect(_APG_PG_URL)
+    except Exception:
+        return None
+
+
+def _pg_ensure_runs_table(conn) -> None:
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS apg_workflow_runs ("
+                "  run_id TEXT PRIMARY KEY,"
+                "  module_name TEXT NOT NULL,"
+                "  data TEXT NOT NULL,"
+                "  updated_at TIMESTAMPTZ DEFAULT NOW()"
+                ")"
+            )
+        conn.commit()
+    except Exception:
+        pass  # best-effort
+
+
+def _pg_save_workflow_run(run: Dict[str, Any]) -> None:
+    conn = _pg_connection()
+    if not conn:
+        return
+    try:
+        _pg_ensure_runs_table(conn)
+        rid = str(run.get("id", ""))
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO apg_workflow_runs (run_id, module_name, data)"
+                " VALUES (%s, %s, %s)"
+                " ON CONFLICT (run_id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()",
+                (rid, MODULE_NAME, json.dumps(run, default=str))
+            )
+        conn.commit()
+    except Exception:
+        pass  # best-effort
+    finally:
+        conn.close()
+
+
+def _pg_load_workflow_runs() -> list[Dict[str, Any]]:
+    conn = _pg_connection()
+    if not conn:
+        return []
+    try:
+        _pg_ensure_runs_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT data FROM apg_workflow_runs WHERE module_name = %s", (MODULE_NAME,))
+            rows = cur.fetchall()
+        return [json.loads(row[0]) for row in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+
+def _pg_ensure_records_table(conn) -> None:
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS apg_records ("
+                "  id TEXT NOT NULL,"
+                "  collection TEXT NOT NULL,"
+                "  tenant_id TEXT NOT NULL DEFAULT 'default',"
+                "  data JSONB NOT NULL,"
+                "  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),"
+                "  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),"
+                "  PRIMARY KEY (collection, id)"
+                ")"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_apg_records_tenant"
+                " ON apg_records (collection, tenant_id)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_apg_records_gin"
+                " ON apg_records USING gin (data)"
+            )
+        conn.commit()
+    except Exception:
+        pass  # best-effort
+
+
+def _pg_save_entity_records(entity_name: str, records: list[Dict[str, Any]]) -> None:
+    conn = _pg_connection()
+    if not conn:
+        return
+    try:
+        _pg_ensure_records_table(conn)
+        with conn.cursor() as cur:
+            for record in records:
+                rid = str(record.get("id", ""))
+                if not rid:
+                    continue
+                cur.execute(
+                    "INSERT INTO apg_records (id, collection, tenant_id, data)"
+                    " VALUES (%s, %s, %s, %s::jsonb)"
+                    " ON CONFLICT (collection, id)"
+                    " DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()",
+                    (rid, entity_name.lower(), "default", json.dumps(record, default=str))
+                )
+        conn.commit()
+    except Exception:
+        pass  # best-effort
+    finally:
+        conn.close()
+
+
+def _pg_load_entity_records(entity_name: str) -> list[Dict[str, Any]]:
+    conn = _pg_connection()
+    if not conn:
+        return []
+    try:
+        _pg_ensure_records_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT data FROM apg_records WHERE collection = %s ORDER BY created_at",
+                (entity_name.lower(),)
+            )
+            rows = cur.fetchall()
+        return [json.loads(row[0]) for row in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+
 _load_record_store()
 
+_flask_app = _FlaskApp("app", root_path=os.path.abspath(os.path.dirname(globals().get("__file__", None) or ".")))
 
-class ApplicationRequestHandler(BaseHTTPRequestHandler):
-    def _send_json(self, status: int, response: Dict[str, Any]) -> None:
-        body = _json_bytes(response)
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
 
-    def _send_html(self, status: int, html_payload: str) -> None:
-        body = html_payload.encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+@_flask_app.before_request
+def _setup_tenant() -> None:
+    tid = _flask_request.headers.get("X-APG-Tenant") or _flask_request.headers.get("X-Tenant-ID")
+    _TENANT_LOCAL.tenant_id = tid or None
 
-    def _send_redirect(self, status: int, location: str) -> None:
-        self.send_response(status)
-        self.send_header("Location", location)
-        self.send_header("Content-Length", "0")
-        self.end_headers()
 
-    def _authorize_mutation(self) -> bool:
-        if _authorized(self.headers):
-            return True
-        status, response = _auth_failure_payload()
-        self._send_json(status, response)
-        return False
+def _check_mutation_auth():
+    if _authorized(_flask_request.headers):
+        return None
+    status, response = _auth_failure_payload()
+    return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
 
-    def do_GET(self) -> None:
-        path, _, raw_query = self.path.partition("?")
-        query = parse_qs(raw_query, keep_blank_values=True)
-        if path == "/theme.css":
-            body = theme_stylesheet().encode("utf-8")
-            status = 200
-            content_type = "text/css; charset=utf-8"
-        elif path == "/ui" or path.startswith("/ui/"):
-            status, html_payload = _ui_payload(path, query)
-            body = html_payload.encode("utf-8")
-            content_type = "text/html; charset=utf-8"
-        elif _capability_screen(path) is not None:
-            status, html_payload = _capability_screen_payload(path)
-            body = html_payload.encode("utf-8")
-            content_type = "text/html; charset=utf-8"
-        elif _application_screen(path) is not None:
-            status, html_payload = _application_screen_payload(path)
-            body = html_payload.encode("utf-8")
-            content_type = "text/html; charset=utf-8"
-        else:
-            status, payload = _route_payload(path, query)
-            body = _json_bytes(payload)
-            content_type = "application/json; charset=utf-8"
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
 
-    def do_POST(self) -> None:
-        path = self.path.split("?", 1)[0]
-        if not self._authorize_mutation():
-            return
+@_flask_app.route("/", methods=["GET"])
+@_flask_app.route("/home", methods=["GET"])
+def _flask_home():
+    return _FlaskResponse(_landing_page_html(), content_type="text/html; charset=utf-8")
+
+
+@_flask_app.route("/theme.css", methods=["GET"])
+def _flask_theme():
+    return _FlaskResponse(theme_stylesheet(), content_type="text/css; charset=utf-8")
+
+
+@_flask_app.route("/entities/<entity_name>/records.csv", methods=["GET"])
+def _flask_csv_export(entity_name):
+    return _FlaskResponse(_csv_export_body(entity_name), content_type="text/csv; charset=utf-8")
+
+
+@_flask_app.route("/ui", methods=["GET"])
+@_flask_app.route("/ui/", methods=["GET"])
+@_flask_app.route("/ui/<path:subpath>", methods=["GET"])
+def _flask_ui_get(subpath=""):
+    path = "/ui/" + subpath if subpath else "/ui"
+    query = {k: v for k, v in _flask_request.args.lists()}
+    status, html_payload = _ui_payload(path, query)
+    return _FlaskResponse(html_payload, status=status, content_type="text/html; charset=utf-8")
+
+
+@_flask_app.route("/ui", methods=["POST"])
+@_flask_app.route("/ui/", methods=["POST"])
+@_flask_app.route("/ui/<path:subpath>", methods=["POST"])
+def _flask_ui_post(subpath=""):
+    path = "/ui/" + subpath if subpath else "/ui"
+    auth_err = _check_mutation_auth()
+    if auth_err:
+        return auth_err
+    if _flask_request.content_type and "application/x-www-form-urlencoded" in _flask_request.content_type:
+        payload = {"record": _flask_request.form.to_dict(flat=True)}
+    else:
         try:
-            length = int(self.headers.get("Content-Length") or "0")
-            raw_body = self.rfile.read(length) if length else b"{}"
-            content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip()
-            if content_type == "application/x-www-form-urlencoded":
-                parsed = parse_qs(raw_body.decode("utf-8"), keep_blank_values=True)
-                payload = {"record": {key: values[-1] if values else "" for key, values in parsed.items()}}
-            else:
-                payload = json.loads(raw_body.decode("utf-8") or "{}")
+            payload = _flask_request.get_json(force=True, silent=False) or {}
             if not isinstance(payload, dict):
                 raise ValueError("JSON body must be an object")
-            if path.startswith("/ui/") and content_type == "application/x-www-form-urlencoded":
-                status, response = _ui_post_payload(path, payload)
-                if status in {302, 303}:
-                    self._send_redirect(status, str(response["location"]))
-                    return
-                if "html" in response:
-                    self._send_html(status, str(response["html"]))
-                    return
-                self._send_html(status, _ui_error_payload(path, response))
-                return
-            else:
-                status, response = _post_payload(path, payload)
-        except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
-            status, response = 400, {"error": "invalid_json", "message": str(error)}
-        self._send_json(status, response)
+        except Exception as _e:
+            return _FlaskResponse(
+                json.dumps({"error": "invalid_json", "message": str(_e)}),
+                status=400, content_type="application/json; charset=utf-8",
+            )
+    status, response = _ui_post_payload(path, payload)
+    if status in {302, 303}:
+        return _flask_redirect(str(response["location"]), code=status)
+    if "html" in response:
+        _r = _FlaskResponse(str(response["html"]), status=status, content_type="text/html; charset=utf-8")
+        if response.get("hx_trigger"):
+            _r.headers["HX-Trigger"] = json.dumps(response["hx_trigger"])
+        return _r
+    return _FlaskResponse(_ui_error_payload(path, response), status=status, content_type="text/html; charset=utf-8")
 
-    def do_PUT(self) -> None:
-        path = self.path.split("?", 1)[0]
-        if not self._authorize_mutation():
-            return
+
+@_flask_app.route("/<path:api_path>", methods=["GET"])
+def _flask_api_get(api_path):
+    path = "/" + api_path
+    if _capability_screen(path) is not None:
+        status, html_payload = _capability_screen_payload(path)
+        return _FlaskResponse(html_payload, status=status, content_type="text/html; charset=utf-8")
+    if _application_screen(path) is not None:
+        status, html_payload = _application_screen_payload(path)
+        return _FlaskResponse(html_payload, status=status, content_type="text/html; charset=utf-8")
+    query = {k: v for k, v in _flask_request.args.lists()}
+    status, payload = _route_payload(path, query)
+    return _FlaskResponse(json.dumps(payload), status=status, content_type="application/json; charset=utf-8")
+
+
+@_flask_app.route("/<path:api_path>", methods=["POST"])
+def _flask_api_post(api_path):
+    path = "/" + api_path
+    auth_err = _check_mutation_auth()
+    if auth_err:
+        return auth_err
+    ct = _flask_request.content_type or ""
+    if "application/x-www-form-urlencoded" in ct or "multipart/form-data" in ct:
+        payload = _flask_request.form.to_dict(flat=True)
+    else:
         try:
-            length = int(self.headers.get("Content-Length") or "0")
-            raw_body = self.rfile.read(length) if length else b"{}"
-            payload = json.loads(raw_body.decode("utf-8") or "{}")
+            payload = _flask_request.get_json(force=True, silent=False) or {}
             if not isinstance(payload, dict):
                 raise ValueError("JSON body must be an object")
-            status, response = _put_payload(path, payload)
-        except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
-            status, response = 400, {"error": "invalid_json", "message": str(error)}
-        self._send_json(status, response)
+        except Exception as _e:
+            return _FlaskResponse(
+                json.dumps({"error": "invalid_json", "message": str(_e)}),
+                status=400, content_type="application/json; charset=utf-8",
+            )
+    status, response = _post_payload(path, payload)
+    return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
 
-    def do_DELETE(self) -> None:
-        path = self.path
-        if not self._authorize_mutation():
-            return
-        status, response = _delete_record_payload(path)
-        self._send_json(status, response)
 
-    def log_message(self, format: str, *args: Any) -> None:
-        if os.environ.get("APG_DEBUG") == "1":
-            super().log_message(format, *args)
+@_flask_app.route("/<path:api_path>", methods=["PUT"])
+def _flask_api_put(api_path):
+    path = "/" + api_path
+    auth_err = _check_mutation_auth()
+    if auth_err:
+        return auth_err
+    try:
+        payload = _flask_request.get_json(force=True, silent=False) or {}
+        if not isinstance(payload, dict):
+            raise ValueError("JSON body must be an object")
+    except Exception as _e:
+        return _FlaskResponse(
+            json.dumps({"error": "invalid_json", "message": str(_e)}),
+            status=400, content_type="application/json; charset=utf-8",
+        )
+    status, response = _put_payload(path, payload)
+    return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
+
+
+@_flask_app.route("/<path:api_path>", methods=["DELETE"])
+def _flask_api_delete(api_path):
+    path = "/" + api_path
+    auth_err = _check_mutation_auth()
+    if auth_err:
+        return auth_err
+    status, response = _delete_record_payload(path)
+    return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
 
 
 def _arg_value(argv: list[str], name: str, default: str) -> str:
@@ -4315,9 +6119,9 @@ def _arg_value(argv: list[str], name: str, default: str) -> str:
 def run_server(host: str | None = None, port: int | str | None = None) -> None:
     resolved_host = host or os.environ.get("APG_HOST") or os.environ.get("HOST") or "127.0.0.1"
     resolved_port = int(port or os.environ.get("APG_PORT") or os.environ.get("PORT") or "8080")
-    server = HTTPServer((resolved_host, resolved_port), ApplicationRequestHandler)
+    debug = os.environ.get("APG_DEBUG") == "1"
     print(f"{MODULE_NAME} listening on http://{resolved_host}:{resolved_port}", flush=True)
-    server.serve_forever()
+    _flask_app.run(host=resolved_host, port=resolved_port, debug=debug, use_reloader=False)
 
 
 def main(argv: list[str] | None = None) -> None:

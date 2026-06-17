@@ -845,17 +845,17 @@
         },
         "is_active": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "is_hazardous": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "is_serialised": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "last_counted_at": {
@@ -887,27 +887,27 @@
         },
         "quantity_on_hand": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "quantity_on_order": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "quantity_reserved": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "reorder_point": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "reorder_quantity": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "reorder_time": {
@@ -921,7 +921,7 @@
         },
         "requires_refrigeration": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "sku": {
@@ -931,7 +931,7 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "unit_price": {
@@ -954,7 +954,7 @@
         },
         "weight_kg": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "float"
         }
       },

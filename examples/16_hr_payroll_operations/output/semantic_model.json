@@ -1501,7 +1501,7 @@
         },
         "currency": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "department": {
@@ -1521,7 +1521,7 @@
         },
         "employment_type": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "first_name": {
@@ -1536,7 +1536,7 @@
         },
         "is_active": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "last_name": {
@@ -1672,22 +1672,22 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "total_deductions": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "float"
         },
         "total_gross": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "float"
         },
         "total_net": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "float"
         }
       },
@@ -1743,7 +1743,7 @@
         },
         "other_deductions": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "float"
         },
         "pay_run_id": {
@@ -1763,7 +1763,7 @@
         },
         "payment_status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "payslip_id": {

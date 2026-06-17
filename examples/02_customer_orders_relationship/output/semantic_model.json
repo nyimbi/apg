@@ -713,7 +713,7 @@
             "target_field": "id",
             "target_table": "decimal"
           },
-          "required": true,
+          "required": false,
           "type": "decimal"
         },
         "customer_number": {
@@ -728,7 +728,7 @@
         },
         "is_active": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "legal_name": {
@@ -747,7 +747,7 @@
         },
         "segment": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "tags": {
@@ -796,7 +796,7 @@
       "fields": {
         "currency": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "customer_id": {
@@ -861,7 +861,7 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "subtotal": {
@@ -870,7 +870,7 @@
             "target_field": "id",
             "target_table": "decimal"
           },
-          "required": true,
+          "required": false,
           "type": "decimal"
         },
         "tax": {
@@ -879,7 +879,7 @@
             "target_field": "id",
             "target_table": "decimal"
           },
-          "required": true,
+          "required": false,
           "type": "decimal"
         },
         "total": {
@@ -888,7 +888,7 @@
             "target_field": "id",
             "target_table": "decimal"
           },
-          "required": true,
+          "required": false,
           "type": "decimal"
         }
       },
@@ -961,12 +961,12 @@
         },
         "discount_pct": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "float"
         },
         "is_taxable": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "line_id": {
@@ -985,7 +985,7 @@
             "target_field": "id",
             "target_table": "decimal"
           },
-          "required": true,
+          "required": false,
           "type": "decimal"
         },
         "order_id": {
@@ -1005,7 +1005,7 @@
         },
         "quantity": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "unit_price": {

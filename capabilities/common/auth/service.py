@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import dataclasses as _dc
+
 from capabilities.common.db import get_store
-from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList, _schedule
 
 from dataclasses import replace
 from typing import Any
@@ -88,7 +90,7 @@ class AuthService:
 			privacy_budget=float(privacy_budget),
 			metadata=dict(metadata or {}),
 		)
-		self._identities[self._tenant_key(tenant_id, user_id)] = identity
+		self._write("auth_identities", self._identities, self._tenant_key(tenant_id, user_id), identity)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=user_id,
@@ -123,7 +125,7 @@ class AuthService:
 			tier=tier,
 			approval_recorded=approval_recorded,
 		)
-		self._roles[self._tenant_key(tenant_id, role_id)] = role
+		self._write("auth_roles", self._roles, self._tenant_key(tenant_id, role_id), role)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=role_id,
@@ -167,7 +169,7 @@ class AuthService:
 			review_reasons=self._reasons(review_result),
 			review_evidence=self._review_evidence(review_result),
 		)
-		self._role_approvals[self._tenant_key(tenant_id, approval_id)] = approval
+		self._write("auth_role_approvals", self._role_approvals, self._tenant_key(tenant_id, approval_id), approval)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=approval_id,
@@ -215,7 +217,7 @@ class AuthService:
 			review_reasons=self._reasons(result),
 			review_evidence=self._review_evidence(result, review_recorded=True),
 		)
-		self._role_approvals[self._tenant_key(tenant_id, approval_id)] = decided
+		self._write("auth_role_approvals", self._role_approvals, self._tenant_key(tenant_id, approval_id), decided)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=approval_id,
@@ -263,7 +265,7 @@ class AuthService:
 			approval_id=approval.id if approval else approval_id,
 			approval_recorded=approval is not None or approval_recorded or role.approval_recorded,
 		)
-		self._assignments[self._tenant_key(tenant_id, assignment_id)] = assignment
+		self._write("auth_assignments", self._assignments, self._tenant_key(tenant_id, assignment_id), assignment)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=assignment_id,
@@ -326,7 +328,7 @@ class AuthService:
 			trust_score=trust_score,
 			required_actions=required_actions,
 		)
-		self._sessions[self._tenant_key(tenant_id, session_id)] = session
+		self._write("auth_sessions", self._sessions, self._tenant_key(tenant_id, session_id), session)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=session_id,
@@ -342,7 +344,7 @@ class AuthService:
 	def revoke_session(self, session_id: str, actor: str, tenant_id: str | None = None) -> dict[str, Any]:
 		session = self._find_session(session_id, tenant_id) if tenant_id else self._require_session(session_id)
 		revoked = replace(session, status="revoked")
-		self._sessions[self._tenant_key(session.tenant_id, session_id)] = revoked
+		self._write("auth_sessions", self._sessions, self._tenant_key(session.tenant_id, session_id), revoked)
 		self._record_audit(
 			tenant_id=revoked.tenant_id,
 			subject_id=session_id,
@@ -398,7 +400,7 @@ class AuthService:
 			role_ids=tuple(role_ids),
 		)
 		self._ensure_new(self._access_decisions, tenant_id, decision_id, "access decision")
-		self._access_decisions[self._tenant_key(tenant_id, decision_id)] = access_decision
+		self._write("auth_access_decisions", self._access_decisions, self._tenant_key(tenant_id, decision_id), access_decision)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=decision_id,
@@ -452,7 +454,7 @@ class AuthService:
 			review_reasons=self._reasons(review_result),
 			review_evidence=self._review_evidence(review_result),
 		)
-		self._privacy_approvals[self._tenant_key(tenant_id, approval_id)] = approval
+		self._write("auth_privacy_approvals", self._privacy_approvals, self._tenant_key(tenant_id, approval_id), approval)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=approval_id,
@@ -500,7 +502,7 @@ class AuthService:
 			review_reasons=self._reasons(result),
 			review_evidence=self._review_evidence(result, review_recorded=True),
 		)
-		self._privacy_approvals[self._tenant_key(tenant_id, approval_id)] = decided
+		self._write("auth_privacy_approvals", self._privacy_approvals, self._tenant_key(tenant_id, approval_id), decided)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=approval_id,
@@ -552,7 +554,7 @@ class AuthService:
 		else:
 			status = "completed"
 			remaining_budget = max(identity.privacy_budget - float(epsilon_cost), 0.0)
-			self._identities[self._tenant_key(identity.tenant_id, identity.id)] = replace(identity, privacy_budget=remaining_budget)
+			self._write("auth_identities", self._identities, self._tenant_key(identity.tenant_id, identity.id), replace(identity, privacy_budget=remaining_budget))
 		query = AuthPrivacyQuery(
 			id=query_id,
 			tenant_id=tenant_id,
@@ -569,7 +571,7 @@ class AuthService:
 			review_reasons=tuple(reasons),
 			review_evidence=self._review_evidence(privacy_result, review_recorded=approval is not None),
 		)
-		self._privacy_queries[self._tenant_key(tenant_id, query_id)] = query
+		self._write("auth_privacy_queries", self._privacy_queries, self._tenant_key(tenant_id, query_id), query)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=query_id,
@@ -644,7 +646,7 @@ class AuthService:
 			review_reasons=self._reasons(result),
 			review_evidence=self._review_evidence(result, review_recorded=human_approval_required),
 		)
-		self._security_agents[self._tenant_key(tenant_id, agent_id)] = agent
+		self._write("auth_security_agents", self._security_agents, self._tenant_key(tenant_id, agent_id), agent)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=agent_id,
@@ -694,7 +696,7 @@ class AuthService:
 			review_reasons=self._reasons(result),
 			review_evidence=self._review_evidence(result),
 		)
-		self._batch_mutations[self._tenant_key(tenant_id, record.id)] = record
+		self._write("auth_batch_mutations", self._batch_mutations, self._tenant_key(tenant_id, record.id), record)
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=record.id,
@@ -1611,7 +1613,7 @@ class AuthService:
 			"expires_at": expires_at, "justification": justification,
 			"requires_mfa": requires_mfa, "granted_at": _utc_now(),
 		}
-		self._delegations[self._tenant_key(tenant_id, delegation_id)] = record
+		self._write("auth_delegations", self._delegations, self._tenant_key(tenant_id, delegation_id), record)
 		self._record_audit(
 			tenant_id=tenant_id, subject_id=delegation_id, event_type="delegation_granted",
 			actor=delegator_id, decision="allow",
@@ -1720,7 +1722,7 @@ class AuthService:
 			"outcome": outcome, "risk_score": float(risk_score),
 			"geo_country": geo_country, "geo_city": geo_city, "recorded_at": _utc_now(),
 		}
-		self._login_attempts[self._tenant_key(tenant_id, attempt_id)] = record
+		self._write("auth_login_attempts", self._login_attempts, self._tenant_key(tenant_id, attempt_id), record)
 		brute_force_detected = False
 		if outcome != "success":
 			ip_check = await self.check_rate_limit(tenant_id, f"login:ip:{ip_address}", 600, 10)
@@ -1772,7 +1774,7 @@ class AuthService:
 		if deprovisioned_by == user_id:
 			raise PermissionError("deprovision_self_not_allowed")
 		identity = self._require_identity(user_id, tenant_id)
-		self._identities[self._tenant_key(tenant_id, user_id)] = _replace(identity, status="locked")
+		self._write("auth_identities", self._identities, self._tenant_key(tenant_id, user_id), _replace(identity, status="locked"))
 		sessions_revoked: list[str] = []
 		assignments_revoked: list[str] = []
 		keys_revoked: list[str] = []
@@ -2204,6 +2206,58 @@ class AuthService:
 		step_up_bonus = 0.05 if step_up_completed else 0.0
 		return round(max(min(identity.behavioral_trust_score - risk_penalty + mfa_bonus + step_up_bonus, 1.0), 0.0), 3)
 
+	# ── persistence helpers ───────────────────────────────────────────────
+
+	def _write(self, collection: str, container: dict, key: str, model: Any) -> None:
+		"""Write to in-memory dict and fire-and-forget persist to store."""
+		container[key] = model
+		if _dc.is_dataclass(model):
+			record = _dc.asdict(model)
+		elif isinstance(model, dict):
+			record = model
+		else:
+			return
+		_schedule(self._store.put(collection, record))
+
+	async def reload(self) -> None:
+		"""Restore all persisted auth records from the store on startup."""
+		def _reconstitute(model_class: type, record: dict) -> Any:
+			fields = {f.name: f for f in _dc.fields(model_class)}
+			kwargs: dict[str, Any] = {}
+			for name, fld in fields.items():
+				if name not in record:
+					continue
+				val = record[name]
+				if isinstance(val, list) and "tuple" in str(fld.type):
+					val = tuple(val)
+				kwargs[name] = val
+			return model_class(**kwargs)
+
+		_cols = [
+			("auth_identities",      self._identities,       AuthIdentity),
+			("auth_roles",           self._roles,            AuthRole),
+			("auth_role_approvals",  self._role_approvals,   AuthRoleAssignmentApproval),
+			("auth_assignments",     self._assignments,      AuthRoleAssignment),
+			("auth_sessions",        self._sessions,         AuthSession),
+			("auth_access_decisions",self._access_decisions, AuthAccessDecision),
+			("auth_privacy_queries", self._privacy_queries,  AuthPrivacyQuery),
+			("auth_privacy_approvals",self._privacy_approvals,AuthPrivacyBudgetApproval),
+			("auth_security_agents", self._security_agents,  AuthSecurityAgent),
+			("auth_batch_mutations", self._batch_mutations,  AuthBatchMutationEvidence),
+			("auth_audit_events",    self._audit_events,     AuthAuditEvent),
+		]
+		for col, container, model_class in _cols:
+			try:
+				records = await self._store.query(col, {}, limit=100_000)
+				for r in records:
+					try:
+						obj = _reconstitute(model_class, r)
+						container[self._tenant_key(obj.tenant_id, obj.id)] = obj
+					except Exception:
+						pass
+			except Exception:
+				pass
+
 	def _record_audit(
 		self,
 		tenant_id: str,
@@ -2230,7 +2284,7 @@ class AuthService:
 			review_reasons=self._reasons(policy_result),
 			review_evidence=self._review_evidence(policy_result),
 		)
-		self._audit_events[self._tenant_key(tenant_id, event.id)] = event
+		self._write("auth_audit_events", self._audit_events, self._tenant_key(tenant_id, event.id), event)
 		return event
 
 	def _raise_if_denied(self, result: dict[str, Any]) -> None:

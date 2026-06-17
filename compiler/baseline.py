@@ -698,7 +698,13 @@ def _checked_output_sync(output_dir: Path, generated_files: dict[str, str]) -> d
 
 
 def _is_checked_output_file(path: Path) -> bool:
-	return "__pycache__" not in path.parts and path.suffix != ".pyc" and path.name != ".DS_Store"
+	parts = path.parts
+	return (
+		"__pycache__" not in parts
+		and ".omc" not in parts
+		and path.suffix != ".pyc"
+		and path.name != ".DS_Store"
+	)
 
 
 def _collect_domain_coverage(

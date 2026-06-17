@@ -457,7 +457,7 @@
             "target_field": "id",
             "target_table": "decimal"
           },
-          "required": true,
+          "required": false,
           "type": "decimal"
         },
         "customer_number": {
@@ -476,7 +476,7 @@
         },
         "discount_rate": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "float"
         },
         "email": {
@@ -486,12 +486,12 @@
         },
         "is_active": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "is_verified": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "legal_name": {
@@ -501,7 +501,7 @@
         },
         "loyalty_points": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "int"
         },
         "metadata": {
@@ -547,7 +547,7 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "tags": {

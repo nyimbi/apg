@@ -81,6 +81,8 @@
       {% endif %}
     </div>
 
+    <p class="text-xs text-gray-500 mb-2">Showing {{ count }} of {{ total }} matching records.</p>
+
     {% if records %}
       {{ records_table | safe }}
     {% else %}
@@ -100,3 +102,13 @@
   </section>
 
 </div>
+
+<details class="mt-4">
+  <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">Advanced filter</summary>
+  <div class="mt-2">{{ query_form | safe }}</div>
+</details>
+
+<details class="mt-2">
+  <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">Record JSON</summary>
+  <pre class="mt-2 text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-auto max-h-64 font-mono">{{ records_json }}</pre>
+</details>

@@ -1196,17 +1196,17 @@
         },
         "currency": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "is_active": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "is_control": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "normal_balance": {
@@ -1291,7 +1291,7 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "total_credit": {
@@ -1300,7 +1300,7 @@
             "target_field": "id",
             "target_table": "decimal"
           },
-          "required": true,
+          "required": false,
           "type": "decimal"
         },
         "total_debit": {
@@ -1309,7 +1309,7 @@
             "target_field": "id",
             "target_table": "decimal"
           },
-          "required": true,
+          "required": false,
           "type": "decimal"
         }
       },
@@ -1374,7 +1374,7 @@
             "target_field": "id",
             "target_table": "decimal"
           },
-          "required": true,
+          "required": false,
           "type": "decimal"
         },
         "debit": {
@@ -1383,7 +1383,7 @@
             "target_field": "id",
             "target_table": "decimal"
           },
-          "required": true,
+          "required": false,
           "type": "decimal"
         },
         "journal_id": {

@@ -60,7 +60,7 @@ docker run --rm -p 8080:8080 --env-file .env.example apg-generated-app
 
 Generated deployment artifacts:
 
-- `Dockerfile` - standard-library Python container entrypoint
+- `Dockerfile` - Flask 3.x container entrypoint
 - `.dockerignore` - container build exclusions
 - `.env.example` - documented runtime environment variables
 - `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks

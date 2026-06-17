@@ -591,7 +591,7 @@ def _pg_save_journal_entry(entry: Dict[str, Any]) -> None:
             )
         conn.commit()
     except Exception:
-        pass
+        pass  # best-effort
     finally:
         conn.close()
 
@@ -1074,7 +1074,7 @@ def _trigger_saga_compensation(workflow: Dict[str, Any], completed_steps: list[s
             try:
                 _record_event("saga.compensate", str(workflow.get("name", "workflow")), after={{"step": step, "action": str(action)}})
             except Exception:
-                pass
+                pass  # best-effort
 
 
 def _execute_workflow_steps(
@@ -1161,7 +1161,8 @@ def _execute_workflow_steps(
         # Check workflow-level circuit_breaker config for this step
         wf_circuit_breakers = workflow.get("circuit_breakers", {{}})
         step_cb_spec = wf_circuit_breakers.get(step, {{}}) if isinstance(wf_circuit_breakers, dict) else {{}}
-        step_policy = retry_policy.get(step, {{}}) if isinstance(retry_policy, dict) else {{}}
+        _raw_step_policy = retry_policy.get(step) if isinstance(retry_policy, dict) else None
+        step_policy = _raw_step_policy if isinstance(_raw_step_policy, dict) else {{}}
         cb_threshold = int(step_cb_spec.get("threshold", step_policy.get("circuit_threshold", 5)) if isinstance(step_cb_spec, dict) else step_policy.get("circuit_threshold", 5))
         cb_reset = int(step_cb_spec.get("reset_timeout", step_policy.get("reset_timeout", 60)) if isinstance(step_cb_spec, dict) else step_policy.get("reset_timeout", 60))
         if _cb_is_open(cb_k, cb_threshold, cb_reset):
@@ -1310,7 +1311,7 @@ def run_workflow(workflow_name: str, payload: Dict[str, Any] | None = None) -> D
         try:
             emit_apg_event(str(ev_name), {{"workflow": workflow_name, "run_id": run_id, "status": execution.get("status")}})
         except Exception:
-            pass
+            pass  # best-effort
     # Register subscriptions declared on this workflow
     subscribe_events = workflow.get("subscribe_events") or workflow.get("events", {{}}).get("subscribe", [])
     if isinstance(subscribe_events, str):
@@ -1538,7 +1539,7 @@ def emit_apg_event(event_name: str, payload: Dict[str, Any] | None = None) -> Di
             run_workflow(wf_name, {{"trigger_event": event_name, **(payload or {{}})}})
             ev["triggered"].append(wf_name)
         except Exception:
-            pass
+            pass  # best-effort
     return dict(ev)
 
 
@@ -4690,10 +4691,18 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
                 )
             else:
                 cells.append(f'<td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">{{val}}</td>')
+        edit_hidden = "".join(
+            f'<input type="hidden" name="{{html.escape(str(f["name"]), quote=True)}}" value="{{html.escape(str(record.get(str(f["name"]), "") or ""), quote=True)}}">'
+            for f in fields if str(f.get("name")) not in {{"id", "_revision"}}
+        )
         action = (
             f'<div class="flex items-center gap-3 justify-end opacity-0 group-hover/row:opacity-100 transition-opacity">'
-            f'<a href="/ui/entities/{{safe_entity}}/{{record_id}}"'
-            f' class="text-xs font-medium text-apg-primary hover:underline whitespace-nowrap">View →</a>'
+            f'<form method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}" class="inline">'
+            f'<input type="hidden" name="expected_revision" value="{{revision}}">'
+            f'{{edit_hidden}}'
+            f'<button type="submit"'
+            f' class="text-xs font-medium text-apg-primary hover:underline whitespace-nowrap">Edit</button>'
+            f'</form>'
             f'<form method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}/delete" class="inline">'
             f'<input type="hidden" name="expected_revision" value="{{revision}}">'
             f'<button type="submit" onclick="return confirm(this.dataset.msg)" data-msg="Delete this record?"'
@@ -4793,11 +4802,14 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
     except (ValueError, TypeError):
         per = 50
 
-    # Build query for sort/pagination (not q — we do q client-side)
+    # Build query for sort/pagination and field filters
     base_query: Dict[str, list[str]] = {{}}
     if sort_field:
         base_query["sort"] = [sort_field]
         base_query["order"] = [sort_dir]
+    for _k, _v in query.items():
+        if _k.startswith("filter."):
+            base_query[_k] = _v
     query_result = query_records(entity_name, base_query)
     all_records = query_result["records"]
 
@@ -4825,6 +4837,7 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
 
     # Prefer Jinja2 template for rich UI; fall back to f-string builder for zero-dep mode
     create_inputs = _ui_create_form_html(entity_name, fields)
+    query_form = _ui_records_query_form_html(entity_name, query)
     tmpl_body = _render_template(
         "entity_list.html.j2",
         entity_name=html.escape(entity_name),
@@ -4845,6 +4858,8 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
         page=page,
         per=per,
         total_pages=total_pages,
+        records_json=html.escape(json.dumps(paginated, indent=2, sort_keys=True)),
+        query_form=query_form,
     )
     if tmpl_body is not None:
         return 200, _html_page(entity_name, tmpl_body)
@@ -5539,7 +5554,7 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
             try:
                 delete_record(entity_name, rid)
             except Exception:
-                pass
+                pass  # best-effort
         return 303, {{"location": _ui_entity_location(entity_name)}}
     if len(parts) == 5 and parts[0] == "ui" and parts[1] == "entities" and parts[3] == "records":
         entity_name = parts[2]
@@ -6296,7 +6311,7 @@ def _pg_ensure_runs_table(conn) -> None:
             )
         conn.commit()
     except Exception:
-        pass
+        pass  # best-effort
 
 
 def _pg_save_workflow_run(run: Dict[str, Any]) -> None:
@@ -6315,7 +6330,7 @@ def _pg_save_workflow_run(run: Dict[str, Any]) -> None:
             )
         conn.commit()
     except Exception:
-        pass
+        pass  # best-effort
     finally:
         conn.close()
 
@@ -6360,7 +6375,7 @@ def _pg_ensure_records_table(conn) -> None:
             )
         conn.commit()
     except Exception:
-        pass
+        pass  # best-effort
 
 
 def _pg_save_entity_records(entity_name: str, records: list[Dict[str, Any]]) -> None:
@@ -6383,7 +6398,7 @@ def _pg_save_entity_records(entity_name: str, records: list[Dict[str, Any]]) -> 
                 )
         conn.commit()
     except Exception:
-        pass
+        pass  # best-effort
     finally:
         conn.close()
 
@@ -6502,16 +6517,20 @@ def _flask_api_post(api_path):
     auth_err = _check_mutation_auth()
     if auth_err:
         return auth_err
-    try:
-        payload = _flask_request.get_json(force=True, silent=False) or {{}}
-        if not isinstance(payload, dict):
-            raise ValueError("JSON body must be an object")
-        status, response = _post_payload(path, payload)
-    except Exception as _e:
-        return _FlaskResponse(
-            json.dumps({{"error": "invalid_json", "message": str(_e)}}),
-            status=400, content_type="application/json; charset=utf-8",
-        )
+    ct = _flask_request.content_type or ""
+    if "application/x-www-form-urlencoded" in ct or "multipart/form-data" in ct:
+        payload = _flask_request.form.to_dict(flat=True)
+    else:
+        try:
+            payload = _flask_request.get_json(force=True, silent=False) or {{}}
+            if not isinstance(payload, dict):
+                raise ValueError("JSON body must be an object")
+        except Exception as _e:
+            return _FlaskResponse(
+                json.dumps({{"error": "invalid_json", "message": str(_e)}}),
+                status=400, content_type="application/json; charset=utf-8",
+            )
+    status, response = _post_payload(path, payload)
     return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
 
 
@@ -6525,12 +6544,12 @@ def _flask_api_put(api_path):
         payload = _flask_request.get_json(force=True, silent=False) or {{}}
         if not isinstance(payload, dict):
             raise ValueError("JSON body must be an object")
-        status, response = _put_payload(path, payload)
     except Exception as _e:
         return _FlaskResponse(
             json.dumps({{"error": "invalid_json", "message": str(_e)}}),
             status=400, content_type="application/json; charset=utf-8",
         )
+    status, response = _put_payload(path, payload)
     return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
 
 
@@ -6755,7 +6774,7 @@ if __name__ == "__main__":
 			"",
 			"Generated deployment artifacts:",
 			"",
-			"- `Dockerfile` - standard-library Python container entrypoint",
+			"- `Dockerfile` - Flask 3.x container entrypoint",
 			"- `.dockerignore` - container build exclusions",
 			"- `.env.example` - documented runtime environment variables",
 			"- `semantic_model.json` - normalized APG semantic model for IDEs, agents, and release checks",

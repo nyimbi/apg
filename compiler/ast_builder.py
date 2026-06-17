@@ -1146,10 +1146,12 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			type_text = match.group("type").strip()
 			if type_text.startswith("(") or type_text.startswith("async"):
 				continue
+			_type_ann = self._parse_source_type(type_text, source_file)
 			properties.append(PropertyDeclaration(
 				name=match.group("name"),
-				type_annotation=self._parse_source_type(type_text, source_file),
+				type_annotation=_type_ann,
 				default_value=match.group("default"),
+				is_required=not _type_ann.is_optional and match.group("default") is None,
 				source_file=source_file,
 			))
 

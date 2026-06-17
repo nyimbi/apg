@@ -1385,12 +1385,12 @@
       "fields": {
         "credit_limit": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "float"
         },
         "currency": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "customer_number": {
@@ -1405,7 +1405,7 @@
         },
         "payment_terms": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "region": {
@@ -1415,7 +1415,7 @@
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         }
       },
@@ -1446,7 +1446,7 @@
         },
         "is_active": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "bool"
         },
         "position": {
@@ -1476,12 +1476,12 @@
         },
         "country": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "currency": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "legal_name": {
@@ -1491,12 +1491,12 @@
         },
         "payment_terms": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "status": {
           "relationship": null,
-          "required": true,
+          "required": false,
           "type": "str"
         },
         "tax_id": {
