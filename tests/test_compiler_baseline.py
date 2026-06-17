@@ -1371,6 +1371,25 @@ def test_generated_python_app_can_require_api_key_for_mutations(tmp_path):
 			unauthorized = json.loads(error.read().decode("utf-8"))
 		else:
 			raise AssertionError("generated secured app accepted mutation without an API key")
+		# GET without auth must also be rejected when API key is configured
+		unauthorized_get = urllib.request.Request(
+			f"{base_url}/entities/Customer/records",
+			method="GET",
+		)
+		try:
+			urllib.request.urlopen(unauthorized_get, timeout=1)
+		except urllib.error.HTTPError as error:
+			unauthorized_get_status = error.code
+		else:
+			raise AssertionError("generated secured app accepted GET without an API key")
+		# Authorized GET must succeed
+		authorized_get = urllib.request.Request(
+			f"{base_url}/entities/Customer/records",
+			headers={"Authorization": "Bearer secret-key"},
+			method="GET",
+		)
+		with urllib.request.urlopen(authorized_get, timeout=1) as response:
+			get_before_insert = json.loads(response.read().decode("utf-8"))
 		authorized_request = urllib.request.Request(
 			f"{base_url}/entities/Customer/records",
 			data=json.dumps({"record": {"name": "Asha", "email": "asha@example.com"}}).encode("utf-8"),
@@ -1398,6 +1417,8 @@ def test_generated_python_app_can_require_api_key_for_mutations(tmp_path):
 	assert auth["mode"] == "api_key"
 	assert unauthorized_status == 401
 	assert unauthorized["error"] == "unauthorized"
+	assert unauthorized_get_status == 401
+	assert get_before_insert["records"] == []
 	assert created["record"] == {"id": 1, "_revision": 1, "name": "Asha", "email": "asha@example.com"}
 	assert deleted["deleted"] == created["record"]
 

@@ -6041,9 +6041,16 @@ def _flask_ui_post(subpath=""):
     return _FlaskResponse(_ui_error_payload(path, response), status=status, content_type="text/html; charset=utf-8")
 
 
+_APG_GET_PUBLIC = frozenset({"/health", "/auth", "/openapi.json", "/metrics", "/describe"})
+
+
 @_flask_app.route("/<path:api_path>", methods=["GET"])
 def _flask_api_get(api_path):
     path = "/" + api_path
+    if path not in _APG_GET_PUBLIC:
+        auth_err = _check_mutation_auth()
+        if auth_err:
+            return auth_err
     if _capability_screen(path) is not None:
         status, html_payload = _capability_screen_payload(path)
         return _FlaskResponse(html_payload, status=status, content_type="text/html; charset=utf-8")
