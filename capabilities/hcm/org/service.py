@@ -1,6 +1,9 @@
 """Organizational Management async service."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -22,15 +25,16 @@ RESTRUCTURING_STATUSES = {"draft", "proposed", "approved", "in_progress", "compl
 class ORGService:
 	"""Organizational Management — org chart, positions, reporting lines, headcount, restructuring."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.org_units: dict[str, dict[str, Any]] = {}
 		self.positions: dict[str, dict[str, Any]] = {}
 		self.reporting_lines: dict[str, dict[str, Any]] = {}
 		self.headcount_plans: dict[str, dict[str, Any]] = {}
 		self.restructurings: dict[str, dict[str, Any]] = {}
 		self.span_of_control: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── Internal helpers ──────────────────────────────────────────────────────
 
@@ -631,3 +635,11 @@ class ORGService:
 			"headcount_plan_count": len(plans) if not isinstance(plans, Exception) else 0,
 			"generated_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

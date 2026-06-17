@@ -13,6 +13,9 @@ World-class improvements implemented (I1–I15):
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import json
@@ -48,8 +51,9 @@ def _date_diff(d1: str, d2: str) -> int:
 class PMSService:
 	"""In-memory Property Management System service."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.rooms: dict[str, dict[str, Any]] = {}
 		self.guests: dict[str, dict[str, Any]] = {}
 		self.reservations: dict[str, dict[str, Any]] = {}
@@ -58,7 +62,7 @@ class PMSService:
 		self.group_bookings: dict[str, dict[str, Any]] = {}
 		self.night_audits: dict[str, dict[str, Any]] = {}
 		self.payments: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# I7 — engineering work orders
 		self.work_orders: dict[str, dict[str, Any]] = {}
 		# I9 — rate plan catalogue
@@ -1445,3 +1449,11 @@ class PMSService:
 			"staff_loads": staff_load,
 			"assignments": assignments,
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

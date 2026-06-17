@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import time
 from datetime import datetime, timedelta
 from typing import Any
@@ -56,6 +59,7 @@ class SelfServiceBIService:
 		store: Any = None,
 	) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth
 		self._audit_adapter = audit
@@ -68,13 +72,13 @@ class SelfServiceBIService:
 		self._sandboxes: dict[tuple[str, str], dict[str, Any]] = {}
 		self._charts: dict[tuple[str, str], dict[str, Any]] = {}
 		self._bookmarks: dict[tuple[str, str], dict[str, Any]] = {}
-		self._annotations: list[dict[str, Any]] = []
+		self._annotations = WriteThruList('annotations', tenant_id, _store)
 		self._drag_drop_reports: dict[tuple[str, str], dict[str, Any]] = {}
-		self._nlq_history: list[dict[str, Any]] = []
+		self._nlq_history = WriteThruList('nlq_history', tenant_id, _store)
 		self._insights_cache: dict[tuple[str, str], dict[str, Any]] = {}  # (tenant, dataset_id)
 		self._feeds: dict[tuple[str, str], dict[str, Any]] = {}  # (tenant, user_id)
 		self._quality_badges: dict[tuple[str, str], dict[str, Any]] = {}  # (tenant, dataset_id)
-		self._audit: list[dict[str, Any]] = []
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	# ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -999,4 +1003,11 @@ class SelfServiceBIService:
 			return {"query_intent": result.extracted, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_annotations', '_nlq_history', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

@@ -1,6 +1,9 @@
 """Supplier Relationship Management async service (scm_srm)."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -24,8 +27,9 @@ class SupplierRelationshipService:
 	"""Async service for supplier scorecard, risk assessment, collaboration portal,
 	performance reviews and preferred supplier status management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.suppliers: dict[str, dict[str, Any]] = {}
 		self.scorecards: dict[str, dict[str, Any]] = {}
 		self.risk_assessments: dict[str, dict[str, Any]] = {}
@@ -34,7 +38,7 @@ class SupplierRelationshipService:
 		self.preferred_supplier_records: dict[str, dict[str, Any]] = {}
 		self.supplier_certifications: dict[str, dict[str, Any]] = {}
 		self.escalations: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -1146,3 +1150,11 @@ class SupplierRelationshipService:
 			"total_open_risks": len(open_risks),
 			"generated_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

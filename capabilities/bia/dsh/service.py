@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import hashlib
 import json
 import time
@@ -55,6 +58,7 @@ class DashboardService:
 		store: Any = None,
 	) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth
 		self._audit_adapter = audit
@@ -69,9 +73,9 @@ class DashboardService:
 		self._schedules: dict[tuple[str, str], dict[str, Any]] = {}
 		self._shares: dict[tuple[str, str], dict[str, Any]] = {}
 		self._embed_tokens: dict[tuple[str, str], dict[str, Any]] = {}
-		self._view_events: list[dict[str, Any]] = []
-		self._drill_through_results: list[dict[str, Any]] = []
-		self._audit: list[dict[str, Any]] = []
+		self._view_events = WriteThruList('view_events', tenant_id, _store)
+		self._drill_through_results = WriteThruList('drill_through_results', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	# ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1404,4 +1408,11 @@ class DashboardService:
 		if not hasattr(self, "_sessions"):
 			return []
 		return list(self._sessions.get(self._tk(tenant_id, dashboard_id), []))
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_view_events', '_drill_through_results', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

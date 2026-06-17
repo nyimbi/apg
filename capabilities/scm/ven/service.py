@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
 
 try:
 	from .capability_contract import (
@@ -58,9 +60,10 @@ class VendorManagementService:
 	vendor_portal_access.
 	"""
 
-	def __init__(self, tenant_id: str | None = None, user_id: str | None = None, *_: Any, **__: Any) -> None:
+	def __init__(self, tenant_id: str | None = None, user_id: str | None = None, db_url: str | None = None, *_: Any, **__: Any) -> None:
 		self.tenant_id = tenant_id
 		self.user_id = user_id
+		_store = get_store(db_url)
 		self.vendors: dict[str, dict[str, Any]] = {}
 		self.qualifications: dict[str, dict[str, Any]] = {}
 		self.onboarding: dict[str, dict[str, Any]] = {}
@@ -72,12 +75,12 @@ class VendorManagementService:
 		self.portal_users: dict[str, dict[str, Any]] = {}
 		self.scorecards: dict[str, dict[str, Any]] = {}
 		self.agents: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# New stores
-		self._suspensions: dict[str, dict[str, Any]] = {}
-		self._preferred_vendors: dict[str, dict[str, Any]] = {}
-		self._spend_records: list[dict[str, Any]] = []
-		self._portal_events: list[dict[str, Any]] = []
+		self._suspensions = WriteThruDict('suspensions', tenant_id, _store)
+		self._preferred_vendors = WriteThruDict('preferred_vendors', tenant_id, _store)
+		self._spend_records = WriteThruList('spend_records', tenant_id, _store)
+		self._portal_events = WriteThruList('portal_events', tenant_id, _store)
 
 	# ------------------------------------------------------------------
 	# Internal helpers
@@ -1381,6 +1384,14 @@ class VendorManagementService:
 			},
 			"assessed_at": _now(),
 		}
+
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events', '_suspensions', '_preferred_vendors', '_spend_records', '_portal_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 
 
 VendorManagementLifecycleService = VendorManagementService

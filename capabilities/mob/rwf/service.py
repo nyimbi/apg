@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -109,7 +112,7 @@ class RemoteWorkforceService:
 		self._onboarding_steps: dict[tuple[str, str], OnboardingStepResponse] = {}
 		self._compliance_checks: dict[tuple[str, str], ComplianceCheckResponse] = {}
 		self._incidents: dict[tuple[str, str], RemoteIncidentResponse] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# track per-employee equipment count: (tenant_id, employee_id) -> count
 		self._employee_equipment_count: dict[tuple[str, str], int] = {}
 
@@ -1184,7 +1187,7 @@ class RemoteWorkforceService:
 		"""Queue an operation recorded offline for later sync replay."""
 		guard_tenant_id(tenant_id)
 		if not hasattr(self, "_offline_queue"):
-			self._offline_queue: list[dict[str, Any]] = []
+			self._offline_queue = WriteThruList('offline_queue', tenant_id, _store)
 		entry: dict[str, Any] = {
 			"op_id": uuid7str(),
 			"tenant_id": tenant_id,
@@ -1334,4 +1337,11 @@ class RemoteWorkforceService:
 			"audit_event_count": len(self._audit_events),
 			"checked_at": datetime.utcnow().isoformat(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events', '_offline_queue']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

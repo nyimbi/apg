@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import hashlib
 import hmac
 import json
@@ -90,8 +93,9 @@ class EVNService:
 	  I12 — Revenue forecast — contracted vs pipeline split
 	"""
 
-	def __init__(self, tenant_id: str = "default", tenant_secret: str = "changeme") -> None:
+	def __init__(self, tenant_id: str = "default", tenant_secret: str = "changeme", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		# Used for HMAC-SHA256 contract signature (I6)
 		self._tenant_secret = tenant_secret
 
@@ -103,19 +107,19 @@ class EVNService:
 		self.catering_orders: dict[str, dict[str, Any]] = {}
 		self.av_requirements: dict[str, dict[str, Any]] = {}
 		self.setup_configs: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 		# I2 — Waitlist: keyed by "venue_id::event_date"
 		self._waitlist: dict[str, list[dict[str, Any]]] = {}
 
 		# I9 — NPS records
-		self._nps_records: dict[str, dict[str, Any]] = {}
+		self._nps_records = WriteThruDict('nps_records', tenant_id, _store)
 
 		# I11 — AV asset inventory
-		self._av_assets: dict[str, dict[str, Any]] = {}
+		self._av_assets = WriteThruDict('av_assets', tenant_id, _store)
 
 		# I7 — Payment timeline milestones
-		self._payment_milestones: dict[str, dict[str, Any]] = {}
+		self._payment_milestones = WriteThruDict('payment_milestones', tenant_id, _store)
 
 	# ── Internal helpers ──────────────────────────────────────────────────────
 
@@ -1077,3 +1081,11 @@ class EVNService:
 			"pending_milestones": sum(1 for m in self._payment_milestones.values() if m["tenant_id"] == tenant and m["status"] == "pending"),
 			"generated_at": _now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_nps_records', '_av_assets', '_payment_milestones', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

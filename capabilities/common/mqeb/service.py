@@ -7,6 +7,9 @@ Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
 """
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import hmac
@@ -296,8 +299,8 @@ class MqebService:
 		self._idempotency_cache: dict[str, tuple[str, datetime]] = {}
 
 		# I12: tenant quota configs and sliding-window counters
-		self._tenant_quotas: dict[str, dict[str, Any]] = {}
-		self._tenant_quota_counters: dict[str, dict[str, Any]] = {}
+		self._tenant_quotas = WriteThruDict('tenant_quotas', tenant_id, _store)
+		self._tenant_quota_counters = WriteThruDict('tenant_quota_counters', tenant_id, _store)
 
 	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 		return self._get_contract(tenant_id, overrides)

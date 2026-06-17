@@ -6,6 +6,8 @@ import asyncio
 from datetime import date, datetime
 from typing import Any
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
 
 try:
 	from .capability_contract import (
@@ -69,7 +71,7 @@ class TimeExpenseService:
 		self._auth = auth
 		self._audit_adapter = audit
 		self._notify = notify
-		self._store = store
+		self._store = store or get_store(db_url)
 		self.timesheets: dict[tuple[str, str], Timesheet] = {}
 		self.time_entries: dict[tuple[str, str], TimeEntry] = {}
 		self.expense_claims: dict[tuple[str, str], ExpenseClaim] = {}
@@ -81,7 +83,7 @@ class TimeExpenseService:
 		self.audit_events: list[dict[str, Any]] = []
 		# Extended state
 		self._per_diem_records: dict[str, list[dict[str, Any]]] = {}  # employee_id -> records
-		self._analytics_cache: dict[str, dict[str, Any]] = {}
+		self._analytics_cache = WriteThruDict('analytics_cache', tenant_id, self._store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1488,6 +1490,14 @@ class TimeExpenseService:
 			"tenant_id": t,
 			"generated_at": str(date.today()),
 		}
+
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_analytics_cache']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 
 
 PpmTexService = TimeExpenseService

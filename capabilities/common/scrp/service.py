@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import re
@@ -59,14 +62,14 @@ class ScraperDataHarvestingService:
 		self._agents: dict[str, HarvestAgent] = {}
 		self._audit_events: list[ScrpAuditEvent] = []
 		# New stores
-		self._scheduled_tasks: dict[str, dict[str, Any]] = {}
-		self._rate_limits: dict[str, dict[str, Any]] = {}
-		self._proxy_pool: list[dict[str, Any]] = []
+		self._scheduled_tasks = WriteThruDict('scheduled_tasks', tenant_id, _store)
+		self._rate_limits = WriteThruDict('rate_limits', tenant_id, _store)
+		self._proxy_pool = WriteThruList('proxy_pool', tenant_id, _store)
 		self._proxy_index: int = 0
-		self._captcha_records: list[dict[str, Any]] = []
-		self._dedup_manifests: dict[str, dict[str, Any]] = {}
-		self._structured_extractions: dict[str, dict[str, Any]] = {}
-		self._js_renders: dict[str, dict[str, Any]] = {}
+		self._captcha_records = WriteThruList('captcha_records', tenant_id, _store)
+		self._dedup_manifests = WriteThruDict('dedup_manifests', tenant_id, _store)
+		self._structured_extractions = WriteThruDict('structured_extractions', tenant_id, _store)
+		self._js_renders = WriteThruDict('js_renders', tenant_id, _store)
 
 	# ------------------------------------------------------------------
 	# Contract / evaluate
@@ -966,7 +969,7 @@ class ScraperDataHarvestingService:
 			"created_at":      _ts(),
 		}
 		if not hasattr(self, "_crawlers"):
-			self._crawlers: dict[str, dict[str, Any]] = {}
+			self._crawlers = WriteThruDict('crawlers', tenant_id, _store)
 		self._crawlers[cid] = record
 		self._record_event(tenant_id, "crawler_created", cid, f"Crawler '{name}' created", owner)
 		return record
@@ -986,7 +989,7 @@ class ScraperDataHarvestingService:
 		"""
 		self._require_tenant(tenant_id)
 		if not hasattr(self, "_crawlers"):
-			self._crawlers: dict[str, dict[str, Any]] = {}
+			self._crawlers = WriteThruDict('crawlers', tenant_id, _store)
 		crawler = self._crawlers.get(crawler_id)
 		if crawler is None or crawler["tenant_id"] != tenant_id:
 			raise KeyError(f"crawler_not_found:{crawler_id}")
@@ -1069,7 +1072,7 @@ class ScraperDataHarvestingService:
 			"cleaned_at":      _ts(),
 		}
 		if not hasattr(self, "_clean_reports"):
-			self._clean_reports: list[dict[str, Any]] = []
+			self._clean_reports = WriteThruList('clean_reports', tenant_id, _store)
 		self._clean_reports.append(report)
 		self._record_event(tenant_id, "data_cleaned", clean_id, f"Cleaned {len(operations)} ops on {dataset_id}", cleaned_by)
 		return report
@@ -1115,7 +1118,7 @@ class ScraperDataHarvestingService:
 			"extracted_at":  _ts(),
 		}
 		if not hasattr(self, "_entity_extractions"):
-			self._entity_extractions: dict[str, dict[str, Any]] = {}
+			self._entity_extractions = WriteThruDict('entity_extractions', tenant_id, _store)
 		self._entity_extractions[eid] = record
 		return record
 
@@ -1245,7 +1248,7 @@ class ScraperDataHarvestingService:
 			"stored_at":      _ts(),
 		}
 		if not hasattr(self, "_data_stores"):
-			self._data_stores: dict[str, dict[str, Any]] = {}
+			self._data_stores = WriteThruDict('data_stores', tenant_id, _store)
 		self._data_stores[store_id] = manifest
 		self._record_event(tenant_id, "data_stored", store_id, f"Stored {len(records)} records for {dataset_id}", stored_by)
 		return manifest
@@ -1279,7 +1282,7 @@ class ScraperDataHarvestingService:
 			"created_at":            _ts(),
 		}
 		if not hasattr(self, "_source_monitors"):
-			self._source_monitors: dict[str, dict[str, Any]] = {}
+			self._source_monitors = WriteThruDict('source_monitors', tenant_id, _store)
 		self._source_monitors[mon_key] = record
 		self._record_event(tenant_id, "source_monitor_created", source_id, f"Monitor set up for {source.name}", monitored_by)
 		return record
@@ -1375,7 +1378,7 @@ class ScraperDataHarvestingService:
 			"captured_at": _ts(),
 		}
 		if not hasattr(self, "_captures"):
-			self._captures: dict[str, dict[str, Any]] = {}
+			self._captures = WriteThruDict('captures', tenant_id, _store)
 		self._captures[capture_id] = record
 		self._record_event(tenant_id, "screen_captured", capture_id, f"Captured {url} as {output_format}", owner)
 		return record
@@ -1423,7 +1426,7 @@ class ScraperDataHarvestingService:
 			"processed_at": _ts(),
 		}
 		if not hasattr(self, "_ocr_results"):
-			self._ocr_results: dict[str, dict[str, Any]] = {}
+			self._ocr_results = WriteThruDict('ocr_results', tenant_id, _store)
 		self._ocr_results[ocr_id] = record
 		self._record_event(tenant_id, "ocr_processed", ocr_id, f"OCR on {image_ref} via {model}", owner)
 		return record
@@ -1464,7 +1467,7 @@ class ScraperDataHarvestingService:
 			"extracted_at": _ts(),
 		}
 		if not hasattr(self, "_table_extractions"):
-			self._table_extractions: dict[str, dict[str, Any]] = {}
+			self._table_extractions = WriteThruDict('table_extractions', tenant_id, _store)
 		self._table_extractions[table_id] = record
 		self._record_event(tenant_id, "table_extracted", table_id, f"Table from {image_ref}: {len(data_rows)} rows", owner)
 		return record
@@ -1523,7 +1526,7 @@ class ScraperDataHarvestingService:
 			"completed_at": _ts(),
 		}
 		if not hasattr(self, "_rpa_runs"):
-			self._rpa_runs: dict[str, dict[str, Any]] = {}
+			self._rpa_runs = WriteThruDict('rpa_runs', tenant_id, _store)
 		self._rpa_runs[run_id] = record
 		self._record_event(tenant_id, "rpa_workflow_completed", run_id, f"RPA {workflow_id}: {len(steps)} steps", owner)
 		return record
@@ -1550,7 +1553,7 @@ class ScraperDataHarvestingService:
 			raise ValueError("schema_required")
 		content_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
 		if not hasattr(self, "_llm_cache"):
-			self._llm_cache: dict[str, dict[str, Any]] = {}
+			self._llm_cache = WriteThruDict('llm_cache', tenant_id, _store)
 		cache_key = f"{tenant_id}:{model}:{content_hash}"
 		if cache_results and cache_key in self._llm_cache:
 			cached = dict(self._llm_cache[cache_key])
@@ -1585,7 +1588,7 @@ class ScraperDataHarvestingService:
 		if cache_results:
 			self._llm_cache[cache_key] = record
 		if not hasattr(self, "_llm_extractions"):
-			self._llm_extractions: dict[str, dict[str, Any]] = {}
+			self._llm_extractions = WriteThruDict('llm_extractions', tenant_id, _store)
 		self._llm_extractions[ext_id] = record
 		self._record_event(tenant_id, "llm_extracted", ext_id, f"LLM extraction via {model}: {len(extracted)} fields", owner)
 		return record
@@ -1596,7 +1599,7 @@ class ScraperDataHarvestingService:
 		self._require_owned(self._jobs, job_id, tenant_id, "harvest_job_not_found")
 		await asyncio.sleep(0)
 		if not hasattr(self, "_cursors"):
-			self._cursors: dict[str, dict[str, Any]] = {}
+			self._cursors = WriteThruDict('cursors', tenant_id, _store)
 		key = f"{tenant_id}:{job_id}"
 		cursor_state = self._cursors.get(key, {
 			"tenant_id": tenant_id, "job_id": job_id,
@@ -1612,7 +1615,7 @@ class ScraperDataHarvestingService:
 		job = self._require_owned(self._jobs, job_id, tenant_id, "harvest_job_not_found")
 		await asyncio.sleep(0)
 		if not hasattr(self, "_cursors"):
-			self._cursors: dict[str, dict[str, Any]] = {}
+			self._cursors = WriteThruDict('cursors', tenant_id, _store)
 		key = f"{tenant_id}:{job_id}"
 		extractor = self._extractors.get(job.extractor_profile_id)
 		cursor_field = extractor.incremental_cursor_field if extractor else "updated_at"
@@ -1636,7 +1639,7 @@ class ScraperDataHarvestingService:
 		self._require_owned(self._jobs, job_id, tenant_id, "harvest_job_not_found")
 		await asyncio.sleep(0)
 		if not hasattr(self, "_cursors"):
-			self._cursors: dict[str, dict[str, Any]] = {}
+			self._cursors = WriteThruDict('cursors', tenant_id, _store)
 		key = f"{tenant_id}:{job_id}"
 		prev_state = self._cursors.get(key, {})
 		cursor_state: dict[str, Any] = {
@@ -1722,7 +1725,7 @@ class ScraperDataHarvestingService:
 			"diff": diff_output, "owner": owner, "generated_at": _ts(),
 		}
 		if not hasattr(self, "_content_diffs"):
-			self._content_diffs: dict[str, dict[str, Any]] = {}
+			self._content_diffs = WriteThruDict('content_diffs', tenant_id, _store)
 		self._content_diffs[diff_id] = record
 		self._record_event(
 			tenant_id, "content_diff_generated", diff_id,
@@ -1774,7 +1777,7 @@ class ScraperDataHarvestingService:
 			"owner": owner, "generated_at": _ts(),
 		}
 		if not hasattr(self, "_quality_reports"):
-			self._quality_reports: dict[str, dict[str, Any]] = {}
+			self._quality_reports = WriteThruDict('quality_reports', tenant_id, _store)
 		self._quality_reports[report_id] = report
 		self._record_event(
 			tenant_id, "quality_report_generated", report_id,
@@ -1796,3 +1799,11 @@ def _normalize_harvest_agent_runtime(runtime: str) -> str:
 def _normalize_harvest_agent_role(role: str) -> str:
 	value = (role or "").strip().lower()
 	return value if value in SUPPORTED_HARVEST_AGENT_ROLES else ""
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_scheduled_tasks', '_rate_limits', '_dedup_manifests', '_structured_extractions', '_js_renders', '_crawlers', '_crawlers', '_entity_extractions', '_data_stores', '_source_monitors', '_captures', '_ocr_results', '_table_extractions', '_rpa_runs', '_llm_cache', '_llm_extractions', '_cursors', '_cursors', '_cursors', '_content_diffs', '_quality_reports', '_proxy_pool', '_captcha_records', '_clean_reports']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

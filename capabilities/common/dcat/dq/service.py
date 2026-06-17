@@ -1,6 +1,9 @@
 """Data Quality service — profiling, scoring, anomaly detection, completeness/uniqueness/accuracy rules."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 import math
@@ -23,14 +26,15 @@ SUPPORTED_SEVERITIES = {"info", "warning", "error", "critical"}
 class DataQualityService:
 	"""Dataset profiling, quality scoring, anomaly detection, completeness/uniqueness/accuracy rules, DQ reports."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.rules: dict[str, dict[str, Any]] = {}
 		self.profiles: dict[str, dict[str, Any]] = {}
 		self.runs: dict[str, dict[str, Any]] = {}
 		self.anomalies: dict[str, dict[str, Any]] = {}
 		self.scorecards: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _tenant(self, tenant_id: str | None = None) -> str:
 		value = tenant_id or self.tenant_id
@@ -612,3 +616,11 @@ class DataQualityService:
 			"last_run_at": max((r["run_at"] for r in runs), default=None),
 			"generated_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import difflib
 import hashlib
 import json
@@ -56,6 +59,7 @@ class AnalyticsEngineService:
 		store: Any = None,
 	) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth
 		self._audit_adapter = audit
@@ -74,8 +78,8 @@ class AnalyticsEngineService:
 		self._attributions: dict[tuple[str, str], dict[str, Any]] = {}
 		self._segments: dict[tuple[str, str], dict[str, Any]] = {}
 		self._experiments: dict[tuple[str, str], dict[str, Any]] = {}
-		self._predictions: list[dict[str, Any]] = []
-		self._audit: list[dict[str, Any]] = []
+		self._predictions = WriteThruList('predictions', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 		# Extended state for new capabilities
 		self._result_cache: dict[str, tuple[dict[str, Any], float]] = {}
@@ -84,7 +88,7 @@ class AnalyticsEngineService:
 		self._dimensions: dict[tuple[str, str], dict[str, Any]] = {}
 		self._goals: dict[tuple[str, str], dict[str, Any]] = {}
 		self._pivot_results: dict[tuple[str, str], dict[str, Any]] = {}
-		self._queue: list[dict[str, Any]] = []
+		self._queue = WriteThruList('queue', tenant_id, _store)
 
 	# ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -1922,4 +1926,11 @@ class AnalyticsEngineService:
 			return {"narrative": result.summary, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_predictions', '_audit', '_queue']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

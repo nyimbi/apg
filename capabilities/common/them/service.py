@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import json as _json
 import statistics
@@ -54,13 +57,13 @@ class ThemService:
 		self.audit_events: dict[str, ThemeAuditEventRecord] = {}
 		# new collections
 		self._tenant_theme_map: dict[str, str] = {}  # tenant_id -> theme_id
-		self._css_exports: dict[str, dict[str, Any]] = {}
-		self._dark_variants: dict[str, dict[str, Any]] = {}
-		self._breakpoint_configs: dict[str, dict[str, Any]] = {}
-		self._component_overrides: dict[str, dict[str, Any]] = {}
-		self._accessibility_audits: dict[str, dict[str, Any]] = {}
-		self._design_token_exports: dict[str, dict[str, Any]] = {}
-		self._analytics_events: list[dict[str, Any]] = []
+		self._css_exports = WriteThruDict('css_exports', tenant_id, _store)
+		self._dark_variants = WriteThruDict('dark_variants', tenant_id, _store)
+		self._breakpoint_configs = WriteThruDict('breakpoint_configs', tenant_id, _store)
+		self._component_overrides = WriteThruDict('component_overrides', tenant_id, _store)
+		self._accessibility_audits = WriteThruDict('accessibility_audits', tenant_id, _store)
+		self._design_token_exports = WriteThruDict('design_token_exports', tenant_id, _store)
+		self._analytics_events = WriteThruList('analytics_events', tenant_id, _store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1321,7 +1324,7 @@ class ThemService:
 			"snapshotted_at": _utc_now_iso(),
 		}
 		if not hasattr(self, "_snapshots"):
-			self._snapshots: dict[str, dict[str, Any]] = {}
+			self._snapshots = WriteThruDict('snapshots', tenant_id, _store)
 		self._snapshots[snapshot_id] = snapshot
 		self._record_event(tenant_id, "theme_snapshot_created", theme.id, f"Snapshot: {label or 'auto'}", snapshotted_by)
 		return {k: v for k, v in snapshot.items() if k != "matrix"}
@@ -1550,7 +1553,7 @@ class ThemService:
 			"computed_at": _utc_now_iso(),
 		}
 		if not hasattr(self, "_scorecards"):
-			self._scorecards: list[dict[str, Any]] = []
+			self._scorecards = WriteThruList('scorecards', tenant_id, _store)
 		self._scorecards.append(scorecard)
 		self._record_event(tenant_id, "governance_scorecard_computed", tenant_id, f"Scorecard grade: {grade} ({overall}/100)", "system")
 		return scorecard
@@ -1714,3 +1717,11 @@ def _invert_hex_colour(value: str) -> str:
 		return f"#{255 - r:02x}{255 - g:02x}{255 - b:02x}"
 	except ValueError:
 		return v
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_css_exports', '_dark_variants', '_breakpoint_configs', '_component_overrides', '_accessibility_audits', '_design_token_exports', '_snapshots', '_analytics_events', '_scorecards']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

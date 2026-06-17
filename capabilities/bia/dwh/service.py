@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import time
 from datetime import datetime
 from typing import Any
@@ -52,6 +55,7 @@ class DataWarehouseService:
 		store: Any = None,
 	) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth
 		self._audit_adapter = audit
@@ -63,12 +67,12 @@ class DataWarehouseService:
 		self._tables: dict[tuple[str, str], dict[str, Any]] = {}
 		self._etl_jobs: dict[tuple[str, str], dict[str, Any]] = {}
 		self._quality_rules: dict[tuple[str, str], dict[str, Any]] = {}
-		self._quality_runs: list[dict[str, Any]] = []
+		self._quality_runs = WriteThruList('quality_runs', tenant_id, _store)
 		self._partitions: dict[tuple[str, str], list[dict[str, Any]]] = {}  # keyed by (tenant, table_id)
 		self._statistics: dict[tuple[str, str], dict[str, Any]] = {}
-		self._lineage: list[dict[str, Any]] = []
-		self._etl_runs: list[dict[str, Any]] = []
-		self._audit: list[dict[str, Any]] = []
+		self._lineage = WriteThruList('lineage', tenant_id, _store)
+		self._etl_runs = WriteThruList('etl_runs', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	# ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1015,3 +1019,11 @@ class DataWarehouseService:
 		"""Bulk Delete"""
 		assert record_ids
 		return {"deleted_count": len(record_ids)}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_quality_runs', '_lineage', '_etl_runs', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

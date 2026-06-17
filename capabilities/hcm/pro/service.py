@@ -1,6 +1,9 @@
 """Professional Development async service."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -24,8 +27,9 @@ PDI_WEIGHTS = {"plan_completion": 0.25, "skill_gap_closure": 0.25, "certificatio
 class PROService:
 	"""Professional Development — dev plans, skills, mentoring, certifications, career paths."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.development_plans: dict[str, dict[str, Any]] = {}
 		self.plan_templates: dict[str, dict[str, Any]] = {}
 		self.skills: dict[str, dict[str, Any]] = {}
@@ -41,7 +45,7 @@ class PROService:
 		self.feedback_requests: dict[str, dict[str, Any]] = {}
 		self.feedback_responses: dict[str, dict[str, Any]] = {}
 		self.pdi_snapshots: dict[str, list[dict[str, Any]]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── Internal helpers ──────────────────────────────────────────────────────
 
@@ -1497,3 +1501,11 @@ class PROService:
 			"activity_count": len(activities),
 			"generated_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

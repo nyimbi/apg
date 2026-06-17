@@ -8,6 +8,9 @@ Tenant isolation enforced on every query/mutation.
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from decimal import Decimal
@@ -98,7 +101,7 @@ class FleetService:
 		self._db = db_session
 		self._tenant_id = tenant_id.strip()
 		self._actor_id = actor_id.strip()
-		self._events: list[dict[str, Any]] = []
+		self._events = WriteThruList('events', tenant_id, _store)
 
 	# ──────────────────────────────────────────────────────────────
 	# Internal helpers
@@ -1982,3 +1985,11 @@ class FleetService:
 			overdue_maintenance=sum(1 for m in maintenance_rows if m.get("status") == "overdue"),
 			active_incidents=sum(1 for i in incidents if i.get("status") not in ("resolved", "closed")),
 		)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

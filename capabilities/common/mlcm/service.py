@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from typing import Any
 
 from .capability_contract import evaluate_capability_rules, get_capability_contract
@@ -944,7 +947,7 @@ class MlcmService:
 			"created_at":        utc_now_iso(),
 		}
 		if not hasattr(self, "_ab_tests"):
-			self._ab_tests: dict[str, dict[str, Any]] = {}
+			self._ab_tests = WriteThruDict('ab_tests', tenant_id, _store)
 		self._ab_tests[ab_id] = record
 		self._audit(tenant_id, "model_ab_test_created", ab_id, f"A/B test {ab_id} created")
 		return record
@@ -1084,7 +1087,7 @@ class MlcmService:
 			"submitted_at":    utc_now_iso(),
 		}
 		if not hasattr(self, "_training_jobs"):
-			self._training_jobs: dict[str, dict[str, Any]] = {}
+			self._training_jobs = WriteThruDict('training_jobs', tenant_id, _store)
 		self._training_jobs[jid] = record
 		self._audit(tenant_id, "training_job_submitted", jid, f"Training job for {model_id}")
 		return record
@@ -1128,7 +1131,7 @@ class MlcmService:
 			"completed_at":     utc_now_iso(),
 		}
 		if not hasattr(self, "_tuning_runs"):
-			self._tuning_runs: dict[str, dict[str, Any]] = {}
+			self._tuning_runs = WriteThruDict('tuning_runs', tenant_id, _store)
 		self._tuning_runs[tid] = record
 		self._audit(tenant_id, "hyperparameter_tuning_completed", tid, f"Best score={record['best_score']}")
 		return record
@@ -1165,7 +1168,7 @@ class MlcmService:
 			"explained_at": utc_now_iso(),
 		}
 		if not hasattr(self, "_explanations"):
-			self._explanations: dict[str, dict[str, Any]] = {}
+			self._explanations = WriteThruDict('explanations', tenant_id, _store)
 		self._explanations[eid] = record
 		self._audit(tenant_id, "model_explained", eid, f"Explanation via {method}")
 		return record
@@ -1209,7 +1212,7 @@ class MlcmService:
 			"completed_at":        utc_now_iso(),
 		}
 		if not hasattr(self, "_bias_audits"):
-			self._bias_audits: dict[str, dict[str, Any]] = {}
+			self._bias_audits = WriteThruDict('bias_audits', tenant_id, _store)
 		self._bias_audits[aid] = record
 		self._audit(tenant_id, "bias_audit_completed", aid,
 					f"Max disparity={max_disparity:.4f} passed={passed}")
@@ -1248,7 +1251,7 @@ class MlcmService:
 			"exported_at":     utc_now_iso(),
 		}
 		if not hasattr(self, "_exports"):
-			self._exports: dict[str, dict[str, Any]] = {}
+			self._exports = WriteThruDict('exports', tenant_id, _store)
 		self._exports[eid] = record
 		self._audit(tenant_id, "model_exported", eid, f"Exported {version_id} as {export_format}")
 		return record
@@ -1301,3 +1304,11 @@ class MlcmService:
 			"hyperparameter_tuning_count": len(tuning_runs),
 			"generated_at":              utc_now_iso(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_ab_tests', '_training_jobs', '_tuning_runs', '_explanations', '_bias_audits', '_exports']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

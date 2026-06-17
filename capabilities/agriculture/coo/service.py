@@ -1,6 +1,9 @@
 """Cooperative Management service — agr_coo."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -25,17 +28,18 @@ class CooperativeManagementService:
 	"""Async service for cooperative management: member registry, share management,
 	pooled inputs, dividend allocation, and annual returns."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		if not tenant_id:
 			raise ValueError("tenant_id required")
 		self.tenant_id = tenant_id
-		self._coops: dict[str, dict[str, Any]] = {}
-		self._members: dict[str, dict[str, Any]] = {}
-		self._input_pools: dict[str, dict[str, Any]] = {}
-		self._dividends: dict[str, dict[str, Any]] = {}
-		self._annual_returns: dict[str, dict[str, Any]] = {}
-		self._share_ledger: list[dict[str, Any]] = []
-		self._audit: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._coops = WriteThruDict('coops', tenant_id, _store)
+		self._members = WriteThruDict('members', tenant_id, _store)
+		self._input_pools = WriteThruDict('input_pools', tenant_id, _store)
+		self._dividends = WriteThruDict('dividends', tenant_id, _store)
+		self._annual_returns = WriteThruDict('annual_returns', tenant_id, _store)
+		self._share_ledger = WriteThruList('share_ledger', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	def _emit(self, event_type: str, entity_type: str, entity_id: str, payload: dict[str, Any]) -> None:
 		self._audit.append({
@@ -474,3 +478,11 @@ class CooperativeManagementService:
 			"dividend_history": member_divs,
 			"total_dividends": round(sum(d["amount"] for d in member_divs), 2),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_coops', '_members', '_input_pools', '_dividends', '_annual_returns', '_share_ledger', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

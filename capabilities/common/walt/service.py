@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from typing import Any
 
 from .capability_contract import (
@@ -43,18 +46,18 @@ class WaltService:
 		self.audit_events: dict[str, WalletAuditEventRecord] = {}
 		# Additional in-memory stores for new methods
 		self._balance_history: dict[str, list[dict[str, Any]]] = {}
-		self._reversal_records: dict[str, dict[str, Any]] = {}
-		self._wallet_locks: dict[str, dict[str, Any]] = {}
-		self._wallet_merges: dict[str, dict[str, Any]] = {}
-		self._cashback_records: dict[str, dict[str, Any]] = {}
-		self._loyalty_conversions: dict[str, dict[str, Any]] = {}
-		self._export_jobs: dict[str, dict[str, Any]] = {}
-		self._fraud_checks: dict[str, dict[str, Any]] = {}
-		self._analytics_cache: dict[str, dict[str, Any]] = {}
-		self._statements: dict[str, dict[str, Any]] = {}
-		self._topup_records: dict[str, dict[str, Any]] = {}
-		self._withdrawal_records: dict[str, dict[str, Any]] = {}
-		self._transfer_records: dict[str, dict[str, Any]] = {}
+		self._reversal_records = WriteThruDict('reversal_records', tenant_id, _store)
+		self._wallet_locks = WriteThruDict('wallet_locks', tenant_id, _store)
+		self._wallet_merges = WriteThruDict('wallet_merges', tenant_id, _store)
+		self._cashback_records = WriteThruDict('cashback_records', tenant_id, _store)
+		self._loyalty_conversions = WriteThruDict('loyalty_conversions', tenant_id, _store)
+		self._export_jobs = WriteThruDict('export_jobs', tenant_id, _store)
+		self._fraud_checks = WriteThruDict('fraud_checks', tenant_id, _store)
+		self._analytics_cache = WriteThruDict('analytics_cache', tenant_id, _store)
+		self._statements = WriteThruDict('statements', tenant_id, _store)
+		self._topup_records = WriteThruDict('topup_records', tenant_id, _store)
+		self._withdrawal_records = WriteThruDict('withdrawal_records', tenant_id, _store)
+		self._transfer_records = WriteThruDict('transfer_records', tenant_id, _store)
 
 	# ------------------------------------------------------------------ #
 	# Original 21 methods                                                  #
@@ -1068,3 +1071,11 @@ class WaltService:
 
 	def _normalize_token(self, value: str) -> str:
 		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_reversal_records', '_wallet_locks', '_wallet_merges', '_cashback_records', '_loyalty_conversions', '_export_jobs', '_fraud_checks', '_analytics_cache', '_statements', '_topup_records', '_withdrawal_records', '_transfer_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -1,6 +1,9 @@
 """Land Management service — agr_lnd."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import hashlib
 import hmac
 import logging
@@ -75,22 +78,23 @@ class LandManagementService:
 	"""Async service for land management: parcel cadastre, tenure registry,
 	GPS boundary capture, title issuance, and land transfer."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		guard_tenant_id(tenant_id)
 		self.tenant_id = tenant_id
-		self._parcels: dict[str, dict[str, Any]] = {}
-		self._boundaries: dict[str, dict[str, Any]] = {}
-		self._titles: dict[str, dict[str, Any]] = {}
-		self._transfers: dict[str, dict[str, Any]] = {}
-		self._disputes: dict[str, dict[str, Any]] = {}
-		self._encumbrances: dict[str, dict[str, Any]] = {}
-		self._valuations: dict[str, dict[str, Any]] = {}
-		self._formalisations: dict[str, dict[str, Any]] = {}
-		self._rate_bills: dict[str, dict[str, Any]] = {}
-		self._webhooks: dict[str, dict[str, Any]] = {}
-		self._webhook_failures: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._parcels = WriteThruDict('parcels', tenant_id, _store)
+		self._boundaries = WriteThruDict('boundaries', tenant_id, _store)
+		self._titles = WriteThruDict('titles', tenant_id, _store)
+		self._transfers = WriteThruDict('transfers', tenant_id, _store)
+		self._disputes = WriteThruDict('disputes', tenant_id, _store)
+		self._encumbrances = WriteThruDict('encumbrances', tenant_id, _store)
+		self._valuations = WriteThruDict('valuations', tenant_id, _store)
+		self._formalisations = WriteThruDict('formalisations', tenant_id, _store)
+		self._rate_bills = WriteThruDict('rate_bills', tenant_id, _store)
+		self._webhooks = WriteThruDict('webhooks', tenant_id, _store)
+		self._webhook_failures = WriteThruList('webhook_failures', tenant_id, _store)
 		self._transfer_signatures: dict[str, list[dict[str, Any]]] = {}
-		self._audit: list[dict[str, Any]] = []
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	def _emit(self, event_type: str, entity_type: str, entity_id: str, payload: dict[str, Any]) -> None:
 		self._audit.append({
@@ -1206,3 +1210,11 @@ class LandManagementService:
 		except Exception as exc:
 			_log.error("sign_transfer failed: %s", exc)
 			raise
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_parcels', '_boundaries', '_titles', '_transfers', '_disputes', '_encumbrances', '_valuations', '_formalisations', '_rate_bills', '_webhooks', '_webhook_failures', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

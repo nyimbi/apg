@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import time
 from datetime import datetime
 from typing import Any
@@ -52,6 +55,7 @@ class ReportBuilderService:
 		store: Any = None,
 	) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth
 		self._audit_adapter = audit
@@ -66,8 +70,8 @@ class ReportBuilderService:
 		self._report_filters: dict[tuple[str, str], list[dict[str, Any]]] = {}
 		self._report_charts: dict[tuple[str, str], list[dict[str, Any]]] = {}
 		self._shared_portal: dict[str, list[dict[str, Any]]] = {}  # keyed by tenant_id
-		self._runs: list[dict[str, Any]] = []
-		self._audit: list[dict[str, Any]] = []
+		self._runs = WriteThruList('runs', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	# ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -897,4 +901,11 @@ class ReportBuilderService:
 			return {"summary": result.summary, "key_points": result.key_points, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_runs', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

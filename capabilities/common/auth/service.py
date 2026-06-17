@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from dataclasses import replace
 from typing import Any
 
@@ -938,7 +941,7 @@ class AuthService:
 		sig      = base64.urlsafe_b64encode(hashlib.sha256(sig_seed.encode()).digest()).rstrip(b"=").decode()
 		token    = f"{h_enc}.{p_enc}.{sig}"
 		if not hasattr(self, "_jwt_registry"):
-			self._jwt_registry:   dict[str, dict[str, Any]] = {}
+			self._jwt_registry = WriteThruDict('jwt_registry', tenant_id, _store)
 			self._jwt_blacklist:  set[str]                  = set()
 		self._jwt_registry[token] = {"user_id": user_id, "tenant_id": tenant_id, "exp": now + expires_in_seconds}
 		self._record_audit(
@@ -964,7 +967,7 @@ class AuthService:
 		import base64, hashlib, json as _json, time
 		self._require_tenant(tenant_id)
 		if not hasattr(self, "_jwt_registry"):
-			self._jwt_registry:  dict[str, dict[str, Any]] = {}
+			self._jwt_registry = WriteThruDict('jwt_registry', tenant_id, _store)
 			self._jwt_blacklist: set[str]                  = set()
 		if token in self._jwt_blacklist:
 			raise PermissionError("jwt_blacklisted")
@@ -1014,7 +1017,7 @@ class AuthService:
 			"created_at": _utc_now(),
 		}
 		if not hasattr(self, "_api_keys"):
-			self._api_keys: dict[str, dict[str, Any]] = {}
+			self._api_keys = WriteThruDict('api_keys', tenant_id, _store)
 		self._api_keys[self._tenant_key(tenant_id, kid).__str__()] = record
 		return {k: v for k, v in record.items() if k not in {"hash", "salt"}} | {"stored": True}
 
@@ -1032,7 +1035,7 @@ class AuthService:
 		import hashlib
 		self._require_tenant(tenant_id)
 		if not hasattr(self, "_api_keys"):
-			self._api_keys: dict[str, dict[str, Any]] = {}
+			self._api_keys = WriteThruDict('api_keys', tenant_id, _store)
 		record = self._api_keys.get(str(self._tenant_key(tenant_id, key_id)))
 		if record is None:
 			return {"valid": False, "reason": "key_not_found", "key_id": key_id}
@@ -1189,7 +1192,7 @@ class AuthService:
 		self._require_tenant(tenant_id)
 		if not hasattr(self, "_jwt_blacklist"):
 			self._jwt_blacklist: set[str] = set()
-			self._jwt_registry:  dict[str, dict[str, Any]] = {}
+			self._jwt_registry = WriteThruDict('jwt_registry', tenant_id, _store)
 		self._jwt_blacklist.add(token)
 		self._jwt_registry.pop(token, None)
 		self._record_audit(
@@ -1405,7 +1408,7 @@ class AuthService:
 		if not hasattr(self, "_oauth2_codes"):
 			self._oauth2_codes: dict[tuple[str, str], dict[str, Any]] = {}
 		if not hasattr(self, "_refresh_tokens"):
-			self._refresh_tokens: dict[str, dict[str, Any]] = {}
+			self._refresh_tokens = WriteThruDict('refresh_tokens', tenant_id, _store)
 		supported = {"authorization_code", "refresh_token", "client_credentials"}
 		if grant_type not in supported:
 			raise ValueError(f"oauth2_unsupported_grant_type:{grant_type}")
@@ -1487,7 +1490,7 @@ class AuthService:
 		if effect not in {"allow", "deny"}:
 			raise ValueError(f"abac_policy_effect_invalid:{effect}")
 		if not hasattr(self, "_abac_policies"):
-			self._abac_policies: list[dict[str, Any]] = []
+			self._abac_policies = WriteThruList('abac_policies', tenant_id, _store)
 		record = {
 			"id": policy_id, "tenant_id": tenant_id, "name": name,
 			"effect": effect, "priority": priority,
@@ -2316,3 +2319,11 @@ def _abac_conditions_match(conditions: list[dict[str, Any]], context: dict[str, 
 		if not match:
 			return False
 	return True
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_jwt_registry', '_jwt_registry', '_api_keys', '_api_keys', '_jwt_registry', '_refresh_tokens', '_abac_policies']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

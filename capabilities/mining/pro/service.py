@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -35,21 +38,22 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 	All state is in-memory; swap for async DB without changing signatures.
 	"""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
-		self._shifts: dict[str, dict[str, Any]] = {}
-		self._blasts: dict[str, dict[str, Any]] = {}
-		self._grade_boundaries: dict[str, dict[str, Any]] = {}
-		self._stockpiles: dict[str, dict[str, Any]] = {}
-		self._stockpile_movements: dict[str, dict[str, Any]] = {}
-		self._schedules: dict[str, dict[str, Any]] = {}
+		_store = get_store(db_url)
+		self._shifts = WriteThruDict('shifts', tenant_id, _store)
+		self._blasts = WriteThruDict('blasts', tenant_id, _store)
+		self._grade_boundaries = WriteThruDict('grade_boundaries', tenant_id, _store)
+		self._stockpiles = WriteThruDict('stockpiles', tenant_id, _store)
+		self._stockpile_movements = WriteThruDict('stockpile_movements', tenant_id, _store)
+		self._schedules = WriteThruDict('schedules', tenant_id, _store)
 		# Extended stores
-		self._blast_plans: dict[str, dict[str, Any]] = {}
-		self._blast_results: dict[str, dict[str, Any]] = {}
-		self._ore_movements: dict[str, dict[str, Any]] = {}
-		self._grade_control_samples: dict[str, dict[str, Any]] = {}
-		self._dilution_records: dict[str, dict[str, Any]] = {}
-		self._recovery_records: dict[str, dict[str, Any]] = {}
+		self._blast_plans = WriteThruDict('blast_plans', tenant_id, _store)
+		self._blast_results = WriteThruDict('blast_results', tenant_id, _store)
+		self._ore_movements = WriteThruDict('ore_movements', tenant_id, _store)
+		self._grade_control_samples = WriteThruDict('grade_control_samples', tenant_id, _store)
+		self._dilution_records = WriteThruDict('dilution_records', tenant_id, _store)
+		self._recovery_records = WriteThruDict('recovery_records', tenant_id, _store)
 
 	# ── Logging helpers ────────────────────────────────────────────────────────
 
@@ -1507,3 +1511,11 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 	async def export_to_csv(self, ) -> dict[str, Any]:
 		"""Export To Csv"""
 		return {"format": "csv", "tenant_id": self.tenant_id, "content": ""}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_shifts', '_blasts', '_grade_boundaries', '_stockpiles', '_stockpile_movements', '_schedules', '_blast_plans', '_blast_results', '_ore_movements', '_grade_control_samples', '_dilution_records', '_recovery_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -1,6 +1,9 @@
 """Document Intelligence service — OCR pipeline, LLM extraction, invoice/contract/ID parsing, form digitization."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import base64
 import hashlib
@@ -35,22 +38,23 @@ SUPPORTED_MIME_TYPES = {
 class DocumentIntelligenceService:
 	"""OCR + LLM extraction pipeline for invoices, contracts, ID docs, forms, PDFs, and images."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.documents: dict[str, dict[str, Any]] = {}
 		self.extractions: dict[str, dict[str, Any]] = {}
 		self.verification_results: dict[str, dict[str, Any]] = {}
 		self.form_templates: dict[str, dict[str, Any]] = {}
 		self.batches: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# New state stores for enhanced features
-		self._review_queue: dict[str, dict[str, Any]] = {}
+		self._review_queue = WriteThruDict('review_queue', tenant_id, _store)
 		self._embeddings: dict[str, list[float]] = {}
-		self._watchlist_hits: dict[str, dict[str, Any]] = {}
+		self._watchlist_hits = WriteThruDict('watchlist_hits', tenant_id, _store)
 		self._field_locks: dict[str, set[str]] = {}  # document_id -> set of locked field names
-		self._quality_assessments: dict[str, dict[str, Any]] = {}
+		self._quality_assessments = WriteThruDict('quality_assessments', tenant_id, _store)
 		self._clause_classifications: dict[str, list[dict[str, Any]]] = {}
-		self._signature_detections: dict[str, dict[str, Any]] = {}
+		self._signature_detections = WriteThruDict('signature_detections', tenant_id, _store)
 
 	def _tenant(self, tenant_id: str | None = None) -> str:
 		value = tenant_id or self.tenant_id
@@ -1350,3 +1354,11 @@ class DocumentIntelligenceService:
 		})
 		_log.info("review resolved: doc=%s review=%s corrections=%d", document_id, review_id, len(corrections))
 		return deepcopy(ticket)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_review_queue', '_watchlist_hits', '_quality_assessments', '_signature_detections', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

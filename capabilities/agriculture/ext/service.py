@@ -1,6 +1,9 @@
 """Extension Services service — agr_ext."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -25,15 +28,16 @@ class ExtensionServicesService:
 	"""Async service for extension: advisory delivery, demo plot management,
 	training records, and knowledge base."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		if not tenant_id:
 			raise ValueError("tenant_id required")
 		self.tenant_id = tenant_id
-		self._advisories: dict[str, dict[str, Any]] = {}
-		self._demo_plots: dict[str, dict[str, Any]] = {}
-		self._trainings: dict[str, dict[str, Any]] = {}
-		self._knowledge: dict[str, dict[str, Any]] = {}
-		self._audit: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._advisories = WriteThruDict('advisories', tenant_id, _store)
+		self._demo_plots = WriteThruDict('demo_plots', tenant_id, _store)
+		self._trainings = WriteThruDict('trainings', tenant_id, _store)
+		self._knowledge = WriteThruDict('knowledge', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	def _emit(self, event_type: str, entity_type: str, entity_id: str, payload: dict[str, Any]) -> None:
 		self._audit.append({
@@ -412,3 +416,11 @@ class ExtensionServicesService:
 			"pending_follow_ups": len([a for a in self._advisories.values()
 									if a.get("follow_up_required") and not a.get("follow_up_done")]),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_advisories', '_demo_plots', '_trainings', '_knowledge', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

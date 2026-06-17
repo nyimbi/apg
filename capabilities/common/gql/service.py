@@ -1,6 +1,9 @@
 """GraphQL Federation Gateway service — federated gateway, schema stitching, DataLoader, persisted queries."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import json
@@ -39,21 +42,22 @@ class GraphQLGatewayService:
 	_CB_OPEN = "OPEN"
 	_CB_HALF_OPEN = "HALF_OPEN"
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.subgraphs: dict[str, dict[str, Any]] = {}
 		self.persisted_queries: dict[str, dict[str, Any]] = {}
 		self.query_log: list[dict[str, Any]] = []
 		self.dataloader_batches: dict[str, dict[str, Any]] = {}
 		self.schema_cache: dict[str, dict[str, Any]] = {}
 		self.rate_limits: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# Response cache: key → {data, expires_at, hits}
-		self._response_cache: dict[str, dict[str, Any]] = {}
+		self._response_cache = WriteThruDict('response_cache', tenant_id, _store)
 		# Schema registry: tenant:subgraph → list of version records
 		self._schema_versions: dict[str, list[dict[str, Any]]] = {}
 		# Circuit breakers: tenant:subgraph → CB state dict
-		self._circuit_breakers: dict[str, dict[str, Any]] = {}
+		self._circuit_breakers = WriteThruDict('circuit_breakers', tenant_id, _store)
 		# Per-tenant allowlist mode: tenant → bool
 		self._allowlist_mode: dict[str, bool] = {}
 		# Query complexity budgets: tenant → int (default 1000)
@@ -65,9 +69,9 @@ class GraphQLGatewayService:
 		# Field-level auth policies: tenant:subgraph → {TypeName.field → [roles]}
 		self._field_auth_policies: dict[str, dict[str, list[str]]] = {}
 		# Distributed traces: trace_id → trace context dict
-		self._traces: dict[str, dict[str, Any]] = {}
+		self._traces = WriteThruDict('traces', tenant_id, _store)
 		# Webhooks: webhook_id → webhook record
-		self._webhooks: dict[str, dict[str, Any]] = {}
+		self._webhooks = WriteThruDict('webhooks', tenant_id, _store)
 		# Region index: tenant:region → [subgraph_name, ...]
 		self._region_index: dict[str, list[str]] = {}
 
@@ -1942,3 +1946,11 @@ class GraphQLGatewayService:
 
 		yield {"id": sub_id, "type": "complete", "event_index": event_index, "emitted_at": self._now()}
 		_log.info("subscription completed: id=%s tenant=%s events=%d", sub_id, tenant, event_index)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_response_cache', '_circuit_breakers', '_traces', '_webhooks', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

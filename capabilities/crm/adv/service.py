@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
@@ -43,19 +46,19 @@ class AdvancedCRMService:
 	"""
 
 	def __init__(self) -> None:
-		self._accounts: dict[str, dict[str, Any]] = {}
-		self._contacts: dict[str, dict[str, Any]] = {}
-		self._leads: dict[str, dict[str, Any]] = {}
-		self._opportunities: dict[str, dict[str, Any]] = {}
-		self._activities: dict[str, dict[str, Any]] = {}
-		self._campaigns: dict[str, dict[str, Any]] = {}
-		self._forecasts: dict[str, dict[str, Any]] = {}
-		self._agents: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._accounts = WriteThruDict('accounts', tenant_id, _store)
+		self._contacts = WriteThruDict('contacts', tenant_id, _store)
+		self._leads = WriteThruDict('leads', tenant_id, _store)
+		self._opportunities = WriteThruDict('opportunities', tenant_id, _store)
+		self._activities = WriteThruDict('activities', tenant_id, _store)
+		self._campaigns = WriteThruDict('campaigns', tenant_id, _store)
+		self._forecasts = WriteThruDict('forecasts', tenant_id, _store)
+		self._agents = WriteThruDict('agents', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# New stores
-		self._lead_scores: dict[str, dict[str, Any]] = {}
-		self._segments: dict[str, dict[str, Any]] = {}
-		self._win_loss_records: list[dict[str, Any]] = []
+		self._lead_scores = WriteThruDict('lead_scores', tenant_id, _store)
+		self._segments = WriteThruDict('segments', tenant_id, _store)
+		self._win_loss_records = WriteThruList('win_loss_records', tenant_id, _store)
 		self._stage_history: dict[str, list[dict[str, Any]]] = {}
 
 	# ------------------------------------------------------------------
@@ -1867,7 +1870,7 @@ class CRMService:
 		self.realtime_sync = RealTimeSyncEngine(db_pool=None, redis_client=None)
 
 		# Per-tenant configuration store (default values)
-		self._configs: dict[str, dict[str, Any]] = {}
+		self._configs = WriteThruDict('configs', tenant_id, _store)
 		# Time-entry store for clock-in/out
 		self._time_entries: dict[str, list[dict[str, Any]]] = {}
 
@@ -1952,3 +1955,11 @@ class CRMService:
 			**{k: v for k, v in data.items()},
 		)
 		return await self.db_manager.create_opportunity(opp)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_accounts', '_contacts', '_leads', '_opportunities', '_activities', '_campaigns', '_forecasts', '_agents', '_lead_scores', '_segments', '_configs', '_audit_events', '_win_loss_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

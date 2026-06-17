@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -103,7 +106,7 @@ class MobileDeviceManagementService:
 		self._wipe_requests: dict[tuple[str, str], WipeRequestResponse] = {}
 		self._profiles: dict[tuple[str, str], MdmProfileResponse] = {}
 		self._alerts: dict[tuple[str, str], MdmAlertResponse] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# -------------------------------------------------------------------------
 	# Contract helpers
@@ -1175,3 +1178,11 @@ class MobileDeviceManagementService:
 			k = getattr(item, attr, "unknown")
 			counts[k] = counts.get(k, 0) + 1
 		return counts
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

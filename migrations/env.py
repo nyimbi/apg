@@ -26,15 +26,41 @@ if not _db_url:
 	)
 config.set_main_option("sqlalchemy.url", _db_url)
 
-# Import metadata from all capability models so autogenerate can detect changes.
-# Add imports here as new capability models are created.
-target_metadata = None
-try:
-	from capabilities.composition.registry.models import Base as RegistryBase
-	from capabilities.composition.events.models import Base as EventsBase
-	target_metadata = [RegistryBase.metadata, EventsBase.metadata]
-except ImportError:
-	pass  # capability packages not installed in this env — offline migration is still possible
+# Import metadata from all capability models so autogenerate can detect schema changes.
+# Each entry is wrapped in its own try/except so a missing optional dep doesn't block others.
+from sqlalchemy import MetaData
+
+_metadatas: list[MetaData] = []
+
+def _try_import(module_path: str, attr: str) -> None:
+	try:
+		import importlib
+		mod = importlib.import_module(module_path)
+		obj = getattr(mod, attr)
+		meta = obj.metadata if hasattr(obj, "metadata") else obj
+		if isinstance(meta, MetaData) and meta not in _metadatas:
+			_metadatas.append(meta)
+	except Exception:
+		pass
+
+# Core composition models
+_try_import("capabilities.composition.registry.models", "Base")
+_try_import("capabilities.composition.events.models", "Base")
+_try_import("capabilities.composition.gateway.models", "Base")
+
+# CRM order entry (Flask-AppBuilder Model base)
+_try_import("capabilities.crm.ord.models", "Model")
+
+# GRC document control
+_try_import("capabilities.grc.doc.models", "Base")
+
+# API management
+_try_import("capabilities.int.api.models", "Base")
+
+# Intel crawler
+_try_import("capabilities.intel.crawler.models", "Base")
+
+target_metadata = _metadatas if _metadatas else None
 
 
 def run_migrations_offline() -> None:

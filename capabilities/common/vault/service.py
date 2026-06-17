@@ -30,6 +30,9 @@ Extended capabilities (world-class improvements):
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import base64
 import hashlib
@@ -149,7 +152,7 @@ class TokenizationService:
 		# In-memory token vault: {token: encrypted_pan}
 		self._vault: dict[str, bytes] = {}
 		# Lifecycle metadata: {token: {"status": TokenStatus, "expires_at": str|None, "revocation_reason": str|None, "created_at": str}}
-		self._token_meta: dict[str, dict[str, Any]] = {}
+		self._token_meta = WriteThruDict('token_meta', tenant_id, _store)
 		# Reverse index for idempotent get_or_create_token: {pan_fingerprint: token}
 		# fingerprint = HMAC-SHA256(pan, vault_key) — never stores the PAN
 		self._pan_index: dict[str, str] = {}
@@ -900,3 +903,11 @@ def _xor_encrypt(data: bytes, key: bytes) -> bytes:
 	is preserved in variable naming to prevent accidental production use.
 	"""
 	return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_token_meta']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

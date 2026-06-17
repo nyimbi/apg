@@ -1,6 +1,9 @@
 """Beneficiary Registry Service — profiling, enrolment, vulnerability scoring, transfers, deduplication."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -41,13 +44,14 @@ def _compute_vulnerability_score(
 class BeneficiaryRegistryService:
 	"""Async service for NGO beneficiary management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
-		self._beneficiaries: dict[str, dict[str, Any]] = {}
-		self._enrolments: dict[str, dict[str, Any]] = {}
-		self._assessments: dict[str, dict[str, Any]] = {}
-		self._transfers: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._beneficiaries = WriteThruDict('beneficiaries', tenant_id, _store)
+		self._enrolments = WriteThruDict('enrolments', tenant_id, _store)
+		self._assessments = WriteThruDict('assessments', tenant_id, _store)
+		self._transfers = WriteThruDict('transfers', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── helpers ───────────────────────────────────────────────────────────────
 
@@ -485,3 +489,11 @@ class BeneficiaryRegistryService:
 			else:
 				results.append(outcome)
 		return {"enrolled": len(results), "failed": len(errors), "enrolments": results, "errors": errors}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_beneficiaries', '_enrolments', '_assessments', '_transfers', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

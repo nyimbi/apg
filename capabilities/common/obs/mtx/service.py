@@ -8,6 +8,9 @@ Grafana JSON export.
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 import math
@@ -47,28 +50,29 @@ def _sid() -> str:
 class MetricsSLOService:
 	"""In-memory async service for metrics collection, SLO management, and burn rate alerting."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		guard_tenant_id(tenant_id)
 		self.tenant_id = tenant_id
-		self._metric_definitions: dict[str, dict[str, Any]] = {}
-		self._data_points: list[dict[str, Any]] = []
-		self._slos: dict[str, dict[str, Any]] = {}
-		self._burn_rate_alerts: dict[str, dict[str, Any]] = {}
-		self._dashboards: dict[str, dict[str, Any]] = {}
+		_store = get_store(db_url)
+		self._metric_definitions = WriteThruDict('metric_definitions', tenant_id, _store)
+		self._data_points = WriteThruList('data_points', tenant_id, _store)
+		self._slos = WriteThruDict('slos', tenant_id, _store)
+		self._burn_rate_alerts = WriteThruDict('burn_rate_alerts', tenant_id, _store)
+		self._dashboards = WriteThruDict('dashboards', tenant_id, _store)
 		self._prometheus_config: dict[str, Any] | None = None
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# histogram bucket state: metric_name -> {bucket_boundary -> count, _sum, _count}
-		self._histogram_buckets: dict[str, dict[str, Any]] = {}
+		self._histogram_buckets = WriteThruDict('histogram_buckets', tenant_id, _store)
 		# composite SLOs
-		self._composite_slos: dict[str, dict[str, Any]] = {}
+		self._composite_slos = WriteThruDict('composite_slos', tenant_id, _store)
 		# EWMA state: service_name -> {rate_ewma, error_ewma, duration_ewma, rate_var, error_var, duration_var}
 		self._ewma_state: dict[str, dict[str, float]] = {}
 		# error budget policies: policy_id -> {slo_id, thresholds, actions}
-		self._error_budget_policies: dict[str, dict[str, Any]] = {}
+		self._error_budget_policies = WriteThruDict('error_budget_policies', tenant_id, _store)
 		# compliance snapshot history for forecasting: slo_id -> list of (epoch_ts, compliance)
 		self._compliance_history: dict[str, list[tuple[float, float]]] = defaultdict(list)
 		# downsampling cache: cache_key -> {data, expires_at}
-		self._downsample_cache: dict[str, dict[str, Any]] = {}
+		self._downsample_cache = WriteThruDict('downsample_cache', tenant_id, _store)
 		# tenant quota state
 		self._tenant_quota: dict[str, Any] | None = None
 		self._quota_ingestion_count: int = 0
@@ -1671,3 +1675,11 @@ class MetricsSLOService:
 			"quota_configured": self._tenant_quota is not None,
 			"sampled_at": _now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_metric_definitions', '_slos', '_burn_rate_alerts', '_dashboards', '_histogram_buckets', '_composite_slos', '_error_budget_policies', '_downsample_cache', '_data_points', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

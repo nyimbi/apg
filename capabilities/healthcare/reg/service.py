@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -64,10 +67,10 @@ class HealthcareRegulatoryService:
 		self._incidents: dict[tuple[str, str], IncidentResponse] = {}
 		self._submissions: dict[tuple[str, str], RegulatorySubmissionResponse] = {}
 		self._corrective_actions: dict[tuple[str, str], CorrectiveActionResponse] = {}
-		self._inspections: list[dict[str, Any]] = []
-		self._inspection_findings: list[dict[str, Any]] = []
-		self._hipaa_assessments: list[dict[str, Any]] = []
-		self._audit_events: list[dict[str, Any]] = []
+		self._inspections = WriteThruList('inspections', tenant_id, _store)
+		self._inspection_findings = WriteThruList('inspection_findings', tenant_id, _store)
+		self._hipaa_assessments = WriteThruList('hipaa_assessments', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	async def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1504,3 +1507,11 @@ class HealthcareRegulatoryService:
 
 	def _audit(self, tenant_id: str, event: str, entity_id: str) -> None:
 		self._audit_events.append({"tenant_id": tenant_id, "event": event, "entity_id": entity_id, "timestamp": datetime.utcnow().isoformat()})
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_inspections', '_inspection_findings', '_hipaa_assessments', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

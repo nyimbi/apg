@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import math
 import time
 from datetime import datetime
@@ -54,6 +57,7 @@ class TimeSeriesService:
 		store: Any = None,
 	) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth
 		self._audit_adapter = audit
@@ -64,16 +68,16 @@ class TimeSeriesService:
 		self._streams: dict[tuple[str, str], dict[str, Any]] = {}
 		self._series_data: dict[tuple[str, str], list[dict[str, Any]]] = {}  # raw data points per (tenant, series_id)
 		self._anomaly_configs: dict[tuple[str, str], dict[str, Any]] = {}
-		self._anomaly_events: list[dict[str, Any]] = []
+		self._anomaly_events = WriteThruList('anomaly_events', tenant_id, _store)
 		self._forecasts: dict[tuple[str, str], dict[str, Any]] = {}
 		self._windows: dict[tuple[str, str], dict[str, Any]] = {}
-		self._decompositions: list[dict[str, Any]] = []
-		self._correlations: list[dict[str, Any]] = []
-		self._changepoints: list[dict[str, Any]] = []
-		self._rolling_stats: list[dict[str, Any]] = []
-		self._interpolation_runs: list[dict[str, Any]] = []
-		self._ts_reports: list[dict[str, Any]] = []
-		self._audit: list[dict[str, Any]] = []
+		self._decompositions = WriteThruList('decompositions', tenant_id, _store)
+		self._correlations = WriteThruList('correlations', tenant_id, _store)
+		self._changepoints = WriteThruList('changepoints', tenant_id, _store)
+		self._rolling_stats = WriteThruList('rolling_stats', tenant_id, _store)
+		self._interpolation_runs = WriteThruList('interpolation_runs', tenant_id, _store)
+		self._ts_reports = WriteThruList('ts_reports', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	# ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1488,7 +1492,7 @@ class TimeSeriesService:
 			"scored_at": _now(),
 		}
 		if not hasattr(self, "_quality_scores"):
-			self._quality_scores: list[dict[str, Any]] = []
+			self._quality_scores = WriteThruList('quality_scores', tenant_id, _store)
 		self._quality_scores.append(qscore_entry)
 		self._log_audit(tenant_id, "data_quality_scored", series_id, {"score": score})
 		return qscore_entry
@@ -1910,7 +1914,7 @@ class TimeSeriesService:
 			"backtested_at": _now(),
 		}
 		if not hasattr(self, "_backtests"):
-			self._backtests: list[dict[str, Any]] = []
+			self._backtests = WriteThruList('backtests', tenant_id, _store)
 		self._backtests.append(bt_result)
 		self._log_audit(tenant_id, "forecast_backtested", series_id, {
 			"model": model, f"mean_{metric}": round(mean_metric, 4), "n_splits": n_splits,
@@ -2267,3 +2271,11 @@ class TimeSeriesService:
 			"forecast_id": forecast_id, "conformal_q": round(q_conformal, 6),
 		})
 		return cal_result
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_anomaly_events', '_decompositions', '_correlations', '_changepoints', '_rolling_stats', '_interpolation_runs', '_ts_reports', '_audit', '_quality_scores', '_backtests']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

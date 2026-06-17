@@ -1,6 +1,9 @@
 """Intellectual Property Registry — async service layer."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -21,8 +24,9 @@ ROYALTY_BASES = {"revenue", "unit", "fixed", "tiered"}
 class IntellectualPropertyService:
 	"""In-memory async service for IP portfolio management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.assets: dict[str, dict[str, Any]] = {}
 		self.renewals: dict[str, dict[str, Any]] = {}
 		self.licenses: dict[str, dict[str, Any]] = {}
@@ -30,7 +34,7 @@ class IntellectualPropertyService:
 		self.oppositions: dict[str, dict[str, Any]] = {}
 		self.assignments: dict[str, dict[str, Any]] = {}
 		self.watches: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -518,3 +522,11 @@ class IntellectualPropertyService:
 		tenant = self._tenant(tenant_id)
 		events = [deepcopy(e) for e in self._audit_events if e["tenant_id"] == tenant]
 		return events[-limit:]
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

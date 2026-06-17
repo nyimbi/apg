@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import date, datetime
 from typing import Any
@@ -33,24 +36,25 @@ class OmcService:
 				 auth: Any = None, audit: Any = None, notify: Any = None,
 				 db_url: str | None = None, store: Any = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth
 		self._audit_adapter = audit
 		self._notify = notify
 		self._store = store
-		self._channels: dict[str, dict[str, Any]] = {}
-		self._catalogue: dict[str, dict[str, Any]] = {}
-		self._inventory: dict[str, dict[str, Any]] = {}
-		self._carts: dict[str, dict[str, Any]] = {}
-		self._orders: dict[str, dict[str, Any]] = {}
-		self._returns: dict[str, dict[str, Any]] = {}
-		self._journey_events: dict[str, dict[str, Any]] = {}
-		self._pricing_rules: dict[str, dict[str, Any]] = {}
+		self._channels = WriteThruDict('channels', tenant_id, _store)
+		self._catalogue = WriteThruDict('catalogue', tenant_id, _store)
+		self._inventory = WriteThruDict('inventory', tenant_id, _store)
+		self._carts = WriteThruDict('carts', tenant_id, _store)
+		self._orders = WriteThruDict('orders', tenant_id, _store)
+		self._returns = WriteThruDict('returns', tenant_id, _store)
+		self._journey_events = WriteThruDict('journey_events', tenant_id, _store)
+		self._pricing_rules = WriteThruDict('pricing_rules', tenant_id, _store)
 		# Extended state
-		self._customer_profiles: dict[str, dict[str, Any]] = {}   # customer_id -> unified profile
-		self._attribution: dict[str, dict[str, Any]] = {}          # order_id -> attribution
-		self._bopis_orders: dict[str, dict[str, Any]] = {}         # order_id -> bopis metadata
-		self._analytics_cache: dict[str, dict[str, Any]] = {}
+		self._customer_profiles = WriteThruDict('customer_profiles', tenant_id, _store)   # customer_id -> unified profile
+		self._attribution = WriteThruDict('attribution', tenant_id, _store)          # order_id -> attribution
+		self._bopis_orders = WriteThruDict('bopis_orders', tenant_id, _store)         # order_id -> bopis metadata
+		self._analytics_cache = WriteThruDict('analytics_cache', tenant_id, _store)
 		self._collection_ready: set[str] = set()                   # order_ids ready for collection
 
 	# ------------------------------------------------------------------
@@ -1559,7 +1563,7 @@ class OmcService:
 		tenant_id = self.tenant_id
 
 		if not hasattr(self, "_audit_log"):
-			self._audit_log: list[dict[str, Any]] = []
+			self._audit_log = WriteThruList('audit_log', tenant_id, _store)
 
 		results = [e for e in self._audit_log
 				   if e.get("tenant_id") == tenant_id
@@ -1584,7 +1588,7 @@ class OmcService:
 		In production, replace list append with an async write to the audit DB or stream.
 		"""
 		if not hasattr(self, "_audit_log"):
-			self._audit_log: list[dict[str, Any]] = []
+			self._audit_log = WriteThruList('audit_log', tenant_id, _store)
 
 		event: dict[str, Any] = {
 			"id": uuid7str(),
@@ -1606,4 +1610,11 @@ class OmcService:
 				await self._audit_adapter(event)
 			except Exception as _exc:
 				_log.debug("Suppressed %s: %s", type(_exc).__name__, _exc)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_channels', '_catalogue', '_inventory', '_carts', '_orders', '_returns', '_journey_events', '_pricing_rules', '_customer_profiles', '_attribution', '_bopis_orders', '_analytics_cache', '_audit_log', '_audit_log']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

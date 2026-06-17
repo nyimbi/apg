@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -44,11 +47,11 @@ class ConsService:
 		self._processing_decisions: dict[str, ProcessingDecision] = {}
 		self._agents: dict[str, PrivacyAgent] = {}
 		self._audit_events: list[PrivacyAuditEvent] = []
-		self._dpa_register: dict[str, dict[str, Any]] = {}
-		self._breach_records: dict[str, dict[str, Any]] = {}
-		self._pia_records: dict[str, dict[str, Any]] = {}
-		self._portability_exports: dict[str, dict[str, Any]] = {}
-		self._erasure_records: dict[str, dict[str, Any]] = {}
+		self._dpa_register = WriteThruDict('dpa_register', tenant_id, _store)
+		self._breach_records = WriteThruDict('breach_records', tenant_id, _store)
+		self._pia_records = WriteThruDict('pia_records', tenant_id, _store)
+		self._portability_exports = WriteThruDict('portability_exports', tenant_id, _store)
+		self._erasure_records = WriteThruDict('erasure_records', tenant_id, _store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1080,3 +1083,11 @@ def _normalize_privacy_agent_role(role: str) -> str:
 
 def _utc_now_iso() -> str:
 	return datetime.now(timezone.utc).isoformat()
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_dpa_register', '_breach_records', '_pia_records', '_portability_exports', '_erasure_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

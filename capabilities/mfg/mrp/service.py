@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 from datetime import datetime, timezone
 from typing import Any
@@ -27,14 +30,14 @@ def _now() -> str:
 class MfgMrpService:
 	"""Material Requirements Planning service — in-memory store, async API."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
 		# keyed by id
-		self._planning_runs: dict[str, dict[str, Any]] = {}
-		self._production_orders: dict[str, dict[str, Any]] = {}
-		self._purchase_requisitions: dict[str, dict[str, Any]] = {}
-		self._exception_messages: dict[str, dict[str, Any]] = {}
-		self._pegging_records: dict[str, dict[str, Any]] = {}
+		self._planning_runs = WriteThruDict('planning_runs', tenant_id, _store)
+		self._production_orders = WriteThruDict('production_orders', tenant_id, _store)
+		self._purchase_requisitions = WriteThruDict('purchase_requisitions', tenant_id, _store)
+		self._exception_messages = WriteThruDict('exception_messages', tenant_id, _store)
+		self._pegging_records = WriteThruDict('pegging_records', tenant_id, _store)
 
 	# ------------------------------------------------------------------ #
 	# Planning Runs
@@ -415,3 +418,11 @@ class MfgMrpService:
 				"completed": sum(1 for r in self._planning_runs.values() if r["status"] == "completed"),
 			},
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_planning_runs', '_production_orders', '_purchase_requisitions', '_exception_messages', '_pegging_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

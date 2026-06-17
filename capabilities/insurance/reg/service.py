@@ -4,6 +4,9 @@ IRA/NAICOM/FSA returns, Solvency II reporting, statistical returns, market condu
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from copy import deepcopy
 from datetime import date, datetime, timedelta
@@ -36,15 +39,16 @@ MCR_MINIMUM_RATIO = Decimal("0.25")
 class InsuranceRegulatoryReportingService:
 	"""In-memory executable service for Insurance Regulatory Reporting."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.returns: dict[str, dict[str, Any]] = {}
 		self.solvency_reports: dict[str, dict[str, Any]] = {}
 		self.statistical_returns: dict[str, dict[str, Any]] = {}
 		self.market_conduct_filings: dict[str, dict[str, Any]] = {}
 		self.compliance_calendar: dict[str, dict[str, Any]] = {}
 		self.return_seq: int = 0
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _tenant(self, tenant_id: str | None = None) -> str:
 		value = tenant_id or self.tenant_id
@@ -476,3 +480,11 @@ class InsuranceRegulatoryReportingService:
 	async def get_audit_events(self, tenant_id: str) -> list[dict[str, Any]]:
 		tenant = self._tenant(tenant_id)
 		return [deepcopy(e) for e in self._audit_events if e["tenant_id"] == tenant]
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -3,6 +3,9 @@ standing orders, PIN management, beneficiaries, fraud scoring, FX transfers,
 spending analytics, audit chain verification, and proactive balance alerts."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import csv
 import hashlib
@@ -66,8 +69,9 @@ def _hash_pin(pin: str) -> str:
 class MobUssdService:
 	"""Async service for USSD mobile banking operations."""
 
-	def __init__(self, tenant_id: str = "default", session_secret: str | None = None) -> None:
+	def __init__(self, tenant_id: str = "default", session_secret: str | None = None, db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self._session_secret = session_secret or secrets.token_hex(32)
 		# In-memory stores
 		self.accounts: dict[str, dict[str, Any]] = {}
@@ -77,12 +81,12 @@ class MobUssdService:
 		self.ussd_sessions: dict[str, dict[str, Any]] = {}
 		self.otp_store: dict[str, dict[str, Any]] = {}
 		self.pin_attempts: dict[str, int] = {}  # account_number -> attempt count
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		self._audit_chain_tip: str = "0" * 64  # genesis hash
 		self.beneficiaries: dict[str, dict[str, Any]] = {}  # account_number -> {alias -> record}
-		self._idempotency_cache: dict[str, dict[str, Any]] = {}  # key -> {transfer_id, created_at}
+		self._idempotency_cache = WriteThruDict('idempotency_cache', tenant_id, _store)  # key -> {transfer_id, created_at}
 		self._service_code_registry: dict[str, str] = {}  # service_code -> tenant_id
-		self._fx_rates: dict[str, dict[str, Any]] = {}  # "KES/UGX" -> {rate, fetched_at}
+		self._fx_rates = WriteThruDict('fx_rates', tenant_id, _store)  # "KES/UGX" -> {rate, fetched_at}
 		self._usage_frequency: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))  # phone -> {menu_item -> count}
 
 	# ── Internal helpers ──────────────────────────────────────────────────────
@@ -1607,3 +1611,11 @@ class MobUssdService:
 			"high_value_transfer_threshold": str(HIGH_VALUE_TRANSFER_THRESHOLD),
 			"max_beneficiaries_per_account": MAX_BENEFICIARIES_PER_ACCOUNT,
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_idempotency_cache', '_fx_rates', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

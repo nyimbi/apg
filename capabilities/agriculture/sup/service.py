@@ -1,6 +1,9 @@
 """Agricultural Supply Chain service — agr_sup."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -34,16 +37,17 @@ class SupplyChainService:
 	"""Async service for agricultural supply chain: farm-to-buyer traceability,
 	input procurement, cold chain management, and export documentation."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		if not tenant_id:
 			raise ValueError("tenant_id required")
 		self.tenant_id = tenant_id
-		self._batches: dict[str, dict[str, Any]] = {}
+		_store = get_store(db_url)
+		self._batches = WriteThruDict('batches', tenant_id, _store)
 		self._trace_events: dict[str, list[dict[str, Any]]] = {}
-		self._procurement: dict[str, dict[str, Any]] = {}
-		self._cold_chain: dict[str, dict[str, Any]] = {}
-		self._export_docs: dict[str, dict[str, Any]] = {}
-		self._audit: list[dict[str, Any]] = []
+		self._procurement = WriteThruDict('procurement', tenant_id, _store)
+		self._cold_chain = WriteThruDict('cold_chain', tenant_id, _store)
+		self._export_docs = WriteThruDict('export_docs', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	def _emit(self, event_type: str, entity_type: str, entity_id: str, payload: dict[str, Any]) -> None:
 		self._audit.append({
@@ -426,3 +430,11 @@ class SupplyChainService:
 			"cold_chain_integrity": cold_summary.get("integrity"),
 			"present_documents": list(present),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_batches', '_procurement', '_cold_chain', '_export_docs', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

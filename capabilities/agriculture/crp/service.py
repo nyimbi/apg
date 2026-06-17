@@ -1,6 +1,9 @@
 """Crop Management service — agr_crp."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -26,17 +29,18 @@ class CropManagementService:
 	"""Async service for crop management: planting calendars, phenology,
 	variety registry, rotation planning, and yield recording."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		if not tenant_id:
 			raise ValueError("tenant_id required")
 		self.tenant_id = tenant_id
-		self._varieties: dict[str, dict[str, Any]] = {}
-		self._calendars: dict[str, dict[str, Any]] = {}
-		self._crops: dict[str, dict[str, Any]] = {}
-		self._phenology: dict[str, dict[str, Any]] = {}
-		self._rotations: dict[str, dict[str, Any]] = {}
-		self._yields: dict[str, dict[str, Any]] = {}
-		self._audit: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._varieties = WriteThruDict('varieties', tenant_id, _store)
+		self._calendars = WriteThruDict('calendars', tenant_id, _store)
+		self._crops = WriteThruDict('crops', tenant_id, _store)
+		self._phenology = WriteThruDict('phenology', tenant_id, _store)
+		self._rotations = WriteThruDict('rotations', tenant_id, _store)
+		self._yields = WriteThruDict('yields', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	# ------------------------------------------------------------------ helpers
 
@@ -593,3 +597,11 @@ class CropManagementService:
 			"total_yield_kg": round(total_yield, 3),
 			"avg_yield_kg_ha": round(total_yield / total_area, 2) if total_area > 0 else None,
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_varieties', '_calendars', '_crops', '_phenology', '_rotations', '_yields', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

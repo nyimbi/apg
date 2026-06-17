@@ -6,6 +6,8 @@ import asyncio
 from datetime import date
 from typing import Any
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
 
 try:
 	from .capability_contract import (
@@ -62,7 +64,7 @@ class ResourceManagementService:
 		self._auth = auth
 		self._audit_adapter = audit
 		self._notify = notify
-		self._store = store
+		self._store = store or get_store(db_url)
 		self.resources: dict[tuple[str, str], Resource] = {}
 		self.skills: dict[tuple[str, str], ResourceSkill] = {}
 		self.allocations: dict[tuple[str, str], ResourceAllocation] = {}
@@ -74,10 +76,10 @@ class ResourceManagementService:
 		self.agents: dict[tuple[str, str], ResourceAgent] = {}
 		self.audit_events: list[dict[str, Any]] = []
 		# Extended state
-		self._teams: dict[str, dict[str, Any]] = {}               # team_id -> team record
+		self._teams = WriteThruDict('teams', tenant_id, self._store)
 		self._bench_time: dict[str, list[dict[str, Any]]] = {}    # resource_id -> bench records
 		self._overallocation_log: dict[str, list[dict[str, Any]]] = {}  # resource_id -> resolution log
-		self._analytics_cache: dict[str, dict[str, Any]] = {}
+		self._analytics_cache = WriteThruDict('analytics_cache', tenant_id, self._store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1023,5 +1025,13 @@ class ResourceManagementService:
 		"""Get Audit Events"""
 		t = tenant_id or self.tenant_id
 		return [e for e in self.audit_events if e["tenant_id"] == t]
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_teams', '_analytics_cache']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+
 
 PpmResService = ResourceManagementService

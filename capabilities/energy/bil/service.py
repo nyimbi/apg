@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timezone
 from typing import Any
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
@@ -45,6 +48,7 @@ class EnergyBillingService:
 
 	def __init__(self, tenant_id: str = "default", actor_id: str = "system", *, auth=None, audit=None, notify=None, db_url=None, store=None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self.tariffs: dict[tuple[str, str], Tariff] = {}
 		self.bills: dict[tuple[str, str], EnergyBill] = {}
@@ -55,12 +59,12 @@ class EnergyBillingService:
 		self.agents: dict[tuple[str, str], BilAgent] = {}
 		self.audit_events: list[AuditEvent] = []
 		# Extended stores
-		self._consumption_records: dict[str, dict[str, Any]] = {}
-		self._demand_charge_records: dict[str, dict[str, Any]] = {}
-		self._energy_charge_records: dict[str, dict[str, Any]] = {}
-		self._levy_records: dict[str, dict[str, Any]] = {}
-		self._arrears_records: dict[str, dict[str, Any]] = {}
-		self._billing_analytics_records: dict[str, dict[str, Any]] = {}
+		self._consumption_records = WriteThruDict('consumption_records', tenant_id, _store)
+		self._demand_charge_records = WriteThruDict('demand_charge_records', tenant_id, _store)
+		self._energy_charge_records = WriteThruDict('energy_charge_records', tenant_id, _store)
+		self._levy_records = WriteThruDict('levy_records', tenant_id, _store)
+		self._arrears_records = WriteThruDict('arrears_records', tenant_id, _store)
+		self._billing_analytics_records = WriteThruDict('billing_analytics_records', tenant_id, _store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1047,4 +1051,11 @@ class EnergyBillingService:
 			return {"anomaly_score": round(result.score,3), "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_consumption_records', '_demand_charge_records', '_energy_charge_records', '_levy_records', '_arrears_records', '_billing_analytics_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

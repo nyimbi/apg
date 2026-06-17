@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from hashlib import sha256
 from statistics import mean
 from typing import Any
@@ -47,17 +50,17 @@ class PoseService:
 		self._audit_events: dict[str, PoseAuditEvent] = {}
 		# Additional in-memory stores for new methods
 		self._skeletal_tracks: dict[str, list[dict[str, Any]]] = {}
-		self._action_events: dict[str, dict[str, Any]] = {}
-		self._gesture_events: dict[str, dict[str, Any]] = {}
-		self._fall_events: dict[str, dict[str, Any]] = {}
-		self._gait_records: dict[str, dict[str, Any]] = {}
-		self._comparison_records: dict[str, dict[str, Any]] = {}
-		self._rep_counters: dict[str, dict[str, Any]] = {}
-		self._ergonomics_reports: dict[str, dict[str, Any]] = {}
-		self._export_jobs: dict[str, dict[str, Any]] = {}
-		self._annotation_store: dict[str, dict[str, Any]] = {}
-		self._analytics_cache: dict[str, dict[str, Any]] = {}
-		self._benchmark_records: dict[str, dict[str, Any]] = {}
+		self._action_events = WriteThruDict('action_events', tenant_id, _store)
+		self._gesture_events = WriteThruDict('gesture_events', tenant_id, _store)
+		self._fall_events = WriteThruDict('fall_events', tenant_id, _store)
+		self._gait_records = WriteThruDict('gait_records', tenant_id, _store)
+		self._comparison_records = WriteThruDict('comparison_records', tenant_id, _store)
+		self._rep_counters = WriteThruDict('rep_counters', tenant_id, _store)
+		self._ergonomics_reports = WriteThruDict('ergonomics_reports', tenant_id, _store)
+		self._export_jobs = WriteThruDict('export_jobs', tenant_id, _store)
+		self._annotation_store = WriteThruDict('annotation_store', tenant_id, _store)
+		self._analytics_cache = WriteThruDict('analytics_cache', tenant_id, _store)
+		self._benchmark_records = WriteThruDict('benchmark_records', tenant_id, _store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -2272,3 +2275,11 @@ def _weighted_keypoint_consensus(name, candidates, iqr_factor=1.5):
 		"confidence": round(wc, 4),
 		"visibility": round(_mean(c.get("visibility", 1.0) for c in candidates), 4),
 	}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_action_events', '_gesture_events', '_fall_events', '_gait_records', '_comparison_records', '_rep_counters', '_ergonomics_reports', '_export_jobs', '_annotation_store', '_analytics_cache', '_benchmark_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

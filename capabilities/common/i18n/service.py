@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import json
 import re
 from itertools import count
@@ -44,12 +47,12 @@ class I18nService:
 		self._audit_events: dict[str, I18nAuditEvent] = {}
 		# extra in-memory stores for new methods
 		self._translation_versions: dict[str, list[dict[str, Any]]] = {}
-		self._machine_translation_jobs: dict[str, dict[str, Any]] = {}
-		self._plural_rules: dict[str, dict[str, Any]] = {}
-		self._font_hints: dict[str, dict[str, Any]] = {}
+		self._machine_translation_jobs = WriteThruDict('machine_translation_jobs', tenant_id, _store)
+		self._plural_rules = WriteThruDict('plural_rules', tenant_id, _store)
+		self._font_hints = WriteThruDict('font_hints', tenant_id, _store)
 		self._locale_analytics: dict[str, list[dict[str, Any]]] = {}
-		self._export_jobs: dict[str, dict[str, Any]] = {}
-		self._review_assignments: dict[str, dict[str, Any]] = {}
+		self._export_jobs = WriteThruDict('export_jobs', tenant_id, _store)
+		self._review_assignments = WriteThruDict('review_assignments', tenant_id, _store)
 		self._counter = count(1)
 		self._fallback_resolver = LocaleFallbackResolver()
 		self._memory_matcher = TranslationMemoryMatcher()
@@ -1127,3 +1130,11 @@ def _month_name(n: int) -> str:
 
 def _month_abbr(n: int) -> str:
 	return _month_name(n)[:3]
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_machine_translation_jobs', '_plural_rules', '_font_hints', '_export_jobs', '_review_assignments']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

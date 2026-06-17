@@ -1,6 +1,9 @@
 """Land Registry — async service implementation."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import logging
@@ -59,8 +62,9 @@ CAUTION_DEFAULT_EXPIRY_DAYS = 60
 class LandRegistryService:
 	"""Async Land Registry capability service."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.parcels: dict[str, dict[str, Any]] = {}
 		self.titles: dict[str, dict[str, Any]] = {}
 		self.transfers: dict[str, dict[str, Any]] = {}
@@ -80,7 +84,7 @@ class LandRegistryService:
 		self.spousal_consents: dict[str, dict[str, Any]] = {}
 		self.escalations: dict[str, dict[str, Any]] = {}
 		self.title_certificates: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -1826,3 +1830,11 @@ class LandRegistryService:
 			deepcopy(p) for p in self.survey_plans.values()
 			if p["tenant_id"] == tenant and p["parcel_id"] == parcel_id
 		]
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -5,6 +5,9 @@ cancellations, reinstatements and document generation.
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from copy import deepcopy
 from datetime import date, datetime
@@ -36,15 +39,16 @@ SUPPORTED_PRODUCT_CODES = {
 class PolicyAdministrationService:
 	"""In-memory executable service for the Policy Administration lifecycle."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.policies: dict[str, dict[str, Any]] = {}
 		self.endorsements: dict[str, dict[str, Any]] = {}
 		self.renewals: dict[str, dict[str, Any]] = {}
 		self.cancellations: dict[str, dict[str, Any]] = {}
 		self.reinstatements: dict[str, dict[str, Any]] = {}
 		self.documents: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -577,3 +581,11 @@ class PolicyAdministrationService:
 				_log.error("Bulk policy issuance failed for %s: %s", pol_data.get("policy_number"), exc)
 				errors.append({"input": pol_data, "error": str(exc)})
 		return {"processed": len(results), "failed": len(errors), "policies": results, "errors": errors}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

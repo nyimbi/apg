@@ -1,6 +1,9 @@
 """Employee Self-Service async service."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -39,8 +42,9 @@ DEFAULT_EXPENSE_LIMITS: dict[str, float] = {
 class ESSService:
 	"""Employee Self-Service — leave, payslips, expenses, benefits, training, personal data."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.leave_requests: dict[str, dict[str, Any]] = {}
 		self.payslips: dict[str, dict[str, Any]] = {}
 		self.personal_data: dict[str, dict[str, Any]] = {}
@@ -48,7 +52,7 @@ class ESSService:
 		self.benefit_enrolments: dict[str, dict[str, Any]] = {}
 		self.training_registrations: dict[str, dict[str, Any]] = {}
 		self.leave_balances: dict[str, dict[str, float]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# Stores for world-class features
 		self.toil_records: dict[str, dict[str, Any]] = {}
 		self.certificates: dict[str, list[dict[str, Any]]] = {}  # key: "<tenant>:<employee_id>"
@@ -1351,3 +1355,11 @@ class ESSService:
 			employee_id, event_type, channels,
 		)
 		return notification
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

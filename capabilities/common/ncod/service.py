@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio as _asyncio
 import json as _json
 from decimal import Decimal as _Decimal
@@ -1246,7 +1249,7 @@ class NcodService:
 			"resource_counts": counts, "snapshot_at": utc_now_iso(), "body": body,
 		}
 		if not hasattr(self, "_snapshots"):
-			self._snapshots: dict[str, dict[str, Any]] = {}
+			self._snapshots = WriteThruDict('snapshots', tenant_id, _store)
 		self._snapshots[snapshot_id] = manifest
 		self._audit(tenant_id, "app_snapshot_created", snapshot_id, f"Snapshot: {manifest['label']}")
 		return {k: v for k, v in manifest.items() if k != "body"}
@@ -1556,7 +1559,7 @@ class NcodService:
 		overlap = set(roles_allowed) & set(roles_denied or [])
 		assert not overlap, f"roles in both allowed and denied: {overlap}"
 		if not hasattr(self, "_page_permissions"):
-			self._page_permissions: dict[str, dict[str, Any]] = {}
+			self._page_permissions = WriteThruDict('page_permissions', tenant_id, _store)
 		record: dict[str, Any] = {
 			"page_id": page_id,
 			"app_id": page.app_id,
@@ -1595,9 +1598,9 @@ class NcodService:
 		assert event_types, "event_types must be non-empty"
 		assert 0 < retry_limit <= 10, "retry_limit must be 1-10"
 		if not hasattr(self, "_webhooks"):
-			self._webhooks: dict[str, dict[str, Any]] = {}
+			self._webhooks = WriteThruDict('webhooks', tenant_id, _store)
 		if not hasattr(self, "_webhook_queue"):
-			self._webhook_queue: list[dict[str, Any]] = []
+			self._webhook_queue = WriteThruList('webhook_queue', tenant_id, _store)
 		if not hasattr(self, "_webhook_secrets"):
 			self._webhook_secrets: dict[str, str] = {}
 		self._webhook_secrets[webhook_id] = secret
@@ -1643,7 +1646,7 @@ class NcodService:
 		assert policy_ref.strip(), "policy_ref required for federation"
 		normalized_route = normalize_route(mount_route)
 		if not hasattr(self, "_federated_mounts"):
-			self._federated_mounts: dict[str, dict[str, Any]] = {}
+			self._federated_mounts = WriteThruDict('federated_mounts', tenant_id, _store)
 		mount_key = stable_id("ncodfed", tenant_id, host_app_id, remote_app_id, normalized_route)
 		record: dict[str, Any] = {
 			"mount_id": mount_key,
@@ -2005,3 +2008,11 @@ class NcodService:
 			"tabs": tabs, "tab_count": len(tabs),
 			"generated_at": utc_now_iso(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_snapshots', '_page_permissions', '_webhooks', '_federated_mounts', '_webhook_queue']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

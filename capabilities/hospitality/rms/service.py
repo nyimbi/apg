@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from copy import deepcopy
 from datetime import datetime
@@ -34,8 +37,9 @@ _DEMAND_MULTIPLIERS = {
 class RMSService:
 	"""Revenue Management & Rates service."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.rate_plans: dict[str, dict[str, Any]] = {}
 		self.demand_forecasts: dict[str, dict[str, Any]] = {}
 		self.competitor_rates: dict[str, dict[str, Any]] = {}
@@ -44,7 +48,7 @@ class RMSService:
 		self.price_overrides: dict[str, dict[str, Any]] = {}
 		self.seasonal_rules: dict[str, dict[str, Any]] = {}
 		self.revenue_targets: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _tenant(self, tenant_id: str | None = None) -> str:
 		value = tenant_id or self.tenant_id
@@ -542,3 +546,11 @@ class RMSService:
 			"yield_reports": len([r for r in self.yield_reports.values() if r["tenant_id"] == tenant]),
 			"generated_at": _now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

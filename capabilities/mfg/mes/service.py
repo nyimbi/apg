@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timezone
 from typing import Any
 
@@ -26,13 +29,13 @@ def _now() -> str:
 class MfgMesService:
 	"""Manufacturing Execution System service — async, in-memory store."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
-		self._work_orders: dict[str, dict[str, Any]] = {}
-		self._production_events: dict[str, dict[str, Any]] = {}
-		self._downtime_records: dict[str, dict[str, Any]] = {}
-		self._resource_statuses: dict[str, dict[str, Any]] = {}
-		self._oee_records: dict[str, dict[str, Any]] = {}
+		self._work_orders = WriteThruDict('work_orders', tenant_id, _store)
+		self._production_events = WriteThruDict('production_events', tenant_id, _store)
+		self._downtime_records = WriteThruDict('downtime_records', tenant_id, _store)
+		self._resource_statuses = WriteThruDict('resource_statuses', tenant_id, _store)
+		self._oee_records = WriteThruDict('oee_records', tenant_id, _store)
 
 	# ------------------------------------------------------------------ #
 	# Work Orders
@@ -370,3 +373,11 @@ class MfgMesService:
 			},
 			"oee": {"records": len(oee_recs), "average": avg_oee},
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_work_orders', '_production_events', '_downtime_records', '_resource_statuses', '_oee_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

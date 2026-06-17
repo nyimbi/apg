@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import math
 import re
 from collections import Counter
@@ -48,8 +51,8 @@ class SrchService:
 		# Extended stores
 		self._synonyms: dict[str, list[list[str]]] = {}        # collection -> synonym groups
 		self._boost_fields: dict[str, dict[str, float]] = {}   # collection -> {field: boost}
-		self._mappings: dict[str, dict[str, Any]] = {}         # collection -> field configs
-		self._webhooks: dict[str, dict[str, Any]] = {}         # not used here — placeholder
+		self._mappings = WriteThruDict('mappings', tenant_id, _store)         # collection -> field configs
+		self._webhooks = WriteThruDict('webhooks', tenant_id, _store)         # not used here — placeholder
 
 	# ── capability contract ────────────────────────────────────────────────────
 
@@ -989,4 +992,11 @@ def _combine_rule_results(*results: dict[str, Any]) -> dict[str, Any]:
 			return {"relevance_score": round(result.score,3), "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_mappings', '_webhooks']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

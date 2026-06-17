@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -65,7 +68,7 @@ class PatientManagementService:
 		self._appointments: dict[tuple[str, str], AppointmentResponse] = {}
 		self._insurance: dict[tuple[str, str], InsuranceResponse] = {}
 		self._mrn_counter: dict[str, int] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# Extended stores
 		self._transfers: dict[tuple[str, str], dict[str, Any]] = {}
 		self._bills: dict[tuple[str, str], dict[str, Any]] = {}
@@ -2025,4 +2028,11 @@ def _compute_match_score(
 			return {"fraud_score": round(result.score,3), "flags": result.factors, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

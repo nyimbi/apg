@@ -1,6 +1,9 @@
 """Process Mining service — BPMN inference from NATS events, conformance checking, bottleneck analysis, variant discovery."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import collections
 import logging
@@ -23,8 +26,9 @@ SUPPORTED_ALGORITHMS = {"alpha_miner", "heuristics_miner", "inductive_miner", "d
 class ProcessMiningService:
 	"""Infer BPMN process models from NATS event streams, conformance checking, bottleneck analysis, variant discovery."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.event_logs: dict[str, dict[str, Any]] = {}
 		self.raw_events: dict[str, list[dict[str, Any]]] = {}  # event_log_id -> events
 		self.bpmn_models: dict[str, dict[str, Any]] = {}
@@ -32,7 +36,7 @@ class ProcessMiningService:
 		self.bottleneck_reports: dict[str, dict[str, Any]] = {}
 		self.variant_analyses: dict[str, dict[str, Any]] = {}
 		self.simulations: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _tenant(self, tenant_id: str | None = None) -> str:
 		value = tenant_id or self.tenant_id
@@ -1688,3 +1692,11 @@ class ProcessMiningService:
 			"result": result,
 			"generated_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

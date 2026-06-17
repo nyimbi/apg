@@ -8,6 +8,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
 
 try:
 	from .capability_contract import (
@@ -76,7 +78,7 @@ class TransportSchedulingService:
 		self._auth = auth
 		self._audit_adapter = audit
 		self._notify = notify
-		self._store = store
+		self._store = store or get_store(db_url)
 		self.schedules: dict[tuple[str, str], Schedule] = {}
 		self.shifts: dict[tuple[str, str], DriverShift] = {}
 		self.vehicle_assignments: dict[tuple[str, str], VehicleAssignment] = {}
@@ -84,7 +86,7 @@ class TransportSchedulingService:
 		self.conflicts: dict[tuple[str, str], ScheduleConflict] = {}
 		self.notifications: dict[tuple[str, str], ScheduleNotification] = {}
 		self.agents: dict[tuple[str, str], SchedulingAgent] = {}
-		self.audit_events: list[dict[str, Any]] = []
+		self.audit_events = WriteThruList('audit_events', tenant_id, self._store)
 		# Extended state
 		self.disruptions: dict[tuple[str, str], dict[str, Any]] = {}
 		self.capacity_plans: dict[tuple[str, str], dict[str, Any]] = {}
@@ -1800,6 +1802,14 @@ class TransportSchedulingService:
 			"audit_events_by_type": audit_by_type,
 			"generated_at": _now_iso(),
 		}
+
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 
 
 TransportSchService = TransportSchedulingService

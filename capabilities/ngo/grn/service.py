@@ -1,6 +1,9 @@
 """Grant Management Service — grant pipeline, proposals, budgets, disbursements, compliance."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -24,15 +27,16 @@ SUPPORTED_PAYMENT_METHODS = {"bank_transfer", "cheque", "mpesa", "swift", "eft"}
 class GrantManagementService:
 	"""Async service for NGO grant lifecycle management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
-		self._grants: dict[str, dict[str, Any]] = {}
-		self._proposals: dict[str, dict[str, Any]] = {}
-		self._budget_lines: dict[str, dict[str, Any]] = {}
-		self._disbursements: dict[str, dict[str, Any]] = {}
-		self._compliance_reports: dict[str, dict[str, Any]] = {}
-		self._audit_findings: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._grants = WriteThruDict('grants', tenant_id, _store)
+		self._proposals = WriteThruDict('proposals', tenant_id, _store)
+		self._budget_lines = WriteThruDict('budget_lines', tenant_id, _store)
+		self._disbursements = WriteThruDict('disbursements', tenant_id, _store)
+		self._compliance_reports = WriteThruDict('compliance_reports', tenant_id, _store)
+		self._audit_findings = WriteThruDict('audit_findings', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── helpers ──────────────────────────────────────────────────────────────
 
@@ -629,3 +633,11 @@ class GrantManagementService:
 			"currency": grant["currency"],
 			"generated_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_grants', '_proposals', '_budget_lines', '_disbursements', '_compliance_reports', '_audit_findings', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

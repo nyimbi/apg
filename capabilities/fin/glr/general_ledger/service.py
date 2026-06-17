@@ -9,6 +9,9 @@ Invariant: every posted journal satisfies sum(debits) == sum(credits).
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import csv
 import io
 from copy import deepcopy
@@ -74,8 +77,9 @@ class GeneralLedgerService:
 	# Construction
 	# ------------------------------------------------------------------
 
-	def __init__(self, tenant_id: str | None = None, user_id: str | None = None) -> None:
+	def __init__(self, tenant_id: str | None = None, user_id: str | None = None, db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.user_id = user_id
 		# Core stores
 		self.accounts: dict[str, dict[str, Any]] = {}
@@ -96,7 +100,7 @@ class GeneralLedgerService:
 		self.intercompany_journals: dict[str, dict[str, Any]] = {}
 		self.approval_workflows: dict[str, dict[str, Any]] = {}
 		# Infrastructure
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		self._idempotency_keys: set[str] = set()
 
 	# ------------------------------------------------------------------
@@ -4221,3 +4225,11 @@ class TrialBalanceParams:
 	include_zero_balances: bool = False
 	currency: str = "functional"
 	as_of_date: object = None
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -1,6 +1,9 @@
 """Agricultural Credit Scoring service — agr_crd."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -36,16 +39,17 @@ class AgriCreditService:
 	"""Async service for agricultural credit: yield-based scoring, seasonal loans,
 	group lending, and collateral registry."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		if not tenant_id:
 			raise ValueError("tenant_id required")
 		self.tenant_id = tenant_id
-		self._profiles: dict[str, dict[str, Any]] = {}
-		self._loans: dict[str, dict[str, Any]] = {}
-		self._collateral: dict[str, dict[str, Any]] = {}
-		self._groups: dict[str, dict[str, Any]] = {}
+		_store = get_store(db_url)
+		self._profiles = WriteThruDict('profiles', tenant_id, _store)
+		self._loans = WriteThruDict('loans', tenant_id, _store)
+		self._collateral = WriteThruDict('collateral', tenant_id, _store)
+		self._groups = WriteThruDict('groups', tenant_id, _store)
 		self._repayments: dict[str, list[dict[str, Any]]] = {}
-		self._audit: list[dict[str, Any]] = []
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	def _emit(self, event_type: str, entity_type: str, entity_id: str, payload: dict[str, Any]) -> None:
 		self._audit.append({
@@ -443,3 +447,11 @@ class AgriCreditService:
 			"default_rate_pct": round(defaulted / total_disbursed * 100, 2) if total_disbursed > 0 else 0,
 			"group_loans": len(self._groups),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_profiles', '_loans', '_collateral', '_groups', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

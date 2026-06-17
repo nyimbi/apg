@@ -8,6 +8,9 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
 from __future__ import annotations
+
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 from collections import defaultdict
@@ -84,7 +87,7 @@ class _MemStore:
 	"""Trivial in-process store used when no external store is supplied."""
 
 	def __init__(self) -> None:
-		self._data: dict[str, dict[str, Any]] = {}
+		self._data = WriteThruDict('data', tenant_id, _store)
 
 	async def get(self, key: str) -> dict[str, Any] | None:
 		return self._data.get(key)
@@ -175,6 +178,7 @@ class TelecomBillingService:
 	) -> None:
 		assert _present(tenant_id), "tenant_id must not be blank"
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth or _NoopAuth()
 		self._audit = audit or _NoopAudit()
@@ -195,13 +199,13 @@ class TelecomBillingService:
 
 		# Extended in-memory collections for new methods
 		self._balances: dict[str, dict[str, Decimal]] = defaultdict(lambda: defaultdict(Decimal))
-		self._bundles: dict[str, dict[str, Any]] = {}      # bundle_id -> bundle record
-		self._promotions: dict[str, dict[str, Any]] = {}  # promo_code -> promo record
-		self._disputes: dict[str, dict[str, Any]] = {}    # dispute_id -> dispute record
+		self._bundles = WriteThruDict('bundles', tenant_id, _store)      # bundle_id -> bundle record
+		self._promotions = WriteThruDict('promotions', tenant_id, _store)  # promo_code -> promo record
+		self._disputes = WriteThruDict('disputes', tenant_id, _store)    # dispute_id -> dispute record
 		self._adjustments: dict[str, list[dict[str, Any]]] = defaultdict(list)  # invoice_id
 		self._suspended_accounts: set[str] = set()
-		self._bill_runs: dict[str, dict[str, Any]] = {}   # run_id
-		self._revenue_leakage_log: list[dict[str, Any]] = []
+		self._bill_runs = WriteThruDict('bill_runs', tenant_id, _store)   # run_id
+		self._revenue_leakage_log = WriteThruList('revenue_leakage_log', tenant_id, _store)
 
 	# -----------------------------------------------------------------------
 	# Contract / policy helpers
@@ -2175,4 +2179,11 @@ class TelecomBilService(TelecomBillingService):
 			return {"anomaly_score": round(result.score,3), "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_data', '_bundles', '_promotions', '_disputes', '_bill_runs', '_revenue_leakage_log']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

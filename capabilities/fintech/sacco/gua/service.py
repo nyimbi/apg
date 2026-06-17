@@ -12,6 +12,9 @@ Business rules:
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from copy import deepcopy
 from datetime import datetime
@@ -35,15 +38,16 @@ AT_RISK_DPD_THRESHOLD: int = 30
 class GuarantorService:
 	"""Async service for SACCO guarantor management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		# in-memory stores (replace with DB adapters in production)
-		self._requests: dict[str, dict[str, Any]] = {}
-		self._guarantees: dict[str, dict[str, Any]] = {}
-		self._exposure_overrides: dict[str, dict[str, Any]] = {}   # member_id → override
-		self._gl_entries: list[dict[str, Any]] = []
-		self._notices: list[dict[str, Any]] = []
-		self._audit: list[dict[str, Any]] = []
+		self._requests = WriteThruDict('requests', tenant_id, _store)
+		self._guarantees = WriteThruDict('guarantees', tenant_id, _store)
+		self._exposure_overrides = WriteThruDict('exposure_overrides', tenant_id, _store)   # member_id → override
+		self._gl_entries = WriteThruList('gl_entries', tenant_id, _store)
+		self._notices = WriteThruList('notices', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 		# injected member/loan context (populated by caller or APG composition)
 		self._member_savings: dict[str, Decimal] = {}   # member_id → free savings
 		self._member_shares: dict[str, Decimal] = {}    # member_id → share capital
@@ -709,3 +713,11 @@ class GuarantorService:
 			"total_gl_entries": len(self._gl_entries),
 			"checked_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_requests', '_guarantees', '_exposure_overrides', '_gl_entries', '_notices', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

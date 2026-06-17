@@ -1,6 +1,9 @@
 """Agri-Marketplace service — agr_mkt."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -25,16 +28,17 @@ class AgriMarketplaceService:
 	"""Async service for agri-marketplace: farmer produce listing, buyer matching,
 	price discovery, escrow, and auction management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		if not tenant_id:
 			raise ValueError("tenant_id required")
 		self.tenant_id = tenant_id
-		self._listings: dict[str, dict[str, Any]] = {}
-		self._bids: dict[str, dict[str, Any]] = {}
-		self._escrows: dict[str, dict[str, Any]] = {}
-		self._auctions: dict[str, dict[str, Any]] = {}
+		_store = get_store(db_url)
+		self._listings = WriteThruDict('listings', tenant_id, _store)
+		self._bids = WriteThruDict('bids', tenant_id, _store)
+		self._escrows = WriteThruDict('escrows', tenant_id, _store)
+		self._auctions = WriteThruDict('auctions', tenant_id, _store)
 		self._auction_bids: dict[str, list[dict[str, Any]]] = {}
-		self._audit: list[dict[str, Any]] = []
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	def _emit(self, event_type: str, entity_type: str, entity_id: str, payload: dict[str, Any]) -> None:
 		self._audit.append({
@@ -470,3 +474,11 @@ class AgriMarketplaceService:
 			"funded_escrows": len([e for e in self._escrows.values() if e.get("status") == "funded"]),
 			"total_accepted_value": round(total_value, 2),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_listings', '_bids', '_escrows', '_auctions', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

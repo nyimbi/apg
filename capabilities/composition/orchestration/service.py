@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import statistics
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -28,17 +31,17 @@ class WorkflowOrchestrationService:
 	"""Tenant-scoped workflow definition, release, and execution coordinator."""
 
 	def __init__(self) -> None:
-		self._definitions: dict[str, dict[str, Any]] = {}
-		self._tasks: dict[str, dict[str, Any]] = {}
-		self._releases: dict[str, dict[str, Any]] = {}
-		self._executions: dict[str, dict[str, Any]] = {}
-		self._agents: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._definitions = WriteThruDict('definitions', tenant_id, _store)
+		self._tasks = WriteThruDict('tasks', tenant_id, _store)
+		self._releases = WriteThruDict('releases', tenant_id, _store)
+		self._executions = WriteThruDict('executions', tenant_id, _store)
+		self._agents = WriteThruDict('agents', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# new collections
 		self._signals: dict[str, list[dict[str, Any]]] = {}   # execution_id -> signal queue
 		self._compensations: dict[str, list[dict[str, Any]]] = {}  # execution_id -> compensation log
-		self._suspended: dict[str, dict[str, Any]] = {}  # execution_id -> suspension record
-		self._instance_variables: dict[str, dict[str, Any]] = {}  # execution_id -> variables
+		self._suspended = WriteThruDict('suspended', tenant_id, _store)  # execution_id -> suspension record
+		self._instance_variables = WriteThruDict('instance_variables', tenant_id, _store)  # execution_id -> variables
 
 	# ------------------------------------------------------------------ existing
 
@@ -873,7 +876,7 @@ class WorkflowOrchestrationService:
 			"snapshotted_at": self._now(),
 		}
 		if not hasattr(self, "_snapshots"):
-			self._snapshots: dict[str, dict[str, Any]] = {}
+			self._snapshots = WriteThruDict('snapshots', tenant_id, _store)
 		self._snapshots[snapshot_id] = snapshot
 		execution["snapshot_id"] = snapshot_id
 		execution["last_snapshotted_at"] = snapshot["snapshotted_at"]
@@ -1206,7 +1209,7 @@ class WorkflowOrchestrationService:
 		assert max_starts_per_minute >= 0, "max_starts_per_minute must be non-negative"
 		assert bool(admin_id), "admin_id required"
 		if not hasattr(self, "_execution_quotas"):
-			self._execution_quotas: dict[str, dict[str, Any]] = {}
+			self._execution_quotas = WriteThruDict('execution_quotas', tenant_id, _store)
 		quota = self._execution_quotas.setdefault(tenant_id, {})
 		quota.update({
 			"tenant_id": tenant_id,
@@ -1378,3 +1381,11 @@ class NativeWorkflowService:
 				task_id = task.get("id", "")
 				if task_id not in instance.completed_tasks:
 					instance.failed_tasks.append(task_id)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_definitions', '_tasks', '_releases', '_executions', '_agents', '_suspended', '_instance_variables', '_snapshots', '_execution_quotas', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -1,6 +1,9 @@
 """Donor Relationship Management Service — registry, communications, pledges, receipts, stewardship."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -26,14 +29,15 @@ SUPPORTED_PAYMENT_METHODS = {"bank_transfer", "cheque", "mpesa", "swift", "eft",
 class DonorRelationshipService:
 	"""Async service for NGO donor relationship management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
-		self._donors: dict[str, dict[str, Any]] = {}
-		self._communications: dict[str, dict[str, Any]] = {}
-		self._pledges: dict[str, dict[str, Any]] = {}
-		self._receipts: dict[str, dict[str, Any]] = {}
-		self._stewardship_plans: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._donors = WriteThruDict('donors', tenant_id, _store)
+		self._communications = WriteThruDict('communications', tenant_id, _store)
+		self._pledges = WriteThruDict('pledges', tenant_id, _store)
+		self._receipts = WriteThruDict('receipts', tenant_id, _store)
+		self._stewardship_plans = WriteThruDict('stewardship_plans', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		self._receipt_seq: int = 0
 
 	# ── helpers ───────────────────────────────────────────────────────────────
@@ -557,3 +561,11 @@ class DonorRelationshipService:
 			deepcopy(p) for p in self._pledges.values()
 			if p["tenant_id"] == tenant and p["status"] == "open" and p["due_date"] < today
 		]
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_donors', '_communications', '_pledges', '_receipts', '_stewardship_plans', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

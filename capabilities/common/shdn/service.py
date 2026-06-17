@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from typing import Any
 
 from .capability_contract import (
@@ -43,20 +46,20 @@ class ShdnService:
 		self.audit_events: dict[str, LifecycleAuditEventRecord] = {}
 		self.shdn_agents: dict[str, ShdnAgentRecord] = {}
 		# Additional in-memory stores for new methods
-		self._maintenance_windows: dict[str, dict[str, Any]] = {}
-		self._restart_records: dict[str, dict[str, Any]] = {}
-		self._checkpoint_store: dict[str, dict[str, Any]] = {}
-		self._notification_log: dict[str, dict[str, Any]] = {}
-		self._rollback_records: dict[str, dict[str, Any]] = {}
-		self._queue_drain_records: dict[str, dict[str, Any]] = {}
-		self._connection_close_records: dict[str, dict[str, Any]] = {}
-		self._shutdown_reports: dict[str, dict[str, Any]] = {}
-		self._analytics_cache: dict[str, dict[str, Any]] = {}
-		self._inflight_records: dict[str, dict[str, Any]] = {}
-		self._emergency_stop_records: dict[str, dict[str, Any]] = {}
-		self._health_final_records: dict[str, dict[str, Any]] = {}
-		self._service_drain_records: dict[str, dict[str, Any]] = {}
-		self._dependency_notify_records: dict[str, dict[str, Any]] = {}
+		self._maintenance_windows = WriteThruDict('maintenance_windows', tenant_id, _store)
+		self._restart_records = WriteThruDict('restart_records', tenant_id, _store)
+		self._checkpoint_store = WriteThruDict('checkpoint_store', tenant_id, _store)
+		self._notification_log = WriteThruDict('notification_log', tenant_id, _store)
+		self._rollback_records = WriteThruDict('rollback_records', tenant_id, _store)
+		self._queue_drain_records = WriteThruDict('queue_drain_records', tenant_id, _store)
+		self._connection_close_records = WriteThruDict('connection_close_records', tenant_id, _store)
+		self._shutdown_reports = WriteThruDict('shutdown_reports', tenant_id, _store)
+		self._analytics_cache = WriteThruDict('analytics_cache', tenant_id, _store)
+		self._inflight_records = WriteThruDict('inflight_records', tenant_id, _store)
+		self._emergency_stop_records = WriteThruDict('emergency_stop_records', tenant_id, _store)
+		self._health_final_records = WriteThruDict('health_final_records', tenant_id, _store)
+		self._service_drain_records = WriteThruDict('service_drain_records', tenant_id, _store)
+		self._dependency_notify_records = WriteThruDict('dependency_notify_records', tenant_id, _store)
 
 	# ------------------------------------------------------------------ #
 	# Original 22 methods                                                  #
@@ -1180,7 +1183,7 @@ class ShdnService:
 			"created_at": utc_now(),
 		}
 		if not hasattr(self, "_shutdown_budgets"):
-			self._shutdown_budgets: dict[str, dict[str, Any]] = {}
+			self._shutdown_budgets = WriteThruDict('shutdown_budgets', tenant_id, _store)
 		self._shutdown_budgets[record_id] = record
 		self._record_event(
 			tenant_id, "shutdown_budget_set", record_id,
@@ -1222,7 +1225,7 @@ class ShdnService:
 			"anchored_at": utc_now(),
 		}
 		if not hasattr(self, "_audit_anchors"):
-			self._audit_anchors: dict[str, dict[str, Any]] = {}
+			self._audit_anchors = WriteThruDict('audit_anchors', tenant_id, _store)
 		self._audit_anchors[anchor_id] = record
 		self._record_event(
 			tenant_id, "audit_chain_anchored", anchor_id,
@@ -1314,7 +1317,7 @@ class ShdnService:
 			"tested_at": utc_now(),
 		}
 		if not hasattr(self, "_canary_tests"):
-			self._canary_tests: dict[str, dict[str, Any]] = {}
+			self._canary_tests = WriteThruDict('canary_tests', tenant_id, _store)
 		self._canary_tests[record_id] = record
 		self._record_event(
 			tenant_id, "canary_shutdown_tested", record_id,
@@ -1356,7 +1359,7 @@ class ShdnService:
 			"bound_at": utc_now(),
 		}
 		if not hasattr(self, "_capability_adapter_bindings"):
-			self._capability_adapter_bindings: dict[str, dict[str, Any]] = {}
+			self._capability_adapter_bindings = WriteThruDict('capability_adapter_bindings', tenant_id, _store)
 		self._capability_adapter_bindings[record_id] = record
 		self._record_event(
 			tenant_id, "capability_bound", record_id,
@@ -1442,3 +1445,11 @@ class ShdnService:
 
 	def _normalize_token(self, value: str) -> str:
 		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_maintenance_windows', '_restart_records', '_checkpoint_store', '_notification_log', '_rollback_records', '_queue_drain_records', '_connection_close_records', '_shutdown_reports', '_analytics_cache', '_inflight_records', '_emergency_stop_records', '_health_final_records', '_service_drain_records', '_dependency_notify_records', '_shutdown_budgets', '_audit_anchors', '_canary_tests', '_capability_adapter_bindings']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

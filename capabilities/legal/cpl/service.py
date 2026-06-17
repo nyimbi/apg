@@ -1,6 +1,9 @@
 """Legal Compliance Management — async service layer."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import csv
 import hashlib
@@ -31,8 +34,9 @@ CATEGORIES = {
 class LegalComplianceService:
 	"""In-memory async service for regulatory compliance management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.requirements: dict[str, dict[str, Any]] = {}
 		self.calendar_entries: dict[str, dict[str, Any]] = {}
 		self.evidence: dict[str, dict[str, Any]] = {}
@@ -43,8 +47,8 @@ class LegalComplianceService:
 		self.regulator_comms: dict[str, dict[str, Any]] = {}  # I11: regulator communication log
 		self.cost_entries: dict[str, dict[str, Any]] = {}     # I12: compliance cost tracking
 		self.attestations: dict[str, dict[str, Any]] = {}     # I15: attestation workflow
-		self._score_snapshots: dict[str, dict[str, Any]] = {} # I4: compliance trend history
-		self._audit_events: list[dict[str, Any]] = []
+		self._score_snapshots = WriteThruDict('score_snapshots', tenant_id, _store) # I4: compliance trend history
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -1111,3 +1115,11 @@ class LegalComplianceService:
 		})
 		_log.info("requirement reassigned tenant=%s id=%s from=%s to=%s", tenant, requirement_id, old_owner, new_owner_id)
 		return deepcopy(r)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_score_snapshots', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

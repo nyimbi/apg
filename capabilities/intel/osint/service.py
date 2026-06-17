@@ -12,6 +12,9 @@ Usage:
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 from datetime import datetime, timezone
@@ -197,7 +200,7 @@ class OSINTService:
 		self._dissemination: dict[tuple[str, str], DisseminationPackageResponse] = {}
 		self._reviews: dict[tuple[str, str], OSINTReviewResponse] = {}
 		self._agents: dict[tuple[str, str], OSINTAgentResponse] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 		# Fingerprint index for deduplication (tenant_id -> set of fingerprints)
 		self._fingerprints: dict[str, set[str]] = {}
@@ -2694,3 +2697,11 @@ class OpenSourceIntelligenceService(OSINTService):
 	def dashboard_summary(self, tenant_id: str | None = None) -> dict:  # type: ignore[override]
 		"""Legacy sync dashboard_summary."""
 		return self._sync_dashboard_summary(tenant_id)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

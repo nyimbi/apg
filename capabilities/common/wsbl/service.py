@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from typing import Any
 
 from .capability_contract import (
@@ -39,15 +42,15 @@ class WsblService:
 		self._audit_events: list[WebsiteAuditEventRecord] = []
 		# ── WebSocket Broker state ─────────────────────────────────────────────
 		# keyed by "tenant_id:connection_id"
-		self._connections: dict[str, dict[str, Any]] = {}
+		self._connections = WriteThruDict('connections', tenant_id, _store)
 		# keyed by "tenant_id:room_id"
-		self._rooms: dict[str, dict[str, Any]] = {}
+		self._rooms = WriteThruDict('rooms', tenant_id, _store)
 		# keyed by "tenant_id:connection_id"
-		self._presence: dict[str, dict[str, Any]] = {}
+		self._presence = WriteThruDict('presence', tenant_id, _store)
 		# keyed by session_id
-		self._ws_sessions: dict[str, dict[str, Any]] = {}
+		self._ws_sessions = WriteThruDict('ws_sessions', tenant_id, _store)
 		# keyed by "tenant_id:component_id"
-		self._component_locks: dict[str, dict[str, Any]] = {}
+		self._component_locks = WriteThruDict('component_locks', tenant_id, _store)
 		# keyed by "tenant_id:page_id"
 		self._annotations: dict[str, list[dict[str, Any]]] = {}
 		# keyed by "tenant_id:room_id"
@@ -1456,3 +1459,11 @@ class WsblService:
 		conn = self._connections.get(conn_key)
 		if conn is not None and room_id in conn.get("rooms", []):
 			conn["rooms"].remove(room_id)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_connections', '_rooms', '_presence', '_ws_sessions', '_component_locks']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

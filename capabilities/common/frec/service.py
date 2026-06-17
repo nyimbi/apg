@@ -7,6 +7,9 @@ Copyright: © 2025 Datacraft
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import json
@@ -47,6 +50,7 @@ class FacialRecognitionService:
 		assert tenant_id, "tenant_id required"
 
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.database_service = FacialDatabaseService(database_url, encryption_key)
 		self.encryption_service = FaceTemplateEncryption(encryption_key)
 		self.version_manager = TemplateVersionManager(self.encryption_service)
@@ -61,10 +65,10 @@ class FacialRecognitionService:
 		self.liveness_threshold = 0.85
 
 		# In-process stores for lightweight objects (galleries, consents, sessions)
-		self._galleries: dict[str, dict[str, Any]] = {}
-		self._consents: dict[str, dict[str, Any]] = {}
-		self._liveness_sessions: dict[str, dict[str, Any]] = {}
-		self._audit: list[dict[str, Any]] = []
+		self._galleries = WriteThruDict('galleries', tenant_id, _store)
+		self._consents = WriteThruDict('consents', tenant_id, _store)
+		self._liveness_sessions = WriteThruDict('liveness_sessions', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 		print(f"FacialRecognitionService initialised for tenant {tenant_id}")
 
@@ -920,7 +924,7 @@ class FacialRecognitionService:
 		"""Create a named watchlist with policy binding."""
 		assert watchlist_id and name and policy_id and owner
 		if not hasattr(self, "_watchlists"):
-			self._watchlists: dict[str, dict[str, Any]] = {}
+			self._watchlists = WriteThruDict('watchlists', tenant_id, _store)
 		if watchlist_id in self._watchlists:
 			return {"success": False, "error": "watchlist_exists"}
 		self._watchlists[watchlist_id] = {
@@ -942,7 +946,7 @@ class FacialRecognitionService:
 	) -> dict[str, Any]:
 		"""Add a subject to a watchlist."""
 		if not hasattr(self, "_watchlists"):
-			self._watchlists: dict[str, dict[str, Any]] = {}
+			self._watchlists = WriteThruDict('watchlists', tenant_id, _store)
 		wl = self._watchlists.get(watchlist_id)
 		if wl is None:
 			return {"success": False, "error": "watchlist_not_found"}
@@ -966,7 +970,7 @@ class FacialRecognitionService:
 		"""1:N match of probe against a watchlist. Returns hits above the watchlist threshold."""
 		assert probe_image is not None and probe_image.size > 0
 		if not hasattr(self, "_watchlists"):
-			self._watchlists: dict[str, dict[str, Any]] = {}
+			self._watchlists = WriteThruDict('watchlists', tenant_id, _store)
 		wl = self._watchlists.get(watchlist_id)
 		if wl is None:
 			return {"success": False, "error": "watchlist_not_found"}

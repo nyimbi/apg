@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 from datetime import datetime
 from typing import Any
@@ -103,7 +106,7 @@ class MobileAppPlatformService:
 		self._biometrics: dict[tuple[str, str], BiometricEnrollmentResponse] = {}
 		self._permissions: dict[tuple[str, str], PermissionScopeResponse] = {}
 		self._analytics: dict[tuple[str, str], AppAnalyticsEventResponse] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		self._notification_counts: dict[tuple[str, str], int] = {}  # (tenant, device) -> hourly count
 
 	# -------------------------------------------------------------------------
@@ -794,3 +797,11 @@ class MobileAppPlatformService:
 			k = getattr(item, attr, "unknown")
 			counts[k] = counts.get(k, 0) + 1
 		return counts
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

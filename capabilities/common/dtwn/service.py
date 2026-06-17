@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import csv
 import io
 import json
@@ -48,15 +51,15 @@ class DtwnService:
 		self._agents: dict[str, TwinAgent] = {}
 		self._audit_events: list[TwinAuditEvent] = []
 		self._state_sequences: dict[str, int] = {}
-		self._calibration_records: dict[str, dict[str, Any]] = {}
-		self._what_if_analyses: dict[str, dict[str, Any]] = {}
+		self._calibration_records = WriteThruDict('calibration_records', tenant_id, _store)
+		self._what_if_analyses = WriteThruDict('what_if_analyses', tenant_id, _store)
 		self._event_logs: dict[str, list[dict[str, Any]]] = {}
 		self._anomaly_records: dict[str, list[dict[str, Any]]] = {}
-		self._maintenance_predictions: dict[str, dict[str, Any]] = {}
-		self._energy_optimisations: dict[str, dict[str, Any]] = {}
-		self._lifecycle_records: dict[str, dict[str, Any]] = {}
-		self._sensor_calibrations: dict[str, dict[str, Any]] = {}
-		self._optimisation_records: dict[str, dict[str, Any]] = {}
+		self._maintenance_predictions = WriteThruDict('maintenance_predictions', tenant_id, _store)
+		self._energy_optimisations = WriteThruDict('energy_optimisations', tenant_id, _store)
+		self._lifecycle_records = WriteThruDict('lifecycle_records', tenant_id, _store)
+		self._sensor_calibrations = WriteThruDict('sensor_calibrations', tenant_id, _store)
+		self._optimisation_records = WriteThruDict('optimisation_records', tenant_id, _store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -792,3 +795,11 @@ def _maintenance_actions(model_type: str, risk: float) -> list[str]:
 		base.append("prepare_contingency_plan")
 	base.append("update_maintenance_log")
 	return base
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_calibration_records', '_what_if_analyses', '_maintenance_predictions', '_energy_optimisations', '_lifecycle_records', '_sensor_calibrations', '_optimisation_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -1,6 +1,9 @@
 """Order Management & Tracking async service (scm_omt)."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -44,8 +47,9 @@ class OrderManagementService:
 	"""Async service for order lifecycle, ATP, backorder management,
 	split shipments, order promising, and customer notifications."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.orders: dict[str, dict[str, Any]] = {}
 		self.backorders: dict[str, dict[str, Any]] = {}
 		self.split_shipments: dict[str, dict[str, Any]] = {}
@@ -56,7 +60,7 @@ class OrderManagementService:
 		self.rmas: dict[str, dict[str, Any]] = {}  # return merchandise authorizations
 		self.customer_tiers: dict[str, str] = {}  # customer_id → tier
 		self._order_seq: int = 1000
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		self._idempotency_cache: dict[str, str] = {}  # key → order_id
 
 	def _now(self) -> str:
@@ -1121,3 +1125,11 @@ class OrderManagementService:
 			"shortage_quantity": max(0.0, requested_quantity - atp_at_date),
 			"checked_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

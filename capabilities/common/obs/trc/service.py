@@ -15,6 +15,9 @@ New in v1.1.0:
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 import math
@@ -59,24 +62,25 @@ def _tid() -> str:
 class DistributedTracingService:
 	"""In-memory async service for distributed tracing lifecycle."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		guard_tenant_id(tenant_id)
 		self.tenant_id = tenant_id
-		self._traces: dict[str, dict[str, Any]] = {}
-		self._spans: dict[str, dict[str, Any]] = {}
-		self._sampling_rules: dict[str, dict[str, Any]] = {}
-		self._export_configs: dict[str, dict[str, Any]] = {}
-		self._service_deps: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._traces = WriteThruDict('traces', tenant_id, _store)
+		self._spans = WriteThruDict('spans', tenant_id, _store)
+		self._sampling_rules = WriteThruDict('sampling_rules', tenant_id, _store)
+		self._export_configs = WriteThruDict('export_configs', tenant_id, _store)
+		self._service_deps = WriteThruDict('service_deps', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# v1.1 state
 		self._resource_attrs: dict[str, dict[str, str]] = {}  # service_name -> attrs
-		self._retention_policies: dict[str, dict[str, Any]] = {}  # tenant_id -> policy
+		self._retention_policies = WriteThruDict('retention_policies', tenant_id, _store)  # tenant_id -> policy
 		# adaptive sampling: per (service, operation) EMA latency stats
 		self._ema_stats: dict[str, dict[str, float]] = defaultdict(lambda: {"mean": 0.0, "var": 0.0, "n": 0})
 		# token buckets: per (tenant, service) -> {"tokens": float, "last_refill": float}
 		self._token_buckets: dict[str, dict[str, float]] = {}
 		# anomaly log
-		self._anomalies: list[dict[str, Any]] = []
+		self._anomalies = WriteThruList('anomalies', tenant_id, _store)
 		_log.info("DistributedTracingService initialised tenant=%s", self.tenant_id)
 
 	# ------------------------------------------------------------------ helpers
@@ -1249,3 +1253,11 @@ class DistributedTracingService:
 			"tenant_id": self.tenant_id,
 			"generated_at": _now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_traces', '_spans', '_sampling_rules', '_export_configs', '_service_deps', '_retention_policies', '_audit_events', '_anomalies']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -8,6 +8,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
 
 try:
 	from .capability_contract import (
@@ -91,7 +93,7 @@ class VehicleMaintenanceService:
 		self._auth = auth
 		self._audit_adapter = audit
 		self._notify = notify
-		self._store = store
+		self._store = store or get_store(db_url)
 		self.jobs: dict[tuple[str, str], MaintenanceJob] = {}
 		self.workshop_allocations: dict[tuple[str, str], WorkshopAllocation] = {}
 		self.parts_orders: dict[tuple[str, str], PartsOrder] = {}
@@ -100,10 +102,10 @@ class VehicleMaintenanceService:
 		self.roadworthiness_records: dict[tuple[str, str], RoadworthinessRecord] = {}
 		self.schedules: dict[tuple[str, str], MaintenanceSchedule] = {}
 		self.agents: dict[tuple[str, str], MaintenanceAgent] = {}
-		self.audit_events: list[dict[str, Any]] = []
+		self.audit_events = WriteThruList('audit_events', tenant_id, self._store)
 		# Extended state
 		self.tyre_records: dict[tuple[str, str], dict[str, Any]] = {}
-		self.defect_log: list[dict[str, Any]] = []
+		self.defect_log = WriteThruList('defect_log', tenant_id, self._store)
 		self.work_orders: dict[tuple[str, str], dict[str, Any]] = {}
 		self.odometer_readings: dict[str, float] = {}
 
@@ -1802,6 +1804,14 @@ class VehicleMaintenanceService:
 			"rating": "excellent" if score >= 90 else ("good" if score >= 75 else ("acceptable" if score >= 60 else "poor")),
 			"generated_at": _now_iso(),
 		}
+
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['audit_events', 'defect_log']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 
 
 TransportMaintenanceService = VehicleMaintenanceService

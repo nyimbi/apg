@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import csv
 import io
 import json
@@ -47,11 +50,11 @@ class DeplService:
 		self._rollback_events: dict[str, RollbackEvent] = {}
 		self._agents: dict[str, DeploymentAgent] = {}
 		self._audit_events: dict[str, DeploymentAuditEvent] = {}
-		self._artifacts: dict[str, dict[str, Any]] = {}
-		self._canary_states: dict[str, dict[str, Any]] = {}
-		self._change_freezes: dict[str, dict[str, Any]] = {}
-		self._dr_failovers: dict[str, dict[str, Any]] = {}
-		self._post_deploy_tests: dict[str, dict[str, Any]] = {}
+		self._artifacts = WriteThruDict('artifacts', tenant_id, _store)
+		self._canary_states = WriteThruDict('canary_states', tenant_id, _store)
+		self._change_freezes = WriteThruDict('change_freezes', tenant_id, _store)
+		self._dr_failovers = WriteThruDict('dr_failovers', tenant_id, _store)
+		self._post_deploy_tests = WriteThruDict('post_deploy_tests', tenant_id, _store)
 		self._engine = DeploymentEngine()
 
 	# ------------------------------------------------------------------
@@ -1272,3 +1275,11 @@ def _compute_rollout_phases(strategy: str, tier: str) -> list[dict[str, Any]]:
 	# rolling
 	batch_count = 3 if tier == "production" else 1
 	return [{"phase": i + 1, "batch": i + 1, "gate": "health_check"} for i in range(batch_count)]
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_artifacts', '_canary_states', '_change_freezes', '_dr_failovers', '_post_deploy_tests']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

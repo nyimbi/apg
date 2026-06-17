@@ -1,6 +1,9 @@
 """Supply Planning async service (scm_spl)."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 import math
@@ -27,8 +30,9 @@ class SupplyPlanningService:
 	"""Async service for MRP-II, safety stock optimisation, replenishment rules,
 	capacity planning and supply/demand balancing."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.demand_forecasts: dict[str, dict[str, Any]] = {}
 		self.mrp_runs: dict[str, dict[str, Any]] = {}
 		self.safety_stocks: dict[str, dict[str, Any]] = {}
@@ -41,7 +45,7 @@ class SupplyPlanningService:
 		self.scenarios: dict[str, dict[str, Any]] = {}
 		self.supplier_performance: dict[str, dict[str, Any]] = {}
 		self.eoq_analyses: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -1287,3 +1291,11 @@ class SupplyPlanningService:
 		order["released_at"] = self._now()
 		self._emit(tenant, "planned_order_released", order_id, "scm_spl_planned_order", "released")
 		return deepcopy(order)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

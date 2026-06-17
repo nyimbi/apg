@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timezone
 from typing import Any
 
@@ -26,11 +29,11 @@ def _now() -> str:
 class MfgBomService:
 	"""Bill of Materials service — async, in-memory."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
-		self._boms: dict[str, dict[str, Any]] = {}
-		self._bom_lines: dict[str, dict[str, Any]] = {}
-		self._ecos: dict[str, dict[str, Any]] = {}
+		self._boms = WriteThruDict('boms', tenant_id, _store)
+		self._bom_lines = WriteThruDict('bom_lines', tenant_id, _store)
+		self._ecos = WriteThruDict('ecos', tenant_id, _store)
 
 	async def create_bom(
 		self,
@@ -174,3 +177,11 @@ class MfgBomService:
 		if status:
 			ecos = [e for e in ecos if e["status"] == status]
 		return ecos
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_boms', '_bom_lines', '_ecos']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

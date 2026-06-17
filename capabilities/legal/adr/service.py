@@ -1,6 +1,9 @@
 """ADR / Dispute Resolution — async service layer."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -26,8 +29,9 @@ ENFORCEMENT_STATUSES = {"pending", "filed", "recognized", "enforced", "challenge
 class ADRDisputeResolutionService:
 	"""In-memory async service for arbitration and alternative dispute resolution."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.cases: dict[str, dict[str, Any]] = {}
 		self.neutrals: dict[str, dict[str, Any]] = {}
 		self.proceedings: dict[str, dict[str, Any]] = {}
@@ -36,7 +40,7 @@ class ADRDisputeResolutionService:
 		self.submissions: dict[str, dict[str, Any]] = {}
 		self.enforcement_actions: dict[str, dict[str, Any]] = {}
 		self._case_sequence: int = 2000
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -676,3 +680,11 @@ class ADRDisputeResolutionService:
 		tenant = self._tenant(tenant_id)
 		events = [deepcopy(e) for e in self._audit_events if e["tenant_id"] == tenant]
 		return events[-limit:]
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

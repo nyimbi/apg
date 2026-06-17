@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -74,7 +77,7 @@ class LaboratoryInformationService:
 		self._critical_values: dict[tuple[str, str], CriticalValueNotification] = {}
 		self._qc_runs: dict[tuple[str, str], QCRunResponse] = {}
 		self._instruments: dict[tuple[str, str], InstrumentResponse] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# Extended stores
 		self._specimen_labels: dict[tuple[str, str], dict[str, Any]] = {}
 		self._custody_chain: dict[tuple[str, str], list[dict[str, Any]]] = {}
@@ -3016,4 +3019,11 @@ class LaboratoryInformationService:
 			"test_codes_assessed": test_codes,
 			"assessed_at": now.isoformat(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

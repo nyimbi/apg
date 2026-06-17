@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -33,23 +36,24 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class EqpService:
 	"""Service for Equipment & Plant Management operations."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
-		self._equipment: dict[str, dict[str, Any]] = {}
-		self._work_orders: dict[str, dict[str, Any]] = {}
-		self._inspections: dict[str, dict[str, Any]] = {}
-		self._fuel_dockets: dict[str, dict[str, Any]] = {}
-		self._faults: dict[str, dict[str, Any]] = {}
-		self._dispatch_log: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._equipment = WriteThruDict('equipment', tenant_id, _store)
+		self._work_orders = WriteThruDict('work_orders', tenant_id, _store)
+		self._inspections = WriteThruDict('inspections', tenant_id, _store)
+		self._fuel_dockets = WriteThruDict('fuel_dockets', tenant_id, _store)
+		self._faults = WriteThruDict('faults', tenant_id, _store)
+		self._dispatch_log = WriteThruList('dispatch_log', tenant_id, _store)
 		# Extended stores
-		self._availability_records: dict[str, dict[str, Any]] = {}
-		self._planned_maintenance: dict[str, dict[str, Any]] = {}
-		self._breakdown_logs: dict[str, dict[str, Any]] = {}
-		self._condition_monitoring: dict[str, dict[str, Any]] = {}
-		self._pre_start_checks: dict[str, dict[str, Any]] = {}
-		self._fuel_lube_records: dict[str, dict[str, Any]] = {}
-		self._major_components: dict[str, dict[str, Any]] = {}
-		self._replacement_recs: dict[str, dict[str, Any]] = {}
+		self._availability_records = WriteThruDict('availability_records', tenant_id, _store)
+		self._planned_maintenance = WriteThruDict('planned_maintenance', tenant_id, _store)
+		self._breakdown_logs = WriteThruDict('breakdown_logs', tenant_id, _store)
+		self._condition_monitoring = WriteThruDict('condition_monitoring', tenant_id, _store)
+		self._pre_start_checks = WriteThruDict('pre_start_checks', tenant_id, _store)
+		self._fuel_lube_records = WriteThruDict('fuel_lube_records', tenant_id, _store)
+		self._major_components = WriteThruDict('major_components', tenant_id, _store)
+		self._replacement_recs = WriteThruDict('replacement_recs', tenant_id, _store)
 
 	# ── Logging helpers ────────────────────────────────────────────────────────
 
@@ -1115,3 +1119,11 @@ class EqpService:
 	async def analytics_dashboard(self, ) -> dict[str, Any]:
 		"""Analytics Dashboard"""
 		return {"tenant_id": self.tenant_id, "computed_at": datetime.utcnow().isoformat()}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_equipment', '_work_orders', '_inspections', '_fuel_dockets', '_faults', '_availability_records', '_planned_maintenance', '_breakdown_logs', '_condition_monitoring', '_pre_start_checks', '_fuel_lube_records', '_major_components', '_replacement_recs', '_dispatch_log']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

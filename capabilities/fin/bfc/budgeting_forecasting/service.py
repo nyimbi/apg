@@ -9,6 +9,9 @@ budget creation → distribution → approval → forecasting → variance → r
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -140,6 +143,7 @@ class BFCService:
 		assert_tenant_context(tenant_id)
 		assert_actor_present(actor_id)
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 
 		# Allow injecting a shared store for multi-actor tests / real DB backends.
@@ -166,7 +170,7 @@ class BFCService:
 			self._variance_reports: dict[str, BFVarianceReport] = {}
 			self._scenarios: dict[str, BFScenarioModel] = {}
 			self._driver_assumptions: dict[str, BFDriverBasedAssumption] = {}
-			self._events: list[dict[str, Any]] = []
+			self._events = WriteThruList('events', tenant_id, _store)
 
 	def as_actor(self, actor_id: str) -> "BFCService":
 		"""
@@ -1240,4 +1244,11 @@ class BFCService:
 			return {"adjusted_forecast": result.predictions, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

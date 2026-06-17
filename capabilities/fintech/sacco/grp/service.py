@@ -7,6 +7,9 @@ group as a whole is collectively responsible for all borrowing.
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from copy import deepcopy
 from datetime import datetime, date
@@ -36,8 +39,9 @@ SCORE_GRADES = [(90, "A"), (75, "B"), (55, "C"), (35, "D"), (0, "E")]
 class GroupLendingService:
 	"""Async service for SACCO group lending: Chamas, welfare groups, merry-go-rounds."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		# In-memory stores keyed by entity id
 		self.groups: dict[str, Group] = {}
 		self.members: dict[str, GroupMember] = {}            # id -> GroupMember
@@ -45,7 +49,7 @@ class GroupLendingService:
 		self.loans: dict[str, GroupLoan] = {}
 		self.repayments: dict[str, GroupRepayment] = {}
 		self.mgr_rounds: dict[str, MerryGoRoundRound] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		self._loan_counter: int = 0
 		self._cache: BoundedCache = BoundedCache(max_size=512)
 
@@ -1086,3 +1090,11 @@ class GroupLendingService:
 			"mgr_rounds": len(self.mgr_rounds),
 			"checked_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

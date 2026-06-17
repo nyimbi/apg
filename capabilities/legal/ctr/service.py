@@ -1,6 +1,9 @@
 """Contract Lifecycle Management — async service layer."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -23,8 +26,9 @@ APPROVAL_STATUSES = {"pending", "approved", "rejected", "withdrawn"}
 class ContractLifecycleService:
 	"""In-memory async service for contract lifecycle management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.contracts: dict[str, dict[str, Any]] = {}
 		self.redlines: dict[str, dict[str, Any]] = {}
 		self.obligations: dict[str, dict[str, Any]] = {}
@@ -32,7 +36,7 @@ class ContractLifecycleService:
 		self.versions: dict[str, list[dict[str, Any]]] = {}
 		self.signatories: dict[str, dict[str, Any]] = {}
 		self.renewals: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -609,3 +613,11 @@ class ContractLifecycleService:
 		tenant = self._tenant(tenant_id)
 		events = [deepcopy(e) for e in self._audit_events if e["tenant_id"] == tenant]
 		return events[-limit:]
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

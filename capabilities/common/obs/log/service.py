@@ -5,6 +5,9 @@ log level management, Loki export.
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 import re
@@ -38,15 +41,16 @@ def _cid() -> str:
 class LogAggregationService:
 	"""In-memory async service for log aggregation lifecycle."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		guard_tenant_id(tenant_id)
 		self.tenant_id = tenant_id
-		self._entries: list[dict[str, Any]] = []
-		self._retention_policies: dict[str, dict[str, Any]] = {}
-		self._level_overrides: dict[str, dict[str, Any]] = {}
-		self._loki_configs: dict[str, dict[str, Any]] = {}
-		self._correlation_contexts: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._entries = WriteThruList('entries', tenant_id, _store)
+		self._retention_policies = WriteThruDict('retention_policies', tenant_id, _store)
+		self._level_overrides = WriteThruDict('level_overrides', tenant_id, _store)
+		self._loki_configs = WriteThruDict('loki_configs', tenant_id, _store)
+		self._correlation_contexts = WriteThruDict('correlation_contexts', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		_log.info("LogAggregationService initialised tenant=%s", self.tenant_id)
 
 	# ------------------------------------------------------------------ helpers
@@ -681,3 +685,11 @@ class LogAggregationService:
 			"service_name_filter": service_name,
 			"computed_at": _now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_retention_policies', '_level_overrides', '_loki_configs', '_correlation_contexts', '_entries', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

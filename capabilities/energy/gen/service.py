@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timezone
 from typing import Any
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
@@ -45,6 +48,7 @@ class GenerationManagementService:
 
 	def __init__(self, tenant_id: str = "default", actor_id: str = "system", *, auth=None, audit=None, notify=None, db_url=None, store=None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self.plants: dict[tuple[str, str], GenPlant] = {}
 		self.dispatch_schedules: dict[tuple[str, str], DispatchSchedule] = {}
@@ -55,12 +59,12 @@ class GenerationManagementService:
 		self.agents: dict[tuple[str, str], GenAgent] = {}
 		self.audit_events: list[AuditEvent] = []
 		# Extended in-memory stores
-		self._generation_records: dict[str, dict[str, Any]] = {}
-		self._dispatch_instructions: dict[str, dict[str, Any]] = {}
-		self._heat_rate_records: dict[str, dict[str, Any]] = {}
-		self._capacity_factor_records: dict[str, dict[str, Any]] = {}
-		self._gen_analytics_records: dict[str, dict[str, Any]] = {}
-		self._regulatory_reports: dict[str, dict[str, Any]] = {}
+		self._generation_records = WriteThruDict('generation_records', tenant_id, _store)
+		self._dispatch_instructions = WriteThruDict('dispatch_instructions', tenant_id, _store)
+		self._heat_rate_records = WriteThruDict('heat_rate_records', tenant_id, _store)
+		self._capacity_factor_records = WriteThruDict('capacity_factor_records', tenant_id, _store)
+		self._gen_analytics_records = WriteThruDict('gen_analytics_records', tenant_id, _store)
+		self._regulatory_reports = WriteThruDict('regulatory_reports', tenant_id, _store)
 
 	# ── describe / evaluate ──────────────────────────────────────────────────
 
@@ -1000,4 +1004,11 @@ class GenerationManagementService:
 			return {"output_forecast": result.predictions, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_generation_records', '_dispatch_instructions', '_heat_rate_records', '_capacity_factor_records', '_gen_analytics_records', '_regulatory_reports']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

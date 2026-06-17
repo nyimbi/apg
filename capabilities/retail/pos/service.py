@@ -15,6 +15,9 @@ M-Pesa integration via reference number (actual API call delegated to adapter).
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from collections import defaultdict
 from datetime import datetime, date, timedelta
@@ -224,7 +227,7 @@ class _PromotionStore:
 	"""In-process promotions registry."""
 
 	def __init__(self) -> None:
-		self._promos: dict[str, dict[str, Any]] = {}
+		self._promos = WriteThruDict('promos', tenant_id, _store)
 
 	def add(self, promo: dict[str, Any]) -> None:
 		self._promos[promo["id"]] = promo
@@ -260,7 +263,7 @@ class _LoyaltyStore:
 
 	def __init__(self) -> None:
 		self._balances: dict[tuple[str, str], int] = {}
-		self._history: list[dict[str, Any]] = []
+		self._history = WriteThruList('history', tenant_id, _store)
 
 	def balance(self, tenant_id: str, customer_id: str) -> int:
 		return self._balances.get((tenant_id, customer_id), 0)
@@ -329,13 +332,13 @@ class PointOfSaleService:
 		self._handovers: dict[tuple[str, str], dict[str, Any]] = {}
 
 		# Original stores (backward-compat)
-		self._terminals: dict[str, dict[str, Any]] = {}
-		self._sessions: dict[str, dict[str, Any]] = {}
-		self._transactions: dict[str, dict[str, Any]] = {}
-		self._cash_events: dict[str, dict[str, Any]] = {}
-		self._reconciliations: dict[str, dict[str, Any]] = {}
-		self._receipts: dict[str, dict[str, Any]] = {}
-		self._voids: dict[str, dict[str, Any]] = {}
+		self._terminals = WriteThruDict('terminals', tenant_id, _store)
+		self._sessions = WriteThruDict('sessions', tenant_id, _store)
+		self._transactions = WriteThruDict('transactions', tenant_id, _store)
+		self._cash_events = WriteThruDict('cash_events', tenant_id, _store)
+		self._reconciliations = WriteThruDict('reconciliations', tenant_id, _store)
+		self._receipts = WriteThruDict('receipts', tenant_id, _store)
+		self._voids = WriteThruDict('voids', tenant_id, _store)
 
 	# ======================================================================
 	# SESSION MANAGEMENT
@@ -3122,3 +3125,11 @@ def _present(value: str | None) -> bool:
 
 def _normalize(value: str) -> str:
 	return value.strip().lower() if value else ""
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_promos', '_terminals', '_sessions', '_transactions', '_cash_events', '_reconciliations', '_receipts', '_voids', '_history']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

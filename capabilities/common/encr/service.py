@@ -6,6 +6,9 @@ encrypt/decrypt/key/envelope/field/database/transit/homomorphic/ZK/certificate/H
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import base64
 import csv
@@ -98,7 +101,7 @@ class _Store:
 	"""Minimal async-safe in-memory store matching the await self._store pattern."""
 
 	def __init__(self) -> None:
-		self._data: dict[str, dict[str, Any]] = {}
+		self._data = WriteThruDict('data', tenant_id, _store)
 
 	async def put(self, collection: str, record: dict[str, Any]) -> dict[str, Any]:
 		bucket = self._data.setdefault(collection, {})
@@ -314,6 +317,7 @@ class APGEncryptionService:
 	) -> None:
 		self.actor_id = actor_id
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self._store = _Store()
 		self._audit = _Audit(self._store)
 		self._notify = _Notify()

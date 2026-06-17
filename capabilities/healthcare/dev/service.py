@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -65,8 +68,8 @@ class MedicalDeviceManagementService:
 		self._calibrations: dict[tuple[str, str], CalibrationRecordResponse] = {}
 		self._adverse_events: dict[tuple[str, str], AdverseEventResponse] = {}
 		self._recalls: dict[tuple[str, str], dict[str, Any]] = {}
-		self._usage_logs: list[dict[str, Any]] = []
-		self._audit_events: list[dict[str, Any]] = []
+		self._usage_logs = WriteThruList('usage_logs', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	async def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1101,7 +1104,7 @@ class MedicalDeviceManagementService:
 			"compliant": result == "pass",
 		}
 		if not hasattr(self, "_decontamination_records"):
-			self._decontamination_records: list[dict[str, Any]] = []
+			self._decontamination_records = WriteThruList('decontamination_records', tenant_id, _store)
 		self._decontamination_records.append(record)
 		self._audit(tenant_id, "decontamination_recorded", record_id)
 		_log_op("record_decontamination", tenant_id, device_id)
@@ -1440,4 +1443,11 @@ class MedicalDeviceManagementService:
 		self._audit(tenant_id, "device_returned", loan_id)
 		_log_op("return_device_from_loan", tenant_id, loan["device_id"])
 		return completed_loan
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_usage_logs', '_audit_events', '_decontamination_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

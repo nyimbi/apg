@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from datetime import date, datetime
@@ -38,25 +41,26 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 				 auth: Any = None, audit: Any = None, notify: Any = None,
 				 db_url: str | None = None, store: Any = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth
 		self._audit_adapter = audit
 		self._notify = notify
 		self._store = store
-		self._programmes: dict[str, dict[str, Any]] = {}
-		self._members: dict[str, dict[str, Any]] = {}
-		self._tiers: dict[str, dict[str, Any]] = {}
-		self._transactions: dict[str, dict[str, Any]] = {}
-		self._campaigns: dict[str, dict[str, Any]] = {}
-		self._partners: dict[str, dict[str, Any]] = {}
-		self._rewards: dict[str, dict[str, Any]] = {}
-		self._clv_segments: dict[str, dict[str, Any]] = {}
+		self._programmes = WriteThruDict('programmes', tenant_id, _store)
+		self._members = WriteThruDict('members', tenant_id, _store)
+		self._tiers = WriteThruDict('tiers', tenant_id, _store)
+		self._transactions = WriteThruDict('transactions', tenant_id, _store)
+		self._campaigns = WriteThruDict('campaigns', tenant_id, _store)
+		self._partners = WriteThruDict('partners', tenant_id, _store)
+		self._rewards = WriteThruDict('rewards', tenant_id, _store)
+		self._clv_segments = WriteThruDict('clv_segments', tenant_id, _store)
 		# Extended state
 		self._enrolment_log: dict[str, list[dict[str, Any]]] = {}      # programme_id -> enrolments
-		self._coalition_transfers: list[dict[str, Any]] = []
+		self._coalition_transfers = WriteThruList('coalition_transfers', tenant_id, _store)
 		self._personalised_offers: dict[str, list[dict[str, Any]]] = {} # member_id -> offers
-		self._expiry_runs: list[dict[str, Any]] = []
-		self._analytics_cache: dict[str, dict[str, Any]] = {}
+		self._expiry_runs = WriteThruList('expiry_runs', tenant_id, _store)
+		self._analytics_cache = WriteThruDict('analytics_cache', tenant_id, _store)
 
 	# ------------------------------------------------------------------
 	# Logging helpers
@@ -1433,4 +1437,11 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 				_add_group("name_match", ids, key)
 
 		return duplicate_groups
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_programmes', '_members', '_tiers', '_transactions', '_campaigns', '_partners', '_rewards', '_clv_segments', '_analytics_cache', '_coalition_transfers', '_expiry_runs']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

@@ -1,6 +1,9 @@
 """Feature Flags service — runtime toggles, percentage rollout, A/B experiments, per-tenant targeting."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import logging
@@ -27,13 +30,14 @@ def _consistent_hash(key: str, seed: str) -> float:
 class FeatureFlagService:
 	"""Runtime feature toggles, percentage rollout, A/B experiment assignment, per-tenant targeting, audit trail."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.flags: dict[str, dict[str, Any]] = {}  # keyed by "tenant:flag_key"
 		self.experiments: dict[str, dict[str, Any]] = {}
 		self.assignments: dict[str, dict[str, Any]] = {}  # user experiment assignments
 		self.overrides: dict[str, dict[str, Any]] = {}  # per-user flag overrides
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# I10 — named targeting segments, keyed "tenant:segment_id"
 		self.segments: dict[str, dict[str, Any]] = {}
 		# I8 — sticky assignment cache, keyed "tenant:flag_key:user_id"
@@ -1299,3 +1303,11 @@ def _normal_cdf(z: float) -> float:
 							  + t * (-1.821255978
 									 + t * 1.330274429))))
 	return 1.0 - (1.0 / math.sqrt(2 * math.pi)) * math.exp(-0.5 * z * z) * poly
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -1,6 +1,9 @@
 """AgriIoT & Precision Farming service — agr_iot."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -25,16 +28,17 @@ class AgriIoTService:
 	"""Async service for AgriIoT & precision farming: soil sensor ingestion,
 	drone imagery analysis, yield mapping, and variable-rate prescriptions."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		if not tenant_id:
 			raise ValueError("tenant_id required")
 		self.tenant_id = tenant_id
-		self._devices: dict[str, dict[str, Any]] = {}
-		self._telemetry: dict[str, dict[str, Any]] = {}
-		self._imagery: dict[str, dict[str, Any]] = {}
-		self._yield_maps: dict[str, dict[str, Any]] = {}
-		self._prescriptions: dict[str, dict[str, Any]] = {}
-		self._audit: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._devices = WriteThruDict('devices', tenant_id, _store)
+		self._telemetry = WriteThruDict('telemetry', tenant_id, _store)
+		self._imagery = WriteThruDict('imagery', tenant_id, _store)
+		self._yield_maps = WriteThruDict('yield_maps', tenant_id, _store)
+		self._prescriptions = WriteThruDict('prescriptions', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	def _emit(self, event_type: str, entity_type: str, entity_id: str, payload: dict[str, Any]) -> None:
 		self._audit.append({
@@ -475,3 +479,11 @@ def _generate_ndvi_zones(mean: float, minimum: float | None, maximum: float | No
 			"area_ha": None,  # unknown without parcel size
 		})
 	return zones
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_devices', '_telemetry', '_imagery', '_yield_maps', '_prescriptions', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -32,22 +35,23 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class OreService:
 	"""Service for Ore Processing & Metallurgy operations."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
-		self._plant_feeds: dict[str, dict[str, Any]] = {}
-		self._circuits: dict[str, dict[str, Any]] = {}
-		self._reagent_usage: dict[str, dict[str, Any]] = {}
-		self._met_balances: dict[str, dict[str, Any]] = {}
-		self._product_quality: dict[str, dict[str, Any]] = {}
-		self._deviations: dict[str, dict[str, Any]] = {}
+		_store = get_store(db_url)
+		self._plant_feeds = WriteThruDict('plant_feeds', tenant_id, _store)
+		self._circuits = WriteThruDict('circuits', tenant_id, _store)
+		self._reagent_usage = WriteThruDict('reagent_usage', tenant_id, _store)
+		self._met_balances = WriteThruDict('met_balances', tenant_id, _store)
+		self._product_quality = WriteThruDict('product_quality', tenant_id, _store)
+		self._deviations = WriteThruDict('deviations', tenant_id, _store)
 		self._reagent_inventory: dict[str, float] = {}  # reagent_type -> kg on hand
 		# Extended stores
-		self._downtime_logs: dict[str, dict[str, Any]] = {}
-		self._energy_records: dict[str, dict[str, Any]] = {}
-		self._cost_records: dict[str, dict[str, Any]] = {}
-		self._recovery_optimisations: dict[str, dict[str, Any]] = {}
-		self._met_reports: dict[str, dict[str, Any]] = {}
-		self._process_analytics_records: dict[str, dict[str, Any]] = {}
+		self._downtime_logs = WriteThruDict('downtime_logs', tenant_id, _store)
+		self._energy_records = WriteThruDict('energy_records', tenant_id, _store)
+		self._cost_records = WriteThruDict('cost_records', tenant_id, _store)
+		self._recovery_optimisations = WriteThruDict('recovery_optimisations', tenant_id, _store)
+		self._met_reports = WriteThruDict('met_reports', tenant_id, _store)
+		self._process_analytics_records = WriteThruDict('process_analytics_records', tenant_id, _store)
 
 	# ── Logging helpers ────────────────────────────────────────────────────────
 
@@ -1764,4 +1768,11 @@ class OreService:
 			self._log_alert(AlertLevel.CRITICAL, f"Shift report: {len(critical_deviations)} critical deviations in shift {shift_label}")
 		self._log_op("generate_shift_met_report", "shift_report", rec_id)
 		return report
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_plant_feeds', '_circuits', '_reagent_usage', '_met_balances', '_product_quality', '_deviations', '_downtime_logs', '_energy_records', '_cost_records', '_recovery_optimisations', '_met_reports', '_process_analytics_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

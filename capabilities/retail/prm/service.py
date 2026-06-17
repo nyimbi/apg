@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import date, datetime
 from typing import Any
@@ -34,24 +37,25 @@ class PrmService:
 				 auth: Any = None, audit: Any = None, notify: Any = None,
 				 db_url: str | None = None, store: Any = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth
 		self._audit_adapter = audit
 		self._notify = notify
 		self._store = store
-		self._promotions: dict[str, dict[str, Any]] = {}
-		self._triggers: dict[str, dict[str, Any]] = {}
-		self._coupons: dict[str, dict[str, Any]] = {}
-		self._redemptions: dict[str, dict[str, Any]] = {}
-		self._pricing_rules: dict[str, dict[str, Any]] = {}
-		self._markdowns: dict[str, dict[str, Any]] = {}
-		self._effectiveness: dict[str, dict[str, Any]] = {}
+		self._promotions = WriteThruDict('promotions', tenant_id, _store)
+		self._triggers = WriteThruDict('triggers', tenant_id, _store)
+		self._coupons = WriteThruDict('coupons', tenant_id, _store)
+		self._redemptions = WriteThruDict('redemptions', tenant_id, _store)
+		self._pricing_rules = WriteThruDict('pricing_rules', tenant_id, _store)
+		self._markdowns = WriteThruDict('markdowns', tenant_id, _store)
+		self._effectiveness = WriteThruDict('effectiveness', tenant_id, _store)
 		# Extended state
 		self._cart_promotions: dict[str, list[str]] = {}     # cart_id -> promotion_ids applied
-		self._stacking_log: list[dict[str, Any]] = []
-		self._competitor_prices: list[dict[str, Any]] = []
-		self._analytics_cache: dict[str, dict[str, Any]] = {}
-		self._audit_ledger: list[dict[str, Any]] = []        # append-only change history
+		self._stacking_log = WriteThruList('stacking_log', tenant_id, _store)
+		self._competitor_prices = WriteThruList('competitor_prices', tenant_id, _store)
+		self._analytics_cache = WriteThruDict('analytics_cache', tenant_id, _store)
+		self._audit_ledger = WriteThruList('audit_ledger', tenant_id, _store)        # append-only change history
 
 	# ------------------------------------------------------------------
 	# Logging helpers
@@ -1234,4 +1238,11 @@ class PrmService:
 			"suggestions": suggestions,
 			"evaluated_at": datetime.utcnow().isoformat(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_promotions', '_triggers', '_coupons', '_redemptions', '_pricing_rules', '_markdowns', '_effectiveness', '_analytics_cache', '_stacking_log', '_competitor_prices', '_audit_ledger']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

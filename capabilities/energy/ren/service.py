@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timezone
 from typing import Any
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
@@ -49,6 +52,7 @@ class RenewableEnergyService:
 
 	def __init__(self, tenant_id: str = "default", actor_id: str = "system", *, auth=None, audit=None, notify=None, db_url=None, store=None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self.assets: dict[tuple[str, str], RenewableAsset] = {}
 		self.curtailment_events: dict[tuple[str, str], CurtailmentEvent] = {}
@@ -60,11 +64,11 @@ class RenewableEnergyService:
 		self.agents: dict[tuple[str, str], RenAgent] = {}
 		self.audit_events: list[AuditEvent] = []
 		# Extended stores
-		self._generation_records: dict[str, dict[str, Any]] = {}
-		self._fit_payment_records: dict[str, dict[str, Any]] = {}
-		self._rps_records: dict[str, dict[str, Any]] = {}
-		self._green_tariff_products: dict[str, dict[str, Any]] = {}
-		self._ren_analytics: dict[str, dict[str, Any]] = {}
+		self._generation_records = WriteThruDict('generation_records', tenant_id, _store)
+		self._fit_payment_records = WriteThruDict('fit_payment_records', tenant_id, _store)
+		self._rps_records = WriteThruDict('rps_records', tenant_id, _store)
+		self._green_tariff_products = WriteThruDict('green_tariff_products', tenant_id, _store)
+		self._ren_analytics = WriteThruDict('ren_analytics', tenant_id, _store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -947,3 +951,11 @@ class RenewableEnergyService:
 		assert record_id
 		self._audit(self.tenant_id, "record_archived", record_id, "record", {})
 		return {"record_id": record_id, "status": "archived"}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_generation_records', '_fit_payment_records', '_rps_records', '_green_tariff_products', '_ren_analytics']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

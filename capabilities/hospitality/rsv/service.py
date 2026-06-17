@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from copy import deepcopy
 from datetime import datetime
@@ -32,8 +35,9 @@ def _nights(check_in: str, check_out: str) -> int:
 class RSVService:
 	"""Reservations & Channel Manager service."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.channels: dict[str, dict[str, Any]] = {}
 		self.bookings: dict[str, dict[str, Any]] = {}
 		self.availability: dict[str, dict[str, Any]] = {}  # key: tenant:room_type:date
@@ -42,7 +46,7 @@ class RSVService:
 		self.booking_rules: dict[str, dict[str, Any]] = {}
 		self.rate_restrictions: dict[str, dict[str, Any]] = {}
 		self.waitlists: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _tenant(self, tenant_id: str | None = None) -> str:
 		value = tenant_id or self.tenant_id
@@ -487,3 +491,11 @@ class RSVService:
 			"waitlist_count": len([w for w in self.waitlists.values() if w["tenant_id"] == tenant and w["status"] == "waiting"]),
 			"generated_at": _now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

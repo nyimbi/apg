@@ -1,6 +1,9 @@
 """Irrigation Management service — agr_irg."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -25,16 +28,17 @@ class IrrigationManagementService:
 	"""Async service for irrigation: sensor integration, schedule optimisation,
 	water accounting, and canal management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		if not tenant_id:
 			raise ValueError("tenant_id required")
 		self.tenant_id = tenant_id
-		self._sensors: dict[str, dict[str, Any]] = {}
-		self._readings: dict[str, dict[str, Any]] = {}
-		self._schedules: dict[str, dict[str, Any]] = {}
-		self._canals: dict[str, dict[str, Any]] = {}
-		self._water_accounts: dict[str, dict[str, Any]] = {}
-		self._audit: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._sensors = WriteThruDict('sensors', tenant_id, _store)
+		self._readings = WriteThruDict('readings', tenant_id, _store)
+		self._schedules = WriteThruDict('schedules', tenant_id, _store)
+		self._canals = WriteThruDict('canals', tenant_id, _store)
+		self._water_accounts = WriteThruDict('water_accounts', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	def _emit(self, event_type: str, entity_type: str, entity_id: str, payload: dict[str, Any]) -> None:
 		self._audit.append({
@@ -465,3 +469,11 @@ def _classify_moisture(sensor: dict[str, Any]) -> str:
 	if hi is not None and val > hi:
 		return "high"
 	return "optimal"
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_sensors', '_readings', '_schedules', '_canals', '_water_accounts', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

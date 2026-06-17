@@ -12,6 +12,9 @@ Architecture:
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from calendar import month_name
 from datetime import datetime
@@ -74,13 +77,13 @@ class CheckOffService:
 
 	def __init__(self) -> None:
 		# Core stores — keyed by id within dicts
-		self._employers: dict[str, dict[str, Any]] = {}
-		self._links: dict[str, dict[str, Any]] = {}          # member-employer links
-		self._schedules: dict[str, dict[str, Any]] = {}
+		self._employers = WriteThruDict('employers', tenant_id, _store)
+		self._links = WriteThruDict('links', tenant_id, _store)          # member-employer links
+		self._schedules = WriteThruDict('schedules', tenant_id, _store)
 		self._uploads: dict[str, list[dict[str, Any]]] = {}  # key: "{tid}:{eid}:{y}:{m}"
-		self._reconciliations: dict[str, dict[str, Any]] = {}
-		self._remittances: dict[str, dict[str, Any]] = {}    # key: "{tid}:{eid}:{y}:{m}"
-		self._gl_entries: list[dict[str, Any]] = []
+		self._reconciliations = WriteThruDict('reconciliations', tenant_id, _store)
+		self._remittances = WriteThruDict('remittances', tenant_id, _store)    # key: "{tid}:{eid}:{y}:{m}"
+		self._gl_entries = WriteThruList('gl_entries', tenant_id, _store)
 		self._posted_keys: set[str] = set()                  # idempotency
 
 		# Loan / savings stubs — in production delegate to lnd/dep services
@@ -1054,3 +1057,11 @@ class CheckOffService:
 			"posted_periods": len(self._posted_keys),
 			"checked_at": _now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_employers', '_links', '_schedules', '_reconciliations', '_remittances', '_gl_entries']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -1,6 +1,9 @@
 """Results-Based Financing Service — DLIs, result claims, verification, payment triggers."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -23,14 +26,15 @@ SUPPORTED_CONTRACT_STATUSES = {"draft", "active", "suspended", "closed", "cancel
 class ResultsBasedFinancingService:
 	"""Async service for Results-Based Financing management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
-		self._contracts: dict[str, dict[str, Any]] = {}
-		self._dlis: dict[str, dict[str, Any]] = {}
-		self._claims: dict[str, dict[str, Any]] = {}
-		self._verifications: dict[str, dict[str, Any]] = {}
-		self._payment_triggers: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._contracts = WriteThruDict('contracts', tenant_id, _store)
+		self._dlis = WriteThruDict('dlis', tenant_id, _store)
+		self._claims = WriteThruDict('claims', tenant_id, _store)
+		self._verifications = WriteThruDict('verifications', tenant_id, _store)
+		self._payment_triggers = WriteThruDict('payment_triggers', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── helpers ───────────────────────────────────────────────────────────────
 
@@ -636,3 +640,11 @@ class ResultsBasedFinancingService:
 			else:
 				results.append(outcome)
 		return {"created": len(results), "failed": len(errors), "dlis": results, "errors": errors}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_contracts', '_dlis', '_claims', '_verifications', '_payment_triggers', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from typing import Any
 
 from .capability_contract import (
@@ -31,19 +34,19 @@ class MchnService:
 		self._agents: dict[str, MchnAgent] = {}
 		self._runtime = OutputRuntime()
 		# Additional in-memory stores for new methods
-		self._channel_health_checks: dict[str, dict[str, Any]] = {}
-		self._retry_policies: dict[str, dict[str, Any]] = {}
+		self._channel_health_checks = WriteThruDict('channel_health_checks', tenant_id, _store)
+		self._retry_policies = WriteThruDict('retry_policies', tenant_id, _store)
 		self._suppression_lists: dict[str, set[str]] = {}
-		self._personalisation_records: dict[str, dict[str, Any]] = {}
-		self._output_archives: dict[str, dict[str, Any]] = {}
-		self._cost_records: dict[str, dict[str, Any]] = {}
-		self._priority_routes: dict[str, dict[str, Any]] = {}
-		self._delivery_confirms: dict[str, dict[str, Any]] = {}
-		self._analytics_cache: dict[str, dict[str, Any]] = {}
-		self._format_records: dict[str, dict[str, Any]] = {}
-		self._fallback_log: dict[str, dict[str, Any]] = {}
-		self._batch_send_records: dict[str, dict[str, Any]] = {}
-		self._template_applications: dict[str, dict[str, Any]] = {}
+		self._personalisation_records = WriteThruDict('personalisation_records', tenant_id, _store)
+		self._output_archives = WriteThruDict('output_archives', tenant_id, _store)
+		self._cost_records = WriteThruDict('cost_records', tenant_id, _store)
+		self._priority_routes = WriteThruDict('priority_routes', tenant_id, _store)
+		self._delivery_confirms = WriteThruDict('delivery_confirms', tenant_id, _store)
+		self._analytics_cache = WriteThruDict('analytics_cache', tenant_id, _store)
+		self._format_records = WriteThruDict('format_records', tenant_id, _store)
+		self._fallback_log = WriteThruDict('fallback_log', tenant_id, _store)
+		self._batch_send_records = WriteThruDict('batch_send_records', tenant_id, _store)
+		self._template_applications = WriteThruDict('template_applications', tenant_id, _store)
 
 	# ------------------------------------------------------------------ #
 	# Original 22 methods                                                  #
@@ -1053,3 +1056,11 @@ def _state_key(tenant_id: str, item_id: str) -> str:
 def _utc_now() -> str:
 	from datetime import datetime, timezone
 	return datetime.now(timezone.utc).isoformat()
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_channel_health_checks', '_retry_policies', '_personalisation_records', '_output_archives', '_cost_records', '_priority_routes', '_delivery_confirms', '_analytics_cache', '_format_records', '_fallback_log', '_batch_send_records', '_template_applications']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

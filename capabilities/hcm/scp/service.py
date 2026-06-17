@@ -1,6 +1,9 @@
 """Succession Planning async service."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -39,15 +42,16 @@ def _nine_box_quadrant(performance: float, potential: float) -> str:
 class SCPService:
 	"""Succession Planning — talent pools, readiness assessments, nine-box, scenarios, critical roles."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.talent_pools: dict[str, dict[str, Any]] = {}
 		self.pool_members: dict[str, dict[str, Any]] = {}  # keyed by pool_id:employee_id
 		self.readiness_assessments: dict[str, dict[str, Any]] = {}
 		self.nine_box_entries: dict[str, dict[str, Any]] = {}
 		self.succession_scenarios: dict[str, dict[str, Any]] = {}
 		self.critical_roles: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── Internal helpers ──────────────────────────────────────────────────────
 
@@ -1013,3 +1017,11 @@ class SCPService:
 			"registry": registry,
 			"generated_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -12,6 +12,9 @@ Design principles:
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import hashlib
 import json
 import logging
@@ -133,13 +136,13 @@ class GLService:
 	All amounts are Decimal. Tenant-scoped.
 	"""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		guard_tenant_id(tenant_id)
 		self._tenant_id = tenant_id
 		# In-memory stores (production: inject DB session)
-		self._accounts: dict[str, dict[str, Any]] = {}          # code -> account
-		self._journal_entries: list[dict[str, Any]] = []        # append-only
-		self._periods: dict[str, dict[str, Any]] = {}           # period_id -> period
+		self._accounts = WriteThruDict('accounts', tenant_id, _store)          # code -> account
+		self._journal_entries = WriteThruList('journal_entries', tenant_id, _store)        # append-only
+		self._periods = WriteThruDict('periods', tenant_id, _store)           # period_id -> period
 		self._balance_cache = BoundedCache(max_size=500)
 		# Running balance index: O(1) lookup, maintained incrementally on every post
 		self._running_balances: dict[str, 'Decimal'] = {}
@@ -922,3 +925,11 @@ class GLService:
 			"version": "1.0.0",
 			"accounts": len(self._accounts),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_accounts', '_periods', '_journal_entries']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

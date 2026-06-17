@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 import math
@@ -36,29 +39,30 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 	signatures.
 	"""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		# In-memory stores — replace with real persistence
-		self._collars: dict[str, dict[str, Any]] = {}
-		self._assays: dict[str, dict[str, Any]] = {}
-		self._geology: dict[str, dict[str, Any]] = {}
-		self._resources: dict[str, dict[str, Any]] = {}
-		self._reports: dict[str, dict[str, Any]] = {}
+		self._collars = WriteThruDict('collars', tenant_id, _store)
+		self._assays = WriteThruDict('assays', tenant_id, _store)
+		self._geology = WriteThruDict('geology', tenant_id, _store)
+		self._resources = WriteThruDict('resources', tenant_id, _store)
+		self._reports = WriteThruDict('reports', tenant_id, _store)
 		# Extended stores
-		self._licences: dict[str, dict[str, Any]] = {}
-		self._drill_holes: dict[str, dict[str, Any]] = {}
-		self._core_logs: dict[str, dict[str, Any]] = {}
-		self._assay_results: dict[str, dict[str, Any]] = {}
-		self._new_resource_estimates: dict[str, dict[str, Any]] = {}
-		self._geophysics_surveys: dict[str, dict[str, Any]] = {}
-		self._exploration_targets: dict[str, dict[str, Any]] = {}
+		self._licences = WriteThruDict('licences', tenant_id, _store)
+		self._drill_holes = WriteThruDict('drill_holes', tenant_id, _store)
+		self._core_logs = WriteThruDict('core_logs', tenant_id, _store)
+		self._assay_results = WriteThruDict('assay_results', tenant_id, _store)
+		self._new_resource_estimates = WriteThruDict('new_resource_estimates', tenant_id, _store)
+		self._geophysics_surveys = WriteThruDict('geophysics_surveys', tenant_id, _store)
+		self._exploration_targets = WriteThruDict('exploration_targets', tenant_id, _store)
 		# World-class capability stores
-		self._downhole_surveys: dict[str, dict[str, Any]] = {}
-		self._bulk_density: dict[str, dict[str, Any]] = {}
-		self._competent_persons: dict[str, dict[str, Any]] = {}
-		self._core_photos: dict[str, dict[str, Any]] = {}
-		self._expenditures: dict[str, dict[str, Any]] = {}
-		self._resource_domains: dict[str, dict[str, Any]] = {}
+		self._downhole_surveys = WriteThruDict('downhole_surveys', tenant_id, _store)
+		self._bulk_density = WriteThruDict('bulk_density', tenant_id, _store)
+		self._competent_persons = WriteThruDict('competent_persons', tenant_id, _store)
+		self._core_photos = WriteThruDict('core_photos', tenant_id, _store)
+		self._expenditures = WriteThruDict('expenditures', tenant_id, _store)
+		self._resource_domains = WriteThruDict('resource_domains', tenant_id, _store)
 
 	# ── Logging helpers ────────────────────────────────────────────────────────
 
@@ -1648,3 +1652,11 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 			"multi_domain_intervals": multi_domain,
 			"assigned_by_domain": assigned,
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_collars', '_assays', '_geology', '_resources', '_reports', '_licences', '_drill_holes', '_core_logs', '_assay_results', '_new_resource_estimates', '_geophysics_surveys', '_exploration_targets', '_downhole_surveys', '_bulk_density', '_competent_persons', '_core_photos', '_expenditures', '_resource_domains']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

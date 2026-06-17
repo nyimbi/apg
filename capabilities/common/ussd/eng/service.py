@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import logging
@@ -28,25 +31,26 @@ USSD_DEFAULT_TIMEOUT = 180
 class UssdEngService:
 	"""In-memory USSD engine: session state machine, gateway config, menu DSL."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.sessions: dict[str, dict[str, Any]] = {}
 		self.menus: dict[str, dict[str, Any]] = {}
 		self.gateways: dict[str, dict[str, Any]] = {}
 		self.service_codes: dict[str, str] = {}  # service_code -> root menu id
 		self.session_variables: dict[str, dict[str, Any]] = {}
 		self.handlers: dict[str, Any] = {}  # handler_name -> callable
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# I3: idempotency cache keyed by "session_id:hop:handler"
-		self._idempotency_cache: dict[str, dict[str, Any]] = {}
+		self._idempotency_cache = WriteThruDict('idempotency_cache', tenant_id, _store)
 		# I4: sliding-window rate-limit buckets keyed by "tenant:phone:service"
 		self._rate_buckets: dict[str, list[float]] = {}
 		# I6: menu version snapshots keyed by "composite_key:vN"
 		self._menu_versions: dict[str, list[dict[str, Any]]] = {}
 		# I11: dead-letter queue keyed by tenant_id
-		self._dead_letters: list[dict[str, Any]] = []
+		self._dead_letters = WriteThruList('dead_letters', tenant_id, _store)
 		# I14: webhook registrations
-		self._webhooks: list[dict[str, Any]] = []
+		self._webhooks = WriteThruList('webhooks', tenant_id, _store)
 
 	# ── Utility ─────────────────────────────────────────────────────────────
 
@@ -1368,3 +1372,11 @@ class UssdEngService:
 			"hops_replayed": len(trace) - 1, "shadow_id": shadow_id,
 		})
 		return trace
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_idempotency_cache', '_audit_events', '_dead_letters', '_webhooks']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

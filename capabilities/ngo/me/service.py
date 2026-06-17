@@ -1,6 +1,9 @@
 """M&E Service — indicator framework, data collection, reporting, impact assessment, learning cycles."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -24,14 +27,15 @@ SUPPORTED_REPORT_PERIODS = {"monthly", "quarterly", "semi_annual", "annual", "ad
 class MEService:
 	"""Async service for NGO monitoring and evaluation."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
-		self._indicators: dict[str, dict[str, Any]] = {}
-		self._data_collections: dict[str, dict[str, Any]] = {}
-		self._progress_reports: dict[str, dict[str, Any]] = {}
-		self._evaluations: dict[str, dict[str, Any]] = {}
-		self._learning_cycles: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._indicators = WriteThruDict('indicators', tenant_id, _store)
+		self._data_collections = WriteThruDict('data_collections', tenant_id, _store)
+		self._progress_reports = WriteThruDict('progress_reports', tenant_id, _store)
+		self._evaluations = WriteThruDict('evaluations', tenant_id, _store)
+		self._learning_cycles = WriteThruDict('learning_cycles', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── helpers ───────────────────────────────────────────────────────────────
 
@@ -631,3 +635,11 @@ class MEService:
 			"trend": trend,
 			"generated_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_indicators', '_data_collections', '_progress_reports', '_evaluations', '_learning_cycles', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

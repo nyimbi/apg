@@ -1,6 +1,9 @@
 """Crop Insurance service — agr_ins."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -25,14 +28,15 @@ class CropInsuranceService:
 	"""Async service for crop insurance: parametric index products, satellite verification,
 	weather trigger claims, and premium calculation."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		if not tenant_id:
 			raise ValueError("tenant_id required")
 		self.tenant_id = tenant_id
-		self._products: dict[str, dict[str, Any]] = {}
-		self._policies: dict[str, dict[str, Any]] = {}
-		self._claims: dict[str, dict[str, Any]] = {}
-		self._audit: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._products = WriteThruDict('products', tenant_id, _store)
+		self._policies = WriteThruDict('policies', tenant_id, _store)
+		self._claims = WriteThruDict('claims', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	def _emit(self, event_type: str, entity_type: str, entity_id: str, payload: dict[str, Any]) -> None:
 		self._audit.append({
@@ -412,3 +416,11 @@ class CropInsuranceService:
 			"approved_claims": len([c for c in claims if c.get("status") == "approved"]),
 			"policies": [{"id": p["id"], "product_id": p["product_id"], "sum_insured": p["sum_insured"], "coverage_end": p["coverage_end"]} for p in policies],
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_products', '_policies', '_claims', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

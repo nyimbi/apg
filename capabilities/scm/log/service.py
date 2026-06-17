@@ -1,6 +1,9 @@
 """Logistics & Transportation async service (scm_log)."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 import math
@@ -40,8 +43,9 @@ class LogisticsService:
 	"""Async service for carrier integration, shipment tracking, freight audit,
 	route optimisation, customs documentation and 3PL management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.carriers: dict[str, dict[str, Any]] = {}
 		self.shipments: dict[str, dict[str, Any]] = {}
 		self.tracking_events: dict[str, dict[str, Any]] = {}
@@ -54,7 +58,7 @@ class LogisticsService:
 		self.insurance_claims: dict[str, dict[str, Any]] = {}
 		self.consolidation_groups: dict[str, dict[str, Any]] = {}
 		self.webhooks: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── Internal helpers ─────────────────────────────────────────────────────
 
@@ -1329,3 +1333,11 @@ class LogisticsService:
 		if not shipment or shipment["tenant_id"] != tenant:
 			raise KeyError(f"shipment '{shipment_id}' not found")
 		return deepcopy(shipment.get("pods", []))
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

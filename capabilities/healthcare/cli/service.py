@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -58,11 +61,11 @@ class ClinicalManagementService:
 		self._handoffs: dict[tuple[str, str], HandoffResponse] = {}
 		self._pathways: dict[tuple[str, str], dict[str, Any]] = {}
 		self._patient_pathways: list[dict[str, Any]] = {}
-		self._audits: list[dict[str, Any]] = []
-		self._mm_reviews: list[dict[str, Any]] = []
-		self._peer_reviews: list[dict[str, Any]] = []
+		self._audits = WriteThruList('audits', tenant_id, _store)
+		self._mm_reviews = WriteThruList('mm_reviews', tenant_id, _store)
+		self._peer_reviews = WriteThruList('peer_reviews', tenant_id, _store)
 		self._guidelines: dict[str, list[dict[str, Any]]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	async def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1022,4 +1025,11 @@ class ClinicalManagementService:
 			return {"recommendation": result.label, "confidence": result.confidence, "ml_enhanced": True}
 		except Exception:
 			return {"ml_enhanced": False}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audits', '_mm_reviews', '_peer_reviews', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

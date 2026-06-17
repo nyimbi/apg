@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -64,11 +67,11 @@ class ClinicalAnalyticsService:
 		self._quality_indicators: dict[tuple[str, str], QualityIndicatorResponse] = {}
 		self._care_gaps: dict[tuple[str, str], CareGapResponse] = {}
 		self._reports: dict[tuple[str, str], AnalyticsReportResponse] = {}
-		self._population_reports: list[dict[str, Any]] = []
-		self._readmission_records: list[dict[str, Any]] = []
-		self._los_records: list[dict[str, Any]] = []
-		self._surveillance_records: list[dict[str, Any]] = []
-		self._audit_events: list[dict[str, Any]] = []
+		self._population_reports = WriteThruList('population_reports', tenant_id, _store)
+		self._readmission_records = WriteThruList('readmission_records', tenant_id, _store)
+		self._los_records = WriteThruList('los_records', tenant_id, _store)
+		self._surveillance_records = WriteThruList('surveillance_records', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── contract ──────────────────────────────────────────────────────────────
 
@@ -1020,3 +1023,11 @@ class ClinicalAnalyticsService:
 			"entity_id": entity_id,
 			"timestamp": datetime.utcnow().isoformat(),
 		})
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_population_reports', '_readmission_records', '_los_records', '_surveillance_records', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

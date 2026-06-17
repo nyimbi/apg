@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -32,21 +35,22 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class SafService:
 	"""Service for Mine Safety & Compliance operations."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
-		self._incidents: dict[str, dict[str, Any]] = {}
-		self._hazards: dict[str, dict[str, Any]] = {}
-		self._risk_register: dict[str, dict[str, Any]] = {}
-		self._permits: dict[str, dict[str, Any]] = {}
-		self._corrective_actions: dict[str, dict[str, Any]] = {}
-		self._audits: dict[str, dict[str, Any]] = {}
+		_store = get_store(db_url)
+		self._incidents = WriteThruDict('incidents', tenant_id, _store)
+		self._hazards = WriteThruDict('hazards', tenant_id, _store)
+		self._risk_register = WriteThruDict('risk_register', tenant_id, _store)
+		self._permits = WriteThruDict('permits', tenant_id, _store)
+		self._corrective_actions = WriteThruDict('corrective_actions', tenant_id, _store)
+		self._audits = WriteThruDict('audits', tenant_id, _store)
 		# Extended stores
-		self._risk_assessments: dict[str, dict[str, Any]] = {}
-		self._safety_inspections: dict[str, dict[str, Any]] = {}
-		self._emergency_drills: dict[str, dict[str, Any]] = {}
-		self._critical_controls: dict[str, dict[str, Any]] = {}
-		self._regulatory_reports: dict[str, dict[str, Any]] = {}
-		self._culture_surveys: dict[str, dict[str, Any]] = {}
+		self._risk_assessments = WriteThruDict('risk_assessments', tenant_id, _store)
+		self._safety_inspections = WriteThruDict('safety_inspections', tenant_id, _store)
+		self._emergency_drills = WriteThruDict('emergency_drills', tenant_id, _store)
+		self._critical_controls = WriteThruDict('critical_controls', tenant_id, _store)
+		self._regulatory_reports = WriteThruDict('regulatory_reports', tenant_id, _store)
+		self._culture_surveys = WriteThruDict('culture_surveys', tenant_id, _store)
 
 	# ── Logging helpers ────────────────────────────────────────────────────────
 
@@ -1139,7 +1143,7 @@ class SafService:
 			"created_at": now.isoformat(),
 		}
 		if not hasattr(self, "_stop_work_records"):
-			self._stop_work_records: dict[str, dict[str, Any]] = {}
+			self._stop_work_records = WriteThruDict('stop_work_records', tenant_id, _store)
 		self._stop_work_records[rec_id] = rec
 		self._log_escalation(rec_id, f"SWA invoked at {mine_area} by {invoked_by}: {reason}")
 		self._log_op("invoke_swa", "stop_work", rec_id)
@@ -1261,7 +1265,7 @@ class SafService:
 			"created_at": datetime.utcnow().isoformat(),
 		}
 		if not hasattr(self, "_bowtie_analyses"):
-			self._bowtie_analyses: dict[str, dict[str, Any]] = {}
+			self._bowtie_analyses = WriteThruDict('bowtie_analyses', tenant_id, _store)
 		self._bowtie_analyses[rec_id] = rec
 		self._log_op("create_bowtie", "bowtie_analysis", rec_id)
 		return rec
@@ -1646,7 +1650,7 @@ class SafService:
 			"created_at": now.isoformat(),
 		}
 		if not hasattr(self, "_isolation_points"):
-			self._isolation_points: dict[str, dict[str, Any]] = {}
+			self._isolation_points = WriteThruDict('isolation_points', tenant_id, _store)
 		self._isolation_points[rec_id] = rec
 		self._log_op("register_isolation", "isolation_point", rec_id)
 		return rec
@@ -1699,3 +1703,11 @@ class SafService:
 		if state:
 			results = [r for r in results if r["state"] == state]
 		return sorted(results, key=lambda x: x["created_at"], reverse=True)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_incidents', '_hazards', '_risk_register', '_permits', '_corrective_actions', '_audits', '_risk_assessments', '_safety_inspections', '_emergency_drills', '_critical_controls', '_regulatory_reports', '_culture_surveys', '_stop_work_records', '_bowtie_analyses', '_isolation_points']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

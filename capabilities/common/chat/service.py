@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import csv
 import hashlib
@@ -42,13 +45,13 @@ class ChatService:
 		self._chat_agents: dict[str, ChatAgentRecord] = {}
 		self._lifecycle_batches: dict[str, ChatLifecycleBatchRecord] = {}
 		# Extended stores
-		self._reactions: dict[str, dict[str, Any]] = {}       # message_id -> {emoji: [user_ids]}
+		self._reactions = WriteThruDict('reactions', tenant_id, _store)       # message_id -> {emoji: [user_ids]}
 		self._threads: dict[str, list[str]] = {}              # parent_message_id -> [reply_message_ids]
 		self._pinned: dict[str, list[str]] = {}               # room_id -> [message_ids]
 		self._read_receipts: dict[str, dict[str, str]] = {}   # message_id -> {user_id: timestamp}
-		self._webhooks: dict[str, dict[str, Any]] = {}        # webhook_id -> record
-		self._bots: dict[str, dict[str, Any]] = {}            # bot_id -> record
-		self._room_permissions: dict[str, dict[str, Any]] = {}  # room_id -> permission record
+		self._webhooks = WriteThruDict('webhooks', tenant_id, _store)        # webhook_id -> record
+		self._bots = WriteThruDict('bots', tenant_id, _store)            # bot_id -> record
+		self._room_permissions = WriteThruDict('room_permissions', tenant_id, _store)  # room_id -> permission record
 		self._direct_messages: dict[str, list[str]] = {}      # dm_key -> [message_ids]
 		self._engine = ChatEngine()
 		self._restricted_terms = ("secret", "credential", "restricted")
@@ -1365,7 +1368,7 @@ class ChatService:
 
 		cache_key = f"{tenant_id}:{room_id}:{window[-1].id}"
 		if not hasattr(self, "_summary_cache"):
-			self._summary_cache: dict[str, dict[str, Any]] = {}  # type: ignore[assignment]
+			self._summary_cache = WriteThruDict('summary_cache', tenant_id, _store)  # type: ignore[assignment]
 		if cache_key in self._summary_cache:
 			return {**self._summary_cache[cache_key], "cached": True}
 
@@ -1644,7 +1647,7 @@ class ChatService:
 		guard_tenant_id(tenant_id)
 		guard_non_empty_string(user_id, "user_id")
 		if not hasattr(self, "_rate_buckets"):
-			self._rate_buckets: dict[str, dict[str, Any]] = {}  # type: ignore[assignment]
+			self._rate_buckets = WriteThruDict('rate_buckets', tenant_id, _store)  # type: ignore[assignment]
 		bucket_key = f"{tenant_id}:{user_id}"
 		now = time.monotonic()
 		cfg = self.describe(tenant_id).get("configuration", {})
@@ -1710,7 +1713,7 @@ class ChatService:
 		guard_non_empty_string(guest_email, "guest_email")
 		self._require_room(room_id, tenant_id)
 		if not hasattr(self, "_guest_grants"):
-			self._guest_grants: dict[str, dict[str, Any]] = {}  # type: ignore[assignment]
+			self._guest_grants = WriteThruDict('guest_grants', tenant_id, _store)  # type: ignore[assignment]
 		token_raw = f"{tenant_id}:{room_id}:{guest_email}:{time.time()}"
 		token = hashlib.sha256(token_raw.encode()).hexdigest()
 		expires_at = (datetime.now(timezone.utc) + timedelta(hours=expiry_hours)).isoformat(timespec="seconds")
@@ -1911,4 +1914,11 @@ class ChatService:
 
 def _normalize_token(value: str) -> str:
 	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_reactions', '_webhooks', '_bots', '_room_permissions', '_summary_cache', '_rate_buckets', '_guest_grants']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
 

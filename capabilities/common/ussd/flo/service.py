@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import logging
@@ -25,15 +28,16 @@ MAX_EDGES_PER_FLOW = 400
 class UssdFloService:
 	"""In-memory USSD Flow Designer: build, version, translate, and A/B-test USSD flows."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.flows: dict[str, dict[str, Any]] = {}
 		self.nodes: dict[str, dict[str, Any]] = {}   # key = f"{flow_id}:{node_id}"
 		self.edges: dict[str, dict[str, Any]] = {}   # key = edge record id
 		self.translations: dict[str, dict[str, Any]] = {}  # key = f"{flow_id}:{language}"
 		self.ab_tests: dict[str, dict[str, Any]] = {}
 		self.flow_versions: dict[str, list[dict[str, Any]]] = {}  # flow_id -> version list
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── Utility ─────────────────────────────────────────────────────────────
 
@@ -1832,3 +1836,11 @@ class UssdFloService:
 			"edges": results,
 			"errors": errors,
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timezone
 from typing import Any
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
@@ -51,6 +54,7 @@ class GridOperationsService:
 
 	def __init__(self, tenant_id: str = "default", actor_id: str = "system", *, auth=None, audit=None, notify=None, db_url=None, store=None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self.se_runs: dict[tuple[str, str], StateEstimationRun] = {}
 		self.contingency_cases: dict[tuple[str, str], ContingencyCase] = {}
@@ -62,12 +66,12 @@ class GridOperationsService:
 		self.agents: dict[tuple[str, str], GrdAgent] = {}
 		self.audit_events: list[AuditEvent] = []
 		# Extended stores
-		self._frequency_records: dict[str, dict[str, Any]] = {}
-		self._islanding_events: dict[str, dict[str, Any]] = {}
-		self._black_start_plans: dict[str, dict[str, Any]] = {}
-		self._ancillary_procurements: dict[str, dict[str, Any]] = {}
-		self._grid_analytics: dict[str, dict[str, Any]] = {}
-		self._reactive_dispatch_records: dict[str, dict[str, Any]] = {}
+		self._frequency_records = WriteThruDict('frequency_records', tenant_id, _store)
+		self._islanding_events = WriteThruDict('islanding_events', tenant_id, _store)
+		self._black_start_plans = WriteThruDict('black_start_plans', tenant_id, _store)
+		self._ancillary_procurements = WriteThruDict('ancillary_procurements', tenant_id, _store)
+		self._grid_analytics = WriteThruDict('grid_analytics', tenant_id, _store)
+		self._reactive_dispatch_records = WriteThruDict('reactive_dispatch_records', tenant_id, _store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1034,3 +1038,11 @@ class GridOperationsService:
 		"""Compliance Report"""
 		self._audit(self.tenant_id, "compliance_report_generated", standard, "report", {})
 		return {"standard": standard, "tenant_id": self.tenant_id, "status": "compliant", "generated_at": _now()}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_frequency_records', '_islanding_events', '_black_start_plans', '_ancillary_procurements', '_grid_analytics', '_reactive_dispatch_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

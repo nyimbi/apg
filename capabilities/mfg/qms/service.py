@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timezone
 from typing import Any
 
@@ -26,12 +29,12 @@ def _now() -> str:
 class MfgQmsService:
 	"""Quality Management System service — async, in-memory."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
-		self._inspections: dict[str, dict[str, Any]] = {}
-		self._ncrs: dict[str, dict[str, Any]] = {}
-		self._capas: dict[str, dict[str, Any]] = {}
-		self._spc_samples: dict[str, dict[str, Any]] = {}
+		self._inspections = WriteThruDict('inspections', tenant_id, _store)
+		self._ncrs = WriteThruDict('ncrs', tenant_id, _store)
+		self._capas = WriteThruDict('capas', tenant_id, _store)
+		self._spc_samples = WriteThruDict('spc_samples', tenant_id, _store)
 
 	# ------------------------------------------------------------------ #
 	# Inspections
@@ -237,3 +240,11 @@ class MfgQmsService:
 			"capas": {"total": len(capas), "open": sum(1 for c in capas if c["status"] == "open"), "closed": sum(1 for c in capas if c["status"] == "closed")},
 			"spc_samples": len(self._spc_samples),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_inspections', '_ncrs', '_capas', '_spc_samples']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

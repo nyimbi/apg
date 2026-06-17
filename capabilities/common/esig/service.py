@@ -16,6 +16,9 @@ associated with the signature."
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import hashlib
 import json
 import logging
@@ -73,11 +76,11 @@ class ESignatureService:
 		db: Optional async database session for signature persistence
 	"""
 
-	def __init__(self, tenant_id: str = "default", db: Any = None) -> None:
+	def __init__(self, tenant_id: str = "default", db: Any = None, db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
 		self._db = db
 		self._signatures: dict[str, ESignatureRecord] = {}  # in-memory store
-		self._audit_trail: list[dict[str, Any]] = []
+		self._audit_trail = WriteThruList('audit_trail', tenant_id, _store)
 
 	async def sign(
 		self,
@@ -320,3 +323,11 @@ def _compute_signature_hash(
 	"""
 	canonical = f"{document_id}:{meaning}:{signer_id}:{timestamp}"
 	return hashlib.sha256(canonical.encode()).hexdigest()
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_trail']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

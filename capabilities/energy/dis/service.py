@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timezone
 from typing import Any
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
@@ -47,6 +50,7 @@ class DistributionNetworkService:
 
 	def __init__(self, tenant_id: str = "default", actor_id: str = "system", *, auth=None, audit=None, notify=None, db_url=None, store=None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self.feeders: dict[tuple[str, str], Feeder] = {}
 		self.elements: dict[tuple[str, str], NetworkElement] = {}
@@ -58,11 +62,11 @@ class DistributionNetworkService:
 		self.agents: dict[tuple[str, str], DisAgent] = {}
 		self.audit_events: list[AuditEvent] = []
 		# Extended stores
-		self._network_topology_changes: dict[str, dict[str, Any]] = {}
-		self._saidi_saifi_records: dict[str, dict[str, Any]] = {}
-		self._outage_stats_records: dict[str, dict[str, Any]] = {}
-		self._network_analytics_records: dict[str, dict[str, Any]] = {}
-		self._system_normal_records: dict[str, dict[str, Any]] = {}
+		self._network_topology_changes = WriteThruDict('network_topology_changes', tenant_id, _store)
+		self._saidi_saifi_records = WriteThruDict('saidi_saifi_records', tenant_id, _store)
+		self._outage_stats_records = WriteThruDict('outage_stats_records', tenant_id, _store)
+		self._network_analytics_records = WriteThruDict('network_analytics_records', tenant_id, _store)
+		self._system_normal_records = WriteThruDict('system_normal_records', tenant_id, _store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1498,3 +1502,11 @@ class DistributionNetworkService:
 			"gap_pct": gap_pct,
 		})
 		return result
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_network_topology_changes', '_saidi_saifi_records', '_outage_stats_records', '_network_analytics_records', '_system_normal_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

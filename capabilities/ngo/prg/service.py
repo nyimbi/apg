@@ -1,6 +1,9 @@
 """Programme & Project Monitoring Service — logframes, activities, outputs, outcomes, field data."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -23,14 +26,15 @@ SUPPORTED_DATA_TYPES = {"observation", "survey", "interview", "focus_group", "se
 class ProgrammeMonitoringService:
 	"""Async service for NGO programme and project monitoring."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
-		self._programmes: dict[str, dict[str, Any]] = {}
-		self._logframes: dict[str, dict[str, Any]] = {}
-		self._activities: dict[str, dict[str, Any]] = {}
-		self._outputs: dict[str, dict[str, Any]] = {}
-		self._field_data: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._programmes = WriteThruDict('programmes', tenant_id, _store)
+		self._logframes = WriteThruDict('logframes', tenant_id, _store)
+		self._activities = WriteThruDict('activities', tenant_id, _store)
+		self._outputs = WriteThruDict('outputs', tenant_id, _store)
+		self._field_data = WriteThruDict('field_data', tenant_id, _store)
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# ── helpers ───────────────────────────────────────────────────────────────
 
@@ -551,3 +555,11 @@ class ProgrammeMonitoringService:
 			else:
 				results.append(outcome)
 		return {"created": len(results), "failed": len(errors), "activities": results, "errors": errors}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_programmes', '_logframes', '_activities', '_outputs', '_field_data', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

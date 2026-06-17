@@ -1,6 +1,9 @@
 """Weather & Climate Analytics service — agr_wth."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from datetime import datetime
 from typing import Any
@@ -33,16 +36,17 @@ class WeatherClimateService:
 	"""Async service for weather & climate: forecast integration, alert thresholds,
 	historical patterns, and climate risk assessment."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		if not tenant_id:
 			raise ValueError("tenant_id required")
 		self.tenant_id = tenant_id
-		self._forecasts: dict[str, dict[str, Any]] = {}
-		self._thresholds: dict[str, dict[str, Any]] = {}
-		self._alerts: dict[str, dict[str, Any]] = {}
-		self._history: dict[str, dict[str, Any]] = {}
-		self._risk_assessments: dict[str, dict[str, Any]] = {}
-		self._audit: list[dict[str, Any]] = []
+		_store = get_store(db_url)
+		self._forecasts = WriteThruDict('forecasts', tenant_id, _store)
+		self._thresholds = WriteThruDict('thresholds', tenant_id, _store)
+		self._alerts = WriteThruDict('alerts', tenant_id, _store)
+		self._history = WriteThruDict('history', tenant_id, _store)
+		self._risk_assessments = WriteThruDict('risk_assessments', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	def _emit(self, event_type: str, entity_type: str, entity_id: str, payload: dict[str, Any]) -> None:
 		self._audit.append({
@@ -437,3 +441,11 @@ class WeatherClimateService:
 			"avg_min_temp_c": round(sum(temps_min) / len(temps_min), 1) if temps_min else None,
 			"active_alerts": len([a for a in self._alerts.values() if a.get("region") == region and not a.get("acknowledged")]),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_forecasts', '_thresholds', '_alerts', '_history', '_risk_assessments', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

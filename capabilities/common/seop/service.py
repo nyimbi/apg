@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import statistics
 from datetime import datetime, timezone
 from typing import Any
@@ -47,12 +50,12 @@ class SeopService:
 		self.audit_events: dict[str, OpsAuditEventRecord] = {}
 		self.seop_agents: dict[str, SeopAgentRecord] = {}
 		# new collections
-		self._soc_alerts: dict[str, dict[str, Any]] = {}
-		self._threat_hunts: dict[str, dict[str, Any]] = {}
-		self._vulnerability_scans: dict[str, dict[str, Any]] = {}
-		self._patch_reports: dict[str, dict[str, Any]] = {}
-		self._siem_rules: dict[str, dict[str, Any]] = {}
-		self._threat_intel_feeds: dict[str, dict[str, Any]] = {}
+		self._soc_alerts = WriteThruDict('soc_alerts', tenant_id, _store)
+		self._threat_hunts = WriteThruDict('threat_hunts', tenant_id, _store)
+		self._vulnerability_scans = WriteThruDict('vulnerability_scans', tenant_id, _store)
+		self._patch_reports = WriteThruDict('patch_reports', tenant_id, _store)
+		self._siem_rules = WriteThruDict('siem_rules', tenant_id, _store)
+		self._threat_intel_feeds = WriteThruDict('threat_intel_feeds', tenant_id, _store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -1079,3 +1082,11 @@ class SeopService:
 
 	def _normalize_token(self, value: str) -> str:
 		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_soc_alerts', '_threat_hunts', '_vulnerability_scans', '_patch_reports', '_siem_rules', '_threat_intel_feeds']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

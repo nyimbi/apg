@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import statistics
 from datetime import datetime, timezone
 from itertools import count
@@ -44,10 +47,10 @@ class IotdService:
 		self._audit_events: dict[str, DeviceAuditEvent] = {}
 		self._health_reports: dict[str, DeviceHealthReport] = {}
 		self._agents: dict[str, IotdAgent] = {}
-		self._thresholds: dict[str, dict[str, Any]] = {}
+		self._thresholds = WriteThruDict('thresholds', tenant_id, _store)
 		self._heartbeats: dict[str, list[dict[str, Any]]] = {}
-		self._commissioning: dict[str, dict[str, Any]] = {}
-		self._firmware_schedules: dict[str, dict[str, Any]] = {}
+		self._commissioning = WriteThruDict('commissioning', tenant_id, _store)
+		self._firmware_schedules = WriteThruDict('firmware_schedules', tenant_id, _store)
 		self._counter = count(1)
 		self._schema_validator = TelemetrySchemaValidator()
 		self._freshness = DeviceFreshnessInspector()
@@ -974,3 +977,11 @@ def _state_key(tenant_id: str, item_id: str) -> str:
 
 def _reasons(result: dict[str, Any]) -> str:
 	return ", ".join(action.get("reason", "iot_policy_blocked") for action in result["actions"])
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_thresholds', '_commissioning', '_firmware_schedules']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

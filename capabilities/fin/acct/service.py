@@ -16,6 +16,9 @@ Author: Nyimbi Odero <nyimbi@gmail.com>
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import json
 import logging
 import re
@@ -140,8 +143,9 @@ class BankAccountService:
 	# Construction
 	# ------------------------------------------------------------------
 
-	def __init__(self, tenant_id: str | None = None, user_id: str | None = None) -> None:
+	def __init__(self, tenant_id: str | None = None, user_id: str | None = None, db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.user_id = user_id
 
 		# Core stores
@@ -151,7 +155,7 @@ class BankAccountService:
 		self.signatories: dict[str, dict[str, Any]] = {}
 		self.history: dict[str, list[dict[str, Any]]] = {}   # account_id -> list
 		self.products: dict[str, AccountProduct] = deepcopy(_PRODUCTS)
-		self._events: list[dict[str, Any]] = []
+		self._events = WriteThruList('events', tenant_id, _store)
 
 		# Indices
 		self._acct_by_number: dict[str, str] = {}  # acct_number -> account_id
@@ -1166,3 +1170,11 @@ class BankAccountService:
 			"cache_stats": self._cache.stats(),
 			"events_queued": len(self._events),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

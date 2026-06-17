@@ -1,6 +1,9 @@
 """Matter Management — async service layer."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import logging
@@ -67,8 +70,9 @@ DEADLINE_CHAIN_RULES: dict[str, list[dict[str, Any]]] = {
 class MatterManagementService:
 	"""In-memory async service for legal matter lifecycle management."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.matters: dict[str, dict[str, Any]] = {}
 		self.tasks: dict[str, dict[str, Any]] = {}
 		self.deadlines: dict[str, dict[str, Any]] = {}
@@ -80,7 +84,7 @@ class MatterManagementService:
 		self.invoices: dict[str, dict[str, Any]] = {}
 		self.conflict_checks: dict[str, dict[str, Any]] = {}
 		self.attorney_profiles: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -1384,3 +1388,11 @@ class MatterManagementService:
 				"generated_at": self._now(),
 			})
 		return sorted(reports, key=lambda r: r["load_score"], reverse=True)
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

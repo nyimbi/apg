@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import math
 import time
 from datetime import datetime
@@ -51,6 +54,7 @@ class PrescriptiveAnalyticsService:
 		store: Any = None,
 	) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth
 		self._audit_adapter = audit
@@ -62,10 +66,10 @@ class PrescriptiveAnalyticsService:
 		self._recommendations: dict[tuple[str, str], dict[str, Any]] = {}
 		self._whatifs: dict[tuple[str, str], dict[str, Any]] = {}
 		self._simulations: dict[tuple[str, str], dict[str, Any]] = {}
-		self._sensitivity_runs: list[dict[str, Any]] = []
-		self._decisions: list[dict[str, Any]] = []
-		self._lp_runs: list[dict[str, Any]] = []
-		self._audit: list[dict[str, Any]] = []
+		self._sensitivity_runs = WriteThruList('sensitivity_runs', tenant_id, _store)
+		self._decisions = WriteThruList('decisions', tenant_id, _store)
+		self._lp_runs = WriteThruList('lp_runs', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	# ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -987,3 +991,11 @@ class PrescriptiveAnalyticsService:
 		"""Archive Record"""
 		assert record_id
 		return {"record_id": record_id, "status": "archived"}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_sensitivity_runs', '_decisions', '_lp_runs', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

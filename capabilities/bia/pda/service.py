@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import math
 import time
 from datetime import datetime
@@ -54,6 +57,7 @@ class PredictiveAnalyticsService:
 		store: Any = None,
 	) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self._auth = auth
 		self._audit_adapter = audit
@@ -66,11 +70,11 @@ class PredictiveAnalyticsService:
 		self._forecasts: dict[tuple[str, str], dict[str, Any]] = {}
 		self._scenarios: dict[tuple[str, str], dict[str, Any]] = {}
 		self._features: dict[tuple[str, str], dict[str, Any]] = {}
-		self._predictions: list[dict[str, Any]] = []
-		self._drift_reports: list[dict[str, Any]] = []
-		self._automl_runs: list[dict[str, Any]] = []
-		self._eval_results: list[dict[str, Any]] = []
-		self._audit: list[dict[str, Any]] = []
+		self._predictions = WriteThruList('predictions', tenant_id, _store)
+		self._drift_reports = WriteThruList('drift_reports', tenant_id, _store)
+		self._automl_runs = WriteThruList('automl_runs', tenant_id, _store)
+		self._eval_results = WriteThruList('eval_results', tenant_id, _store)
+		self._audit = WriteThruList('audit', tenant_id, _store)
 
 	# ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1699,3 +1703,11 @@ class PredictiveAnalyticsService:
 			"optimise_for": optimise_for,
 		})
 		return result
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_predictions', '_drift_reports', '_automl_runs', '_eval_results', '_audit']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -1,6 +1,9 @@
 """Warehouse Management System async service (scm_wms)."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from copy import deepcopy
@@ -27,8 +30,9 @@ class WarehouseManagementService:
 	"""Async service for bin management, put-away rules, directed pick/pack/ship,
 	cycle counting, cross-docking and slotting optimisation."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.warehouses: dict[str, dict[str, Any]] = {}
 		self.bins: dict[str, dict[str, Any]] = {}
 		self.inventory: dict[str, dict[str, Any]] = {}  # key = tenant:sku:bin_id
@@ -39,7 +43,7 @@ class WarehouseManagementService:
 		self.cycle_counts: dict[str, dict[str, Any]] = {}
 		self.cross_docks: dict[str, dict[str, Any]] = {}
 		self.slotting_optimisations: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		self.lots: dict[str, dict[str, Any]] = {}            # lot tracking
 		self.replenishment_tasks: dict[str, dict[str, Any]] = {}
 		self.dock_appointments: dict[str, dict[str, Any]] = {}
@@ -1481,3 +1485,11 @@ class WarehouseManagementService:
 			"movements": movements,
 			"generated_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

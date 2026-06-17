@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timezone
 from typing import Any
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
@@ -47,6 +50,7 @@ class SmartMeteringService:
 
 	def __init__(self, tenant_id: str = "default", actor_id: str = "system", *, auth=None, audit=None, notify=None, db_url=None, store=None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.actor_id = actor_id
 		self.meters: dict[tuple[str, str], SmartMeter] = {}
 		self.readings: dict[tuple[str, str], IntervalReading] = {}
@@ -58,11 +62,11 @@ class SmartMeteringService:
 		self.agents: dict[tuple[str, str], MetAgent] = {}
 		self.audit_events: list[AuditEvent] = []
 		# Extended stores
-		self._interval_batches: dict[str, dict[str, Any]] = {}
-		self._meter_analytics: dict[str, dict[str, Any]] = {}
-		self._meter_reports: dict[str, dict[str, Any]] = {}
-		self._demand_response_signals: dict[str, dict[str, Any]] = {}
-		self._ami_sync_batches: dict[str, dict[str, Any]] = {}
+		self._interval_batches = WriteThruDict('interval_batches', tenant_id, _store)
+		self._meter_analytics = WriteThruDict('meter_analytics', tenant_id, _store)
+		self._meter_reports = WriteThruDict('meter_reports', tenant_id, _store)
+		self._demand_response_signals = WriteThruDict('demand_response_signals', tenant_id, _store)
+		self._ami_sync_batches = WriteThruDict('ami_sync_batches', tenant_id, _store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -995,3 +999,11 @@ class SmartMeteringService:
 			"by_type": by_type,
 			"computed_at": _now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_interval_batches', '_meter_analytics', '_meter_reports', '_demand_response_signals', '_ami_sync_batches']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

@@ -11,6 +11,9 @@ Website: www.datacraft.co.ke
 """
 
 from __future__ import annotations
+
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 import asyncio
 import logging
@@ -829,16 +832,16 @@ class GragService:
 	"""
 
 	def __init__(self) -> None:
-		self._graphs: dict[str, dict[str, Any]] = {}
-		self._entities: dict[str, dict[str, Any]] = {}
-		self._relationships: dict[str, dict[str, Any]] = {}
-		self._communities: dict[str, dict[str, Any]] = {}
-		self._queries: dict[str, dict[str, Any]] = {}
-		self._subgraphs: dict[str, dict[str, Any]] = {}
+		self._graphs = WriteThruDict('graphs', tenant_id, _store)
+		self._entities = WriteThruDict('entities', tenant_id, _store)
+		self._relationships = WriteThruDict('relationships', tenant_id, _store)
+		self._communities = WriteThruDict('communities', tenant_id, _store)
+		self._queries = WriteThruDict('queries', tenant_id, _store)
+		self._subgraphs = WriteThruDict('subgraphs', tenant_id, _store)
 		self._embeddings: dict[str, list[float]] = {}
-		self._contradictions: dict[str, dict[str, Any]] = {}
-		self._audit_events: dict[str, dict[str, Any]] = {}
-		self._analytics: dict[str, dict[str, Any]] = {}
+		self._contradictions = WriteThruDict('contradictions', tenant_id, _store)
+		self._audit_events = WriteThruDict('audit_events', tenant_id, _store)
+		self._analytics = WriteThruDict('analytics', tenant_id, _store)
 		self._counter = 0
 
 	# ------------------------------------------------------------------

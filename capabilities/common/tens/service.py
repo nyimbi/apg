@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import json
 from typing import Any
 
@@ -40,18 +43,18 @@ class TensService:
 		self.audit_events: dict[str, TenantAuditEventRecord] = {}
 		self.tens_agents: dict[str, TensAgentRecord] = {}
 		# Additional in-memory stores for new methods
-		self._tenant_archives: dict[str, dict[str, Any]] = {}
-		self._tenant_clones: dict[str, dict[str, Any]] = {}
-		self._usage_reports: dict[str, dict[str, Any]] = {}
-		self._billing_summaries: dict[str, dict[str, Any]] = {}
-		self._isolation_checks: dict[str, dict[str, Any]] = {}
-		self._export_jobs: dict[str, dict[str, Any]] = {}
-		self._import_jobs: dict[str, dict[str, Any]] = {}
-		self._subdomain_assignments: dict[str, dict[str, Any]] = {}
-		self._health_checks: dict[str, dict[str, Any]] = {}
-		self._suspensions: dict[str, dict[str, Any]] = {}
-		self._reactivations: dict[str, dict[str, Any]] = {}
-		self._resource_quotas: dict[str, dict[str, Any]] = {}
+		self._tenant_archives = WriteThruDict('tenant_archives', tenant_id, _store)
+		self._tenant_clones = WriteThruDict('tenant_clones', tenant_id, _store)
+		self._usage_reports = WriteThruDict('usage_reports', tenant_id, _store)
+		self._billing_summaries = WriteThruDict('billing_summaries', tenant_id, _store)
+		self._isolation_checks = WriteThruDict('isolation_checks', tenant_id, _store)
+		self._export_jobs = WriteThruDict('export_jobs', tenant_id, _store)
+		self._import_jobs = WriteThruDict('import_jobs', tenant_id, _store)
+		self._subdomain_assignments = WriteThruDict('subdomain_assignments', tenant_id, _store)
+		self._health_checks = WriteThruDict('health_checks', tenant_id, _store)
+		self._suspensions = WriteThruDict('suspensions', tenant_id, _store)
+		self._reactivations = WriteThruDict('reactivations', tenant_id, _store)
+		self._resource_quotas = WriteThruDict('resource_quotas', tenant_id, _store)
 
 	# ------------------------------------------------------------------ #
 	# Original 21 methods                                                  #
@@ -1010,3 +1013,11 @@ class TensService:
 
 	def _normalize_token(self, value: str) -> str:
 		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_tenant_archives', '_tenant_clones', '_usage_reports', '_billing_summaries', '_isolation_checks', '_export_jobs', '_import_jobs', '_subdomain_assignments', '_health_checks', '_suspensions', '_reactivations', '_resource_quotas']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

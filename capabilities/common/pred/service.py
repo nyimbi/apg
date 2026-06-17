@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import math
 from decimal import Decimal, ROUND_HALF_EVEN
 from hashlib import sha256
@@ -49,10 +52,10 @@ class PredService:
 		# Extended stores for world-class improvements
 		self._calibrations: dict[str, tuple[float, float]] = {}  # (A, B) Platt params keyed by tenant:model_id
 		self._monetary_outcomes: dict[str, Decimal] = {}  # score_id -> Decimal outcome
-		self._routing_policies: dict[str, dict[str, Any]] = {}  # tenant:policy_id -> policy
-		self._quota_registry: dict[str, dict[str, Any]] = {}  # tenant_id -> quota state
-		self._latency_records: dict[str, dict[str, Any]] = {}  # score_id -> latency record
-		self._attestations: dict[str, dict[str, Any]] = {}  # score_id -> attestation
+		self._routing_policies = WriteThruDict('routing_policies', tenant_id, _store)  # tenant:policy_id -> policy
+		self._quota_registry = WriteThruDict('quota_registry', tenant_id, _store)  # tenant_id -> quota state
+		self._latency_records = WriteThruDict('latency_records', tenant_id, _store)  # score_id -> latency record
+		self._attestations = WriteThruDict('attestations', tenant_id, _store)  # score_id -> attestation
 		self._lineage_graph: dict[str, set[str]] = {}  # entity_id -> set of upstream entity IDs
 		contract = get_capability_contract()
 		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
@@ -1564,3 +1567,11 @@ class PredService:
 			"root_nodes": roots,
 			"depth": len(path),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_routing_policies', '_quota_registry', '_latency_records', '_attestations']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

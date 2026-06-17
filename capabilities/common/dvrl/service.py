@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 """
 APG Data Virtualization (DVRL) Service Layer — expanded to 42+ methods.
@@ -289,8 +292,9 @@ class DVRLFederationConfigRecord:
 class DVRLLifecycleService:
 	"""Dependency-light DVRL lifecycle and guardrail control plane — expanded to 42+ methods."""
 
-	def __init__(self, tenant_id: str = "default"):
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None):
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self._agent_runtimes = set(SUPPORTED_DVRL_AGENT_RUNTIMES)
 		self._agent_roles = set(SUPPORTED_DVRL_AGENT_ROLES)
 		self._privileged_agent_roles = set(PRIVILEGED_DVRL_AGENT_ROLES)
@@ -307,12 +311,12 @@ class DVRLLifecycleService:
 		self._semantic_layers: dict[str, DVRLSemanticLayerRecord] = {}
 		self._lineage_records: dict[str, DVRLLineageRecord] = {}
 		self._federation_configs: dict[str, DVRLFederationConfigRecord] = {}
-		self._access_policies: dict[str, dict[str, Any]] = {}
-		self._source_catalogs: dict[str, dict[str, Any]] = {}
-		self._virtual_joins: dict[str, dict[str, Any]] = {}
-		self._preview_results: dict[str, dict[str, Any]] = {}
-		self._pushdown_stats: dict[str, dict[str, Any]] = {}
-		self._caching_strategies: dict[str, dict[str, Any]] = {}
+		self._access_policies = WriteThruDict('access_policies', tenant_id, _store)
+		self._source_catalogs = WriteThruDict('source_catalogs', tenant_id, _store)
+		self._virtual_joins = WriteThruDict('virtual_joins', tenant_id, _store)
+		self._preview_results = WriteThruDict('preview_results', tenant_id, _store)
+		self._pushdown_stats = WriteThruDict('pushdown_stats', tenant_id, _store)
+		self._caching_strategies = WriteThruDict('caching_strategies', tenant_id, _store)
 
 	# ------------------------------------------------------------------
 	# Contract
@@ -1036,3 +1040,11 @@ class DVRLLifecycleService:
 	@staticmethod
 	def _key(tenant_id: str, record_id: str) -> str:
 		return f"{tenant_id}:{record_id}"
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_access_policies', '_source_catalogs', '_virtual_joins', '_preview_results', '_pushdown_stats', '_caching_strategies']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

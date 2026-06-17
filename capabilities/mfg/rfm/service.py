@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 from datetime import datetime, timezone
 from typing import Any
 
@@ -21,11 +24,11 @@ def _now() -> str:
 class MfgRfmService:
 	"""Repetitive Manufacturing service — async, in-memory."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
-		self._lines: dict[str, dict[str, Any]] = {}
-		self._schedules: dict[str, dict[str, Any]] = {}
-		self._backflush_records: dict[str, dict[str, Any]] = {}
+		self._lines = WriteThruDict('lines', tenant_id, _store)
+		self._schedules = WriteThruDict('schedules', tenant_id, _store)
+		self._backflush_records = WriteThruDict('backflush_records', tenant_id, _store)
 
 	async def create_production_line(self, line_code: str, line_name: str, item_id: str, item_code: str, takt_time_sec: float | None = None, shifts_per_day: int = 1, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
 		line: dict[str, Any] = {
@@ -112,3 +115,11 @@ class MfgRfmService:
 			"schedules": {"total": len(schedules), "planned": sum(1 for s in schedules if s["status"] == "planned"), "confirmed": sum(1 for s in schedules if s["status"] == "confirmed")},
 			"backflush_records": len(backflushes),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_lines', '_schedules', '_backflush_records']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

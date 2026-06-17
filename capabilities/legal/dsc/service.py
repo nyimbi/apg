@@ -7,6 +7,9 @@ I12 (cost tracking) from WORLD_CLASS_IMPROVEMENTS.md.
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import hmac
@@ -50,8 +53,9 @@ class DocumentEDiscoveryService:
 	matter cost tracker.
 	"""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.documents: dict[str, dict[str, Any]] = {}
 		self.privilege_log: dict[str, dict[str, Any]] = {}
 		self.privilege_challenges: dict[str, dict[str, Any]] = {}
@@ -60,21 +64,21 @@ class DocumentEDiscoveryService:
 		self.hold_acknowledgements: dict[str, dict[str, Any]] = {}  # ack_id -> record
 		self.production_sets: dict[str, dict[str, Any]] = {}
 		self.access_log: list[dict[str, Any]] = []
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# Rolling Bates counter keyed by matter_id (I9)
 		self._matter_bates: dict[str, int] = {}
 		# Document version history keyed by doc_id (I11-adjacent)
 		self._version_history: dict[str, list[dict[str, Any]]] = {}
 		# Review codings keyed by coding_id (I5)
-		self._review_codings: dict[str, dict[str, Any]] = {}
+		self._review_codings = WriteThruDict('review_codings', tenant_id, _store)
 		# Redaction log keyed by redaction_id (I6)
-		self._redaction_log: dict[str, dict[str, Any]] = {}
+		self._redaction_log = WriteThruDict('redaction_log', tenant_id, _store)
 		# Discovery deadlines keyed by deadline_id (I7)
-		self._deadlines: dict[str, dict[str, Any]] = {}
+		self._deadlines = WriteThruDict('deadlines', tenant_id, _store)
 		# Cost entries keyed by cost_id (I12)
-		self._cost_entries: dict[str, dict[str, Any]] = {}
+		self._cost_entries = WriteThruDict('cost_entries', tenant_id, _store)
 		# Secure share tokens keyed by token (I15)
-		self._share_tokens: dict[str, dict[str, Any]] = {}
+		self._share_tokens = WriteThruDict('share_tokens', tenant_id, _store)
 		self._share_secret: str = secrets.token_hex(32)
 
 	# ── Internals ────────────────────────────────────────────────────────────
@@ -1147,3 +1151,11 @@ class DocumentEDiscoveryService:
 		tenant = self._tenant(tenant_id)
 		events = [deepcopy(e) for e in self._audit_events if e["tenant_id"] == tenant]
 		return events[-limit:]
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_review_codings', '_redaction_log', '_deadlines', '_cost_entries', '_share_tokens', '_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

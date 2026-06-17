@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import time
 from typing import Any, AsyncGenerator
@@ -31,14 +34,14 @@ class AgntService:
 		self._planner = AgentCompositionPlanner()
 
 		# Extended stores
-		self._tools: dict[str, dict[str, Any]] = {}           # tool_name -> spec
+		self._tools = WriteThruDict('tools', tenant_id, _store)           # tool_name -> spec
 		self._agent_tools: dict[str, set[str]] = {}           # agent_key -> {tool_names}
 		self._memory_store: dict[str, list[dict[str, Any]]] = {}  # agent_key -> [chunks]
 		self._working_memory: dict[str, list[dict[str, Any]]] = {}  # session_id -> [turns]
-		self._session_contexts: dict[str, dict[str, Any]] = {}     # session_id -> context
+		self._session_contexts = WriteThruDict('session_contexts', tenant_id, _store)     # session_id -> context
 		self._cost_ledger: dict[str, list[dict[str, Any]]] = {}    # agent_key -> [{cost, ts}]
 		self._guardrail_hits: dict[str, list[dict[str, Any]]] = {} # agent_key -> [hits]
-		self._ab_results: dict[str, dict[str, Any]] = {}
+		self._ab_results = WriteThruDict('ab_results', tenant_id, _store)
 
 		for runtime in _default_runtimes():
 			self._runtimes[self._key(runtime.tenant_id, runtime.name)] = runtime
@@ -960,3 +963,11 @@ def _raise_if_blocked(result: dict[str, Any]) -> None:
 	if result["decision"] == "require_review":
 		raise PermissionError(reasons or "agent_composition_review_required")
 	raise PermissionError(reasons or "agent_composition_policy_blocked")
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_tools', '_session_contexts', '_ab_results']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

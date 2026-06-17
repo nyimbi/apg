@@ -1,6 +1,9 @@
 """Returns & Reverse Logistics async service (scm_rrl)."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 from collections import defaultdict
@@ -44,8 +47,9 @@ class ReturnsService:
 	"""Async service for RMA processing, refurbishment workflows,
 	disposal management, credit notes and reverse shipment tracking."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.rmas: dict[str, dict[str, Any]] = {}
 		self.refurbishments: dict[str, dict[str, Any]] = {}
 		self.disposals: dict[str, dict[str, Any]] = {}
@@ -54,7 +58,7 @@ class ReturnsService:
 		self.return_inspections: dict[str, dict[str, Any]] = {}
 		self._rma_seq: int = 3000
 		self._cn_seq: int = 7000
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	def _now(self) -> str:
 		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -606,3 +610,11 @@ class ReturnsService:
 			else:
 				results.append(item)
 		return {"created": len(results), "failed": len(errors), "rmas": results, "errors": errors}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

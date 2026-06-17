@@ -1,6 +1,9 @@
 """Temporal durable workflow execution service."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 import os
 from datetime import datetime, timezone
@@ -32,13 +35,13 @@ class TemporalService:
 	back to an in-memory stub suitable for testing and development.
 	"""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
 		self._host = os.environ.get("TEMPORAL_HOST", "")
 		self._namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
 		self._adapter: Any = None
 		# In-memory stub for dev/test when Temporal is not running
-		self._stub_workflows: dict[str, dict[str, Any]] = {}
+		self._stub_workflows = WriteThruDict('stub_workflows', tenant_id, _store)
 
 	async def connect(self) -> None:
 		if self._host:
@@ -283,3 +286,11 @@ class TemporalService:
 
 	async def get_audit_events(self, *, limit: int = 50) -> list[dict[str, Any]]:
 		return []
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_stub_workflows']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

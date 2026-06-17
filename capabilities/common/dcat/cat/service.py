@@ -1,6 +1,9 @@
 """Data Catalog service — dataset registry, lineage, metadata, glossary."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import logging
 import math
@@ -42,21 +45,22 @@ _COMPLETENESS_FIELDS = [
 class DataCatalogService:
 	"""Dataset registry with lineage graph, metadata tagging, glossary, and ownership tracking."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.datasets: dict[str, dict[str, Any]] = {}
 		self.lineage_edges: dict[str, dict[str, Any]] = {}
 		self.tags: dict[str, dict[str, Any]] = {}
 		self.glossary_terms: dict[str, dict[str, Any]] = {}
 		self.ownership_records: dict[str, dict[str, Any]] = {}
 		self.schema_versions: dict[str, list[dict[str, Any]]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# New state stores
 		self._quality_scores: dict[str, list[dict[str, Any]]] = {}          # dataset_id -> list of score records
-		self._access_log: list[dict[str, Any]] = []                          # raw access events
-		self._term_column_links: list[dict[str, Any]] = []                   # glossary-term → column bindings
-		self._data_contracts: dict[str, dict[str, Any]] = {}                 # contract_id -> contract
-		self._deprecations: dict[str, dict[str, Any]] = {}                   # dataset_id -> deprecation record
+		self._access_log = WriteThruList('access_log', tenant_id, _store)                          # raw access events
+		self._term_column_links = WriteThruList('term_column_links', tenant_id, _store)                   # glossary-term → column bindings
+		self._data_contracts = WriteThruDict('data_contracts', tenant_id, _store)                 # contract_id -> contract
+		self._deprecations = WriteThruDict('deprecations', tenant_id, _store)                   # dataset_id -> deprecation record
 		self._embeddings: dict[str, list[float]] = {}                        # dataset_id -> embedding vector
 
 	def _tenant(self, tenant_id: str | None = None) -> str:
@@ -1273,3 +1277,11 @@ class DataCatalogService:
 			"generated_at": self._now(),
 			"total": len(graph),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_data_contracts', '_deprecations', '_audit_events', '_access_log', '_term_column_links']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

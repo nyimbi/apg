@@ -2,6 +2,9 @@
 utility pay, send money confirmation."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import logging
@@ -70,8 +73,9 @@ _DEFAULT_MERCHANTS: dict[str, str] = {
 class PayUssdService:
 	"""Async service for USSD payment operations."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		# In-memory stores
 		self.bill_payments: dict[str, dict[str, Any]] = {}
 		self.merchant_payments: dict[str, dict[str, Any]] = {}
@@ -82,7 +86,7 @@ class PayUssdService:
 		self.ussd_sessions: dict[str, dict[str, Any]] = {}
 		self.pin_store: dict[str, str] = {}  # phone_number -> pin_hash
 		self.pin_attempts: dict[str, int] = {}  # phone_number -> count
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# Seed built-in billers
 		self._seed_billers()
 
@@ -933,3 +937,11 @@ class PayUssdService:
 			"max_airtime_amount": str(MAX_AIRTIME_AMOUNT),
 			"built_in_billers": len([b for b in self.billers.values() if b.get("built_in")]),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

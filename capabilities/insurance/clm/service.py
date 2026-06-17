@@ -4,6 +4,9 @@ Handles FNOL, assessment, reserve management, payments, fraud detection, and sub
 """
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import logging
 from copy import deepcopy
 from datetime import date, datetime
@@ -27,15 +30,16 @@ FRAUD_HIGH_THRESHOLD = 0.75
 class ClaimsManagementService:
 	"""In-memory executable service for the Claims Management lifecycle."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.claims: dict[str, dict[str, Any]] = {}
 		self.reserves: dict[str, dict[str, Any]] = {}
 		self.payments: dict[str, dict[str, Any]] = {}
 		self.fraud_assessments: dict[str, dict[str, Any]] = {}
 		self.subrogations: dict[str, dict[str, Any]] = {}
 		self.assessments: dict[str, dict[str, Any]] = {}
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		self._claim_seq: int = 0
 
 	def _tenant(self, tenant_id: str | None = None) -> str:
@@ -1133,3 +1137,11 @@ class ClaimsManagementService:
 		summary["tenant_id"] = tenant
 		summary["generated_at"] = self._now()
 		return summary
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+

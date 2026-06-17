@@ -1,6 +1,9 @@
 """Procurement Management async service (scm_prc)."""
 from __future__ import annotations
 
+from capabilities.common.db import get_store
+from capabilities.common.db.write_thru import WriteThruDict, WriteThruList
+
 import asyncio
 import hashlib
 import json
@@ -31,8 +34,9 @@ class ProcurementService:
 	"""Async service for RFQ, purchase orders, three-way match,
 	vendor evaluation, contract compliance and spend analytics."""
 
-	def __init__(self, tenant_id: str = "default") -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self.tenant_id = tenant_id
+		_store = get_store(db_url)
 		self.rfqs: dict[str, dict[str, Any]] = {}
 		self.rfq_responses: dict[str, dict[str, Any]] = {}
 		self.purchase_orders: dict[str, dict[str, Any]] = {}
@@ -45,7 +49,7 @@ class ProcurementService:
 		self.sla_config: dict[str, int] = dict(DEFAULT_SLA_HOURS)  # overridable per tenant
 		self._rfq_seq: int = 5000
 		self._po_seq: int = 8000
-		self._audit_events: list[dict[str, Any]] = []
+		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		self._audit_chain_hash: str = ""  # tamper-evident chain
 
 	def _now(self) -> str:
@@ -1176,3 +1180,11 @@ class ProcurementService:
 			"po_sent_to_received_hours": _stats(po_sent_to_received),
 			"generated_at": self._now(),
 		}
+
+	async def initialize(self) -> None:
+		"""Restore persisted data from the database. Call once after __init__ in production."""
+		for attr in ['_audit_events']:
+			obj = getattr(self, attr, None)
+			if obj is not None and hasattr(obj, "reload"):
+				await obj.reload()
+
