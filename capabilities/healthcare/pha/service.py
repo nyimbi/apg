@@ -58,13 +58,14 @@ class PolicyViolationError(ValueError):
 class PharmacyManagementService:
 	"""Tenant-scoped pharmacy management runtime."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._drugs: dict[tuple[str, str], DrugResponse] = {}
 		self._dispense_orders: dict[tuple[str, str], DispenseOrderResponse] = {}
 		self._interactions: dict[tuple[str, str], DrugInteractionResponse] = {}
 		self._controlled_logs: dict[tuple[str, str], ControlledSubstanceLogResponse] = {}
 		self._inventory: dict[tuple[str, str], InventoryItemResponse] = {}
 		self._prior_auths: dict[tuple[str, str], PriorAuthResponse] = {}
+		_store = get_store(db_url)
 		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# Unstructured operation stores (raw dict results)
 		self._prescription_verifications: dict[tuple[str, str], dict[str, Any]] = {}

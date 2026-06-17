@@ -34,7 +34,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class TensService:
 	"""Deterministic legacy tenant service for APG composition."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self.legacy_tenants: dict[str, LegacyTenantRecord] = {}
 		self.mappings: dict[str, TenantMappingRecord] = {}
 		self.boundaries: dict[str, AccessBoundaryRecord] = {}
@@ -43,6 +43,7 @@ class TensService:
 		self.audit_events: dict[str, TenantAuditEventRecord] = {}
 		self.tens_agents: dict[str, TensAgentRecord] = {}
 		# Additional in-memory stores for new methods
+		_store = get_store(db_url)
 		self._tenant_archives = WriteThruDict('tenant_archives', tenant_id, _store)
 		self._tenant_clones = WriteThruDict('tenant_clones', tenant_id, _store)
 		self._usage_reports = WriteThruDict('usage_reports', tenant_id, _store)

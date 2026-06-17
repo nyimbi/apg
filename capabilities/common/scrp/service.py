@@ -52,7 +52,7 @@ class ScraperDataHarvestingService:
 	data_deduplication, scraping_analytics.
 	"""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._sources: dict[str, HarvestSource] = {}
 		self._extractors: dict[str, ExtractorProfile] = {}
 		self._jobs: dict[str, HarvestJob] = {}
@@ -62,6 +62,7 @@ class ScraperDataHarvestingService:
 		self._agents: dict[str, HarvestAgent] = {}
 		self._audit_events: list[ScrpAuditEvent] = []
 		# New stores
+		_store = get_store(db_url)
 		self._scheduled_tasks = WriteThruDict('scheduled_tasks', tenant_id, _store)
 		self._rate_limits = WriteThruDict('rate_limits', tenant_id, _store)
 		self._proxy_pool = WriteThruList('proxy_pool', tenant_id, _store)

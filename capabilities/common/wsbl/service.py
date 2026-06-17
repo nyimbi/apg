@@ -32,7 +32,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class WsblService:
 	"""Dependency-light website-builder runtime behind the capability contract."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._sites: dict[str, WebsiteSiteRecord] = {}
 		self._domains: dict[str, WebsiteDomainRecord] = {}
 		self._components: dict[str, WebsiteComponentRecord] = {}
@@ -42,6 +42,7 @@ class WsblService:
 		self._audit_events: list[WebsiteAuditEventRecord] = []
 		# ── WebSocket Broker state ─────────────────────────────────────────────
 		# keyed by "tenant_id:connection_id"
+		_store = get_store(db_url)
 		self._connections = WriteThruDict('connections', tenant_id, _store)
 		# keyed by "tenant_id:room_id"
 		self._rooms = WriteThruDict('rooms', tenant_id, _store)

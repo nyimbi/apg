@@ -33,6 +33,7 @@ class MfgMrpService:
 	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
 		# keyed by id
+		_store = get_store(db_url)
 		self._planning_runs = WriteThruDict('planning_runs', tenant_id, _store)
 		self._production_orders = WriteThruDict('production_orders', tenant_id, _store)
 		self._purchase_requisitions = WriteThruDict('purchase_requisitions', tenant_id, _store)

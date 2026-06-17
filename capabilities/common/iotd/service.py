@@ -38,7 +38,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class IotdService:
 	"""Tenant-aware IoT device, telemetry, command, firmware, and health runtime."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._devices: dict[str, DeviceIdentity] = {}
 		self._telemetry: dict[str, TelemetryEvent] = {}
 		self._commands: dict[str, DeviceCommand] = {}
@@ -47,6 +47,7 @@ class IotdService:
 		self._audit_events: dict[str, DeviceAuditEvent] = {}
 		self._health_reports: dict[str, DeviceHealthReport] = {}
 		self._agents: dict[str, IotdAgent] = {}
+		_store = get_store(db_url)
 		self._thresholds = WriteThruDict('thresholds', tenant_id, _store)
 		self._heartbeats: dict[str, list[dict[str, Any]]] = {}
 		self._commissioning = WriteThruDict('commissioning', tenant_id, _store)

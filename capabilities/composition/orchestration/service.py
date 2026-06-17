@@ -30,7 +30,8 @@ except ImportError:
 class WorkflowOrchestrationService:
 	"""Tenant-scoped workflow definition, release, and execution coordinator."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
+		_store = get_store(db_url)
 		self._definitions = WriteThruDict('definitions', tenant_id, _store)
 		self._tasks = WriteThruDict('tasks', tenant_id, _store)
 		self._releases = WriteThruDict('releases', tenant_id, _store)

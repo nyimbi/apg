@@ -79,7 +79,7 @@ class GraphRAGConfig:
 
 class GraphRAGServiceError(Exception):
 	"""Base exception for GraphRAG service operations"""
-	def __init__(self, message: str, error_code: str = "GRAPHRAG_ERROR", details: Optional[Dict[str, Any]] = None):
+	def __init__(self, message: str, error_code: str = "GRAPHRAG_ERROR", details: Optional[Dict[str, Any]] = None, db_url: str | None = None):
 		super().__init__(message)
 		self.error_code = error_code
 		self.details = details or {}
@@ -831,7 +831,8 @@ class GragService:
 	with full audit trail and analytics.  All public methods are async.
 	"""
 
-	def __init__(self) -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
+		_store = get_store(db_url)
 		self._graphs = WriteThruDict('graphs', tenant_id, _store)
 		self._entities = WriteThruDict('entities', tenant_id, _store)
 		self._relationships = WriteThruDict('relationships', tenant_id, _store)

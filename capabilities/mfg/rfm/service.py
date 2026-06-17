@@ -26,6 +26,7 @@ class MfgRfmService:
 
 	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
+		_store = get_store(db_url)
 		self._lines = WriteThruDict('lines', tenant_id, _store)
 		self._schedules = WriteThruDict('schedules', tenant_id, _store)
 		self._backflush_records = WriteThruDict('backflush_records', tenant_id, _store)

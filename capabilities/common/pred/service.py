@@ -39,7 +39,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class PredService:
 	"""In-process forecasting, scoring, simulation, drift, and governance service."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._models: dict[str, PredictiveModel] = {}
 		self._feature_sets: dict[str, FeatureSet] = {}
 		self._forecasts: dict[str, ForecastRun] = {}
@@ -52,6 +52,7 @@ class PredService:
 		# Extended stores for world-class improvements
 		self._calibrations: dict[str, tuple[float, float]] = {}  # (A, B) Platt params keyed by tenant:model_id
 		self._monetary_outcomes: dict[str, Decimal] = {}  # score_id -> Decimal outcome
+		_store = get_store(db_url)
 		self._routing_policies = WriteThruDict('routing_policies', tenant_id, _store)  # tenant:policy_id -> policy
 		self._quota_registry = WriteThruDict('quota_registry', tenant_id, _store)  # tenant_id -> quota state
 		self._latency_records = WriteThruDict('latency_records', tenant_id, _store)  # score_id -> latency record

@@ -39,7 +39,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class PoseService:
 	"""In-process pose service enforcing tenant, consent, quality, and audit guardrails."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._models: dict[str, PoseModelRecord] = {}
 		self._sessions: dict[str, PoseSessionRecord] = {}
 		self._frames: dict[str, PoseFrameRecord] = {}
@@ -50,6 +50,7 @@ class PoseService:
 		self._audit_events: dict[str, PoseAuditEvent] = {}
 		# Additional in-memory stores for new methods
 		self._skeletal_tracks: dict[str, list[dict[str, Any]]] = {}
+		_store = get_store(db_url)
 		self._action_events = WriteThruDict('action_events', tenant_id, _store)
 		self._gesture_events = WriteThruDict('gesture_events', tenant_id, _store)
 		self._fall_events = WriteThruDict('fall_events', tenant_id, _store)

@@ -45,7 +45,8 @@ class AdvancedCRMService:
 	crm_dashboard.
 	"""
 
-	def __init__(self) -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
+		_store = get_store(db_url)
 		self._accounts = WriteThruDict('accounts', tenant_id, _store)
 		self._contacts = WriteThruDict('contacts', tenant_id, _store)
 		self._leads = WriteThruDict('leads', tenant_id, _store)
@@ -1854,7 +1855,8 @@ class CRMService:
 	retained for backward-compatibility with older callers.
 	"""
 
-	def __init__(self) -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
+		_store = get_store(db_url)
 		from .database import DatabaseManager
 		self.db_manager = DatabaseManager()
 

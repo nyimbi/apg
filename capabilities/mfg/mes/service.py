@@ -31,6 +31,7 @@ class MfgMesService:
 
 	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
+		_store = get_store(db_url)
 		self._work_orders = WriteThruDict('work_orders', tenant_id, _store)
 		self._production_events = WriteThruDict('production_events', tenant_id, _store)
 		self._downtime_records = WriteThruDict('downtime_records', tenant_id, _store)

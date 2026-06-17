@@ -41,6 +41,7 @@ class TemporalService:
 		self._namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
 		self._adapter: Any = None
 		# In-memory stub for dev/test when Temporal is not running
+		_store = get_store(db_url)
 		self._stub_workflows = WriteThruDict('stub_workflows', tenant_id, _store)
 
 	async def connect(self) -> None:

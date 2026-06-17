@@ -35,7 +35,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class SrchService:
 	"""Deterministic enterprise-search service for APG composition."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self.indices: dict[str, SearchIndexRecord] = {}
 		self.documents: dict[str, SearchDocumentRecord] = {}
 		self.queries: dict[str, QueryRecord] = {}
@@ -51,6 +51,7 @@ class SrchService:
 		# Extended stores
 		self._synonyms: dict[str, list[list[str]]] = {}        # collection -> synonym groups
 		self._boost_fields: dict[str, dict[str, float]] = {}   # collection -> {field: boost}
+		_store = get_store(db_url)
 		self._mappings = WriteThruDict('mappings', tenant_id, _store)         # collection -> field configs
 		self._webhooks = WriteThruDict('webhooks', tenant_id, _store)         # not used here — placeholder
 

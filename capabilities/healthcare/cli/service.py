@@ -61,6 +61,7 @@ class ClinicalManagementService:
 		self._handoffs: dict[tuple[str, str], HandoffResponse] = {}
 		self._pathways: dict[tuple[str, str], dict[str, Any]] = {}
 		self._patient_pathways: list[dict[str, Any]] = {}
+		_store = get_store(db_url)
 		self._audits = WriteThruList('audits', tenant_id, _store)
 		self._mm_reviews = WriteThruList('mm_reviews', tenant_id, _store)
 		self._peer_reviews = WriteThruList('peer_reviews', tenant_id, _store)

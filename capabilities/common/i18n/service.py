@@ -37,7 +37,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class I18nService:
 	"""Tenant-aware locale, glossary, translation, coverage, and publishing runtime."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._locales: dict[str, LocaleDefinition] = {}
 		self._glossary_terms: dict[str, GlossaryTerm] = {}
 		self._translations: dict[str, TranslationEntry] = {}
@@ -47,6 +47,7 @@ class I18nService:
 		self._audit_events: dict[str, I18nAuditEvent] = {}
 		# extra in-memory stores for new methods
 		self._translation_versions: dict[str, list[dict[str, Any]]] = {}
+		_store = get_store(db_url)
 		self._machine_translation_jobs = WriteThruDict('machine_translation_jobs', tenant_id, _store)
 		self._plural_rules = WriteThruDict('plural_rules', tenant_id, _store)
 		self._font_hints = WriteThruDict('font_hints', tenant_id, _store)

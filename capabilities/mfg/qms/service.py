@@ -31,6 +31,7 @@ class MfgQmsService:
 
 	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
+		_store = get_store(db_url)
 		self._inspections = WriteThruDict('inspections', tenant_id, _store)
 		self._ncrs = WriteThruDict('ncrs', tenant_id, _store)
 		self._capas = WriteThruDict('capas', tenant_id, _store)

@@ -268,7 +268,7 @@ class MqebAuditEventRecord:
 class MqebService:
 	"""Dependency-light MQEB event-fabric service for generated APG applications."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		from .capability_contract import (
 			PRIVILEGED_MQEB_AGENT_ROLES,
 			SUPPORTED_MQEB_AGENT_ROLES,
@@ -299,6 +299,7 @@ class MqebService:
 		self._idempotency_cache: dict[str, tuple[str, datetime]] = {}
 
 		# I12: tenant quota configs and sliding-window counters
+		_store = get_store(db_url)
 		self._tenant_quotas = WriteThruDict('tenant_quotas', tenant_id, _store)
 		self._tenant_quota_counters = WriteThruDict('tenant_quota_counters', tenant_id, _store)
 

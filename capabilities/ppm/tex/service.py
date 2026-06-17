@@ -83,6 +83,7 @@ class TimeExpenseService:
 		self.audit_events: list[dict[str, Any]] = []
 		# Extended state
 		self._per_diem_records: dict[str, list[dict[str, Any]]] = {}  # employee_id -> records
+		_store = get_store(db_url)
 		self._analytics_cache = WriteThruDict('analytics_cache', tenant_id, self._store)
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:

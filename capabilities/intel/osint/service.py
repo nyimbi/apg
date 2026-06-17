@@ -179,10 +179,12 @@ class OSINTService:
 		db_session: Any = None,
 		tenant_id: str = "default",
 		actor_id: str = "system",
+		db_url: str | None = None,
 	) -> None:
 		self._db = db_session
 		self._tenant_id = tenant_id
 		self._actor_id = actor_id
+		_store = get_store(db_url)
 
 		# In-memory stores keyed by (tenant_id, id)
 		self._sources: dict[tuple[str, str], OSINTSourceResponse] = {}

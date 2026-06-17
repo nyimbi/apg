@@ -36,7 +36,7 @@ def _utc_now() -> str:
 class ChatService:
 	"""Room registry, message stream, presence store, moderation queue, and analytics."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._rooms: dict[str, ChatRoom] = {}
 		self._messages: dict[str, ChatMessage] = {}
 		self._presence: dict[str, ChatPresence] = {}
@@ -45,6 +45,7 @@ class ChatService:
 		self._chat_agents: dict[str, ChatAgentRecord] = {}
 		self._lifecycle_batches: dict[str, ChatLifecycleBatchRecord] = {}
 		# Extended stores
+		_store = get_store(db_url)
 		self._reactions = WriteThruDict('reactions', tenant_id, _store)       # message_id -> {emoji: [user_ids]}
 		self._threads: dict[str, list[str]] = {}              # parent_message_id -> [reply_message_ids]
 		self._pinned: dict[str, list[str]] = {}               # room_id -> [message_ids]

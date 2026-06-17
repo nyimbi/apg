@@ -146,8 +146,10 @@ class TokenizationService:
 		db: Any = None,
 		vault_key: str | None = None,
 		bulk_concurrency: int = 50,
+		db_url: str | None = None,
 	) -> None:
 		self._tenant_id = tenant_id
+		_store = get_store(db_url)
 		self._db = db
 		# In-memory token vault: {token: encrypted_pan}
 		self._vault: dict[str, bytes] = {}

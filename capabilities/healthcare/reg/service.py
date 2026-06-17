@@ -67,6 +67,7 @@ class HealthcareRegulatoryService:
 		self._incidents: dict[tuple[str, str], IncidentResponse] = {}
 		self._submissions: dict[tuple[str, str], RegulatorySubmissionResponse] = {}
 		self._corrective_actions: dict[tuple[str, str], CorrectiveActionResponse] = {}
+		_store = get_store(db_url)
 		self._inspections = WriteThruList('inspections', tenant_id, _store)
 		self._inspection_findings = WriteThruList('inspection_findings', tenant_id, _store)
 		self._hipaa_assessments = WriteThruList('hipaa_assessments', tenant_id, _store)

@@ -101,7 +101,7 @@ def _present(v: str | None) -> bool:
 class RemoteWorkforceService:
 	"""Tenant-scoped runtime for the Remote Workforce capability."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._work_policies: dict[tuple[str, str], WorkPolicyResponse] = {}
 		self._acknowledgments: dict[tuple[str, str], PolicyAcknowledgmentResponse] = {}
 		self._vpn_access: dict[tuple[str, str], VpnAccessResponse] = {}
@@ -112,6 +112,7 @@ class RemoteWorkforceService:
 		self._onboarding_steps: dict[tuple[str, str], OnboardingStepResponse] = {}
 		self._compliance_checks: dict[tuple[str, str], ComplianceCheckResponse] = {}
 		self._incidents: dict[tuple[str, str], RemoteIncidentResponse] = {}
+		_store = get_store(db_url)
 		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# track per-employee equipment count: (tenant_id, employee_id) -> count
 		self._employee_equipment_count: dict[tuple[str, str], int] = {}

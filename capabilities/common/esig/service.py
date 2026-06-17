@@ -80,6 +80,7 @@ class ESignatureService:
 		self._tenant_id = tenant_id
 		self._db = db
 		self._signatures: dict[str, ESignatureRecord] = {}  # in-memory store
+		_store = get_store(db_url)
 		self._audit_trail = WriteThruList('audit_trail', tenant_id, _store)
 
 	async def sign(

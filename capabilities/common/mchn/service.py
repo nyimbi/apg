@@ -22,7 +22,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class MchnService:
 	"""Tenant-aware channel, template, route, render, delivery, and receipt service."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._channels: dict[str, OutputChannel] = {}
 		self._templates: dict[str, OutputTemplate] = {}
 		self._policies: dict[str, DeliveryPolicy] = {}
@@ -34,6 +34,7 @@ class MchnService:
 		self._agents: dict[str, MchnAgent] = {}
 		self._runtime = OutputRuntime()
 		# Additional in-memory stores for new methods
+		_store = get_store(db_url)
 		self._channel_health_checks = WriteThruDict('channel_health_checks', tenant_id, _store)
 		self._retry_policies = WriteThruDict('retry_policies', tenant_id, _store)
 		self._suppression_lists: dict[str, set[str]] = {}

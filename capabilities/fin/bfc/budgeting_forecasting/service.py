@@ -139,6 +139,7 @@ class BFCService:
 		actor_id: str,
 		*,
 		_shared_store: dict[str, Any] | None = None,
+		db_url: str | None = None,
 	) -> None:
 		assert_tenant_context(tenant_id)
 		assert_actor_present(actor_id)

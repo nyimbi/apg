@@ -98,7 +98,7 @@ def _norm(v: str) -> str:
 class MobileAppPlatformService:
 	"""Tenant-scoped runtime for the Mobile App Platform capability."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._apps: dict[tuple[str, str], MobileAppResponse] = {}
 		self._versions: dict[tuple[str, str], AppVersionResponse] = {}
 		self._sync_sessions: dict[tuple[str, str], SyncSessionResponse] = {}
@@ -106,6 +106,7 @@ class MobileAppPlatformService:
 		self._biometrics: dict[tuple[str, str], BiometricEnrollmentResponse] = {}
 		self._permissions: dict[tuple[str, str], PermissionScopeResponse] = {}
 		self._analytics: dict[tuple[str, str], AppAnalyticsEventResponse] = {}
+		_store = get_store(db_url)
 		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		self._notification_counts: dict[tuple[str, str], int] = {}  # (tenant, device) -> hourly count
 

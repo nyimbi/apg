@@ -24,7 +24,7 @@ def _now() -> str:
 class AgntService:
 	"""In-memory agent registry, runtime registry, team validator, plan builder, and execution engine."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._agents: dict[str, AgentDefinition] = {}
 		self._runtimes: dict[str, AgentRuntime] = {}
 		self._teams: dict[str, AgentTeam] = {}
@@ -34,6 +34,7 @@ class AgntService:
 		self._planner = AgentCompositionPlanner()
 
 		# Extended stores
+		_store = get_store(db_url)
 		self._tools = WriteThruDict('tools', tenant_id, _store)           # tool_name -> spec
 		self._agent_tools: dict[str, set[str]] = {}           # agent_key -> {tool_names}
 		self._memory_store: dict[str, list[dict[str, Any]]] = {}  # agent_key -> [chunks]

@@ -70,13 +70,14 @@ class PolicyViolationError(ValueError):
 class LaboratoryInformationService:
 	"""Tenant-scoped LIS runtime with QC, critical values, and chain of custody."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._orders: dict[tuple[str, str], LabOrderResponse] = {}
 		self._specimens: dict[tuple[str, str], SpecimenResponse] = {}
 		self._results: dict[tuple[str, str], LabResultResponse] = {}
 		self._critical_values: dict[tuple[str, str], CriticalValueNotification] = {}
 		self._qc_runs: dict[tuple[str, str], QCRunResponse] = {}
 		self._instruments: dict[tuple[str, str], InstrumentResponse] = {}
+		_store = get_store(db_url)
 		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# Extended stores
 		self._specimen_labels: dict[tuple[str, str], dict[str, Any]] = {}

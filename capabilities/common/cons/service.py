@@ -38,7 +38,7 @@ def _utc_now_iso() -> str:
 class ConsService:
 	"""Tenant-scoped purpose registry, consent ledger, preference, and request service."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._purposes: dict[str, PrivacyPurpose] = {}
 		self._notices: dict[str, PrivacyNotice] = {}
 		self._consents: dict[str, ConsentEvent] = {}
@@ -47,6 +47,7 @@ class ConsService:
 		self._processing_decisions: dict[str, ProcessingDecision] = {}
 		self._agents: dict[str, PrivacyAgent] = {}
 		self._audit_events: list[PrivacyAuditEvent] = []
+		_store = get_store(db_url)
 		self._dpa_register = WriteThruDict('dpa_register', tenant_id, _store)
 		self._breach_records = WriteThruDict('breach_records', tenant_id, _store)
 		self._pia_records = WriteThruDict('pia_records', tenant_id, _store)

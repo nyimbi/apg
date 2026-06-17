@@ -140,6 +140,7 @@ class GLService:
 		guard_tenant_id(tenant_id)
 		self._tenant_id = tenant_id
 		# In-memory stores (production: inject DB session)
+		_store = get_store(db_url)
 		self._accounts = WriteThruDict('accounts', tenant_id, _store)          # code -> account
 		self._journal_entries = WriteThruList('journal_entries', tenant_id, _store)        # append-only
 		self._periods = WriteThruDict('periods', tenant_id, _store)           # period_id -> period

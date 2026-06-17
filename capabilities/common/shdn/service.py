@@ -36,7 +36,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class ShdnService:
 	"""Deterministic lifecycle-control service for APG composition."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self.targets: dict[str, ShutdownTargetRecord] = {}
 		self.plans: dict[str, ShutdownPlanRecord] = {}
 		self.drains: dict[str, DrainOperationRecord] = {}
@@ -46,6 +46,7 @@ class ShdnService:
 		self.audit_events: dict[str, LifecycleAuditEventRecord] = {}
 		self.shdn_agents: dict[str, ShdnAgentRecord] = {}
 		# Additional in-memory stores for new methods
+		_store = get_store(db_url)
 		self._maintenance_windows = WriteThruDict('maintenance_windows', tenant_id, _store)
 		self._restart_records = WriteThruDict('restart_records', tenant_id, _store)
 		self._checkpoint_store = WriteThruDict('checkpoint_store', tenant_id, _store)

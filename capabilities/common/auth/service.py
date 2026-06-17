@@ -34,7 +34,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class AuthService:
 	"""Tenant identity control plane backed by the executable AUTH contract."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._identities: dict[tuple[str, str], AuthIdentity] = {}
 		self._roles: dict[tuple[str, str], AuthRole] = {}
 		self._role_approvals: dict[tuple[str, str], AuthRoleAssignmentApproval] = {}
@@ -941,6 +941,7 @@ class AuthService:
 		sig      = base64.urlsafe_b64encode(hashlib.sha256(sig_seed.encode()).digest()).rstrip(b"=").decode()
 		token    = f"{h_enc}.{p_enc}.{sig}"
 		if not hasattr(self, "_jwt_registry"):
+			_store = get_store(db_url)
 			self._jwt_registry = WriteThruDict('jwt_registry', tenant_id, _store)
 			self._jwt_blacklist:  set[str]                  = set()
 		self._jwt_registry[token] = {"user_id": user_id, "tenant_id": tenant_id, "exp": now + expires_in_seconds}

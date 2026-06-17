@@ -47,7 +47,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class ThemService:
 	"""Deterministic theme and brand-governance service for APG composition."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self.themes: dict[str, ThemeRecord] = {}
 		self.tokens: dict[str, ThemeTokenRecord] = {}
 		self.assets: dict[str, BrandAssetRecord] = {}
@@ -57,6 +57,7 @@ class ThemService:
 		self.audit_events: dict[str, ThemeAuditEventRecord] = {}
 		# new collections
 		self._tenant_theme_map: dict[str, str] = {}  # tenant_id -> theme_id
+		_store = get_store(db_url)
 		self._css_exports = WriteThruDict('css_exports', tenant_id, _store)
 		self._dark_variants = WriteThruDict('dark_variants', tenant_id, _store)
 		self._breakpoint_configs = WriteThruDict('breakpoint_configs', tenant_id, _store)

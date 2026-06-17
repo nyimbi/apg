@@ -97,7 +97,7 @@ def _present(v: str | None) -> bool:
 class MobileDeviceManagementService:
 	"""Tenant-scoped runtime for the Mobile Device Management capability."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._devices: dict[tuple[str, str], DeviceResponse] = {}
 		self._policies: dict[tuple[str, str], PolicyResponse] = {}
 		self._policy_assignments: dict[tuple[str, str], PolicyAssignmentResponse] = {}
@@ -106,6 +106,7 @@ class MobileDeviceManagementService:
 		self._wipe_requests: dict[tuple[str, str], WipeRequestResponse] = {}
 		self._profiles: dict[tuple[str, str], MdmProfileResponse] = {}
 		self._alerts: dict[tuple[str, str], MdmAlertResponse] = {}
+		_store = get_store(db_url)
 		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 
 	# -------------------------------------------------------------------------

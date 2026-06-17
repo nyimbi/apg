@@ -76,6 +76,7 @@ class ResourceManagementService:
 		self.agents: dict[tuple[str, str], ResourceAgent] = {}
 		self.audit_events: list[dict[str, Any]] = []
 		# Extended state
+		_store = get_store(db_url)
 		self._teams = WriteThruDict('teams', tenant_id, self._store)
 		self._bench_time: dict[str, list[dict[str, Any]]] = {}    # resource_id -> bench records
 		self._overallocation_log: dict[str, list[dict[str, Any]]] = {}  # resource_id -> resolution log

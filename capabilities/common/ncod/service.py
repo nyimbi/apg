@@ -53,7 +53,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class NcodService:
 	"""In-process app builder enforcing NCOD ownership, policy, and publish gates."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._apps: dict[str, BuilderApp] = {}
 		self._pages: dict[str, BuilderPage] = {}
 		self._components: dict[str, BuilderComponent] = {}
@@ -1249,6 +1249,7 @@ class NcodService:
 			"resource_counts": counts, "snapshot_at": utc_now_iso(), "body": body,
 		}
 		if not hasattr(self, "_snapshots"):
+			_store = get_store(db_url)
 			self._snapshots = WriteThruDict('snapshots', tenant_id, _store)
 		self._snapshots[snapshot_id] = manifest
 		self._audit(tenant_id, "app_snapshot_created", snapshot_id, f"Snapshot: {manifest['label']}")

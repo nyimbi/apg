@@ -101,7 +101,7 @@ class _Store:
 	"""Minimal async-safe in-memory store matching the await self._store pattern."""
 
 	def __init__(self) -> None:
-		self._data = WriteThruDict('data', tenant_id, _store)
+		self._data: dict[str, dict[str, Any]] = {}
 
 	async def put(self, collection: str, record: dict[str, Any]) -> dict[str, Any]:
 		bucket = self._data.setdefault(collection, {})
@@ -314,6 +314,7 @@ class APGEncryptionService:
 		self,
 		actor_id: str = "system",
 		tenant_id: str = "default",
+		db_url: str | None = None,
 	) -> None:
 		self.actor_id = actor_id
 		self.tenant_id = tenant_id

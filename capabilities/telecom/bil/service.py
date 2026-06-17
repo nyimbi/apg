@@ -175,6 +175,7 @@ class TelecomBillingService:
 		audit: AuditAdapter | None = None,
 		notify: NotifyAdapter | None = None,
 		store: BillingStore | None = None,
+		db_url: str | None = None,
 	) -> None:
 		assert _present(tenant_id), "tenant_id must not be blank"
 		self.tenant_id = tenant_id

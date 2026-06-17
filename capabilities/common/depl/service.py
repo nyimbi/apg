@@ -40,7 +40,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class DeplService:
 	"""Tenant release console, rollout controller, health gate, and rollback center."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._environments: dict[str, DeploymentEnvironment] = {}
 		self._releases: dict[str, ReleaseManifest] = {}
 		self._rollback_plans: dict[str, RollbackPlan] = {}
@@ -50,6 +50,7 @@ class DeplService:
 		self._rollback_events: dict[str, RollbackEvent] = {}
 		self._agents: dict[str, DeploymentAgent] = {}
 		self._audit_events: dict[str, DeploymentAuditEvent] = {}
+		_store = get_store(db_url)
 		self._artifacts = WriteThruDict('artifacts', tenant_id, _store)
 		self._canary_states = WriteThruDict('canary_states', tenant_id, _store)
 		self._change_freezes = WriteThruDict('change_freezes', tenant_id, _store)

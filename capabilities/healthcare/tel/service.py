@@ -65,6 +65,7 @@ class TelemedicineService:
 		self._monitoring: dict[tuple[str, str], RemoteMonitoringEnrollmentResponse] = {}
 		self._prescriptions: dict[tuple[str, str], PrescriptionTransmitResponse] = {}
 		self._billing: dict[tuple[str, str], TeleBillingResponse] = {}
+		_store = get_store(db_url)
 		self._vital_readings = WriteThruList('vital_readings', tenant_id, _store)
 		self._telemonitoring_alerts = WriteThruList('telemonitoring_alerts', tenant_id, _store)
 		self._provider_schedules: dict[str, list[dict[str, Any]]] = {}

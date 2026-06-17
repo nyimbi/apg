@@ -102,6 +102,7 @@ class VehicleMaintenanceService:
 		self.roadworthiness_records: dict[tuple[str, str], RoadworthinessRecord] = {}
 		self.schedules: dict[tuple[str, str], MaintenanceSchedule] = {}
 		self.agents: dict[tuple[str, str], MaintenanceAgent] = {}
+		_store = get_store(db_url)
 		self.audit_events = WriteThruList('audit_events', tenant_id, self._store)
 		# Extended state
 		self.tyre_records: dict[tuple[str, str], dict[str, Any]] = {}

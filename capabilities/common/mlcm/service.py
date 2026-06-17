@@ -40,7 +40,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class MlcmService:
 	"""In-process model registry, evaluation, promotion, deployment, and drift service."""
 
-	def __init__(self, minimum_eval_score: float | None = None) -> None:
+	def __init__(self, minimum_eval_score: float | None = None, db_url: str | None = None) -> None:
 		contract = get_capability_contract()
 		self.minimum_eval_score = float(
 			minimum_eval_score
@@ -947,6 +947,7 @@ class MlcmService:
 			"created_at":        utc_now_iso(),
 		}
 		if not hasattr(self, "_ab_tests"):
+			_store = get_store(db_url)
 			self._ab_tests = WriteThruDict('ab_tests', tenant_id, _store)
 		self._ab_tests[ab_id] = record
 		self._audit(tenant_id, "model_ab_test_created", ab_id, f"A/B test {ab_id} created")

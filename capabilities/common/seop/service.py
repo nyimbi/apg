@@ -41,7 +41,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class SeopService:
 	"""Deterministic Security Operations service for APG composition."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self.detections: dict[str, DetectionRecord] = {}
 		self.incidents: dict[str, IncidentRecord] = {}
 		self.playbooks: dict[str, PlaybookRecord] = {}
@@ -50,6 +50,7 @@ class SeopService:
 		self.audit_events: dict[str, OpsAuditEventRecord] = {}
 		self.seop_agents: dict[str, SeopAgentRecord] = {}
 		# new collections
+		_store = get_store(db_url)
 		self._soc_alerts = WriteThruDict('soc_alerts', tenant_id, _store)
 		self._threat_hunts = WriteThruDict('threat_hunts', tenant_id, _store)
 		self._vulnerability_scans = WriteThruDict('vulnerability_scans', tenant_id, _store)

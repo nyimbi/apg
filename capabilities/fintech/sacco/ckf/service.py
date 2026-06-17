@@ -75,8 +75,9 @@ def _period_label(month: int, year: int) -> str:
 class CheckOffService:
 	"""Async service managing employer check-off deductions, reconciliation and GL posting."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		# Core stores — keyed by id within dicts
+		_store = get_store(db_url)
 		self._employers = WriteThruDict('employers', tenant_id, _store)
 		self._links = WriteThruDict('links', tenant_id, _store)          # member-employer links
 		self._schedules = WriteThruDict('schedules', tenant_id, _store)

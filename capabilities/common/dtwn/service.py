@@ -41,7 +41,7 @@ def _utc_now_iso() -> str:
 class DtwnService:
 	"""Tenant-scoped twin registry, telemetry fusion, simulation, and prediction service."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._twins: dict[str, DigitalTwin] = {}
 		self._models: dict[str, SimulationModel] = {}
 		self._telemetry: dict[str, TelemetrySample] = {}
@@ -51,6 +51,7 @@ class DtwnService:
 		self._agents: dict[str, TwinAgent] = {}
 		self._audit_events: list[TwinAuditEvent] = []
 		self._state_sequences: dict[str, int] = {}
+		_store = get_store(db_url)
 		self._calibration_records = WriteThruDict('calibration_records', tenant_id, _store)
 		self._what_if_analyses = WriteThruDict('what_if_analyses', tenant_id, _store)
 		self._event_logs: dict[str, list[dict[str, Any]]] = {}

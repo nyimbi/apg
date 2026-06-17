@@ -86,6 +86,7 @@ class TransportSchedulingService:
 		self.conflicts: dict[tuple[str, str], ScheduleConflict] = {}
 		self.notifications: dict[tuple[str, str], ScheduleNotification] = {}
 		self.agents: dict[tuple[str, str], SchedulingAgent] = {}
+		_store = get_store(db_url)
 		self.audit_events = WriteThruList('audit_events', tenant_id, self._store)
 		# Extended state
 		self.disruptions: dict[tuple[str, str], dict[str, Any]] = {}

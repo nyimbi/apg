@@ -95,12 +95,13 @@ class FleetService:
 		actor_id:   ID of the user/system performing the action (for audit).
 	"""
 
-	def __init__(self, db_session: Any, tenant_id: str, actor_id: str) -> None:
+	def __init__(self, db_session: Any, tenant_id: str, actor_id: str, db_url: str | None = None) -> None:
 		assert tenant_id and tenant_id.strip(), "tenant_id is required"
 		assert actor_id and actor_id.strip(), "actor_id is required"
 		self._db = db_session
 		self._tenant_id = tenant_id.strip()
 		self._actor_id = actor_id.strip()
+		_store = get_store(db_url)
 		self._events = WriteThruList('events', tenant_id, _store)
 
 	# ──────────────────────────────────────────────────────────────

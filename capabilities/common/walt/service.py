@@ -36,7 +36,7 @@ from capabilities.common.reliability import guard_tenant_id, guard_non_empty_str
 class WaltService:
 	"""Deterministic wallet, payment, settlement, and reconciliation service."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self.wallets: dict[str, WalletRecord] = {}
 		self.instruments: dict[str, PaymentInstrumentRecord] = {}
 		self.transactions: dict[str, TransactionRecord] = {}
@@ -46,6 +46,7 @@ class WaltService:
 		self.audit_events: dict[str, WalletAuditEventRecord] = {}
 		# Additional in-memory stores for new methods
 		self._balance_history: dict[str, list[dict[str, Any]]] = {}
+		_store = get_store(db_url)
 		self._reversal_records = WriteThruDict('reversal_records', tenant_id, _store)
 		self._wallet_locks = WriteThruDict('wallet_locks', tenant_id, _store)
 		self._wallet_merges = WriteThruDict('wallet_merges', tenant_id, _store)

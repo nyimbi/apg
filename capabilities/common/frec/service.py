@@ -44,7 +44,7 @@ def _now() -> str:
 class FacialRecognitionService:
 	"""Facial recognition service — enroll, verify, identify, liveness, gallery, attributes, compliance."""
 
-	def __init__(self, database_url: str, encryption_key: str, tenant_id: str) -> None:
+	def __init__(self, database_url: str, encryption_key: str, tenant_id: str, db_url: str | None = None) -> None:
 		assert database_url, "database_url required"
 		assert encryption_key, "encryption_key required"
 		assert tenant_id, "tenant_id required"

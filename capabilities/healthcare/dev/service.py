@@ -68,6 +68,7 @@ class MedicalDeviceManagementService:
 		self._calibrations: dict[tuple[str, str], CalibrationRecordResponse] = {}
 		self._adverse_events: dict[tuple[str, str], AdverseEventResponse] = {}
 		self._recalls: dict[tuple[str, str], dict[str, Any]] = {}
+		_store = get_store(db_url)
 		self._usage_logs = WriteThruList('usage_logs', tenant_id, _store)
 		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 

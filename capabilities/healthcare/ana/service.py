@@ -67,6 +67,7 @@ class ClinicalAnalyticsService:
 		self._quality_indicators: dict[tuple[str, str], QualityIndicatorResponse] = {}
 		self._care_gaps: dict[tuple[str, str], CareGapResponse] = {}
 		self._reports: dict[tuple[str, str], AnalyticsReportResponse] = {}
+		_store = get_store(db_url)
 		self._population_reports = WriteThruList('population_reports', tenant_id, _store)
 		self._readmission_records = WriteThruList('readmission_records', tenant_id, _store)
 		self._los_records = WriteThruList('los_records', tenant_id, _store)

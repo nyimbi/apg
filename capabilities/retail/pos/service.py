@@ -227,7 +227,7 @@ class _PromotionStore:
 	"""In-process promotions registry."""
 
 	def __init__(self) -> None:
-		self._promos = WriteThruDict('promos', tenant_id, _store)
+		self._promos: dict[str, dict[str, Any]] = {}
 
 	def add(self, promo: dict[str, Any]) -> None:
 		self._promos[promo["id"]] = promo
@@ -263,7 +263,7 @@ class _LoyaltyStore:
 
 	def __init__(self) -> None:
 		self._balances: dict[tuple[str, str], int] = {}
-		self._history = WriteThruList('history', tenant_id, _store)
+		self._history: list[dict[str, Any]] = []
 
 	def balance(self, tenant_id: str, customer_id: str) -> int:
 		return self._balances.get((tenant_id, customer_id), 0)
@@ -300,7 +300,8 @@ class PointOfSaleService:
 	Preserves the original PosService methods as well as the expanded interface.
 	"""
 
-	def __init__(self) -> None:
+	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
+		_store = get_store(db_url)
 		# New stores (typed, _Store)
 		self._store_terminals: _Store = _Store()
 		self._store_sessions: _Store = _Store()

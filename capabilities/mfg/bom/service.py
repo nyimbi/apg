@@ -31,6 +31,7 @@ class MfgBomService:
 
 	def __init__(self, tenant_id: str = "default", db_url: str | None = None) -> None:
 		self._tenant_id = tenant_id
+		_store = get_store(db_url)
 		self._boms = WriteThruDict('boms', tenant_id, _store)
 		self._bom_lines = WriteThruDict('bom_lines', tenant_id, _store)
 		self._ecos = WriteThruDict('ecos', tenant_id, _store)

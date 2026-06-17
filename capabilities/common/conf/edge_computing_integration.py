@@ -12,7 +12,7 @@ from enum import Enum
 from pydantic import BaseModel, Field, field_validator
 from uuid_extensions import uuid7str
 
-from, field_validator.models import CMResource, ConfigurationDSL
+from .models import CMResource, ConfigurationDSL
 
 
 class EdgeDeviceType(str, Enum):

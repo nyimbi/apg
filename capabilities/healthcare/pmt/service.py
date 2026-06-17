@@ -61,13 +61,14 @@ class PolicyViolationError(ValueError):
 class PatientManagementService:
 	"""Tenant-scoped patient management runtime."""
 
-	def __init__(self) -> None:
+	def __init__(self, db_url: str | None = None) -> None:
 		self._patients: dict[tuple[str, str], PatientResponse] = {}
 		self._admissions: dict[tuple[str, str], AdmissionResponse] = {}
 		self._beds: dict[tuple[str, str], BedResponse] = {}
 		self._appointments: dict[tuple[str, str], AppointmentResponse] = {}
 		self._insurance: dict[tuple[str, str], InsuranceResponse] = {}
 		self._mrn_counter: dict[str, int] = {}
+		_store = get_store(db_url)
 		self._audit_events = WriteThruList('audit_events', tenant_id, _store)
 		# Extended stores
 		self._transfers: dict[tuple[str, str], dict[str, Any]] = {}
