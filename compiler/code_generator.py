@@ -1766,9 +1766,16 @@ def _load_record_store() -> None:
             rid = str(run.get("id", ""))
             if rid and rid not in WORKFLOW_RUNS:
                 WORKFLOW_RUNS[rid] = run
+        for entity_name in list(RECORD_STORE.keys()):
+            pg_records = _pg_load_entity_records(entity_name)
+            if pg_records:
+                RECORD_STORE[entity_name] = pg_records
 
 
 def _persist_record_store() -> str | None:
+    if _APG_PG_URL:
+        for entity_name, records in list_records().items():
+            _pg_save_entity_records(entity_name, records)
     path = _data_path()
     if path is None:
         return None
@@ -6248,7 +6255,7 @@ def _csv_export_body(entity_name: str) -> bytes:
 
 
 import os as _os_env
-_APG_PG_URL: str | None = _os_env.environ.get("APG_PG_URL") or _os_env.environ.get("DATABASE_URL") or None
+_APG_PG_URL: str | None = _os_env.environ.get("APG_DATABASE_URL") or _os_env.environ.get("APG_PG_URL") or _os_env.environ.get("DATABASE_URL") or None
 
 
 def _pg_connection():
@@ -6306,6 +6313,77 @@ def _pg_load_workflow_runs() -> list[Dict[str, Any]]:
         _pg_ensure_runs_table(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT data FROM apg_workflow_runs WHERE module_name = %s", (MODULE_NAME,))
+            rows = cur.fetchall()
+        return [json.loads(row[0]) for row in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+
+def _pg_ensure_records_table(conn) -> None:
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS apg_records ("
+                "  id TEXT NOT NULL,"
+                "  collection TEXT NOT NULL,"
+                "  tenant_id TEXT NOT NULL DEFAULT 'default',"
+                "  data JSONB NOT NULL,"
+                "  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),"
+                "  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),"
+                "  PRIMARY KEY (collection, id)"
+                ")"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_apg_records_tenant"
+                " ON apg_records (collection, tenant_id)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_apg_records_gin"
+                " ON apg_records USING gin (data)"
+            )
+        conn.commit()
+    except Exception:
+        pass
+
+
+def _pg_save_entity_records(entity_name: str, records: list[Dict[str, Any]]) -> None:
+    conn = _pg_connection()
+    if not conn:
+        return
+    try:
+        _pg_ensure_records_table(conn)
+        with conn.cursor() as cur:
+            for record in records:
+                rid = str(record.get("id", ""))
+                if not rid:
+                    continue
+                cur.execute(
+                    "INSERT INTO apg_records (id, collection, tenant_id, data)"
+                    " VALUES (%s, %s, %s, %s::jsonb)"
+                    " ON CONFLICT (collection, id)"
+                    " DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()",
+                    (rid, entity_name.lower(), "default", json.dumps(record, default=str))
+                )
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+
+def _pg_load_entity_records(entity_name: str) -> list[Dict[str, Any]]:
+    conn = _pg_connection()
+    if not conn:
+        return []
+    try:
+        _pg_ensure_records_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT data FROM apg_records WHERE collection = %s ORDER BY created_at",
+                (entity_name.lower(),)
+            )
             rows = cur.fetchall()
         return [json.loads(row[0]) for row in rows]
     except Exception:
