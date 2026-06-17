@@ -55,7 +55,7 @@ THEME = {
 }
 
 
-def get_capability_contract() -> dict[str, Any]:
+def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:
 	return {"id": CAPABILITY_ID, "name": CAPABILITY_NAME, "version": CAPABILITY_VERSION,
 		"domain": CAPABILITY_DOMAIN, "description": CAPABILITY_DESCRIPTION,
 		"provides": PROVIDES, "requires": REQUIRES, "publishes": PUBLISHES,

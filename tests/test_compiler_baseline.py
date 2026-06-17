@@ -284,7 +284,7 @@ def test_documented_python_target_generates_executable_application_files():
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in app
 	assert "django" not in app.lower()
-	assert "HTTPServer" in app
+	assert "_FlaskApp" in app
 	assert "run_server" in app
 	assert "openapi_document" in app
 	assert "python:3.11-slim" in dockerfile
@@ -1431,7 +1431,7 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	requirements = (output / "requirements.txt").read_text(encoding="utf-8")
 	smoke_test = (output / "smoke_test.py").read_text(encoding="utf-8")
 	assert "APG Python Application" in app
-	assert "HTTPServer" in app
+	assert "_FlaskApp" in app
 	assert "HEALTHCHECK" in dockerfile
 	assert "APG_HOST=127.0.0.1" in env_example
 	assert "python app.py --self-test" in readme
@@ -1442,7 +1442,7 @@ def test_cli_compile_default_target_writes_generated_application(tmp_path):
 	assert "Typed APG fields render as matching HTML controls" in readme
 	assert "Flask-AppBuilder" not in app
 	assert "flask_appbuilder" not in requirements
-	assert "standard library" in requirements
+	assert "flask" in requirements
 	assert "openapi_contract" in smoke_test
 	assert "component_manifest" in smoke_test
 	assert "route_dispatch" in smoke_test
@@ -2780,7 +2780,7 @@ def test_cli_create_basic_project_scaffolds_python_target(tmp_path):
 
 	assert "python generated/app.py" in readme
 	assert "Python Manifest" in readme
-	assert "standard library" in requirements
+	assert "flask" in requirements
 	assert "flask_appbuilder" not in config
 	assert "Flask-AppBuilder" not in readme
 	assert "def describe_application()" in agent_tests

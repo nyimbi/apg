@@ -261,9 +261,9 @@ def test_all_capabilities_have_rules():
 	assert low == [], f"Caps with <10 governance rules: {low[:5]}"
 
 
-# ── 18. exactly 259 capabilities present ─────────────────────────────────────
+# ── 18. at least 337 capabilities present ────────────────────────────────────
 
 def test_259_capabilities_present():
-	"""The manifest must contain at least 259 capabilities (gap closure adds more)."""
+	"""The manifest must contain at least 337 capabilities (connectors and new domains added)."""
 	count = capability_count()
-	assert count >= 259, f"Expected at least 259 capabilities, got {count}"
+	assert count >= 337, f"Expected at least 337 capabilities, got {count}"

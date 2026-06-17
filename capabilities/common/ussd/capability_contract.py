@@ -144,6 +144,22 @@ def health(
 	)
 
 
+def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:
+	"""Return the standard APG capability contract dict for this capability."""
+	return {
+		"capability": CAPABILITY_ID,
+		"id": CAPABILITY_ID,
+		"version": VERSION,
+		"domain": DOMAIN,
+		"description": DESCRIPTION,
+		"provides": PROVIDES,
+		"requires": REQUIRES,
+		"publishes": PUBLISHES,
+		"subscribes": SUBSCRIBES,
+		"configuration": {"tenant_id": tenant_id},
+	}
+
+
 # ── Composition keywords ───────────────────────────────────────────────────────
 #
 # These strings trigger capability composition in APG routing rules.

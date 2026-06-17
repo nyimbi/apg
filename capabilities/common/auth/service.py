@@ -35,17 +35,18 @@ class AuthService:
 	"""Tenant identity control plane backed by the executable AUTH contract."""
 
 	def __init__(self, db_url: str | None = None) -> None:
-		self._identities: dict[tuple[str, str], AuthIdentity] = {}
-		self._roles: dict[tuple[str, str], AuthRole] = {}
-		self._role_approvals: dict[tuple[str, str], AuthRoleAssignmentApproval] = {}
-		self._assignments: dict[tuple[str, str], AuthRoleAssignment] = {}
-		self._sessions: dict[tuple[str, str], AuthSession] = {}
-		self._access_decisions: dict[tuple[str, str], AuthAccessDecision] = {}
-		self._privacy_queries: dict[tuple[str, str], AuthPrivacyQuery] = {}
-		self._privacy_approvals: dict[tuple[str, str], AuthPrivacyBudgetApproval] = {}
-		self._security_agents: dict[tuple[str, str], AuthSecurityAgent] = {}
-		self._batch_mutations: dict[tuple[str, str], AuthBatchMutationEvidence] = {}
-		self._audit_events: dict[tuple[str, str], AuthAuditEvent] = {}
+		self._store = get_store(db_url)
+		self._identities: dict[str, AuthIdentity] = {}
+		self._roles: dict[str, AuthRole] = {}
+		self._role_approvals: dict[str, AuthRoleAssignmentApproval] = {}
+		self._assignments: dict[str, AuthRoleAssignment] = {}
+		self._sessions: dict[str, AuthSession] = {}
+		self._access_decisions: dict[str, AuthAccessDecision] = {}
+		self._privacy_queries: dict[str, AuthPrivacyQuery] = {}
+		self._privacy_approvals: dict[str, AuthPrivacyBudgetApproval] = {}
+		self._security_agents: dict[str, AuthSecurityAgent] = {}
+		self._batch_mutations: dict[str, AuthBatchMutationEvidence] = {}
+		self._audit_events: dict[str, AuthAuditEvent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -2018,10 +2019,10 @@ class AuthService:
 			"warnings": warnings, "verified_at": _utc_now(),
 		}
 
-	def _tenant_key(self, tenant_id: str, record_id: str) -> tuple[str, str]:
-		return (tenant_id, record_id)
+	def _tenant_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
 
-	def _ensure_new(self, records: dict[tuple[str, str], Any], tenant_id: str, record_id: str, label: str) -> None:
+	def _ensure_new(self, records: dict[str, Any], tenant_id: str, record_id: str, label: str) -> None:
 		if self._tenant_key(tenant_id, record_id) in records:
 			raise ValueError(f"{label} already exists for tenant: {record_id}")
 

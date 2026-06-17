@@ -468,7 +468,7 @@ import html
 import json
 import os
 import sys
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, quote
@@ -1459,6 +1459,10 @@ def execute_workflow_compensations(
 import threading as _apg_threading
 _CB_LOCK = _apg_threading.Lock()
 _ES_LOCK = _apg_threading.Lock()
+try:
+    import jwt as _jwt_lib
+except ImportError:
+    _jwt_lib = None
 
 
 def _cb_key(workflow_name: str, step: str) -> str:
@@ -1985,14 +1989,25 @@ def auth_status() -> Dict[str, Any]:
 
 
 def _authorized(headers: Any) -> bool:
-    required_key = os.environ.get("APG_API_KEY")
-    if not required_key:
-        return True
-    supplied_key = headers.get("X-APG-API-Key")
     authorization = headers.get("Authorization", "")
+    supplied_key = headers.get("X-APG-API-Key")
     if authorization.startswith("Bearer "):
-        supplied_key = authorization.removeprefix("Bearer ").strip()
-    return supplied_key == required_key
+        token = authorization.removeprefix("Bearer ").strip()
+        jwt_secret = os.environ.get("APG_JWT_SECRET")
+        jwt_pubkey = os.environ.get("APG_JWT_PUBLIC_KEY")
+        if (jwt_secret or jwt_pubkey) and _jwt_lib is not None:
+            try:
+                key = jwt_pubkey or jwt_secret
+                alg = "RS256" if jwt_pubkey else "HS256"
+                _jwt_lib.decode(token, key, algorithms=[alg])
+                return True
+            except Exception:
+                return False
+        supplied_key = token
+    required_key = os.environ.get("APG_API_KEY")
+    if required_key:
+        return supplied_key == required_key
+    return True
 
 
 def _auth_failure_payload() -> tuple[int, Dict[str, Any]]:
@@ -6394,140 +6409,139 @@ def _pg_load_entity_records(entity_name: str) -> list[Dict[str, Any]]:
 
 _load_record_store()
 
+_flask_app = _FlaskApp("app", root_path=os.path.abspath(os.path.dirname(globals().get("__file__", None) or ".")))
 
-class ApplicationRequestHandler(BaseHTTPRequestHandler):
-    def _send_json(self, status: int, response: Dict[str, Any]) -> None:
-        body = _json_bytes(response)
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
 
-    def _send_html(self, status: int, html_payload: str, hx_trigger: dict | None = None) -> None:
-        body = html_payload.encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        if hx_trigger:
-            self.send_header("HX-Trigger", json.dumps(hx_trigger))
-        self.end_headers()
-        self.wfile.write(body)
+@_flask_app.before_request
+def _setup_tenant() -> None:
+    tid = _flask_request.headers.get("X-APG-Tenant") or _flask_request.headers.get("X-Tenant-ID")
+    _TENANT_LOCAL.tenant_id = tid or None
 
-    def _send_redirect(self, status: int, location: str) -> None:
-        self.send_response(status)
-        self.send_header("Location", location)
-        self.send_header("Content-Length", "0")
-        self.end_headers()
 
-    def _authorize_mutation(self) -> bool:
-        if _authorized(self.headers):
-            return True
-        status, response = _auth_failure_payload()
-        self._send_json(status, response)
-        return False
+def _check_mutation_auth():
+    if _authorized(_flask_request.headers):
+        return None
+    status, response = _auth_failure_payload()
+    return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
 
-    def _setup_tenant(self) -> None:
-        tid = self.headers.get("X-APG-Tenant") or self.headers.get("X-Tenant-ID")
-        _TENANT_LOCAL.tenant_id = tid or None
 
-    def do_GET(self) -> None:
-        self._setup_tenant()
-        path, _, raw_query = self.path.partition("?")
-        query = parse_qs(raw_query, keep_blank_values=True)
-        if path in ("/", "/home"):
-            body = _landing_page_html().encode("utf-8")
-            status = 200
-            content_type = "text/html; charset=utf-8"
-        elif path == "/theme.css":
-            body = theme_stylesheet().encode("utf-8")
-            status = 200
-            content_type = "text/css; charset=utf-8"
-        elif path.startswith("/entities/") and path.endswith("/records.csv"):
-            entity_name = path.split("/")[2]
-            body = _csv_export_body(entity_name)
-            status = 200
-            content_type = "text/csv; charset=utf-8"
-        elif path == "/ui" or path.startswith("/ui/"):
-            status, html_payload = _ui_payload(path, query)
-            body = html_payload.encode("utf-8")
-            content_type = "text/html; charset=utf-8"
-        elif _capability_screen(path) is not None:
-            status, html_payload = _capability_screen_payload(path)
-            body = html_payload.encode("utf-8")
-            content_type = "text/html; charset=utf-8"
-        elif _application_screen(path) is not None:
-            status, html_payload = _application_screen_payload(path)
-            body = html_payload.encode("utf-8")
-            content_type = "text/html; charset=utf-8"
-        else:
-            status, payload = _route_payload(path, query)
-            body = _json_bytes(payload)
-            content_type = "application/json; charset=utf-8"
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+@_flask_app.route("/", methods=["GET"])
+@_flask_app.route("/home", methods=["GET"])
+def _flask_home():
+    return _FlaskResponse(_landing_page_html(), content_type="text/html; charset=utf-8")
 
-    def do_POST(self) -> None:
-        self._setup_tenant()
-        path = self.path.split("?", 1)[0]
-        if not self._authorize_mutation():
-            return
+
+@_flask_app.route("/theme.css", methods=["GET"])
+def _flask_theme():
+    return _FlaskResponse(theme_stylesheet(), content_type="text/css; charset=utf-8")
+
+
+@_flask_app.route("/entities/<entity_name>/records.csv", methods=["GET"])
+def _flask_csv_export(entity_name):
+    return _FlaskResponse(_csv_export_body(entity_name), content_type="text/csv; charset=utf-8")
+
+
+@_flask_app.route("/ui", methods=["GET"])
+@_flask_app.route("/ui/", methods=["GET"])
+@_flask_app.route("/ui/<path:subpath>", methods=["GET"])
+def _flask_ui_get(subpath=""):
+    path = "/ui/" + subpath if subpath else "/ui"
+    query = {{k: v for k, v in _flask_request.args.lists()}}
+    status, html_payload = _ui_payload(path, query)
+    return _FlaskResponse(html_payload, status=status, content_type="text/html; charset=utf-8")
+
+
+@_flask_app.route("/ui", methods=["POST"])
+@_flask_app.route("/ui/", methods=["POST"])
+@_flask_app.route("/ui/<path:subpath>", methods=["POST"])
+def _flask_ui_post(subpath=""):
+    path = "/ui/" + subpath if subpath else "/ui"
+    auth_err = _check_mutation_auth()
+    if auth_err:
+        return auth_err
+    if _flask_request.content_type and "application/x-www-form-urlencoded" in _flask_request.content_type:
+        payload = {{"record": _flask_request.form.to_dict(flat=True)}}
+    else:
         try:
-            length = int(self.headers.get("Content-Length") or "0")
-            raw_body = self.rfile.read(length) if length else b"{{}}"
-            content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip()
-            if content_type == "application/x-www-form-urlencoded":
-                parsed = parse_qs(raw_body.decode("utf-8"), keep_blank_values=True)
-                payload = {{"record": {{key: values[-1] if values else "" for key, values in parsed.items()}}}}
-            else:
-                payload = json.loads(raw_body.decode("utf-8") or "{{}}")
+            payload = _flask_request.get_json(force=True, silent=False) or {{}}
             if not isinstance(payload, dict):
                 raise ValueError("JSON body must be an object")
-            if path.startswith("/ui/") and content_type == "application/x-www-form-urlencoded":
-                status, response = _ui_post_payload(path, payload)
-                if status in {{302, 303}}:
-                    self._send_redirect(status, str(response["location"]))
-                    return
-                if "html" in response:
-                    hx_trigger = response.get("hx_trigger")
-                    self._send_html(status, str(response["html"]), hx_trigger=hx_trigger)
-                    return
-                self._send_html(status, _ui_error_payload(path, response))
-                return
-            else:
-                status, response = _post_payload(path, payload)
-        except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
-            status, response = 400, {{"error": "invalid_json", "message": str(error)}}
-        self._send_json(status, response)
+        except Exception as _e:
+            return _FlaskResponse(
+                json.dumps({{"error": "invalid_json", "message": str(_e)}}),
+                status=400, content_type="application/json; charset=utf-8",
+            )
+    status, response = _ui_post_payload(path, payload)
+    if status in {{302, 303}}:
+        return _flask_redirect(str(response["location"]), code=status)
+    if "html" in response:
+        _r = _FlaskResponse(str(response["html"]), status=status, content_type="text/html; charset=utf-8")
+        if response.get("hx_trigger"):
+            _r.headers["HX-Trigger"] = json.dumps(response["hx_trigger"])
+        return _r
+    return _FlaskResponse(_ui_error_payload(path, response), status=status, content_type="text/html; charset=utf-8")
 
-    def do_PUT(self) -> None:
-        path = self.path.split("?", 1)[0]
-        if not self._authorize_mutation():
-            return
-        try:
-            length = int(self.headers.get("Content-Length") or "0")
-            raw_body = self.rfile.read(length) if length else b"{{}}"
-            payload = json.loads(raw_body.decode("utf-8") or "{{}}")
-            if not isinstance(payload, dict):
-                raise ValueError("JSON body must be an object")
-            status, response = _put_payload(path, payload)
-        except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
-            status, response = 400, {{"error": "invalid_json", "message": str(error)}}
-        self._send_json(status, response)
 
-    def do_DELETE(self) -> None:
-        path = self.path
-        if not self._authorize_mutation():
-            return
-        status, response = _delete_record_payload(path)
-        self._send_json(status, response)
+@_flask_app.route("/<path:api_path>", methods=["GET"])
+def _flask_api_get(api_path):
+    path = "/" + api_path
+    if _capability_screen(path) is not None:
+        status, html_payload = _capability_screen_payload(path)
+        return _FlaskResponse(html_payload, status=status, content_type="text/html; charset=utf-8")
+    if _application_screen(path) is not None:
+        status, html_payload = _application_screen_payload(path)
+        return _FlaskResponse(html_payload, status=status, content_type="text/html; charset=utf-8")
+    query = {{k: v for k, v in _flask_request.args.lists()}}
+    status, payload = _route_payload(path, query)
+    return _FlaskResponse(json.dumps(payload), status=status, content_type="application/json; charset=utf-8")
 
-    def log_message(self, format: str, *args: Any) -> None:
-        if os.environ.get("APG_DEBUG") == "1":
-            super().log_message(format, *args)
+
+@_flask_app.route("/<path:api_path>", methods=["POST"])
+def _flask_api_post(api_path):
+    path = "/" + api_path
+    auth_err = _check_mutation_auth()
+    if auth_err:
+        return auth_err
+    try:
+        payload = _flask_request.get_json(force=True, silent=False) or {{}}
+        if not isinstance(payload, dict):
+            raise ValueError("JSON body must be an object")
+        status, response = _post_payload(path, payload)
+    except Exception as _e:
+        return _FlaskResponse(
+            json.dumps({{"error": "invalid_json", "message": str(_e)}}),
+            status=400, content_type="application/json; charset=utf-8",
+        )
+    return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
+
+
+@_flask_app.route("/<path:api_path>", methods=["PUT"])
+def _flask_api_put(api_path):
+    path = "/" + api_path
+    auth_err = _check_mutation_auth()
+    if auth_err:
+        return auth_err
+    try:
+        payload = _flask_request.get_json(force=True, silent=False) or {{}}
+        if not isinstance(payload, dict):
+            raise ValueError("JSON body must be an object")
+        status, response = _put_payload(path, payload)
+    except Exception as _e:
+        return _FlaskResponse(
+            json.dumps({{"error": "invalid_json", "message": str(_e)}}),
+            status=400, content_type="application/json; charset=utf-8",
+        )
+    return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
+
+
+@_flask_app.route("/<path:api_path>", methods=["DELETE"])
+def _flask_api_delete(api_path):
+    path = "/" + api_path
+    auth_err = _check_mutation_auth()
+    if auth_err:
+        return auth_err
+    status, response = _delete_record_payload(path)
+    return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
 
 
 def _arg_value(argv: list[str], name: str, default: str) -> str:
@@ -6542,9 +6556,9 @@ def _arg_value(argv: list[str], name: str, default: str) -> str:
 def run_server(host: str | None = None, port: int | str | None = None) -> None:
     resolved_host = host or os.environ.get("APG_HOST") or os.environ.get("HOST") or "127.0.0.1"
     resolved_port = int(port or os.environ.get("APG_PORT") or os.environ.get("PORT") or "8080")
-    server = HTTPServer((resolved_host, resolved_port), ApplicationRequestHandler)
+    debug = os.environ.get("APG_DEBUG") == "1"
     print(f"{{MODULE_NAME}} listening on http://{{resolved_host}}:{{resolved_port}}", flush=True)
-    server.serve_forever()
+    _flask_app.run(host=resolved_host, port=resolved_port, debug=debug, use_reloader=False)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -6573,9 +6587,10 @@ if __name__ == "__main__":
 '''
 
 	def _generate_python_requirements(self) -> str:
-		"""Generate requirements for the dependency-free Python target."""
+		"""Generate requirements for the APG Python target."""
 		return """# APG generated Python application requirements
-# The default compiler target uses only the Python standard library.
+flask>=3.0,<4
+PyJWT>=2.8,<3
 """
 
 	def _generate_python_dockerfile(self, module: ModuleDeclaration) -> str:
@@ -6589,6 +6604,7 @@ ENV APG_PORT=8080
 
 WORKDIR /app
 COPY . /app
+RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \\
