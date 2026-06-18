@@ -68,7 +68,33 @@ def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:
         "ui_routes": UI_ROUTES,
         "theme": THEME,
         "configuration": DEFAULT_CONFIGURATION,
-    }
+    
+        "rule_engine": {
+            "type": "deterministic",
+            "default_decision": "deny",
+            "rules": [
+                {"name": "tenant_required", "condition": {"tenant_context_present": True}, "effect": {"decision": "allow"}},
+                {"name": "write_policy", "condition": {"write_requires_policy": True}, "effect": {"decision": "allow"}},
+                {"name": "cross_tenant_denied", "condition": {"cross_tenant_access": "cross_tenant"}, "effect": {"decision": "deny"}},
+            ],
+        },
+        "ui": {
+            "shell": "apg_python",
+            "requires_theme": True,
+            "template_roots": ["templates"],
+            "routes": [{'name': 'dashboard', 'path': '/leg-ip/dashboard', 'component': 'LegIpDashboard', 'permission': 'leg_ip:view', 'nav_group': 'Overview'}, {'name': 'list', 'path': '/leg-ip/list', 'component': 'LegIpList', 'permission': 'leg_ip:view', 'nav_group': 'Overview'}, {'name': 'settings', 'path': '/leg-ip/settings', 'component': 'LegIpSettings', 'permission': 'leg_ip:admin', 'nav_group': 'Administration'}],
+        },
+        "configuration_schema": {
+            "type": "object",
+            "required": ['tenant_id'],
+            "properties": {
+                "tenant_id": {"type": "string"},
+                "governance": {"type": "object"},
+                "agents": {"type": "object"},
+                "theme": {"type": "object"},
+            },
+        },
+}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:

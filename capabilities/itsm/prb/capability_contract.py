@@ -96,7 +96,21 @@ def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:
 		"ui": {"shell": "apg_python", "api_prefix": "/itsm-prb/api/v1", "requires_theme": True, "routes": deepcopy(UI_ROUTES)},
 		"theme": deepcopy(THEME),
 		"streaming": deepcopy(STREAMING),
-	}
+	
+		"configuration_schema": {
+			"type": "object",
+			"required": ['tenant_id'],
+			"properties": {
+				"tenant_id": {"type": "string"},
+				"problems": {"type": "object"},
+				"rca": {"type": "object"},
+				"kedb": {"type": "object"},
+				"governance": {"type": "object"},
+				"observability": {"type": "object"},
+				"adapters": {"type": "object"},
+			},
+		},
+}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:

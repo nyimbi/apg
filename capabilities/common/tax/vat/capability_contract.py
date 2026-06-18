@@ -85,7 +85,8 @@ def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:
 		"requires": list(REQUIRES),
 		"configuration": configuration,
 		"rule_engine": {"type": "deterministic", "default_decision": "allow", "rules": deepcopy(RULES)},
-		"ui": {"shell": "apg_python", "api_prefix": "/tax/vat/api/v1", "routes": deepcopy(UI_ROUTES)},
+		"ui": {"shell": "apg_python", "api_prefix": "/tax/vat/api/v1",
+			"requires_theme": True, "routes": deepcopy(UI_ROUTES)},
 		"streaming": {"processor": "bytewax", "stream": VAT_EVENT_STREAM, "key": "tenant_id"},
 		"theme": {
 			"name": "common_tax_vat_theme",

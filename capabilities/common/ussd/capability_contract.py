@@ -160,7 +160,8 @@ def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:
 		"rule_engine": {"type": "deterministic", "default_decision": "allow", "rules": [
 			{"name": "tenant_context_required", "condition": {"tenant_context_present": False}, "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}},
 		]},
-		"ui": {"shell": "apg_python", "api_prefix": "/ussd/api/v1", "routes": [
+		"ui": {"shell": "apg_python", "api_prefix": "/ussd/api/v1",
+			"requires_theme": True, "routes": [
 			{"name": "dashboard", "path": "/ussd/dashboard", "component": "UssdDashboard", "permission": "ussd:view", "nav_group": "Overview"},
 		]},
 		"theme": {

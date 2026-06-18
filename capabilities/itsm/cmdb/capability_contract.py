@@ -190,7 +190,25 @@ def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:
 		},
 		"theme": deepcopy(THEME),
 		"streaming": deepcopy(STREAMING),
-	}
+	
+		"configuration_schema": {
+			"type": "object",
+			"required": ['tenant_id'],
+			"properties": {
+				"tenant_id": {"type": "string"},
+				"ci": {"type": "object"},
+				"relationships": {"type": "object"},
+				"discovery": {"type": "object"},
+				"change_tracking": {"type": "object"},
+				"health": {"type": "object"},
+				"governance": {"type": "object"},
+				"observability": {"type": "object"},
+				"adapters": {"type": "object"},
+				"ui": {"type": "object"},
+				"theme": {"type": "object"},
+			},
+		},
+}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:

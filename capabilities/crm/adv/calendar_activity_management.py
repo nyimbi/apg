@@ -419,7 +419,7 @@ class CalendarActivityManager:
 	activity tracking, and productivity analytics capabilities.
 	"""
 	
-	def __init__(self, db_manager: DatabaseManager):
+	def __init__(self, db_manager: Any):
 		"""
 		Initialize calendar activity manager
 		

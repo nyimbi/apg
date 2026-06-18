@@ -141,7 +141,21 @@ def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:
 		"ui": {"shell": "apg_python", "api_prefix": "/mfg-mes/api/v1", "requires_theme": True, "routes": deepcopy(UI_ROUTES)},
 		"theme": deepcopy(THEME),
 		"streaming": {"processor": "bytewax", "stream": MES_EVENT_STREAM, "key": "tenant_id", "events": list(PUBLISHES)},
-	}
+	
+		"configuration_schema": {
+			"type": "object",
+			"required": ['tenant_id'],
+			"properties": {
+				"tenant_id": {"type": "string"},
+				"work_orders": {"type": "object"},
+				"resources": {"type": "object"},
+				"production_events": {"type": "object"},
+				"oee": {"type": "object"},
+				"governance": {"type": "object"},
+				"adapters": {"type": "object"},
+			},
+		},
+}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:

@@ -56,7 +56,21 @@ RULES: list[dict[str, Any]] = [
 
 def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:
 	cfg = deepcopy(DEFAULT_CONFIGURATION); cfg["tenant_id"] = tenant_id
-	return {"capability": CAPABILITY_ID, "name": CAPABILITY_NAME, "display_name": CAPABILITY_NAME, "version": CAPABILITY_VERSION, "domain": CAPABILITY_DOMAIN, "description": CAPABILITY_DESCRIPTION, "provides": list(PROVIDES), "requires": list(REQUIRES), "publishes": list(PUBLISHES), "subscribes": list(SUBSCRIBES), "configuration": cfg, "rule_engine": {"type": "deterministic", "default_decision": "allow", "rules": deepcopy(RULES)}, "ui": {"shell": "apg_python", "api_prefix": "/mfg-qms/api/v1", "requires_theme": True, "routes": deepcopy(UI_ROUTES)}, "theme": deepcopy(THEME), "streaming": {"processor": "bytewax", "stream": QMS_EVENT_STREAM, "key": "tenant_id", "events": list(PUBLISHES)}}
+	return {"capability": CAPABILITY_ID, "name": CAPABILITY_NAME, "display_name": CAPABILITY_NAME, "version": CAPABILITY_VERSION, "domain": CAPABILITY_DOMAIN, "description": CAPABILITY_DESCRIPTION, "provides": list(PROVIDES), "requires": list(REQUIRES), "publishes": list(PUBLISHES), "subscribes": list(SUBSCRIBES), "configuration": cfg, "rule_engine": {"type": "deterministic", "default_decision": "allow", "rules": deepcopy(RULES)}, "ui": {"shell": "apg_python", "api_prefix": "/mfg-qms/api/v1", "requires_theme": True, "routes": deepcopy(UI_ROUTES)}, "theme": deepcopy(THEME), "streaming": {"processor": "bytewax", "stream": QMS_EVENT_STREAM, "key": "tenant_id", "events": list(PUBLISHES)},
+		"configuration_schema": {
+			"type": "object",
+			"required": ['tenant_id'],
+			"properties": {
+				"tenant_id": {"type": "string"},
+				"inspection": {"type": "object"},
+				"ncr": {"type": "object"},
+				"capa": {"type": "object"},
+				"spc": {"type": "object"},
+				"governance": {"type": "object"},
+				"adapters": {"type": "object"},
+			},
+		},
+}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:
