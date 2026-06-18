@@ -1,42 +1,13 @@
 {
-  "app": {
-    "name": "agr_wth",
-    "description": "Weather & Climate Analytics package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "agr_wth": {
-      "domain": "agriculture",
-      "display_name": "Weather & Climate Analytics",
-      "version": "1.0.0",
-      "description": "Weather forecast integration, climate data analysis, agri-alert thresholds",
-      "provides": [
-        "weather_forecast",
-        "climate_analytics",
-        "agri_alerts",
-        "temperature_monitoring",
-        "rainfall_tracking"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "ntfy"
-      ],
-      "entities": [
-        "WeatherStation",
-        "WeatherObservation",
-        "ClimateAlert",
-        "ForecastRecord"
-      ],
-      "configuration": {
-        "theme": "agr_wth_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "agr_wth",
+  "display_name": "agr_wth",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

@@ -101,3 +101,8 @@ class Permission(Model, BaseMixin):
 
 # Common exports
 __all__ = ["Model", "BaseMixin", "AuditMixin", "User", "Role", "Permission", "db", "get_db_session", "get_session"]
+
+# Pydantic BaseModel alias (used by capabilities as APGBaseModel)
+from pydantic import BaseModel as _PydanticBaseModel
+BaseModel = _PydanticBaseModel
+APGBaseModel = _PydanticBaseModel

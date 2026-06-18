@@ -1,21 +1,10 @@
 {
+  "format": "apg.semantic-model.v1",
   "capability": "mfg_ppl",
-  "version": "1.0.0",
-  "domain": "mfg",
-  "entities": {
-    "MfPplMasterSchedule": {"description": "Master Production Schedule record", "fields": {"id": {"type": "string"}, "item_id": {"type": "string"}, "period_start": {"type": "string"}, "period_end": {"type": "string"}, "planned_quantity": {"type": "number"}, "status": {"type": "string"}}},
-    "MfPplSopRecord": {"description": "S&OP consensus record per period", "fields": {"id": {"type": "string"}, "period": {"type": "string"}, "demand_plan": {"type": "number"}, "supply_plan": {"type": "number"}, "inventory_plan": {"type": "number"}, "status": {"type": "string"}}},
-    "MfPplDemandForecast": {"description": "Statistical or consensus demand forecast", "fields": {"id": {"type": "string"}, "item_id": {"type": "string"}, "period": {"type": "string"}, "forecast_qty": {"type": "number"}, "confidence_pct": {"type": "number"}}}
-  },
-  "api_endpoints": {
-    "POST /mfg-ppl/api/v1/mps": {"description": "Create MPS entry"},
-    "GET /mfg-ppl/api/v1/mps": {"description": "List MPS entries"},
-    "POST /mfg-ppl/api/v1/sop": {"description": "Create S&OP record"},
-    "POST /mfg-ppl/api/v1/demand-forecasts": {"description": "Create demand forecast"},
-    "GET /mfg-ppl/api/v1/dashboard": {"description": "Dashboard summary"}
-  },
-  "events": {
-    "publishes": ["apg.mfg.ppl.master_schedule_updated", "apg.mfg.ppl.sop_approved", "apg.mfg.ppl.demand_plan_updated"],
-    "subscribes": ["apg.crm.forecast_updated", "apg.mfg.mrp.planning_run_completed"]
+  "display_name": "Production Planning",
+  "entities": {},
+  "agents": {},
+  "app": {
+    "description": "Production Planning APG capability"
   }
 }

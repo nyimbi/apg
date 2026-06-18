@@ -1,0 +1,10 @@
+{
+  "format": "apg.semantic-model.v1",
+  "capability": "common_ussd",
+  "display_name": "common_ussd",
+  "entities": {},
+  "agents": {},
+  "app": {
+    "description": "common_ussd APG capability"
+  }
+}

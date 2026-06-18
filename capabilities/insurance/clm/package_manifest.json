@@ -1,44 +1,13 @@
 {
-  "app": {
-    "name": "ins_clm",
-    "description": "Claims Management package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "ins_clm": {
-      "domain": "insurance",
-      "display_name": "Claims Management",
-      "version": "1.0.0",
-      "description": "First notice of loss, claims adjudication, payment, fraud detection",
-      "provides": [
-        "fnol_intake",
-        "claims_adjudication",
-        "claims_payment",
-        "fraud_referral",
-        "claims_analytics"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "ntfy",
-        "ins_pol",
-        "fintech_payments"
-      ],
-      "entities": [
-        "Claim",
-        "ClaimItem",
-        "ClaimsAdjudication",
-        "ClaimsPayment"
-      ],
-      "configuration": {
-        "theme": "ins_clm_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "ins_clm",
+  "display_name": "ins_clm",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

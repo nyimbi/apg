@@ -1,23 +1,10 @@
 {
+  "format": "apg.semantic-model.v1",
   "capability": "mfg_bom",
-  "version": "1.0.0",
-  "domain": "mfg",
-  "entities": {
-    "MfBom": {"description": "Bill of Materials header", "fields": {"id": {"type": "string"}, "parent_item_id": {"type": "string"}, "bom_type": {"type": "string"}, "version": {"type": "string"}, "status": {"type": "string"}}},
-    "MfBomLine": {"description": "BOM component line", "fields": {"id": {"type": "string"}, "bom_id": {"type": "string"}, "component_item_id": {"type": "string"}, "quantity": {"type": "number"}, "uom": {"type": "string"}, "item_type": {"type": "string"}}},
-    "MfEco": {"description": "Engineering Change Order", "fields": {"id": {"type": "string"}, "bom_id": {"type": "string"}, "eco_number": {"type": "string"}, "status": {"type": "string"}, "approver_id": {"type": "string", "nullable": true}}}
-  },
-  "api_endpoints": {
-    "POST /mfg-bom/api/v1/boms": {"description": "Create BOM", "response": "MfBom"},
-    "POST /mfg-bom/api/v1/boms/{id}/lines": {"description": "Add BOM line", "response": "MfBomLine"},
-    "GET /mfg-bom/api/v1/boms/{id}": {"description": "Get BOM with lines", "response": "MfBom"},
-    "GET /mfg-bom/api/v1/boms/{id}/explode": {"description": "Explode BOM", "response": "list"},
-    "POST /mfg-bom/api/v1/ecos": {"description": "Create ECO", "response": "MfEco"},
-    "POST /mfg-bom/api/v1/ecos/{id}/approve": {"description": "Approve ECO", "response": "MfEco"},
-    "POST /mfg-bom/api/v1/ecos/{id}/release": {"description": "Release ECO", "response": "MfEco"}
-  },
-  "events": {
-    "publishes": ["apg.mfg.bom.bom_created", "apg.mfg.bom.bom_changed", "apg.mfg.bom.eco_released"],
-    "subscribes": ["apg.mfg.plm.design_released"]
+  "display_name": "Bill of Materials",
+  "entities": {},
+  "agents": {},
+  "app": {
+    "description": "Bill of Materials APG capability"
   }
 }

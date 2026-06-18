@@ -43,11 +43,7 @@ UI_ROUTES = [
 
 THEME = {
 	"name": "int_dsy_theme",
-	"tokens": {
-		"color.primary": "#0F4C75", "color.accent": "#1B98E0",
-		"surface.canvas": "#F8FAFC", "surface.panel": "#FFFFFF",
-		"text.primary": "#111827", "border.radius": "8px", "density": "compact",
-	},
+	"tokens": {"color.primary": "#0F4C75", "color.accent": "#1B98E0", "color.success": "#10B981", "color.danger": "#EF4444", "surface.canvas": "#F8FAFC", "surface.panel": "#FFFFFF", "text.primary": "#111827", "border.radius": "8px", "density": "compact"},
 }
 
 

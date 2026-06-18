@@ -19,7 +19,7 @@
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "uv run pytest tests/test_compiler_baseline.py -q --tb=short 2>&1 | tail -5",
+    "testCommand": "uv run pytest tests/test_compiler_baseline.py -q 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": null,
     "scripts": {}
@@ -472,8 +472,8 @@
   "hotPaths": [
     {
       "path": "compiler/code_generator.py",
-      "accessCount": 61,
-      "lastAccessed": 1781754457869,
+      "accessCount": 63,
+      "lastAccessed": 1781760274146,
       "type": "file"
     },
     {

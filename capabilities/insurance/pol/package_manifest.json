@@ -1,44 +1,13 @@
 {
-  "app": {
-    "name": "ins_pol",
-    "description": "Policy Administration package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "ins_pol": {
-      "domain": "insurance",
-      "display_name": "Policy Administration",
-      "version": "1.0.0",
-      "description": "Policy lifecycle management, endorsements, renewals, cancellations",
-      "provides": [
-        "policy_issuance",
-        "endorsement_management",
-        "renewal_processing",
-        "cancellation_management",
-        "policy_inquiry"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "ntfy",
-        "ins_und",
-        "fintech_payments"
-      ],
-      "entities": [
-        "Policy",
-        "Endorsement",
-        "Renewal",
-        "Cancellation"
-      ],
-      "configuration": {
-        "theme": "ins_pol_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "ins_pol",
+  "display_name": "ins_pol",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

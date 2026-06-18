@@ -1,42 +1,13 @@
 {
-  "app": {
-    "name": "leg_ip",
-    "description": "Intellectual Property Registry package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "leg_ip": {
-      "domain": "legal",
-      "display_name": "Intellectual Property Registry",
-      "version": "1.0.0",
-      "description": "Patent, trademark, copyright and design registrations, renewal management",
-      "provides": [
-        "ip_registration",
-        "renewal_management",
-        "ip_portfolio",
-        "infringement_tracking",
-        "ip_valuation"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "ntfy"
-      ],
-      "entities": [
-        "IPAsset",
-        "IPRegistration",
-        "IPRenewal",
-        "InfringementCase"
-      ],
-      "configuration": {
-        "theme": "leg_ip_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "leg_ip",
+  "display_name": "leg_ip",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

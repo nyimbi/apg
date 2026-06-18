@@ -107,6 +107,25 @@ def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:
 		"rule_engine": {"type": "deterministic", "default_decision": "allow", "rules": deepcopy(RULES)},
 		"ui": {"shell": "apg_python", "api_prefix": "/tax/wht/api/v1", "routes": deepcopy(UI_ROUTES)},
 		"streaming": {"processor": "bytewax", "stream": WHT_EVENT_STREAM, "key": "tenant_id"},
+		"theme": {
+			"name": "common_tax_wht_theme",
+			"tokens": {
+				"color.primary": "#1A3A5C",
+				"color.accent": "#F59E0B",
+				"color.success": "#10B981",
+				"color.danger": "#EF4444",
+				"surface.canvas": "#F8FAFC",
+				"surface.panel": "#FFFFFF",
+				"text.primary": "#111827",
+				"border.radius": "8px",
+			},
+			"components": {"button": {}},
+		},
+		"configuration_schema": {
+			"type": "object",
+			"required": ["tenant_id"],
+			"properties": {"tenant_id": {"type": "string"}},
+		},
 	}
 
 

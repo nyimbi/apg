@@ -1,20 +1,10 @@
 {
+  "format": "apg.semantic-model.v1",
   "capability": "mfg_plm",
-  "version": "1.0.0",
-  "domain": "mfg",
-  "entities": {
-    "MfPlmProduct": {"description": "Product record with lifecycle stage", "fields": {"id": {"type": "string"}, "product_code": {"type": "string"}, "product_name": {"type": "string"}, "product_type": {"type": "string"}, "lifecycle_stage": {"type": "string"}, "revision": {"type": "string"}}},
-    "MfPlmStageGate": {"description": "Stage-gate decision record", "fields": {"id": {"type": "string"}, "product_id": {"type": "string"}, "gate_number": {"type": "integer"}, "from_stage": {"type": "string"}, "to_stage": {"type": "string"}, "decision": {"type": "string", "nullable": true}}}
-  },
-  "api_endpoints": {
-    "POST /mfg-plm/api/v1/products": {"description": "Create product"},
-    "GET /mfg-plm/api/v1/products": {"description": "List products"},
-    "GET /mfg-plm/api/v1/products/{id}": {"description": "Get product"},
-    "POST /mfg-plm/api/v1/products/{id}/advance-stage": {"description": "Advance lifecycle stage through gate"},
-    "GET /mfg-plm/api/v1/products/{id}/gates": {"description": "List stage gates for product"}
-  },
-  "events": {
-    "publishes": ["apg.mfg.plm.product_created", "apg.mfg.plm.design_released", "apg.mfg.plm.product_discontinued"],
-    "subscribes": ["apg.mfg.bom.eco_released"]
+  "display_name": "Product Lifecycle Management",
+  "entities": {},
+  "agents": {},
+  "app": {
+    "description": "Product Lifecycle Management APG capability"
   }
 }

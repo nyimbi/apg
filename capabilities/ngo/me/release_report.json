@@ -1,0 +1,24 @@
+{
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "capability": "ngo_me",
+  "evidence": {
+    "self_test": {
+      "capability": "ngo_me",
+      "passed": true,
+      "status": "ok"
+    },
+    "contracts": {
+      "capability_contract": {
+        "display_name": "ngo_me",
+        "errors": [],
+        "route_count": 1,
+        "rule_count": 10
+      }
+    },
+    "semantic_model": {
+      "capability": "ngo_me",
+      "format": "apg.semantic-model.v1"
+    }
+  }
+}

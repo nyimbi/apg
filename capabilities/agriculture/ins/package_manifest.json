@@ -1,44 +1,13 @@
 {
-  "app": {
-    "name": "agr_ins",
-    "description": "Crop Insurance package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "agr_ins": {
-      "domain": "agriculture",
-      "display_name": "Crop Insurance",
-      "version": "1.0.0",
-      "description": "Parametric index insurance, satellite verification, mobile money claims",
-      "provides": [
-        "policy_issuance",
-        "parametric_claims",
-        "satellite_verification",
-        "mobile_payout",
-        "index_calculation"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "agr_wth",
-        "agr_crp",
-        "fintech_payments"
-      ],
-      "entities": [
-        "CropPolicy",
-        "InsuranceClaim",
-        "SatelliteIndex",
-        "PayoutRecord"
-      ],
-      "configuration": {
-        "theme": "agr_ins_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "agr_ins",
+  "display_name": "agr_ins",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

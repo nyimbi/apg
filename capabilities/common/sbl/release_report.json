@@ -1,0 +1,24 @@
+{
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "capability": "common_sbl",
+  "evidence": {
+    "self_test": {
+      "capability": "common_sbl",
+      "passed": true,
+      "status": "ok"
+    },
+    "contracts": {
+      "capability_contract": {
+        "display_name": "SaaS Billing Engine",
+        "errors": [],
+        "route_count": 11,
+        "rule_count": 25
+      }
+    },
+    "semantic_model": {
+      "capability": "common_sbl",
+      "format": "apg.semantic-model.v1"
+    }
+  }
+}

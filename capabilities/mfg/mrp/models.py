@@ -15,7 +15,8 @@ from sqlalchemy.orm import relationship
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator
 from uuid_extensions import uuid7str
 
-from ...core_financials.general_ledger.models import BaseModel as SQLBaseModel
+from sqlalchemy.orm import declarative_base as _db
+SQLBaseModel = _db()
 
 class MRPRunStatus(str, Enum):
 	"""MRP run status enumeration"""
@@ -378,7 +379,7 @@ class MRPExceptionCreate(BaseModel):
 	model_config = ConfigDict(extra='forbid', validate_by_name=True)
 	
 	exception_type: MRPExceptionType
-	severity: str = Field(..., regex="^(low|medium|high|critical)$")
+	severity: str = Field(..., pattern="^(low|medium|high|critical)$")
 	exception_code: str | None = None
 	material_id: str | None = None
 	facility_id: str | None = None
@@ -409,8 +410,8 @@ class InventoryPositionUpdate(BaseModel):
 	manufacturing_lead_time_days: int = Field(default=0, ge=0)
 	safety_lead_time_days: int = Field(default=0, ge=0)
 	standard_cost: Decimal | None = None
-	make_or_buy: str = Field(default="buy", regex="^(make|buy)$")
-	abc_classification: str | None = Field(None, regex="^[ABC]$")
+	make_or_buy: str = Field(default="buy", pattern="^(make|buy)$")
+	abc_classification: str | None = Field(None, pattern="^[ABC]$")
 	is_mrp_controlled: bool = True
 
 __all__ = [

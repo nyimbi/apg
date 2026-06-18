@@ -47,11 +47,7 @@ UI_ROUTES = [
 
 THEME = {
 	"name": "proc_sup_portal_theme",
-	"tokens": {
-		"color.primary": "#1A3A5C", "color.accent": "#F59E0B",
-		"surface.canvas": "#F8FAFC", "surface.panel": "#FFFFFF",
-		"text.primary": "#111827", "border.radius": "8px", "density": "compact",
-	},
+	"tokens": {"color.primary": "#1A3A5C", "color.accent": "#F59E0B", "color.success": "#10B981", "color.danger": "#EF4444", "surface.canvas": "#F8FAFC", "surface.panel": "#FFFFFF", "text.primary": "#111827", "border.radius": "8px", "density": "compact"},
 }
 
 

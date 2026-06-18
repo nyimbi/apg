@@ -28,7 +28,16 @@ def get_capability_contract(tenant_id="default"):
 		},
 		"theme": {
 			"name": "customer_master_theme",
-			"tokens": {"border.radius": "8px"},
+			"tokens": {
+				"color.primary": "#1A3A5C",
+				"color.accent": "#F59E0B",
+				"color.success": "#10B981",
+				"color.danger": "#EF4444",
+				"surface.canvas": "#F8FAFC",
+				"surface.panel": "#FFFFFF",
+				"text.primary": "#111827",
+				"border.radius": "8px",
+			},
 			"components": {"dashboard": {"density": "compact"}},
 		},
 	}

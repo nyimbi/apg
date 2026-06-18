@@ -15,7 +15,8 @@ from sqlalchemy.orm import relationship
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator
 from uuid_extensions import uuid7str
 
-from ...core_financials.general_ledger.models import BaseModel as SQLBaseModel
+from sqlalchemy.orm import declarative_base as _db
+SQLBaseModel = _db()
 
 class QualityControlPlanStatus(str, Enum):
 	"""Quality control plan status"""
@@ -550,13 +551,13 @@ class CAPARecordCreate(BaseModel):
 	
 	capa_number: str = Field(..., min_length=1, max_length=50)
 	title: str = Field(..., min_length=1, max_length=200)
-	capa_type: str = Field(..., regex="^(corrective|preventive)$")
+	capa_type: str = Field(..., pattern="^(corrective|preventive)$")
 	non_conformance_id: str | None = None
 	source_type: str = Field(..., min_length=1, max_length=30)
 	source_reference: str | None = None
 	problem_description: str = Field(..., min_length=1)
 	impact_assessment: str | None = None
-	risk_level: str = Field(default="medium", regex="^(low|medium|high|critical)$")
+	risk_level: str = Field(default="medium", pattern="^(low|medium|high|critical)$")
 	root_cause_description: str | None = None
 	root_cause_method: str | None = None
 	contributing_factors: str | None = None

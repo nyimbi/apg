@@ -49,11 +49,7 @@ UI_ROUTES = [
 
 THEME = {
 	"name": "int_esb_theme",
-	"tokens": {
-		"color.primary": "#0F172A", "color.accent": "#38BDF8",
-		"surface.canvas": "#F8FAFC", "surface.panel": "#FFFFFF",
-		"text.primary": "#111827", "border.radius": "8px", "density": "compact",
-	},
+	"tokens": {"color.primary": "#0F172A", "color.accent": "#38BDF8", "color.success": "#10B981", "color.danger": "#EF4444", "surface.canvas": "#F8FAFC", "surface.panel": "#FFFFFF", "text.primary": "#111827", "border.radius": "8px", "density": "compact"},
 }
 
 

@@ -1,0 +1,24 @@
+{
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "capability": "hos_rsv",
+  "evidence": {
+    "self_test": {
+      "capability": "hos_rsv",
+      "passed": true,
+      "status": "ok"
+    },
+    "contracts": {
+      "capability_contract": {
+        "display_name": "hos_rsv",
+        "errors": [],
+        "route_count": 1,
+        "rule_count": 10
+      }
+    },
+    "semantic_model": {
+      "capability": "hos_rsv",
+      "format": "apg.semantic-model.v1"
+    }
+  }
+}

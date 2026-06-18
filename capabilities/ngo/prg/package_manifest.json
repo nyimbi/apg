@@ -1,43 +1,13 @@
 {
-  "app": {
-    "name": "ngo_prg",
-    "description": "Programme & Project Monitoring package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "ngo_prg": {
-      "domain": "ngo",
-      "display_name": "Programme & Project Monitoring",
-      "version": "1.0.0",
-      "description": "Programme design, activity scheduling, budget tracking, results framework",
-      "provides": [
-        "programme_management",
-        "activity_scheduling",
-        "budget_tracking",
-        "results_framework",
-        "milestone_tracking"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "ntfy",
-        "ngo_grn"
-      ],
-      "entities": [
-        "Programme",
-        "Activity",
-        "ProgrammeBudget",
-        "Milestone"
-      ],
-      "configuration": {
-        "theme": "ngo_prg_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "ngo_prg",
+  "display_name": "ngo_prg",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

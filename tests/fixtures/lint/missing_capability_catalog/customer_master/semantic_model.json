@@ -1,0 +1,10 @@
+{
+  "format": "apg.semantic-model.v1",
+  "capability": "customer_master",
+  "display_name": "Customer Master",
+  "entities": {},
+  "agents": {},
+  "app": {
+    "description": "Customer Master APG capability"
+  }
+}

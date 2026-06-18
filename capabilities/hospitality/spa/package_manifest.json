@@ -1,43 +1,13 @@
 {
-  "app": {
-    "name": "hos_spa",
-    "description": "Spa & Activities Management package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "hos_spa": {
-      "domain": "hospitality",
-      "display_name": "Spa & Activities Management",
-      "version": "1.0.0",
-      "description": "Spa appointment booking, treatment management, activity scheduling, gift vouchers",
-      "provides": [
-        "spa_booking",
-        "treatment_management",
-        "activity_scheduling",
-        "gift_vouchers",
-        "therapist_management"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "ntfy",
-        "fintech_payments"
-      ],
-      "entities": [
-        "SpaAppointment",
-        "Treatment",
-        "Activity",
-        "GiftVoucher"
-      ],
-      "configuration": {
-        "theme": "hos_spa_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "hos_spa",
+  "display_name": "hos_spa",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

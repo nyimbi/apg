@@ -43,7 +43,7 @@ UI_ROUTES = [
 
 THEME = {
 	"name": "mfg_mro_theme",
-	"tokens": {"color.primary": "#34495E", "color.accent": "#E74C3C", "border.radius": "6px", "density": "compact"},
+	"tokens": {"color.primary": "#34495E", "color.accent": "#E74C3C", "color.success": "#10B981", "color.danger": "#EF4444", "surface.canvas": "#F8FAFC", "surface.panel": "#FFFFFF", "text.primary": "#111827", "border.radius": "6px", "density": "compact"},
 }
 
 RULES: list[dict[str, Any]] = [

@@ -1,0 +1,24 @@
+{
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "capability": "proc_twy",
+  "evidence": {
+    "self_test": {
+      "capability": "proc_twy",
+      "passed": true,
+      "status": "ok"
+    },
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Three-Way Match Engine",
+        "errors": [],
+        "route_count": 6,
+        "rule_count": 10
+      }
+    },
+    "semantic_model": {
+      "capability": "proc_twy",
+      "format": "apg.semantic-model.v1"
+    }
+  }
+}

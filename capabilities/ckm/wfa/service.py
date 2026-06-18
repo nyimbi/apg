@@ -1381,3 +1381,5 @@ __all__ = [
     'APGPlatformIntegration',
     'create_wbpm_service'
 ]
+
+CkmWfaService = WorkflowBusinessProcessMgmtService

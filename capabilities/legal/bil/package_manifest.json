@@ -1,43 +1,13 @@
 {
-  "app": {
-    "name": "leg_bil",
-    "description": "Legal Billing & Time Tracking package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "leg_bil": {
-      "domain": "legal",
-      "display_name": "Legal Billing & Time Tracking",
-      "version": "1.0.0",
-      "description": "Time entry, expense capture, invoice generation, LEDES billing, client trust accounts",
-      "provides": [
-        "time_entry",
-        "expense_capture",
-        "invoice_generation",
-        "trust_accounting",
-        "billing_analytics"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "fin_gl",
-        "leg_mat"
-      ],
-      "entities": [
-        "TimeEntry",
-        "BillingExpense",
-        "LegalInvoice",
-        "TrustAccount"
-      ],
-      "configuration": {
-        "theme": "leg_bil_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "leg_bil",
+  "display_name": "leg_bil",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

@@ -1,17 +1,13 @@
 {
-  "app": {
-    "name": "proc_sup_portal",
-    "description": "Supplier Self-Service Portal APG capability",
-    "version": "1.0.0"
-  },
-  "capabilities": {
-    "proc_sup_portal": {
-      "domain": "proc",
-      "display_name": "Supplier Self-Service Portal",
-      "version": "1.0.0"
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "proc_sup_portal",
+  "display_name": "proc_sup_portal",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

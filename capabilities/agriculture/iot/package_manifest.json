@@ -1,42 +1,13 @@
 {
-  "app": {
-    "name": "agr_iot",
-    "description": "AgriIoT & Precision Farming package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "agr_iot": {
-      "domain": "agriculture",
-      "display_name": "AgriIoT & Precision Farming",
-      "version": "1.0.0",
-      "description": "Soil sensor ingestion, drone imagery processing, yield map generation",
-      "provides": [
-        "sensor_data_ingestion",
-        "drone_imagery",
-        "yield_mapping",
-        "soil_analysis",
-        "precision_recommendations"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "iotd"
-      ],
-      "entities": [
-        "IoTDevice",
-        "SensorReading",
-        "DroneImagery",
-        "YieldMap"
-      ],
-      "configuration": {
-        "theme": "agr_iot_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "agr_iot",
+  "display_name": "agr_iot",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

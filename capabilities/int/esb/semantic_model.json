@@ -1,93 +1,10 @@
 {
-  "capability_id": "int_esb",
-  "capability_name": "Enterprise Service Bus",
-  "version": "1.0.0",
-  "domain": "int",
-  "entities": {
-    "EsbFlow": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "tenant_id": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "tenant_id"
-      ]
-    },
-    "EsbFlowStep": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "tenant_id": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "tenant_id"
-      ]
-    },
-    "EsbFlowRun": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "tenant_id": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "tenant_id"
-      ]
-    },
-    "EsbDeadLetter": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "uuid"
-        },
-        "tenant_id": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "tenant_id"
-      ]
-    }
-  },
-  "api_endpoints": [
-    {
-      "method": "GET",
-      "path": "/api/int-esb/esbflows",
-      "description": "List EsbFlow"
-    },
-    {
-      "method": "POST",
-      "path": "/api/int-esb/esbflows",
-      "description": "Create EsbFlow"
-    }
-  ],
-  "events": {
-    "publishes": [
-      "flow.started",
-      "flow.completed",
-      "flow.failed",
-      "message.dead_lettered"
-    ],
-    "subscribes": []
+  "format": "apg.semantic-model.v1",
+  "capability": "int_esb",
+  "display_name": "int_esb",
+  "entities": {},
+  "agents": {},
+  "app": {
+    "description": "int_esb APG capability"
   }
 }

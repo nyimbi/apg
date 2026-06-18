@@ -15,7 +15,8 @@ from sqlalchemy.orm import relationship
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator
 from uuid_extensions import uuid7str
 
-from ...core_financials.general_ledger.models import BaseModel as SQLBaseModel
+from sqlalchemy.orm import declarative_base as _db
+SQLBaseModel = _db()
 
 class WorkOrderStatus(str, Enum):
 	"""Work order execution status"""
@@ -556,7 +557,7 @@ class AlertCreate(BaseModel):
 	alert_description: str = Field(..., min_length=1)
 	alert_category: str = Field(..., min_length=1, max_length=50)
 	severity: AlertSeverity
-	priority: str = Field(default="medium", regex="^(low|medium|high|urgent|critical)$")
+	priority: str = Field(default="medium", pattern="^(low|medium|high|urgent|critical)$")
 	source_type: str = Field(..., min_length=1, max_length=30)
 	source_system: str | None = None
 	facility_id: str | None = None
@@ -566,9 +567,9 @@ class AlertCreate(BaseModel):
 	work_order_execution_id: str | None = None
 	alert_timestamp: datetime = Field(default_factory=datetime.utcnow)
 	assigned_to: str | None = None
-	production_impact: str | None = Field(None, regex="^(none|low|medium|high)$")
-	quality_impact: str | None = Field(None, regex="^(none|low|medium|high)$")
-	safety_impact: str | None = Field(None, regex="^(none|low|medium|high)$")
+	production_impact: str | None = Field(None, pattern="^(none|low|medium|high)$")
+	quality_impact: str | None = Field(None, pattern="^(none|low|medium|high)$")
+	safety_impact: str | None = Field(None, pattern="^(none|low|medium|high)$")
 	metric_values: str | None = None
 	process_parameters: str | None = None
 

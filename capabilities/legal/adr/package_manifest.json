@@ -1,43 +1,13 @@
 {
-  "app": {
-    "name": "leg_adr",
-    "description": "ADR / Dispute Resolution package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "leg_adr": {
-      "domain": "legal",
-      "display_name": "ADR / Dispute Resolution",
-      "version": "1.0.0",
-      "description": "Mediation, arbitration, customary dispute resolution, settlement tracking",
-      "provides": [
-        "dispute_filing",
-        "mediator_assignment",
-        "arbitration_management",
-        "settlement_recording",
-        "customary_adr"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "ntfy",
-        "esig"
-      ],
-      "entities": [
-        "Dispute",
-        "MediationSession",
-        "ArbitrationCase",
-        "SettlementAgreement"
-      ],
-      "configuration": {
-        "theme": "leg_adr_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "leg_adr",
+  "display_name": "leg_adr",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

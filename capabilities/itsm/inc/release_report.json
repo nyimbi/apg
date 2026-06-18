@@ -1,0 +1,24 @@
+{
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "capability": "itsm_inc",
+  "evidence": {
+    "self_test": {
+      "capability": "itsm_inc",
+      "passed": true,
+      "status": "ok"
+    },
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Incident Management",
+        "errors": [],
+        "route_count": 7,
+        "rule_count": 10
+      }
+    },
+    "semantic_model": {
+      "capability": "itsm_inc",
+      "format": "apg.semantic-model.v1"
+    }
+  }
+}

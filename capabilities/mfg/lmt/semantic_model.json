@@ -1,27 +1,10 @@
 {
+  "format": "apg.semantic-model.v1",
   "capability": "mfg_lmt",
-  "version": "1.0.0",
-  "domain": "mfg",
-  "entities": {
-    "MfLmtLot": {"description": "Production or purchase lot with traceability and expiry", "fields": {"id": {"type": "string"}, "lot_number": {"type": "string"}, "lot_type": {"type": "string"}, "item_id": {"type": "string"}, "quantity": {"type": "number"}, "status": {"type": "string"}, "expiry_date": {"type": "string", "nullable": true}, "parent_lot_id": {"type": "string", "nullable": true}}},
-    "MfLmtGenealogyLink": {"description": "Parent-child lot consumption link for genealogy tracing", "fields": {"id": {"type": "string"}, "parent_lot_id": {"type": "string"}, "child_lot_id": {"type": "string"}, "quantity_consumed": {"type": "number"}}},
-    "MfLmtRecallEvent": {"description": "Lot recall event with affected lot list", "fields": {"id": {"type": "string"}, "recall_number": {"type": "string"}, "root_lot_id": {"type": "string"}, "reason": {"type": "string"}, "affected_lot_ids": {"type": "array"}, "status": {"type": "string"}}}
-  },
-  "api_endpoints": {
-    "POST /mfg-lmt/api/v1/lots": {"description": "Create lot"},
-    "GET /mfg-lmt/api/v1/lots": {"description": "List lots"},
-    "GET /mfg-lmt/api/v1/lots/{id}": {"description": "Get lot"},
-    "POST /mfg-lmt/api/v1/lots/{id}/quarantine": {"description": "Quarantine lot"},
-    "POST /mfg-lmt/api/v1/lots/{id}/release": {"description": "Release lot from quarantine"},
-    "POST /mfg-lmt/api/v1/lots/{id}/consume": {"description": "Consume quantity from lot"},
-    "POST /mfg-lmt/api/v1/genealogy": {"description": "Create genealogy link"},
-    "GET /mfg-lmt/api/v1/lots/{id}/trace/forward": {"description": "Trace lot forward"},
-    "GET /mfg-lmt/api/v1/lots/{id}/trace/backward": {"description": "Trace lot backward"},
-    "POST /mfg-lmt/api/v1/recalls": {"description": "Initiate lot recall"},
-    "GET /mfg-lmt/api/v1/dashboard": {"description": "Dashboard summary"}
-  },
-  "events": {
-    "publishes": ["apg.mfg.lmt.lot_created", "apg.mfg.lmt.lot_quarantined", "apg.mfg.lmt.lot_expired", "apg.mfg.lmt.recall_initiated"],
-    "subscribes": ["apg.mfg.mes.work_order_completed", "apg.mfg.qms.ncr_raised"]
+  "display_name": "Lot and Batch Management",
+  "entities": {},
+  "agents": {},
+  "app": {
+    "description": "Lot and Batch Management APG capability"
   }
 }

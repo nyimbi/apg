@@ -1,0 +1,13 @@
+{
+  "format": "apg.package-manifest.v1",
+  "name": "audit_log",
+  "display_name": "Audit Log",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
+}

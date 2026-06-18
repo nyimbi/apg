@@ -157,6 +157,32 @@ def get_capability_contract(tenant_id: str = "default") -> dict[str, Any]:
 		"publishes": PUBLISHES,
 		"subscribes": SUBSCRIBES,
 		"configuration": {"tenant_id": tenant_id},
+		"rule_engine": {"type": "deterministic", "default_decision": "allow", "rules": [
+			{"name": "tenant_context_required", "condition": {"tenant_context_present": False}, "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}},
+		]},
+		"ui": {"shell": "apg_python", "api_prefix": "/ussd/api/v1", "routes": [
+			{"name": "dashboard", "path": "/ussd/dashboard", "component": "UssdDashboard", "permission": "ussd:view", "nav_group": "Overview"},
+		]},
+		"theme": {
+			"name": "common_ussd_theme",
+			"tokens": {
+				"color.primary": "#1A3A5C",
+				"color.accent": "#F59E0B",
+				"color.success": "#10B981",
+				"color.danger": "#EF4444",
+				"surface.canvas": "#F8FAFC",
+				"surface.panel": "#FFFFFF",
+				"text.primary": "#111827",
+				"border.radius": "8px",
+			},
+			"components": {"button": {}},
+		},
+		"configuration_schema": {
+			"type": "object",
+			"required": ["tenant_id"],
+			"properties": {"tenant_id": {"type": "string"}},
+		},
+		"streaming": {"processor": "bytewax", "stream": "apg.common.ussd", "key": "tenant_id"},
 	}
 
 

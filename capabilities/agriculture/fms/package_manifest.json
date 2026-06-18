@@ -1,43 +1,13 @@
 {
-  "app": {
-    "name": "agr_fms",
-    "description": "Farm Management System package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "agr_fms": {
-      "domain": "agriculture",
-      "display_name": "Farm Management System",
-      "version": "1.0.0",
-      "description": "Parcel registry, input recording, labour management, farm operations",
-      "provides": [
-        "farm_registration",
-        "parcel_management",
-        "input_recording",
-        "labour_tracking",
-        "farm_operations"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "agr_crp",
-        "agr_lnd"
-      ],
-      "entities": [
-        "Farm",
-        "Parcel",
-        "InputRecord",
-        "LabourRecord"
-      ],
-      "configuration": {
-        "theme": "agr_fms_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "agr_fms",
+  "display_name": "agr_fms",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

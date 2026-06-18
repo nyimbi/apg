@@ -1,0 +1,24 @@
+{
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "capability": "agr_lnd",
+  "evidence": {
+    "self_test": {
+      "capability": "agr_lnd",
+      "passed": true,
+      "status": "ok"
+    },
+    "contracts": {
+      "capability_contract": {
+        "display_name": "agr_lnd",
+        "errors": [],
+        "route_count": 1,
+        "rule_count": 10
+      }
+    },
+    "semantic_model": {
+      "capability": "agr_lnd",
+      "format": "apg.semantic-model.v1"
+    }
+  }
+}

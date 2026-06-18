@@ -1,43 +1,13 @@
 {
-  "app": {
-    "name": "ins_dst",
-    "description": "Distribution & Agency Management package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "ins_dst": {
-      "domain": "insurance",
-      "display_name": "Distribution & Agency Management",
-      "version": "1.0.0",
-      "description": "Agent onboarding, commission tracking, performance management, licensing",
-      "provides": [
-        "agent_management",
-        "commission_tracking",
-        "performance_reporting",
-        "licensing_registry",
-        "channel_management"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "ntfy",
-        "fin_gl"
-      ],
-      "entities": [
-        "InsuranceAgent",
-        "Commission",
-        "AgentLicence",
-        "ChannelPartner"
-      ],
-      "configuration": {
-        "theme": "ins_dst_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "ins_dst",
+  "display_name": "ins_dst",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

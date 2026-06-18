@@ -1,44 +1,13 @@
 {
-  "app": {
-    "name": "ngo_rbf",
-    "description": "Results-Based Financing package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "ngo_rbf": {
-      "domain": "ngo",
-      "display_name": "Results-Based Financing",
-      "version": "1.0.0",
-      "description": "RBF contract management, result verification, disbursement triggers, World Bank/USAID compliance",
-      "provides": [
-        "rbf_contract_management",
-        "result_verification",
-        "disbursement_triggers",
-        "compliance_reporting",
-        "independent_verification"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "ngo_me",
-        "ngo_grn",
-        "fintech_payments"
-      ],
-      "entities": [
-        "RBFContract",
-        "ResultIndicator",
-        "VerificationReport",
-        "ConditionalDisbursement"
-      ],
-      "configuration": {
-        "theme": "ngo_rbf_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "ngo_rbf",
+  "display_name": "ngo_rbf",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

@@ -15,7 +15,8 @@ from sqlalchemy.orm import relationship
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator
 from uuid_extensions import uuid7str
 
-from ...core_financials.general_ledger.models import BaseModel as SQLBaseModel
+from sqlalchemy.orm import declarative_base as _db
+SQLBaseModel = _db()
 
 class BOMStatus(str, Enum):
 	"""BOM status enumeration"""
@@ -372,7 +373,7 @@ class BOMComponentCreate(BaseModel):
 	expiry_date: date | None = None
 	preferred_supplier_id: str | None = None
 	supplier_part_number: str | None = None
-	make_or_buy: str = Field(default="buy", regex="^(make|buy)$")
+	make_or_buy: str = Field(default="buy", pattern="^(make|buy)$")
 	unit_cost: Decimal | None = None
 	operation_sequence: int | None = None
 	work_center_id: str | None = None
@@ -384,7 +385,7 @@ class ComponentSubstituteCreate(BaseModel):
 	substitute_product_id: str = Field(..., min_length=36, max_length=36)
 	substitute_sku: str = Field(..., min_length=1, max_length=100)
 	substitute_name: str = Field(..., min_length=1, max_length=200)
-	substitution_type: str = Field(..., regex="^(direct|functional|form_fit_function)$")
+	substitution_type: str = Field(..., pattern="^(direct|functional|form_fit_function)$")
 	substitution_ratio: Decimal = Field(default=Decimal('1'), gt=0)
 	priority: int = Field(default=1, ge=1)
 	effective_date: date
@@ -405,9 +406,9 @@ class EngineeringChangeOrderCreate(BaseModel):
 	implementation_plan: str | None = None
 	affected_bom_id: str | None = None
 	affected_product_ids: str | None = None
-	priority: str = Field(default="normal", regex="^(low|normal|high|urgent|critical)$")
-	urgency: str = Field(default="normal", regex="^(low|normal|high|urgent)$")
-	business_impact: str = Field(default="low", regex="^(low|medium|high|critical)$")
+	priority: str = Field(default="normal", pattern="^(low|normal|high|urgent|critical)$")
+	urgency: str = Field(default="normal", pattern="^(low|normal|high|urgent)$")
+	business_impact: str = Field(default="low", pattern="^(low|medium|high|critical)$")
 	requested_date: date
 	required_implementation_date: date | None = None
 	planned_implementation_date: date | None = None

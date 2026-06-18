@@ -1,28 +1,10 @@
 {
+  "format": "apg.semantic-model.v1",
   "capability": "mfg_pco",
-  "version": "1.0.0",
-  "domain": "mfg",
-  "entities": {
-    "MfPcoCostRecord": {"description": "Standard or actual cost record for an item", "fields": {"id": {"type": "string"}, "item_id": {"type": "string"}, "cost_type": {"type": "string"}, "cost_version": {"type": "string"}, "status": {"type": "string"}, "material_cost": {"type": "number"}, "labour_cost": {"type": "number"}, "overhead_cost": {"type": "number"}, "total_cost": {"type": "number"}, "currency": {"type": "string"}}},
-    "MfPcoVarianceRecord": {"description": "Production cost variance (standard vs actual)", "fields": {"id": {"type": "string"}, "work_order_id": {"type": "string"}, "item_id": {"type": "string"}, "variance_type": {"type": "string"}, "cost_element": {"type": "string"}, "standard_cost": {"type": "number"}, "actual_cost": {"type": "number"}, "variance_amount": {"type": "number"}, "period": {"type": "string"}}},
-    "MfPcoPeriodClose": {"description": "Period costing close record", "fields": {"id": {"type": "string"}, "period": {"type": "string"}, "status": {"type": "string"}, "total_variances": {"type": "number"}, "approver_id": {"type": "string", "nullable": true}, "closed_at": {"type": "string", "nullable": true}}}
-  },
-  "api_endpoints": {
-    "POST /mfg-pco/api/v1/cost-records": {"description": "Create cost record"},
-    "POST /mfg-pco/api/v1/cost-records/{id}/rollup": {"description": "Roll up material cost from BOM"},
-    "POST /mfg-pco/api/v1/cost-records/{id}/freeze": {"description": "Freeze cost record"},
-    "POST /mfg-pco/api/v1/cost-records/{id}/activate": {"description": "Activate cost record"},
-    "GET /mfg-pco/api/v1/cost-records": {"description": "List cost records"},
-    "GET /mfg-pco/api/v1/items/{item_id}/active-cost": {"description": "Get active cost for an item"},
-    "POST /mfg-pco/api/v1/variances": {"description": "Record variance"},
-    "GET /mfg-pco/api/v1/variances": {"description": "List variances"},
-    "GET /mfg-pco/api/v1/variances/summary": {"description": "Variance summary by period"},
-    "POST /mfg-pco/api/v1/period-closes": {"description": "Initiate period close"},
-    "POST /mfg-pco/api/v1/period-closes/{id}/approve": {"description": "Approve period close"},
-    "GET /mfg-pco/api/v1/dashboard": {"description": "Dashboard summary"}
-  },
-  "events": {
-    "publishes": ["apg.mfg.pco.cost_rolled_up", "apg.mfg.pco.variance_posted", "apg.mfg.pco.period_closed"],
-    "subscribes": ["apg.mfg.bom.bom_changed", "apg.mfg.mes.work_order_completed", "apg.mfg.mrp.production_order_released"]
+  "display_name": "Product Costing",
+  "entities": {},
+  "agents": {},
+  "app": {
+    "description": "Product Costing APG capability"
   }
 }

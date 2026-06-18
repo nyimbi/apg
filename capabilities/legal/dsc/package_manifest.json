@@ -1,43 +1,13 @@
 {
-  "app": {
-    "name": "leg_dsc",
-    "description": "Document & eDiscovery package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "leg_dsc": {
-      "domain": "legal",
-      "display_name": "Document & eDiscovery",
-      "version": "1.0.0",
-      "description": "Document management, legal hold, eDiscovery production, privilege logging",
-      "provides": [
-        "document_management",
-        "legal_hold",
-        "ediscovery_production",
-        "privilege_log",
-        "document_search"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "docint",
-        "srch"
-      ],
-      "entities": [
-        "LegalDocument",
-        "LegalHold",
-        "DiscoverySet",
-        "PrivilegeLog"
-      ],
-      "configuration": {
-        "theme": "leg_dsc_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "leg_dsc",
+  "display_name": "leg_dsc",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

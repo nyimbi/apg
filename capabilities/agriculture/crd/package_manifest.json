@@ -1,44 +1,13 @@
 {
-  "app": {
-    "name": "agr_crd",
-    "description": "Agricultural Credit Scoring package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "agr_crd": {
-      "domain": "agriculture",
-      "display_name": "Agricultural Credit Scoring",
-      "version": "1.0.0",
-      "description": "Yield-based credit scoring, group lending, smallholder credit profiles",
-      "provides": [
-        "credit_scoring",
-        "loan_eligibility",
-        "group_lending",
-        "credit_profile",
-        "repayment_tracking"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "agr_fms",
-        "agr_crp",
-        "fintech_kyc"
-      ],
-      "entities": [
-        "CreditProfile",
-        "LoanApplication",
-        "GroupLendingRecord",
-        "RepaymentRecord"
-      ],
-      "configuration": {
-        "theme": "agr_crd_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "agr_crd",
+  "display_name": "agr_crd",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

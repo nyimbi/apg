@@ -1,43 +1,13 @@
 {
-  "app": {
-    "name": "agr_ext",
-    "description": "Extension Services package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "agr_ext": {
-      "domain": "agriculture",
-      "display_name": "Extension Services",
-      "version": "1.0.0",
-      "description": "Agricultural advisory delivery, training records, farmer outreach",
-      "provides": [
-        "advisory_delivery",
-        "training_management",
-        "farmer_outreach",
-        "knowledge_base",
-        "field_visit_tracking"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "ntfy",
-        "agr_fms"
-      ],
-      "entities": [
-        "ExtensionAgent",
-        "Advisory",
-        "TrainingSession",
-        "FieldVisit"
-      ],
-      "configuration": {
-        "theme": "agr_ext_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "agr_ext",
+  "display_name": "agr_ext",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }

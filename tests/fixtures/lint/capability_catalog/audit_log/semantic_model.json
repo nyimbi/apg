@@ -1,0 +1,10 @@
+{
+  "format": "apg.semantic-model.v1",
+  "capability": "audit_log",
+  "display_name": "Audit Log",
+  "entities": {},
+  "agents": {},
+  "app": {
+    "description": "Audit Log APG capability"
+  }
+}

@@ -1,42 +1,13 @@
 {
-  "app": {
-    "name": "agr_lnd",
-    "description": "Land Management package-backed APG capability",
-    "version": "1.0.0",
-    "entity_count": 4
-  },
-  "capabilities": {
-    "agr_lnd": {
-      "domain": "agriculture",
-      "display_name": "Land Management",
-      "version": "1.0.0",
-      "description": "Parcel cadastre, land tenure registry, GPS boundary mapping",
-      "provides": [
-        "parcel_registration",
-        "tenure_registry",
-        "boundary_mapping",
-        "land_dispute_management",
-        "title_management"
-      ],
-      "requires": [
-        "auth",
-        "audl",
-        "geos"
-      ],
-      "entities": [
-        "LandParcel",
-        "TenureRecord",
-        "BoundaryPoint",
-        "TitleDeed"
-      ],
-      "configuration": {
-        "theme": "agr_lnd_theme",
-        "allow_tenant_overrides": true
-      }
-    }
-  },
-  "metadata": {
-    "generated": "2026-06-13",
-    "generator": "apg-contract-generator"
-  }
+  "format": "apg.package-manifest.v1",
+  "name": "agr_lnd",
+  "display_name": "agr_lnd",
+  "base_target": "python",
+  "generated_artifacts": [
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
+  ]
 }
