@@ -46,12 +46,16 @@
       </div>
     </div>
 
-    {# Card list #}
-    <div class="space-y-2.5">
+    {# Card list — apg-kanban-col enables SortableJS drag-and-drop #}
+    <div class="space-y-2.5 apg-kanban-col min-h-16"
+         data-col-label="{{ col.label | e }}"
+         id="apg-col-{{ col.label | urlencode }}">
       {% for record in col.records %}
       {% set rec_id = record.get('id', '') | string %}
       <a href="/ui/entities/{{ safe_entity }}/{{ rec_id | urlencode }}"
-         class="block bg-white rounded-xl border border-gray-200 p-4 hover:border-apg-primary hover:shadow-md transition-all group/card">
+         data-record-id="{{ rec_id | e }}"
+         data-revision="{{ record.get('_revision', '') | string | e }}"
+         class="block bg-white rounded-xl border border-gray-200 p-4 hover:border-apg-primary hover:shadow-md transition-all group/card cursor-grab active:cursor-grabbing">
         <div class="flex items-start justify-between gap-2 mb-2.5">
           <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
                style="background: var(--apg-primary, #0ea5e9)">
@@ -78,7 +82,7 @@
       {% endfor %}
 
       {% if not col.records %}
-      <div class="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-6 text-center">
+      <div class="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-6 text-center apg-kanban-empty">
         <p class="text-xs text-gray-300">Empty</p>
       </div>
       {% endif %}
@@ -93,3 +97,46 @@
   </div>
   {% endif %}
 </div>
+
+<script>
+(function() {
+  var entity = {{ safe_entity | tojson }};
+  var statusField = {{ status_field | tojson }};
+
+  document.querySelectorAll('.apg-kanban-col').forEach(function(col) {
+    new Sortable(col, {
+      group: 'apg-kanban',
+      animation: 150,
+      ghostClass: 'opacity-30',
+      chosenClass: 'shadow-lg',
+      dragClass: 'rotate-1',
+      onEnd: function(evt) {
+        var card = evt.item;
+        var recordId = card.dataset.recordId;
+        var newCol = evt.to;
+        var newStatus = newCol.dataset.colLabel;
+        if (!recordId || !newStatus) return;
+
+        var body = {record: {}};
+        body.record[statusField] = newStatus;
+
+        fetch('/entities/' + encodeURIComponent(entity) + '/records/' + encodeURIComponent(recordId), {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(body)
+        }).then(function(r) {
+          if (r.ok) {
+            APGToast('Moved to ' + newStatus, 'success');
+          } else {
+            APGToast('Move failed — ' + r.status, 'error');
+            evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
+          }
+        }).catch(function() {
+          APGToast('Move failed', 'error');
+          evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
+        });
+      }
+    });
+  });
+})();
+</script>

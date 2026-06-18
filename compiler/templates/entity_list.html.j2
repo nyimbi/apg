@@ -16,6 +16,10 @@
       ⊞ Kanban
     </a>
     {% endif %}
+    <a href="/entities/{{ safe_entity }}/records.csv"
+       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-500 hover:border-emerald-400 hover:text-emerald-600 transition-colors">
+      ↓ CSV
+    </a>
     <a href="/entities/{{ safe_entity }}/records"
        class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-500 hover:border-gray-300 transition-colors">
       API JSON ↗
@@ -98,6 +102,55 @@
         <p class="text-xs text-gray-400 mt-1">Use the form on the left to create the first one.</p>
         {% endif %}
       </div>
+    {% endif %}
+
+    {# Pagination controls #}
+    {% if total_pages > 1 %}
+    <nav class="mt-4 flex items-center justify-between flex-wrap gap-3" aria-label="Pagination">
+      <div class="flex items-center gap-1 flex-wrap">
+        {% if page > 1 %}
+        <a href="/ui/entities/{{ safe_entity }}?page={{ page - 1 }}&per={{ per }}{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+           class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">← Prev</a>
+        {% else %}
+        <span class="px-3 py-1.5 text-sm border border-gray-100 rounded-lg text-gray-300 select-none">← Prev</span>
+        {% endif %}
+
+        {% if page > 3 %}
+        <a href="/ui/entities/{{ safe_entity }}?page=1&per={{ per }}{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+           class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">1</a>
+        {% if page > 4 %}<span class="px-1 text-xs text-gray-400">…</span>{% endif %}
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+        {% if p >= page - 2 and p <= page + 2 %}
+        <a href="/ui/entities/{{ safe_entity }}?page={{ p }}&per={{ per }}{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+           class="px-3 py-1.5 text-sm rounded-lg {% if p == page %}bg-apg-primary text-white font-semibold{% else %}border border-gray-200 text-gray-600 hover:border-apg-primary hover:text-apg-primary{% endif %} transition-colors">{{ p }}</a>
+        {% endif %}
+        {% endfor %}
+
+        {% if page < total_pages - 2 %}
+        {% if page < total_pages - 3 %}<span class="px-1 text-xs text-gray-400">…</span>{% endif %}
+        <a href="/ui/entities/{{ safe_entity }}?page={{ total_pages }}&per={{ per }}{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+           class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">{{ total_pages }}</a>
+        {% endif %}
+
+        {% if page < total_pages %}
+        <a href="/ui/entities/{{ safe_entity }}?page={{ page + 1 }}&per={{ per }}{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+           class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">Next →</a>
+        {% else %}
+        <span class="px-3 py-1.5 text-sm border border-gray-100 rounded-lg text-gray-300 select-none">Next →</span>
+        {% endif %}
+      </div>
+      <div class="flex items-center gap-2 text-xs text-gray-400">
+        <span>Page {{ page }} of {{ total_pages }}</span>
+        <select onchange="location.href='/ui/entities/{{ safe_entity }}?page=1&per='+this.value+'{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}'"
+                class="px-2 py-1 border border-gray-200 rounded text-xs text-gray-500 bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-apg-primary">
+          {% for n in [10, 25, 50, 100, 200] %}
+          <option value="{{ n }}"{% if n == per %} selected{% endif %}>{{ n }} / page</option>
+          {% endfor %}
+        </select>
+      </div>
+    </nav>
     {% endif %}
   </section>
 

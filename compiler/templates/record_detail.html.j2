@@ -230,25 +230,54 @@
     </div>
     <div class="p-5">
       <ol class="relative border-l-2 border-gray-100 ml-4 space-y-5">
-        <li class="ml-6">
-          <span class="absolute flex items-center justify-center w-8 h-8 bg-blue-50 rounded-full -left-4 text-sm ring-4 ring-white">📋</span>
-          <div class="pl-2">
-            <p class="text-sm font-medium text-gray-900">Record created</p>
-            <p class="text-xs text-gray-400 mt-0.5">Revision {{ revision }} · via APG</p>
-          </div>
-        </li>
+        {% if activity_events %}
+          {% for ev in activity_events %}
+          <li class="ml-6">
+            <span class="absolute flex items-center justify-center w-8 h-8 rounded-full -left-4 text-sm ring-4 ring-white
+              {% if ev.type == 'create' %}bg-blue-50
+              {% elif ev.type == 'update' %}bg-purple-50
+              {% elif ev.type == 'delete' %}bg-red-50
+              {% elif ev.type == 'note' %}bg-yellow-50
+              {% else %}bg-gray-50{% endif %}">
+              {% if ev.type == 'create' %}📋
+              {% elif ev.type == 'update' %}✏️
+              {% elif ev.type == 'delete' %}🗑️
+              {% elif ev.type == 'note' %}💬
+              {% else %}⚡{% endif %}
+            </span>
+            <div class="pl-2">
+              <p class="text-sm font-medium text-gray-900">{{ ev.detail or (ev.type | title) }}</p>
+              <p class="text-xs text-gray-400 mt-0.5">
+                {{ ev.actor or 'APG' }}
+                {% if ev.ts %} · {{ ev.ts }}{% endif %}
+              </p>
+            </div>
+          </li>
+          {% endfor %}
+        {% else %}
+          <li class="ml-6">
+            <span class="absolute flex items-center justify-center w-8 h-8 bg-blue-50 rounded-full -left-4 text-sm ring-4 ring-white">📋</span>
+            <div class="pl-2">
+              <p class="text-sm font-medium text-gray-900">Record created</p>
+              <p class="text-xs text-gray-400 mt-0.5">Revision {{ revision }} · via APG</p>
+            </div>
+          </li>
+        {% endif %}
       </ol>
-      <div class="mt-8 flex gap-3">
+      <form method="post"
+            action="/ui/entities/{{ safe_entity }}/records/{{ safe_record_id }}/note"
+            class="mt-8 flex gap-3">
         <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
              style="background: var(--apg-primary, #0ea5e9)">A</div>
         <div class="flex-1">
-          <textarea placeholder="Add a note…" rows="2"
+          <textarea name="note" placeholder="Add a note…" rows="2" required
                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent placeholder-gray-300"></textarea>
-          <button class="mt-1.5 px-3 py-1.5 bg-apg-primary text-white text-xs font-medium rounded-lg hover:opacity-90 transition-opacity">
+          <button type="submit"
+                  class="mt-1.5 px-3 py-1.5 bg-apg-primary text-white text-xs font-medium rounded-lg hover:opacity-90 transition-opacity">
             Save Note
           </button>
         </div>
-      </div>
+      </form>
     </div>
   </div>
 </div>

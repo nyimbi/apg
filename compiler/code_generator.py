@@ -3552,7 +3552,7 @@ def theme_stylesheet() -> str:
         ":root {{ --apg-radius: 8px; --apg-radius-sm: 4px; --apg-radius-full: 9999px; }}",
         ":root {{ --apg-shadow-sm: 0 1px 2px rgba(0,0,0,0.08); --apg-shadow-md: 0 4px 6px rgba(0,0,0,0.10); --apg-shadow-lg: 0 10px 15px rgba(0,0,0,0.12); }}",
         ":root {{ --apg-sidebar-width: 240px; --apg-topbar-height: 56px; }}",
-        ":root {{ --apg-font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --apg-font-mono: 'JetBrains Mono', ui-monospace, monospace; }}",
+        ":root {{ --apg-font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --apg-font-mono: ui-monospace, 'Cascadia Code', 'Fira Mono', monospace; }}",
         ":root {{ --apg-space-1: 4px; --apg-space-2: 8px; --apg-space-3: 12px; --apg-space-4: 16px; --apg-space-6: 24px; --apg-space-8: 32px; }}",
         ":root {{ --apg-duration-fast: 150ms; --apg-duration-base: 200ms; }}",
         ":root {{ --apg-bg-canvas: #f6f8fa; --apg-bg-card: var(--apg-surface); --apg-bg-hover: rgba(0,0,0,0.04); }}",
@@ -3634,13 +3634,9 @@ def _html_page(title: str, body: str) -> str:
     safe_title = html.escape(title)
     safe_module = html.escape(MODULE_NAME)
     head_extras = (
-        # Inter font
-        '<link rel="preconnect" href="https://fonts.googleapis.com">'
-        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">'
         # Tailwind CDN — enables utility classes in Jinja2 templates
         '<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>'
-        '<script>tailwind.config={{theme:{{extend:{{fontFamily:{{sans:["Inter","system-ui","sans-serif"],mono:["JetBrains Mono","ui-monospace","monospace"]}},colors:{{apg:{{primary:"#1E5B5A",accent:"#D97706"}}}}}}}}}}</script>'
+        '<script>tailwind.config={{theme:{{extend:{{fontFamily:{{sans:["system-ui","ui-sans-serif","-apple-system","sans-serif"],mono:["ui-monospace","Cascadia Code","Fira Mono","monospace"]}},colors:{{apg:{{primary:"#1E5B5A",accent:"#D97706"}}}}}}}}}}</script>'
         # htmx — progressive enhancement for partial updates
         '<script defer src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>'
         # SortableJS — drag-and-drop for kanban
