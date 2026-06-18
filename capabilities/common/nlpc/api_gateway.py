@@ -32,7 +32,10 @@ import hmac
 import base64
 import re
 
-from .models import NLPTask as NLPTaskType, NLPProcessingRequest as ProcessingRequest, NLPProcessingResult as ProcessingResult, NLPDocument as TextDocument
+try:
+    from .models import NLPTask as NLPTaskType, NLPProcessingRequest as ProcessingRequest, NLPProcessingResult as ProcessingResult, NLPDocument as TextDocument
+except ImportError:
+    from models import NLPTask as NLPTaskType, NLPProcessingRequest as ProcessingRequest, NLPProcessingResult as ProcessingResult, NLPDocument as TextDocument  # type: ignore[no-redef]
 from production_operations import ProductionOperationsManager, get_operations_manager
 
 # Configure logging

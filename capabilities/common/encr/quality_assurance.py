@@ -20,7 +20,7 @@ from uuid_extensions import uuid7str
 
 from pydantic import BaseModel, Field, ConfigDict
 
-from..request_context import get_tenant_id_from_context
+from ..request_context import get_tenant_id_from_context
 
 # Quality Assurance Enums
 class SecurityAuditType(str, Enum):

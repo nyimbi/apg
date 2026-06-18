@@ -102,6 +102,22 @@
   </div>
   {% endif %}
 
+  {% if application_routes %}
+  <div class="apg-card">
+    <div class="apg-card-header">
+      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Application Routes</h2>
+    </div>
+    <ul class="divide-y divide-gray-100 dark:divide-gray-700">
+      {% for route, screen in application_routes.items() %}
+      <li class="py-2 flex items-center justify-between">
+        <a href="{{ route }}" class="text-sm text-apg-primary hover:underline">{{ route }}</a>
+        <span class="text-xs text-gray-400">{{ screen.get('application', '') }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   {% if agents %}
   <div class="apg-card">
     <div class="apg-card-header">
@@ -113,6 +129,24 @@
         <a href="/ui/agents/{{ agent_name | urlencode }}"
            class="text-sm text-apg-primary hover:underline font-medium">
           {{ agent_name }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if agent_teams %}
+  <div class="apg-card">
+    <div class="apg-card-header">
+      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Agent Teams</h2>
+    </div>
+    <ul class="divide-y divide-gray-100 dark:divide-gray-700">
+      {% for team_name in agent_teams %}
+      <li class="py-2">
+        <a href="/ui/agent-teams/{{ team_name | urlencode }}"
+           class="text-sm text-apg-primary hover:underline font-medium">
+          {{ team_name }}
         </a>
       </li>
       {% endfor %}

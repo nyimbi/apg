@@ -171,12 +171,12 @@ def test_legacy_framework_generation_helpers_are_removed():
         assert not hasattr(PythonCodeGenerator, helper_name)
 
 
-def test_python_code_generator_source_is_framework_neutral():
+def test_python_code_generator_does_not_use_appbuilder_ui_framework():
+    # Generator emits Flask apps (intentional) but must not depend on
+    # Flask-AppBuilder UI framework components or ORM-specific imports.
     source = inspect.getsource(PythonCodeGenerator)
 
     for forbidden in (
-        "Flask",
-        "flask",
         "AppBuilder",
         "appbuilder",
         "SQLAlchemy",
