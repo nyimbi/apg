@@ -19,7 +19,7 @@ from typing import Dict, List, Any, Optional, Union, Tuple, AsyncContextManager
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
-from models import (
+from .models import (
     AgGatewayConfig, AgApiRoute, AgPolicy, AgUpstreamService,
     AgTrafficMetrics, AgSecurityEvent, AgWasmModule, AgHttpRequest, 
     AgHttpResponse, EnvironmentType, PolicyType, ThreatLevel

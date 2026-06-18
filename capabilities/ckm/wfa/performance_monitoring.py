@@ -22,7 +22,7 @@ import statistics
 import numpy as np
 from scipy import stats
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMServiceResponse, WBPMPagedResponse,
 	WBPMProcessInstance, WBPMTask, ProcessStatus, TaskStatus, TaskPriority
 )

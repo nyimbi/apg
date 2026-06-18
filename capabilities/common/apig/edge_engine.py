@@ -20,7 +20,7 @@ from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
 
-from models import (
+from .models import (
 	AgHttpRequest, AgHttpResponse, AgWasmModule, AgTrafficMetrics,
 	AgSecurityEvent, AgCacheConfig, ThreatLevel, HttpMethod
 )

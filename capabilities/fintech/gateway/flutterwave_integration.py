@@ -31,14 +31,17 @@ from enum import Enum
 import uuid
 
 # Flutterwave SDK imports
-from flutterwave import Flutterwave
+try:
+    from flutterwave import Flutterwave
+except ImportError:
+    pass  # flutterwave optional
 
 # APG imports
-from models import (
+from .models import (
     PaymentTransaction, PaymentMethod, PaymentResult, 
     PaymentStatus, PaymentMethodType, HealthStatus, HealthCheckResult
 )
-from base_processor import BasePaymentProcessor
+from .payment_processor import BasePaymentProcessor
 
 logger = logging.getLogger(__name__)
 

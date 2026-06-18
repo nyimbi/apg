@@ -25,7 +25,7 @@ import threading
 from contextlib import asynccontextmanager
 import structlog
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMServiceResponse, WBPMPagedResponse,
 	WBPMProcessInstance, WBPMTask, ProcessStatus, TaskStatus, TaskPriority
 )

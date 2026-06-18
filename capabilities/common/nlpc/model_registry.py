@@ -23,7 +23,7 @@ import threading
 from contextlib import asynccontextmanager
 from uuid_extensions import uuid7str
 
-from models import (
+from .models import (
 	NLPModel, ModelProvider, NLPTaskType, LanguageCode, 
 	ProcessingStatus, QualityLevel
 )

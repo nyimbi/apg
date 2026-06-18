@@ -29,7 +29,7 @@ except ImportError:
 	def uuid7str() -> str:
 		return str(uuid4())
 
-from models import (
+from .models import (
 	AgUpstreamService, AgHttpRequest, AgHttpResponse, AgTrafficMetrics,
 	LoadBalancingAlgorithm, validate_tenant_access
 )

@@ -32,11 +32,11 @@ import uuid
 import urllib.parse
 
 # APG imports
-from models import (
+from .models import (
     PaymentTransaction, PaymentMethod, PaymentResult, 
     PaymentStatus, PaymentMethodType, HealthStatus, HealthCheckResult
 )
-from base_processor import BasePaymentProcessor
+from .payment_processor import BasePaymentProcessor
 
 logger = logging.getLogger(__name__)
 

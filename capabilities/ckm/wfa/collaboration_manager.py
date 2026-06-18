@@ -18,7 +18,7 @@ from enum import Enum
 import uuid
 from collections import defaultdict
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMServiceResponse, WBPMPagedResponse
 )
 

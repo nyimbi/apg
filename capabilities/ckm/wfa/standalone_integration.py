@@ -17,7 +17,7 @@ from enum import Enum
 import json
 from uuid_extensions import uuid7str
 
-from models import APGTenantContext, WBPMServiceResponse, APGBaseModel
+from .models import APGTenantContext, WBPMServiceResponse, APGBaseModel
 
 # Configure logging
 logger = logging.getLogger(__name__)

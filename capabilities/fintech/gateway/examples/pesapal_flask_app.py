@@ -27,7 +27,7 @@ from werkzeug.exceptions import BadRequest
 # Import APG payment gateway components
 from pesapal_integration import create_pesapal_service, PesapalEnvironment
 from pesapal_webhook_handler import create_pesapal_webhook_handler
-from models import PaymentTransaction, PaymentMethod, PaymentMethodType
+from .models import PaymentTransaction, PaymentMethod, PaymentMethodType
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

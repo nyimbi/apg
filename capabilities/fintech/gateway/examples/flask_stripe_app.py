@@ -36,7 +36,7 @@ os.environ.update({
 from stripe_integration import create_stripe_service, StripeEnvironment
 from stripe_webhook_handler import StripeWebhookHandler, create_stripe_webhook_blueprint
 from stripe_reporting import create_stripe_reporting_service, ReportPeriod, ReportFilter, ReportFormat
-from models import PaymentTransaction, PaymentMethod, PaymentMethodType
+from .models import PaymentTransaction, PaymentMethod, PaymentMethodType
 from uuid_extensions import uuid7str
 
 # Configure logging

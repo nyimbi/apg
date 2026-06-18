@@ -33,7 +33,7 @@ except ImportError:
 	WEBSOCKETS_AVAILABLE = False
 	WebSocketServerProtocol = None
 
-from models import (
+from .models import (
 	ProcessingRequest, ProcessingResult, StreamingSession, StreamingChunk,
 	NLPTaskType, ModelProvider, QualityLevel, LanguageCode, ProcessingStatus
 )

@@ -31,15 +31,21 @@ from enum import Enum
 import uuid
 import urllib.parse
 import defusedxml.ElementTree as safe_ET
-import xmltodict
-import dicttoxml
+try:
+    import xmltodict
+except ImportError:
+    pass  # xmltodict optional
+try:
+    import dicttoxml
+except ImportError:
+    dicttoxml = None
 
 # APG imports
-from models import (
+from .models import (
     PaymentTransaction, PaymentMethod, PaymentResult, 
     PaymentStatus, PaymentMethodType, HealthStatus, HealthCheckResult
 )
-from base_processor import BasePaymentProcessor
+from .payment_processor import BasePaymentProcessor
 
 logger = logging.getLogger(__name__)
 

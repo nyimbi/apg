@@ -18,7 +18,7 @@ from enum import Enum
 from collections import defaultdict, Counter
 import uuid
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMServiceResponse, WBPMPagedResponse,
 	WBPMProcessInstance, WBPMTask, TaskStatus, InstanceStatus, TaskPriority
 )

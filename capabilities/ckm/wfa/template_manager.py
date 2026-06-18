@@ -19,7 +19,7 @@ import uuid
 from collections import defaultdict
 import hashlib
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMServiceResponse, WBPMPagedResponse,
 	WBPMProcessTemplate, ProcessStatus, TaskPriority
 )

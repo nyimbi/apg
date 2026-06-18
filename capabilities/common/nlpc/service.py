@@ -2712,3 +2712,13 @@ class _ParallelDoc:
 		self.content = content
 		self.tenant_id = tenant_id
 
+
+# Aliases for sub-module compatibility
+NLPService = NLPCoreService
+
+class ModelConfig:
+	"""Stub ModelConfig for sub-module imports."""
+	model_id: str = ''
+	provider: str = 'ollama'
+	max_tokens: int = 512
+	temperature: float = 0.7

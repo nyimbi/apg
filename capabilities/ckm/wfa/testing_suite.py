@@ -26,7 +26,7 @@ from unittest.mock import Mock, AsyncMock, patch
 from contextlib import asynccontextmanager
 import aiofiles
 
-from models import (
+from .models import (
     APGTenantContext, WBPMServiceResponse, WBPMPagedResponse,
     WBPMProcessInstance, WBPMTask, ProcessStatus, TaskStatus, TaskPriority
 )

@@ -25,7 +25,7 @@ import hashlib
 from contextlib import asynccontextmanager
 from uuid_extensions import uuid7str
 
-from models import (
+from .models import (
 	AnnotationProject, TextAnnotation, NLPTaskType, LanguageCode,
 	ProcessingRequest, ProcessingResult, TextDocument
 )

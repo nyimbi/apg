@@ -24,7 +24,7 @@ import hashlib
 import xml.etree.ElementTree as ET
 from urllib.parse import urljoin, urlparse
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMServiceResponse, WBPMPagedResponse
 )
 

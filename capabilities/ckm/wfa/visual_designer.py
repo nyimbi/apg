@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import uuid
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMProcessDefinition, WBPMProcessActivity, WBPMProcessFlow,
 	WBPMServiceResponse, ActivityType, GatewayDirection, EventType,
 	WBPMProcessTemplate, TaskPriority

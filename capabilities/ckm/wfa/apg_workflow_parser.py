@@ -20,7 +20,7 @@ from enum import Enum
 import uuid
 from uuid_extensions import uuid7str
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMProcessDefinition, WBPMProcessActivity, WBPMProcessFlow,
 	WBPMServiceResponse, ActivityType, GatewayDirection, EventType, APGBaseModel,
 	TaskPriority

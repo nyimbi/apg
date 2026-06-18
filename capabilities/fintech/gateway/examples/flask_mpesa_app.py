@@ -32,7 +32,7 @@ os.environ.update({
 
 from mpesa_integration import create_mpesa_service, MPESAEnvironment, MPESATransactionType
 from mpesa_webhook_handler import MPESAWebhookHandler, create_mpesa_webhook_blueprint
-from models import PaymentTransaction, PaymentMethod, PaymentMethodType
+from .models import PaymentTransaction, PaymentMethod, PaymentMethodType
 from uuid_extensions import uuid7str
 
 # Configure logging

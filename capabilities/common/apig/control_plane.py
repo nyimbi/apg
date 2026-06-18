@@ -23,7 +23,7 @@ from pathlib import Path
 from enum import Enum
 from dataclasses import dataclass, field
 
-from models import (
+from .models import (
 	AgGatewayConfig, AgApiRoute, AgPolicy, AgUpstreamService,
 	AgRateLimit, AgCacheConfig, AgHealthCheck, PolicyType,
 	LoadBalancingAlgorithm, EnvironmentType, validate_tenant_access

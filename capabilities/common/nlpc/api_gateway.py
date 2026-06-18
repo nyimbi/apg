@@ -32,7 +32,7 @@ import hmac
 import base64
 import re
 
-from models import NLPTask as NLPTaskType, NLPProcessingRequest as ProcessingRequest, NLPProcessingResult as ProcessingResult, NLPDocument as TextDocument
+from .models import NLPTask as NLPTaskType, NLPProcessingRequest as ProcessingRequest, NLPProcessingResult as ProcessingResult, NLPDocument as TextDocument
 from production_operations import ProductionOperationsManager, get_operations_manager
 
 # Configure logging

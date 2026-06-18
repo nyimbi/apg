@@ -38,7 +38,7 @@ os.environ.update({
 from adyen_integration import create_adyen_service, AdyenEnvironment, AdyenPaymentMethod
 from adyen_webhook_handler import AdyenWebhookHandler, create_adyen_webhook_blueprint
 from adyen_reporting import create_adyen_reporting_service, AdyenReportPeriod, AdyenReportFilter
-from models import PaymentTransaction, PaymentMethod, PaymentMethodType
+from .models import PaymentTransaction, PaymentMethod, PaymentMethodType
 from uuid_extensions import uuid7str
 
 # Configure logging

@@ -27,7 +27,7 @@ from werkzeug.exceptions import BadRequest
 # Import APG payment gateway components
 from flutterwave_integration import create_flutterwave_service, FlutterwaveEnvironment
 from flutterwave_webhook_handler import create_flutterwave_webhook_handler
-from models import PaymentTransaction, PaymentMethod, PaymentMethodType
+from .models import PaymentTransaction, PaymentMethod, PaymentMethodType
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

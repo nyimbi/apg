@@ -38,7 +38,7 @@ except ImportError:
     class Config: pass
     class Engine: pass
 
-from models import AgWasmModule, AgHttpRequest, AgHttpResponse
+from .models import AgWasmModule, AgHttpRequest, AgHttpResponse
 
 # Configure logging
 logger = logging.getLogger(__name__)

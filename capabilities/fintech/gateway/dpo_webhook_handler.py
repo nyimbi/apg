@@ -23,7 +23,7 @@ from enum import Enum
 from dataclasses import dataclass
 import urllib.parse
 
-from models import PaymentStatus, PaymentResult
+from .models import PaymentStatus, PaymentResult
 from dpo_integration import DPOService, DPOConfig
 
 logger = logging.getLogger(__name__)

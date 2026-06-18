@@ -23,7 +23,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 import pickle
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMServiceResponse, WBPMPagedResponse,
 	WBPMProcessInstance, WBPMTask, TaskStatus, InstanceStatus, TaskPriority
 )

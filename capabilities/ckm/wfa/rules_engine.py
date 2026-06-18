@@ -21,7 +21,7 @@ from collections import defaultdict
 import operator
 import ast
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMServiceResponse, WBPMPagedResponse,
 	WBPMProcessInstance, WBPMTask, TaskPriority
 )

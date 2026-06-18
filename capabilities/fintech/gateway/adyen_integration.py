@@ -30,18 +30,25 @@ from enum import Enum
 import uuid
 
 # Adyen SDK imports
-import Adyen
-from Adyen.client import AdyenClient
-from Adyen.service import CheckoutApi, PaymentApi, RecurringApi, ManagementApi, BalancePlatformApi, LegalEntityManagementApi, PosTerminalManagementApi, DataProtectionApi
-from Adyen.exceptions import AdyenError, AdyenAPIError, AdyenInvalidRequestError
-from Adyen.util import is_valid_hmac
+try:
+    import Adyen
+    from Adyen.client import AdyenClient
+    from Adyen.service import CheckoutApi, PaymentApi, RecurringApi, ManagementApi, BalancePlatformApi, LegalEntityManagementApi, PosTerminalManagementApi, DataProtectionApi
+    from Adyen.exceptions import AdyenError, AdyenAPIError, AdyenInvalidRequestError
+    from Adyen.util import is_valid_hmac
+except ImportError:
+    Adyen = AdyenClient = CheckoutApi = PaymentApi = RecurringApi = None
+    ManagementApi = BalancePlatformApi = LegalEntityManagementApi = None
+    PosTerminalManagementApi = DataProtectionApi = None
+    AdyenError = AdyenAPIError = AdyenInvalidRequestError = Exception
+    def is_valid_hmac(*a, **kw): return False
 
 # APG imports
-from models import (
+from .models import (
     PaymentTransaction, PaymentMethod, PaymentResult, 
     PaymentStatus, PaymentMethodType, HealthStatus, HealthCheckResult
 )
-from base_processor import BasePaymentProcessor
+from .payment_processor import BasePaymentProcessor
 
 logger = logging.getLogger(__name__)
 

@@ -20,7 +20,7 @@ from collections import defaultdict, deque
 import statistics
 import time
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMServiceResponse, WBPMPagedResponse,
 	WBPMProcessInstance, WBPMTask, ProcessStatus, TaskStatus, TaskPriority
 )

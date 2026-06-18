@@ -447,7 +447,7 @@ class PaymentTransactionTable(Base):
 	processing_fee = Column(Integer, nullable=True)
 	net_amount = Column(Integer, nullable=True)
 	
-	metadata = Column(JSON, nullable=True)
+	extra_metadata = Column(JSON, nullable=True)
 	customer_ip = Column(String(45), nullable=True)
 	user_agent = Column(Text, nullable=True)
 	
@@ -501,7 +501,7 @@ class PaymentMethodTable(Base):
 	
 	nickname = Column(String(100), nullable=True)
 	is_default = Column(Boolean, default=False)
-	metadata = Column(JSON, nullable=True)
+	extra_metadata = Column(JSON, nullable=True)
 	
 	created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, index=True)
 	updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -551,7 +551,7 @@ class MerchantTable(Base):
 	
 	apg_capabilities = Column(JSON, nullable=True)
 	business_workflows = Column(JSON, nullable=True)
-	metadata = Column(JSON, nullable=True)
+	extra_metadata = Column(JSON, nullable=True)
 	
 	created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, index=True)
 	updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -697,3 +697,18 @@ def _log_models_loaded():
 
 # Execute model loading log
 _log_models_loaded()
+
+# Aliases
+PaymentResult = PaymentTransaction
+
+
+# Stubs and aliases for payment processor integrations
+class HealthStatus(str):
+    HEALTHY = 'healthy'
+    DEGRADED = 'degraded'
+    UNHEALTHY = 'unhealthy'
+
+class HealthCheckResult(_BM if False else object):
+    status: str = 'healthy'
+    latency_ms: float = 0.0
+    details: dict = {}

@@ -809,3 +809,37 @@ ProcessingRequest = NLPProcessingRequest
 ProcessingResult = NLPProcessingResult
 ProcessingRecord = NLPDocument  # backward-compat alias
 
+
+# Aliases
+TextDocument = NLPDocument
+
+NLPModel = NLPModelConfig
+
+
+# Aliases and stubs for sub-module compatibility
+ProcessingRequest = NLPProcessingRequest
+ProcessingResult = NLPProcessingResult
+
+class StreamingChunk:
+    text: str = ''
+    chunk_index: int = 0
+    is_final: bool = False
+
+class StreamingSession:
+    session_id: str = ''
+    task_type: str = ''
+    chunks: list = []
+
+class SystemHealth:
+    status: str = 'healthy'
+    models_loaded: int = 0
+    requests_per_minute: float = 0.0
+
+NLPTaskType = NLPTask
+
+class QualityLevel(str, Enum):
+	FAST = 'fast'
+	BALANCED = 'balanced'
+	ACCURATE = 'accurate'
+	PREMIUM = 'premium'
+

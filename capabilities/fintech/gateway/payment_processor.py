@@ -485,3 +485,4 @@ def _log_payment_processor_module_loaded():
 
 # Execute module loading log
 _log_payment_processor_module_loaded()
+BasePaymentProcessor = AbstractPaymentProcessor

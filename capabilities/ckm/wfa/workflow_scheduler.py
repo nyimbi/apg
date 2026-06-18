@@ -19,7 +19,7 @@ import json
 import cron_descriptor
 from uuid_extensions import uuid7str
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMProcessDefinition, WBPMProcessInstance, 
 	WBPMServiceResponse, ProcessStatus, TaskStatus, APGBaseModel
 )

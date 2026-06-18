@@ -19,7 +19,7 @@ import uuid
 from collections import defaultdict, deque
 import re
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMServiceResponse, WBPMPagedResponse,
 	WBPMProcessInstance, WBPMTask, ProcessStatus, TaskStatus, TaskPriority
 )

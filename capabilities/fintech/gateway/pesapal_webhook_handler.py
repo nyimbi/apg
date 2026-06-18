@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Callable, Awaitable
 from enum import Enum
 from dataclasses import dataclass
 
-from models import PaymentStatus, PaymentResult
+from .models import PaymentStatus, PaymentResult
 from pesapal_integration import PesapalService, PesapalConfig
 
 logger = logging.getLogger(__name__)

@@ -28,7 +28,7 @@ import shutil
 from pathlib import Path
 from uuid_extensions import uuid7str
 
-from models import (
+from .models import (
 	NLPModel, ModelProvider, NLPTaskType, LanguageCode,
 	ProcessingRequest, ProcessingResult
 )

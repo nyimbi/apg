@@ -80,12 +80,15 @@ except ImportError:
 
     aioredis = _AioRedisCompat()
 
-from models import (
+from .models import (
     AgHttpRequest, AgHttpResponse, AgUpstreamService, AgWasmModule,
     AgSecurityEvent, ThreatLevel, HttpMethod
 )
-from wasm_runtime import ProductionWASMRuntime, WASMExecutionContext, WASMExecutionResult
-from ollama_client import ProductionOllamaClient, OllamaConfig, GenerationRequest
+from .wasm_runtime import ProductionWASMRuntime, WASMExecutionContext, WASMExecutionResult
+try:
+    from ollama_client import ProductionOllamaClient, OllamaConfig, GenerationRequest
+except ImportError:
+    ProductionOllamaClient = OllamaConfig = GenerationRequest = None
 
 # Configure logging
 logger = logging.getLogger(__name__)

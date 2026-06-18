@@ -21,13 +21,13 @@ from dataclasses import dataclass
 import concurrent.futures
 from uuid_extensions import uuid7str
 
-from models import (
+from .models import (
 	TextDocument, NLPModel, ProcessingRequest, ProcessingResult,
 	StreamingSession, StreamingChunk, SystemHealth,
 	NLPTaskType, ModelProvider, ProcessingStatus, QualityLevel, LanguageCode
 )
-from service import NLPService, ModelConfig
-from model_registry import ModelRegistry, ModelStatus, LoadBalanceStrategy
+from .service import NLPService, ModelConfig
+from .model_registry import ModelRegistry, ModelStatus, LoadBalanceStrategy
 
 # Configure logging
 logger = logging.getLogger(__name__)

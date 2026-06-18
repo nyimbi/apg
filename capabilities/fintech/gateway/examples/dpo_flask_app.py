@@ -27,7 +27,7 @@ from werkzeug.exceptions import BadRequest
 # Import APG payment gateway components
 from dpo_integration import create_dpo_service, DPOEnvironment
 from dpo_webhook_handler import create_dpo_webhook_handler
-from models import PaymentTransaction, PaymentMethod, PaymentMethodType
+from .models import PaymentTransaction, PaymentMethod, PaymentMethodType
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

@@ -20,7 +20,7 @@ from pathlib import Path
 import inspect
 import yaml
 
-from models import (
+from .models import (
 	APGTenantContext, WBPMServiceResponse, WBPMPagedResponse,
 	WBPMProcessInstance, WBPMTask, ProcessStatus, TaskStatus, TaskPriority
 )
