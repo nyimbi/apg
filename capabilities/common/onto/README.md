@@ -194,7 +194,7 @@ Fifteen architectural improvements are specified in `WORLD_CLASS_IMPROVEMENTS.md
 | 2 | **OWL/RDF Round-Trip Serialization** — `serialize_rdf` / `deserialize_rdf` preserving OWL 2 axioms through Turtle, N-Triples, JSON-LD, RDF/XML | Stub (Turtle delegated to `export_ontology`) |
 | 3 | **Pluggable OWL Reasoner Backend** — abstract `ReasonerBackend` protocol; pure-Python EL transitive closure + `owlready2`/HermiT adapter | Stub (heuristic inferred count) |
 | 4 | **Async Persistence Adapter** — `StorageBackend` protocol; PostgreSQL (asyncpg JSONB) and SQLite backends; write-through on mutations | Planned |
-| 5 | **Change-Delta Event Streaming** — `OntologyChangeDelta` CloudEvents to Bytewax/Kafka/Redis; downstream `grph`/`srch`/`meta` subscribe | Planned |
+| 5 | **Change-Delta Event Streaming** — `OntologyChangeDelta` CloudEvents to Bytewax/Bytewax/Redis; downstream `grph`/`srch`/`meta` subscribe | Planned |
 | 6 | **Semantic Similarity-Guided Duplicate Detection** — Ollama `nomic-embed-text` cosine similarity; configurable threshold gates `create_term` | **Implemented** (`find_similar_terms` via Jaccard; Ollama adapter is drop-in) |
 | 7 | **Ontology Alignment / Mapping Discovery** — pairwise embedding alignment; lexical + synonym strategies; auto-create above confidence cutoff | **Implemented** (`align_ontologies`) |
 | 8 | **SKOS Hierarchy Import/Export** — W3C SKOS Turtle serialization mapping edges to `skos:broader/narrower/related` and synonyms to `skos:altLabel` | **Implemented** (`export_skos`) |

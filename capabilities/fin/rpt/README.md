@@ -192,7 +192,7 @@ Roadmap items that extend `fin_rpt` to enterprise-grade coverage:
 1. **Variance Analysis Engine** — automated period-over-period and budget-vs-actual variance with Ollama-drafted narrative commentary.
 2. **Rolling Forecast Integration** — driver-based 12/18-month rolling forecasts blended with actuals; confidence intervals from historical variance.
 3. **Multi-Currency Translation and Revaluation** — IAS 21 FX translation (spot/average/closing rates), translation reserve (OCI), and `fx_translation_completed` events.
-4. **Real-Time GL Integration via CDC** — Debezium → Kafka → Bytewax streaming of journal entries; near-real-time trial balance eliminates batch close delays.
+4. **Real-Time GL Integration via CDC** — Debezium → Bytewax → Bytewax streaming of journal entries; near-real-time trial balance eliminates batch close delays.
 5. **Audit-Trail Immutability with Merkle Chaining** — SHA-256 hash-chained audit ledger with `verify_audit_chain()`; backed by append-only PostgreSQL.
 6. **Automated IFRS 16 Lease Schedule Generator** — right-of-use asset, lease liability, interest and depreciation amortisation tables from lease terms.
 7. **Statement of Changes in Equity (SOCE)** — IFRS-compliant equity roll-forward across profit, OCI, dividends, and share movements.

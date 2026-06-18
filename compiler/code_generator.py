@@ -6611,6 +6611,8 @@ if __name__ == "__main__":
 	def _generate_python_requirements(self) -> str:
 		"""Generate requirements for the APG Python target."""
 		return """# APG generated Python application requirements
+# standard library: json, uuid, dataclasses, typing (no install needed)
+
 flask>=3.0,<4
 PyJWT>=2.8,<3
 """

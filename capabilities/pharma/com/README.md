@@ -135,7 +135,7 @@ Composes with `pharma_rec` for Sunshine Act reporting obligations. Feeds spend d
 - **I1.** World-Class Improvements: pharma_com — Commercial Operations
 - **I2.** True Async Service Layer
 - **I3.** PostgreSQL-Backed Persistence via Async SQLAlchemy
-- **I4.** Event Streaming via Bytewax / Kafka
+- **I4.** Event Streaming via Bytewax / Bytewax
 - **I5.** Pharmacovigilance Signal Detection
 - **I6.** Regulatory Submission Workflow (E2B R3 / CIOMS)
 - **I7.** Adverse Event Report (ICSR) Lifecycle

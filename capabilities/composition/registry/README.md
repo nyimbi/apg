@@ -248,7 +248,7 @@ Fifteen targeted improvements drawn from production-grade registries (Consul, Ne
 
 5. **Transitive Dependency Impact Analysis** — `impact_analysis` runs reverse BFS from a capability to surface all direct/transitive dependents, affected compositions, and a risk level. (cf. Maven `dependency:tree`, Snyk dependency graph)
 
-6. **Event Replay and Audit Reconstruction** — `replay_audit_to_snapshot` replays audit events up to a timestamp, reconstructing a point-in-time capability state snapshot. (cf. Kafka consumer replay, EventStore projections)
+6. **Event Replay and Audit Reconstruction** — `replay_audit_to_snapshot` replays audit events up to a timestamp, reconstructing a point-in-time capability state snapshot. (cf. Bytewax consumer replay, EventStore projections)
 
 7. **Composition Diff and Migration Plan Generator** — `diff_compositions` compares two composition blueprints and returns added/removed/version-changed capabilities plus auto-generated migration notes. (cf. Terraform `plan`, `kubectl diff`)
 

@@ -162,12 +162,12 @@ see and remediate routing violations.
 ## World-Class Enhancements (v2.0)
 
 15 targeted improvements that elevate MQEB to a production-grade, observable,
-composable event fabric competitive with Apache Kafka, AWS EventBridge, and
+composable event fabric competitive with Bytewax, AWS EventBridge, and
 Google Cloud Pub/Sub.
 
 | # | Name | Category | Summary |
 |---|------|----------|---------|
-| I1 | Backpressure-Aware Flow Control | Reliability | Per-topic `max_queue_depth` with token-bucket admission control; overflow redirects to configurable spill topic. Comparable to Kafka producer quotas and SQS `ApproximateNumberOfMessages` alarms. |
+| I1 | Backpressure-Aware Flow Control | Reliability | Per-topic `max_queue_depth` with token-bucket admission control; overflow redirects to configurable spill topic. Comparable to Bytewax producer quotas and SQS `ApproximateNumberOfMessages` alarms. |
 | I2 | Cursor-Based Consumer Groups with Committed Offsets | Correctness | `ConsumerGroupRecord` with monotonic committed offsets; `commit_offset` and `seek_offset` methods; offset changes emitted as audit events. Closes the consumer-restart exactly-once gap. |
 | I3 | Schema Registry Validation with Fail-Close | Data Quality | `SchemaRegistryAdapter` protocol; `validate_message_schema` caches compiled validators in `BoundedCache`; raises `PermissionError("schema_validation_failed")` on regulated topics with mismatched payloads. |
 | I4 | Distributed Saga with Compensating Transactions | Correctness | `SagaRecord` + `SagaStep`; `start_saga`, `advance_saga`, `compensate_saga` methods; each transition emits an audit event. Provides in-fabric rollback without AWS Step Functions or Temporal. |

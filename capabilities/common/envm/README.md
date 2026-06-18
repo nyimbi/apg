@@ -139,7 +139,7 @@ and represent the production-grade roadmap for this capability.
 | 8 | **Promotion Rollback with Audit Trail** — `rollback_promotion(run_id, rolled_back_by, reason)` reverses promotion atomically | ITIL / SOC2 CC8.1 change management compliance |
 | 9 | **Cost Anomaly Detection** — `cost_anomaly_detect(threshold_pct)` computes rolling mean+stddev and emits `cost_anomaly` event | Prevents billing surprises; FinOps automation |
 | 10 | **RBAC Policy Enforcement** — `_check_rbac(actor_id, action, env)` enforced at service boundary for promote/deprovision/rotate/create | Service becomes self-defending |
-| 11 | **Event Streaming Outbox** — `_Outbox` flushes to pluggable `EventBusAdapter` (Null + Kafka); best-effort, non-blocking | Real-time composition with `moni`, `audl`, `depl` |
+| 11 | **Event Streaming Outbox** — `_Outbox` flushes to pluggable `EventBusAdapter` (Null + Bytewax); best-effort, non-blocking | Real-time composition with `moni`, `audl`, `depl` |
 | 12 | **Environment Locking and Freeze** — `env_lock()` / `env_unlock()` with `EnvironmentLockedError` on mutating ops | Enforces change-freeze windows; CAB compliance |
 | 13 | **Drift History and Trend Analysis** — `drift_trend(window)` computes slope via linear regression, classifies `improving | stable | worsening` | Proactive governance; enables automated escalation |
 | 14 | **Multi-Region Replication Metadata** — `env_add_replica(replica_region, replica_role)` / `env_list_replicas()` with per-replica drift/health | Models geo-distributed deployments; DR test automation |

@@ -210,7 +210,7 @@ print(scorecard["dimensions"])     # per-dimension breakdown
 | # | Name | Category | Summary |
 |---|------|----------|---------|
 | I1 | Async-Native Service Layer | Architecture | All public methods are `async def`; `asyncio.gather` for fan-out; DI-injected async adapters. Eliminates thread-pool overhead, enables 10-50x concurrency. |
-| I2 | NATS JetStream Lifecycle Events | Streaming | `publish_theme`, `update_tokens`, `add_brand_asset`, `apply_tenant_theme` each publish to `apg.them.<event_type>.<tenant_id>` after committing state. Sub-millisecond durable delivery without a Kafka broker. |
+| I2 | NATS JetStream Lifecycle Events | Streaming | `publish_theme`, `update_tokens`, `add_brand_asset`, `apply_tenant_theme` each publish to `apg.them.<event_type>.<tenant_id>` after committing state. Sub-millisecond durable delivery via NATS JetStream. |
 | I3 | Perceptual Dark-Mode via OKLCH | Colour Science | Flips only the L channel in OKLCH (not RGB), preserving hue and chroma. Produces perceptually uniform dark palettes that pass WCAG contrast without manual correction. Exposed as `dark_mode_oklch` strategy. |
 | I4 | Live Token Diff and Rollback | Governance | `token_diff(from_version, to_version)` returns added/removed/changed keys. `token_rollback(group, target_version)` re-applies historical values as a new version; history is never mutated. |
 | I5 | Multi-Surface Contrast Matrix | Accessibility | `contrast_matrix()` computes WCAG ratios for every fg/bg token pair, not just against white. Returns violation report with fix suggestions per pair; critical for WCAG 2.1 AA/AAA certification. |

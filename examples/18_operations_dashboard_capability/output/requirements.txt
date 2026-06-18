@@ -1,3 +1,5 @@
 # APG generated Python application requirements
+# standard library: json, uuid, dataclasses, typing (no install needed)
+
 flask>=3.0,<4
 PyJWT>=2.8,<3

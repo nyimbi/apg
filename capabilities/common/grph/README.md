@@ -242,7 +242,7 @@ Fifteen targeted improvements planned for the next release cycle, in priority or
 |---|---|---|
 | 1 | **Native Cypher Query Engine** — Lark-grammar DSL compiling `MATCH/WHERE/RETURN` to traversal primitives | Declarative ad-hoc analytics, Neo4j parity |
 | 2 | **PostgreSQL + Apache AGE backend** — `StorageAdapter` protocol with `InMemoryAdapter` and `AGEAdapter`; ACID guarantees, AGE graph namespaces per tenant | Durable, restartable graphs |
-| 3 | **Kafka/Redpanda mutation log** — Every `_record_event` published as a CloudEvent to `grph.mutations.<tenant_id>` via `aiokafka` | Real-time downstream consumers, projection materialisation |
+| 3 | **Bytewax mutation log** — Every `_record_event` published as a CloudEvent to `grph.mutations.<tenant_id>` via bytewax stream processor | Real-time downstream consumers, projection materialisation |
 | 4 | **Incremental PageRank** — Power-iteration with damping `d=0.85`, convergence `epsilon`, dirty-flag caching | Reliable hub/authority scores |
 | 5 | **Semantic edge inference via Ollama** — Embed node properties with `nomic-embed-text`, create `SEMANTICALLY_SIMILAR` edges above cosine threshold | Automatic knowledge-graph enrichment |
 | 6 | **Bi-temporal versioning** — `valid_from`, `valid_to`, `transaction_time` on nodes/edges; `as_of(ts)` and `between(t1, t2)` queries | Compliance, lineage auditing, time-series |
@@ -250,7 +250,7 @@ Fifteen targeted improvements planned for the next release cycle, in priority or
 | 8 | **Hierarchical partitioning (METIS-style)** — Recursive spectral bisection via Fiedler eigenvector; partition tree for cross-shard traversal | Sub-linear analytics on large graphs |
 | 9 | **Graph compression** — `compress_schema` replaces structurally-equivalent nodes with superposition nodes; 40–80% storage reduction | Dense graph scalability |
 | 10 | **Schema validation + migration engine** — JSON Schema per node/edge type enforced at write time; `migrate_schema` applies transformation specs atomically | Data quality enforcement |
-| 11 | **Distributed read replicas** — Redis-backed `GraphReadCache` with Kafka invalidation events; horizontal read scaling with read-your-writes consistency | Multi-process deployments |
+| 11 | **Distributed read replicas** — Redis-backed `GraphReadCache` with Bytewax invalidation events; horizontal read scaling with read-your-writes consistency | Multi-process deployments |
 | 12 | **Full-text + vector search via SRCH** — `search_nodes(query)` runs BM25 + vector hybrid retrieval; GRPH as knowledge-graph RAG backend | Fuzzy and semantic node discovery |
 | 13 | **CRDT merge semantics** — G-Set/2P-Set node and edge state; `merge(snapshot_a, snapshot_b)` without conflicts | Offline/edge/air-gapped deployments |
 | 14 | **Interactive visualisation export** — `export_vis_json` (Cytoscape.js) and `export_d3_force` (D3 force-directed); served at `/grph/explorer/json` | Embedded graph explorer in the FAB UI |

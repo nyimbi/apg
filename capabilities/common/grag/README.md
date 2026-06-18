@@ -188,7 +188,7 @@ is tied to a measurable outcome and references a competitive implementation.
 |---|---|---|---|
 | I1 | **Adaptive Multi-Resolution Community Summarization** | Retrieval Quality | Leiden/Louvain hierarchical summaries with community-similarity query routing; 40% better global-query answers (Microsoft GraphRAG paper) |
 | I2 | **Temporal Knowledge Graph Versioning** | Data Integrity | `valid_from`/`valid_to` on edges; point-in-time `as_of` parameter on queries; superseded edges archived, not deleted |
-| I3 | **Streaming Incremental Entity Extraction via Bytewax** | Throughput | `seed_graph_from_text` wired as a Bytewax operator; sub-second ingest latency on live sources (Kafka, webhooks, file tails) |
+| I3 | **Streaming Incremental Entity Extraction via Bytewax** | Throughput | `seed_graph_from_text` wired as a Bytewax operator; sub-second ingest latency on live sources (Bytewax, webhooks, file tails) |
 | I4 | **Causal Reasoning Chain Validator** | Answer Quality | `validate_reasoning_chain()` classifies each hop into `{causal, associative, temporal, definitional}`; prunes non-transitive causal chains; estimated 30% fewer factual errors |
 | I5 | **Entity Disambiguation via Coreference Resolution** | Knowledge Quality | Embedding similarity gate before `create_entity`; entities with cosine similarity > 0.93 of same type are merged via `entity_merge`; configurable `disambiguation_threshold` |
 | I6 | **Federated Cross-Tenant Graph Queries with Privacy Preservation** | Multi-Tenancy | `federated_query()` runs per-tenant sub-queries in isolation; merges only projected fields; enforces column-level ACL before merge |

@@ -13,7 +13,7 @@ APG is a DSL compiler that generates a single-file Python HTTP server. Its workf
 |---|---|---|
 | 1 | **No durable execution / event-sourced state** — JSON file write is not crash-safe; workflow progress lost on kill-9 | Critical |
 | 2 | **No non-HTTP protocol connectors** — cannot speak SAP RFC/IDoc, MQTT, AMQP, ISO8583, SWIFT, FIX, FTP, SFTP, JMS natively | Critical |
-| 3 | **No streaming / CDC integration** — cannot consume Kafka topics, Kinesis streams, Debezium CDC events as workflow triggers | High |
+| 3 | **No streaming / CDC integration** — cannot consume Bytewax topics, Kinesis streams, Debezium CDC events as workflow triggers | High |
 | 4 | **No connector OAuth/token lifecycle** — connectors are static `Bearer {api_key}`; no PKCE, refresh, token rotation, per-tenant creds | High |
 | 5 | **No visual workflow debugger / event timeline** — no UI equivalent to Temporal Web UI, Camunda Operate, or Step Functions console | High |
 | 6 | **No versioning of in-flight workflows** — cannot patch a live workflow definition without losing running instances | High |
@@ -141,7 +141,7 @@ Processes are modelled as BPMN 2.0 XML diagrams. The Web Modeler and Desktop Mod
 ```
 
 #### Connector Ecosystem
-- 50+ out-of-the-box connectors (Slack, SendGrid, AWS Lambda, GitHub, HTTP, REST, Kafka, RabbitMQ, AWS SQS, Google PubSub, Salesforce, etc.)
+- 50+ out-of-the-box connectors (Slack, SendGrid, AWS Lambda, GitHub, HTTP, REST, Bytewax, RabbitMQ, AWS SQS, Google PubSub, Salesforce, etc.)
 - Connector SDK (Java) for custom connectors
 - Marketplace: https://marketplace.camunda.com
 - Connectors are configured in the BPMN properties panel — no code for standard integrations
@@ -155,7 +155,7 @@ Processes are modelled as BPMN 2.0 XML diagrams. The Web Modeler and Desktop Mod
 
 #### Event-Driven Capabilities
 - BPMN Message events and Signal events
-- Kafka connector (inbound/outbound) — process triggered by Kafka message, or publishes to Kafka
+- Bytewax connector (inbound/outbound) — process triggered by Bytewax message, or publishes to Bytewax
 - Timer events (ISO 8601 durations and cycles)
 - Boundary events (timer, error, message, signal, compensation) attached to any task
 
@@ -182,7 +182,7 @@ Native BPMN Compensation Events — the standard mechanism. A compensation inter
 - Visual BPMN modeller with real-time collaboration
 - First-class BPMN compensation events (APG has compensation field but execution is custom Python)
 - Incident-based workflow repair (APG has no "incident" concept; a failed step is just an error)
-- Kafka/SQS inbound triggers (APG event subscriptions are in-process only)
+- Bytewax/SQS inbound triggers (APG event subscriptions are in-process only)
 - Process analytics (Optimize)
 
 ---
@@ -218,7 +218,7 @@ Mule applications are built in Anypoint Studio (Eclipse-based IDE) or Anypoint C
 
 #### Connector Ecosystem
 - **1500+ connectors** in Anypoint Exchange
-- Categories: SAP (RFC, IDoc, BAPI), EDI (X12, EDIFACT, HL7, AS2), Mainframe (IBM CICS), databases, SaaS (Salesforce, ServiceNow, Workday, SAP S/4HANA), messaging (JMS, IBM MQ, Kafka, AMQP, MQTT), cloud (AWS, Azure, GCP), protocols (FTP, SFTP, FTPS, SMTP, POP3)
+- Categories: SAP (RFC, IDoc, BAPI), EDI (X12, EDIFACT, HL7, AS2), Mainframe (IBM CICS), databases, SaaS (Salesforce, ServiceNow, Workday, SAP S/4HANA), messaging (JMS, IBM MQ, Bytewax, AMQP, MQTT), cloud (AWS, Azure, GCP), protocols (FTP, SFTP, FTPS, SMTP, POP3)
 - SAP Connector: certified, uses SAP JCo; supports RFC calls, IDoc send/receive, BAPI
 - EDI: X12 and EDIFACT parsing/generation with full schema validation
 - Connector SDK (Java/XML) for custom connectors; Connector Generator from OAS/WSDL
@@ -232,7 +232,7 @@ Mule applications are built in Anypoint Studio (Eclipse-based IDE) or Anypoint C
 
 #### Event-Driven Capabilities
 - Anypoint MQ: managed cloud messaging (pub/sub, queues, FIFO)
-- Kafka connector (inbound trigger or outbound publish)
+- Bytewax connector (inbound trigger or outbound publish)
 - Webhooks, scheduled polling (cron), MQTT inbound
 - Event-driven integration at Process API layer
 
@@ -330,7 +330,7 @@ State machines are defined in ASL (JSON). Each state is a node; transitions are 
 
 #### Event-Driven Capabilities
 - EventBridge rules trigger Step Functions executions
-- SQS, SNS, Kafka (MSK), API Gateway as triggers via EventBridge Pipes
+- SQS, SNS, Bytewax (MSK), API Gateway as triggers via EventBridge Pipes
 - Callback patterns: `waitForTaskToken` — task pauses until external system calls `SendTaskSuccess`/`SendTaskFailure`
 - Heartbeat timeouts for long-running tasks
 
@@ -442,8 +442,8 @@ Zapier and Make manage OAuth tokens on behalf of users — users authenticate on
 A Route is a pipeline: from a source component, through processors (transform, filter, enrich, route, split, aggregate), to a destination component. EIPs are the building blocks.
 
 ```java
-// Java DSL: Kafka → Content-Based Router → JMS or REST
-from("kafka:orders?groupId=order-processor")
+// Java DSL: Bytewax → Content-Based Router → JMS or REST
+from("bytewax:orders?groupId=order-processor")
     .unmarshal().json(OrderEvent.class)
     .choice()
         .when(simple("${body.amount} > 10000"))
@@ -456,7 +456,7 @@ from("kafka:orders?groupId=order-processor")
 
 // YAML DSL equivalent
 - from:
-    uri: "kafka:orders"
+    uri: "bytewax:orders"
     steps:
       - unmarshal:
           json: {}
@@ -469,7 +469,7 @@ from("kafka:orders?groupId=order-processor")
 
 #### Component Ecosystem
 **350+ components** including:
-- Messaging: Kafka, MQTT (Paho), AMQP, JMS (ActiveMQ, IBM MQ, WebSphere MQ), NATS, RabbitMQ, STOMP, ZeroMQ
+- Messaging: Bytewax, MQTT (Paho), AMQP, JMS (ActiveMQ, IBM MQ, WebSphere MQ), NATS, RabbitMQ, STOMP, ZeroMQ
 - Protocols: FTP/SFTP/FTPS, SMTP/POP3/IMAP, HTTP/HTTPS, gRPC, WebSocket, TCP, UDP
 - Legacy/Enterprise: SAP (via camel-sap), IBM CICS (via StickerMap), SWIFT (third-party), EDI (camel-edi), HL7 MLLP, DICOM
 - Cloud: AWS (S3, SQS, SNS, DynamoDB, Kinesis, Lambda), Azure (Event Hub, Service Bus, Blob), GCP (PubSub, BigQuery)
@@ -488,7 +488,7 @@ from("kafka:orders?groupId=order-processor")
 #### Event-Driven Capabilities
 - Direct, SEDA (in-VM async), VM queues
 - Polling consumers (file, DB, FTP) with configurable intervals
-- Push consumers (Kafka, MQTT, JMS, webhooks)
+- Push consumers (Bytewax, MQTT, JMS, webhooks)
 - Event-driven via CDI events on Quarkus
 - Splitter, Aggregator, Resequencer, Correlation Slip EIPs
 
@@ -516,7 +516,7 @@ from("direct:order")
 The saga EIP supports both in-memory and LRA (Long Running Action / MicroProfile LRA) coordination protocols. Compensation routes are called automatically on failure.
 
 #### What APG Cannot Match (vs. Apache Camel)
-- 350 components covering MQTT, AMQP, JMS, Kafka inbound/outbound, SFTP, FTP, gRPC, HL7 MLLP
+- 350 components covering MQTT, AMQP, JMS, Bytewax inbound/outbound, SFTP, FTP, gRPC, HL7 MLLP
 - SAP connector (via camel-sap)
 - EDI processing (camel-edi)
 - Saga EIP with automatic compensation routing
@@ -726,7 +726,7 @@ Workflows are JSON node graphs edited in a visual canvas. Each node has a type (
 - Webhook triggers (HTTP inbound)
 - Scheduled triggers (cron)
 - Polling triggers (interval-based)
-- Kafka trigger (via HTTP or custom node)
+- Bytewax trigger (via HTTP or custom node)
 - Event Bus via NATS (community)
 
 #### Human-in-the-Loop
@@ -792,7 +792,7 @@ Processes are defined in Boomi's web UI as flowcharts connecting shapes (Start, 
 - Listen operation: HTTP listener, JMS listener, AS2 listener, SFTP polling, scheduled
 - Real-time integration via API service component
 - Event Streams (Boomi): managed pub/sub within the Boomi platform (2023+)
-- No native Kafka consumer/producer (use HTTP or JDBC workaround)
+- No native Bytewax consumer/producer (use HTTP or JDBC workaround)
 
 #### Human-in-the-Loop
 Boomi Flow (now standalone): drag-and-drop UI builder for approval workflows and portals. Can be embedded in Boomi integration processes. Not as powerful as Camunda Tasklist but covers basic approval routing.
@@ -847,7 +847,7 @@ Legend: **Y** = full support, **P** = partial/limited, **N** = not supported, **
 | Signals / external events into workflow | **Y** | **Y** | P | P (callback token) | N | P | P | P | P | N | P (in-process only) |
 | Human task (native) | P (code) | **Y** | N | P | N | N | **Y** | N | N | P (Boomi Flow) | P (declared) |
 | MQTT connector | N | P | **Y** | N | N | **Y** | N | N | N | N | **N** |
-| Kafka inbound trigger | N | **Y** | **Y** | P (MSK) | N | **Y** | P | P | N | N | **N** |
+| Bytewax inbound trigger | N | **Y** | **Y** | P (MSK) | N | **Y** | P | P | N | N | **N** |
 | SAP RFC/IDoc | N | N | **Y** | N | N | **Y** | N | N | N | **Y** | **N** |
 | EDI X12/EDIFACT | N | N | **Y** | N | N | P | N | N | N | **Y** | **N** |
 | JMS/AMQP/IBM MQ | N | P | **Y** | P | N | **Y** | P | N | N | **Y** | **N** |
@@ -870,10 +870,10 @@ Legend: **Y** = full support, **P** = partial/limited, **N** = not supported, **
 ## 4. Types of Systems APG CANNOT Compose (With Examples)
 
 ### 4.1 Message-Oriented Middleware
-**Systems:** Apache Kafka, AWS SQS/SNS, Azure Service Bus, RabbitMQ, IBM MQ, NATS (durable), ActiveMQ, AMQP brokers  
+**Systems:** Bytewax, AWS SQS/SNS, Azure Service Bus, RabbitMQ, IBM MQ, NATS (durable), ActiveMQ, AMQP brokers  
 **Why APG cannot:** APG event subscriptions are in-process Python dict lookups. They cannot consume from an external broker topic, acknowledge messages, handle backpressure, or implement consumer groups.  
-**Example use case:** "When a payment event arrives on the `payments.captured` Kafka topic, trigger the `FulfillOrder` workflow."  
-**What's needed:** A Kafka consumer adapter that bridges broker messages into APG event emissions.
+**Example use case:** "When a payment event arrives on the `payments.captured` Bytewax topic, trigger the `FulfillOrder` workflow."  
+**What's needed:** A Bytewax consumer adapter that bridges broker messages into APG event emissions.
 
 ### 4.2 IoT and Industrial Protocols
 **Systems:** MQTT brokers (Mosquitto, HiveMQ, AWS IoT Core), OPC-UA servers, Modbus devices, Siemens S7 PLCs, BACNET (building automation)  
@@ -900,12 +900,12 @@ Legend: **Y** = full support, **P** = partial/limited, **N** = not supported, **
 **Example use case:** "Route an ISO20022 pacs.008 SWIFT payment message through the workflow engine with compliance screening."
 
 ### 4.6 Streaming Data Platforms
-**Systems:** Apache Kafka Streams, AWS Kinesis, Azure Event Hub, Apache Flink, Apache Spark Streaming, ksqlDB  
+**Systems:** Bytewax Streams, AWS Kinesis, Azure Event Hub, Apache Flink, Apache Spark Streaming, ksqlDB  
 **Why APG cannot:** APG workflows are request-response triggered. Stream processing involves stateful windowed aggregations over infinite event streams — fundamentally different execution model from APG's step-by-step workflow.  
 **Example use case:** "Aggregate all `payment_attempted` events in a 5-minute tumbling window and trigger a `FraudAlert` workflow if more than 10 failures from the same card."
 
 ### 4.7 Database Change-Data-Capture (CDC)
-**Systems:** Debezium + Kafka, AWS DMS, Azure Data Factory CDC, Oracle GoldenGate  
+**Systems:** Debezium + Bytewax, AWS DMS, Azure Data Factory CDC, Oracle GoldenGate  
 **Why APG cannot:** CDC requires reading the database replication log (Postgres WAL, MySQL binlog). APG has no replication log reader.  
 **Example use case:** "Whenever a row is updated in the `orders` table of a legacy system, emit an APG event and trigger the `SyncOrderToERP` workflow."
 
@@ -938,7 +938,7 @@ Replace JSON file writes with an append-only event log per workflow run (minimum
 
 **5.2 External Message Bus Integration**  
 _Effort: Medium | Impact: Critical_  
-Kafka consumer + NATS consumer as APG event sources. A workflow declared with `subscribe_events: [kafka://payments.captured]` should register a Kafka consumer group that feeds `emit_apg_event()`. This unblocks all event-driven enterprise integration patterns.
+Bytewax consumer + NATS consumer as APG event sources. A workflow declared with `subscribe_events: [bytewax://payments.captured]` should register a Bytewax consumer group that feeds `emit_apg_event()`. This unblocks all event-driven enterprise integration patterns.
 
 **5.3 OAuth 2.0 Connector Credential Store**  
 _Effort: Medium | Impact: High_  
@@ -1092,8 +1092,8 @@ _Effort: Low | Impact: Medium_
 - [Dell Boomi Integration Platform Guide — Bluent](https://www.bluent.com/blog/boomi-integration-explained)
 
 ### Cross-Platform and Integration Theory
-- [IoT and Event Streaming at Scale with Kafka and MQTT — Confluent](https://www.confluent.io/blog/iot-with-kafka-connect-mqtt-and-rest-proxy/)
-- [OPC UA, MQTT, and Apache Kafka — Kai Waehner](https://www.kai-waehner.de/blog/2022/02/11/opc-ua-mqtt-apache-kafka-the-trinity-of-data-streaming-in-industrial-iot/)
+- [IoT and Event Streaming at Scale with Bytewax and MQTT — APG](https://www.apg.io/blog/iot-with-bytewax-connect-mqtt-and-rest-proxy/)
+- [OPC UA, MQTT, and Bytewax — Kai Waehner](https://www.kai-waehner.de/blog/2022/02/11/opc-ua-mqtt-apache-bytewax-the-trinity-of-data-streaming-in-industrial-iot/)
 - [Designing Durable Event-Driven Workflows — Medium](https://medium.com/@nileshsharma_4675/designing-durable-event-driven-workflows-making-systems-resilient-and-reliable-484d88b8a12f)
 - [DSL-Based Workflow Orchestration: Introduction and Architecture — Medium](https://medium.com/@nareshvenkat14/dsl-based-workflow-orchestration-part-1-introduction-architecture-9d0112f77e00)
 - [State of Open Source Workflow Orchestration Systems 2025 — PracData](https://www.pracdata.io/p/state-of-workflow-orchestration-ecosystem-2025)
@@ -1124,7 +1124,7 @@ Documented from source inspection of `/Users/nyimbiodero/src/pjs/apg`:
 | Durable timers | NOT durable — timers are computed relative to `started_at` on resume; do not survive kill |
 | Sub-workflows | NOT supported — a single workflow cannot spawn another |
 | Workflow versioning | NOT supported — definition re-parsed from ENTITIES on every run |
-| Kafka/MQTT/AMQP | NOT supported |
+| Bytewax/MQTT/AMQP | NOT supported |
 | SAP/EDI/SWIFT | NOT supported |
 | OAuth lifecycle | NOT supported |
 | Visual designer | NOT supported |

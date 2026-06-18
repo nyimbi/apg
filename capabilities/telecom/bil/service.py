@@ -87,7 +87,7 @@ class _MemStore:
 	"""Trivial in-process store used when no external store is supplied."""
 
 	def __init__(self) -> None:
-		self._data = WriteThruDict('data', tenant_id, _store)
+		self._data: dict[str, Any] = {}
 
 	async def get(self, key: str) -> dict[str, Any] | None:
 		return self._data.get(key)

@@ -241,7 +241,7 @@ graph = await svc.network_graph_analysis(["cust-1", "cust-2", "cust-3", "cust-4"
 
 8. **SLA-Tracked Case Management** — `case_sla_status(case_id)` returns time-in-state, SLA target, breach flag, and escalation chain. Integrates with `ntfy` for Slack/SMS escalation on SLA breach.
 
-9. **Streaming Pipeline Integration (Bytewax / Kafka)** — `FraudEventEmitter` adapter serialises `FraudSignal`, `FraudDecision`, and `FraudCase` lifecycle events as CloudEvents and publishes to `apg.fintech.fraud.lifecycle`. `stream_signal` and `stream_decision` async entry points.
+9. **Streaming Pipeline Integration (Bytewax / Bytewax)** — `FraudEventEmitter` adapter serialises `FraudSignal`, `FraudDecision`, and `FraudCase` lifecycle events as CloudEvents and publishes to `apg.fintech.fraud.lifecycle`. `stream_signal` and `stream_decision` async entry points.
 
 10. **Chargeback Representment Workflow** — state machine `received → evidence_gathering → representment_filed → won | lost` with `file_representment(case_id, evidence_bundle)` and `record_representment_outcome`. Win/loss rates feed back to ML feature store as long-term fraud labels.
 

@@ -1017,3 +1017,5 @@ class CICDService:
 		lead_times = [45] * min(len(builds), len(deployments))
 		avg = round(statistics.mean(lead_times), 2)
 		return _R(lead_time_minutes=avg, sample_size=len(lead_times), computed_at=_ts())
+
+CicdService = CICDService

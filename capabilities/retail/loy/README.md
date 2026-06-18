@@ -165,7 +165,7 @@ Provides end-to-end loyalty programme management for retail tenants: member enro
 7. **Predictive Churn Intervention** — scheduler-driven win-back offers triggered by RFM recency threshold with acceptance-rate tracking
 8. **Tier Downgrade Grace Period Enforcement** — `tier_downgrade_check` with rolling-window qualification, `downgrade_scheduled_at` timestamp, and notification on execution
 9. **Points Float & Liability Reporting** — actuarial breakage model with Monte Carlo scenario, segmented by tier and CLV, exportable for finance systems
-10. **Batch Earn via Event Stream (Bytewax / Kafka)** — async generator batch processing with partial-failure model and `batch_earn_completed` stream event
+10. **Batch Earn via Event Stream (Bytewax / Bytewax)** — async generator batch processing with partial-failure model and `batch_earn_completed` stream event
 11. **Member Merge & Duplicate Detection** — fuzzy-match duplicate candidates, balance/transaction retargeting, immutable audit on merge
 12. **Tiered Reward Gating** — `min_tier_name` and `allowed_segments` on rewards; `list_rewards_for_member` enforces eligibility at catalogue and redemption
 13. **Campaign ROI Measurement** — `record_campaign_attribution` links transactions to campaigns; `get_campaign_roi` computes incremental revenue vs. points cost

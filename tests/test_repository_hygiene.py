@@ -19,7 +19,9 @@ from compiler.repository_hygiene import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_ROOT_TRACKED_FILES = {
+	".env.example",
 	".gitignore",
+	"alembic.ini",
 	"LICENSE",
 	"README.md",
 	"PACKAGES.md",
@@ -30,6 +32,7 @@ ALLOWED_ROOT_TRACKED_FILES = {
 	"Dockerfile.capability",
 	"Dockerfile.gateway",
 	"pytest.ini",
+	"requirements.txt",
 	"setup.py",
 	"uuid_extensions.py",
 	"prompt.md",

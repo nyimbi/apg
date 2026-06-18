@@ -154,7 +154,7 @@ All 15 improvements documented in `WORLD_CLASS_IMPROVEMENTS.md`, in order:
 
 9. **Secure Enclave Template Storage with HSM Integration** — `HsmTemplateStore` adapter contract + `enroll_face_with_hsm`: PKCS#11-compatible HSM or cloud KMS (AWS KMS, Azure Key Vault, GCP Cloud KMS) for all wrap/unwrap operations; plaintext feature vector never in application memory.
 
-10. **Real-Time Watchlist Hit Streaming via Event Bus** — `watchlist_hit_stream` async generator: publish confirmed hits to Kafka, NATS, or APG `evtb` adapter with sub-second latency.
+10. **Real-Time Watchlist Hit Streaming via Event Bus** — `watchlist_hit_stream` async generator: publish confirmed hits to Bytewax, NATS, or APG `evtb` adapter with sub-second latency.
 
 11. **Multi-Modal Fusion: Face + Voice + Iris** — `multimodal_verify`: score-level fusion via logistic regression over face, optional voice embedding, optional iris hash; degrades gracefully to face-only with adjusted threshold.
 

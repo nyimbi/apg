@@ -43,7 +43,7 @@ RMA processing, refurbishment workflow, disposal management, credit notes, rever
 12. **Bulk Operations & Async Job Queue** — `bulk_approve_rmas()`, `bulk_resolve_rmas()`, `bulk_complete_refurbishments()` via `asyncio.Queue` with retries, backoff, and job progress endpoint.
 13. **Returns Fraud Detection** — `fraud_score()` returns 0–100 risk score from signals: return frequency, missing evidence, repeat SKU, out-of-window, high-value; emits `fraud_risk_detected` audit events.
 14. **Refurbishment Cost & Profitability Analytics** — `refurbishment_profitability()` breaks down avg refurb cost, resale uplift, cycle time, and net margin per SKU with configurable time granularity.
-15. **Event-Driven Integration Bus** — Pluggable `EventBus` (in-process / Redis Streams / Kafka / NATS) publishing CloudEvents 1.0 for downstream `scm_inv`, `fin_ar`, `crm_cst` consumers.
+15. **Event-Driven Integration Bus** — Pluggable `EventBus` (in-process / Redis Streams / Bytewax / NATS) publishing CloudEvents 1.0 for downstream `scm_inv`, `fin_ar`, `crm_cst` consumers.
 
 ## New Methods
 

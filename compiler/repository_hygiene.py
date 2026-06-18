@@ -10,7 +10,9 @@ from typing import Callable, Iterable
 REPOSITORY_HYGIENE_AUDIT_FORMAT = "apg.repository-hygiene-audit.v1"
 
 ALLOWED_ROOT_TRACKED_FILES = {
+	".env.example",
 	".gitignore",
+	"alembic.ini",
 	"LICENSE",
 	"README.md",
 	"PACKAGES.md",
@@ -22,6 +24,7 @@ ALLOWED_ROOT_TRACKED_FILES = {
 	"Dockerfile.gateway",
 	"prompt.md",
 	"pytest.ini",
+	"requirements.txt",
 	"setup.py",
 	"uuid_extensions.py",
 	"catalog-info.yaml",   # Backstage software catalog for APG developer portal

@@ -160,7 +160,7 @@ result = await svc.time_weighted_return("pf-001", start_date="2025-01-01", end_d
 | I12 | **Risk Budget Monitoring** — limit registration for tracking_error, var_95_pct_aum, max_drawdown, beta_max; utilisation % with ok/warning/breached status; NATS breach events | Risk/Governance | MSCI RiskMetrics, BlackRock Aladdin |
 | I13 | **Portfolio Scoring and Rating Engine** — composite 0-100 score across Sharpe, concentration, ESG, compliance, and fee efficiency; letter grade (A+ to D); trend delta | Analytics | Morningstar Portfolio Rating, Fitch |
 | I14 | **DRIP Automation** — per-instrument reinvestment policies (configurable %), automatic `add_holding` on dividend corporate actions, residual cash recording, fractional unit support | Operations | Computershare DRIP, FNZ Platform |
-| I15 | **NATS-Backed Persistent Audit Log with Event Sourcing** — JetStream durable publish on every audit event; `replay_audit_events` for point-in-time portfolio reconstruction; tamper-evident | Infrastructure | Kafka Event Sourcing, AWS EventBridge |
+| I15 | **NATS-Backed Persistent Audit Log with Event Sourcing** — JetStream durable publish on every audit event; `replay_audit_events` for point-in-time portfolio reconstruction; tamper-evident | Infrastructure | Bytewax Event Sourcing, AWS EventBridge |
 
 ## New Methods
 

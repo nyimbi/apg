@@ -289,7 +289,7 @@ a production-grade zero-trust broker:
    `RedisAdapter`. Zero-change swap at deploy time.
 
 4. **Continuous posture telemetry pipeline** — Streaming channel (Bytewax /
-   Kafka) continuously updates `trust_score` and auto-triggers session
+   Bytewax) continuously updates `trust_score` and auto-triggers session
    reevaluation when score drops below tenant-configured thresholds.
 
 5. **Risk-adaptive ML scoring** — Pluggable `RiskScoringAdapter` delegates to
@@ -389,7 +389,7 @@ updated = await service.async_update_device_posture(
 ```
 
 Designed to be called from a streaming posture telemetry consumer (Bytewax,
-Kafka worker). Updates `trust_score` in-place and emits an audit event; pair
+Bytewax worker). Updates `trust_score` in-place and emits an audit event; pair
 with `async_bulk_reevaluate_sessions` to close the posture-to-access-decision
 loop.
 

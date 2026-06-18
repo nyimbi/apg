@@ -159,7 +159,7 @@ The following 15 production-grade improvements are specified in
 
 9. **Federated Query Audit with Cryptographic Non-Repudiation** — SHA-256
    chained digest per audit event (`hash(payload + prev_hash)`); chain root
-   published to an append-only sink (PostgreSQL, object store, or Kafka); meets
+   published to an append-only sink (PostgreSQL, object store, or Bytewax); meets
    PCI-DSS 10.5 and HIPAA §164.312.
 
 10. **Multi-Tenant Namespace Isolation with Rate Limiting** — `DVRLTenantRegistry`

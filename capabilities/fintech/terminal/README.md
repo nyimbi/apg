@@ -21,7 +21,7 @@ Terminal Management System provides a standalone-deployable implementation of PO
 | `float_and_credit_management` | Float top-up, thresholds, agent intraday credit facility |
 | `reconciliation_and_reporting` | Per-terminal and network-wide EOD batch reconciliation |
 | `fraud_and_compliance` | Velocity scoring, biometric liveness, tamper detection, CBK returns |
-| `observability` | OpenTelemetry tracing, Prometheus metrics, Kafka event streaming |
+| `observability` | OpenTelemetry tracing, Prometheus metrics, Bytewax event streaming |
 
 ## Requires
 
@@ -114,7 +114,7 @@ POST /api/v1/fx            Cross-currency transaction
 
 5. **Real-Time Velocity & Fraud Scoring** — Inline sliding-window velocity check (1h and 24h) per customer, per terminal, and per agent. Rule-based fraud score 0–100. Auto-declines above threshold; emits `fraud_alert_terminal()` event. Velocity counters stored in Redis.
 
-6. **Async Event Streaming via Kafka / CloudEvents** — Every lifecycle, transaction, and health event is published as a CloudEvent to a Kafka topic with at-least-once delivery. Downstream capabilities (`intel_alerts`, `fin_reporting`) subscribe without polling the terminal DB.
+6. **Async Event Streaming via Bytewax / CloudEvents** — Every lifecycle, transaction, and health event is published as a CloudEvent to a Bytewax topic with at-least-once delivery. Downstream capabilities (`intel_alerts`, `fin_reporting`) subscribe without polling the terminal DB.
 
 7. **EOD Automated Batch Reconciliation** — `batch_reconcile_network()` collects terminal day-totals, diffs against acquirer clearing files, and produces a machine-readable CBK ABR-01 variance report. Terminals with float variance > 0.5% raise auto-tickets.
 

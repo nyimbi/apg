@@ -76,7 +76,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 	},
 	"observability": {
 		"event_stream": TWY_EVENT_STREAM,
-		"stream_processor": "nats",
+		"stream_processor": "bytewax",
 	},
 	"adapters": {
 		"auth": "auth",
@@ -152,7 +152,7 @@ THEME = {
 }
 
 STREAMING = {
-	"processor": "nats",
+	"processor": "bytewax",
 	"stream": TWY_EVENT_STREAM,
 	"key": "tenant_id",
 	"publishes": NATS_PUBLISHES,

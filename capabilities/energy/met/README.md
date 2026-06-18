@@ -24,7 +24,7 @@ Smart Metering & AMI (`energy_met`) manages the full lifecycle of advanced meter
 | `bidirectional_metering` | Import/export register tracking and net metering reconciliation for DER |
 | `tou_tariff_engine` | TOU/CPP interval bucketing for direct billing feed to `energy_bil` |
 | `outage_detection` | Meter-cluster communication loss → outage boundary inference → `energy_dis` |
-| `streaming_bridge` | MQTT/Kafka CloudEvent publication for real-time analytics pipelines |
+| `streaming_bridge` | MQTT/Bytewax CloudEvent publication for real-time analytics pipelines |
 
 ## Requires
 | Capability | Reason |
@@ -52,7 +52,7 @@ Smart Metering & AMI (`energy_met`) manages the full lifecycle of advanced meter
 | `demand_response.opt_out_allowed` | bool | true | Customers can opt out of DR |
 | `demand_response.notification_required` | bool | true | Notify customers before DR event |
 | `fraud.risk_score_threshold` | float | 0.7 | Alert threshold for fraud risk score |
-| `streaming.broker_type` | str | — | `mqtt` or `kafka` when bridge enabled |
+| `streaming.broker_type` | str | — | `mqtt` or `bytewax` when bridge enabled |
 | `carbon.default_region_id` | str | — | Fallback grid region for emission factor lookup |
 
 ## Quick Start
@@ -147,7 +147,7 @@ analytics = await svc.meter_analytics(period="2026-06")
 
 10. **Loss Calculations & Technical Loss Attribution** — Feeder-level comparison of substation injection vs. sum of meter reads. Returns technical loss, NTL estimate, and per-section breakdown stored in `FeederLossRecord`. (`compute_feeder_losses`)
 
-11. **Meter Data Streaming via MQTT/Kafka Bridge** — Publishes `IntervalReading` as JSON CloudEvents via aiomqtt/aiokafka at read time. Configurable per-tenant topic prefix and broker type. (`publish_reading_to_stream`, `configure_streaming_bridge`)
+11. **Meter Data Streaming via MQTT/Bytewax Bridge** — Publishes `IntervalReading` as JSON CloudEvents via aiomqtt/bytewax stream processor at read time. Configurable per-tenant topic prefix and broker type. (`publish_reading_to_stream`, `configure_streaming_bridge`)
 
 12. **Outage Detection & FLISR Event Correlation** — Clusters meters with communication loss exceeding a threshold, infers outage boundary from GIS adjacency in < 2 min, emits `OutageEvent` to `energy_dis`. (`detect_outage_cluster`, `correlate_restoration`)
 
@@ -288,4 +288,4 @@ kpis = await svc.meter_analytics(period="2026-06")
 - Outage clusters emit `OutageEvent` to `energy_dis` for SAIDI/SAIFI tracking
 - AMI head-end health feeds `moni` operational dashboards
 - Carbon footprint data feeds ESG reporting pipelines (IFRS S2, SEC Climate)
-- MQTT/Kafka streaming feeds real-time SCADA and V/VAR optimisation systems
+- MQTT/Bytewax streaming feeds real-time SCADA and V/VAR optimisation systems

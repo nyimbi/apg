@@ -31,7 +31,6 @@ install_requires = [
     "uuid6>=0.4",
     # Web framework & generated apps
     "flask>=3.0.0",
-    "flask-appbuilder>=4.3.0",
     "httpx>=0.27.0",
     # Database
     "sqlalchemy[asyncio]>=2.0.0",

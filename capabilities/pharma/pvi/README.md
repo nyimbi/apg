@@ -121,7 +121,7 @@ Receives adverse event signals from `pharma_ctr` for clinical trial SAEs. Feeds 
 - **I10.** Aggregate Reporting (DSUR / SUSAR Line Listings)
 - **I11.** Multi-Tenant RBAC with PV Role Hierarchy
 - **I12.** Case Deduplication via Phonetic and Semantic Matching
-- **I13.** Streaming Event Bus Integration (Bytewax / Kafka)
+- **I13.** Streaming Event Bus Integration (Bytewax / Bytewax)
 - **I14.** PSUR Submission Deadline Tracker with EMA EURD List
 - **I15.** AI-Assisted Narrative Generation via Local LLM
 

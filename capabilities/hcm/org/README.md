@@ -49,7 +49,7 @@ Capability for managing organisational structure: org chart, positions, reportin
 
 **I8. Hierarchy Cache with Invalidation** — in-process `_hierarchy_cache` keyed by `(tenant_id, unit_id)`, invalidated on mutations; `invalidate_hierarchy_cache(tenant_id)` for explicit reset; cache metrics in `health_check` [Performance]
 
-**I9. Outbox Event Bus** — replace in-memory `_emit` list with `hcm_org_events` outbox table; background relay to Kafka topic or HTTP webhook with at-least-once delivery and idempotency keys [Reliability / Composability]
+**I9. Outbox Event Bus** — replace in-memory `_emit` list with `hcm_org_events` outbox table; background relay to Bytewax topic or HTTP webhook with at-least-once delivery and idempotency keys [Reliability / Composability]
 
 **I10. Position Reclassification History** — `update_position` on grade/FTE/title creates a `PositionSnapshot` instead of overwriting; `get_position_history(tenant_id, position_id)` returns full timeline [Pay Equity Audit]
 

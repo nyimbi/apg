@@ -1113,3 +1113,14 @@ class CollaborationService:
 			mentions_received=mentions_received,
 			generated_at=_ts(),
 		)
+
+class CollaborationContext:
+    session_id: str = ''
+    user_id: str = ''
+    tenant_id: str = ''
+
+class SessionCreateRequest:
+    title: str = ''
+    description: str = ''
+    context_id: str = ''
+    max_participants: int = 50

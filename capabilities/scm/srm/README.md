@@ -71,7 +71,7 @@ Supplier scorecard, risk assessment, collaboration portal, performance reviews, 
 8. **Supplier Benchmarking** — `benchmark_supplier()` computes per-dimension delta between a supplier and named category peers, contextualising absolute scores.
 9. **Structured Onboarding Workflow** — `start_onboarding()` / `complete_onboarding_item()` enforce a configurable checklist (NDA, certs, bank details, site audit) before approval is permitted.
 10. **Portfolio Risk Heatmap** — `risk_heatmap()` returns a category × severity matrix consumable by any BI tool in a single API call.
-11. **Webhook / Event Bus Integration** — async `_emit()` publishes CloudEvents-formatted payloads to a configurable webhook URL or broker (Kafka, NATS, Redis Streams).
+11. **Webhook / Event Bus Integration** — async `_emit()` publishes CloudEvents-formatted payloads to a configurable webhook URL or broker (Bytewax, NATS, Redis Streams).
 12. **Composite Supplier Health Score** — `H = 0.4×scorecard + 0.2×risk_penalty_inverse + 0.2×esg + 0.1×no_open_escalations + 0.1×cert_current` surfaced on every supplier record.
 13. **Expiring Certification Alerts** — `get_expiring_certifications(within_days=60)` returns certs with `days_remaining` for 90/60/30-day notification dispatch.
 14. **Multi-Currency Contract Value Normalisation** — FX-rate integration normalises all contract values to a base currency for portfolio spend analytics.

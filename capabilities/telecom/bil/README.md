@@ -92,7 +92,7 @@ Receives CDRs from telecom_net mediation layer. Consumes customer data from tele
 
 ## World-Class Enhancements (v2.0)
 
-**I1. Real-Time Streaming Rating** — Bytewax/Kafka pipeline for sub-second CDR-to-charge at 10M+ CDRs/hour. [Scalability]
+**I1. Real-Time Streaming Rating** — Bytewax/Bytewax pipeline for sub-second CDR-to-charge at 10M+ CDRs/hour. [Scalability]
 
 **I2. Policy-as-Code Tariff Engine** — OPA-backed tariff rules hot-reloaded at runtime; no code deployments for rate changes. [Operability]
 

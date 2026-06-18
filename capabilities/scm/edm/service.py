@@ -13,7 +13,7 @@ from decimal import Decimal
 from sqlalchemy import and_, or_, func, text
 import json
 
-from ....auth_rbac.models import get_session
+from ...auth_rbac.models import get_session
 from .models import (
 	IMEDMExpiryPolicy, IMEDMExpiryItem, IMEDMExpiryMovement,
 	IMEDMDisposition, IMEDMExpiryAlert, IMEDMWasteReport

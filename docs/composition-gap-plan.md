@@ -22,9 +22,9 @@ Based on analysis of Temporal, Camunda 8, MuleSoft Anypoint, AWS Step Functions,
 **What best systems do**: MuleSoft covers SAP RFC, EDI X12/EDIFACT, HL7 MLLP, AMQP, MQTT, gRPC, SFTP, JMS. Apache Camel has 300+ components. APG's connector generator only reads OpenAPI (HTTP).
 **APG current state**: HTTP-only via OpenAPI spec → Bearer token stub
 **Plan**:
-- Add `protocol` field to connector DSL: `protocol: kafka | mqtt | grpc | sftp | amqp | http`  
+- Add `protocol` field to connector DSL: `protocol: bytewax | mqtt | grpc | sftp | amqp | http`  
 - Add `compiler/connector_generator.py` templates per protocol
-- Kafka connector: `confluent-kafka-python` producer/consumer stubs
+- Bytewax connector: `apg-bytewax-python` producer/consumer stubs
 - MQTT connector: `paho-mqtt` publish/subscribe stubs
 - gRPC connector: protobuf stub generator
 - Timeline: Phase 2
@@ -107,7 +107,7 @@ Based on analysis of Temporal, Camunda 8, MuleSoft Anypoint, AWS Step Functions,
 5. Visual workflow debug timeline (event-based)
 
 ### Phase 2 (Next sprint)
-6. Non-HTTP connector protocols (Kafka, MQTT, gRPC stubs)
+6. Non-HTTP connector protocols (Bytewax, MQTT, gRPC stubs)
 7. OAuth token lifecycle management
 8. Sub-workflow composition
 

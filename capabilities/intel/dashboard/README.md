@@ -80,7 +80,7 @@ package-artifact audit, stale-marker scan, disallowed messaging scan, and
 ## World-Class Enhancements (v2.0)
 
 - **I1.** World-Class Improvements: Intelligence Dashboard
-- **I2.** Real-Time Streaming Threat Feed (Bytewax/Kafka Integration)
+- **I2.** Real-Time Streaming Threat Feed (Bytewax/Bytewax Integration)
 - **I3.** Confidence Score Time-Series Tracking
 - **I4.** Cross-Domain Correlation Engine
 - **I5.** Automated Classification Downgrade/Upgrade Workflow

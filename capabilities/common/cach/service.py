@@ -1736,3 +1736,10 @@ CacheService._apply_compression = _apply_compression_method
 CacheService._default_compression_algorithm = _default_compression_algorithm_method
 CacheService.set = _cache_set_method
 CacheService.get = _cache_get_method
+
+CachService = CacheService
+
+class CacheEvictionReviewRecord:
+    key: str = ''
+    size_bytes: int = 0
+    reason: str = ''

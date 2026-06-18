@@ -8,11 +8,11 @@ import sys
 from pathlib import Path
 
 
-APIG_DIR = Path(__file__).resolve().parent.parent / "capabilities" / "common" / "apig"
-sys.path.insert(0, str(APIG_DIR))
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
-from edge_engine import APGEdgeEngine  # noqa: E402
-from models import AgHttpRequest, AgHttpResponse, AgWasmModule, HttpMethod  # noqa: E402
+from capabilities.common.apig.edge_engine import APGEdgeEngine  # noqa: E402
+from capabilities.common.apig.models import AgHttpRequest, AgHttpResponse, AgWasmModule, HttpMethod  # noqa: E402
 
 
 def test_edge_engine_routes_to_registered_upstream_after_wasm_transform():

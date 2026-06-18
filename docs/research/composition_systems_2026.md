@@ -76,7 +76,7 @@ This document benchmarks APG against the world's most mature composition platfor
 
 **Core composition primitives (Mendix):**
 - **Marketplace** — 1,200+ reusable modules with version pinning and compatibility metadata.
-- **Integration with Kafka, MuleSoft, AWS** — native connectors for event streaming and API management.
+- **Integration with Bytewax, MuleSoft, AWS** — native connectors for event streaming and API management.
 - **MendixAI** — natural language to module scaffold.
 
 **Composition strengths (shared):** Strong module versioning and impact analysis. The Forge/Marketplace model creates a composable ecosystem with reuse incentives. Contract-first development with compiler-enforced breaking-change detection.
@@ -121,7 +121,7 @@ This document benchmarks APG against the world's most mature composition platfor
 
 **Core composition primitives (Apache Camel):**
 - **Routes** — from(source).to(target) pipelines with transformers, filters, splitters, aggregators, and choice routers.
-- **Components** — 300+ pre-built connectors (Kafka, S3, HTTP, JDBC, AMQP, gRPC, etc.).
+- **Components** — 300+ pre-built connectors (Bytewax, S3, HTTP, JDBC, AMQP, gRPC, etc.).
 - **Enterprise Integration Patterns** — Content-Based Router, Message Filter, Splitter, Aggregator, Dead Letter Channel, Idempotent Consumer all implemented as first-class route DSL nodes.
 - **Camel K** — serverless Camel routes as Kubernetes CRDs.
 
@@ -237,7 +237,7 @@ This document benchmarks APG against the world's most mature composition platfor
 
 ### 4.1 Streaming / Real-Time Data Pipelines
 
-Systems like Kafka, Flink, Spark Streaming, Bytewax operate on continuous, unbounded event streams. APG's `composition_events` capability is Bytewax-backed and exists in code, but `.apg` files model discrete CRUD entities (`table Patient { ... }`), not streams. There is no `stream`, `window`, `aggregation`, or `watermark` concept in the DSL.
+Systems like Bytewax, Flink, Spark Streaming, Bytewax operate on continuous, unbounded event streams. APG's `composition_events` capability is Bytewax-backed and exists in code, but `.apg` files model discrete CRUD entities (`table Patient { ... }`), not streams. There is no `stream`, `window`, `aggregation`, or `watermark` concept in the DSL.
 
 **Example gap:** Cannot write a `.apg` file that computes a rolling 5-minute sum of M-Pesa transactions and triggers a fraud alert when the threshold is crossed.
 

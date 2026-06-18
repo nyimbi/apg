@@ -271,7 +271,7 @@ below are the contracts to target.
     keeping humans in the approval loop.
 
 15. **Event-Driven Capability Composition Hooks** — Direct capability imports
-    replaced by an async event bus (`asyncio.Queue` internally; Kafka adapter
+    replaced by an async event bus (`asyncio.Queue` internally; Bytewax adapter
     externally). Emits `esgc.inventory.created`, `esgc.activity.recorded`,
     `esgc.report.published`. Subscribing capabilities replace hard-wired calls —
     hot-swappable integrations and replay-based testing without mocks.

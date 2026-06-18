@@ -152,7 +152,7 @@ Insurance Claim:  filed → under_review → approved | rejected
 10. **Carrier Scorecard & Tender** — on-time rate, CO2/tonne-km, cost/kg scoring; weighted tender ranking with audit trail
 11. **Customs Tariff & Duty Estimation** — WCO HS code validation; CIF + tariff + VAT breakdown; trade agreement support
 12. **Shipment Insurance Integration** — quote → bind → claim workflow keyed on declared value, route risk score, and commodity
-13. **CloudEvents Bus** — async `_publish` with CloudEvents v1.0 JSON; Redis Streams / Kafka / asyncio.Queue transports
+13. **CloudEvents Bus** — async `_publish` with CloudEvents v1.0 JSON; Redis Streams / Bytewax / asyncio.Queue transports
 14. **Predictive ETA Engine** — gradient-boosted model on historical transit data with weather and port congestion signals
 15. **Distributed Tracing & Observability** — OpenTelemetry spans, W3C traceparent propagation, Prometheus metrics, Grafana dashboard
 

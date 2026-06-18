@@ -18,7 +18,7 @@ Bin management, put-away rules, directed pick/pack/ship, cycle counting, cross-d
 12. **Carrier Rate Shopping** — `rate_shop()` queries carrier adapters concurrently via `asyncio.gather`; auto-selects cheapest.
 13. **Inbound Quality Inspection** — `QualityInspection` gate before put-away; non-conforming lots routed to quarantine.
 14. **Persistent Storage Adapter** — `StorageAdapter` ABC + `PostgresStorageAdapter` (asyncpg); survives restarts.
-15. **Event Streaming to Broker** — `BrokerAdapter` interface (Kafka/Redis Streams/NATS) replaces in-process `_emit()` list.
+15. **Event Streaming to Broker** — `BrokerAdapter` interface (Bytewax/Redis Streams/NATS) replaces in-process `_emit()` list.
 
 ## New Methods
 
