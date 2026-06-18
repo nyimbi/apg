@@ -13,6 +13,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Set, Tuple, Union
 from dataclasses import dataclass, field
+_dc_field = field
 from enum import Enum
 from collections import defaultdict, Counter
 import numpy as np
@@ -69,13 +70,13 @@ class FacetDefinition:
 	display_name: str = ""
 	facet_type: str = "terms"  # terms, range, date_histogram
 	size: int = 10
-	aggregation_params: Dict[str, Any] = field(default_factory=dict)
+	aggregation_params: Dict[str, Any] = _dc_field(default_factory=dict)
 
 
 @dataclass
 class SearchQuery:
 	"""Comprehensive search query specification"""
-	query_id: str = field(default_factory=uuid7str)
+	query_id: str = _dc_field(default_factory=uuid7str)
 	query_text: str = ""
 	tenant_id: str = ""
 	user_id: str = ""
@@ -85,8 +86,8 @@ class SearchQuery:
 	search_scope: SearchScope = SearchScope.ALL
 	
 	# Filtering and faceting
-	filters: List[SearchFilter] = field(default_factory=list)
-	facets: List[FacetDefinition] = field(default_factory=list)
+	filters: List[SearchFilter] = _dc_field(default_factory=list)
+	facets: List[FacetDefinition] = _dc_field(default_factory=list)
 	
 	# Pagination and sorting
 	from_index: int = 0
@@ -99,19 +100,19 @@ class SearchQuery:
 	enable_suggestions: bool = True
 	enable_autocomplete: bool = True
 	min_score: float = 0.0
-	boost_fields: Dict[str, float] = field(default_factory=dict)
+	boost_fields: Dict[str, float] = _dc_field(default_factory=dict)
 	
 	# Context
-	search_context: Dict[str, Any] = field(default_factory=dict)
+	search_context: Dict[str, Any] = _dc_field(default_factory=dict)
 	
 	# Timing
-	created_at: datetime = field(default_factory=datetime.utcnow)
+	created_at: datetime = _dc_field(default_factory=datetime.utcnow)
 
 
 @dataclass
 class SearchResult:
 	"""Individual search result"""
-	result_id: str = field(default_factory=uuid7str)
+	result_id: str = _dc_field(default_factory=uuid7str)
 	asset_id: str = ""
 	asset_type: str = ""
 	name: str = ""
@@ -125,16 +126,16 @@ class SearchResult:
 	popularity_score: float = 0.0
 	
 	# Metadata
-	tags: List[str] = field(default_factory=list)
-	classifications: List[str] = field(default_factory=list)
+	tags: List[str] = _dc_field(default_factory=list)
+	classifications: List[str] = _dc_field(default_factory=list)
 	owner: Optional[str] = None
 	created_at: Optional[datetime] = None
 	modified_at: Optional[datetime] = None
 	
 	# Search-specific
-	highlighted_fields: Dict[str, List[str]] = field(default_factory=dict)
-	match_reasons: List[str] = field(default_factory=list)
-	column_matches: List[Dict[str, Any]] = field(default_factory=list)
+	highlighted_fields: Dict[str, List[str]] = _dc_field(default_factory=dict)
+	match_reasons: List[str] = _dc_field(default_factory=list)
+	column_matches: List[Dict[str, Any]] = _dc_field(default_factory=list)
 	
 	# Context
 	business_context: Optional[str] = None
@@ -171,35 +172,35 @@ class SearchFacet:
 	"""Search facet result"""
 	field: str = ""
 	display_name: str = ""
-	buckets: List[Dict[str, Any]] = field(default_factory=list)
+	buckets: List[Dict[str, Any]] = _dc_field(default_factory=list)
 	total_count: int = 0
 
 
 @dataclass
 class SearchResponse:
 	"""Complete search response"""
-	response_id: str = field(default_factory=uuid7str)
-	query: SearchQuery = field(default_factory=SearchQuery)
+	response_id: str = _dc_field(default_factory=uuid7str)
+	query: SearchQuery = _dc_field(default_factory=SearchQuery)
 	
 	# Results
-	results: List[SearchResult] = field(default_factory=list)
+	results: List[SearchResult] = _dc_field(default_factory=list)
 	total_results: int = 0
 	max_score: float = 0.0
 	
 	# Facets
-	facets: List[SearchFacet] = field(default_factory=list)
+	facets: List[SearchFacet] = _dc_field(default_factory=list)
 	
 	# Suggestions and corrections
-	suggested_queries: List[str] = field(default_factory=list)
-	query_corrections: List[str] = field(default_factory=list)
-	auto_complete_suggestions: List[str] = field(default_factory=list)
+	suggested_queries: List[str] = _dc_field(default_factory=list)
+	query_corrections: List[str] = _dc_field(default_factory=list)
+	auto_complete_suggestions: List[str] = _dc_field(default_factory=list)
 	
 	# Performance metrics
 	search_time_ms: float = 0.0
 	from_cache: bool = False
 	
 	# Analytics
-	search_timestamp: datetime = field(default_factory=datetime.utcnow)
+	search_timestamp: datetime = _dc_field(default_factory=datetime.utcnow)
 	
 	def to_dict(self) -> Dict[str, Any]:
 		"""Convert to dictionary for API response"""

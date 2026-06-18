@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover - exercised in dependency-light test env
 	aioredis = _AioRedisModule()
 from pydantic import BaseModel, Field, field_validator
 
-from, field_validator.models import AMAPI, AMEndpoint, APIStatus, ProtocolType
+from .models import AMAPI, AMEndpoint, APIStatus, ProtocolType
 from .service import APILifecycleService
 
 # =============================================================================

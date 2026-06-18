@@ -1,0 +1,84 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "clinic_demo" [ref=e3] [cursor=pointer]:
+      - /url: /ui
+    - navigation [ref=e4]:
+      - link "Home" [ref=e5] [cursor=pointer]:
+        - /url: /ui
+      - link "⚡ Workflows" [ref=e6] [cursor=pointer]:
+        - /url: /ui/workflows
+      - link "Marketplace" [ref=e7] [cursor=pointer]:
+        - /url: /ui/marketplace
+  - main [ref=e8]:
+    - generic [ref=e9]:
+      - heading "clinic_demo" [level=1] [ref=e10]
+      - paragraph [ref=e11]: Generated APG application
+    - navigation "API navigation" [ref=e12]:
+      - link "⚡ Workflows" [ref=e13] [cursor=pointer]:
+        - /url: /ui/workflows
+      - link "Manifest JSON" [ref=e14] [cursor=pointer]:
+        - /url: /manifest
+      - link "Component JSON" [ref=e15] [cursor=pointer]:
+        - /url: /component.json
+      - link "Capabilities" [ref=e16] [cursor=pointer]:
+        - /url: /capabilities
+      - link "Agents" [ref=e17] [cursor=pointer]:
+        - /url: /agents
+      - link "Events" [ref=e18] [cursor=pointer]:
+        - /url: /events
+      - link "Metrics" [ref=e19] [cursor=pointer]:
+        - /url: /metrics
+      - link "Self-Test" [ref=e20] [cursor=pointer]:
+        - /url: /self-test
+      - link "API Contract" [ref=e21] [cursor=pointer]:
+        - /url: /openapi.json
+      - link "Databases" [ref=e22] [cursor=pointer]:
+        - /url: /ui/databases
+    - generic [ref=e23]:
+      - generic [ref=e25]:
+        - generic [ref=e26]: "8"
+        - generic [ref=e27]: Entities
+      - generic [ref=e29]:
+        - generic [ref=e30]: "0"
+        - generic [ref=e31]: Capabilities
+      - generic [ref=e33]:
+        - generic [ref=e34]: "0"
+        - generic [ref=e35]: AI Agents
+      - generic [ref=e37]:
+        - generic [ref=e38]: "0"
+        - generic [ref=e39]: Screens
+    - generic [ref=e41]:
+      - heading "Entities" [level=2] [ref=e43]
+      - list [ref=e44]:
+        - listitem [ref=e45]:
+          - link "Patient" [ref=e46] [cursor=pointer]:
+            - /url: /ui/entities/Patient
+          - generic [ref=e47]: entity
+        - listitem [ref=e48]:
+          - link "Appointment" [ref=e49] [cursor=pointer]:
+            - /url: /ui/entities/Appointment
+          - generic [ref=e50]: entity
+        - listitem [ref=e51]:
+          - link "Consultation" [ref=e52] [cursor=pointer]:
+            - /url: /ui/entities/Consultation
+          - generic [ref=e53]: entity
+        - listitem [ref=e54]:
+          - link "Prescription" [ref=e55] [cursor=pointer]:
+            - /url: /ui/entities/Prescription
+          - generic [ref=e56]: entity
+        - listitem [ref=e57]:
+          - link "LabTest" [ref=e58] [cursor=pointer]:
+            - /url: /ui/entities/LabTest
+          - generic [ref=e59]: entity
+        - listitem [ref=e60]:
+          - link "Bill" [ref=e61] [cursor=pointer]:
+            - /url: /ui/entities/Bill
+          - generic [ref=e62]: entity
+        - listitem [ref=e63]:
+          - link "Staff" [ref=e64] [cursor=pointer]:
+            - /url: /ui/entities/Staff
+          - generic [ref=e65]: entity
+        - listitem [ref=e66]:
+          - link "ClinicApp" [ref=e67] [cursor=pointer]:
+            - /url: /ui/entities/ClinicApp
+          - generic [ref=e68]: application

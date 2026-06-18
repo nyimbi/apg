@@ -18,15 +18,15 @@ from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 import json
 
-from models import (
+from .models import (
     APGTenantContext, WBPMServiceConfig, WBPMServiceResponse, WBPMPagedResponse,
     WBPMProcessDefinition, WBPMProcessInstance, WBPMProcessActivity, WBPMProcessFlow,
     WBPMTask, WBPMTaskHistory, WBPMTaskComment, WBPMProcessTemplate,
     ProcessStatus, InstanceStatus, TaskStatus, TaskPriority
 )
 
-from workflow_engine import WorkflowExecutionEngine, create_workflow_engine
-from task_management import (
+from .workflow_engine import WorkflowExecutionEngine, create_workflow_engine
+from .task_management import (
     AITaskRouter, TaskQueueManager, EscalationEngine, TaskPerformanceTracker,
     create_task_management_components, AssignmentStrategy, TaskAssignmentCriteria, UserProfile
 )

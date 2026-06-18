@@ -19,7 +19,7 @@ from uuid import uuid4
 import json
 import re
 
-from models import (
+from .models import (
     APGTenantContext, WBPMProcessDefinition, WBPMProcessInstance, WBPMProcessActivity,
     WBPMProcessFlow, WBPMTask, ProcessStatus, InstanceStatus, TaskStatus, TaskPriority,
     ActivityType, GatewayDirection, EventType, WBPMServiceResponse

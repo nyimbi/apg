@@ -21,29 +21,43 @@ from typing import Dict, List, Any, Optional, Union, Tuple, AsyncContextManager
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
-from models import (
+from .models import (
     AgGatewayConfig, AgApiRoute, AgPolicy, AgUpstreamService,
-    AgTrafficMetrics, AgSecurityEvent, AgWasmModule, AgHttpRequest, 
+    AgTrafficMetrics, AgSecurityEvent, AgWasmModule, AgHttpRequest,
     AgHttpResponse, EnvironmentType, PolicyType, ThreatLevel
 )
 
-from apg_clients import (
-    APGAuthRBACClient, APGMonitoringClient, APGConfigurationClient,
-    APGAIOrchestrationClient, APGMessageQueueClient, APGAuditComplianceClient,
-    APGServiceConfig, AuthResult
-)
+try:
+    from apg_clients import (
+        APGAuthRBACClient, APGMonitoringClient, APGConfigurationClient,
+        APGAIOrchestrationClient, APGMessageQueueClient, APGAuditComplianceClient,
+        APGServiceConfig, AuthResult
+    )
+except ImportError:
+    APGAuthRBACClient = APGMonitoringClient = APGConfigurationClient = None
+    APGAIOrchestrationClient = APGMessageQueueClient = APGAuditComplianceClient = None
+    APGServiceConfig = AuthResult = None
 
-from edge_engine_production import (
-    ProductionEdgeEngine, EdgeProcessingResult
-)
+try:
+    from edge_engine_production import (
+        ProductionEdgeEngine, EdgeProcessingResult
+    )
+except ImportError:
+    ProductionEdgeEngine = EdgeProcessingResult = None
 
-from wasm_runtime import (
-    ProductionWASMRuntime, WASMExecutionContext, WASMExecutionResult
-)
+try:
+    from wasm_runtime import (
+        ProductionWASMRuntime, WASMExecutionContext, WASMExecutionResult
+    )
+except ImportError:
+    ProductionWASMRuntime = WASMExecutionContext = WASMExecutionResult = None
 
-from ollama_client import (
-    ProductionOllamaClient, OllamaConfig, GenerationRequest
-)
+try:
+    from ollama_client import (
+        ProductionOllamaClient, OllamaConfig, GenerationRequest
+    )
+except ImportError:
+    ProductionOllamaClient = OllamaConfig = GenerationRequest = None
 
 # Configure logging
 logger = logging.getLogger(__name__)

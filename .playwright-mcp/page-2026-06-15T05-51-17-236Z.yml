@@ -1,0 +1,63 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - link "clinic_demo" [ref=e3] [cursor=pointer]:
+      - /url: /ui
+    - navigation [ref=e4]:
+      - link "Home" [ref=e5] [cursor=pointer]:
+        - /url: /ui
+      - link "⚡ Workflows" [ref=e6] [cursor=pointer]:
+        - /url: /ui/workflows
+      - link "Marketplace" [ref=e7] [cursor=pointer]:
+        - /url: /ui/marketplace
+  - main [ref=e8]:
+    - navigation [ref=e9]:
+      - link "Application" [ref=e10] [cursor=pointer]:
+        - /url: /ui
+      - generic [ref=e11]: /
+      - link "Patient" [ref=e12] [cursor=pointer]:
+        - /url: /ui/entities/Patient
+      - generic [ref=e13]: /
+      - generic [ref=e14]: P001
+    - generic [ref=e15]:
+      - generic [ref=e17]:
+        - generic [ref=e18]: P
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - heading "P001" [level=1] [ref=e21]
+            - generic [ref=e22]: entity
+          - paragraph [ref=e23]: "1"
+        - generic [ref=e24]:
+          - link "⚡ Workflow" [ref=e25] [cursor=pointer]:
+            - /url: /ui/workflows/Patient/create_Patient
+          - button "Delete" [ref=e27] [cursor=pointer]
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - paragraph [ref=e30]: Patient Number
+          - paragraph [ref=e31]: P001
+        - generic [ref=e32]:
+          - paragraph [ref=e33]: Full Name
+          - paragraph [ref=e34]: Alice Wanjiru
+        - generic [ref=e35]:
+          - paragraph [ref=e36]: Date Of Birth
+          - paragraph [ref=e37]: 1990-03-15
+        - generic [ref=e38]:
+          - paragraph [ref=e39]: Gender
+          - paragraph [ref=e40]: Female
+    - generic [ref=e41]:
+      - button "Details" [ref=e42] [cursor=pointer]
+      - button "Related" [ref=e43] [cursor=pointer]
+      - button "Activity" [active] [ref=e44] [cursor=pointer]
+    - generic [ref=e153]:
+      - heading "Activity" [level=2] [ref=e155]
+      - generic [ref=e156]:
+        - list [ref=e157]:
+          - listitem [ref=e158]:
+            - generic [ref=e159]: 📋
+            - generic [ref=e160]:
+              - paragraph [ref=e161]: Record created
+              - paragraph [ref=e162]: Revision 1 · via APG
+        - generic [ref=e163]:
+          - generic [ref=e164]: A
+          - generic [ref=e165]:
+            - textbox "Add a note…" [ref=e166]
+            - button "Save Note" [ref=e167] [cursor=pointer]

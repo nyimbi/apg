@@ -19,7 +19,7 @@ from .models import (
 	CFCAJobCost, CFCAStandardCost, CFCAVarianceAnalysis
 )
 from ..general_ledger.models import CFGLAccount, CFGLPosting
-from ...auth_rbac.models import db
+from ...common.auth_rbac.models import db
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 

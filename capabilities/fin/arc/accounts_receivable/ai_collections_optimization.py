@@ -17,7 +17,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 from uuid_extensions import uuid7str
 
-from, field_validator.models import (
+from .models import (
 	ARCustomer, ARInvoice, ARPayment, ARCollectionActivity, ARDispute,
 	ARCustomerStatus, ARInvoiceStatus, ARCollectionPriority, CurrencyCode
 )

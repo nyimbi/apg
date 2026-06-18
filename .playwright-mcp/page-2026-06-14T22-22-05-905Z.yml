@@ -1,0 +1,97 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "sacco_demo" [ref=e3] [cursor=pointer]:
+      - /url: /ui
+    - navigation [ref=e4]:
+      - link "Home" [ref=e5] [cursor=pointer]:
+        - /url: /ui
+      - link "⚡ Workflows" [ref=e6] [cursor=pointer]:
+        - /url: /ui/workflows
+  - main [ref=e7]:
+    - navigation [ref=e8]:
+      - link "Application" [ref=e9] [cursor=pointer]:
+        - /url: /ui
+      - generic [ref=e10]: /
+      - generic [ref=e11]: Member
+      - generic [ref=e12]:
+        - generic [ref=e13]: ≡ List
+        - link "⊞ Kanban" [ref=e14] [cursor=pointer]:
+          - /url: /ui/entities/Member?view=kanban
+        - link "API JSON ↗" [ref=e15] [cursor=pointer]:
+          - /url: /entities/Member/records
+    - generic [ref=e17]:
+      - generic: 🔍
+      - textbox "Search Member records…" [ref=e18]
+    - generic [ref=e19]:
+      - complementary [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - heading "New Member" [level=2] [ref=e23]
+            - generic [ref=e24]: entity
+          - generic [ref=e25]:
+            - generic [ref=e26]:
+              - text: id
+              - textbox "id" [ref=e27]
+            - generic [ref=e28]:
+              - text: member_number
+              - textbox "member_number" [ref=e29]
+            - generic [ref=e30]:
+              - text: full_name
+              - textbox "full_name" [ref=e31]
+            - generic [ref=e32]:
+              - text: national_id
+              - textbox "national_id" [ref=e33]
+            - generic [ref=e34]:
+              - text: phone
+              - textbox "phone" [ref=e35]
+            - generic [ref=e36]:
+              - text: email
+              - textbox "email" [ref=e37]
+            - generic [ref=e38]:
+              - text: share_capital
+              - spinbutton "share_capital" [ref=e39]
+            - generic [ref=e40]:
+              - text: monthly_contribution
+              - spinbutton "monthly_contribution" [ref=e41]
+            - generic [ref=e42]:
+              - text: join_date
+              - textbox "join_date" [ref=e43]
+            - generic [ref=e44]:
+              - text: status
+              - textbox "status" [ref=e45]
+            - generic [ref=e46]:
+              - text: employer
+              - textbox "employer" [ref=e47]
+            - generic [ref=e48]:
+              - text: designation
+              - textbox "designation" [ref=e49]
+            - button "Create Member" [ref=e50] [cursor=pointer]
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - heading "Member" [level=1] [ref=e53]
+          - generic [ref=e54]: 1 record
+        - table [ref=e57]:
+          - rowgroup [ref=e58]:
+            - row "Id Member Number Full Name National Phone Email" [ref=e59]:
+              - columnheader "Id" [ref=e60]
+              - columnheader "Member Number" [ref=e61]
+              - columnheader "Full Name" [ref=e62]
+              - columnheader "National" [ref=e63]
+              - columnheader "Phone" [ref=e64]
+              - columnheader "Email" [ref=e65]
+              - columnheader [ref=e66]
+          - rowgroup [ref=e67]:
+            - row "mem-001 MEM001 Alice Wanjiru Mwangi 12345678 0712345678 alice@sacco.co.ke View → Delete" [ref=e68]:
+              - cell "mem-001" [ref=e69]:
+                - link "mem-001" [ref=e70] [cursor=pointer]:
+                  - /url: /ui/entities/Member/mem-001
+              - cell "MEM001" [ref=e71]
+              - cell "Alice Wanjiru Mwangi" [ref=e72]
+              - cell "12345678" [ref=e73]
+              - cell "0712345678" [ref=e74]
+              - cell "alice@sacco.co.ke" [ref=e75]
+              - cell "View → Delete" [ref=e76]:
+                - generic [ref=e77]:
+                  - link "View →" [ref=e78] [cursor=pointer]:
+                    - /url: /ui/entities/Member/mem-001
+                  - button "Delete" [ref=e80] [cursor=pointer]

@@ -1,0 +1,14 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "clinic_demo" [ref=e3] [cursor=pointer]:
+      - /url: /ui
+    - navigation [ref=e4]:
+      - link "Home" [ref=e5] [cursor=pointer]:
+        - /url: /ui
+      - link "⚡ Workflows" [ref=e6] [cursor=pointer]:
+        - /url: /ui/workflows
+      - link "Marketplace" [ref=e7] [cursor=pointer]:
+        - /url: /ui/marketplace
+  - main [ref=e8]:
+    - heading "Record not found" [level=1] [ref=e9]
+    - paragraph [ref=e10]: Patient/018f1234-0001-7000-8000-000000000001

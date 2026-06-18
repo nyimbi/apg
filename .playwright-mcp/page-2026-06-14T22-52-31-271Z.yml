@@ -1,0 +1,115 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "sacco_demo" [ref=e3] [cursor=pointer]:
+      - /url: /ui
+    - navigation [ref=e4]:
+      - link "Home" [ref=e5] [cursor=pointer]:
+        - /url: /ui
+      - link "⚡ Workflows" [ref=e6] [cursor=pointer]:
+        - /url: /ui/workflows
+  - main [ref=e7]:
+    - navigation [ref=e8]:
+      - link "Application" [ref=e9] [cursor=pointer]:
+        - /url: /ui
+      - generic [ref=e10]: /
+      - link "Member" [ref=e11] [cursor=pointer]:
+        - /url: /ui/entities/Member
+      - generic [ref=e12]: /
+      - generic [ref=e13]: MEM001
+    - generic [ref=e16]:
+      - generic [ref=e17]: M
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - heading "MEM001" [level=1] [ref=e20]
+          - generic [ref=e21]: active
+          - generic [ref=e22]: entity
+        - paragraph [ref=e23]: mem-001
+      - generic [ref=e24]:
+        - link "⚡ Workflow" [ref=e25] [cursor=pointer]:
+          - /url: /ui/workflows/Member/create_Member
+        - button "Delete" [ref=e27] [cursor=pointer]
+    - generic [ref=e28]:
+      - button "Details" [ref=e29] [cursor=pointer]
+      - button "Related" [ref=e30] [cursor=pointer]
+      - button "Activity" [ref=e31] [cursor=pointer]
+    - generic [ref=e33]:
+      - generic [ref=e34]:
+        - heading "Record Details" [level=2] [ref=e35]
+        - generic [ref=e36]: rev. 1
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - term [ref=e39]: Id
+          - definition [ref=e40]:
+            - generic [ref=e41]: mem-001
+            - button "Edit id" [ref=e42] [cursor=pointer]:
+              - img [ref=e43]
+        - generic [ref=e45]:
+          - term [ref=e46]: Member Number
+          - definition [ref=e47]:
+            - generic [ref=e48]: MEM001
+            - button "Edit member_number" [ref=e49] [cursor=pointer]:
+              - img [ref=e50]
+        - generic [ref=e52]:
+          - term [ref=e53]: Full Name
+          - definition [ref=e54]:
+            - generic [ref=e55]: Alice Wanjiru
+            - button "Edit full_name" [ref=e56] [cursor=pointer]:
+              - img [ref=e57]
+        - generic [ref=e59]:
+          - term [ref=e60]: National
+          - definition [ref=e61]:
+            - generic [ref=e62]: "12345678"
+            - button "Edit national_id" [ref=e63] [cursor=pointer]:
+              - img [ref=e64]
+        - generic [ref=e66]:
+          - term [ref=e67]: Phone
+          - definition [ref=e68]:
+            - link "0712345678" [ref=e70] [cursor=pointer]:
+              - /url: tel:0712345678
+              - img [ref=e71]
+              - text: "0712345678"
+            - button "Edit phone" [ref=e73] [cursor=pointer]:
+              - img [ref=e74]
+        - generic [ref=e76]:
+          - term [ref=e77]: Email
+          - definition [ref=e78]:
+            - link "alice@sacco.co.ke" [ref=e80] [cursor=pointer]:
+              - /url: mailto:alice@sacco.co.ke
+            - button "Edit email" [ref=e81] [cursor=pointer]:
+              - img [ref=e82]
+        - generic [ref=e84]:
+          - term [ref=e85]: Share Capital
+          - definition [ref=e86]:
+            - generic [ref=e87]: "5000.0"
+            - button "Edit share_capital" [ref=e88] [cursor=pointer]:
+              - img [ref=e89]
+        - generic [ref=e91]:
+          - term [ref=e92]: Monthly Contribution
+          - definition [ref=e93]:
+            - generic [ref=e94]: "2000.0"
+            - button "Edit monthly_contribution" [ref=e95] [cursor=pointer]:
+              - img [ref=e96]
+        - generic [ref=e98]:
+          - term [ref=e99]: Join Date
+          - definition [ref=e100]:
+            - generic [ref=e101]: 2024-01-15
+            - button "Edit join_date" [ref=e102] [cursor=pointer]:
+              - img [ref=e103]
+        - generic [ref=e105]:
+          - term [ref=e106]: Status
+          - definition [ref=e107]:
+            - generic [ref=e109]: active
+            - button "Edit status" [ref=e110] [cursor=pointer]:
+              - img [ref=e111]
+        - generic [ref=e113]:
+          - term [ref=e114]: Employer
+          - definition [ref=e115]:
+            - generic [ref=e116]: Nairobi County
+            - button "Edit employer" [ref=e117] [cursor=pointer]:
+              - img [ref=e118]
+        - generic [ref=e120]:
+          - term [ref=e121]: Designation
+          - definition [ref=e122]:
+            - generic [ref=e123]: Officer
+            - button "Edit designation" [ref=e124] [cursor=pointer]:
+              - img [ref=e125]

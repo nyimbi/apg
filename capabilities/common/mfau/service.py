@@ -20,7 +20,7 @@ from .models import (
 	TrustLevel, AuthenticationStatus, DeviceInfo
 )
 from .integration import APGIntegrationRouter
-from .mfa_engine import MFAEngine
+from .mfa_engine import MFAAuthenticationEngine as MFAEngine
 from .risk_analyzer import RiskAnalyzer
 from .token_service import TokenService
 from .biometric_service import BiometricService

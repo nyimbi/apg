@@ -13,7 +13,7 @@ from datetime import date, datetime
 # Direct imports to avoid circular dependency
 from pydantic import BaseModel, Field, field_validator
 from decimal import Decimal
-from, field_validator.service import (
+from .service import (
 	ARCustomerService, ARInvoiceService, ARCollectionsService,
 	ARCashApplicationService, ARAnalyticsService
 )

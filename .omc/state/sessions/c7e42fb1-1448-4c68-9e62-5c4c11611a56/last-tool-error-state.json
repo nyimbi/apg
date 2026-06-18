@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"python -c \\\"\\nfrom compiler.ast_builder import ASTBuilder\\nfrom compiler.semantic_analyzer import SemanticAnalyzer\\n\\nsrc = open('examples/module_system_demo.apg').read()\\nbuilder = ASTBui...",
-  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 7, in <module>\nAttributeError: 'ASTBuilder' object has no attribute 'build'",
-  "timestamp": "2026-06-12T06:13:08.021Z",
+  "tool_input_preview": "{\"command\":\"python3 -c \\\"\\nimport subprocess, sys, os\\n\\nsys.path.insert(0, '.')\\nerrors = []\\nfor root, dirs, files in os.walk('capabilities'):\\n    dirs[:] = [d for d in dirs if d not in ['__pycache...",
+  "error": "Exit code 1\nCould not load capability module: financial_management\nCould not load capability module: human_capital_management\nCould not load capability module: procurement_sourcing\nCould not load capability module: inventory_supply_chain\nCould not load capability module: sales_revenue_management\nCould not load capability module: production_execution\nCould not load capability module: quality_compliance\nCould not load capability module: maintenance_reliability\nCould not load capability module: pro...",
+  "timestamp": "2026-06-18T04:40:29.869Z",
   "retry_count": 1
 }

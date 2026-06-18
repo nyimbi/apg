@@ -13,7 +13,7 @@ from sqlalchemy.orm import relationship
 from uuid_extensions import uuid7str
 import json
 
-from ....auth_rbac.models import BaseMixin, AuditMixin, Model
+from ...auth_rbac.models import BaseMixin, AuditMixin, Model
 
 
 class IMRRSupplier(Model, AuditMixin, BaseMixin):

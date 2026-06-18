@@ -16,15 +16,10 @@ from typing import Any, Dict, List, Optional, Union, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from pydantic, model_validator.config import ConfigDict
+from pydantic.config import ConfigDict
 from pydantic import EmailStr, HttpUrl, Json
 from uuid_extensions import uuid7str
 
-
-class ConfigDict, field_validator, model_validator(ConfigDict):
-	extra = 'forbid'
-	validate_by_name = True
-	validate_by_alias = True
 
 
 # Base Analytics Model

@@ -609,3 +609,7 @@ class CFGLPosting(GLJournalEntryResponse):
 GLJournalEntry = CFGLJournalEntry
 GLJournalLine = CFGLJournalLine
 GLPosting = CFGLPosting
+
+# Aliases used by capabilities.fin.fam
+CFGLAccount = GLAccountResponse
+CFGLPeriod = GLPeriodResponse

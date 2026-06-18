@@ -1255,3 +1255,5 @@ __all__ = [
 	"PresentationAttackDetector",
 	"SecurityHardeningService"
 ]
+# Alias for backward compatibility
+AntiSpoofingService = PresentationAttackDetector

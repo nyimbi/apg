@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 
 from .models import PPOPurchaseOrder, PPOPurchaseOrderLine, PPOReceipt, PPOReceiptLine, PPOThreeWayMatch, PPOChangeOrder
-from ...auth_rbac.models import get_db_session
+from ...common.auth_rbac.models import get_db_session
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 
 

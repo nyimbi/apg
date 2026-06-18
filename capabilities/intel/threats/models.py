@@ -799,3 +799,55 @@ class ThreatReportGenerationRequest(BaseModel):
 	include_indicators: bool = True
 	include_mitre_heatmap: bool = True
 	include_attribution: bool = True
+
+
+# ---------------------------------------------------------------------------
+# Aliases for service.py compatibility
+# ---------------------------------------------------------------------------
+ThreatActor = ThreatActorResponse
+ThreatIndicator = ThreatIndicatorResponse
+ThreatCampaign = ThreatCampaignResponse
+ThreatReport = ThreatReportResponse
+ThreatAssessment = ThreatAssessmentResponse
+
+
+class ThreatAgent(TIBase):
+	"""Represents an automated threat agent or bot."""
+	agent_type: str = "automated"
+	runtime: str = ""
+	capabilities_list: list[str] = Field(default_factory=list)
+
+
+class ThreatAuthority(TIBase):
+	"""Represents a threat intelligence authority or sharing organization."""
+	authority_type: str = "isac"
+	jurisdiction: str = ""
+	contact: str = ""
+
+
+class ThreatMitigation(TIBase):
+	"""Represents a mitigation control or countermeasure."""
+	mitigation_type: str = "technical"
+	control_id: str = ""
+	effectiveness: float = 0.0
+
+
+class ThreatReview(TIBase):
+	"""Represents a review or validation of threat intelligence."""
+	review_status: str = "pending"
+	reviewer_id: str = ""
+	notes: str = ""
+
+
+class ThreatSource(TIBase):
+	"""Represents a threat intelligence source or feed provider."""
+	source_type: str = "osint"
+	reliability: str = "unknown"
+	url: str = ""
+
+
+class ThreatWorkspace(TIBase):
+	"""Represents a collaborative workspace for threat analysis."""
+	workspace_type: str = "investigation"
+	owner_id: str = ""
+	members: list[str] = Field(default_factory=list)

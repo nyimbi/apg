@@ -17,7 +17,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic import ConfigDict
 from pydantic import EmailStr, PositiveFloat, PositiveInt
-from pydantic, model_validator.functional_validators import AfterValidator
+from pydantic.functional_validators import AfterValidator
 from typing_extensions import Annotated
 
 from uuid_extensions import uuid7str
@@ -222,7 +222,7 @@ class APGBaseModel(BaseModel):
 		return f"Model {self.__class__.__name__} {action}: {self.id}"
 
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_apg_integration(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate APG integration requirements."""
 		assert values.get('tenant_id'), "tenant_id required for APG multi-tenancy"
@@ -328,7 +328,7 @@ class BFBudgetLine(BaseModel):
 		return v
 
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_monthly_quarterly_totals(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate monthly amounts sum to budgeted amount."""
 		budgeted = values.get('budgeted_amount', Decimal('0.00'))
@@ -438,7 +438,7 @@ class BFBudget(APGBaseModel):
 		return v
 
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_budget_consistency(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate budget data consistency."""
 		# Validate template usage
@@ -621,7 +621,7 @@ class BFForecast(APGBaseModel):
 		return v.upper() if v else None
 
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_forecast_periods(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate forecast period relationships."""
 		base_start = values.get('base_period_start')
@@ -742,7 +742,7 @@ class BFVarianceAnalysis(APGBaseModel):
 		return v
 
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_variance_calculations(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate variance calculation consistency."""
 		baseline = values.get('baseline_amount', Decimal('0'))
@@ -863,7 +863,7 @@ class BFScenario(APGBaseModel):
 		return v
 
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_scenario_consistency(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate scenario data consistency."""
 		# Validate probability weights for multiple scenarios

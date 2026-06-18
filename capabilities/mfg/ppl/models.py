@@ -15,7 +15,8 @@ from sqlalchemy.orm import relationship
 from pydantic import BaseModel, Field, ConfigDict, AfterValidator
 from uuid_extensions import uuid7str
 
-from ...core_financials.general_ledger.models import BaseModel as SQLBaseModel
+from sqlalchemy.orm import declarative_base as _db
+SQLBaseModel = _db()
 
 class ProductionOrderStatus(str, Enum):
 	"""Production order status enumeration"""

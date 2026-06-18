@@ -1,0 +1,141 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "clinic_demo" [ref=e3] [cursor=pointer]:
+      - /url: /ui
+    - navigation [ref=e4]:
+      - link "Home" [ref=e5] [cursor=pointer]:
+        - /url: /ui
+      - link "⚡ Workflows" [ref=e6] [cursor=pointer]:
+        - /url: /ui/workflows
+      - link "Marketplace" [ref=e7] [cursor=pointer]:
+        - /url: /ui/marketplace
+  - main [ref=e8]:
+    - navigation [ref=e9]:
+      - link "Application" [ref=e10] [cursor=pointer]:
+        - /url: /ui
+      - generic [ref=e11]: /
+      - link "Patient" [ref=e12] [cursor=pointer]:
+        - /url: /ui/entities/Patient
+      - generic [ref=e13]: /
+      - generic [ref=e14]: P001
+    - generic [ref=e15]:
+      - generic [ref=e17]:
+        - generic [ref=e18]: P
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - heading "P001" [level=1] [ref=e21]
+            - generic [ref=e22]: entity
+          - paragraph [ref=e23]: "2"
+        - generic [ref=e24]:
+          - link "⚡ Workflow" [ref=e25] [cursor=pointer]:
+            - /url: /ui/workflows/Patient/create_Patient
+          - button "Delete" [ref=e27] [cursor=pointer]
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - paragraph [ref=e30]: Patient Number
+          - paragraph [ref=e31]: P001
+        - generic [ref=e32]:
+          - paragraph [ref=e33]: Full Name
+          - paragraph [ref=e34]: Jane Wanjiku
+        - generic [ref=e35]:
+          - paragraph [ref=e36]: Date Of Birth
+          - paragraph [ref=e37]: 1985-03-14
+        - generic [ref=e38]:
+          - paragraph [ref=e39]: Gender
+          - paragraph [ref=e40]: Female
+    - generic [ref=e41]:
+      - button "Details" [ref=e42] [cursor=pointer]
+      - button "Related" [ref=e43] [cursor=pointer]
+      - button "Activity" [ref=e44] [cursor=pointer]
+    - generic [ref=e46]:
+      - generic [ref=e47]:
+        - heading "Record Details" [level=2] [ref=e48]
+        - generic [ref=e49]: rev. 1
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - term [ref=e52]: Id
+          - definition [ref=e53]:
+            - generic [ref=e54]: "2"
+            - button "Edit id" [ref=e55] [cursor=pointer]:
+              - img [ref=e56]
+        - generic [ref=e58]:
+          - term [ref=e59]: Patient Number
+          - definition [ref=e60]:
+            - generic [ref=e61]: P001
+            - button "Edit patient_number" [ref=e62] [cursor=pointer]:
+              - img [ref=e63]
+        - generic [ref=e65]:
+          - term [ref=e66]: Full Name
+          - definition [ref=e67]:
+            - generic [ref=e68]: Jane Wanjiku
+            - button "Edit full_name" [ref=e69] [cursor=pointer]:
+              - img [ref=e70]
+        - generic [ref=e72]:
+          - term [ref=e73]: Date Of Birth
+          - definition [ref=e74]:
+            - generic [ref=e75]: 1985-03-14
+            - button "Edit date_of_birth" [ref=e76] [cursor=pointer]:
+              - img [ref=e77]
+        - generic [ref=e79]:
+          - term [ref=e80]: Gender
+          - definition [ref=e81]:
+            - generic [ref=e82]: Female
+            - button "Edit gender" [ref=e83] [cursor=pointer]:
+              - img [ref=e84]
+        - generic [ref=e86]:
+          - term [ref=e87]: Phone
+          - definition [ref=e88]:
+            - link "0712345678" [ref=e90] [cursor=pointer]:
+              - /url: tel:0712345678
+              - img [ref=e91]
+              - text: "0712345678"
+            - button "Edit phone" [ref=e93] [cursor=pointer]:
+              - img [ref=e94]
+        - generic [ref=e96]:
+          - term [ref=e97]: Emergency Contact
+          - definition [ref=e98]:
+            - generic [ref=e99]: —
+            - button "Edit emergency_contact" [ref=e100] [cursor=pointer]:
+              - img [ref=e101]
+        - generic [ref=e103]:
+          - term [ref=e104]: National
+          - definition [ref=e105]:
+            - generic [ref=e106]: —
+            - button "Edit national_id" [ref=e107] [cursor=pointer]:
+              - img [ref=e108]
+        - generic [ref=e110]:
+          - term [ref=e111]: Blood Group
+          - definition [ref=e112]:
+            - generic [ref=e113]: O+
+            - button "Edit blood_group" [ref=e114] [cursor=pointer]:
+              - img [ref=e115]
+        - generic [ref=e117]:
+          - term [ref=e118]: Allergies
+          - definition [ref=e119]:
+            - generic [ref=e120]: —
+            - button "Edit allergies" [ref=e121] [cursor=pointer]:
+              - img [ref=e122]
+        - generic [ref=e124]:
+          - term [ref=e125]: Insurance Provider
+          - definition [ref=e126]:
+            - generic [ref=e127]: —
+            - button "Edit insurance_provider" [ref=e128] [cursor=pointer]:
+              - img [ref=e129]
+        - generic [ref=e131]:
+          - term [ref=e132]: Insurance Number
+          - definition [ref=e133]:
+            - generic [ref=e134]: —
+            - button "Edit insurance_number" [ref=e135] [cursor=pointer]:
+              - img [ref=e136]
+        - generic [ref=e138]:
+          - term [ref=e139]: Next Of Kin
+          - definition [ref=e140]:
+            - generic [ref=e141]: —
+            - button "Edit next_of_kin" [ref=e142] [cursor=pointer]:
+              - img [ref=e143]
+        - generic [ref=e145]:
+          - term [ref=e146]: County
+          - definition [ref=e147]:
+            - generic [ref=e148]: Nairobi
+            - button "Edit county" [ref=e149] [cursor=pointer]:
+              - img [ref=e150]

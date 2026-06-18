@@ -20,7 +20,7 @@ import yaml
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from pydantic_settings import BaseSettings
 
-from apg, field_validator.framework.base_service import APGBaseService
+
 from apg.framework.config import APGConfig
 from apg.framework.security import APGSecurity
 

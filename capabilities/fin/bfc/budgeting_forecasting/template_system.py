@@ -22,7 +22,7 @@ import asyncpg
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic import ConfigDict
 
-from, model_validator.models import (
+from .models import (
 	APGBaseModel, BFBudgetType, BFLineType,
 	PositiveAmount, CurrencyCode, FiscalYear, NonEmptyString
 )
@@ -147,7 +147,7 @@ class BudgetTemplateModel(APGBaseModel):
 		return v
 
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_template_consistency(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate template data consistency."""
 		# Validate inheritance level

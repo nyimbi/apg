@@ -230,35 +230,50 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-10T18:27:45.581Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 366757271,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ad979ebbf8ab935eb",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-10T18:31:25.071Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 366537781,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a55477719cc75a397",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-10T18:35:08.305Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 366314547,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ac7e85b64e05083e1",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T04:28:21.355Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 330721497,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a6cff87f008d0f429",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T04:28:21.377Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 330721475,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a1281f3c2098108e0",
@@ -292,21 +307,30 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T04:33:11.036Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 330431816,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "aa09cce4c705754a7",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T04:33:15.576Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 330427276,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ab8dcf1e3d96a8a7c",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T04:37:38.415Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 330164437,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a10bb3b45aede1f6e",
@@ -322,21 +346,30 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T04:41:31.225Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 329931627,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a2c0e77289e831966",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T04:45:30.317Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 329692535,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a3513295ad8cfa34d",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T04:50:01.005Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 329421847,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a918872ef91866544",
@@ -406,21 +439,30 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T05:11:47.377Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 328115475,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "afb261d215e518639",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T05:15:36.424Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 327886428,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a435d1298c097c176",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T05:19:24.984Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 327657868,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "af52e4f797ec3ce30",
@@ -517,7 +559,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:40:19.253Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304803599,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a6bd358eefafa962b",
@@ -542,7 +587,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:40:36.992Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304785860,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a93549e28660dfb4b",
@@ -558,14 +606,20 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:41:12.526Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304750326,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a1c765ee0af873d5c",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:41:34.144Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304728708,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a54dc173be7fd5c5f",
@@ -581,7 +635,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:42:11.815Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304691037,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "abed10ca52043b10c",
@@ -597,14 +654,20 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:42:49.076Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304653776,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a918b941f50345e08",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:42:52.740Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304650112,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ae7a4139348dd024b",
@@ -629,7 +692,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:43:20.677Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304622175,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a5b4cca97baa33f36",
@@ -663,7 +729,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:44:01.683Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304581169,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a7ac87f5dcc1be630",
@@ -697,77 +766,110 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:44:48.364Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304534488,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a62438a3c4110ffc9",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:44:51.934Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304530918,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a57ac4bf306a998f9",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:45:56.723Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304466129,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ab73508c79aeffce1",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:46:18.907Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304443945,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a33bc12d528aba5d7",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:46:45.149Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304417703,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a2edc5cd071a63697",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:47:30.434Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304372418,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ae04a630db13d931d",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:47:53.574Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304349278,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "afab6500e3abb388f",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:47:57.910Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304344942,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ab0a2e607e6adc5a5",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:48:15.208Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304327644,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "afd2f70429fac98a6",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:48:16.893Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304325959,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a2ac5593a213a0432",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:48:21.015Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304321837,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a04899824696651d5",
@@ -783,42 +885,60 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:49:50.743Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304232109,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a705ea61ccf836574",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:50:04.510Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304218342,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a152801e41327c075",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:51:41.402Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304121450,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a5729f8c6f7eca829",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:51:46.251Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304116601,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a459b84e190d9c885",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:52:13.768Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304089084,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a2872aa1137e783ec",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:52:23.451Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304079401,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a1f42336b692014db",
@@ -834,140 +954,200 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:52:41.617Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304061235,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a45a381582e3d6968",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:52:49.974Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304052878,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a76e051db7beb38d2",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:53:13.226Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 304029626,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a267ce6a06924be4e",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:54:02.983Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303979869,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a3c54bed7edbebb2b",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:55:13.602Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303909250,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ad940c5260b46d65c",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:55:13.722Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303909130,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a118426ee59d5ed1a",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:56:59.008Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303803844,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a43721d349dac44b5",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:56:59.065Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303803787,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "af0b5954c79b24514",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:57:02.568Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303800284,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a405dabea26be36ce",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:57:03.234Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303799618,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "abeb4587f288dc372",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:57:03.544Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303799308,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "adb5eaa547ffde001",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:57:12.074Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303790778,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "acba93c9a6533dc9f",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:58:03.684Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303739168,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "af407162af57aa419",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:58:30.281Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303712571,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "abc5e3d239e85ab6c",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:58:36.504Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303706348,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a882c1fc12b2da245",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T11:58:58.441Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303684411,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a60b1e46f2321e747",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:01:22.148Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303540704,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a96e70c93ea46f2cd",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:01:22.849Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303540003,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "aa031b7c3725656fb",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:01:25.129Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303537723,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a98a72cbabba50121",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:01:51.743Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303511109,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "aaf3d2b7797a728c2",
@@ -1064,56 +1244,80 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:02:17.766Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303485086,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a0746efdcae8527aa",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:02:48.901Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303453951,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ac4b1ef082de0747c",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:03:03.999Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303438853,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a3ef3502ffd9a83eb",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:03:09.906Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303432946,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a3ae86ca5ee978aad",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:03:17.662Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303425190,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ae7348b85c69691fd",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:03:27.099Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303415753,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a6400d0c3cc2ee4db",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:04:45.223Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303337629,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "aad5b9aa6dd5e2fbb",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:05:51.021Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303271831,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a4f3301997917600f",
@@ -1129,21 +1333,30 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:06:45.878Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303216974,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a4dda21847c1bae1a",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:06:47.674Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303215178,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "add0f2b5ce0ed98f7",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:07:10.564Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303192288,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a9215119752903ff9",
@@ -1168,7 +1381,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:07:34.473Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303168379,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a0af0b80541864dd2",
@@ -1193,14 +1409,20 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:07:41.304Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303161548,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ac1db6fd58f2fcf2d",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:07:41.503Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303161349,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "aa44b2cf842caaa40",
@@ -1234,14 +1456,20 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:07:41.218Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303161634,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a98430e326d9dfa7c",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:07:41.698Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303161154,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a18e9f31de2e09da2",
@@ -1257,7 +1485,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:07:43.906Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303158946,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a8936df2e8c0d7fbb",
@@ -1309,14 +1540,20 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:07:47.029Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303155823,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "aa9e28b264cad0e43",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:07:47.827Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303155025,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a0633a8a12c948490",
@@ -1350,35 +1587,50 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:07:55.767Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303147085,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a6973c524df1d13a8",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:07:59.112Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303143740,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a7e508015f3128130",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:08:02.434Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303140418,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a057057ebb5d584cb",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:08:05.542Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303137310,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a9eb71f95c45c6d5b",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:08:09.362Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303133490,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a4ed0f965337808c9",
@@ -1430,21 +1682,30 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:09:55.775Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303027077,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a456952822599cc0d",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:09:58.349Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 303024503,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "abbd45effba03b601",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:10:34.026Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302988826,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ad4789f07c827e1d7",
@@ -1487,7 +1748,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:10:49.497Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302973355,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a51ab093ae0e926d1",
@@ -1521,21 +1785,30 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:11:27.495Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302935357,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a07cb485d26631f68",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:11:28.174Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302934678,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ab584bfbb0acb876c",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:11:54.724Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302908128,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a3f5e1f24b16d3d82",
@@ -1569,14 +1842,20 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:13:00.035Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302842817,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a6bc8d933b4d8f309",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:13:01.843Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302841009,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "abf837b9d942551ff",
@@ -1592,7 +1871,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:13:15.250Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302827602,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "aca3ec1f14ddc1c7d",
@@ -1644,7 +1926,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:13:47.091Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302795761,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a8b190a4968f9101d",
@@ -1660,7 +1945,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:14:08.083Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302774769,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ad2421719da18d8d5",
@@ -1703,14 +1991,20 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:14:46.589Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302736263,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a19b5cd251036850c",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:14:50.945Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302731907,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a04bbee6bdab2f328",
@@ -1726,7 +2020,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:15:17.005Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302705847,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "afd4a31de337a9211",
@@ -1751,7 +2048,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:15:48.920Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:20:22.852Z",
+      "duration_ms": 302673932,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ac4802df0365a245c",
@@ -1794,14 +2094,20 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:16:39.886Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302808141,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a4cd7956a9cb6fabe",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:17:18.566Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302769461,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a512c8a647f73edda",
@@ -1835,7 +2141,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:18:14.829Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302713198,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "afbb4e3fcaa48f879",
@@ -1860,7 +2169,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:18:54.615Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302673412,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a242c406126476221",
@@ -1885,7 +2197,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:19:56.612Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302611415,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a90088a3c090214dc",
@@ -1901,98 +2216,140 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:20:23.514Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302584513,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "aa615fbf9eeb681cc",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:20:27.172Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302580855,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "acd28306153b5ab6a",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:21:40.146Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302507881,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "af59166c10dc33657",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:21:57.453Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302490574,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a60ef68d5a323ed2c",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:22:08.163Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302479864,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a1f246adc5d487f71",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:23:46.459Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302381568,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a87e2cf9992506990",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:23:57.297Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302370730,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ae7239d59c0b12bcc",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:24:28.387Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302339640,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a312b8a70e839bfcf",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:25:10.840Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302297187,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a0fd15541aa2d6ba4",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:27:10.308Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302177719,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "ad3a50bd5192387f4",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:27:20.849Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302167178,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a0c1f8aefd68c658d",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:27:51.552Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302136475,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "adb079e8ec955ca8a",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:28:40.828Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 302087199,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a886dcd70e14357b2",
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-11T12:30:49.614Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 301958413,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a539c2e5608300608",
@@ -2368,7 +2725,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-12T02:34:15.689Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 251352338,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a3305e87b2b6d2708",
@@ -3995,7 +4355,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-12T06:11:28.928Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 238319099,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "a7d112c176359cf0d",
@@ -4011,7 +4374,10 @@
       "agent_type": "workflow-subagent",
       "started_at": "2026-06-12T06:11:29.182Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 238318845,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
     },
     {
       "agent_id": "abced5618fbad90d1",
@@ -4030,10 +4396,433 @@
       "status": "completed",
       "completed_at": "2026-06-12T06:20:35.899Z",
       "duration_ms": 216880
+    },
+    {
+      "agent_id": "ae705513f7bcf7c50",
+      "agent_type": "general-purpose",
+      "started_at": "2026-06-15T00:23:28.027Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-15T00:23:28.027Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a471a50308632d864",
+      "agent_type": "general-purpose",
+      "started_at": "2026-06-15T00:30:16.128Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-15T00:30:16.128Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a80ced65622968a3b",
+      "agent_type": "unknown",
+      "started_at": "2026-06-15T00:36:19.384Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-15T00:36:19.384Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a278c0a59c6d18ae7",
+      "agent_type": "unknown",
+      "started_at": "2026-06-15T05:59:09.689Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-15T05:59:09.689Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a34a04ba98c5c69ad",
+      "agent_type": "unknown",
+      "started_at": "2026-06-15T06:07:56.656Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-15T06:07:56.656Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a6314c9f869f4a776",
+      "agent_type": "unknown",
+      "started_at": "2026-06-15T07:19:03.136Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-15T07:19:03.136Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a87480b067e4244c9",
+      "agent_type": "Explore",
+      "started_at": "2026-06-15T09:23:16.338Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-15T09:23:43.490Z",
+      "duration_ms": 27152
+    },
+    {
+      "agent_id": "a4f29a785ba548ca2",
+      "agent_type": "unknown",
+      "started_at": "2026-06-15T09:26:09.525Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-15T09:26:09.525Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "adefb5b67e561aaea",
+      "agent_type": "unknown",
+      "started_at": "2026-06-15T09:33:45.607Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-15T09:33:45.607Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "ac6e46c8b41d1c3bb",
+      "agent_type": "Explore",
+      "started_at": "2026-06-16T03:10:43.525Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T03:15:17.361Z",
+      "duration_ms": 273836
+    },
+    {
+      "agent_id": "a058e9e76f8bfc3c5",
+      "agent_type": "unknown",
+      "started_at": "2026-06-16T03:19:01.923Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T03:19:01.923Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "ad56c86dafdc88409",
+      "agent_type": "unknown",
+      "started_at": "2026-06-16T07:34:03.915Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T07:34:03.915Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "afda8305aa664e4c2",
+      "agent_type": "Explore",
+      "started_at": "2026-06-16T11:02:47.234Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T11:04:26.545Z",
+      "duration_ms": 99311
+    },
+    {
+      "agent_id": "af28c8c8b8156f902",
+      "agent_type": "Explore",
+      "started_at": "2026-06-16T11:02:57.650Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T11:04:36.408Z",
+      "duration_ms": 98758
+    },
+    {
+      "agent_id": "a8ef567a083551c45",
+      "agent_type": "Explore",
+      "started_at": "2026-06-16T11:03:06.004Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T11:05:33.549Z",
+      "duration_ms": 147545
+    },
+    {
+      "agent_id": "a9fc0c94fe10c966e",
+      "agent_type": "unknown",
+      "started_at": "2026-06-16T11:12:35.126Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T11:12:35.126Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a6cc69c531ddd613d",
+      "agent_type": "unknown",
+      "started_at": "2026-06-16T11:19:37.048Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T11:19:37.048Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a72f29e73cda8e1ea",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-16T20:18:10.710Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T20:20:31.995Z",
+      "duration_ms": 141285
+    },
+    {
+      "agent_id": "a659b298e91e50da9",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-16T20:18:10.767Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T20:22:23.124Z",
+      "duration_ms": 252357
+    },
+    {
+      "agent_id": "a902d63b6f428b6b6",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-16T20:18:10.828Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T20:23:03.431Z",
+      "duration_ms": 292603
+    },
+    {
+      "agent_id": "aa77c1a082eb2add0",
+      "agent_type": "unknown",
+      "started_at": "2026-06-16T20:21:26.190Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T20:21:26.190Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a63ff57d503a42268",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-16T20:23:03.736Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T20:25:01.244Z",
+      "duration_ms": 117508
+    },
+    {
+      "agent_id": "a9e93ce8058a444b5",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-16T20:23:03.789Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T20:42:06.295Z",
+      "duration_ms": 1142506
+    },
+    {
+      "agent_id": "a14160268a8b8c39d",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-16T20:23:03.842Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T20:25:37.692Z",
+      "duration_ms": 153850
+    },
+    {
+      "agent_id": "a8dc164d32cf9b863",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-16T20:23:03.898Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T20:25:14.412Z",
+      "duration_ms": 130514
+    },
+    {
+      "agent_id": "abe737865616c2204",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-16T20:23:03.951Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T20:24:55.151Z",
+      "duration_ms": 111200
+    },
+    {
+      "agent_id": "abf8ac65fe7397467",
+      "agent_type": "workflow-subagent",
+      "started_at": "2026-06-16T20:25:38.002Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-16T20:30:59.675Z",
+      "duration_ms": 321673
+    },
+    {
+      "agent_id": "a7d9f096f1f6b8a55",
+      "agent_type": "code-review-expert",
+      "started_at": "2026-06-17T06:45:50.918Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T06:50:03.919Z",
+      "duration_ms": 253001
+    },
+    {
+      "agent_id": "af5f8ccd1207f4097",
+      "agent_type": "Explore",
+      "started_at": "2026-06-17T06:46:01.403Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T06:47:15.291Z",
+      "duration_ms": 73888
+    },
+    {
+      "agent_id": "a4ac0af6cb26f3a81",
+      "agent_type": "unknown",
+      "started_at": "2026-06-17T06:52:53.590Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T06:52:53.590Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a2ec52b2c17d03f49",
+      "agent_type": "general-purpose",
+      "started_at": "2026-06-17T08:03:17.751Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T08:07:33.579Z",
+      "duration_ms": 255828
+    },
+    {
+      "agent_id": "aa0ab0e5763517b1a",
+      "agent_type": "unknown",
+      "started_at": "2026-06-17T08:29:12.247Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T08:29:12.247Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a0afe6a460ebc2adc",
+      "agent_type": "unknown",
+      "started_at": "2026-06-17T10:32:30.582Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T10:32:30.582Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "aa199b9af911bc97e",
+      "agent_type": "unknown",
+      "started_at": "2026-06-17T11:23:14.896Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T11:23:14.896Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "afbead078e5dfdaab",
+      "agent_type": "unknown",
+      "started_at": "2026-06-17T11:54:13.458Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T11:54:13.458Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a78595074b0bbdf94",
+      "agent_type": "unknown",
+      "started_at": "2026-06-17T12:16:00.098Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T12:16:00.098Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a4243f8b7c2798a07",
+      "agent_type": "Explore",
+      "started_at": "2026-06-17T12:19:15.078Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T12:19:46.108Z",
+      "duration_ms": 31030
+    },
+    {
+      "agent_id": "af1fdcc5397f6e88b",
+      "agent_type": "unknown",
+      "started_at": "2026-06-17T12:52:35.556Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T12:52:35.556Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "ad839bf9a41bbc535",
+      "agent_type": "unknown",
+      "started_at": "2026-06-17T13:13:31.536Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-17T13:13:31.536Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "ac9ddedec7f3d9a9f",
+      "agent_type": "unknown",
+      "started_at": "2026-06-18T02:14:32.517Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-18T02:14:32.517Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "acc85f3d27dc637fa",
+      "agent_type": "unknown",
+      "started_at": "2026-06-18T03:41:05.068Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-18T03:41:05.068Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "af158e1799299cdf1",
+      "agent_type": "unknown",
+      "started_at": "2026-06-18T03:58:20.437Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-18T03:58:20.437Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "aa5cc269fb0dd0c1a",
+      "agent_type": "general-purpose",
+      "started_at": "2026-06-18T04:15:21.065Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-18T04:18:31.846Z",
+      "duration_ms": 190781
+    },
+    {
+      "agent_id": "a7388447cd2d56738",
+      "agent_type": "general-purpose",
+      "started_at": "2026-06-18T04:20:39.763Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-18T04:23:51.895Z",
+      "duration_ms": 192132
+    },
+    {
+      "agent_id": "a142e738532b2cbc5",
+      "agent_type": "general-purpose",
+      "started_at": "2026-06-18T04:20:45.036Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-18T04:26:06.111Z",
+      "duration_ms": 321075
+    },
+    {
+      "agent_id": "a00121f3917bde349",
+      "agent_type": "unknown",
+      "started_at": "2026-06-18T04:30:10.487Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-18T04:30:10.487Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "ad9b34e5b35764920",
+      "agent_type": "Explore",
+      "started_at": "2026-06-18T04:38:10.745Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-18T04:55:04.987Z",
+      "duration_ms": 1014242
     }
   ],
-  "total_spawned": 392,
-  "total_completed": 349,
-  "total_failed": 0,
-  "last_updated": "2026-06-12T06:21:47.907Z"
+  "total_spawned": 411,
+  "total_completed": 397,
+  "total_failed": 144,
+  "last_updated": "2026-06-18T04:55:05.093Z"
 }

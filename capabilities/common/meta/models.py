@@ -390,7 +390,7 @@ class MetaLineage(Base):
 	execution_duration_ms = Column(Integer)
 	
 	# Additional metadata
-	metadata = Column(JSONB, default=dict)
+	extra_metadata = Column(JSONB, default=dict)
 	tags = Column(JSONB, default=list)
 	
 	# Lifecycle
@@ -438,7 +438,7 @@ class MetaClassification(Base):
 	rule_version = Column(String(20))
 	
 	# Additional metadata
-	metadata = Column(JSONB, default=dict)
+	extra_metadata = Column(JSONB, default=dict)
 	
 	# Lifecycle
 	created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

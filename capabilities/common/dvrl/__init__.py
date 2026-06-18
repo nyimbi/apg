@@ -23,9 +23,34 @@ from .capability_contract import (  # noqa: E402
     evaluate_capability_rules,
 )
 
+from datetime import datetime, timezone as _tz
+
+
+async def _log_info(message: str, context: dict = None) -> None:
+    """Log informational message for DVRL operations."""
+    ts = datetime.now(_tz.utc).isoformat()
+    print(f"[{ts}] DVRL INFO: {message}")
+
+
+async def _log_error(message: str, error: Exception = None) -> None:
+    """Log error message for DVRL operations."""
+    ts = datetime.now(_tz.utc).isoformat()
+    suffix = f" | Error: {error}" if error else ""
+    print(f"[{ts}] DVRL ERROR: {message}{suffix}")
+
+
+async def _log_warning(message: str, context: dict = None) -> None:
+    """Log warning message for DVRL operations."""
+    ts = datetime.now(_tz.utc).isoformat()
+    print(f"[{ts}] DVRL WARN: {message}")
+
+
 __all__ = [
     "__version__",
     "__capability_id__",
     "get_capability_contract",
     "evaluate_capability_rules",
+    "_log_info",
+    "_log_error",
+    "_log_warning",
 ]

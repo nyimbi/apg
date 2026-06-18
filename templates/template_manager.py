@@ -916,9 +916,8 @@ Generated with APG (Application Programming Generation) language.
 		
 		# Requirements template
 		files["requirements.txt.template"] = '''# APG Generated Application Requirements
-# Python-first templates are standard-library only by default.
-
-# Template-specific requirements
+flask>=3.0,<4
+PyJWT>=2.8,<3
 ''' + self._get_template_requirements(template_type)
 		
 		# Configuration template

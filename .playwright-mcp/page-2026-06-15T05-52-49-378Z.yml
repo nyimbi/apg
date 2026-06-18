@@ -1,0 +1,25 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "clinic_demo" [ref=e3] [cursor=pointer]:
+      - /url: /ui
+    - navigation [ref=e4]:
+      - link "Home" [ref=e5] [cursor=pointer]:
+        - /url: /ui
+      - link "⚡ Workflows" [ref=e6] [cursor=pointer]:
+        - /url: /ui/workflows
+      - link "Marketplace" [ref=e7] [cursor=pointer]:
+        - /url: /ui/marketplace
+  - main [ref=e8]:
+    - navigation [ref=e9]:
+      - link "Application" [ref=e10] [cursor=pointer]:
+        - /url: /ui
+      - generic [ref=e11]: /
+      - generic [ref=e12]: Connector Marketplace
+    - generic [ref=e13]:
+      - heading "Connector Marketplace" [level=1] [ref=e14]
+      - generic [ref=e15]: 0 connectors
+    - generic [ref=e16]:
+      - generic [ref=e17]: 🔌
+      - paragraph [ref=e18]: No connectors installed
+      - paragraph [ref=e19]: Generate a connector from an OpenAPI spec to get started.
+      - paragraph [ref=e21]: apg connector generate --spec openapi.yaml

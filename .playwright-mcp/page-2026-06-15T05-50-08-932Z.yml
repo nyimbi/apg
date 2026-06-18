@@ -1,0 +1,117 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - link "clinic_demo" [ref=e3] [cursor=pointer]:
+      - /url: /ui
+    - navigation [ref=e4]:
+      - link "Home" [ref=e5] [cursor=pointer]:
+        - /url: /ui
+      - link "⚡ Workflows" [ref=e6] [cursor=pointer]:
+        - /url: /ui/workflows
+      - link "Marketplace" [ref=e7] [cursor=pointer]:
+        - /url: /ui/marketplace
+  - main [ref=e8]:
+    - navigation [ref=e9]:
+      - link "Application" [ref=e10] [cursor=pointer]:
+        - /url: /ui
+      - generic [ref=e11]: /
+      - generic [ref=e12]: Patient
+      - link "API JSON ↗" [ref=e14] [cursor=pointer]:
+        - /url: /entities/Patient/records
+    - generic [ref=e16]:
+      - generic: 🔍
+      - textbox "Search Patient records…" [ref=e17]
+    - generic [ref=e18]:
+      - complementary [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - heading "New Patient" [level=2] [ref=e22]
+            - generic [ref=e23]: entity
+          - generic [ref=e24]:
+            - generic [ref=e25]:
+              - text: id
+              - textbox "id" [ref=e26]
+            - generic [ref=e27]:
+              - text: patient_number
+              - textbox "patient_number" [ref=e28]
+            - generic [ref=e29]:
+              - text: full_name
+              - textbox "full_name" [active] [ref=e30]
+            - generic [ref=e31]:
+              - text: date_of_birth
+              - textbox "date_of_birth" [ref=e32]
+            - generic [ref=e33]:
+              - text: gender
+              - textbox "gender" [ref=e34]
+            - generic [ref=e35]:
+              - text: phone
+              - textbox "phone" [ref=e36]
+            - generic [ref=e37]:
+              - text: emergency_contact
+              - textbox "emergency_contact" [ref=e38]
+            - generic [ref=e39]:
+              - text: national_id
+              - textbox "national_id" [ref=e40]
+            - generic [ref=e41]:
+              - text: blood_group
+              - textbox "blood_group" [ref=e42]
+            - generic [ref=e43]:
+              - text: allergies
+              - textbox "allergies" [ref=e44]
+            - generic [ref=e45]:
+              - text: insurance_provider
+              - textbox "insurance_provider" [ref=e46]
+            - generic [ref=e47]:
+              - text: insurance_number
+              - textbox "insurance_number" [ref=e48]
+            - generic [ref=e49]:
+              - text: next_of_kin
+              - textbox "next_of_kin" [ref=e50]
+            - generic [ref=e51]:
+              - text: county
+              - textbox "county" [ref=e52]
+            - button "Create Patient" [ref=e53] [cursor=pointer]
+      - generic [ref=e54]:
+        - generic [ref=e55]:
+          - heading "Patient" [level=1] [ref=e56]
+          - generic [ref=e57]: 1 record
+        - table [ref=e60]:
+          - rowgroup [ref=e61]:
+            - row "Id Patient Number Full Name Date Of Birth Gender Phone" [ref=e62]:
+              - columnheader [ref=e63]:
+                - checkbox [ref=e64]
+              - columnheader "Id" [ref=e65]:
+                - link "Id" [ref=e66] [cursor=pointer]:
+                  - /url: /ui/entities/Patient?sort=id&dir=asc
+              - columnheader "Patient Number" [ref=e67]:
+                - link "Patient Number" [ref=e68] [cursor=pointer]:
+                  - /url: /ui/entities/Patient?sort=patient_number&dir=asc
+              - columnheader "Full Name" [ref=e69]:
+                - link "Full Name" [ref=e70] [cursor=pointer]:
+                  - /url: /ui/entities/Patient?sort=full_name&dir=asc
+              - columnheader "Date Of Birth" [ref=e71]:
+                - link "Date Of Birth" [ref=e72] [cursor=pointer]:
+                  - /url: /ui/entities/Patient?sort=date_of_birth&dir=asc
+              - columnheader "Gender" [ref=e73]:
+                - link "Gender" [ref=e74] [cursor=pointer]:
+                  - /url: /ui/entities/Patient?sort=gender&dir=asc
+              - columnheader "Phone" [ref=e75]:
+                - link "Phone" [ref=e76] [cursor=pointer]:
+                  - /url: /ui/entities/Patient?sort=phone&dir=asc
+              - columnheader [ref=e77]
+          - rowgroup [ref=e78]:
+            - row "1 P001 Alice Wanjiru 1990-03-15 Female +254712345678 View → Delete" [ref=e79]:
+              - cell [ref=e80]:
+                - checkbox [ref=e81]
+              - cell "1" [ref=e82]:
+                - link "1" [ref=e83] [cursor=pointer]:
+                  - /url: /ui/entities/Patient/1
+              - cell "P001" [ref=e84]
+              - cell "Alice Wanjiru" [ref=e85]
+              - cell "1990-03-15" [ref=e86]
+              - cell "Female" [ref=e87]
+              - cell "+254712345678" [ref=e88]
+              - cell "View → Delete" [ref=e89]:
+                - generic [ref=e90]:
+                  - link "View →" [ref=e91] [cursor=pointer]:
+                    - /url: /ui/entities/Patient/1
+                  - button "Delete" [ref=e93] [cursor=pointer]

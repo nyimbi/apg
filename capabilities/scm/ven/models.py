@@ -325,7 +325,7 @@ class VMVendor(VMBaseModel):
 		return v
 	
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_dates(cls, values):
 		"""Validate date relationships"""
 		onboarding = values.get('onboarding_date')
@@ -473,7 +473,7 @@ class VMPerformance(VMBaseModel):
 	updated_by: UUID = Field(..., description="Last updater user ID")
 	
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_period_dates(cls, values):
 		"""Validate performance period dates"""
 		start_date = values.get('start_date')
@@ -667,7 +667,7 @@ class VMContract(VMBaseModel):
 	updated_by: UUID = Field(..., description="Last updater user ID")
 	
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_contract_dates(cls, values):
 		"""Validate contract date relationships"""
 		effective = values.get('effective_date')
@@ -850,7 +850,7 @@ class VMIntelligence(VMBaseModel):
 	created_by: UUID = Field(..., description="Creator user ID")
 	
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_validity_period(cls, values):
 		"""Validate intelligence validity period"""
 		valid_from = values.get('valid_from')
@@ -1016,7 +1016,7 @@ class VMPortalSession(VMBaseModel):
 	)
 	
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_session_timing(cls, values):
 		"""Validate session timing"""
 		created_at = values.get('created_at')
@@ -1157,7 +1157,7 @@ class VMCompliance(VMBaseModel):
 	updated_by: UUID = Field(..., description="Last updater user ID")
 	
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_review_dates(cls, values):
 		"""Validate review date relationships"""
 		last_review = values.get('last_review_date')

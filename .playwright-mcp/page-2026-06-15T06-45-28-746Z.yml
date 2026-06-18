@@ -1,0 +1,79 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "clinic_demo" [ref=e3] [cursor=pointer]:
+      - /url: /ui
+    - navigation [ref=e4]:
+      - link "Home" [ref=e5] [cursor=pointer]:
+        - /url: /ui
+      - link "⚡ Workflows" [ref=e6] [cursor=pointer]:
+        - /url: /ui/workflows
+      - link "Marketplace" [ref=e7] [cursor=pointer]:
+        - /url: /ui/marketplace
+  - main [ref=e8]:
+    - navigation [ref=e9]:
+      - link "Application" [ref=e10] [cursor=pointer]:
+        - /url: /ui
+      - generic [ref=e11]: /
+      - generic [ref=e12]: Patient
+      - link "API JSON ↗" [ref=e14] [cursor=pointer]:
+        - /url: /entities/Patient/records
+    - generic [ref=e16]:
+      - generic: 🔍
+      - textbox "Search Patient records…" [ref=e17]
+    - generic [ref=e18]:
+      - complementary [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - heading "New Patient" [level=2] [ref=e22]
+            - generic [ref=e23]: entity
+          - generic [ref=e24]:
+            - generic [ref=e25]:
+              - generic [ref=e26]:
+                - generic [ref=e27]: Patient Number
+                - textbox "Patient Number" [ref=e28]
+              - generic [ref=e29]:
+                - generic [ref=e30]: Full Name
+                - textbox "Full Name" [ref=e31]
+              - generic [ref=e32]:
+                - generic [ref=e33]: Date Of Birth
+                - textbox [ref=e34]:
+                  - /placeholder: Date Of Birth
+              - generic [ref=e35]:
+                - generic [ref=e36]: Gender
+                - textbox "Gender" [ref=e37]
+              - generic [ref=e38]:
+                - generic [ref=e39]: Phone
+                - textbox "Phone" [ref=e40]
+              - generic [ref=e41]:
+                - generic [ref=e42]: Emergency Contact
+                - textbox "Emergency Contact" [ref=e43]
+              - generic [ref=e44]:
+                - generic [ref=e45]: National
+                - textbox "National" [ref=e46]
+              - generic [ref=e47]:
+                - generic [ref=e48]: Blood Group
+                - textbox "Blood Group" [ref=e49]
+              - generic [ref=e50]:
+                - generic [ref=e51]: Allergies
+                - textbox "Allergies" [ref=e52]
+              - generic [ref=e53]:
+                - generic [ref=e54]: Insurance Provider
+                - textbox "Insurance Provider" [ref=e55]
+              - generic [ref=e56]:
+                - generic [ref=e57]: Insurance Number
+                - textbox "Insurance Number" [ref=e58]
+              - generic [ref=e59]:
+                - generic [ref=e60]: Next Of Kin
+                - textbox "Next Of Kin" [ref=e61]
+              - generic [ref=e62]:
+                - generic [ref=e63]: County
+                - textbox "County" [ref=e64]
+            - button "Create Patient" [ref=e65] [cursor=pointer]
+      - generic:
+        - generic:
+          - heading "Patient" [level=1] [ref=e66]
+          - generic [ref=e67]: 0 records
+        - generic [ref=e68]:
+          - generic: 📋
+          - paragraph: No Patient records yet.
+          - paragraph: Use the form on the left to create the first one.

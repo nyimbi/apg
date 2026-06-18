@@ -142,6 +142,22 @@ class DeviceBinding(APGBase):
 	location_data: Optional[dict[str, Any]] = Field(default=None, description="Device location data")
 
 
+class DeviceInfo(APGBase):
+	"""Device information for MFA authentication context"""
+	device_id: str = Field(description="Unique device identifier")
+	device_type: str = Field(default="unknown", description="Type of device (mobile, desktop, etc.)")
+	device_name: str = Field(default="", description="Human-readable device name")
+	device_fingerprint: str = Field(default="", description="Cryptographic device fingerprint")
+	trust_level: TrustLevel = Field(default=TrustLevel.UNKNOWN, description="Device trust level")
+	last_seen: datetime = Field(default_factory=datetime.utcnow, description="Last device activity")
+	is_active: bool = Field(default=True, description="Whether device is active")
+	os_version: Optional[str] = Field(default=None, description="Operating system version")
+	app_version: Optional[str] = Field(default=None, description="Application version")
+	ip_address: Optional[str] = Field(default=None, description="Device IP address")
+	user_agent: Optional[str] = Field(default=None, description="User agent string")
+	location_data: Optional[dict[str, Any]] = Field(default=None, description="Device location data")
+
+
 class BiometricTemplate(APGBase):
 	"""Biometric template storage with privacy protection"""
 	biometric_type: str = Field(description="Type of biometric (face, voice, behavioral)")

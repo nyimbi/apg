@@ -22,7 +22,6 @@ from dateutil.rrule import rrule, DAILY, WEEKLY, MONTHLY, YEARLY
 
 from pydantic import BaseModel, Field, field_validator
 
-from, field_validator.database import DatabaseManager
 
 
 logger = logging.getLogger(__name__)

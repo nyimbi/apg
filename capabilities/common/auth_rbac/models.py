@@ -2,12 +2,49 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import Column, DateTime, String, Boolean, Text
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, Session as _Session
 
 
 Model = declarative_base()
+
+
+# ---------------------------------------------------------------------------
+# Session / db stubs — used by capabilities that import from auth_rbac.models
+# ---------------------------------------------------------------------------
+
+class _DBStub:
+	"""Minimal db stub mimicking Flask-SQLAlchemy's db object."""
+
+	class _Session:
+		def add(self, obj: Any) -> None: ...
+		def commit(self) -> None: ...
+		def rollback(self) -> None: ...
+		def close(self) -> None: ...
+		def flush(self) -> None: ...
+		def delete(self, obj: Any) -> None: ...
+		def query(self, *args: Any) -> Any: ...
+		def execute(self, *args: Any, **kwargs: Any) -> Any: ...
+
+	session = _Session()
+
+	@staticmethod
+	def create_all() -> None: ...
+
+
+db = _DBStub()
+
+
+def get_db_session() -> Any:
+	"""Return a stub SQLAlchemy-like session."""
+	return db.session
+
+
+def get_session() -> Any:
+	"""Return a stub SQLAlchemy-like session (alias for get_db_session)."""
+	return db.session
 
 
 class BaseMixin:
@@ -63,4 +100,4 @@ class Permission(Model, BaseMixin):
 
 
 # Common exports
-__all__ = ["Model", "BaseMixin", "AuditMixin", "User", "Role", "Permission"]
+__all__ = ["Model", "BaseMixin", "AuditMixin", "User", "Role", "Permission", "db", "get_db_session", "get_session"]

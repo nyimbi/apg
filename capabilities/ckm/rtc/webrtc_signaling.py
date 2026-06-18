@@ -13,11 +13,12 @@ from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
 
+from .config import get_config
+
 try:
 	from .websocket_manager import websocket_manager
 	from .models import RTCVideoCall, RTCVideoParticipant
 	from .service import RTCService
-	from .config import get_config
 except ImportError:
 	# Fallback for development
 	pass

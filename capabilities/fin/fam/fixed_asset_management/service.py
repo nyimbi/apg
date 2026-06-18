@@ -18,7 +18,7 @@ from .models import (
 	CFAMAssetAcquisition, CFAMAssetDisposal, CFAMAssetTransfer, CFAMAssetMaintenance,
 	CFAMAssetInsurance, CFAMAssetValuation, CFAMAssetLease
 )
-from ..general_ledger.models import CFGLJournalEntry, CFGLJournalLine, CFGLAccount, CFGLPeriod
+from ...glr.general_ledger.models import CFGLJournalEntry, CFGLJournalLine, CFGLAccount, CFGLPeriod
 from ...auth_rbac.models import db
 from capabilities.common.reliability import guard_tenant_id, guard_non_empty_string, BoundedCache
 

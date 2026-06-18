@@ -17,7 +17,7 @@ from enum import Enum
 import random
 import hashlib
 
-from models import (
+from .models import (
     APGTenantContext, WBPMTask, WBPMTaskHistory, WBPMTaskComment,
     TaskStatus, TaskPriority, WBPMServiceResponse, WBPMPagedResponse
 )

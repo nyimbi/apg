@@ -14,7 +14,7 @@ from sqlalchemy import and_, or_, func, text
 from sqlalchemy.orm import sessionmaker, Session
 import json
 
-from ....auth_rbac.models import get_session
+from ....common.auth_rbac.models import get_session
 from .models import (
 	IMSTCItem, IMSTCItemCategory, IMSTCUnitOfMeasure,
 	IMSTCWarehouse, IMSTCLocation, IMSTCStockLevel,

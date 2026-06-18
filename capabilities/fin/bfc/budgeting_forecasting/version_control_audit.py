@@ -25,7 +25,7 @@ import asyncpg
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic import ConfigDict
 
-from, model_validator.models import (
+from .models import (
 	APGBaseModel, BFBudgetStatus, BFApprovalStatus,
 	PositiveAmount, CurrencyCode, NonEmptyString
 )
@@ -151,7 +151,7 @@ class BudgetVersion(APGBaseModel):
 		return v
 
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_version_consistency(cls, values: Dict[str, Any]) -> Dict[str, Any]:
 		"""Validate version data consistency."""
 		is_current = values.get('is_current', True)

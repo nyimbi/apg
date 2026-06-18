@@ -17,7 +17,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic import ConfigDict
 from pydantic import EmailStr, PositiveFloat, PositiveInt
-from pydantic, model_validator.functional_validators import AfterValidator
+from pydantic.functional_validators import AfterValidator
 from typing_extensions import Annotated
 
 from uuid_extensions import uuid7str
@@ -322,7 +322,7 @@ class WBPMProcessInstance(APGBaseModel):
 		return v
 	
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_duration_calculation(cls, values):
 		"""Validate duration calculation consistency."""
 		start_time = values.get('start_time')
@@ -396,7 +396,7 @@ class WBPMProcessFlow(APGBaseModel):
 		return v.strip()
 	
 	@model_validator(mode='before')
- @classmethod
+	@classmethod
 	def validate_no_self_flow(cls, values):
 		"""Validate flow doesn't connect activity to itself."""
 		source = values.get('source_activity_id')
