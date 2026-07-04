@@ -1,0 +1,38 @@
+<section class="mb-6">
+  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-apg-primary">Application</a> / <a href="/ui/entities/{{ safe_entity }}" class="hover:text-apg-primary">{{ entity_name }}</a> / <span class="font-semibold text-gray-900">Analytics</span></p>
+  <div class="flex items-center justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">{{ entity_name }} Analytics</h1>
+      <p class="text-sm text-gray-500 mt-1">{{ total }} record{{ 's' if total != 1 else '' }}</p>
+    </div>
+    <a class="apg-btn apg-btn-secondary" href="/ui/entities/{{ safe_entity }}">Table</a>
+  </div>
+</section>
+
+<section class="apg-grid-2 gap-6 mb-6">
+  <article class="apg-card">
+    <div class="apg-card-header"><h2 class="text-sm font-semibold text-gray-900">Records Over Time</h2></div>
+    <div class="apg-chart" data-apg-chart="{{ line_chart.id }}"></div>
+    <script id="{{ line_chart.id }}" type="application/json">{{ line_chart.spec_json | safe }}</script>
+  </article>
+  <article class="apg-card">
+    <div class="apg-card-header"><h2 class="text-sm font-semibold text-gray-900">Status Distribution</h2></div>
+    <div class="apg-chart" data-apg-chart="{{ status_chart.id }}"></div>
+    <script id="{{ status_chart.id }}" type="application/json">{{ status_chart.spec_json | safe }}</script>
+  </article>
+</section>
+
+<section class="apg-grid-3 gap-4">
+  {% for stat in numeric_stats %}
+  <article class="apg-card">
+    <h2 class="text-sm font-semibold text-gray-900 mb-3">{{ stat.field }}</h2>
+    <dl class="grid grid-cols-3 gap-3 text-center">
+      <div><dt class="text-xs text-gray-400">Min</dt><dd class="font-semibold">{{ stat.min }}</dd></div>
+      <div><dt class="text-xs text-gray-400">Avg</dt><dd class="font-semibold">{{ stat.avg }}</dd></div>
+      <div><dt class="text-xs text-gray-400">Max</dt><dd class="font-semibold">{{ stat.max }}</dd></div>
+    </dl>
+  </article>
+  {% else %}
+  <article class="apg-card"><div class="apg-chart-empty"><p>No numeric fields available</p></div></article>
+  {% endfor %}
+</section>

@@ -16,3 +16,10 @@ without external network access.
 - Version: 1.15.3
 - Source: official SortableJS distribution package
 - License: MIT
+
+## uPlot
+
+- Files: `uplot.min.js`, `uplot.min.css`
+- Version: 1.6.30
+- Source: official uPlot distribution package
+- License: MIT

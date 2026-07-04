@@ -453,7 +453,7 @@ class PythonCodeGenerator:
 	def _load_static_assets() -> dict[str, str]:
 		"""Load vendored UI assets to emit into generated static/ output."""
 		asset_dir = Path(__file__).parent / "assets"
-		asset_files = ("apg.css", "htmx.min.js", "sortable.min.js")
+		asset_files = ("apg.css", "htmx.min.js", "sortable.min.js", "uplot.min.js", "uplot.min.css", "apg-charts.js")
 		assets: dict[str, str] = {}
 		for asset_name in asset_files:
 			asset_path = asset_dir / asset_name
@@ -3684,8 +3684,11 @@ def _html_page(title: str, body: str) -> str:
     head_extras = (
         '<script>(function(){{try{{var m=localStorage.getItem("apg-theme")||"system";var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;}}catch(e){{}}}})();</script>'
         '<link rel="stylesheet" href="/static/apg.css">'
+        '<link rel="stylesheet" href="/static/uplot.min.css">'
         '<script defer src="/static/htmx.min.js"></script>'
         '<script defer src="/static/sortable.min.js"></script>'
+        '<script defer src="/static/uplot.min.js"></script>'
+        '<script defer src="/static/apg-charts.js"></script>'
     )
     toast_js = (
         '<div id="apg-toast-root" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>'
@@ -4367,6 +4370,7 @@ def _ui_index_html() -> str:
         {{"url": "/openapi.json",   "label": "API Contract"}},
         {{"url": "/ui/databases",   "label": "Databases"}},
     ]
+    dashboard = _ui_dashboard_context(app)
     tmpl_body = _render_template(
         "app_index.html.j2",
         module_name=html.escape(MODULE_NAME),
@@ -4379,6 +4383,11 @@ def _ui_index_html() -> str:
         agents=app.get("ai_agents", []),
         agent_teams=app.get("ai_agent_teams", []),
         api_links=api_links,
+        dashboard_stats=dashboard["stats"],
+        status_charts=dashboard["status_charts"],
+        recent_activity=dashboard["recent_activity"],
+        workflow_summary=dashboard["workflow_summary"],
+        agent_summary=dashboard["agent_summary"],
     )
     if tmpl_body is not None:
         return _html_page(MODULE_NAME, tmpl_body)
@@ -4412,6 +4421,60 @@ def _ui_index_html() -> str:
         f"<ul>{{team_links}}</ul>"
     )
     return _html_page(MODULE_NAME, body)
+
+
+def _status_field_name(fields: list[Dict[str, Any]]) -> str | None:
+    for candidate in ("status", "state", "stage", "phase"):
+        for field in fields:
+            if str(field.get("name", "")).lower() == candidate:
+                return str(field.get("name"))
+    return None
+
+
+def _chart_json(spec: Dict[str, Any]) -> str:
+    return json.dumps(spec, sort_keys=True)
+
+
+def _ui_dashboard_context(app: Dict[str, Any]) -> Dict[str, Any]:
+    stats = []
+    status_charts = []
+    for entity in ENTITIES:
+        if entity.get("type") in {{"application"}}:
+            continue
+        entity_name = str(entity["name"])
+        records = list_records(entity_name)
+        spark = {{"type": "sparkline", "title": f"{{entity_name}} records", "data": [{{"x": i, "y": len(records)}} for i in range(30)], "empty": "No records yet"}}
+        stats.append({{
+            "label": entity_name,
+            "value": len(records),
+            "delta": "0%",
+            "chart_id": f"chart-stat-{{_css_name(entity_name)}}",
+            "spec_json": _chart_json(spark),
+        }})
+        status_field = _status_field_name(_field_specs(entity_name))
+        if status_field:
+            counts: Dict[str, int] = {{}}
+            for record in records:
+                key = str(record.get(status_field) or "Unspecified")
+                counts[key] = counts.get(key, 0) + 1
+            status_charts.append({{
+                "entity": entity_name,
+                "field": status_field,
+                "chart_id": f"chart-status-{{_css_name(entity_name)}}",
+                "spec_json": _chart_json({{
+                    "type": "donut",
+                    "title": f"{{entity_name}} by {{status_field}}",
+                    "data": [{{"label": key, "value": value}} for key, value in sorted(counts.items())],
+                    "empty": f"No {{status_field}} data yet",
+                }}),
+            }})
+    return {{
+        "stats": stats,
+        "status_charts": status_charts,
+        "recent_activity": EVENT_LOG[-8:],
+        "workflow_summary": {{"workflow_count": sum(len(items) for items in APP_WORKFLOWS.values()), "run_count": len(WORKFLOW_RUNS)}},
+        "agent_summary": {{"agent_count": len(app.get("ai_agent_descriptions", {{}})), "team_count": len(app.get("ai_agent_team_descriptions", {{}}))}},
+    }}
 
 
 def _ui_database_catalog_html() -> tuple[int, str]:
@@ -4909,6 +4972,62 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
     return 200, _html_page(entity_name, body)
 
 
+def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
+    entity = _entity_spec(entity_name)
+    if entity is None:
+        return 404, _html_page("Unknown entity", f"<h1>Unknown entity: {{html.escape(entity_name)}}</h1>")
+    fields = _field_specs(entity_name)
+    records = list_records(entity_name)
+    safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    line_data = [{{"x": i, "y": len(records)}} for i in range(30)]
+    line_chart = {{
+        "id": f"analytics-line-{{_css_name(entity_name)}}",
+        "spec_json": _chart_json({{"type": "line", "title": f"{{entity_name}} records over time", "data": line_data, "empty": "No records yet"}}),
+    }}
+    status_field = _status_field_name(fields)
+    counts: Dict[str, int] = {{}}
+    if status_field:
+        for record in records:
+            key = str(record.get(status_field) or "Unspecified")
+            counts[key] = counts.get(key, 0) + 1
+    status_chart = {{
+        "id": f"analytics-status-{{_css_name(entity_name)}}",
+        "spec_json": _chart_json({{
+            "type": "donut",
+            "title": f"{{entity_name}} status distribution",
+            "data": [{{"label": key, "value": value}} for key, value in sorted(counts.items())],
+            "empty": "No status data yet",
+        }}),
+    }}
+    numeric_stats = []
+    for field in fields:
+        field_name = str(field.get("name", ""))
+        if _json_schema_type(str(field.get("type", ""))) not in {{"integer", "number"}}:
+            continue
+        values = []
+        for record in records:
+            value = record.get(field_name)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                values.append(float(value))
+        if values:
+            numeric_stats.append({{
+                "field": field_name,
+                "min": round(min(values), 2),
+                "avg": round(sum(values) / len(values), 2),
+                "max": round(max(values), 2),
+            }})
+    tmpl_body = _render_template(
+        "entity_analytics.html.j2",
+        entity_name=entity_name,
+        safe_entity=safe_entity,
+        total=len(records),
+        line_chart=line_chart,
+        status_chart=status_chart,
+        numeric_stats=numeric_stats,
+    )
+    return 200, _html_page(f"{{entity_name}} Analytics", tmpl_body if tmpl_body is not None else _jinja_required_page(f"{{entity_name}} Analytics"))
+
+
 def _ui_error_message(response: Dict[str, Any]) -> str:
     errors = response.get("errors")
     if isinstance(errors, list) and errors:
@@ -5309,6 +5428,8 @@ def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[i
     if len(parts) == 3 and parts[0] == "ui" and parts[1] == "entities":
         if query and query.get("view", [""])[0] == "kanban":
             return _ui_kanban_html(parts[2])
+        if query and query.get("view", [""])[0] == "analytics":
+            return _ui_entity_analytics_html(parts[2])
         return _ui_entity_html(parts[2], query=query)
     # /ui/entities/ENTITY/RECORD_ID
     if len(parts) == 4 and parts[0] == "ui" and parts[1] == "entities":

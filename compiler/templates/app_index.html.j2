@@ -22,31 +22,68 @@
 
 {# Stats row #}
 <div class="apg-grid-4 mb-8">
-  <div class="apg-card">
+  {% for stat in dashboard_stats[:4] %}
+  <article class="apg-card">
     <div class="apg-stat">
-      <span class="apg-stat-value">{{ entities | length }}</span>
-      <span class="apg-stat-label">Entities</span>
+      <span class="apg-stat-value">{{ stat.value }}</span>
+      <span class="apg-stat-label">{{ stat.label }}</span>
+      <span class="apg-stat-delta">{{ stat.delta }}</span>
     </div>
-  </div>
-  <div class="apg-card">
+    <div class="apg-chart mt-3" data-apg-chart="{{ stat.chart_id }}"></div>
+    <script id="{{ stat.chart_id }}" type="application/json">{{ stat.spec_json | safe }}</script>
+  </article>
+  {% endfor %}
+  <article class="apg-card">
     <div class="apg-stat">
       <span class="apg-stat-value">{{ capabilities | length }}</span>
       <span class="apg-stat-label">Capabilities</span>
     </div>
-  </div>
-  <div class="apg-card">
+  </article>
+  <article class="apg-card">
     <div class="apg-stat">
-      <span class="apg-stat-value">{{ agents | length }}</span>
-      <span class="apg-stat-label">AI Agents</span>
+      <span class="apg-stat-value">{{ workflow_summary.workflow_count }}</span>
+      <span class="apg-stat-label">Workflows</span>
     </div>
-  </div>
-  <div class="apg-card">
-    <div class="apg-stat">
-      <span class="apg-stat-value">{{ ui_routes | length }}</span>
-      <span class="apg-stat-label">Screens</span>
-    </div>
-  </div>
+  </article>
 </div>
+
+{% if status_charts %}
+<section class="apg-grid-2 gap-6 mb-8">
+  {% for chart in status_charts %}
+  <article class="apg-card">
+    <div class="apg-card-header">
+      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ chart.entity }} by {{ chart.field }}</h2>
+      <a class="text-xs hover:underline" href="/ui/entities/{{ chart.entity | urlencode }}?view=analytics">Analytics</a>
+    </div>
+    <div class="apg-chart" data-apg-chart="{{ chart.chart_id }}"></div>
+    <script id="{{ chart.chart_id }}" type="application/json">{{ chart.spec_json | safe }}</script>
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
+
+<section class="apg-grid-3 gap-6 mb-8">
+  <article class="apg-card">
+    <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Recent Activity</h2>
+    {% if recent_activity %}
+    <ul class="space-y-2">
+      {% for event in recent_activity %}
+      <li class="text-xs text-gray-500">{{ event.get('type', 'event') }} · {{ event.get('entity', '') }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="apg-chart-empty"><p>No activity yet</p></div>
+    {% endif %}
+  </article>
+  <article class="apg-card">
+    <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Workflow Summary</h2>
+    <p class="text-sm text-gray-500">{{ workflow_summary.workflow_count }} workflow(s), {{ workflow_summary.run_count }} run(s)</p>
+  </article>
+  <article class="apg-card">
+    <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Agent Summary</h2>
+    <p class="text-sm text-gray-500">{{ agent_summary.agent_count }} agent(s), {{ agent_summary.team_count }} team(s)</p>
+  </article>
+</section>
 
 <div class="apg-grid-2 gap-6">
   {% if entities %}
