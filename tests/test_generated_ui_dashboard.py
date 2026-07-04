@@ -395,3 +395,35 @@ def test_generated_workflow_wizard_advances_sequentially_and_records_runs():
 	assert "1 recorded runs" in list_html
 	assert "Recent runs" in list_html
 	assert "workflow-run-1" in list_html
+
+
+def test_generated_agent_team_console_renders_and_invokes_from_entity_metadata():
+	result = compile_apg_file("examples/06_support_agent_team/main.apg")
+	assert result.success, result.errors
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	status, agent_html = namespace["_ui_payload"]("/ui/agents/Planner")
+	assert status == 200
+	assert "Conversation" in agent_html
+	assert "Structured payload" in agent_html
+	assert "Raw description JSON" in agent_html
+
+	status, team_html = namespace["_ui_payload"]("/ui/agent-teams/SupportCrew")
+	assert status == 200
+	assert "Team console" in team_html
+	assert "Team lanes" in team_html
+	assert "Handoff flow" in team_html
+	assert "Planner" in team_html
+	assert "Writer" in team_html
+	assert "Reviewer" in team_html
+	assert "Unknown agent team" not in team_html
+
+	post_status, post_payload = namespace["_ui_post_payload"](
+		"/ui/agent-teams/SupportCrew/invoke",
+		{"message": "Escalate ticket 123", "payload_json": "{}"},
+	)
+	assert post_status == 200
+	assert "Team response" in post_payload["html"]
+	assert "Escalate ticket 123" in post_payload["html"]
+	assert "Raw response JSON" in post_payload["html"]

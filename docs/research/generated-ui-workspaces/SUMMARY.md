@@ -476,6 +476,73 @@ Validation evidence:
 - Full suite: `1481 passed, 1 skipped, 3 warnings in 714.85s`.
 - PythonCodeGenerator tripwire clean.
 
+### agent-and-agent-team-consoles
+
+Status: complete.
+
+Intended commit:
+
+```text
+ux(agent-and-agent-team-consoles): restore team consoles and chat layout
+```
+
+Files:
+
+- `compiler/code_generator.py`
+- `compiler/templates/agent_console.html.j2`
+- `tests/test_generated_ui_dashboard.py`
+- `examples/01_minimal_customer_records/output/app.py`
+- `examples/02_customer_orders_relationship/output/app.py`
+- `examples/03_inventory_typed_records/output/app.py`
+- `examples/04_order_fulfillment_model/output/app.py`
+- `examples/05_single_support_agent/output/app.py`
+- `examples/06_support_agent_team/output/app.py`
+- `examples/07_multi_runtime_agent_team/output/app.py`
+- `examples/08_basic_capability_contract/output/app.py`
+- `examples/09_capability_rules_configuration/output/app.py`
+- `examples/10_themed_i18n_streaming_capability/output/app.py`
+- `examples/11_screen_composition_relationships/output/app.py`
+- `examples/12_finance_general_ledger/output/app.py`
+- `examples/13_procurement_approval_workbench/output/app.py`
+- `examples/14_inventory_warehouse_operations/output/app.py`
+- `examples/15_manufacturing_quality_control/output/app.py`
+- `examples/16_hr_payroll_operations/output/app.py`
+- `examples/17_crm_sales_pipeline/output/app.py`
+- `examples/18_operations_dashboard_capability/output/app.py`
+- `examples/19_multi_capability_dependency_suite/output/app.py`
+- `examples/20_enterprise_erp_platform/output/app.py`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/README.md`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/thinking.md`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/sources.md`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/rationale.md`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/before-agent-console.html`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/before-agent-console.headers`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/before-team-console.html`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/before-team-console.headers`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/before-agent-post.html`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/before-agent-post.headers`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/before-team-post.html`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/before-team-post.headers`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/after-agent-console.html`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/after-agent-console.headers`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/after-team-console.html`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/after-team-console.headers`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/after-agent-post.html`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/after-agent-post.headers`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/after-team-post.html`
+- `docs/research/generated-ui-workspaces/agent-and-agent-team-consoles/assets/after-team-post.headers`
+- `docs/research/generated-ui-workspaces/SUMMARY.md`
+
+Validation evidence:
+
+- Live before audit: example 06 `/ui/agents/Planner`, `/ui/agent-teams/SupportCrew`, and invoke POSTs booted at `127.0.0.1:20895`; team console and team POST returned 404.
+- Live after audit: regenerated example 06 booted at `127.0.0.1:20898`; agent and team consoles returned 200 and both POST flows rendered response panels.
+- Regenerated all 20 numbered examples through `APGCompiler.compile_file()`.
+- Targeted tests: `2 passed in 1.61s`.
+- CSS coverage: `1 passed in 0.27s`.
+- Full suite: `1482 passed, 1 skipped, 3 warnings in 716.48s`.
+- PythonCodeGenerator tripwire clean.
+
 ## Verdicts
 
 | Workspace | Before | After | Status |
@@ -487,6 +554,7 @@ Validation evidence:
 | record-detail-activity-related | Related records caused raw JSON fallback; no copy link or prev/next navigation; title selection preferred generated numbers. | Full record template renders with related records, filtered related links, activity/notes, copy link, next/previous navigation, and human-readable titles. | Complete |
 | create-edit-forms-drawer-inline-edit | Create drawer bypassed native validation, structured fields used single-line text inputs, failed creates returned a contextless fragment, and inline edit controls were not type-aware. | Native required/type validation, helper text, JSON textareas, contextual error recovery, draft guard, Ctrl/Cmd-S submit, and semantic inline edit controls. | Complete |
 | workflow-list-wizard-run-progress | Wizard skipped every other step, successful UI workflows left no run history/debug trace, completion had no run link, and structured textarea values could fail final validation. | Wizard advances sequentially, successful completions record shared workflow runs, recent runs appear on the list, completion links to record/debugger, and array/object strings are coerced. | Complete |
+| agent-and-agent-team-consoles | Single-agent console was form-first and raw-JSON-heavy; declared team console and team POST were 404 dead ends. | Conversation-first agent/team consoles, preserved prompt context, team lanes and handoff flow, raw JSON disclosures, and metadata fallback for team routes/invocation. | Complete |
 
 ## Defect Ledger
 
@@ -524,3 +592,8 @@ Validation evidence:
 | workflow-list-wizard-run-progress | Workflow list had no run history context. | Added recorded run counts and a recent-runs panel linking to the debugger. | Resolved |
 | workflow-list-wizard-run-progress | Completion state had no direct debugger or created-record path. | Added recorded-run summary plus `Open created record` and `Inspect run` links. | Resolved |
 | workflow-list-wizard-run-progress | Structured textarea values remained strings through record coercion. | Parsed array/object JSON strings in `_coerce_value_for_type()`. | Resolved |
+| agent-and-agent-team-consoles | Declared team routes returned `Unknown agent team`. | Added team-description fallback from agent-team entity metadata. | Resolved |
+| agent-and-agent-team-consoles | Team invocation returned 404 when sidecar team catalog was empty. | Added entity-metadata team invocation fallback that invokes declared member agents when available. | Resolved |
+| agent-and-agent-team-consoles | In-memory generated apps could not render agent consoles without `ai_agents.py`. | Added semantic-model fallback for agent descriptions. | Resolved |
+| agent-and-agent-team-consoles | Console placed form/raw JSON before conversational output. | Reworked template into conversation, composer, structured payload disclosure, and secondary raw JSON details. | Resolved |
+| agent-and-agent-team-consoles | Team membership and handoff flow were invisible. | Added team lanes and handoff flow side panels. | Resolved |

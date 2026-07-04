@@ -3710,6 +3710,75 @@ def validate_route_dispatch_contract() -> Dict[str, Any]:
     }}
 
 
+def _split_agent_literal_list(value: Any) -> list[str]:
+    text = str(value or "").strip()
+    if text.startswith("[") and text.endswith("]"):
+        text = text[1:-1]
+    return [item.strip().strip("'").strip('"') for item in text.split(",") if item.strip()]
+
+
+def _entity_agent_team_descriptions() -> Dict[str, Dict[str, Any]]:
+    descriptions: Dict[str, Dict[str, Any]] = {{}}
+    for entity in ENTITIES:
+        if str(entity.get("type", "")) != "agent_team":
+            continue
+        fields = {{
+            str(field.get("name", "")): field
+            for field in entity.get("fields", [])
+            if isinstance(field, dict)
+        }}
+        agents = _split_agent_literal_list(fields.get("agents", {{}}).get("type", ""))
+        capabilities = _split_agent_literal_list(fields.get("capabilities", {{}}).get("type", ""))
+        flow_text = str(fields.get("flow", {{}}).get("type", ""))
+        flow = []
+        for edge in [part.strip() for part in flow_text.split(",") if part.strip()]:
+            if "->" in edge:
+                source, target = [piece.strip() for piece in edge.split("->", 1)]
+                flow.append({{"source": source, "target": target, "condition": ""}})
+        descriptions[str(entity.get("name", ""))] = {{
+            "name": str(entity.get("name", "")),
+            "agents": agents,
+            "capabilities": capabilities,
+            "flow": flow,
+            "policy": {{}},
+            "configuration": {{}},
+            "rules": [],
+            "ui": {{}},
+            "theme": {{}},
+            "source": "entity_metadata",
+        }}
+    return descriptions
+
+
+def _semantic_agent_descriptions() -> Dict[str, Dict[str, Any]]:
+    raw_agents = SEMANTIC_MODEL.get("agents", {{}})
+    if not isinstance(raw_agents, dict):
+        return {{}}
+    descriptions: Dict[str, Dict[str, Any]] = {{}}
+    for name, spec in raw_agents.items():
+        if not isinstance(spec, dict):
+            continue
+        descriptions[str(name)] = {{
+            "name": str(spec.get("name") or name),
+            "role": spec.get("role"),
+            "model": spec.get("model"),
+            "runtime": spec.get("runtime"),
+            "system": spec.get("system"),
+            "capabilities": list(spec.get("capabilities", [])) if isinstance(spec.get("capabilities", []), list) else [],
+            "tools": list(spec.get("tools", [])) if isinstance(spec.get("tools", []), list) else [],
+            "memory": spec.get("memory"),
+            "inputs": list(spec.get("inputs", [])) if isinstance(spec.get("inputs", []), list) else [],
+            "outputs": list(spec.get("outputs", [])) if isinstance(spec.get("outputs", []), list) else [],
+            "handoffs": list(spec.get("handoffs", [])) if isinstance(spec.get("handoffs", []), list) else [],
+            "configuration": dict(spec.get("configuration", {{}})) if isinstance(spec.get("configuration", {{}}), dict) else {{}},
+            "rules": list(spec.get("rules", [])) if isinstance(spec.get("rules", []), list) else [],
+            "ui": dict(spec.get("ui", {{}})) if isinstance(spec.get("ui", {{}}), dict) else {{}},
+            "theme": dict(spec.get("theme", {{}})) if isinstance(spec.get("theme", {{}}), dict) else {{}},
+            "source": "semantic_model",
+        }}
+    return descriptions
+
+
 def describe_application() -> Dict[str, Any]:
     _entity_summary_keys = {{"name", "type", "properties", "methods"}}
     description: Dict[str, Any] = {{
@@ -3729,6 +3798,13 @@ def describe_application() -> Dict[str, Any]:
             name: AI_AGENTS.describe_agent(name)
             for name in AI_AGENTS.list_agents()
         }}
+    semantic_agent_descriptions = _semantic_agent_descriptions()
+    if semantic_agent_descriptions:
+        description["ai_agent_descriptions"] = {{
+            **semantic_agent_descriptions,
+            **description.get("ai_agent_descriptions", {{}}),
+        }}
+        description["ai_agents"] = sorted(set(description.get("ai_agents", [])) | set(semantic_agent_descriptions))
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "list_agent_teams"):
         description["ai_agent_teams"] = AI_AGENTS.list_agent_teams()
     if AI_AGENTS is not None and hasattr(AI_AGENTS, "describe_team") and hasattr(AI_AGENTS, "list_agent_teams"):
@@ -3736,6 +3812,13 @@ def describe_application() -> Dict[str, Any]:
             name: AI_AGENTS.describe_team(name)
             for name in AI_AGENTS.list_agent_teams()
         }}
+    entity_team_descriptions = _entity_agent_team_descriptions()
+    if entity_team_descriptions:
+        description["ai_agent_team_descriptions"] = {{
+            **entity_team_descriptions,
+            **description.get("ai_agent_team_descriptions", {{}}),
+        }}
+        description["ai_agent_teams"] = sorted(set(description.get("ai_agent_teams", [])) | set(entity_team_descriptions))
     if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "list_applications"):
         description["application_compositions"] = APG_APPLICATIONS.list_applications()
     if APG_APPLICATIONS is not None and hasattr(APG_APPLICATIONS, "describe_application_compositions"):
@@ -6462,7 +6545,29 @@ def _agent_display_text(result: Dict[str, Any] | None) -> Any:
     return result
 
 
-def _ui_agent_console_html(name: str, result: Dict[str, Any] | None = None, error: str = "", team: bool = False) -> tuple[int, str]:
+def _agent_result_status(result: Dict[str, Any] | None) -> str:
+    if not isinstance(result, dict):
+        return ""
+    return str(result.get("status") or result.get("state") or "")
+
+
+def _agent_status_badge(status: str) -> str:
+    normalized = status.lower()
+    if normalized in {{"completed", "success", "ok"}}:
+        return "apg-badge-success"
+    if normalized in {{"failed", "error", "unavailable"}}:
+        return "apg-badge-danger"
+    return "apg-badge-warning" if normalized else "apg-badge-neutral"
+
+
+def _ui_agent_console_html(
+    name: str,
+    result: Dict[str, Any] | None = None,
+    error: str = "",
+    team: bool = False,
+    request_payload: Dict[str, Any] | None = None,
+    user_message: str = "",
+) -> tuple[int, str]:
     app = describe_application()
     catalog_key = "ai_agent_team_descriptions" if team else "ai_agent_descriptions"
     catalog = app.get(catalog_key, {{}})
@@ -6470,16 +6575,28 @@ def _ui_agent_console_html(name: str, result: Dict[str, Any] | None = None, erro
         title = "Unknown agent team" if team else "Unknown agent"
         return 404, _html_page(title, f"<h1>{{title}}</h1><p>{{html.escape(name)}}</p>")
     action = f"/ui/{{'agent-teams' if team else 'agents'}}/{{html.escape(name, quote=True)}}/invoke"
+    description = catalog[name]
+    request_payload = dict(request_payload or {{}})
+    result_status = _agent_result_status(result)
+    team_members = list(description.get("agents", [])) if team and isinstance(description, dict) else []
+    team_flow = list(description.get("flow", [])) if team and isinstance(description, dict) else []
     tmpl_body = _render_template(
         "agent_console.html.j2",
         name=name,
         team=team,
         action=action,
-        description_json=json.dumps(catalog[name], indent=2, sort_keys=True),
+        description=description,
+        description_json=json.dumps(description, indent=2, sort_keys=True),
         result=result,
         result_json=json.dumps(result, indent=2, sort_keys=True) if result is not None else "",
         result_html=_sanitize_agent_markdown(_agent_display_text(result)) if result is not None else "",
+        result_status=result_status,
+        result_badge_class=_agent_status_badge(result_status),
         error=error,
+        user_message=user_message,
+        payload_json=json.dumps(request_payload, indent=2, sort_keys=True) if request_payload else "{{}}",
+        team_members=team_members,
+        team_flow=team_flow,
         live_topic=f"agent:{{name}}",
     )
     return 200, _html_page(name, tmpl_body if tmpl_body is not None else _jinja_required_page(name))
@@ -6534,29 +6651,42 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
 
     if len(parts) == 4 and parts[0] == "ui" and parts[1] == "agents" and parts[3] == "invoke":
         request_payload, error = _parse_json_object_field(form_record, "payload_json")
+        message = str(form_record.get("message") or "")
         if error:
-            _status, html_payload = _ui_agent_console_html(parts[2], error=error)
+            _status, html_payload = _ui_agent_console_html(parts[2], error=error, request_payload={{}}, user_message=message)
             return 400, {{"html": html_payload}}
-        message = form_record.get("message")
         if message:
             request_payload["message"] = message
         if str(form_record.get("stream", "")).lower() in {{"1", "true", "yes", "on"}}:
             request_payload["stream"] = True
         status, result = _agent_invocation_payload(f"/agents/{{parts[2]}}/invoke", request_payload)
-        _status, html_payload = _ui_agent_console_html(parts[2], result=result if status == 200 else None, error="" if status == 200 else result.get("error", "agent invocation failed"))
+        _status, html_payload = _ui_agent_console_html(
+            parts[2],
+            result=result if status == 200 else None,
+            error="" if status == 200 else result.get("error", "agent invocation failed"),
+            request_payload=request_payload,
+            user_message=message,
+        )
         return status, {{"html": html_payload}}
     if len(parts) == 4 and parts[0] == "ui" and parts[1] in {{"agent-teams", "teams"}} and parts[3] == "invoke":
         request_payload, error = _parse_json_object_field(form_record, "payload_json")
+        message = str(form_record.get("message") or "")
         if error:
-            _status, html_payload = _ui_agent_console_html(parts[2], error=error, team=True)
+            _status, html_payload = _ui_agent_console_html(parts[2], error=error, team=True, request_payload={{}}, user_message=message)
             return 400, {{"html": html_payload}}
-        message = form_record.get("message")
         if message:
             request_payload["message"] = message
         if str(form_record.get("stream", "")).lower() in {{"1", "true", "yes", "on"}}:
             request_payload["stream"] = True
         status, result = _agent_invocation_payload(f"/agent-teams/{{parts[2]}}/invoke", request_payload)
-        _status, html_payload = _ui_agent_console_html(parts[2], result=result if status == 200 else None, error="" if status == 200 else result.get("error", "team invocation failed"), team=True)
+        _status, html_payload = _ui_agent_console_html(
+            parts[2],
+            result=result if status == 200 else None,
+            error="" if status == 200 else result.get("error", "team invocation failed"),
+            team=True,
+            request_payload=request_payload,
+            user_message=message,
+        )
         return status, {{"html": html_payload}}
     if len(parts) == 5 and parts[0] == "ui" and parts[1] == "capabilities":
         capability_name = parts[2]
@@ -7095,9 +7225,23 @@ def _capability_streaming_payload(capability_name: str) -> tuple[int, Dict[str, 
 
 
 def _agent_invocation_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
-    if AI_AGENTS is None:
-        return 404, {{"error": "agents_unavailable"}}
     parts = [part for part in path.split("/") if part]
+    if AI_AGENTS is None:
+        if len(parts) == 3 and parts[0] in {{"agent-teams", "teams"}} and parts[2] in {{"invoke", "run"}}:
+            team_description = _entity_agent_team_descriptions().get(parts[1])
+            if team_description is not None:
+                return 200, {{
+                    "team": parts[1],
+                    "status": "unavailable",
+                    "error": "agents_unavailable",
+                    "source": "entity_metadata",
+                    "flow": team_description.get("flow", []),
+                    "invocations": [
+                        {{"agent": str(agent_name), "status": "unavailable", "error": "agents_unavailable"}}
+                        for agent_name in team_description.get("agents", [])
+                    ],
+                }}
+        return 404, {{"error": "agents_unavailable"}}
     try:
         if len(parts) == 3 and parts[0] == "agents" and parts[2] in {{"invoke", "run"}}:
             topic = f"agent:{{parts[1]}}"
@@ -7126,7 +7270,29 @@ def _agent_invocation_payload(path: str, payload: Dict[str, Any]) -> tuple[int, 
             invoker = getattr(AI_AGENTS, "invoke_team", None)
             if invoker is None:
                 return 404, {{"error": "team_invocation_unavailable"}}
-            result = invoker(parts[1], payload)
+            try:
+                result = invoker(parts[1], payload)
+            except KeyError:
+                team_description = _entity_agent_team_descriptions().get(parts[1])
+                if team_description is None:
+                    raise
+                invocations = []
+                for agent_name in team_description.get("agents", []):
+                    agent_status, agent_result = _agent_invocation_payload(f"/agents/{{quote(str(agent_name), safe='')}}/invoke", payload)
+                    invocations.append(agent_result if isinstance(agent_result, dict) else {{"output": agent_result, "status": agent_status}})
+                if any(str(item.get("status", "")).lower() in {{"failed", "error"}} for item in invocations if isinstance(item, dict)):
+                    team_status = "failed"
+                elif any(str(item.get("status", "")).lower() == "adapter_required" for item in invocations if isinstance(item, dict)):
+                    team_status = "adapter_required"
+                else:
+                    team_status = "completed"
+                result = {{
+                    "team": parts[1],
+                    "status": team_status,
+                    "source": "entity_metadata",
+                    "flow": team_description.get("flow", []),
+                    "invocations": invocations,
+                }}
             _publish_live_event(topic, "agent-result", result if isinstance(result, dict) else {{"output": result}})
             return 200, result
     except KeyError as error:
