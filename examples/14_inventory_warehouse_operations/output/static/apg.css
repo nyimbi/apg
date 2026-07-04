@@ -279,6 +279,11 @@ pre code { background: transparent; padding: 0; color: inherit; }
 .apg-agent-output ul { margin: .5rem 0 .5rem 1.25rem; list-style: disc; }
 .apg-stream-cursor::after { content: ""; display: inline-block; width: .5rem; height: 1rem; margin-left: .25rem; background: var(--apg-primary); animation: apg-blink 1s steps(2,start) infinite; vertical-align: text-bottom; }
 @keyframes apg-blink { 50% { opacity: 0; } }
+.apg-login-page { min-height: calc(100vh - var(--apg-topbar-height)); display: grid; place-items: center; padding: var(--apg-space-6); }
+.apg-login-card { width: min(100%, 24rem); padding: var(--apg-space-6); border: 1px solid var(--apg-border); border-radius: var(--apg-radius); background: var(--apg-bg-card); box-shadow: var(--apg-shadow-md); }
+.apg-user-menu { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto; padding: 0; border: 0; box-shadow: none; background: transparent; }
+.apg-avatar { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: var(--apg-radius-full); background: var(--apg-primary); color: #fff; font-size: .75rem; font-weight: 700; }
+.apg-user-name { max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .875rem; color: var(--apg-text); }
 
 .hero-gradient { background: linear-gradient(135deg, var(--apg-primary), var(--apg-accent)); }
 .apg-kanban-col { min-height: 12rem; }

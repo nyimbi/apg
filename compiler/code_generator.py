@@ -425,6 +425,25 @@ class PythonCodeGenerator:
 		return spec
 
 	@staticmethod
+	def _is_security_config_entity(entity: Any) -> bool:
+		return str(getattr(entity, "name", "")).lower() == "security"
+
+	@staticmethod
+	def _module_requires_auth(module: "ModuleDeclaration") -> bool:
+		for entity in module.entities:
+			if not PythonCodeGenerator._is_security_config_entity(entity):
+				continue
+			for prop in getattr(entity, "properties", []):
+				if str(getattr(prop, "name", "")).lower() not in {"authentication", "auth"}:
+					continue
+				type_name = str(getattr(getattr(prop, "type_annotation", None), "type_name", "")).lower()
+				default_value = str(getattr(prop, "default_value", "") or "").strip().strip('"').strip("'").lower()
+				value = default_value or type_name
+				if value in {"required", "enabled", "true", "jwt", "session"}:
+					return True
+		return False
+
+	@staticmethod
 	def _landing_style_for(module: "ModuleDeclaration") -> str:
 		"""Derive a landing page style from the APG module's theme declaration."""
 		for entity in module.entities:
@@ -464,7 +483,12 @@ class PythonCodeGenerator:
 
 	def _generate_python_app(self, module: ModuleDeclaration) -> str:
 		"""Generate a framework-neutral Python app.py entrypoint."""
-		entity_specs = [self._entity_spec(entity) for entity in module.entities]
+		auth_required = self._module_requires_auth(module)
+		entity_specs = [
+			self._entity_spec(entity)
+			for entity in module.entities
+			if not self._is_security_config_entity(entity)
+		]
 		semantic_model = build_semantic_model_from_module(module, f"{module.name}.apg")
 		ui_templates = self._load_ui_templates()
 		# Derive landing style from theme name or default to "default"
@@ -481,6 +505,7 @@ from __future__ import annotations
 
 import importlib
 import html
+import hmac
 import json
 import os
 import queue as _queue
@@ -488,7 +513,7 @@ import re
 import sys
 import threading as _threading
 import time as _time
-from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse
+from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse, session as _flask_session
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, quote
@@ -520,6 +545,7 @@ TENANT_SCOPED_ENTITIES: set[str] = {{
 }}
 SEMANTIC_MODEL: Dict[str, Any] = {semantic_model!r}
 APG_UI_TEMPLATES: Dict[str, str] = {ui_templates!r}
+APG_AUTH_REQUIRED = {auth_required!r}
 
 
 def _live_topic_list(raw_topics: str | None = None) -> list[str]:
@@ -2074,10 +2100,118 @@ def component_manifest() -> Dict[str, Any]:
 
 
 def auth_status() -> Dict[str, Any]:
+    if APG_AUTH_REQUIRED:
+        return {{
+            "mode": "session",
+            "login": "/login",
+            "logout": "/logout",
+        }}
     return {{
         "mode": "api_key" if os.environ.get("APG_API_KEY") else "open",
         "header": "Authorization: Bearer <key> or X-APG-API-Key" if os.environ.get("APG_API_KEY") else None,
     }}
+
+
+def _auth_credentials() -> Dict[str, Dict[str, Any]]:
+    raw = os.environ.get("APG_AUTH_USERS", "").strip()
+    if raw:
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = {{}}
+        if isinstance(parsed, dict):
+            result: Dict[str, Dict[str, Any]] = {{}}
+            for username, spec in parsed.items():
+                if isinstance(spec, dict):
+                    result[str(username)] = {{
+                        "password": str(spec.get("password", "")),
+                        "name": str(spec.get("name", username)),
+                        "roles": list(spec.get("roles", ["user"])) if isinstance(spec.get("roles", []), list) else ["user"],
+                        "permissions": list(spec.get("permissions", [])) if isinstance(spec.get("permissions", []), list) else [],
+                    }}
+                else:
+                    result[str(username)] = {{"password": str(spec), "name": str(username), "roles": ["user"], "permissions": []}}
+            if result:
+                return result
+    username = os.environ.get("APG_AUTH_USERNAME", "admin")
+    password = os.environ.get("APG_AUTH_PASSWORD", "admin")
+    return {{
+        username: {{
+            "password": password,
+            "name": os.environ.get("APG_AUTH_DISPLAY_NAME", username),
+            "roles": ["admin"],
+            "permissions": ["*"],
+        }}
+    }}
+
+
+def _authenticate_user(username: str, password: str) -> Dict[str, Any] | None:
+    user = _auth_credentials().get(username)
+    if not user:
+        return None
+    if not hmac.compare_digest(str(user.get("password", "")), str(password)):
+        return None
+    return {{
+        "username": username,
+        "name": str(user.get("name", username)),
+        "roles": list(user.get("roles", [])),
+        "permissions": list(user.get("permissions", [])),
+    }}
+
+
+def _issue_login_session(user: Dict[str, Any]) -> Dict[str, Any]:
+    _flask_session["apg_user"] = user
+    token = ""
+    jwt_secret = os.environ.get("APG_JWT_SECRET")
+    if jwt_secret and _jwt_lib is not None:
+        try:
+            token = _jwt_lib.encode({{"sub": user["username"], "name": user["name"], "roles": user.get("roles", [])}}, jwt_secret, algorithm="HS256")
+        except Exception:
+            token = ""
+    return {{"user": user, "token": token}}
+
+
+def _current_user() -> Dict[str, Any] | None:
+    user = _flask_session.get("apg_user")
+    return dict(user) if isinstance(user, dict) else None
+
+
+def _login_required_for_path(path: str) -> bool:
+    if not APG_AUTH_REQUIRED:
+        return False
+    return path == "/ui" or path.startswith("/ui/")
+
+
+def _login_page(error: str = "", next_url: str = "/ui") -> str:
+    body = _render_template(
+        "login.html.j2",
+        module_name=MODULE_NAME,
+        error=error,
+        next_url=next_url or "/ui",
+    )
+    if body is None:
+        safe_error = html.escape(error)
+        safe_next = html.escape(next_url or "/ui", quote=True)
+        error_html = f'<p role="alert">{{safe_error}}</p>' if safe_error else ''
+        body = (
+            '<main class="apg-login-page">'
+            '<section class="apg-login-card">'
+            f'<h1>{{html.escape(MODULE_NAME)}}</h1>'
+            f'{{error_html}}'
+            f'<form method="post" action="/login"><input type="hidden" name="next" value="{{safe_next}}">'
+            '<label>Username <input name="username" autocomplete="username"></label>'
+            '<label>Password <input name="password" type="password" autocomplete="current-password"></label>'
+            '<button class="apg-btn" type="submit">Sign in</button></form>'
+            '</section></main>'
+        )
+    return _html_page("Sign in", body)
+
+
+def _forbidden_page(message: str = "You do not have permission to view this page.") -> str:
+    return _html_page(
+        "Access denied",
+        '<section class="apg-card"><h1>Access denied</h1><p>' + html.escape(message) + '</p></section>',
+    )
 
 
 def _authorized(headers: Any) -> bool:
@@ -3747,6 +3881,18 @@ def _html_page(title: str, body: str) -> str:
         f'<a class="apg-sidebar-link" href="/ui/agent-teams/{{html.escape(quote(str(name), safe=""), quote=True)}}">{{html.escape(str(name))}}</a>'
         for name in sorted(app.get("ai_agent_team_descriptions", {{}}))
     )
+    current_user = _current_user() if APG_AUTH_REQUIRED else None
+    user_menu = ""
+    if current_user:
+        display_name = html.escape(str(current_user.get("name") or current_user.get("username") or "User"))
+        initials = "".join(part[:1].upper() for part in display_name.split()[:2]) or "U"
+        user_menu = (
+            '<form method="post" action="/logout" class="apg-user-menu">'
+            f'<span class="apg-avatar" aria-hidden="true">{{html.escape(initials)}}</span>'
+            f'<span class="apg-user-name">{{display_name}}</span>'
+            '<button class="apg-btn apg-btn-secondary" type="submit">Logout</button>'
+            '</form>'
+        )
     sidebar_html = (
         '<aside id="apg-sidebar" class="apg-sidebar" aria-label="Application navigation">'
         '<div class="apg-sidebar-section"><p class="apg-sidebar-heading">Navigate</p>'
@@ -3844,6 +3990,7 @@ def _html_page(title: str, body: str) -> str:
         f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/marketplace">Marketplace</a>'
         f'  </nav>'
         f'  <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">System</button>'
+        f'  {{user_menu}}'
         f'</header>'
         f'{{sidebar_html}}'
         f'<main class="apg-content apg-shell-content" id="content" tabindex="-1">{{body}}</main>'
@@ -6634,12 +6781,16 @@ def _pg_load_entity_records(entity_name: str) -> list[Dict[str, Any]]:
 _load_record_store()
 
 _flask_app = _FlaskApp("app", root_path=os.path.abspath(os.path.dirname(globals().get("__file__", None) or ".")))
+_flask_app.secret_key = os.environ.get("APG_SESSION_SECRET") or os.environ.get("APG_JWT_SECRET") or "apg-generated-session-secret"
 
 
 @_flask_app.before_request
-def _setup_tenant() -> None:
+def _setup_tenant() -> Any:
     tid = _flask_request.headers.get("X-APG-Tenant") or _flask_request.headers.get("X-Tenant-ID")
     _TENANT_LOCAL.tenant_id = tid or None
+    if _login_required_for_path(_flask_request.path) and _current_user() is None:
+        return _flask_redirect("/login?next=" + quote(_flask_request.full_path.rstrip("?") or "/ui", safe="/?=&%"))
+    return None
 
 
 def _check_mutation_auth():
@@ -6658,6 +6809,42 @@ def _flask_home():
 @_flask_app.route("/theme.css", methods=["GET"])
 def _flask_theme():
     return _FlaskResponse(theme_stylesheet(), content_type="text/css; charset=utf-8")
+
+
+@_flask_app.route("/login", methods=["GET"])
+def _flask_login_get():
+    if not APG_AUTH_REQUIRED:
+        return _FlaskResponse(json.dumps({{"error": "not_found", "path": "/login"}}), status=404, content_type="application/json; charset=utf-8")
+    next_url = _flask_request.args.get("next") or "/ui"
+    if not str(next_url).startswith("/"):
+        next_url = "/ui"
+    if _current_user() is not None:
+        return _flask_redirect(next_url)
+    return _FlaskResponse(_login_page(next_url=next_url), content_type="text/html; charset=utf-8")
+
+
+@_flask_app.route("/login", methods=["POST"])
+def _flask_login_post():
+    if not APG_AUTH_REQUIRED:
+        return _FlaskResponse(json.dumps({{"error": "not_found", "path": "/login"}}), status=404, content_type="application/json; charset=utf-8")
+    username = str(_flask_request.form.get("username") or "")
+    password = str(_flask_request.form.get("password") or "")
+    next_url = str(_flask_request.form.get("next") or "/ui")
+    if not next_url.startswith("/"):
+        next_url = "/ui"
+    user = _authenticate_user(username, password)
+    if user is None:
+        return _FlaskResponse(_login_page("Invalid username or password.", next_url), status=401, content_type="text/html; charset=utf-8")
+    _issue_login_session(user)
+    return _flask_redirect(next_url)
+
+
+@_flask_app.route("/logout", methods=["POST"])
+def _flask_logout_post():
+    if not APG_AUTH_REQUIRED:
+        return _FlaskResponse(json.dumps({{"error": "not_found", "path": "/logout"}}), status=404, content_type="application/json; charset=utf-8")
+    _flask_session.pop("apg_user", None)
+    return _flask_redirect("/login")
 
 
 @_flask_app.route("/entities/<entity_name>/records.csv", methods=["GET"])

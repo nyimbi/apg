@@ -1,0 +1,15 @@
+<main class="apg-login-page">
+  <section class="apg-login-card" aria-labelledby="apg-login-title">
+    <h1 id="apg-login-title">{{ module_name }}</h1>
+    <p class="text-sm text-gray-500 mb-4">Sign in to continue.</p>
+    {% if error %}
+    <div role="alert" class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/login" class="space-y-4">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <label>Username <input name="username" autocomplete="username" required autofocus></label>
+      <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+      <button type="submit" class="apg-btn w-full justify-center">Sign in</button>
+    </form>
+  </section>
+</main>

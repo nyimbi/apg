@@ -361,7 +361,8 @@ class SemanticAnalyzer:
 		
 		# Resolve property types — only for table/entity types, not agent/workflow/capability config
 		_TYPED_ENTITY_TYPES = {EntityType.ENTITY, EntityType.FORM, EntityType.UI_COMPONENT}
-		if entity.entity_type in _TYPED_ENTITY_TYPES:
+		is_config_entity = entity.name.lower() in {"security"}
+		if entity.entity_type in _TYPED_ENTITY_TYPES and not is_config_entity:
 			for prop in entity.properties:
 				if not self._is_valid_type(prop.type_annotation):
 					self.errors.append(SemanticError(

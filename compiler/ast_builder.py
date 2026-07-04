@@ -599,6 +599,16 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				alias=alias,
 			))
 
+		for body in self._iter_source_anonymous_blocks(cleaned, "security"):
+			properties, methods = self._parse_source_members(body, source_file)
+			module.entities.append(EntityDeclaration(
+				entity_type=EntityType.ENTITY,
+				name="security",
+				properties=properties,
+				methods=methods,
+				source_file=source_file,
+			))
+
 		for kind, name, body in self._iter_source_entities(cleaned):
 			if kind == "module":
 				continue
@@ -723,6 +733,25 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 					depth -= 1
 				index += 1
 			yield match.group(1), match.group(2), source_code[body_start:index - 1]
+			position = index
+
+	def _iter_source_anonymous_blocks(self, source_code: str, keyword: str):
+		pattern = re.compile(r"\b" + re.escape(keyword) + r"\s*\{", re.UNICODE)
+		position = 0
+		while True:
+			match = pattern.search(source_code, position)
+			if not match:
+				break
+			body_start = match.end()
+			depth = 1
+			index = body_start
+			while index < len(source_code) and depth:
+				if source_code[index] == "{":
+					depth += 1
+				elif source_code[index] == "}":
+					depth -= 1
+				index += 1
+			yield source_code[body_start:index - 1]
 			position = index
 
 	def _source_entity_keywords(self) -> set[str]:

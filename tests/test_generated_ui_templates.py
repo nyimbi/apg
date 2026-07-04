@@ -13,6 +13,7 @@ REQUIRED_TEMPLATES = {
 	"agent_console.html.j2",
 	"capability_console.html.j2",
 	"debug_console.html.j2",
+	"login.html.j2",
 }
 
 
