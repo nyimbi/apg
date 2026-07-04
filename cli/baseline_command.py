@@ -20,7 +20,14 @@ from compiler.baseline import build_compiler_baseline_report
 )
 @click.option("--json", "as_json", is_flag=True, help="Emit apg.compiler-baseline-report.v1 JSON")
 @click.option(
+	"--refresh",
+	"refresh_outputs",
+	is_flag=True,
+	help="Alias for --refresh-outputs",
+)
+@click.option(
 	"--refresh-outputs",
+	"refresh_outputs",
 	is_flag=True,
 	help="Rewrite each numbered example output directory from the current compiler before auditing",
 )

@@ -3486,6 +3486,8 @@ def _html_page(title: str, body: str) -> str:
     )
     head_extras = (
         '<script>(function(){try{var m=localStorage.getItem("apg-theme")||"system";var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;}catch(e){}})();</script>'
+        '<meta name="theme-color" content="#1E5B5A">'
+        '<link rel="manifest" href="/static/manifest.webmanifest">'
         '<link rel="stylesheet" href="/static/apg.css">'
         '<link rel="stylesheet" href="/static/uplot.min.css">'
         '<script defer src="/static/htmx.min.js"></script>'
@@ -3529,7 +3531,11 @@ def _html_page(title: str, body: str) -> str:
         'function apgToggleSidebar(){if(matchMedia("(max-width: 767px)").matches){document.documentElement.classList.toggle("apg-sidebar-open");}else{apgSetSidebar(!document.documentElement.classList.contains("apg-sidebar-collapsed"));}}'
         'function apgCloseSidebar(){document.documentElement.classList.remove("apg-sidebar-open");}'
         'try{if(localStorage.getItem("apg-sidebar-collapsed")==="1")document.documentElement.classList.add("apg-sidebar-collapsed");}catch(e){}'
+        'function apgSyncOffline(){var b=document.getElementById("apg-offline-banner");if(b)b.hidden=navigator.onLine;}'
+        'window.addEventListener("online",apgSyncOffline);window.addEventListener("offline",apgSyncOffline);'
+        'if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/static/sw.js").catch(function(){});});}'
         'document.addEventListener("keydown",function(e){if(e.key==="Escape")apgCloseSidebar();});'
+        'document.addEventListener("DOMContentLoaded",apgSyncOffline);'
         '</script>'
     )
     skeleton_css = (
@@ -3561,6 +3567,7 @@ def _html_page(title: str, body: str) -> str:
         "</head>"
         '<body class="min-h-full bg-gray-50 text-gray-900">'
         '<a class="apg-skip-link" href="#content">Skip to content</a>'
+        '<div id="apg-offline-banner" class="apg-offline-banner" role="status" hidden>Offline mode: showing cached APG screens.</div>'
         f'<header class="apg-topbar sticky top-0 z-50" role="banner">'
         f'  <button class="apg-icon-btn" type="button" onclick="apgToggleSidebar()" aria-label="Toggle navigation">☰</button>'
         f'  <a class="apg-logo" href="/ui">{safe_module}</a>'

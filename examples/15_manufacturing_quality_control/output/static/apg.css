@@ -100,6 +100,19 @@ p { margin: 0 0 var(--apg-space-3); }
 	background: var(--apg-surface);
 	box-shadow: var(--apg-shadow-sm);
 }
+.apg-offline-banner {
+	position: sticky;
+	top: 0;
+	z-index: 120;
+	padding: var(--apg-space-2) var(--apg-space-4);
+	background: #fef3c7;
+	color: #78350f;
+	border-bottom: 1px solid #f59e0b;
+	text-align: center;
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+.apg-offline-banner[hidden] { display: none; }
 .apg-icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0; border: 1px solid var(--apg-border); border-radius: var(--apg-radius-sm); background: var(--apg-surface); color: var(--apg-text); }
 .apg-logo { font-weight: 700; font-size: 1rem; color: var(--apg-primary) !important; text-decoration: none !important; }
 .apg-topnav { display: flex; align-items: center; gap: var(--apg-space-1); flex: 1; }

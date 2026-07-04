@@ -91,7 +91,10 @@ def test_default_python_generation_integrates_agents_and_capabilities():
         "static/apg-charts.js",
         "static/apg-sse.js",
         "static/htmx.min.js",
+        "static/icon.svg",
+        "static/manifest.webmanifest",
         "static/sortable.min.js",
+        "static/sw.js",
         "static/uplot.min.css",
         "static/uplot.min.js",
     }

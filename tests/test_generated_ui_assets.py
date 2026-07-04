@@ -114,7 +114,13 @@ def test_no_external_urls_in_generated_output():
 	result = compile_apg_file(str(EXAMPLE_20))
 
 	assert result.success, result.errors
-	for required in ("static/apg.css", "static/htmx.min.js", "static/sortable.min.js"):
+	for required in (
+		"static/apg.css",
+		"static/htmx.min.js",
+		"static/sortable.min.js",
+		"static/manifest.webmanifest",
+		"static/sw.js",
+	):
 		assert required in result.generated_files
 		assert result.generated_files[required].strip()
 
