@@ -98,8 +98,11 @@ class PythonCodeGenerator:
 		self.current_module = ast
 		
 		if self.config.use_composable_templates:
-			return self._generate_with_composable_templates(ast)
-		return self._generate_python_application(ast)
+			files = self._generate_with_composable_templates(ast)
+		else:
+			files = self._generate_python_application(ast)
+		files.update(self._load_static_assets())
+		return files
 	
 	def _generate_with_composable_templates(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""Generate application using the composable template system"""
@@ -445,6 +448,19 @@ class PythonCodeGenerator:
 				key = f.relative_to(tmpl_dir).as_posix()
 				templates[key] = f.read_text(encoding="utf-8")
 		return templates
+
+	@staticmethod
+	def _load_static_assets() -> dict[str, str]:
+		"""Load vendored UI assets to emit into generated static/ output."""
+		asset_dir = Path(__file__).parent / "assets"
+		asset_files = ("apg.css", "htmx.min.js", "sortable.min.js")
+		assets: dict[str, str] = {}
+		for asset_name in asset_files:
+			asset_path = asset_dir / asset_name
+			if not asset_path.is_file():
+				raise FileNotFoundError(f"Missing generated UI asset: {asset_path}")
+			assets[f"static/{asset_name}"] = asset_path.read_text(encoding="utf-8")
+		return assets
 
 	def _generate_python_app(self, module: ModuleDeclaration) -> str:
 		"""Generate a framework-neutral Python app.py entrypoint."""
@@ -3526,12 +3542,18 @@ def _css_name(value: str) -> str:
 def theme_stylesheet() -> str:
     lines = [
         ":root {{",
-        "  --apg-accent: #126e82;",
+        "  --apg-primary: #1E5B5A;",
+        "  --apg-accent: #D97706;",
         "  --apg-surface: #ffffff;",
         "  --apg-border: #d0d7de;",
         "  --apg-text: #1f2328;",
         "  --apg-muted: #59636e;",
+        "  --apg-bg-canvas: #f6f8fa;",
+        "  --apg-bg-card: var(--apg-surface);",
+        "  --apg-bg-hover: rgba(0,0,0,0.04);",
         "}}",
+        "@media (prefers-color-scheme: dark) {{ :root:not([data-theme='light']) {{ --apg-surface: #1e2028; --apg-border: #30363d; --apg-text: #e6edf3; --apg-muted: #8b949e; --apg-bg-canvas: #0d1117; --apg-bg-card: #161b22; --apg-bg-hover: rgba(255,255,255,0.06); }} }}",
+        ":root[data-theme='dark'], :root.dark {{ --apg-surface: #1e2028; --apg-border: #30363d; --apg-text: #e6edf3; --apg-muted: #8b949e; --apg-bg-canvas: #0d1117; --apg-bg-card: #161b22; --apg-bg-hover: rgba(255,255,255,0.06); }}",
     ]
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities") and hasattr(APG_CAPABILITIES, "capability_theme"):
         for capability_name in APG_CAPABILITIES.list_capabilities():
@@ -3547,6 +3569,7 @@ def theme_stylesheet() -> str:
                     lines.append(":root {{ " + css_var + ": " + str(token_value) + "; }}")
                     if str(token_name).lower() in {{"accent", "primary", "brand"}}:
                         lines.append(":root {{ --apg-accent: var(" + css_var + "); }}")
+    return "\\n".join(lines) + "\\n"
     lines.extend([
         # Extended spacing + radius + shadow tokens
         ":root {{ --apg-radius: 8px; --apg-radius-sm: 4px; --apg-radius-full: 9999px; }}",
@@ -3634,13 +3657,10 @@ def _html_page(title: str, body: str) -> str:
     safe_title = html.escape(title)
     safe_module = html.escape(MODULE_NAME)
     head_extras = (
-        # Tailwind CDN — enables utility classes in Jinja2 templates
-        '<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>'
-        '<script>tailwind.config={{theme:{{extend:{{fontFamily:{{sans:["system-ui","ui-sans-serif","-apple-system","sans-serif"],mono:["ui-monospace","Cascadia Code","Fira Mono","monospace"]}},colors:{{apg:{{primary:"#1E5B5A",accent:"#D97706"}}}}}}}}}}</script>'
-        # htmx — progressive enhancement for partial updates
-        '<script defer src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>'
-        # SortableJS — drag-and-drop for kanban
-        '<script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>'
+        '<script>(function(){{try{{var m=localStorage.getItem("apg-theme")||"system";var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;}}catch(e){{}}}})();</script>'
+        '<link rel="stylesheet" href="/static/apg.css">'
+        '<script defer src="/static/htmx.min.js"></script>'
+        '<script defer src="/static/sortable.min.js"></script>'
     )
     toast_js = (
         '<div id="apg-toast-root" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>'
@@ -3659,6 +3679,9 @@ def _html_page(title: str, body: str) -> str:
         'if(!t)return;'
         'try{{var d=JSON.parse(t);if(d.apgToast)apgToast(d.apgToast.msg,d.apgToast.type||"success");}}catch(ex){{}}'
         '}});'
+        'function apgApplyTheme(m){{var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;var b=document.getElementById("apg-theme-toggle");if(b){{b.setAttribute("aria-label","Theme: "+m);b.textContent=m==="dark"?"Dark":m==="light"?"Light":"System";}}}}'
+        'function apgCycleTheme(){{var order=["system","light","dark"];var cur=localStorage.getItem("apg-theme")||"system";var next=order[(order.indexOf(cur)+1)%order.length];localStorage.setItem("apg-theme",next);apgApplyTheme(next);}}'
+        'document.addEventListener("DOMContentLoaded",function(){{apgApplyTheme(localStorage.getItem("apg-theme")||"system");}});'
         '</script>'
     )
     skeleton_css = (
@@ -3696,6 +3719,7 @@ def _html_page(title: str, body: str) -> str:
         f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/workflows">⚡ Workflows</a>'
         f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/marketplace">Marketplace</a>'
         f'  </nav>'
+        f'  <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">System</button>'
         f'</header>'
         f'<main class="apg-content" id="main-content">{{body}}</main>'
         f"{{toast_js}}"
@@ -4963,7 +4987,7 @@ def _ui_field_view_fragment(entity_name: str, record_id: str, field: Dict[str, A
         f'<button hx-get="{{edit_url}}" hx-target="#{{fld_id}}" hx-swap="outerHTML"'
         f' class="opacity-0 group-hover/field:opacity-100 flex-shrink-0 p-1 text-gray-300 hover:text-apg-primary rounded transition-all"'
         f' title="Edit {{html.escape(field_name)}}">'
-        f'<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">'
+        f'<svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">'
         f'<path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zm-2.207 2.207L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>'
         f'</svg></button>'
         f'</dd></div>'
@@ -6579,7 +6603,7 @@ def run_server(host: str | None = None, port: int | str | None = None) -> None:
     resolved_host = host or os.environ.get("APG_HOST") or os.environ.get("HOST") or "127.0.0.1"
     resolved_port = int(port or os.environ.get("APG_PORT") or os.environ.get("PORT") or "8080")
     debug = os.environ.get("APG_DEBUG") == "1"
-    print(f"{{MODULE_NAME}} listening on http://{{resolved_host}}:{{resolved_port}}", flush=True)
+    print(f"{{MODULE_NAME}} listening on {{resolved_host}}:{{resolved_port}}", flush=True)
     _flask_app.run(host=resolved_host, port=resolved_port, debug=debug, use_reloader=False)
 
 

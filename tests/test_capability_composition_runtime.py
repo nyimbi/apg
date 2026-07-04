@@ -11,11 +11,19 @@ import sys
 import time
 import types
 import urllib.request
+from pathlib import Path
 
 from compiler.ast_builder import ASTBuilder, CapabilityDeclaration
 from compiler.compiler import APGCompiler
 from compiler.parser import APGParser
 from compiler.semantic_analyzer import SemanticAnalyzer
+
+
+def _write_generated_files(target: Path, generated_files: dict[str, str]) -> None:
+    for filename, content in generated_files.items():
+        path = target / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
 
 
 CAPABILITY_SOURCE = """
@@ -528,8 +536,7 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
 
     app_dir = tmp_path / "generated_erp_ops"
     app_dir.mkdir()
-    for filename, content in result.generated_files.items():
-        (app_dir / filename).write_text(content, encoding="utf-8")
+    _write_generated_files(app_dir, result.generated_files)
 
     smoke = subprocess.run(
         [sys.executable, "smoke_test.py"],
@@ -723,8 +730,7 @@ def test_generated_package_reexports_grouped_capability_descriptions(tmp_path):
 
     package_dir = tmp_path / "erp_ops_generated"
     package_dir.mkdir()
-    for filename, content in result.generated_files.items():
-        (package_dir / filename).write_text(content, encoding="utf-8")
+    _write_generated_files(package_dir, result.generated_files)
 
     spec = importlib.util.spec_from_file_location(
         "erp_ops_generated",
@@ -857,8 +863,7 @@ def test_generated_app_cli_fails_when_validation_or_self_test_fails(tmp_path):
 
     app_dir = tmp_path / "invalid_i18n_app"
     app_dir.mkdir()
-    for filename, content in result.generated_files.items():
-        (app_dir / filename).write_text(content, encoding="utf-8")
+    _write_generated_files(app_dir, result.generated_files)
 
     validation = subprocess.run(
         [sys.executable, "app.py", "--validate"],

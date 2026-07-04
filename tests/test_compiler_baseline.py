@@ -37,6 +37,14 @@ from language_server.semantic_service import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+
+def _write_generated_files(target: Path, generated_files: dict[str, str]) -> None:
+	for filename, content in generated_files.items():
+		path = target / filename
+		path.parent.mkdir(parents=True, exist_ok=True)
+		path.write_text(content, encoding="utf-8")
+
+
 MINIMAL_AGENT_SOURCE = """
 module baseline version 1.0.0 {
 	description: "Compiler baseline";
@@ -336,8 +344,7 @@ def test_generated_python_package_is_importable_with_runtime_manifests(tmp_path)
 	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
 	package_dir = tmp_path / "generated_pkg"
 	package_dir.mkdir()
-	for filename, content in result.generated_files.items():
-		(package_dir / filename).write_text(content, encoding="utf-8")
+	_write_generated_files(package_dir, result.generated_files)
 
 	spec = importlib.util.spec_from_file_location(
 		"generated_pkg",
@@ -517,8 +524,7 @@ def test_generated_component_manifest_contract_rejects_missing_artifact_files(tm
 
 	package_dir = tmp_path / "generated_app"
 	package_dir.mkdir()
-	for filename, content in result.generated_files.items():
-		(package_dir / filename).write_text(content, encoding="utf-8")
+	_write_generated_files(package_dir, result.generated_files)
 	(package_dir / "README.md").unlink()
 
 	spec = importlib.util.spec_from_file_location("generated_app", package_dir / "app.py")
@@ -556,8 +562,7 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 	result = compile_apg_string(MINIMAL_AGENT_SOURCE)
 	package_dir = tmp_path / "generated_app"
 	package_dir.mkdir()
-	for filename, content in result.generated_files.items():
-		(package_dir / filename).write_text(content, encoding="utf-8")
+	_write_generated_files(package_dir, result.generated_files)
 
 	with socket.socket() as sock:
 		sock.bind(("127.0.0.1", 0))
@@ -647,8 +652,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	result = compile_apg_string(DATA_APP_SOURCE)
 	package_dir = tmp_path / "generated_data_app"
 	package_dir.mkdir()
-	for filename, content in result.generated_files.items():
-		(package_dir / filename).write_text(content, encoding="utf-8")
+	_write_generated_files(package_dir, result.generated_files)
 
 	with socket.socket() as sock:
 		sock.bind(("127.0.0.1", 0))
@@ -1057,8 +1061,7 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 	result = compile_apg_string(TYPED_DATA_APP_SOURCE)
 	package_dir = tmp_path / "generated_typed_form_app"
 	package_dir.mkdir()
-	for filename, content in result.generated_files.items():
-		(package_dir / filename).write_text(content, encoding="utf-8")
+	_write_generated_files(package_dir, result.generated_files)
 
 	with socket.socket() as sock:
 		sock.bind(("127.0.0.1", 0))
@@ -1244,8 +1247,7 @@ def test_generated_python_app_persists_records_with_data_file(tmp_path):
 	result = compile_apg_string(DATA_APP_SOURCE)
 	package_dir = tmp_path / "generated_persistent_app"
 	package_dir.mkdir()
-	for filename, content in result.generated_files.items():
-		(package_dir / filename).write_text(content, encoding="utf-8")
+	_write_generated_files(package_dir, result.generated_files)
 
 	data_file = tmp_path / "records.json"
 	env = dict(os.environ, APG_DATA_FILE=str(data_file))
@@ -1335,8 +1337,7 @@ def test_generated_python_app_can_require_api_key_for_mutations(tmp_path):
 	result = compile_apg_string(DATA_APP_SOURCE)
 	package_dir = tmp_path / "generated_secured_app"
 	package_dir.mkdir()
-	for filename, content in result.generated_files.items():
-		(package_dir / filename).write_text(content, encoding="utf-8")
+	_write_generated_files(package_dir, result.generated_files)
 
 	with socket.socket() as sock:
 		sock.bind(("127.0.0.1", 0))

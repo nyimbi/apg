@@ -6,10 +6,18 @@ import json
 import importlib.util
 import sys
 import types
+from pathlib import Path
 
 from compiler.ast_builder import ASTBuilder, ApplicationDeclaration
 from compiler.compiler import APGCompiler
 from compiler.parser import APGParser
+
+
+def _write_generated_files(target: Path, generated_files: dict[str, str]) -> None:
+    for filename, content in generated_files.items():
+        path = target / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
 
 
 APPLICATION_SOURCE = """
@@ -179,8 +187,7 @@ def test_generated_package_reexports_application_composition_helpers(tmp_path):
 
     package_dir = tmp_path / "enterprise_suite_generated"
     package_dir.mkdir()
-    for filename, content in result.generated_files.items():
-        (package_dir / filename).write_text(content, encoding="utf-8")
+    _write_generated_files(package_dir, result.generated_files)
 
     spec = importlib.util.spec_from_file_location(
         "enterprise_suite_generated",

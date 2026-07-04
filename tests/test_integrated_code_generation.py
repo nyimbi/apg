@@ -87,6 +87,9 @@ def test_default_python_generation_integrates_agents_and_capabilities():
         "apg_capabilities.py",
         "app.py",
         "requirements.txt",
+        "static/apg.css",
+        "static/htmx.min.js",
+        "static/sortable.min.js",
     }
     assert "standard library" in files["requirements.txt"]
     assert "Planner" in files["ai_agents.py"]

@@ -7,9 +7,10 @@ from typing import Any
 
 from capabilities.capability_contract_registry import (
 	CapabilityContractRecord,
-	evaluate_rules,
 	load_contract_registry,
 	validate_contract_registry,
+	_evaluate_default,
+	_normalize_rule_evaluation_result,
 )
 
 
@@ -118,7 +119,7 @@ def audit_capability_operability(
 def _audit_record(record: CapabilityContractRecord) -> dict[str, Any]:
 	contract = record.contract
 	errors: list[str] = []
-	rule_probes = _rule_probes(record.capability_id, errors)
+	rule_probes = _rule_probes(record, errors)
 	package_artifacts = _package_artifacts(record.path.parent)
 	route_count = len(contract["ui"]["routes"])
 	rule_count = len(contract["rule_engine"]["rules"])
@@ -143,11 +144,16 @@ def _audit_record(record: CapabilityContractRecord) -> dict[str, Any]:
 	}
 
 
-def _rule_probes(capability_id: str, errors: list[str]) -> list[dict[str, Any]]:
+def _rule_probes(record: CapabilityContractRecord, errors: list[str]) -> list[dict[str, Any]]:
 	probes: list[dict[str, Any]] = []
 	for name, context in RULE_PROBE_CONTEXTS.items():
 		try:
-			result = evaluate_rules(capability_id, dict(context))
+			probe_context = dict(context)
+			if hasattr(record.module, "evaluate_capability_rules"):
+				result = record.module.evaluate_capability_rules(probe_context)
+			else:
+				result = _evaluate_default(record.contract["rule_engine"]["rules"], probe_context)
+			result = _normalize_rule_evaluation_result(result, probe_context)
 			decision = result.get("decision") if isinstance(result, dict) else None
 			matched_rules = result.get("matched_rules") if isinstance(result, dict) else None
 			actions = result.get("actions") if isinstance(result, dict) else None
@@ -157,7 +163,7 @@ def _rule_probes(capability_id: str, errors: list[str]) -> list[dict[str, Any]]:
 				and isinstance(actions, list)
 			)
 			if not ok:
-				errors.append(f"{capability_id}: rule probe {name} returned invalid result shape")
+				errors.append(f"{record.capability_id}: rule probe {name} returned invalid result shape")
 			probes.append({
 				"name": name,
 				"ok": ok,
@@ -166,7 +172,7 @@ def _rule_probes(capability_id: str, errors: list[str]) -> list[dict[str, Any]]:
 				"action_count": len(actions) if isinstance(actions, list) else 0,
 			})
 		except Exception as exc:  # pragma: no cover - defensive audit shape
-			errors.append(f"{capability_id}: rule probe {name} failed: {exc}")
+			errors.append(f"{record.capability_id}: rule probe {name} failed: {exc}")
 			probes.append({
 				"name": name,
 				"ok": False,
