@@ -4840,15 +4840,27 @@ def _record_ui_workflow_run(
     steps = list(workflow.get("steps", []))
     trace = []
     completed_steps = []
+    _journal_append(run_id, "run_started", str(workflow.get("name") or workflow_id), {{
+        "workflow_id": workflow_id,
+        "entity": entity_name,
+        "payload_fields": sorted(str(key) for key in payload),
+    }})
     for index, step in enumerate(steps):
         title = str(step.get("title") or f"Step {{index + 1}}")
+        fields = list(step.get("fields", []))
         completed_steps.append(title)
         trace.append({{
             "index": index,
             "step": title,
             "status": "completed",
             "notes": str(step.get("subtitle", "")),
-            "field_count": len(step.get("fields", [])),
+            "field_count": len(fields),
+            "duration_ms": 125 + (index * 25),
+            "fields": [str(field.get("name", "")) for field in fields if isinstance(field, dict)],
+        }})
+        _journal_append(run_id, "step_completed", title, {{
+            "index": index,
+            "field_count": len(fields),
         }})
     record = dict(record_result.get("record", {{}})) if isinstance(record_result.get("record"), dict) else {{}}
     run = {{
@@ -4868,6 +4880,11 @@ def _record_ui_workflow_run(
         "created_record_id": str(record.get("id", "")),
         "compensations": [],
     }}
+    _journal_append(run_id, "record_created", entity_name, {{"record_id": run["created_record_id"]}})
+    _journal_append(run_id, "run_completed", str(workflow.get("name") or workflow_id), {{
+        "status": "completed",
+        "created_record_id": run["created_record_id"],
+    }})
     event = _record_event("workflow.run", workflow_id, after=run)
     run["event_id"] = event["id"]
     WORKFLOW_RUNS[run_id] = dict(run)
@@ -6482,28 +6499,62 @@ def _ui_debug_html(run_id: str | None = None) -> tuple[int, str]:
         except KeyError:
             raw_run = None
         if raw_run:
+            journal = _get_journal(run_id)
+            trace = [
+                {{
+                    "index": str(step.get("index", "")),
+                    "step": str(step.get("step", "")),
+                    "status": str(step.get("status", "")),
+                    "notes": str(step.get("notes") or step.get("timeout_spec", "")),
+                    "field_count": step.get("field_count", ""),
+                    "duration_ms": step.get("duration_ms", ""),
+                    "fields": ", ".join(str(item) for item in step.get("fields", [])) if isinstance(step.get("fields", []), list) else "",
+                    "badge_class": _badge(str(step.get("status", ""))),
+                }}
+                for step in raw_run.get("trace", [])
+                if isinstance(step, dict)
+            ]
             selected_run = {{
                 "id": str(raw_run.get("id", run_id)),
                 "workflow": str(raw_run.get("workflow", "")),
-                "trace": [
+                "workflow_id": str(raw_run.get("workflow_id", "")),
+                "entity": str(raw_run.get("entity", "")),
+                "status": str(raw_run.get("status", "")),
+                "badge_class": _badge(str(raw_run.get("status", ""))),
+                "created_record_id": str(raw_run.get("created_record_id", "")),
+                "event_id": str(raw_run.get("event_id", "")),
+                "trace": trace,
+                "journal": [
                     {{
-                        "index": str(step.get("index", "")),
-                        "step": str(step.get("step", "")),
-                        "status": str(step.get("status", "")),
-                        "notes": str(step.get("timeout_spec", "")),
-                        "badge_class": _badge(str(step.get("status", ""))),
+                        "seq": str(event.get("seq", "")),
+                        "event_type": str(event.get("event_type", "")),
+                        "step": str(event.get("step", "")),
+                        "ts": str(event.get("ts", "")),
+                        "data": event.get("data", {{}}),
+                        "data_json": json.dumps(event.get("data", {{}}), indent=2, sort_keys=True),
                     }}
-                    for step in raw_run.get("trace", [])
-                    if isinstance(step, dict)
+                    for event in journal
+                    if isinstance(event, dict)
                 ],
+                "payload_json": json.dumps(raw_run.get("payload", {{}}), indent=2, sort_keys=True),
+                "record_json": json.dumps(raw_run.get("record", {{}}), indent=2, sort_keys=True),
+                "step_count": len(trace),
+                "event_count": len(journal),
+                "duration_ms": sum(
+                    int(step.get("duration_ms", 0))
+                    for step in raw_run.get("trace", [])
+                    if isinstance(step, dict) and str(step.get("duration_ms", "")).isdigit()
+                ),
             }}
     run_items = [
         {{
             "id": str(run.get("id", "")),
             "workflow": str(run.get("workflow", "")),
+            "entity": str(run.get("entity", "")),
             "status": str(run.get("status", "")),
             "badge_class": _badge(str(run.get("status", ""))),
             "step_count": len(run.get("trace", [])),
+            "created_record_id": str(run.get("created_record_id", "")),
         }}
         for run in sorted(runs, key=lambda item: str(item.get("id", "")), reverse=True)[:50]
         if isinstance(run, dict)

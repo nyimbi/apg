@@ -1,45 +1,130 @@
 <section class="mb-6">
   <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <span class="font-semibold text-gray-900">Debug</span></p>
-  <h1 class="text-xl font-bold text-gray-900">Flow Debugger</h1>
-  <p class="text-sm text-gray-500 mt-1">Workflow runs, event journals, and circuit breaker state.</p>
+  <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">Flow debugger</h1>
+      <p class="text-sm text-gray-500 mt-1">Workflow run history, timeline, journal events, circuit breakers, and event subscriptions.</p>
+    </div>
+    {% if selected_run %}
+    <span class="apg-badge {{ selected_run.badge_class }}">{{ selected_run.status }}</span>
+    {% endif %}
+  </div>
 </section>
 
 {% if selected_run %}
-<article class="apg-card">
-  <header class="apg-card-header">
-    <h2 class="text-base font-semibold text-gray-900">Run: {{ selected_run.id }}</h2>
-    <span class="apg-badge apg-badge-neutral">{{ selected_run.workflow }}</span>
-  </header>
-  {% if selected_run.trace %}
-  <ol class="space-y-3">
-    {% for step in selected_run.trace %}
-    <li class="border border-gray-200 rounded-lg p-3">
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-sm font-medium text-gray-900">{{ step.step }}</p>
-        <span class="apg-badge {{ step.badge_class }}">{{ step.status }}</span>
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+  <article class="apg-card lg:col-span-2">
+    <header class="apg-card-header">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Run detail</p>
+        <h2 class="text-base font-semibold text-gray-900">{{ selected_run.id }}</h2>
       </div>
-      <p class="text-xs text-gray-500 mt-1">Step {{ step.index }}{% if step.notes %} · {{ step.notes }}{% endif %}</p>
-    </li>
-    {% endfor %}
-  </ol>
+      <span class="apg-badge apg-badge-neutral">{{ selected_run.workflow }}</span>
+    </header>
+
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4" aria-label="Run summary">
+      <div class="border border-gray-100 rounded-lg p-3">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Steps</p>
+        <p class="text-xl font-bold text-gray-900">{{ selected_run.step_count }}</p>
+      </div>
+      <div class="border border-gray-100 rounded-lg p-3">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Journal events</p>
+        <p class="text-xl font-bold text-gray-900">{{ selected_run.event_count }}</p>
+      </div>
+      <div class="border border-gray-100 rounded-lg p-3">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Created record</p>
+        <p class="text-xl font-bold text-gray-900">{{ selected_run.created_record_id or '-' }}</p>
+      </div>
+    </section>
+
+    {% if selected_run.trace %}
+    <h3 class="text-sm font-semibold text-gray-900 mb-3">Run timeline</h3>
+    <ol class="space-y-3">
+      {% for step in selected_run.trace %}
+      <li class="border border-gray-200 rounded-lg p-3">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p class="text-sm font-medium text-gray-900">{{ step.step }}</p>
+            <p class="text-xs text-gray-500 mt-1">Step {{ step.index }}{% if step.field_count %} · {{ step.field_count }} field{{ '' if step.field_count == 1 else 's' }}{% endif %}{% if step.duration_ms %} · {{ step.duration_ms }} ms{% endif %}</p>
+          </div>
+          <span class="apg-badge {{ step.badge_class }}">{{ step.status }}</span>
+        </div>
+        {% if step.notes %}<p class="text-xs text-gray-500 mt-2">{{ step.notes }}</p>{% endif %}
+        {% if step.fields %}<p class="text-xs text-gray-400 mt-2">Fields: <span class="font-mono">{{ step.fields }}</span></p>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="text-sm text-gray-500">No steps recorded for this run.</p>
+    {% endif %}
+  </article>
+
+  <aside class="space-y-4">
+    <article class="apg-card">
+      <h2 class="text-base font-semibold text-gray-900 mb-3">Run context</h2>
+      <dl class="space-y-2">
+        <div class="flex items-center justify-between gap-3"><dt class="text-sm text-gray-500">Entity</dt><dd class="text-sm font-mono text-gray-900">{{ selected_run.entity }}</dd></div>
+        <div class="flex items-center justify-between gap-3"><dt class="text-sm text-gray-500">Workflow ID</dt><dd class="text-sm font-mono text-gray-900">{{ selected_run.workflow_id }}</dd></div>
+        <div class="flex items-center justify-between gap-3"><dt class="text-sm text-gray-500">Event ID</dt><dd class="text-sm font-mono text-gray-900">{{ selected_run.event_id or '-' }}</dd></div>
+        <div class="flex items-center justify-between gap-3"><dt class="text-sm text-gray-500">Duration</dt><dd class="text-sm font-mono text-gray-900">{{ selected_run.duration_ms }} ms</dd></div>
+      </dl>
+    </article>
+
+    <article class="apg-card">
+      <h2 class="text-base font-semibold text-gray-900 mb-3">Snapshots</h2>
+      <details class="mb-3">
+        <summary class="cursor-pointer text-sm font-medium text-gray-700">Payload snapshot</summary>
+        <pre>{{ selected_run.payload_json }}</pre>
+      </details>
+      <details>
+        <summary class="cursor-pointer text-sm font-medium text-gray-700">Created record snapshot</summary>
+        <pre>{{ selected_run.record_json }}</pre>
+      </details>
+    </article>
+  </aside>
+</section>
+
+<section class="apg-card">
+  <header class="apg-card-header">
+    <h2 class="text-base font-semibold text-gray-900">Event journal</h2>
+    <a href="/workflows/runs/{{ selected_run.id }}/journal" class="apg-btn apg-btn-secondary">Journal JSON</a>
+  </header>
+  {% if selected_run.journal %}
+  <div class="apg-table-wrap">
+    <table class="apg-table">
+      <thead><tr><th>Seq</th><th>Event</th><th>Step</th><th>Time</th><th>Data</th></tr></thead>
+      <tbody>
+        {% for event in selected_run.journal %}
+        <tr>
+          <td class="font-mono">{{ event.seq }}</td>
+          <td><span class="apg-badge apg-badge-neutral">{{ event.event_type }}</span></td>
+          <td>{{ event.step }}</td>
+          <td class="font-mono text-xs">{{ event.ts }}</td>
+          <td><details><summary class="cursor-pointer text-sm font-medium text-gray-700">Data</summary><pre>{{ event.data_json }}</pre></details></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
-  <p class="text-sm text-gray-500">No steps recorded for this run.</p>
+  <p class="text-sm text-gray-500">No journal events recorded for this run.</p>
   {% endif %}
-</article>
+</section>
 {% endif %}
 
 <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
   <article class="apg-card">
-    <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Recent Runs</h2></header>
+    <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Recent runs</h2></header>
     {% if runs %}
     <div class="apg-table-wrap">
       <table class="apg-table">
-        <thead><tr><th>Run</th><th>Workflow</th><th>Status</th><th>Steps</th></tr></thead>
+        <thead><tr><th>Run</th><th>Workflow</th><th>Entity</th><th>Status</th><th>Steps</th></tr></thead>
         <tbody>
           {% for run in runs %}
           <tr>
             <td><a href="/ui/debug/{{ run.id }}" class="font-mono hover:underline">{{ run.id }}</a></td>
             <td>{{ run.workflow }}</td>
+            <td>{{ run.entity }}</td>
             <td><span class="apg-badge {{ run.badge_class }}">{{ run.status }}</span></td>
             <td>{{ run.step_count }}</td>
           </tr>
@@ -48,12 +133,12 @@
       </table>
     </div>
     {% else %}
-    <p class="text-sm text-gray-500">No workflow runs yet.</p>
+    <p class="text-sm text-gray-500">No workflow runs yet. Complete a workflow to inspect its timeline here.</p>
     {% endif %}
   </article>
 
   <article class="apg-card">
-    <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Circuit Breakers</h2></header>
+    <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Circuit breakers</h2></header>
     {% if circuit_breakers %}
     <dl class="space-y-3">
       {% for item in circuit_breakers %}
@@ -70,11 +155,11 @@
 </section>
 
 <section class="apg-card">
-  <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Event Subscriptions</h2></header>
+  <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Event subscriptions</h2></header>
   {% if subscriptions %}
   <ul class="space-y-2">
     {% for item in subscriptions %}
-    <li class="text-sm text-gray-600"><span class="font-mono">{{ item.event }}</span> → {{ item.workflows }}</li>
+    <li class="text-sm text-gray-600"><span class="font-mono">{{ item.event }}</span> -> {{ item.workflows }}</li>
     {% endfor %}
   </ul>
   {% else %}

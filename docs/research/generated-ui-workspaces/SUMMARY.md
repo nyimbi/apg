@@ -668,6 +668,74 @@ Validation evidence:
 - Full suite: `1484 passed, 1 skipped, 3 warnings in 750.06s`.
 - PythonCodeGenerator tripwire clean.
 
+### flow-debugger
+
+Status: complete.
+
+Intended commit:
+
+```text
+ux(flow-debugger): expose workflow timelines and journals
+```
+
+Files:
+
+- `compiler/code_generator.py`
+- `compiler/templates/debug_console.html.j2`
+- `tests/test_generated_ui_dashboard.py`
+- `examples/01_minimal_customer_records/output/app.py`
+- `examples/02_customer_orders_relationship/output/app.py`
+- `examples/03_inventory_typed_records/output/app.py`
+- `examples/04_order_fulfillment_model/output/app.py`
+- `examples/05_single_support_agent/output/app.py`
+- `examples/06_support_agent_team/output/app.py`
+- `examples/07_multi_runtime_agent_team/output/app.py`
+- `examples/08_basic_capability_contract/output/app.py`
+- `examples/09_capability_rules_configuration/output/app.py`
+- `examples/10_themed_i18n_streaming_capability/output/app.py`
+- `examples/11_screen_composition_relationships/output/app.py`
+- `examples/12_finance_general_ledger/output/app.py`
+- `examples/13_procurement_approval_workbench/output/app.py`
+- `examples/14_inventory_warehouse_operations/output/app.py`
+- `examples/15_manufacturing_quality_control/output/app.py`
+- `examples/16_hr_payroll_operations/output/app.py`
+- `examples/17_crm_sales_pipeline/output/app.py`
+- `examples/18_operations_dashboard_capability/output/app.py`
+- `examples/19_multi_capability_dependency_suite/output/app.py`
+- `examples/20_enterprise_erp_platform/output/app.py`
+- `docs/research/generated-ui-workspaces/flow-debugger/README.md`
+- `docs/research/generated-ui-workspaces/flow-debugger/thinking.md`
+- `docs/research/generated-ui-workspaces/flow-debugger/sources.md`
+- `docs/research/generated-ui-workspaces/flow-debugger/rationale.md`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/before-debug-empty.html`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/before-debug-empty.headers`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/before-wizard-complete.html`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/before-wizard-complete.headers`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/before-debug-list.html`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/before-debug-list.headers`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/before-debug-run.html`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/before-debug-run.headers`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/before-journal.json`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/before-journal.headers`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/after-wizard-complete.html`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/after-wizard-complete.headers`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/after-debug-list.html`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/after-debug-list.headers`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/after-debug-run.html`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/after-debug-run.headers`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/after-journal.json`
+- `docs/research/generated-ui-workspaces/flow-debugger/assets/after-journal.headers`
+- `docs/research/generated-ui-workspaces/SUMMARY.md`
+
+Validation evidence:
+
+- Live before audit: example 01 `/ui/debug`, generated wizard completion, `/ui/debug/workflow-run-1`, and `/workflows/runs/workflow-run-1/journal` booted at `127.0.0.1:20903`; the run detail had only a basic step list and the journal endpoint returned `events: []`.
+- Live after audit: regenerated example 01 booted at `127.0.0.1:20904`; run detail rendered timeline, context, snapshots, and event journal, while the journal endpoint returned run/step/record/completion events.
+- Regenerated all 20 numbered examples through `APGCompiler.compile_file()`.
+- Targeted tests: `3 passed` across flow debugger regression, CSS class coverage, and required template route coverage.
+- Full suite: `1484 passed, 1 skipped, 3 warnings in 729.14s`.
+- PythonCodeGenerator tripwire clean.
+
 ## Verdicts
 
 | Workspace | Before | After | Status |
@@ -682,6 +750,7 @@ Validation evidence:
 | agent-and-agent-team-consoles | Single-agent console was form-first and raw-JSON-heavy; declared team console and team POST were 404 dead ends. | Conversation-first agent/team consoles, preserved prompt context, team lanes and handoff flow, raw JSON disclosures, and metadata fallback for team routes/invocation. | Complete |
 | capability-console-rules-config-approval | Three blank JSON boxes and generic/raw results made rules, configuration, and approvals hard to test without knowing the payload contract. | Prefilled generated contexts, preserved submitted JSON, operation-specific summaries, capability profile, and secondary raw JSON disclosures. | Complete |
 | database-catalog | Declared databases could render as empty: example 20 showed 0 schemas/tables and `/databases/ERPDB/schemas` returned `[]`. | Generated schemas are inferred from record entities, UI renders tables/columns/indexes/constraints, and schema JSON exposes the same metadata. | Complete |
+| flow-debugger | Completed UI workflow runs showed only a plain step list and had an empty journal endpoint, so the debugger lacked audit context. | UI workflow runs write journal events and render run timeline, context, payload, created-record snapshot, and journal table. | Complete |
 
 ## Defect Ledger
 
@@ -734,3 +803,8 @@ Validation evidence:
 | database-catalog | Catalog UI did not expose table and column metadata. | Reworked the template into summary cards, database cards, table/column grids, constraints, indexes, and validation details. | Resolved |
 | database-catalog | Validation warned that generated databases did not declare schemas even when entity metadata was sufficient. | Added inferred generated schema tables with synthetic primary-key columns, producing clean validation. | Resolved |
 | database-catalog | Raw validation detail competed with the main catalog. | Kept warnings visible and moved raw validation JSON behind a disclosure. | Resolved |
+| flow-debugger | UI-created workflow runs did not write journal events. | `_record_ui_workflow_run()` now appends run start, step completion, record created, and run completed journal events. | Resolved |
+| flow-debugger | Run detail exposed only a minimal step list. | Added run summary metrics, timeline, run context, payload snapshot, created-record snapshot, and event journal table. | Resolved |
+| flow-debugger | Journal endpoint returned `events: []` for generated UI workflows. | Connected UI workflow recording to `WORKFLOW_EVENT_JOURNAL`, making the JSON endpoint useful. | Resolved |
+| flow-debugger | Recent runs lacked entity context. | Added entity context to the recent-runs table. | Resolved |
+| flow-debugger | Empty state did not tell users how to populate the debugger. | Updated empty recent-runs copy to direct users to complete a workflow. | Resolved |

@@ -398,6 +398,25 @@ def test_generated_workflow_wizard_advances_sequentially_and_records_runs():
 	assert "Recent runs" in list_html
 	assert "workflow-run-1" in list_html
 
+	status, debug_html = namespace["_ui_payload"]("/ui/debug/workflow-run-1")
+	assert status == 200
+	assert "Run timeline" in debug_html
+	assert "Event journal" in debug_html
+	assert "Payload snapshot" in debug_html
+	assert "Created record snapshot" in debug_html
+	assert "Journal JSON" in debug_html
+	assert "workflow-run-1" in debug_html
+	assert "Customer" in debug_html
+	assert "WF-1001" in debug_html
+
+	journal_status, journal_payload = namespace["_route_payload"]("/workflows/runs/workflow-run-1/journal")
+	assert journal_status == 200
+	event_types = [event["event_type"] for event in journal_payload["events"]]
+	assert event_types[0] == "run_started"
+	assert "step_completed" in event_types
+	assert "record_created" in event_types
+	assert event_types[-1] == "run_completed"
+
 
 def test_generated_agent_team_console_renders_and_invokes_from_entity_metadata():
 	result = compile_apg_file("examples/06_support_agent_team/main.apg")
