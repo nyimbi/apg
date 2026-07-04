@@ -3656,6 +3656,31 @@ def theme_stylesheet() -> str:
 def _html_page(title: str, body: str) -> str:
     safe_title = html.escape(title)
     safe_module = html.escape(MODULE_NAME)
+    entity_nav = "".join(
+        f'<a class="apg-sidebar-link" href="/ui/entities/{{html.escape(quote(str(entity["name"]), safe=""), quote=True)}}">{{html.escape(str(entity["name"]))}}</a>'
+        for entity in ENTITIES
+        if entity.get("type") not in {{"application"}}
+    ) or '<span class="apg-sidebar-empty">No entities</span>'
+    app = describe_application()
+    agent_nav = "".join(
+        f'<a class="apg-sidebar-link" href="/ui/agents/{{html.escape(quote(str(name), safe=""), quote=True)}}">{{html.escape(str(name))}}</a>'
+        for name in sorted(app.get("ai_agent_descriptions", {{}}))
+    )
+    team_nav = "".join(
+        f'<a class="apg-sidebar-link" href="/ui/agent-teams/{{html.escape(quote(str(name), safe=""), quote=True)}}">{{html.escape(str(name))}}</a>'
+        for name in sorted(app.get("ai_agent_team_descriptions", {{}}))
+    )
+    sidebar_html = (
+        '<aside id="apg-sidebar" class="apg-sidebar" aria-label="Application navigation">'
+        '<div class="apg-sidebar-section"><p class="apg-sidebar-heading">Navigate</p>'
+        '<a class="apg-sidebar-link" href="/ui">Dashboard</a>'
+        '<a class="apg-sidebar-link" href="/ui/workflows">Workflows</a>'
+        '<a class="apg-sidebar-link" href="/ui/databases">Databases</a>'
+        '<a class="apg-sidebar-link" href="/ui/marketplace">Marketplace</a></div>'
+        f'<div class="apg-sidebar-section"><p class="apg-sidebar-heading">Entities</p>{{entity_nav}}</div>'
+        + (f'<div class="apg-sidebar-section"><p class="apg-sidebar-heading">Agents</p>{{agent_nav}}{{team_nav}}</div>' if agent_nav or team_nav else "")
+        + '</aside><div id="apg-sidebar-backdrop" class="apg-sidebar-backdrop" onclick="apgCloseSidebar()"></div>'
+    )
     head_extras = (
         '<script>(function(){{try{{var m=localStorage.getItem("apg-theme")||"system";var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;}}catch(e){{}}}})();</script>'
         '<link rel="stylesheet" href="/static/apg.css">'
@@ -3693,6 +3718,11 @@ def _html_page(title: str, body: str) -> str:
         'function apgConfirm(message,ok){{var d=document.getElementById("apg-confirm-dialog");if(!d||!d.showModal){{var nativeConfirm=window["confirm"];if(nativeConfirm&&nativeConfirm(message))ok();return;}}document.getElementById("apg-confirm-message").textContent=message;var done=false;function close(){{if(done)return;done=true;d.removeEventListener("close",onclose);}}function onclose(){{var v=d.returnValue;close();if(v==="confirm")ok();}}d.addEventListener("close",onclose);d.showModal();}}'
         'function apgConfirmSubmit(form,message){{apgConfirm(message||"Delete this record?",function(){{form.dataset.apgConfirmed="1";form.requestSubmit();}});return false;}}'
         'document.addEventListener("DOMContentLoaded",function(){{document.querySelectorAll(".apg-topnav a").forEach(function(a){{if(a.getAttribute("href")===location.pathname){{a.classList.add("active");a.setAttribute("aria-current","page");}}}});}});'
+        'function apgSetSidebar(collapsed){{document.documentElement.classList.toggle("apg-sidebar-collapsed",collapsed);try{{localStorage.setItem("apg-sidebar-collapsed",collapsed?"1":"0");}}catch(e){{}}}}'
+        'function apgToggleSidebar(){{if(matchMedia("(max-width: 767px)").matches){{document.documentElement.classList.toggle("apg-sidebar-open");}}else{{apgSetSidebar(!document.documentElement.classList.contains("apg-sidebar-collapsed"));}}}}'
+        'function apgCloseSidebar(){{document.documentElement.classList.remove("apg-sidebar-open");}}'
+        'try{{if(localStorage.getItem("apg-sidebar-collapsed")==="1")document.documentElement.classList.add("apg-sidebar-collapsed");}}catch(e){{}}'
+        'document.addEventListener("keydown",function(e){{if(e.key==="Escape")apgCloseSidebar();}});'
         '</script>'
     )
     skeleton_css = (
@@ -3725,6 +3755,7 @@ def _html_page(title: str, body: str) -> str:
         '<body class="min-h-full bg-gray-50 text-gray-900">'
         '<a class="apg-skip-link" href="#content">Skip to content</a>'
         f'<header class="apg-topbar sticky top-0 z-50" role="banner">'
+        f'  <button class="apg-icon-btn" type="button" onclick="apgToggleSidebar()" aria-label="Toggle navigation">☰</button>'
         f'  <a class="apg-logo" href="/ui">{{safe_module}}</a>'
         f'  <nav class="apg-topnav ml-4">'
         f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui">Home</a>'
@@ -3733,7 +3764,8 @@ def _html_page(title: str, body: str) -> str:
         f'  </nav>'
         f'  <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">System</button>'
         f'</header>'
-        f'<main class="apg-content" id="content" tabindex="-1">{{body}}</main>'
+        f'{{sidebar_html}}'
+        f'<main class="apg-content apg-shell-content" id="content" tabindex="-1">{{body}}</main>'
         f"{{toast_js}}"
         f"{{cmd_palette_html}}"
         "</body></html>"

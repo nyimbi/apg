@@ -24,6 +24,9 @@
        class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-500 hover:border-gray-300 transition-colors">
       API JSON ↗
     </a>
+    <button type="button" class="apg-btn" onclick="document.getElementById('apg-create-drawer').showModal();">
+      New {{ entity_name }}
+    </button>
   </div>
 </nav>
 
@@ -48,28 +51,26 @@
   </div>
 </form>
 
-<div class="flex items-start gap-5 flex-col lg:flex-row">
-
-  {# ── Create form ─────────────────────────────────────────────── #}
-  <aside class="w-full lg:w-72 shrink-0">
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden sticky top-4">
-      <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-        <h2 class="text-sm font-semibold text-gray-900">New {{ entity_name }}</h2>
-        <span class="text-xs font-medium uppercase tracking-wide text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{{ entity_type }}</span>
+<dialog id="apg-create-drawer" class="apg-drawer" aria-labelledby="apg-create-title">
+  <form method="post" action="/ui/entities/{{ safe_entity }}/records" novalidate class="apg-drawer-panel">
+    <header class="apg-card-header">
+      <div>
+        <h2 id="apg-create-title" class="text-base font-semibold text-gray-900">New {{ entity_name }}</h2>
+        <p class="text-xs text-gray-400 mt-1">{{ entity_type }}</p>
       </div>
-      <form method="post" action="/ui/entities/{{ safe_entity }}/records" novalidate>
-        <div class="overflow-y-auto max-h-[55vh] px-4 pt-4 space-y-3">
-          {{ create_inputs | safe }}
-        </div>
-        <div class="px-4 pb-4 pt-3 border-t border-gray-100">
-          <button type="submit"
-                  class="w-full px-3 py-2 bg-apg-primary text-white text-sm font-medium rounded-lg hover:opacity-90 active:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-apg-primary focus:ring-offset-2">
-            Create {{ entity_name }}
-          </button>
-        </div>
-      </form>
+      <button type="button" class="apg-btn apg-btn-secondary" onclick="document.getElementById('apg-create-drawer').close();">Close</button>
+    </header>
+    <div class="overflow-y-auto max-h-[70vh] space-y-3">
+      {{ create_inputs | safe }}
     </div>
-  </aside>
+    <footer class="flex items-center justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
+      <button type="button" class="apg-btn apg-btn-secondary" onclick="document.getElementById('apg-create-drawer').close();">Cancel</button>
+      <button type="submit" class="apg-btn">Create {{ entity_name }}</button>
+    </footer>
+  </form>
+</dialog>
+
+<div class="flex items-start gap-5 flex-col lg:flex-row">
 
   {# ── Records section ─────────────────────────────────────────── #}
   <section class="flex-1 min-w-0">
@@ -99,7 +100,8 @@
         </p>
         {% else %}
         <p class="text-sm font-medium text-gray-500">No {{ entity_name }} records yet.</p>
-        <p class="text-xs text-gray-400 mt-1">Use the form on the left to create the first one.</p>
+        <p class="text-xs text-gray-400 mt-1">Create the first record to get started.</p>
+        <button type="button" class="apg-btn mt-4" onclick="document.getElementById('apg-create-drawer').showModal();">New {{ entity_name }}</button>
         {% endif %}
       </div>
     {% endif %}

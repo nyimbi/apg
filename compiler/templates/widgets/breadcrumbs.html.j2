@@ -1,0 +1,10 @@
+<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap" aria-label="Breadcrumb">
+  {% for item in breadcrumbs %}
+    {% if item.href and not loop.last %}
+    <a href="{{ item.href }}" class="hover:text-apg-primary transition-colors">{{ item.label }}</a>
+    {% else %}
+    <span class="font-semibold text-gray-900" {% if loop.last %}aria-current="page"{% endif %}>{{ item.label }}</span>
+    {% endif %}
+    {% if not loop.last %}<span aria-hidden="true">/</span>{% endif %}
+  {% endfor %}
+</nav>

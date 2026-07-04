@@ -94,6 +94,7 @@ p { margin: 0 0 var(--apg-space-3); }
 	background: var(--apg-surface);
 	box-shadow: var(--apg-shadow-sm);
 }
+.apg-icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0; border: 1px solid var(--apg-border); border-radius: var(--apg-radius-sm); background: var(--apg-surface); color: var(--apg-text); }
 .apg-logo { font-weight: 700; font-size: 1rem; color: var(--apg-primary) !important; text-decoration: none !important; }
 .apg-topnav { display: flex; align-items: center; gap: var(--apg-space-1); flex: 1; }
 .apg-content { max-width: 1280px; margin: 0 auto; padding: var(--apg-space-6); }
@@ -124,6 +125,21 @@ p { margin: 0 0 var(--apg-space-3); }
 	background: var(--apg-surface);
 	color: var(--apg-text);
 }
+.apg-sidebar { position: fixed; top: var(--apg-topbar-height); bottom: 0; left: 0; z-index: 80; width: var(--apg-sidebar-width); overflow-y: auto; border-right: 1px solid var(--apg-border); background: var(--apg-surface); padding: var(--apg-space-4); transition: transform var(--apg-duration-base), width var(--apg-duration-base); }
+.apg-sidebar-section + .apg-sidebar-section { margin-top: var(--apg-space-5); }
+.apg-sidebar-heading { margin: 0 0 var(--apg-space-2); font-size: 0.72rem; font-weight: 700; color: var(--apg-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.apg-sidebar-link { display: flex; align-items: center; min-height: 44px; padding: 0.55rem 0.65rem; border-radius: var(--apg-radius-sm); color: var(--apg-text); font-size: 0.875rem; text-decoration: none; }
+.apg-sidebar-link:hover,
+.apg-sidebar-link[aria-current="page"] { background: var(--apg-bg-hover); text-decoration: none; opacity: 1; }
+.apg-sidebar-empty { display: block; color: var(--apg-muted); font-size: 0.8rem; padding: var(--apg-space-2); }
+.apg-sidebar-backdrop { display: none; position: fixed; inset: var(--apg-topbar-height) 0 0 0; z-index: 70; background: rgba(0,0,0,0.35); }
+.apg-shell-content { padding-left: calc(var(--apg-sidebar-width) + var(--apg-space-6)); }
+:root.apg-sidebar-collapsed .apg-sidebar { width: 4.5rem; }
+:root.apg-sidebar-collapsed .apg-sidebar-heading,
+:root.apg-sidebar-collapsed .apg-sidebar-empty { display: none; }
+:root.apg-sidebar-collapsed .apg-sidebar-link { justify-content: center; font-size: 0; }
+:root.apg-sidebar-collapsed .apg-sidebar-link::first-letter { font-size: 0.875rem; }
+:root.apg-sidebar-collapsed .apg-shell-content { padding-left: calc(4.5rem + var(--apg-space-6)); }
 
 .apg-card {
 	background: var(--apg-bg-card);
@@ -242,6 +258,9 @@ pre code { background: transparent; padding: 0; color: inherit; }
 .apg-dialog { border: 0; padding: 0; border-radius: var(--apg-radius); background: transparent; color: var(--apg-text); }
 .apg-dialog::backdrop { background: rgba(0,0,0,0.45); }
 .apg-dialog-panel { width: min(92vw, 28rem); margin: 0; padding: var(--apg-space-4); }
+.apg-drawer { width: min(92vw, 34rem); max-width: none; height: 100vh; max-height: 100vh; margin: 0 0 0 auto; padding: 0; border: 0; background: transparent; color: var(--apg-text); }
+.apg-drawer::backdrop { background: rgba(0,0,0,0.42); }
+.apg-drawer-panel { min-height: 100%; margin: 0; border-radius: 0; border: 0; box-shadow: var(--apg-shadow-lg); padding: var(--apg-space-5); background: var(--apg-surface); }
 
 .hero-gradient { background: linear-gradient(135deg, var(--apg-primary), var(--apg-accent)); }
 .apg-kanban-col { min-height: 12rem; }
@@ -348,6 +367,7 @@ pre code { background: transparent; padding: 0; color: inherit; }
 .max-h-64 { max-height: 16rem; }
 .max-h-80 { max-height: 20rem; }
 .max-h-\[55vh\] { max-height: 55vh; }
+.max-h-\[70vh\] { max-height: 70vh; }
 .m-0 { margin: 0; }
 .mx-auto { margin-left: auto; margin-right: auto; }
 .mx-1 { margin-left: 0.25rem; margin-right: 0.25rem; }
@@ -615,4 +635,13 @@ pre code { background: transparent; padding: 0; color: inherit; }
 	.apg-grid-2, .apg-grid-3, .apg-grid-4 { grid-template-columns: 1fr; }
 	.apg-topbar { padding: 0 var(--apg-space-3); overflow-x: auto; }
 	.apg-content { padding: var(--apg-space-4); }
+	.apg-sidebar { transform: translateX(-100%); }
+	.apg-shell-content,
+	:root.apg-sidebar-collapsed .apg-shell-content { padding-left: var(--apg-space-4); }
+	:root.apg-sidebar-open .apg-sidebar { transform: translateX(0); }
+	:root.apg-sidebar-open .apg-sidebar-backdrop { display: block; }
+	.apg-drawer { width: 100vw; }
+}
+@media (max-width: 480px) {
+	.apg-table { min-width: 42rem; }
 }
