@@ -5613,10 +5613,66 @@ def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
     fields = _field_specs(entity_name)
     records = list_records(entity_name)
     safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
-    line_data = [{{"x": i, "y": len(records)}} for i in range(30)]
+    import datetime as _dt
+
+    date_candidates = [
+        str(field.get("name", ""))
+        for field in fields
+        if str(field.get("type", "")).lower() in {{"date", "datetime", "timestamp"}}
+    ]
+    date_candidates.extend(["created_at", "created_on", "created", "updated_at", "updated_on", "date", "timestamp"])
+
+    def parse_record_date(value: Any) -> _dt.date | None:
+        if value in (None, ""):
+            return None
+        text = str(value).strip().replace("Z", "+00:00")
+        try:
+            return _dt.datetime.fromisoformat(text).date()
+        except ValueError:
+            try:
+                return _dt.date.fromisoformat(text[:10])
+            except ValueError:
+                return None
+
+    dated_records: list[tuple[_dt.date, Dict[str, Any]]] = []
+    date_field = ""
+    for candidate in date_candidates:
+        values = [
+            (parsed, record)
+            for record in records
+            for parsed in [parse_record_date(record.get(candidate))]
+            if parsed is not None
+        ]
+        if values:
+            date_field = candidate
+            dated_records = values
+            break
+
+    line_data = []
+    recent_count = 0
+    date_range = ""
+    if dated_records:
+        end_date = max(day for day, _record in dated_records)
+        start_date = end_date - _dt.timedelta(days=29)
+        counts_by_day: Dict[_dt.date, int] = {{}}
+        for day, _record in dated_records:
+            if day < start_date or day > end_date:
+                continue
+            counts_by_day[day] = counts_by_day.get(day, 0) + 1
+        for index in range(30):
+            day = start_date + _dt.timedelta(days=index)
+            line_data.append({{"x": day.isoformat(), "y": counts_by_day.get(day, 0)}})
+        recent_start = end_date - _dt.timedelta(days=6)
+        recent_count = sum(1 for day, _record in dated_records if day >= recent_start)
+        date_range = f"{{start_date.isoformat()}} to {{end_date.isoformat()}}"
     line_chart = {{
         "id": f"analytics-line-{{_css_name(entity_name)}}",
-        "spec_json": _chart_json({{"type": "line", "title": f"{{entity_name}} records over time", "data": line_data, "empty": "No records yet"}}),
+        "spec_json": _chart_json({{
+            "type": "line",
+            "title": f"{{entity_name}} records over time",
+            "data": line_data,
+            "empty": "No date field data yet",
+        }}),
     }}
     status_field = _status_field_name(fields)
     counts: Dict[str, int] = {{}}
@@ -5624,6 +5680,15 @@ def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
         for record in records:
             key = str(record.get(status_field) or "Unspecified")
             counts[key] = counts.get(key, 0) + 1
+    status_rows = []
+    total_status = sum(counts.values())
+    for key, value in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
+        status_rows.append({{
+            "label": key,
+            "count": value,
+            "percent": round((value / total_status) * 100, 1) if total_status else 0,
+            "url": _ui_entity_query_path(entity_name, updates={{f"filter.{{status_field}}": key}}) if status_field else _ui_entity_query_path(entity_name),
+        }})
     status_chart = {{
         "id": f"analytics-status-{{_css_name(entity_name)}}",
         "spec_json": _chart_json({{
@@ -5643,18 +5708,59 @@ def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
             value = record.get(field_name)
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 values.append(float(value))
+            elif isinstance(value, str):
+                try:
+                    values.append(float(value.replace(",", "")))
+                except ValueError:
+                    continue
         if values:
             numeric_stats.append({{
                 "field": field_name,
                 "min": round(min(values), 2),
                 "avg": round(sum(values) / len(values), 2),
                 "max": round(max(values), 2),
+                "count": len(values),
             }})
+    top_status = status_rows[0] if status_rows else None
+    metrics = [
+        {{"label": "Records", "value": len(records), "hint": "Total rows", "url": _ui_entity_query_path(entity_name)}},
+        {{"label": "Recent", "value": recent_count, "hint": "Last 7 days" if date_field else "Needs date field", "url": _ui_entity_query_path(entity_name)}},
+        {{"label": "Statuses", "value": len(status_rows), "hint": status_field or "No status field", "url": _ui_entity_query_path(entity_name)}},
+        {{"label": "Measures", "value": len(numeric_stats), "hint": "Numeric fields", "url": _ui_entity_query_path(entity_name)}},
+    ]
+    insights = []
+    if top_status:
+        insights.append({{
+            "title": "Largest segment",
+            "body": f"{{top_status['label']}} has {{top_status['count']}} record{{'s' if top_status['count'] != 1 else ''}}.",
+            "url": top_status["url"],
+            "action": f"View {{top_status['label']}} records",
+        }})
+    if date_field and date_range:
+        insights.append({{
+            "title": "Trend window",
+            "body": f"Using {{date_field}} across {{date_range}}.",
+            "url": _ui_entity_query_path(entity_name),
+            "action": "Open table",
+        }})
+    if not records:
+        insights.append({{
+            "title": "No records yet",
+            "body": "Create records before reading analytics.",
+            "url": _ui_entity_query_path(entity_name),
+            "action": f"Create {{entity_name}}",
+        }})
     tmpl_body = _render_template(
         "entity_analytics.html.j2",
         entity_name=entity_name,
         safe_entity=safe_entity,
         total=len(records),
+        metrics=metrics,
+        status_field=status_field or "",
+        status_rows=status_rows,
+        date_field=date_field,
+        date_range=date_range,
+        insights=insights,
         line_chart=line_chart,
         status_chart=status_chart,
         numeric_stats=numeric_stats,

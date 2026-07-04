@@ -9,20 +9,63 @@
   </div>
 </section>
 
+<section class="apg-analytics-metrics" aria-label="{{ entity_name }} analytics summary">
+  {% for metric in metrics %}
+  <a href="{{ metric.url }}" class="apg-analytics-metric">
+    <span>{{ metric.label }}</span>
+    <strong>{{ metric.value }}</strong>
+    <small>{{ metric.hint }}</small>
+  </a>
+  {% endfor %}
+</section>
+
 <section class="apg-grid-2 gap-6 mb-6">
   <article class="apg-card">
-    <div class="apg-card-header"><h2 class="text-sm font-semibold text-gray-900">Records Over Time</h2></div>
+    <div class="apg-card-header">
+      <div>
+        <h2 class="text-sm font-semibold text-gray-900">Records Over Time</h2>
+        <p class="text-xs text-gray-400 mt-1">{% if date_field %}Grouped by {{ date_field }}{% else %}Add a date field for trend history{% endif %}</p>
+      </div>
+    </div>
     <div class="apg-chart" data-apg-chart="{{ line_chart.id }}"></div>
     <script id="{{ line_chart.id }}" type="application/json">{{ line_chart.spec_json | safe }}</script>
   </article>
   <article class="apg-card">
-    <div class="apg-card-header"><h2 class="text-sm font-semibold text-gray-900">Status Distribution</h2></div>
+    <div class="apg-card-header">
+      <div>
+        <h2 class="text-sm font-semibold text-gray-900">Status Distribution</h2>
+        <p class="text-xs text-gray-400 mt-1">{% if status_field %}Click a segment below to inspect records{% else %}No status field detected{% endif %}</p>
+      </div>
+    </div>
     <div class="apg-chart" data-apg-chart="{{ status_chart.id }}"></div>
     <script id="{{ status_chart.id }}" type="application/json">{{ status_chart.spec_json | safe }}</script>
+    {% if status_rows %}
+    <div class="apg-status-drilldown" aria-label="Status drilldown">
+      {% for row in status_rows %}
+      <a href="{{ row.url }}" class="apg-status-row">
+        <span>{{ row.label }}</span>
+        <strong>{{ row.count }}</strong>
+        <small>{{ row.percent }}%</small>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
   </article>
 </section>
 
-<section class="apg-grid-3 gap-4">
+{% if insights %}
+<section class="apg-analytics-insights" aria-label="Analytics insights">
+  {% for insight in insights %}
+  <article class="apg-card">
+    <h2 class="text-sm font-semibold text-gray-900 mb-2">{{ insight.title }}</h2>
+    <p class="text-sm text-gray-500">{{ insight.body }}</p>
+    <a href="{{ insight.url }}" class="apg-btn apg-btn-secondary mt-3">{{ insight.action }}</a>
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
+
+<section class="apg-grid-3 gap-4" aria-label="Numeric field statistics">
   {% for stat in numeric_stats %}
   <article class="apg-card">
     <h2 class="text-sm font-semibold text-gray-900 mb-3">{{ stat.field }}</h2>
@@ -31,8 +74,9 @@
       <div><dt class="text-xs text-gray-400">Avg</dt><dd class="font-semibold">{{ stat.avg }}</dd></div>
       <div><dt class="text-xs text-gray-400">Max</dt><dd class="font-semibold">{{ stat.max }}</dd></div>
     </dl>
+    <p class="text-xs text-gray-400 mt-3">{{ stat.count }} measured record{{ 's' if stat.count != 1 else '' }}</p>
   </article>
   {% else %}
-  <article class="apg-card"><div class="apg-chart-empty"><p>No numeric fields available</p></div></article>
+  <article class="apg-card"><div class="apg-chart-empty"><p>No numeric fields available for {{ entity_name }}</p></div></article>
   {% endfor %}
 </section>

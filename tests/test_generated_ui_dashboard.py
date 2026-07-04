@@ -109,3 +109,71 @@ def test_generated_entity_list_exposes_saved_views_and_filter_state():
 	assert "filter.status=active" in filtered
 	assert "q=Acme" in filtered
 	assert "dir=asc&amp;filter.status=active&amp;q=Acme&amp;sort=id" in filtered
+
+
+def test_generated_entity_analytics_uses_record_dates_and_drilldowns():
+	result = compile_apg_file("examples/20_enterprise_erp_platform/main.apg")
+	assert result.success, result.errors
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	for record in [
+		{
+			"vendor_number": "V-001",
+			"legal_name": "Acme Components",
+			"tax_id": "KE-123",
+			"payment_terms": "net_30",
+			"currency": "KES",
+			"bank_account": "100200",
+			"status": "active",
+			"country": "KE",
+			"created_at": "2026-07-01",
+		},
+		{
+			"vendor_number": "V-002",
+			"legal_name": "Nairobi Supplies",
+			"tax_id": "KE-456",
+			"payment_terms": "net_15",
+			"currency": "KES",
+			"bank_account": "100201",
+			"status": "suspended",
+			"country": "KE",
+			"created_at": "2026-07-02",
+		},
+		{
+			"vendor_number": "V-003",
+			"legal_name": "Lagos Parts",
+			"tax_id": "NG-789",
+			"payment_terms": "net_30",
+			"currency": "NGN",
+			"bank_account": "100202",
+			"status": "active",
+			"country": "NG",
+			"created_at": "2026-07-03",
+		},
+	]:
+		create_status, create_payload = namespace["create_record"]("Vendor", record)
+		assert create_status == 201, create_payload
+
+	status, html = namespace["_ui_payload"]("/ui/entities/Vendor", {"view": ["analytics"]})
+	assert status == 200
+	assert 'aria-label="Vendor analytics summary"' in html
+	assert "Grouped by created_at" in html
+	assert "Largest segment" in html
+	assert "View active records" in html
+	assert "filter.status=active" in html
+	assert "apg-status-row" in html
+
+	specs = _json_scripts(html)
+	line_spec = next(spec for spec in specs if spec["type"] == "line")
+	donut_spec = next(spec for spec in specs if spec["type"] == "donut")
+	assert len(line_spec["data"]) == 30
+	assert [point for point in line_spec["data"] if point["y"] == 1][-3:] == [
+		{"x": "2026-07-01", "y": 1},
+		{"x": "2026-07-02", "y": 1},
+		{"x": "2026-07-03", "y": 1},
+	]
+	assert donut_spec["data"] == [
+		{"label": "active", "value": 2},
+		{"label": "suspended", "value": 1},
+	]
