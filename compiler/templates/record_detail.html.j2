@@ -1,7 +1,8 @@
 {# record_detail.html.j2 — Salesforce-quality record detail page
    Variables: entity_name, entity_type, safe_entity, safe_record_id,
               record, fields, field_semantics, title, status_val, revision,
-              related_lists, has_kanban (bool)
+              related_lists, related_count, prev_record_url, next_record_url,
+              record_url, has_kanban (bool)
    related_lists: [{"entity": str, "fk_field": str, "records": [dict], "cols": [str]}]
    field_semantics: {field_name: semantic_type}
 #}
@@ -43,9 +44,23 @@
       {% endif %}
     </div>
     <div class="flex items-center gap-2 flex-shrink-0 flex-wrap">
+      {% if prev_record_url %}
+      <a href="{{ prev_record_url }}" class="apg-btn apg-btn-secondary">Previous</a>
+      {% endif %}
+      {% if next_record_url %}
+      <a href="{{ next_record_url }}" class="apg-btn apg-btn-secondary">Next</a>
+      {% endif %}
+      <button type="button"
+              class="apg-btn apg-btn-secondary"
+              onclick="navigator.clipboard && navigator.clipboard.writeText(location.origin + '{{ record_url }}'); APGToast('Record link copied', 'success');">
+        Copy link
+      </button>
+      {% if has_kanban %}
+      <a href="/ui/entities/{{ safe_entity }}?view=kanban" class="apg-btn apg-btn-secondary">Kanban</a>
+      {% endif %}
       <a href="/ui/workflows/{{ safe_entity }}/create_{{ safe_entity }}"
-         class="px-3 py-1.5 text-sm font-medium bg-apg-primary text-white rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap">
-        ⚡ Workflow
+         class="apg-btn">
+        Workflow
       </a>
       <form method="post"
             action="/ui/entities/{{ safe_entity }}/records/{{ safe_record_id }}/delete"
@@ -108,7 +123,7 @@
     Related
     {% if related_lists %}
     <span class="ml-1 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
-      {{ related_lists | sum(attribute='records') | length if related_lists else 0 }}
+      {{ related_count }}
     </span>
     {% endif %}
   </button>
@@ -167,8 +182,8 @@
           <h2 class="text-sm font-semibold text-gray-900">{{ rel.entity }}</h2>
           <span class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">{{ rel.records | length }}</span>
         </div>
-        <a href="/ui/entities/{{ rel.entity | urlencode }}"
-           class="text-xs text-apg-primary hover:underline">View all →</a>
+        <a href="{{ rel.list_url }}"
+           class="text-xs text-apg-primary hover:underline">View filtered</a>
       </div>
       {% if rel.records %}
       <div class="overflow-x-auto">
@@ -201,7 +216,7 @@
             <tr>
               <td colspan="{{ rel.cols | length + 1 }}" class="px-4 py-2.5 text-center text-xs text-gray-400">
                 + {{ rel.records | length - 5 }} more —
-                <a href="/ui/entities/{{ rel.entity | urlencode }}" class="text-apg-primary hover:underline">view all</a>
+                <a href="{{ rel.list_url }}" class="text-apg-primary hover:underline">view filtered</a>
               </td>
             </tr>
             {% endif %}
@@ -209,7 +224,13 @@
         </table>
       </div>
       {% else %}
-      <div class="px-4 py-8 text-center text-sm text-gray-400">No related {{ rel.entity }} records.</div>
+      <div class="px-4 py-8 text-center text-sm text-gray-400">
+        <p>No related {{ rel.entity }} records through {{ rel.fk_field }}.</p>
+        <div class="mt-3 flex items-center justify-center gap-2 flex-wrap">
+          <a href="{{ rel.list_url }}" class="apg-btn apg-btn-secondary">Open filtered list</a>
+          <a href="{{ rel.create_url }}" class="apg-btn">Create {{ rel.entity }}</a>
+        </div>
+      </div>
       {% endif %}
     </div>
     {% endfor %}

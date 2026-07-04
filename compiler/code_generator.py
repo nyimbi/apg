@@ -5869,11 +5869,21 @@ def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
     safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
     safe_record_id = html.escape(quote(record_id, safe=""), quote=True)
 
-    # Pick a good display title (first non-id string field value, or id prefix)
+    # Pick a good display title (preferred name field, first string value, or id prefix)
+    preferred_title_names = ("legal_name", "full_name", "name", "title", "subject", "number", "code")
     title_field = next(
-        (f for f in fields if str(f.get("type", "")).lower() in {{"str", "string", "text", "email", "varchar"}} and str(f.get("name")) not in {{"id", "_revision"}}),
+        (
+            f for preferred in preferred_title_names
+            for f in fields
+            if str(f.get("name", "")).lower() == preferred
+        ),
         None,
     )
+    if title_field is None:
+        title_field = next(
+            (f for f in fields if str(f.get("type", "")).lower() in {{"str", "string", "text", "email", "varchar"}} and str(f.get("name")) not in {{"id", "_revision"}}),
+            None,
+        )
     title = str(record.get(title_field["name"], record_id) if title_field else record_id)[:80]
 
     # Status badge value
@@ -5900,12 +5910,34 @@ def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
         if fk_field:
             fk_name = str(fk_field["name"])
             rel_result = query_records(ent, {{f"filter.{{fk_name}}": [record_id]}})
-            if rel_result.get("records"):
-                rel_cols = ["id"] + [str(f["name"]) for f in ent_fields if str(f.get("name")) not in {{"id", "_revision", fk_name}}][:4]
-                related_lists.append({{"entity": ent, "fk_field": fk_name, "records": rel_result["records"], "cols": rel_cols}})
+            rel_records = rel_result.get("records", [])
+            rel_cols = ["id"] + [str(f["name"]) for f in ent_fields if str(f.get("name")) not in {{"id", "_revision", fk_name}}][:4]
+            related_lists.append({{
+                "entity": ent,
+                "fk_field": fk_name,
+                "records": rel_records,
+                "count": len(rel_records),
+                "cols": rel_cols,
+                "list_url": _ui_entity_query_path(ent, updates={{f"filter.{{fk_name}}": record_id}}),
+                "create_url": _ui_entity_query_path(ent),
+            }})
 
     has_kanban = any(str(f.get("name", "")).lower() in {{"status", "state", "stage", "phase"}} for f in fields)
     revision = html.escape(str(record.get("_revision", "")))
+    entity_records = list_records(entity_name)
+    record_ids = [str(item.get("id", "")) for item in entity_records if item.get("id", "") not in (None, "")]
+    try:
+        current_index = record_ids.index(str(record_id))
+    except ValueError:
+        current_index = -1
+    prev_record_url = ""
+    next_record_url = ""
+    if current_index > 0:
+        prev_record_url = f"/ui/entities/{{safe_entity}}/{{quote(record_ids[current_index - 1], safe='')}}"
+    if current_index >= 0 and current_index < len(record_ids) - 1:
+        next_record_url = f"/ui/entities/{{safe_entity}}/{{quote(record_ids[current_index + 1], safe='')}}"
+    related_count = sum(int(rel.get("count", 0)) for rel in related_lists)
+    record_url = f"/ui/entities/{{safe_entity}}/{{safe_record_id}}"
 
     display_fields = [f for f in fields if str(f.get("name")) != "_revision"]
     field_semantics = {{
@@ -5925,6 +5957,10 @@ def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
         status_val=html.escape(status_val),
         revision=revision,
         related_lists=related_lists,
+        related_count=related_count,
+        prev_record_url=prev_record_url,
+        next_record_url=next_record_url,
+        record_url=record_url,
         has_kanban=has_kanban,
         activity_events=_get_activity(entity_name, record_id),
     )

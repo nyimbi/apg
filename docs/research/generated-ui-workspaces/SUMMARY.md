@@ -299,6 +299,60 @@ Validation evidence:
 - Full suite: `1478 passed, 1 skipped, 3 warnings in 799.95s`.
 - PythonCodeGenerator tripwire clean.
 
+### record-detail-activity-related
+
+Status: complete.
+
+Intended commit:
+
+```text
+ux(record-detail-activity-related): render related records and navigation
+```
+
+Files:
+
+- `compiler/code_generator.py`
+- `compiler/templates/record_detail.html.j2`
+- `tests/test_generated_ui_dashboard.py`
+- `examples/01_minimal_customer_records/output/app.py`
+- `examples/02_customer_orders_relationship/output/app.py`
+- `examples/03_inventory_typed_records/output/app.py`
+- `examples/04_order_fulfillment_model/output/app.py`
+- `examples/05_single_support_agent/output/app.py`
+- `examples/06_support_agent_team/output/app.py`
+- `examples/07_multi_runtime_agent_team/output/app.py`
+- `examples/08_basic_capability_contract/output/app.py`
+- `examples/09_capability_rules_configuration/output/app.py`
+- `examples/10_themed_i18n_streaming_capability/output/app.py`
+- `examples/11_screen_composition_relationships/output/app.py`
+- `examples/12_finance_general_ledger/output/app.py`
+- `examples/13_procurement_approval_workbench/output/app.py`
+- `examples/14_inventory_warehouse_operations/output/app.py`
+- `examples/15_manufacturing_quality_control/output/app.py`
+- `examples/16_hr_payroll_operations/output/app.py`
+- `examples/17_crm_sales_pipeline/output/app.py`
+- `examples/18_operations_dashboard_capability/output/app.py`
+- `examples/19_multi_capability_dependency_suite/output/app.py`
+- `examples/20_enterprise_erp_platform/output/app.py`
+- `docs/research/generated-ui-workspaces/record-detail-activity-related/README.md`
+- `docs/research/generated-ui-workspaces/record-detail-activity-related/thinking.md`
+- `docs/research/generated-ui-workspaces/record-detail-activity-related/sources.md`
+- `docs/research/generated-ui-workspaces/record-detail-activity-related/rationale.md`
+- `docs/research/generated-ui-workspaces/record-detail-activity-related/assets/before-customer-detail.html`
+- `docs/research/generated-ui-workspaces/record-detail-activity-related/assets/before-customer-detail.headers`
+- `docs/research/generated-ui-workspaces/record-detail-activity-related/assets/after-customer-detail.html`
+- `docs/research/generated-ui-workspaces/record-detail-activity-related/assets/after-customer-detail.headers`
+- `docs/research/generated-ui-workspaces/SUMMARY.md`
+
+Validation evidence:
+
+- Live before audit: example 02 `/ui/entities/Customer/1` booted at `127.0.0.1:20888` and fell back to raw JSON when related records existed.
+- Live after audit: regenerated example 02 `/ui/entities/Customer/1` booted at `127.0.0.1:20889` and rendered the full record page.
+- Regenerated all 20 numbered examples through `APGCompiler.compile_file()`.
+- Targeted tests: `2 passed in 1.19s`.
+- Full suite: `1479 passed, 1 skipped, 3 warnings in 790.16s`.
+- PythonCodeGenerator tripwire clean.
+
 ## Verdicts
 
 | Workspace | Before | After | Status |
@@ -307,6 +361,7 @@ Validation evidence:
 | entity-list-table-filters-saved-views | Generic table page with no saved views, hidden filter state, top-level API JSON link, and filter-dropping pagination/sort links. | Saved-view tabs, semantic `Active` preset, active filter chips, query-preserving pagination/sort/page-size links, canonical table wrapper, and developer exports disclosure. | Complete |
 | entity-analytics | Chart-present but shallow: flat placeholder trend, no drill-through, no headline metrics, and no actionable insights. | Date-bucketed trend data, summary metrics, status drill-through links, largest-segment and trend-window insights, and clearer empty states. | Complete |
 | kanban | `view=kanban` silently fell back to the entity list because the template used unsupported Jinja loop control; movement was pointer-only. | Template renders with default Jinja, cards have keyboard/server move controls, board context is preserved after moves, columns have drill-through and WIP guidance. | Complete |
+| record-detail-activity-related | Related records caused raw JSON fallback; no copy link or prev/next navigation; title selection preferred generated numbers. | Full record template renders with related records, filtered related links, activity/notes, copy link, next/previous navigation, and human-readable titles. | Complete |
 
 ## Defect Ledger
 
@@ -330,3 +385,7 @@ Validation evidence:
 | kanban | Card movement required pointer drag/drop. | Added native per-card move forms with status select and submit button. | Resolved |
 | kanban | Server-rendered card moves redirected to the list. | Added `return_view=kanban` handling for UI record updates. | Resolved |
 | kanban | Columns had no drill-through or bottleneck signal. | Added filtered list links, board summary metrics, and generated WIP guidance. | Resolved |
+| record-detail-activity-related | Related-record pages fell back to raw JSON. | Moved related count computation into Python and removed brittle Jinja list summing. | Resolved |
+| record-detail-activity-related | Related entity sections were hidden unless child records already existed. | Added related candidates with empty-state CTAs and filtered list links. | Resolved |
+| record-detail-activity-related | Record review lacked copy and adjacent navigation. | Added copy-link, previous, and next header controls. | Resolved |
+| record-detail-activity-related | Display title selected generated identifiers before meaningful names. | Preferred `legal_name`, `full_name`, `name`, and similar fields. | Resolved |

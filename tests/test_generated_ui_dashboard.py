@@ -220,3 +220,60 @@ def test_generated_kanban_renders_board_and_keyboard_move_controls():
 	)
 	assert move_status == 303
 	assert move_payload["location"] == "/ui/entities/Vendor?view=kanban"
+
+
+def test_generated_record_detail_renders_related_activity_and_navigation():
+	result = compile_apg_file("examples/02_customer_orders_relationship/main.apg")
+	assert result.success, result.errors
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	for index in [1, 2]:
+		create_status, create_payload = namespace["create_record"](
+			"Customer",
+			{
+				"customer_number": f"C-{index:03d}",
+				"legal_name": f"Customer {index}",
+				"email": f"c{index}@example.com",
+				"phone": "+254700000001",
+				"segment": "standard",
+				"credit_limit": 10000,
+				"is_active": True,
+				"tags": ["retail"],
+				"attributes": {"region": "EA"},
+			},
+		)
+		assert create_status == 201, create_payload
+
+	order_status, order_payload = namespace["create_record"](
+		"Order",
+		{
+			"order_number": "O-001",
+			"customer_id": "1",
+			"order_date": "2026-07-01",
+			"delivery_date": "2026-07-05",
+			"status": "open",
+			"currency": "KES",
+			"subtotal": 1000,
+			"tax": 250,
+			"total": 1250,
+			"notes": "first order",
+			"line_items": [{"sku": "SKU-1"}],
+			"metadata": {"channel": "direct"},
+		},
+	)
+	assert order_status == 201, order_payload
+
+	status, html = namespace["_ui_record_detail_html"]("Customer", "1")
+	assert status == 200
+	assert "Record Details" in html
+	assert "Customer 1" in html
+	assert "Related" in html
+	assert "Activity" in html
+	assert "Copy link" in html
+	assert "Next" in html
+	assert "Order" in html
+	assert "View filtered" in html
+	assert "filter.customer_id=1" in html
+	assert "Save Note" in html
+	assert "<pre>" not in html
