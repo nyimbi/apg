@@ -1009,8 +1009,91 @@ def list_entities() -> list[Dict[str, Any]]:
     return [dict(entity) for entity in ENTITIES]
 
 
+def _database_schema_name(database: Dict[str, Any]) -> str:
+    config = database.get("connection_config", {{}})
+    if isinstance(config, dict) and config.get("schema"):
+        return str(config.get("schema"))
+    for field in database.get("fields", []):
+        if isinstance(field, dict) and field.get("name") == "schema" and field.get("default"):
+            return str(field.get("default"))
+    return "public"
+
+
+def _database_column_specs(entity: Dict[str, Any]) -> list[Dict[str, Any]]:
+    entity_name = str(entity.get("name", ""))
+    columns: list[Dict[str, Any]] = [
+        {{"name": "id", "type": "integer", "required": True, "nullable": False, "primary_key": True}}
+    ]
+    for field in entity.get("fields", []):
+        if not isinstance(field, dict):
+            continue
+        field_name = str(field.get("name", "")).strip()
+        if not field_name or field_name == "id":
+            continue
+        required = bool(field.get("required", False))
+        column: Dict[str, Any] = {{
+            "name": field_name,
+            "type": str(field.get("type", "any")),
+            "required": required,
+            "nullable": not required,
+            "primary_key": False,
+        }}
+        relationship = _field_relationship(entity_name, field_name)
+        if relationship:
+            column["reference"] = {{
+                "table": relationship.get("target_table", ""),
+                "column": relationship.get("target_field", "id"),
+                "cardinality": relationship.get("cardinality", "many-to-one"),
+            }}
+        columns.append(column)
+    return columns
+
+
+def _database_table_specs() -> list[Dict[str, Any]]:
+    tables: list[Dict[str, Any]] = []
+    for entity in ENTITIES:
+        if str(entity.get("type", "")) not in {{"entity", "table"}}:
+            continue
+        table_name = str(entity.get("name", "")).strip()
+        if not table_name:
+            continue
+        columns = _database_column_specs(entity)
+        indexes = [
+            {{"name": f"idx_{{table_name}}_{{column['name']}}", "columns": [column["name"]]}}
+            for column in columns
+            if column.get("name") not in {{"id"}} and (column.get("required") or column.get("reference"))
+        ][:3]
+        tables.append({{
+            "name": table_name,
+            "columns": columns,
+            "indexes": indexes,
+            "source": "generated_entity",
+        }})
+    return tables
+
+
+def _with_inferred_database_schemas(database: Dict[str, Any]) -> Dict[str, Any]:
+    enriched = dict(database)
+    schemas = list(enriched.get("schemas", [])) if isinstance(enriched.get("schemas", []), list) else []
+    if schemas:
+        enriched["schemas"] = schemas
+        return enriched
+    tables = _database_table_specs()
+    if tables:
+        enriched["schemas"] = [
+            {{"name": _database_schema_name(enriched), "tables": tables, "source": "generated_entities"}}
+        ]
+    else:
+        enriched["schemas"] = []
+    return enriched
+
+
 def list_databases() -> list[Dict[str, Any]]:
-    return [dict(entity) for entity in ENTITIES if entity.get("type") == "database"]
+    return [
+        _with_inferred_database_schemas(entity)
+        for entity in ENTITIES
+        if entity.get("type") == "database"
+    ]
 
 
 def list_workflows() -> list[str]:
@@ -5150,11 +5233,27 @@ def _ui_database_catalog_html() -> tuple[int, str]:
     status_label = "valid" if status["valid"] else "invalid"
     databases = list_databases()
     graph = relationship_graph()
-    relationships = [
-        {{"source": edge.get("source", ""), "target": edge.get("target", "")}}
-        for edge in graph.get("edges", [])
-        if isinstance(edge, dict)
-    ]
+    relationships: list[Dict[str, Any]] = []
+    for database in databases:
+        for schema in database.get("schemas", []):
+            schema_name = str(schema.get("name", ""))
+            for table in schema.get("tables", []):
+                table_name = str(table.get("name", ""))
+                for column in table.get("columns", []):
+                    if not isinstance(column, dict) or not isinstance(column.get("reference"), dict):
+                        continue
+                    reference = column["reference"]
+                    relationships.append({{
+                        "source": f"{{schema_name}}.{{table_name}}.{{column.get('name', '')}}",
+                        "target": f"{{reference.get('table', '')}}.{{reference.get('column', 'id')}}",
+                        "cardinality": reference.get("cardinality", "many-to-one"),
+                    }})
+    if not relationships:
+        relationships = [
+            {{"source": edge.get("source", ""), "target": edge.get("target", ""), "cardinality": edge.get("type", "")}}
+            for edge in graph.get("edges", [])
+            if isinstance(edge, dict)
+        ]
     tmpl_body = _render_template(
         "database_catalog.html.j2",
         status=status,

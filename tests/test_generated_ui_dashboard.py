@@ -502,3 +502,43 @@ def test_generated_capability_console_summarizes_operations_and_preserves_inputs
 	assert "Approvers" in approval_html
 	assert "credit_manager" in approval_html
 	assert "finance_controller" in approval_html
+
+
+def test_generated_database_catalog_infers_schemas_and_renders_tables():
+	result = compile_apg_file("examples/20_enterprise_erp_platform/main.apg")
+	assert result.success, result.errors
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	status = namespace["database_status"]()
+	assert status["database_count"] == 1
+	assert status["schema_count"] == 1
+	assert status["table_count"] == 3
+	assert status["valid"] is True
+
+	page_status, html = namespace["_ui_payload"]("/ui/databases")
+	assert page_status == 200
+	assert "Database catalog" in html
+	assert "ERPDB" in html
+	assert "erp_platform" in html
+	assert "Vendor" in html
+	assert "Customer" in html
+	assert "Employee" in html
+	assert "vendor_number" in html
+	assert "Primary key" in html
+	assert "Schema JSON" in html
+	assert "Validation details" in html
+	assert "No schema warnings" in html
+
+	api_status, payload = namespace["_route_payload"]("/databases/ERPDB/schemas")
+	assert api_status == 200
+	schemas = payload["schemas"]
+	assert schemas[0]["name"] == "erp_platform"
+	assert [table["name"] for table in schemas[0]["tables"]] == ["Vendor", "Customer", "Employee"]
+	assert schemas[0]["tables"][0]["columns"][0] == {
+		"name": "id",
+		"type": "integer",
+		"required": True,
+		"nullable": False,
+		"primary_key": True,
+	}

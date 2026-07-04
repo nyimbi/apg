@@ -1,0 +1,672 @@
+<!doctype html><html lang="en" dir="ltr" class="h-full"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><script>(function(){try{var m=localStorage.getItem("apg-theme")||"system";var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;}catch(e){}})();</script><meta name="theme-color" content="#1E5B5A"><link rel="manifest" href="/static/manifest.webmanifest"><link rel="stylesheet" href="/static/apg.css"><link rel="stylesheet" href="/static/uplot.min.css"><script defer src="/static/htmx.min.js"></script><script defer src="/static/sortable.min.js"></script><script defer src="/static/uplot.min.js"></script><script defer src="/static/apg-charts.js"></script><script defer src="/static/apg-sse.js"></script><style>.apg-skeleton{  background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);  background-size:200% 100%;  animation:apg-shimmer 1.5s infinite;  border-radius:4px;}@keyframes apg-shimmer{  0%{background-position:200% 0}  100%{background-position:-200% 0}}.apg-loading .apg-skeleton-row{height:40px;margin-bottom:8px;}.htmx-request .apg-content-area{opacity:0.6;transition:opacity 0.2s;}</style><link rel="stylesheet" href="/theme.css"><title>Databases — enterprise_erp</title></head><body class="min-h-full bg-gray-50 text-gray-900"><a class="apg-skip-link" href="#content">Skip to content</a><div id="apg-offline-banner" class="apg-offline-banner" role="status" hidden>Offline mode: showing cached APG screens.</div><header class="apg-topbar sticky top-0 z-50" role="banner">  <button class="apg-icon-btn" type="button" onclick="apgToggleSidebar()" aria-label="Toggle navigation">☰</button>  <a class="apg-logo" href="/ui">enterprise_erp</a>  <nav class="apg-topnav ml-4">    <a class="apg-nav-link hover:bg-gray-100" href="/ui">Home</a>    <a class="apg-nav-link hover:bg-gray-100" href="/ui/workflows">⚡ Workflows</a>    <a class="apg-nav-link hover:bg-gray-100" href="/ui/marketplace">Marketplace</a>  </nav>  <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">System</button>  <form method="post" action="/locale" class="apg-locale-form"><input type="hidden" name="next" value="/ui/databases"><label class="apg-sr-only" for="apg-locale-select">Language</label><select id="apg-locale-select" name="lang" class="apg-locale-select" onchange="this.form.submit()" aria-label="Language"><option value="en" selected>en</option><option value="sw">sw</option><option value="fr">fr</option><option value="ar">ar</option><option value="ha">ha</option><option value="yo">yo</option><option value="zu">zu</option><option value="am">am</option></select></form>  </header><aside id="apg-sidebar" class="apg-sidebar" aria-label="Application navigation"><div class="apg-sidebar-section"><p class="apg-sidebar-heading">Navigate</p><a class="apg-sidebar-link" href="/ui">Dashboard</a><a class="apg-sidebar-link" href="/ui/workflows">Workflows</a><a class="apg-sidebar-link" href="/ui/databases">Databases</a><a class="apg-sidebar-link" href="/ui/marketplace">Marketplace</a></div><div class="apg-sidebar-section"><p class="apg-sidebar-heading">Entities</p><a class="apg-sidebar-link" href="/ui/entities/Vendor">Vendor</a><a class="apg-sidebar-link" href="/ui/entities/Customer">Customer</a><a class="apg-sidebar-link" href="/ui/entities/Employee">Employee</a><a class="apg-sidebar-link" href="/ui/entities/ERPDB">ERPDB</a><a class="apg-sidebar-link" href="/ui/entities/ERPCore">ERPCore</a><a class="apg-sidebar-link" href="/ui/entities/ExecutiveERP">ExecutiveERP</a><a class="apg-sidebar-link" href="/ui/entities/ERPAnalyst">ERPAnalyst</a><a class="apg-sidebar-link" href="/ui/entities/PrivacyAgent">PrivacyAgent</a><a class="apg-sidebar-link" href="/ui/entities/ERPAdvisors">ERPAdvisors</a><a class="apg-sidebar-link" href="/ui/entities/HireToRetire">HireToRetire</a><a class="apg-sidebar-link" href="/ui/entities/MonthEndClose">MonthEndClose</a><a class="apg-sidebar-link" href="/ui/entities/EnterpriseERP">EnterpriseERP</a></div><div class="apg-sidebar-section"><p class="apg-sidebar-heading">Agents</p><a class="apg-sidebar-link" href="/ui/agents/ERPAnalyst">ERPAnalyst</a><a class="apg-sidebar-link" href="/ui/agents/PrivacyAgent">PrivacyAgent</a><a class="apg-sidebar-link" href="/ui/agent-teams/ERPAdvisors">ERPAdvisors</a></div></aside><div id="apg-sidebar-backdrop" class="apg-sidebar-backdrop" onclick="apgCloseSidebar()"></div><main class="apg-content apg-shell-content" id="content" tabindex="-1"><section class="mb-6">
+  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <span class="font-semibold text-gray-900">Databases</span></p>
+  <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">Database catalog</h1>
+      <p class="text-sm text-gray-500 mt-1">Schemas, generated tables, columns, indexes, and references for this app.</p>
+    </div>
+    <span class="apg-badge apg-badge-success">valid</span>
+  </div>
+</section>
+
+<section class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" aria-label="Database summary">
+  <article class="apg-card">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Databases</p>
+    <p class="text-2xl font-bold text-gray-900">1</p>
+  </article>
+  <article class="apg-card">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Schemas</p>
+    <p class="text-2xl font-bold text-gray-900">1</p>
+  </article>
+  <article class="apg-card">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Tables</p>
+    <p class="text-2xl font-bold text-gray-900">3</p>
+  </article>
+  <article class="apg-card">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">References</p>
+    <p class="text-2xl font-bold text-gray-900">0</p>
+  </article>
+</section>
+
+
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+  
+  <article class="apg-card">
+    <header class="apg-card-header">
+      <div>
+        <h2 class="text-base font-semibold text-gray-900">ERPDB</h2>
+        <p class="text-xs text-gray-500 mt-1">database</p>
+      </div>
+      <a class="apg-btn apg-btn-secondary" href="/databases/ERPDB/schemas">Schema JSON</a>
+    </header>
+    
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+      
+      <div class="border border-gray-100 rounded-lg p-3">
+        <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">engine</dt>
+        <dd class="text-sm font-mono text-gray-900 mt-1">postgresql</dd>
+      </div>
+      
+      <div class="border border-gray-100 rounded-lg p-3">
+        <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">schema</dt>
+        <dd class="text-sm font-mono text-gray-900 mt-1">erp_platform</dd>
+      </div>
+      
+      <div class="border border-gray-100 rounded-lg p-3">
+        <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">url</dt>
+        <dd class="text-sm font-mono text-gray-900 mt-1">env(&#34;ERP_DATABASE_URL&#34;)</dd>
+      </div>
+      
+    </dl>
+    
+    
+    <div class="space-y-3">
+      
+      <section class="border border-gray-200 rounded-lg p-3">
+        <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-900">erp_platform</h3>
+            <p class="text-xs text-gray-500 mt-1">3 tables</p>
+          </div>
+          
+          <span class="apg-badge apg-badge-neutral">generated_entities</span>
+          
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          
+          <a href="#table-ERPDB-erp_platform-Vendor" class="apg-badge apg-badge-info">Vendor</a>
+          
+          <a href="#table-ERPDB-erp_platform-Customer" class="apg-badge apg-badge-info">Customer</a>
+          
+          <a href="#table-ERPDB-erp_platform-Employee" class="apg-badge apg-badge-info">Employee</a>
+          
+        </div>
+      </section>
+      
+    </div>
+    
+  </article>
+  
+</section>
+
+
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+  <div class="lg:col-span-2 space-y-4">
+    
+      
+        
+        <article id="table-ERPDB-erp_platform-Vendor" class="apg-card">
+          <header class="apg-card-header">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">ERPDB / erp_platform</p>
+              <h2 class="text-base font-semibold text-gray-900">Vendor</h2>
+            </div>
+            <span class="apg-badge apg-badge-neutral">9 columns</span>
+          </header>
+          <div class="apg-table-wrap">
+            <table class="apg-table">
+              <thead>
+                <tr>
+                  <th>Column</th>
+                  <th>Type</th>
+                  <th>Constraints</th>
+                  <th>Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">id</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">integer</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="apg-badge apg-badge-success">Primary key</span>
+                      
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">vendor_number</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">legal_name</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">tax_id</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">payment_terms</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      
+                      <span class="apg-badge apg-badge-neutral">Nullable</span>
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">currency</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      
+                      <span class="apg-badge apg-badge-neutral">Nullable</span>
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">bank_account</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str?</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">status</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      
+                      <span class="apg-badge apg-badge-neutral">Nullable</span>
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">country</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      
+                      <span class="apg-badge apg-badge-neutral">Nullable</span>
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+              </tbody>
+            </table>
+          </div>
+          
+          <details class="mt-3">
+            <summary class="cursor-pointer text-sm font-medium text-gray-700">Indexes</summary>
+            <ul class="mt-2 space-y-1">
+              
+              <li class="text-sm text-gray-600"><span class="font-mono">idx_Vendor_vendor_number</span> on <span class="font-mono">vendor_number</span></li>
+              
+              <li class="text-sm text-gray-600"><span class="font-mono">idx_Vendor_legal_name</span> on <span class="font-mono">legal_name</span></li>
+              
+              <li class="text-sm text-gray-600"><span class="font-mono">idx_Vendor_tax_id</span> on <span class="font-mono">tax_id</span></li>
+              
+            </ul>
+          </details>
+          
+        </article>
+        
+        <article id="table-ERPDB-erp_platform-Customer" class="apg-card">
+          <header class="apg-card-header">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">ERPDB / erp_platform</p>
+              <h2 class="text-base font-semibold text-gray-900">Customer</h2>
+            </div>
+            <span class="apg-badge apg-badge-neutral">8 columns</span>
+          </header>
+          <div class="apg-table-wrap">
+            <table class="apg-table">
+              <thead>
+                <tr>
+                  <th>Column</th>
+                  <th>Type</th>
+                  <th>Constraints</th>
+                  <th>Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">id</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">integer</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="apg-badge apg-badge-success">Primary key</span>
+                      
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">customer_number</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">legal_name</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">credit_limit</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">float</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      
+                      <span class="apg-badge apg-badge-neutral">Nullable</span>
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">payment_terms</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      
+                      <span class="apg-badge apg-badge-neutral">Nullable</span>
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">currency</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      
+                      <span class="apg-badge apg-badge-neutral">Nullable</span>
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">status</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      
+                      <span class="apg-badge apg-badge-neutral">Nullable</span>
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">region</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+              </tbody>
+            </table>
+          </div>
+          
+          <details class="mt-3">
+            <summary class="cursor-pointer text-sm font-medium text-gray-700">Indexes</summary>
+            <ul class="mt-2 space-y-1">
+              
+              <li class="text-sm text-gray-600"><span class="font-mono">idx_Customer_customer_number</span> on <span class="font-mono">customer_number</span></li>
+              
+              <li class="text-sm text-gray-600"><span class="font-mono">idx_Customer_legal_name</span> on <span class="font-mono">legal_name</span></li>
+              
+              <li class="text-sm text-gray-600"><span class="font-mono">idx_Customer_region</span> on <span class="font-mono">region</span></li>
+              
+            </ul>
+          </details>
+          
+        </article>
+        
+        <article id="table-ERPDB-erp_platform-Employee" class="apg-card">
+          <header class="apg-card-header">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">ERPDB / erp_platform</p>
+              <h2 class="text-base font-semibold text-gray-900">Employee</h2>
+            </div>
+            <span class="apg-badge apg-badge-neutral">8 columns</span>
+          </header>
+          <div class="apg-table-wrap">
+            <table class="apg-table">
+              <thead>
+                <tr>
+                  <th>Column</th>
+                  <th>Type</th>
+                  <th>Constraints</th>
+                  <th>Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">id</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">integer</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="apg-badge apg-badge-success">Primary key</span>
+                      
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">employee_number</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">full_name</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">department</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">position</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">salary</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">float</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">hire_date</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">str</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      <span class="apg-badge apg-badge-warning">Required</span>
+                      
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+                <tr>
+                  <td><span class="font-mono text-gray-900">is_active</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">bool</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      
+                      
+                      <span class="apg-badge apg-badge-neutral">Nullable</span>
+                    </div>
+                  </td>
+                  <td>
+                    
+                    <span class="text-xs text-gray-400">none</span>
+                    
+                  </td>
+                </tr>
+                
+              </tbody>
+            </table>
+          </div>
+          
+          <details class="mt-3">
+            <summary class="cursor-pointer text-sm font-medium text-gray-700">Indexes</summary>
+            <ul class="mt-2 space-y-1">
+              
+              <li class="text-sm text-gray-600"><span class="font-mono">idx_Employee_employee_number</span> on <span class="font-mono">employee_number</span></li>
+              
+              <li class="text-sm text-gray-600"><span class="font-mono">idx_Employee_full_name</span> on <span class="font-mono">full_name</span></li>
+              
+              <li class="text-sm text-gray-600"><span class="font-mono">idx_Employee_department</span> on <span class="font-mono">department</span></li>
+              
+            </ul>
+          </details>
+          
+        </article>
+        
+      
+    
+  </div>
+
+  <aside class="space-y-4">
+    <section class="apg-card">
+      <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Reference map</h2></header>
+      
+      <p class="text-sm text-gray-500">No foreign-key references declared.</p>
+      
+    </section>
+
+    <section class="apg-card">
+      <header class="apg-card-header">
+        <h2 class="text-base font-semibold text-gray-900">Validation</h2>
+        <span class="apg-badge apg-badge-success">valid</span>
+      </header>
+      
+      <p class="text-sm text-gray-500 mb-3">No schema warnings.</p>
+      
+      <details>
+        <summary class="cursor-pointer text-sm font-medium text-gray-700">Validation details</summary>
+        <pre>{
+  &#34;errors&#34;: [],
+  &#34;validated_databases&#34;: [
+    &#34;ERPDB&#34;
+  ],
+  &#34;warnings&#34;: []
+}</pre>
+      </details>
+    </section>
+  </aside>
+</section></main><div id="apg-toast-root" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div><dialog id="apg-confirm-dialog" class="apg-dialog"><form method="dialog" class="apg-dialog-panel"><h2 id="apg-confirm-title">Confirm action</h2><p id="apg-confirm-message" class="text-sm text-gray-600">Are you sure?</p><div class="flex items-center justify-end gap-2 mt-4"><button value="cancel" class="apg-btn apg-btn-secondary" type="submit">Cancel</button><button value="confirm" class="apg-btn apg-btn-danger" type="submit">Delete</button></div></form></dialog><script>function apgToast(m,t){var c=t==="error"?"bg-red-600":"bg-gray-900";var el=document.createElement("div");el.className=c+" text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto transition-all duration-300 opacity-0 translate-y-2";el.textContent=m;document.getElementById("apg-toast-root").appendChild(el);requestAnimationFrame(function(){el.classList.remove("opacity-0","translate-y-2");});setTimeout(function(){el.classList.add("opacity-0");setTimeout(function(){el.remove();},300);},3000);}document.addEventListener("htmx:afterOnLoad",function(e){var t=e.detail.xhr.getResponseHeader("HX-Trigger");if(!t)return;try{var d=JSON.parse(t);if(d.apgToast)apgToast(d.apgToast.msg,d.apgToast.type||"success");}catch(ex){}});function apgApplyTheme(m){var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;var b=document.getElementById("apg-theme-toggle");if(b){b.setAttribute("aria-label","Theme: "+m);b.textContent=m==="dark"?"Dark":m==="light"?"Light":"System";}}function apgCycleTheme(){var order=["system","light","dark"];var cur=localStorage.getItem("apg-theme")||"system";var next=order[(order.indexOf(cur)+1)%order.length];localStorage.setItem("apg-theme",next);apgApplyTheme(next);}document.addEventListener("DOMContentLoaded",function(){apgApplyTheme(localStorage.getItem("apg-theme")||"system");});function apgConfirm(message,ok){var d=document.getElementById("apg-confirm-dialog");if(!d||!d.showModal){var nativeConfirm=window["confirm"];if(nativeConfirm&&nativeConfirm(message))ok();return;}document.getElementById("apg-confirm-message").textContent=message;var done=false;function close(){if(done)return;done=true;d.removeEventListener("close",onclose);}function onclose(){var v=d.returnValue;close();if(v==="confirm")ok();}d.addEventListener("close",onclose);d.showModal();}function apgConfirmSubmit(form,message){apgConfirm(message||"Delete this record?",function(){form.dataset.apgConfirmed="1";form.requestSubmit();});return false;}document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(".apg-topnav a").forEach(function(a){if(a.getAttribute("href")===location.pathname){a.classList.add("active");a.setAttribute("aria-current","page");}});});function apgSetSidebar(collapsed){document.documentElement.classList.toggle("apg-sidebar-collapsed",collapsed);try{localStorage.setItem("apg-sidebar-collapsed",collapsed?"1":"0");}catch(e){}}function apgToggleSidebar(){if(matchMedia("(max-width: 767px)").matches){document.documentElement.classList.toggle("apg-sidebar-open");}else{apgSetSidebar(!document.documentElement.classList.contains("apg-sidebar-collapsed"));}}function apgCloseSidebar(){document.documentElement.classList.remove("apg-sidebar-open");}try{if(localStorage.getItem("apg-sidebar-collapsed")==="1")document.documentElement.classList.add("apg-sidebar-collapsed");}catch(e){}function apgSyncOffline(){var b=document.getElementById("apg-offline-banner");if(b)b.hidden=navigator.onLine;}window.addEventListener("online",apgSyncOffline);window.addEventListener("offline",apgSyncOffline);if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/static/sw.js").catch(function(){});});}document.addEventListener("keydown",function(e){if(e.key==="Escape")apgCloseSidebar();});document.addEventListener("DOMContentLoaded",apgSyncOffline);</script><div id="apg-cmd" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onclick="if(event.target===this)apgCmdClose()"><div class="mx-auto mt-[15vh] max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"><div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100"><svg class="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9 a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg><input id="apg-cmd-input" type="text" placeholder="Search records, entities..." autocomplete="off" class="flex-1 text-sm outline-none placeholder-gray-400" oninput="apgCmdSearch(this.value)"><kbd class="text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">Esc</kbd></div><div id="apg-cmd-results" class="max-h-80 overflow-y-auto py-2"><p class="text-xs text-gray-400 text-center py-8">Type to search...</p></div></div></div><script>document.addEventListener("keydown",function(e){if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();apgCmdOpen();}if(e.key==="Escape")apgCmdClose();});function apgCmdOpen(){document.getElementById("apg-cmd").classList.remove("hidden");document.getElementById("apg-cmd-input").focus();}function apgCmdClose(){document.getElementById("apg-cmd").classList.add("hidden");document.getElementById("apg-cmd-input").value="";document.getElementById("apg-cmd-results").innerHTML='<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>';}var _cmdTimer;function apgCmdSearch(q){clearTimeout(_cmdTimer);if(!q.trim()){document.getElementById("apg-cmd-results").innerHTML='<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>';return;}_cmdTimer=setTimeout(function(){fetch("/api/search?q="+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(d){var el=document.getElementById("apg-cmd-results");if(!d.results||!d.results.length){el.innerHTML='<p class="text-xs text-gray-400 text-center py-8">No results</p>';return;}el.innerHTML=d.results.map(function(r){return '<a href="/ui/entities/'+encodeURIComponent(r.entity)+'/'+encodeURIComponent(r.id)+'"'+'  onclick="apgCmdClose()"'+'  class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group">'+'<span class="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center text-xs font-bold text-blue-600 flex-shrink-0">'+r.entity.charAt(0).toUpperCase()+'</span>'+'<div class="min-w-0"><p class="text-sm font-medium text-gray-900 truncate">'+r.label+'</p>'+'<p class="text-xs text-gray-400 truncate">'+r.entity+'</p></div>'+'</a>';}).join("");});},200);}</script></body></html>

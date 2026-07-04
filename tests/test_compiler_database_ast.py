@@ -281,11 +281,14 @@ def test_generated_ui_surfaces_database_catalog_status_and_schema_links():
 
 	status, database_html = namespace["_ui_payload"]("/ui/databases")
 	assert status == 200
-	assert "Status: <strong>valid</strong>" in database_html
+	assert "Database catalog" in database_html
+	assert "apg-badge-success" in database_html
 	assert "/databases/LedgerDB/schemas" in database_html
 	assert "accounting" in database_html
 	assert "journals" in database_html
 	assert "accounts" in database_html
+	assert "Primary key" in database_html
+	assert "Validation details" in database_html
 
 
 def test_generated_readme_documents_database_runtime_surface():

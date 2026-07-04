@@ -1,60 +1,186 @@
 <section class="mb-6">
   <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <span class="font-semibold text-gray-900">Databases</span></p>
-  <h1 class="text-xl font-bold text-gray-900">Databases</h1>
-  <p class="text-sm text-gray-500 mt-1">{{ status.database_count }} database(s), {{ status.schema_count }} schema(s), {{ status.table_count }} table(s), {{ status.reference_count }} reference(s).</p>
-  <p class="text-sm text-gray-500 mt-1">Status: <strong>{{ status_label }}</strong></p>
+  <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">Database catalog</h1>
+      <p class="text-sm text-gray-500 mt-1">Schemas, generated tables, columns, indexes, and references for this app.</p>
+    </div>
+    <span class="apg-badge {{ 'apg-badge-success' if status.valid else 'apg-badge-danger' }}">{{ status_label }}</span>
+  </div>
 </section>
 
-<section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+<section class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" aria-label="Database summary">
+  <article class="apg-card">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Databases</p>
+    <p class="text-2xl font-bold text-gray-900">{{ status.database_count }}</p>
+  </article>
+  <article class="apg-card">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Schemas</p>
+    <p class="text-2xl font-bold text-gray-900">{{ status.schema_count }}</p>
+  </article>
+  <article class="apg-card">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Tables</p>
+    <p class="text-2xl font-bold text-gray-900">{{ status.table_count }}</p>
+  </article>
+  <article class="apg-card">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">References</p>
+    <p class="text-2xl font-bold text-gray-900">{{ status.reference_count }}</p>
+  </article>
+</section>
+
+{% if databases %}
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
   {% for database in databases %}
   <article class="apg-card">
     <header class="apg-card-header">
-      <h2 class="text-base font-semibold text-gray-900">{{ database.name }}</h2>
-      <a class="text-sm hover:underline" href="/databases/{{ database.name }}/schemas">Schema JSON</a>
+      <div>
+        <h2 class="text-base font-semibold text-gray-900">{{ database.name }}</h2>
+        <p class="text-xs text-gray-500 mt-1">{{ database.type or 'database' }}</p>
+      </div>
+      <a class="apg-btn apg-btn-secondary" href="/databases/{{ database.name }}/schemas">Schema JSON</a>
     </header>
-    {% for schema in database.schemas %}
-    <section class="mb-4">
-      <h3 class="text-sm font-semibold text-gray-700">{{ schema.name }}</h3>
-      {% if schema.tables %}
-      <div class="space-y-3">
-        {% for table in schema.tables %}
-        <div class="border border-gray-200 rounded-lg p-3">
-          <p class="font-medium text-sm text-gray-900">{{ table.name }}</p>
-          {% if table.columns %}
-          <ul class="mt-2 space-y-1">
-            {% for column in table.columns %}
-            <li class="text-xs text-gray-500"><span class="font-mono text-gray-700">{{ column.name }}</span> · {{ column.type }}</li>
-            {% endfor %}
-          </ul>
-          {% else %}
-          <p class="text-xs text-gray-400 mt-2">No columns declared.</p>
+    {% if database.connection_config %}
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+      {% for key, value in database.connection_config.items() %}
+      <div class="border border-gray-100 rounded-lg p-3">
+        <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ key }}</dt>
+        <dd class="text-sm font-mono text-gray-900 mt-1">{{ value }}</dd>
+      </div>
+      {% endfor %}
+    </dl>
+    {% endif %}
+    {% if database.schemas %}
+    <div class="space-y-3">
+      {% for schema in database.schemas %}
+      <section class="border border-gray-200 rounded-lg p-3">
+        <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-900">{{ schema.name }}</h3>
+            <p class="text-xs text-gray-500 mt-1">{{ schema.tables | length }} table{{ '' if schema.tables | length == 1 else 's' }}</p>
+          </div>
+          {% if schema.source %}
+          <span class="apg-badge apg-badge-neutral">{{ schema.source }}</span>
           {% endif %}
         </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="text-xs text-gray-400">No tables declared.</p>
-      {% endif %}
-    </section>
-    {% endfor %}
+        <div class="flex items-center gap-2 flex-wrap">
+          {% for table in schema.tables %}
+          <a href="#table-{{ database.name }}-{{ schema.name }}-{{ table.name }}" class="apg-badge apg-badge-info">{{ table.name }}</a>
+          {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-500">No schemas declared.</p>
+    {% endif %}
   </article>
   {% endfor %}
 </section>
-
-<section class="apg-card">
-  <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Relationships</h2></header>
-  {% if relationships %}
-  <ul class="space-y-2">
-    {% for relationship in relationships %}
-    <li class="text-sm text-gray-600"><span class="font-mono">{{ relationship.source }}</span> → <span class="font-mono">{{ relationship.target }}</span></li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="text-sm text-gray-500">No relationships declared.</p>
-  {% endif %}
+{% else %}
+<section class="apg-card text-center">
+  <h2 class="text-base font-semibold text-gray-900">No databases declared</h2>
+  <p class="text-sm text-gray-500 mt-1">This generated application does not declare a database workspace.</p>
 </section>
+{% endif %}
 
-<section class="apg-card">
-  <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Validation</h2><span class="apg-badge {{ 'apg-badge-success' if status.valid else 'apg-badge-danger' }}">{{ status_label }}</span></header>
-  <pre>{{ validation_json }}</pre>
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+  <div class="lg:col-span-2 space-y-4">
+    {% for database in databases %}
+      {% for schema in database.schemas %}
+        {% for table in schema.tables %}
+        <article id="table-{{ database.name }}-{{ schema.name }}-{{ table.name }}" class="apg-card">
+          <header class="apg-card-header">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ database.name }} / {{ schema.name }}</p>
+              <h2 class="text-base font-semibold text-gray-900">{{ table.name }}</h2>
+            </div>
+            <span class="apg-badge apg-badge-neutral">{{ table.columns | length }} columns</span>
+          </header>
+          <div class="apg-table-wrap">
+            <table class="apg-table">
+              <thead>
+                <tr>
+                  <th>Column</th>
+                  <th>Type</th>
+                  <th>Constraints</th>
+                  <th>Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for column in table.columns %}
+                <tr>
+                  <td><span class="font-mono text-gray-900">{{ column.name }}</span></td>
+                  <td><span class="apg-badge apg-badge-neutral">{{ column.type }}</span></td>
+                  <td>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      {% if column.primary_key %}<span class="apg-badge apg-badge-success">Primary key</span>{% endif %}
+                      {% if column.required and not column.primary_key %}<span class="apg-badge apg-badge-warning">Required</span>{% endif %}
+                      {% if column.nullable %}<span class="apg-badge apg-badge-neutral">Nullable</span>{% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    {% if column.reference %}
+                    <span class="font-mono text-sm text-gray-700">{{ column.reference.table }}.{{ column.reference.column }}</span>
+                    {% else %}
+                    <span class="text-xs text-gray-400">none</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if table.indexes %}
+          <details class="mt-3">
+            <summary class="cursor-pointer text-sm font-medium text-gray-700">Indexes</summary>
+            <ul class="mt-2 space-y-1">
+              {% for index in table.indexes %}
+              <li class="text-sm text-gray-600"><span class="font-mono">{{ index.name }}</span> on <span class="font-mono">{{ index.columns | join(', ') }}</span></li>
+              {% endfor %}
+            </ul>
+          </details>
+          {% endif %}
+        </article>
+        {% endfor %}
+      {% endfor %}
+    {% endfor %}
+  </div>
+
+  <aside class="space-y-4">
+    <section class="apg-card">
+      <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Reference map</h2></header>
+      {% if relationships %}
+      <ol class="space-y-2">
+        {% for relationship in relationships %}
+        <li class="border border-gray-100 rounded-lg p-3">
+          <p class="text-sm font-mono text-gray-900">{{ relationship.source }}</p>
+          <p class="text-xs text-gray-500 mt-1">references {{ relationship.target }}{% if relationship.cardinality %} · {{ relationship.cardinality }}{% endif %}</p>
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <p class="text-sm text-gray-500">No foreign-key references declared.</p>
+      {% endif %}
+    </section>
+
+    <section class="apg-card">
+      <header class="apg-card-header">
+        <h2 class="text-base font-semibold text-gray-900">Validation</h2>
+        <span class="apg-badge {{ 'apg-badge-success' if status.valid else 'apg-badge-danger' }}">{{ status_label }}</span>
+      </header>
+      {% if status.validation.warnings %}
+      <ul class="space-y-2 mb-3">
+        {% for warning in status.validation.warnings %}
+        <li class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">{{ warning }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-sm text-gray-500 mb-3">No schema warnings.</p>
+      {% endif %}
+      <details>
+        <summary class="cursor-pointer text-sm font-medium text-gray-700">Validation details</summary>
+        <pre>{{ validation_json }}</pre>
+      </details>
+    </section>
+  </aside>
 </section>

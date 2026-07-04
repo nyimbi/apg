@@ -609,6 +609,65 @@ Validation evidence:
 - Full suite: `1483 passed, 1 skipped, 3 warnings in 730.43s`.
 - PythonCodeGenerator tripwire clean.
 
+### database-catalog
+
+Status: complete.
+
+Intended commit:
+
+```text
+ux(database-catalog): infer schemas and render table metadata
+```
+
+Files:
+
+- `compiler/code_generator.py`
+- `compiler/templates/database_catalog.html.j2`
+- `tests/test_compiler_database_ast.py`
+- `tests/test_generated_ui_dashboard.py`
+- `examples/01_minimal_customer_records/output/app.py`
+- `examples/02_customer_orders_relationship/output/app.py`
+- `examples/03_inventory_typed_records/output/app.py`
+- `examples/04_order_fulfillment_model/output/app.py`
+- `examples/05_single_support_agent/output/app.py`
+- `examples/06_support_agent_team/output/app.py`
+- `examples/07_multi_runtime_agent_team/output/app.py`
+- `examples/08_basic_capability_contract/output/app.py`
+- `examples/09_capability_rules_configuration/output/app.py`
+- `examples/10_themed_i18n_streaming_capability/output/app.py`
+- `examples/11_screen_composition_relationships/output/app.py`
+- `examples/12_finance_general_ledger/output/app.py`
+- `examples/13_procurement_approval_workbench/output/app.py`
+- `examples/14_inventory_warehouse_operations/output/app.py`
+- `examples/15_manufacturing_quality_control/output/app.py`
+- `examples/16_hr_payroll_operations/output/app.py`
+- `examples/17_crm_sales_pipeline/output/app.py`
+- `examples/18_operations_dashboard_capability/output/app.py`
+- `examples/19_multi_capability_dependency_suite/output/app.py`
+- `examples/20_enterprise_erp_platform/output/app.py`
+- `docs/research/generated-ui-workspaces/database-catalog/README.md`
+- `docs/research/generated-ui-workspaces/database-catalog/thinking.md`
+- `docs/research/generated-ui-workspaces/database-catalog/sources.md`
+- `docs/research/generated-ui-workspaces/database-catalog/rationale.md`
+- `docs/research/generated-ui-workspaces/database-catalog/assets/before-database-catalog.html`
+- `docs/research/generated-ui-workspaces/database-catalog/assets/before-database-catalog.headers`
+- `docs/research/generated-ui-workspaces/database-catalog/assets/before-schema-json.json`
+- `docs/research/generated-ui-workspaces/database-catalog/assets/before-schema-json.headers`
+- `docs/research/generated-ui-workspaces/database-catalog/assets/after-database-catalog.html`
+- `docs/research/generated-ui-workspaces/database-catalog/assets/after-database-catalog.headers`
+- `docs/research/generated-ui-workspaces/database-catalog/assets/after-schema-json.json`
+- `docs/research/generated-ui-workspaces/database-catalog/assets/after-schema-json.headers`
+- `docs/research/generated-ui-workspaces/SUMMARY.md`
+
+Validation evidence:
+
+- Live before audit: example 20 `/ui/databases` and `/databases/ERPDB/schemas` booted at `127.0.0.1:20901`; UI reported 0 schemas/tables and JSON returned `schemas: []`.
+- Live after audit: regenerated example 20 booted at `127.0.0.1:20902`; UI rendered `ERPDB / erp_platform` with Vendor, Customer, and Employee tables, and JSON returned the inferred schema.
+- Regenerated all 20 numbered examples through `APGCompiler.compile_file()`.
+- Targeted tests: `3 passed` across database catalog regression, CSS class coverage, and required template route coverage.
+- Full suite: `1484 passed, 1 skipped, 3 warnings in 750.06s`.
+- PythonCodeGenerator tripwire clean.
+
 ## Verdicts
 
 | Workspace | Before | After | Status |
@@ -622,6 +681,7 @@ Validation evidence:
 | workflow-list-wizard-run-progress | Wizard skipped every other step, successful UI workflows left no run history/debug trace, completion had no run link, and structured textarea values could fail final validation. | Wizard advances sequentially, successful completions record shared workflow runs, recent runs appear on the list, completion links to record/debugger, and array/object strings are coerced. | Complete |
 | agent-and-agent-team-consoles | Single-agent console was form-first and raw-JSON-heavy; declared team console and team POST were 404 dead ends. | Conversation-first agent/team consoles, preserved prompt context, team lanes and handoff flow, raw JSON disclosures, and metadata fallback for team routes/invocation. | Complete |
 | capability-console-rules-config-approval | Three blank JSON boxes and generic/raw results made rules, configuration, and approvals hard to test without knowing the payload contract. | Prefilled generated contexts, preserved submitted JSON, operation-specific summaries, capability profile, and secondary raw JSON disclosures. | Complete |
+| database-catalog | Declared databases could render as empty: example 20 showed 0 schemas/tables and `/databases/ERPDB/schemas` returned `[]`. | Generated schemas are inferred from record entities, UI renders tables/columns/indexes/constraints, and schema JSON exposes the same metadata. | Complete |
 
 ## Defect Ledger
 
@@ -669,3 +729,8 @@ Validation evidence:
 | capability-console-rules-config-approval | Rule/configuration/approval results were raw or generic. | Added operation-specific summaries for matched rules/actions, resolved configuration, and approvers. | Resolved |
 | capability-console-rules-config-approval | Capability rules and defaults were hidden in raw JSON. | Added a capability profile panel with default configuration and declared rules. | Resolved |
 | capability-console-rules-config-approval | Regression coverage did not load generated capability companion modules. | Compiled the test app to a temporary output directory and imported the generated module with that directory on `sys.path`. | Resolved |
+| database-catalog | Database declarations without explicit schemas produced empty schema lists. | Inferred schemas from generated record entities when no authored schema exists. | Resolved |
+| database-catalog | Schema JSON endpoint returned `schemas: []` for example 20. | Reused enriched `list_databases()` output for `/databases/<name>/schemas`. | Resolved |
+| database-catalog | Catalog UI did not expose table and column metadata. | Reworked the template into summary cards, database cards, table/column grids, constraints, indexes, and validation details. | Resolved |
+| database-catalog | Validation warned that generated databases did not declare schemas even when entity metadata was sufficient. | Added inferred generated schema tables with synthetic primary-key columns, producing clean validation. | Resolved |
+| database-catalog | Raw validation detail competed with the main catalog. | Kept warnings visible and moved raw validation JSON behind a disclosure. | Resolved |
