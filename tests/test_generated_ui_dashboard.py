@@ -277,3 +277,54 @@ def test_generated_record_detail_renders_related_activity_and_navigation():
 	assert "filter.customer_id=1" in html
 	assert "Save Note" in html
 	assert "<pre>" not in html
+
+
+def test_generated_forms_use_native_validation_and_contextual_errors():
+	result = compile_apg_file("examples/02_customer_orders_relationship/main.apg")
+	assert result.success, result.errors
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	status, html = namespace["_ui_payload"]("/ui/entities/Customer")
+	assert status == 200
+	assert 'id="apg-create-form"' in html
+	assert 'name="email" type="email"' in html
+	assert 'name="tags" rows="3"' in html
+	assert "Required JSON value" in html
+	assert "Discard this draft?" in html
+	assert "window.confirm" not in html
+
+	error_status, error_payload = namespace["_ui_post_payload"](
+		"/ui/entities/Customer/records",
+		{"record": {"customer_number": "C-001"}},
+	)
+	assert error_status == 422
+	assert "html" in error_payload
+	assert "Customer table controls" in error_payload["html"]
+	assert "legal_name is required" in error_payload["html"]
+	assert "attributes is required" in error_payload["html"]
+
+	create_status, create_payload = namespace["create_record"](
+		"Customer",
+		{
+			"customer_number": "C-001",
+			"legal_name": "Asha Retail",
+			"email": "asha@example.com",
+			"phone": "+254700000001",
+			"segment": "standard",
+			"credit_limit": 10000,
+			"is_active": True,
+			"tags": ["retail"],
+			"attributes": {"region": "EA"},
+		},
+	)
+	assert create_status == 201, create_payload
+
+	status, numeric_fragment = namespace["_ui_field_edit_html"]("Customer", "1", "credit_limit")
+	assert status == 200
+	assert 'type="number"' in numeric_fragment
+	assert 'step="any"' in numeric_fragment
+
+	status, json_fragment = namespace["_ui_field_edit_html"]("Customer", "1", "tags")
+	assert status == 200
+	assert "<textarea" in json_fragment

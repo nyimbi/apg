@@ -79,7 +79,7 @@
 </section>
 
 <dialog id="apg-create-drawer" class="apg-drawer" aria-labelledby="apg-create-title">
-  <form method="post" action="/ui/entities/{{ safe_entity }}/records" novalidate class="apg-drawer-panel">
+  <form id="apg-create-form" method="post" action="/ui/entities/{{ safe_entity }}/records" class="apg-drawer-panel">
     <header class="apg-card-header">
       <div>
         <h2 id="apg-create-title" class="text-base font-semibold text-gray-900">New {{ entity_name }}</h2>
@@ -96,6 +96,31 @@
     </footer>
   </form>
 </dialog>
+
+<script>
+(function() {
+  var drawer = document.getElementById('apg-create-drawer');
+  var form = document.getElementById('apg-create-form');
+  if (!drawer || !form) return;
+  var dirty = false;
+  form.addEventListener('input', function() { dirty = true; });
+  form.addEventListener('submit', function() { dirty = false; });
+  drawer.addEventListener('cancel', function(event) {
+    if (!dirty) return;
+    event.preventDefault();
+    apgConfirm('Discard this draft?', function() {
+      dirty = false;
+      drawer.close();
+    });
+  });
+  document.addEventListener('keydown', function(event) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's' && drawer.open) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
+})();
+</script>
 
 <div class="flex items-start gap-5 flex-col lg:flex-row">
 

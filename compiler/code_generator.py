@@ -5072,6 +5072,12 @@ def _ui_field_input_html(field: Dict[str, Any], entity_name: str = "") -> str:
     safe_name = html.escape(field_name, quote=True)
     human_label = html.escape(_humanize_label(field_name))
     expected = _json_schema_type(str(field.get("type", "any")))
+    field_type = str(field.get("type", ""))
+    required = bool(field.get("required"))
+    required_attr = " required" if required else ""
+    required_mark = ' <span class="text-red-500" aria-hidden="true">*</span>' if required else ""
+    helper_id = f"help-{{html.escape(field_name, quote=True)}}"
+    helper = "Required" if required else "Optional"
 
     # Foreign key → styled dropdown
     rel = _field_relationship(entity_name, field_name) if entity_name else None
@@ -5080,8 +5086,9 @@ def _ui_field_input_html(field: Dict[str, Any], entity_name: str = "") -> str:
         opts = _fk_select_options(target)
         return (
             f'<div class="space-y-1">'
-            f'<label {{_LABEL_CLS}}>{{human_label}}</label>'
-            f'<select name="{{safe_name}}" {{_SELECT_CLS}}>{{opts}}</select>'
+            f'<label {{_LABEL_CLS}}>{{human_label}}{{required_mark}}</label>'
+            f'<select name="{{safe_name}}" aria-describedby="{{helper_id}}"{{required_attr}} {{_SELECT_CLS}}>{{opts}}</select>'
+            f'<p id="{{helper_id}}" class="text-xs text-gray-400">{{helper}}</p>'
             f'</div>'
         )
 
@@ -5090,22 +5097,38 @@ def _ui_field_input_html(field: Dict[str, Any], entity_name: str = "") -> str:
             f'<div class="flex items-center gap-2">'
             f'<input type="hidden" name="{{safe_name}}" value="false">'
             f'<input type="checkbox" name="{{safe_name}}" value="true" {{_CHECKBOX_CLS}}>'
-            f'<label {{_LABEL_CLS}} style="margin-bottom:0">{{human_label}}</label>'
+            f'<label {{_LABEL_CLS}} style="margin-bottom:0">{{human_label}}{{required_mark}}</label>'
             f'</div>'
         )
     if expected == "integer":
         type_attr = 'type="number" step="1"'
     elif expected == "number":
         type_attr = 'type="number" step="any"'
-    elif field.get("type", "").lower() in {{"date", "datetime", "timestamp"}}:
+    elif field_type.lower() in {{"date", "datetime", "timestamp"}}:
         type_attr = 'type="date"'
+    elif _ui_field_semantic(field_name, field_type) == "email":
+        type_attr = 'type="email"'
+    elif _ui_field_semantic(field_name, field_type) == "phone":
+        type_attr = 'type="tel"'
+    elif _ui_field_semantic(field_name, field_type) == "url":
+        type_attr = 'type="url"'
     else:
         type_attr = 'type="text"'
     placeholder = f'placeholder="{{human_label}}"'
+    if field_type.lower() in {{"list", "dict", "json", "jsonb"}} or expected in {{"array", "object"}}:
+        return (
+            f'<div class="space-y-1">'
+            f'<label {{_LABEL_CLS}}>{{human_label}}{{required_mark}}</label>'
+            f'<textarea name="{{safe_name}}" rows="3" aria-describedby="{{helper_id}}"{{required_attr}} {{_INPUT_CLS}} '
+            f'placeholder="{{html.escape("[] for lists, {{}} for objects", quote=True)}}"></textarea>'
+            f'<p id="{{helper_id}}" class="text-xs text-gray-400">{{helper}} JSON value</p>'
+            f'</div>'
+        )
     return (
         f'<div class="space-y-1">'
-        f'<label {{_LABEL_CLS}}>{{human_label}}</label>'
-        f'<input name="{{safe_name}}" {{type_attr}} {{placeholder}} {{_INPUT_CLS}}>'
+        f'<label {{_LABEL_CLS}}>{{human_label}}{{required_mark}}</label>'
+        f'<input name="{{safe_name}}" {{type_attr}} {{placeholder}} aria-describedby="{{helper_id}}"{{required_attr}} {{_INPUT_CLS}}>'
+        f'<p id="{{helper_id}}" class="text-xs text-gray-400">{{helper}}</p>'
         f'</div>'
     )
 
@@ -5150,9 +5173,18 @@ def _ui_record_editor_input_html(
         attributes = 'type="number" step="any"'
     elif field.get("type", "").lower() in {{"date", "datetime", "timestamp"}}:
         attributes = 'type="date"'
+    elif _ui_field_semantic(field_name, str(field.get("type", ""))) == "email":
+        attributes = 'type="email"'
+    elif _ui_field_semantic(field_name, str(field.get("type", ""))) == "phone":
+        attributes = 'type="tel"'
+    elif _ui_field_semantic(field_name, str(field.get("type", ""))) == "url":
+        attributes = 'type="url"'
     else:
         attributes = 'type="text"'
     safe_value = html.escape(_ui_record_display_value(value), quote=True)
+    field_type = str(field.get("type", "")).lower()
+    if field_type in {{"list", "dict", "json", "jsonb"}} or expected in {{"array", "object"}}:
+        return f'<textarea form="{{safe_form_id}}" name="{{safe_name}}" rows="3">{{safe_value}}</textarea>'
     return f'<input form="{{safe_form_id}}" name="{{safe_name}}" value="{{safe_value}}" {{attributes}}>'
 
 
@@ -5987,7 +6019,9 @@ def _ui_field_edit_html(entity_name: str, record_id: str, field_name: str) -> tu
     patch_url = f"/ui/entities/{{safe_entity}}/{{safe_record_id}}/fields/{{safe_field_name}}/patch"
     cancel_url = f"/ui/entities/{{safe_entity}}/{{safe_record_id}}/fields/{{safe_field_name}}/view"
     field_type = str(field.get("type", "string"))
-    if field_type in {{"text", "markdown"}}:
+    field_semantic = _ui_field_semantic(field_name, field_type)
+    field_expected = _json_schema_type(field_type)
+    if field_type.lower() in {{"text", "markdown", "list", "dict", "json", "jsonb"}} or field_expected in {{"array", "object"}}:
         input_html = (
             f'<textarea name="{{safe_field_name}}" rows="3"'
             f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary resize-none">'
@@ -5996,9 +6030,30 @@ def _ui_field_edit_html(entity_name: str, record_id: str, field_name: str) -> tu
     elif field_type == "boolean":
         checked = "checked" if str(record.get(field_name, "")).lower() == "true" else ""
         input_html = f'<input type="checkbox" name="{{safe_field_name}}" value="true" {{checked}} class="w-4 h-4 text-apg-primary rounded">'
-    elif field_type in {{"integer", "number", "float"}}:
+    elif field_expected == "integer":
         input_html = (
-            f'<input type="number" name="{{safe_field_name}}" value="{{current_val}}"'
+            f'<input type="number" step="1" name="{{safe_field_name}}" value="{{current_val}}"'
+            f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary">'
+        )
+    elif field_expected == "number":
+        input_html = (
+            f'<input type="number" step="any" name="{{safe_field_name}}" value="{{current_val}}"'
+            f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary">'
+        )
+    elif field_type.lower() in {{"date", "datetime", "timestamp"}}:
+        input_html = (
+            f'<input type="date" name="{{safe_field_name}}" value="{{current_val[:10]}}"'
+            f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary">'
+        )
+    elif field_semantic == "email":
+        input_type = "email"
+        input_html = (
+            f'<input type="{{input_type}}" name="{{safe_field_name}}" value="{{current_val}}"'
+            f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary">'
+        )
+    elif field_semantic == "phone":
+        input_html = (
+            f'<input type="tel" name="{{safe_field_name}}" value="{{current_val}}"'
             f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary">'
         )
     else:
@@ -6444,6 +6499,11 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
         status, response = _create_record_payload(f"/entities/{{entity_name}}/records", payload)
         if status == 201:
             return 303, {{"location": _ui_entity_location(entity_name)}}
+        _detail = response.get("errors") or response.get("message") or response.get("error") or "Record could not be created."
+        if isinstance(_detail, list):
+            _detail = "; ".join(str(item) for item in _detail)
+        _page_status, html_payload = _ui_entity_html(entity_name, notice=str(_detail))
+        return status, {{"html": html_payload}}
         return status, response
     if (len(parts) == 5 and parts[0] == "ui" and parts[1] == "entities"
             and parts[3] == "records" and parts[4] == "bulk_delete"):
