@@ -543,6 +543,72 @@ Validation evidence:
 - Full suite: `1482 passed, 1 skipped, 3 warnings in 716.48s`.
 - PythonCodeGenerator tripwire clean.
 
+### capability-console-rules-config-approval
+
+Status: complete.
+
+Intended commit:
+
+```text
+ux(capability-console-rules-config-approval): clarify capability operations
+```
+
+Files:
+
+- `compiler/code_generator.py`
+- `compiler/templates/capability_console.html.j2`
+- `tests/test_generated_ui_dashboard.py`
+- `examples/01_minimal_customer_records/output/app.py`
+- `examples/02_customer_orders_relationship/output/app.py`
+- `examples/03_inventory_typed_records/output/app.py`
+- `examples/04_order_fulfillment_model/output/app.py`
+- `examples/05_single_support_agent/output/app.py`
+- `examples/06_support_agent_team/output/app.py`
+- `examples/07_multi_runtime_agent_team/output/app.py`
+- `examples/08_basic_capability_contract/output/app.py`
+- `examples/09_capability_rules_configuration/output/app.py`
+- `examples/10_themed_i18n_streaming_capability/output/app.py`
+- `examples/11_screen_composition_relationships/output/app.py`
+- `examples/12_finance_general_ledger/output/app.py`
+- `examples/13_procurement_approval_workbench/output/app.py`
+- `examples/14_inventory_warehouse_operations/output/app.py`
+- `examples/15_manufacturing_quality_control/output/app.py`
+- `examples/16_hr_payroll_operations/output/app.py`
+- `examples/17_crm_sales_pipeline/output/app.py`
+- `examples/18_operations_dashboard_capability/output/app.py`
+- `examples/19_multi_capability_dependency_suite/output/app.py`
+- `examples/20_enterprise_erp_platform/output/app.py`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/README.md`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/thinking.md`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/sources.md`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/rationale.md`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/before-console.html`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/before-console.headers`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/before-rules.html`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/before-rules.headers`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/before-config.html`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/before-config.headers`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/before-approval.html`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/before-approval.headers`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/after-console.html`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/after-console.headers`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/after-rules.html`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/after-rules.headers`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/after-config.html`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/after-config.headers`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/after-approval.html`
+- `docs/research/generated-ui-workspaces/capability-console-rules-config-approval/assets/after-approval.headers`
+- `docs/research/generated-ui-workspaces/SUMMARY.md`
+
+Validation evidence:
+
+- Live before audit: example 09 `/ui/capabilities/CreditControl` and the rules/configuration/approval POST flows booted at `127.0.0.1:20899`.
+- Live after audit: regenerated example 09 booted at `127.0.0.1:20900`; the console and all three POST flows returned 200 and rendered operation-specific summaries.
+- Regenerated all 20 numbered examples through `APGCompiler.compile_file()`.
+- Targeted tests: `3 passed` across capability console regression, CSS class coverage, and required template route coverage.
+- Full suite: `1483 passed, 1 skipped, 3 warnings in 730.43s`.
+- PythonCodeGenerator tripwire clean.
+
 ## Verdicts
 
 | Workspace | Before | After | Status |
@@ -555,6 +621,7 @@ Validation evidence:
 | create-edit-forms-drawer-inline-edit | Create drawer bypassed native validation, structured fields used single-line text inputs, failed creates returned a contextless fragment, and inline edit controls were not type-aware. | Native required/type validation, helper text, JSON textareas, contextual error recovery, draft guard, Ctrl/Cmd-S submit, and semantic inline edit controls. | Complete |
 | workflow-list-wizard-run-progress | Wizard skipped every other step, successful UI workflows left no run history/debug trace, completion had no run link, and structured textarea values could fail final validation. | Wizard advances sequentially, successful completions record shared workflow runs, recent runs appear on the list, completion links to record/debugger, and array/object strings are coerced. | Complete |
 | agent-and-agent-team-consoles | Single-agent console was form-first and raw-JSON-heavy; declared team console and team POST were 404 dead ends. | Conversation-first agent/team consoles, preserved prompt context, team lanes and handoff flow, raw JSON disclosures, and metadata fallback for team routes/invocation. | Complete |
+| capability-console-rules-config-approval | Three blank JSON boxes and generic/raw results made rules, configuration, and approvals hard to test without knowing the payload contract. | Prefilled generated contexts, preserved submitted JSON, operation-specific summaries, capability profile, and secondary raw JSON disclosures. | Complete |
 
 ## Defect Ledger
 
@@ -597,3 +664,8 @@ Validation evidence:
 | agent-and-agent-team-consoles | In-memory generated apps could not render agent consoles without `ai_agents.py`. | Added semantic-model fallback for agent descriptions. | Resolved |
 | agent-and-agent-team-consoles | Console placed form/raw JSON before conversational output. | Reworked template into conversation, composer, structured payload disclosure, and secondary raw JSON details. | Resolved |
 | agent-and-agent-team-consoles | Team membership and handoff flow were invisible. | Added team lanes and handoff flow side panels. | Resolved |
+| capability-console-rules-config-approval | Console started with blank JSON payloads. | Generated rule, configuration, and approval defaults from the capability description. | Resolved |
+| capability-console-rules-config-approval | Submitted operation JSON was not preserved after POST. | Passed the active raw JSON field back into the capability console template. | Resolved |
+| capability-console-rules-config-approval | Rule/configuration/approval results were raw or generic. | Added operation-specific summaries for matched rules/actions, resolved configuration, and approvers. | Resolved |
+| capability-console-rules-config-approval | Capability rules and defaults were hidden in raw JSON. | Added a capability profile panel with default configuration and declared rules. | Resolved |
+| capability-console-rules-config-approval | Regression coverage did not load generated capability companion modules. | Compiled the test app to a temporary output directory and imported the generated module with that directory on `sys.path`. | Resolved |

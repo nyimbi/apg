@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import re
+import sys
 
-from compiler.compiler import compile_apg_file
+from compiler.compiler import APGCompiler, compile_apg_file
 
 
 def _json_scripts(html: str) -> list[dict]:
@@ -427,3 +429,76 @@ def test_generated_agent_team_console_renders_and_invokes_from_entity_metadata()
 	assert "Team response" in post_payload["html"]
 	assert "Escalate ticket 123" in post_payload["html"]
 	assert "Raw response JSON" in post_payload["html"]
+
+
+def test_generated_capability_console_summarizes_operations_and_preserves_inputs(tmp_path):
+	output_dir = tmp_path / "capability_console"
+	result = APGCompiler().compile_file(
+		"examples/09_capability_rules_configuration/main.apg",
+		output_dir=output_dir,
+	)
+	assert result.success, result.errors
+	for module_name in ["apg_capabilities", "apg_application", "generated_capability_console_app"]:
+		sys.modules.pop(module_name, None)
+	sys.path.insert(0, str(output_dir))
+	try:
+		spec = importlib.util.spec_from_file_location("generated_capability_console_app", output_dir / "app.py")
+		assert spec is not None
+		assert spec.loader is not None
+		module = importlib.util.module_from_spec(spec)
+		sys.modules["generated_capability_console_app"] = module
+		spec.loader.exec_module(module)
+	finally:
+		sys.path.remove(str(output_dir))
+
+	status, html = module._ui_payload("/ui/capabilities/CreditControl")
+	assert status == 200
+	assert "Rules evaluation" in html
+	assert "Configuration" in html
+	assert "Approval plan" in html
+	assert "Default configuration" in html
+	assert "Raw capability JSON" in html
+	assert "tenant_id" in html
+
+	rule_context = {
+		"tenant_id": "tenant-001",
+		"customer_id": "customer-001",
+		"amount": 60000,
+		"risk_score": 0.78,
+		"is_international": True,
+	}
+	post_status, post_payload = module._ui_post_payload(
+		"/ui/capabilities/CreditControl/rules/evaluate",
+		{"context_json": json.dumps(rule_context, separators=(",", ":"))},
+	)
+	assert post_status == 200
+	rules_html = post_payload["html"]
+	assert "Rules evaluation" in rules_html
+	assert "Matched rules" in rules_html
+	assert "Actions" in rules_html
+	assert "tenant-001" in rules_html
+	assert "60000" in rules_html
+	assert "Raw result JSON" in rules_html
+
+	config_status, config_payload = module._ui_post_payload(
+		"/ui/capabilities/CreditControl/configuration/resolve",
+		{"configuration_json": json.dumps({"review_threshold": 0.25, "default_limit": 75000}, separators=(",", ":"))},
+	)
+	assert config_status == 200
+	config_html = config_payload["html"]
+	assert "Configuration resolution" in config_html
+	assert "Resolved configuration" in config_html
+	assert "review_threshold" in config_html
+	assert "0.25" in config_html
+	assert "75000" in config_html
+
+	approval_status, approval_payload = module._ui_post_payload(
+		"/ui/capabilities/CreditControl/approval/plan",
+		{"context_json": json.dumps({**rule_context, "requester": "operator"}, separators=(",", ":"))},
+	)
+	assert approval_status == 200
+	approval_html = approval_payload["html"]
+	assert "Approval plan" in approval_html
+	assert "Approvers" in approval_html
+	assert "credit_manager" in approval_html
+	assert "finance_controller" in approval_html

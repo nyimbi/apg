@@ -1,52 +1,147 @@
+{% set operation = operation | default('') %}
+{% set operation_label = operation_label | default('Result') %}
+{% set rule_context_json = rule_context_json | default('{}') %}
+{% set configuration_json = configuration_json | default('{}') %}
+{% set approval_context_json = approval_context_json | default('{}') %}
+{% set description = description | default({}) %}
+
 <section class="mb-6">
   <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <a href="/capabilities" class="hover:text-blue-600">Capability catalog</a> / <span class="font-semibold text-gray-900">{{ name }}</span></p>
-  <h1 class="text-xl font-bold text-gray-900">{{ name }}</h1>
+  <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">{{ name }}</h1>
+      <p class="text-sm text-gray-500 mt-1">Rules, configuration, and approval planning workspace.</p>
+    </div>
+    {% if description.contract %}
+    <span class="apg-badge apg-badge-neutral">{{ description.contract.get('name', 'capability') }}</span>
+    {% endif %}
+  </div>
 </section>
 
 {% if error %}
-<div role="alert" class="bg-red-50 border border-red-200 text-red-700">{{ error }}</div>
+<div role="alert" class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm mb-4">{{ error }}</div>
 {% endif %}
 
 <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-  <form method="post" action="/ui/capabilities/{{ safe_name }}/rules/evaluate" class="space-y-4">
-    <h2 class="text-base font-semibold text-gray-900">Rules Evaluate</h2>
-    <label>Context JSON <textarea name="context_json" rows="8">{}</textarea></label>
-    <button type="submit" class="apg-btn">Evaluate</button>
+  <form method="post" action="/ui/capabilities/{{ safe_name }}/rules/evaluate" class="apg-card space-y-4">
+    <div>
+      <h2 class="text-base font-semibold text-gray-900">Rules evaluation</h2>
+      <p class="text-xs text-gray-500 mt-1">Test policy decisions with an explicit request context.</p>
+    </div>
+    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Context JSON
+      <textarea name="context_json" rows="8" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">{{ rule_context_json }}</textarea>
+    </label>
+    <button type="submit" class="apg-btn">Evaluate rules</button>
   </form>
-  <form method="post" action="/ui/capabilities/{{ safe_name }}/configuration/resolve" class="space-y-4">
-    <h2 class="text-base font-semibold text-gray-900">Configuration Resolve</h2>
-    <label>Overrides JSON <textarea name="configuration_json" rows="8">{}</textarea></label>
-    <button type="submit" class="apg-btn">Resolve</button>
+
+  <form method="post" action="/ui/capabilities/{{ safe_name }}/configuration/resolve" class="apg-card space-y-4">
+    <div>
+      <h2 class="text-base font-semibold text-gray-900">Configuration</h2>
+      <p class="text-xs text-gray-500 mt-1">Preview resolved configuration after overrides.</p>
+    </div>
+    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Overrides JSON
+      <textarea name="configuration_json" rows="8" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">{{ configuration_json }}</textarea>
+    </label>
+    <button type="submit" class="apg-btn">Resolve config</button>
   </form>
-  <form method="post" action="/ui/capabilities/{{ safe_name }}/approval/plan" class="space-y-4">
-    <h2 class="text-base font-semibold text-gray-900">Approval Plan</h2>
-    <label>Context JSON <textarea name="context_json" rows="8">{}</textarea></label>
-    <button type="submit" class="apg-btn">Plan</button>
+
+  <form method="post" action="/ui/capabilities/{{ safe_name }}/approval/plan" class="apg-card space-y-4">
+    <div>
+      <h2 class="text-base font-semibold text-gray-900">Approval plan</h2>
+      <p class="text-xs text-gray-500 mt-1">Identify approvers and review requirements before execution.</p>
+    </div>
+    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Context JSON
+      <textarea name="context_json" rows="8" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">{{ approval_context_json }}</textarea>
+    </label>
+    <button type="submit" class="apg-btn">Plan approval</button>
   </form>
 </section>
 
 <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
   <article class="apg-card">
-    <h2 class="text-base font-semibold text-gray-900 mb-3">Description</h2>
-    <details open>
+    <h2 class="text-base font-semibold text-gray-900 mb-3">Capability profile</h2>
+    {% if description.configuration %}
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Default configuration</p>
+    <dl class="space-y-2 mb-4">
+      {% for key, value in description.configuration.items() %}
+      <div class="flex items-center justify-between gap-3 border-b border-gray-100 py-2">
+        <dt class="text-sm text-gray-600">{{ key }}</dt>
+        <dd class="text-sm font-mono text-gray-900">{{ value }}</dd>
+      </div>
+      {% endfor %}
+    </dl>
+    {% endif %}
+    {% if description.rules %}
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Declared rules</p>
+    <ol class="space-y-2 mb-4">
+      {% for rule in description.rules %}
+      <li class="border border-gray-100 rounded-lg p-3">
+        <p class="text-sm font-medium text-gray-900">{{ rule.name or rule.get('name', 'rule') }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ rule.when or rule.get('when', '') }}</p>
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+    <details>
       <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw capability JSON</summary>
       <pre>{{ description_json }}</pre>
     </details>
   </article>
+
   <article class="apg-card">
-    <h2 class="text-base font-semibold text-gray-900 mb-3">Result</h2>
+    <div class="flex items-center justify-between gap-3 mb-3">
+      <h2 class="text-base font-semibold text-gray-900">{{ operation_label }}</h2>
+      {% if result and result.decision %}
+      <span class="apg-badge {% if result.decision == 'allow' %}apg-badge-success{% elif result.decision == 'deny' %}apg-badge-danger{% else %}apg-badge-warning{% endif %}">{{ result.decision }}</span>
+      {% elif result and result.required is defined %}
+      <span class="apg-badge {% if result.required %}apg-badge-warning{% else %}apg-badge-success{% endif %}">{{ 'required' if result.required else 'not required' }}</span>
+      {% endif %}
+    </div>
     {% if result %}
-    <dl class="space-y-2 mb-4">
-      {% for key, value in result_items %}
-      <div><dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ key }}</dt><dd class="text-sm text-gray-700 break-words">{{ value }}</dd></div>
-      {% endfor %}
-    </dl>
-    <details>
-      <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw result JSON</summary>
-      <pre>{{ result_json_html | safe }}</pre>
-    </details>
+      {% if result.matched_rules %}
+      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Matched rules</p>
+      <div class="flex items-center gap-2 flex-wrap mb-4">
+        {% for rule in result.matched_rules %}
+        <span class="apg-badge apg-badge-neutral">{{ rule }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if result.actions %}
+      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Actions</p>
+      <ol class="space-y-2 mb-4">
+        {% for action in result.actions %}
+        <li class="border border-gray-100 rounded-lg p-3">
+          <p class="text-sm font-medium text-gray-900">{{ action.action or action.get('action', '') }}</p>
+          <p class="text-xs text-gray-500 mt-1">{{ action.rule or action.get('rule', '') }}</p>
+        </li>
+        {% endfor %}
+      </ol>
+      {% endif %}
+      {% if result.configuration %}
+      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Resolved configuration</p>
+      <dl class="space-y-2 mb-4">
+        {% for key, value in result.configuration.items() %}
+        <div class="flex items-center justify-between gap-3 border-b border-gray-100 py-2">
+          <dt class="text-sm text-gray-600">{{ key }}</dt>
+          <dd class="text-sm font-mono text-gray-900">{{ value }}</dd>
+        </div>
+        {% endfor %}
+      </dl>
+      {% endif %}
+      {% if result.approvers %}
+      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Approvers</p>
+      <div class="flex items-center gap-2 flex-wrap mb-4">
+        {% for approver in result.approvers %}
+        <span class="apg-badge apg-badge-neutral">{{ approver }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <details>
+        <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw result JSON</summary>
+        <pre>{{ result_json_html | safe }}</pre>
+      </details>
     {% else %}
-    <p class="text-sm text-gray-500">Run a capability operation to view results.</p>
+    <p class="text-sm text-gray-500">Run a capability operation to view decision, configuration, or approval results.</p>
     {% endif %}
   </article>
 </section>

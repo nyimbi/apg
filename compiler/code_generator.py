@@ -6602,12 +6602,52 @@ def _ui_agent_console_html(
     return 200, _html_page(name, tmpl_body if tmpl_body is not None else _jinja_required_page(name))
 
 
-def _ui_capability_console_html(name: str, result: Dict[str, Any] | None = None, error: str = "") -> tuple[int, str]:
+def _capability_default_rule_context(description: Dict[str, Any]) -> Dict[str, Any]:
+    configuration = description.get("configuration", {{}}) if isinstance(description, dict) else {{}}
+    default_limit = configuration.get("default_limit", 1000) if isinstance(configuration, dict) else 1000
+    review_threshold = configuration.get("review_threshold", 0.5) if isinstance(configuration, dict) else 0.5
+    return {{
+        "tenant_id": "example-tenant",
+        "customer_id": "customer-001",
+        "amount": default_limit,
+        "risk_score": review_threshold,
+        "is_international": False,
+    }}
+
+
+def _capability_default_approval_context(description: Dict[str, Any]) -> Dict[str, Any]:
+    context = _capability_default_rule_context(description)
+    context["requester"] = "operator"
+    return context
+
+
+def _capability_operation_label(operation: str) -> str:
+    labels = {{
+        "rules": "Rules evaluation",
+        "configuration": "Configuration resolution",
+        "approval": "Approval plan",
+    }}
+    return labels.get(operation, "Result")
+
+
+def _ui_capability_console_html(
+    name: str,
+    result: Dict[str, Any] | None = None,
+    error: str = "",
+    operation: str = "",
+    context_json: str = "",
+    configuration_json: str = "",
+    approval_context_json: str = "",
+) -> tuple[int, str]:
     app = describe_application()
     capabilities = app.get("capability_descriptions", {{}})
     if name not in capabilities:
         return 404, _html_page("Unknown capability", f"<h1>Unknown capability</h1><p>{{html.escape(name)}}</p>")
     safe_name = html.escape(name, quote=True)
+    description = capabilities[name]
+    default_rule_context = _capability_default_rule_context(description)
+    default_approval_context = _capability_default_approval_context(description)
+    default_configuration = description.get("configuration", {{}}) if isinstance(description, dict) else {{}}
     result_items = []
     if isinstance(result, dict):
         for key, value in sorted(result.items()):
@@ -6619,7 +6659,13 @@ def _ui_capability_console_html(name: str, result: Dict[str, Any] | None = None,
         "capability_console.html.j2",
         name=name,
         safe_name=safe_name,
-        description_json=json.dumps(capabilities[name], indent=2, sort_keys=True),
+        description=description,
+        description_json=json.dumps(description, indent=2, sort_keys=True),
+        rule_context_json=context_json or json.dumps(default_rule_context, indent=2, sort_keys=True),
+        configuration_json=configuration_json or json.dumps(default_configuration, indent=2, sort_keys=True),
+        approval_context_json=approval_context_json or json.dumps(default_approval_context, indent=2, sort_keys=True),
+        operation=operation,
+        operation_label=_capability_operation_label(operation),
         result=result,
         result_items=result_items,
         result_json=json.dumps(result, indent=2, sort_keys=True) if result is not None else "",
@@ -6692,29 +6738,37 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
         capability_name = parts[2]
         operation = "/".join(parts[3:])
         if operation == "rules/evaluate":
+            raw_context_json = str(form_record.get("context_json") or "")
             context, error = _parse_json_object_field(form_record, "context_json")
             if error:
-                _status, html_payload = _ui_capability_console_html(capability_name, error=error)
+                _status, html_payload = _ui_capability_console_html(capability_name, error=error, operation="rules", context_json=raw_context_json)
                 return 400, {{"html": html_payload}}
             status, result = _rule_evaluation_payload(f"/capabilities/{{capability_name}}/rules/evaluate", {{"context": context}})
         elif operation == "configuration/resolve":
+            raw_configuration_json = str(form_record.get("configuration_json") or "")
             configuration, error = _parse_json_object_field(form_record, "configuration_json")
             if error:
-                _status, html_payload = _ui_capability_console_html(capability_name, error=error)
+                _status, html_payload = _ui_capability_console_html(capability_name, error=error, operation="configuration", configuration_json=raw_configuration_json)
                 return 400, {{"html": html_payload}}
             status, result = _configuration_payload(f"/capabilities/{{capability_name}}/configuration/resolve", {{"overrides": configuration}})
         elif operation == "approval/plan":
+            raw_approval_context_json = str(form_record.get("context_json") or "")
             context, error = _parse_json_object_field(form_record, "context_json")
             if error:
-                _status, html_payload = _ui_capability_console_html(capability_name, error=error)
+                _status, html_payload = _ui_capability_console_html(capability_name, error=error, operation="approval", approval_context_json=raw_approval_context_json)
                 return 400, {{"html": html_payload}}
             status, result = _approval_plan_payload(f"/capabilities/{{capability_name}}/approval/plan", {{"context": context}})
         else:
             return 404, {{"error": "not_found", "path": path}}
+        op_key = "rules" if operation == "rules/evaluate" else "configuration" if operation == "configuration/resolve" else "approval"
         _status, html_payload = _ui_capability_console_html(
             capability_name,
             result=result if status == 200 else None,
             error="" if status == 200 else result.get("error", "capability operation failed"),
+            operation=op_key,
+            context_json=raw_context_json if operation == "rules/evaluate" else "",
+            configuration_json=raw_configuration_json if operation == "configuration/resolve" else "",
+            approval_context_json=raw_approval_context_json if operation == "approval/plan" else "",
         )
         return status, {{"html": html_payload}}
     if len(parts) == 4 and parts[0] == "ui" and parts[1] == "entities" and parts[3] == "records":

@@ -1,0 +1,817 @@
+<!doctype html><html lang="en" dir="ltr" class="h-full"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><script>(function(){try{var m=localStorage.getItem("apg-theme")||"system";var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;}catch(e){}})();</script><meta name="theme-color" content="#1E5B5A"><link rel="manifest" href="/static/manifest.webmanifest"><link rel="stylesheet" href="/static/apg.css"><link rel="stylesheet" href="/static/uplot.min.css"><script defer src="/static/htmx.min.js"></script><script defer src="/static/sortable.min.js"></script><script defer src="/static/uplot.min.js"></script><script defer src="/static/apg-charts.js"></script><script defer src="/static/apg-sse.js"></script><style>.apg-skeleton{  background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);  background-size:200% 100%;  animation:apg-shimmer 1.5s infinite;  border-radius:4px;}@keyframes apg-shimmer{  0%{background-position:200% 0}  100%{background-position:-200% 0}}.apg-loading .apg-skeleton-row{height:40px;margin-bottom:8px;}.htmx-request .apg-content-area{opacity:0.6;transition:opacity 0.2s;}</style><link rel="stylesheet" href="/theme.css"><title>CreditControl — credit_control</title></head><body class="min-h-full bg-gray-50 text-gray-900"><a class="apg-skip-link" href="#content">Skip to content</a><div id="apg-offline-banner" class="apg-offline-banner" role="status" hidden>Offline mode: showing cached APG screens.</div><header class="apg-topbar sticky top-0 z-50" role="banner">  <button class="apg-icon-btn" type="button" onclick="apgToggleSidebar()" aria-label="Toggle navigation">☰</button>  <a class="apg-logo" href="/ui">credit_control</a>  <nav class="apg-topnav ml-4">    <a class="apg-nav-link hover:bg-gray-100" href="/ui">Home</a>    <a class="apg-nav-link hover:bg-gray-100" href="/ui/workflows">⚡ Workflows</a>    <a class="apg-nav-link hover:bg-gray-100" href="/ui/marketplace">Marketplace</a>  </nav>  <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">System</button>    </header><aside id="apg-sidebar" class="apg-sidebar" aria-label="Application navigation"><div class="apg-sidebar-section"><p class="apg-sidebar-heading">Navigate</p><a class="apg-sidebar-link" href="/ui">Dashboard</a><a class="apg-sidebar-link" href="/ui/workflows">Workflows</a><a class="apg-sidebar-link" href="/ui/databases">Databases</a><a class="apg-sidebar-link" href="/ui/marketplace">Marketplace</a></div><div class="apg-sidebar-section"><p class="apg-sidebar-heading">Entities</p><a class="apg-sidebar-link" href="/ui/entities/CreditControl">CreditControl</a><a class="apg-sidebar-link" href="/ui/entities/CreditControlApp">CreditControlApp</a></div></aside><div id="apg-sidebar-backdrop" class="apg-sidebar-backdrop" onclick="apgCloseSidebar()"></div><main class="apg-content apg-shell-content" id="content" tabindex="-1"><section class="mb-6">
+  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <a href="/capabilities" class="hover:text-blue-600">Capability catalog</a> / <span class="font-semibold text-gray-900">CreditControl</span></p>
+  <h1 class="text-xl font-bold text-gray-900">CreditControl</h1>
+</section>
+
+
+
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <form method="post" action="/ui/capabilities/CreditControl/rules/evaluate" class="space-y-4">
+    <h2 class="text-base font-semibold text-gray-900">Rules Evaluate</h2>
+    <label>Context JSON <textarea name="context_json" rows="8">{}</textarea></label>
+    <button type="submit" class="apg-btn">Evaluate</button>
+  </form>
+  <form method="post" action="/ui/capabilities/CreditControl/configuration/resolve" class="space-y-4">
+    <h2 class="text-base font-semibold text-gray-900">Configuration Resolve</h2>
+    <label>Overrides JSON <textarea name="configuration_json" rows="8">{}</textarea></label>
+    <button type="submit" class="apg-btn">Resolve</button>
+  </form>
+  <form method="post" action="/ui/capabilities/CreditControl/approval/plan" class="space-y-4">
+    <h2 class="text-base font-semibold text-gray-900">Approval Plan</h2>
+    <label>Context JSON <textarea name="context_json" rows="8">{}</textarea></label>
+    <button type="submit" class="apg-btn">Plan</button>
+  </form>
+</section>
+
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+  <article class="apg-card">
+    <h2 class="text-base font-semibold text-gray-900 mb-3">Description</h2>
+    <details open>
+      <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw capability JSON</summary>
+      <pre>{
+  &#34;approvals&#34;: {
+    &#34;approvers&#34;: [
+      &#34;credit_manager&#34;,
+      &#34;finance_controller&#34;
+    ],
+    &#34;levels&#34;: 2
+  },
+  &#34;business_rules&#34;: [],
+  &#34;components&#34;: {},
+  &#34;configuration&#34;: {
+    &#34;currency&#34;: &#34;KES&#34;,
+    &#34;default_limit&#34;: 50000,
+    &#34;high_risk_threshold&#34;: 0.7,
+    &#34;max_days_overdue&#34;: 30,
+    &#34;review_threshold&#34;: 0.5
+  },
+  &#34;contract&#34;: {
+    &#34;configuration&#34;: {
+      &#34;currency&#34;: &#34;KES&#34;,
+      &#34;default_limit&#34;: 50000,
+      &#34;high_risk_threshold&#34;: 0.7,
+      &#34;max_days_overdue&#34;: 30,
+      &#34;review_threshold&#34;: 0.5
+    },
+    &#34;configuration_schema&#34;: {
+      &#34;required&#34;: [
+        &#34;default_limit&#34;,
+        &#34;currency&#34;
+      ]
+    },
+    &#34;id&#34;: &#34;credit_control&#34;,
+    &#34;name&#34;: &#34;Credit Control&#34;,
+    &#34;provides&#34;: [
+      &#34;credit_limit_checks&#34;,
+      &#34;hold_release&#34;,
+      &#34;credit_scoring&#34;
+    ],
+    &#34;requires&#34;: [
+      &#34;audit_events&#34;,
+      &#34;customer_master&#34;
+    ],
+    &#34;rule_engine&#34;: {
+      &#34;default_decision&#34;: &#34;allow&#34;,
+      &#34;type&#34;: &#34;deterministic&#34;
+    },
+    &#34;rules&#34;: [
+      {
+        &#34;action&#34;: &#34;deny&#34;,
+        &#34;name&#34;: &#34;tenant_required&#34;,
+        &#34;priority&#34;: 100,
+        &#34;when&#34;: &#34;tenant_id missing&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;tenant_id&#34;,
+          &#34;negated&#34;: false,
+          &#34;type&#34;: &#34;missing&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;allow&#34;,
+        &#34;name&#34;: &#34;customer_present&#34;,
+        &#34;priority&#34;: 99,
+        &#34;when&#34;: &#34;customer_id not missing&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;customer_id&#34;,
+          &#34;negated&#34;: true,
+          &#34;type&#34;: &#34;missing&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;deny&#34;,
+        &#34;name&#34;: &#34;over_limit&#34;,
+        &#34;priority&#34;: 90,
+        &#34;when&#34;: &#34;order_total &gt; credit_limit&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;order_total&#34;,
+          &#34;op&#34;: &#34;&gt;&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: &#34;credit_limit&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;deny&#34;,
+        &#34;name&#34;: &#34;under_minimum&#34;,
+        &#34;priority&#34;: 89,
+        &#34;when&#34;: &#34;order_total &lt; 100&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;order_total&#34;,
+          &#34;op&#34;: &#34;&lt;&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: 100
+        }
+      },
+      {
+        &#34;action&#34;: &#34;require_review&#34;,
+        &#34;name&#34;: &#34;at_limit&#34;,
+        &#34;priority&#34;: 88,
+        &#34;when&#34;: &#34;order_total &gt;= credit_limit&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;order_total&#34;,
+          &#34;op&#34;: &#34;&gt;=&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: &#34;credit_limit&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;allow&#34;,
+        &#34;name&#34;: &#34;safe_order&#34;,
+        &#34;priority&#34;: 87,
+        &#34;when&#34;: &#34;order_total &lt;= 1000&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;order_total&#34;,
+          &#34;op&#34;: &#34;&lt;=&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: 1000
+        }
+      },
+      {
+        &#34;action&#34;: &#34;allow&#34;,
+        &#34;name&#34;: &#34;premium_customer&#34;,
+        &#34;priority&#34;: 86,
+        &#34;when&#34;: &#34;customer_tier == premium&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;customer_tier&#34;,
+          &#34;op&#34;: &#34;==&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: &#34;premium&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;require_review&#34;,
+        &#34;name&#34;: &#34;non_standard_currency&#34;,
+        &#34;priority&#34;: 85,
+        &#34;when&#34;: &#34;currency != KES&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;currency&#34;,
+          &#34;op&#34;: &#34;!=&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: &#34;KES&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;require_review&#34;,
+        &#34;name&#34;: &#34;high_risk_region&#34;,
+        &#34;priority&#34;: 80,
+        &#34;when&#34;: &#34;country in [NG, SD, LY]&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;country&#34;,
+          &#34;negated&#34;: false,
+          &#34;type&#34;: &#34;in&#34;,
+          &#34;values&#34;: [
+            &#34;NG&#34;,
+            &#34;SD&#34;,
+            &#34;LY&#34;
+          ]
+        }
+      },
+      {
+        &#34;action&#34;: &#34;allow&#34;,
+        &#34;name&#34;: &#34;approved_currency&#34;,
+        &#34;priority&#34;: 79,
+        &#34;when&#34;: &#34;currency in [KES, UGX, TZS, USD, EUR]&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;currency&#34;,
+          &#34;negated&#34;: false,
+          &#34;type&#34;: &#34;in&#34;,
+          &#34;values&#34;: [
+            &#34;KES&#34;,
+            &#34;UGX&#34;,
+            &#34;TZS&#34;,
+            &#34;USD&#34;,
+            &#34;EUR&#34;
+          ]
+        }
+      },
+      {
+        &#34;action&#34;: &#34;require_review&#34;,
+        &#34;name&#34;: &#34;blocked_category&#34;,
+        &#34;priority&#34;: 78,
+        &#34;when&#34;: &#34;product_category not in [food, medicine, education]&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;product_category&#34;,
+          &#34;negated&#34;: true,
+          &#34;type&#34;: &#34;in&#34;,
+          &#34;values&#34;: [
+            &#34;food&#34;,
+            &#34;medicine&#34;,
+            &#34;education&#34;
+          ]
+        }
+      },
+      {
+        &#34;action&#34;: &#34;require_review&#34;,
+        &#34;name&#34;: &#34;high_value_new_customer&#34;,
+        &#34;priority&#34;: 70,
+        &#34;when&#34;: &#34;order_total &gt; 100000 and customer_age_days &lt; 90&#34;,
+        &#34;when_ast&#34;: {
+          &#34;left&#34;: {
+            &#34;field&#34;: &#34;order_total&#34;,
+            &#34;op&#34;: &#34;&gt;&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: 100000
+          },
+          &#34;right&#34;: {
+            &#34;field&#34;: &#34;customer_age_days&#34;,
+            &#34;op&#34;: &#34;&lt;&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: 90
+          },
+          &#34;type&#34;: &#34;and&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;deny&#34;,
+        &#34;name&#34;: &#34;risk_and_overdue&#34;,
+        &#34;priority&#34;: 69,
+        &#34;when&#34;: &#34;risk_score &gt; high_risk_threshold and days_overdue &gt; max_days_overdue&#34;,
+        &#34;when_ast&#34;: {
+          &#34;left&#34;: {
+            &#34;field&#34;: &#34;risk_score&#34;,
+            &#34;op&#34;: &#34;&gt;&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: &#34;high_risk_threshold&#34;
+          },
+          &#34;right&#34;: {
+            &#34;field&#34;: &#34;days_overdue&#34;,
+            &#34;op&#34;: &#34;&gt;&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: &#34;max_days_overdue&#34;
+          },
+          &#34;type&#34;: &#34;and&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;deny&#34;,
+        &#34;name&#34;: &#34;fraud_pattern&#34;,
+        &#34;priority&#34;: 68,
+        &#34;when&#34;: &#34;velocity_score &gt; 0.8 and geo_anomaly == true&#34;,
+        &#34;when_ast&#34;: {
+          &#34;left&#34;: {
+            &#34;field&#34;: &#34;velocity_score&#34;,
+            &#34;op&#34;: &#34;&gt;&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: 0.8
+          },
+          &#34;right&#34;: {
+            &#34;field&#34;: &#34;geo_anomaly&#34;,
+            &#34;op&#34;: &#34;==&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: true
+          },
+          &#34;type&#34;: &#34;and&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;require_review&#34;,
+        &#34;name&#34;: &#34;urgent_review&#34;,
+        &#34;priority&#34;: 60,
+        &#34;when&#34;: &#34;amount &gt; 500000 or customer_tier == vip&#34;,
+        &#34;when_ast&#34;: {
+          &#34;left&#34;: {
+            &#34;field&#34;: &#34;amount&#34;,
+            &#34;op&#34;: &#34;&gt;&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: 500000
+          },
+          &#34;right&#34;: {
+            &#34;field&#34;: &#34;customer_tier&#34;,
+            &#34;op&#34;: &#34;==&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: &#34;vip&#34;
+          },
+          &#34;type&#34;: &#34;or&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;deny&#34;,
+        &#34;name&#34;: &#34;any_block_reason&#34;,
+        &#34;priority&#34;: 59,
+        &#34;when&#34;: &#34;is_blacklisted == true or is_frozen == true&#34;,
+        &#34;when_ast&#34;: {
+          &#34;left&#34;: {
+            &#34;field&#34;: &#34;is_blacklisted&#34;,
+            &#34;op&#34;: &#34;==&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: true
+          },
+          &#34;right&#34;: {
+            &#34;field&#34;: &#34;is_frozen&#34;,
+            &#34;op&#34;: &#34;==&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: true
+          },
+          &#34;type&#34;: &#34;or&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;require_review&#34;,
+        &#34;name&#34;: &#34;complex_approval&#34;,
+        &#34;priority&#34;: 50,
+        &#34;when&#34;: &#34;(amount &gt; 50000 or is_international == true) and risk_score &lt; review_threshold&#34;,
+        &#34;when_ast&#34;: {
+          &#34;left&#34;: {
+            &#34;left&#34;: {
+              &#34;field&#34;: &#34;amount&#34;,
+              &#34;op&#34;: &#34;&gt;&#34;,
+              &#34;type&#34;: &#34;compare&#34;,
+              &#34;value&#34;: 50000
+            },
+            &#34;right&#34;: {
+              &#34;field&#34;: &#34;is_international&#34;,
+              &#34;op&#34;: &#34;==&#34;,
+              &#34;type&#34;: &#34;compare&#34;,
+              &#34;value&#34;: true
+            },
+            &#34;type&#34;: &#34;or&#34;
+          },
+          &#34;right&#34;: {
+            &#34;field&#34;: &#34;risk_score&#34;,
+            &#34;op&#34;: &#34;&lt;&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: &#34;review_threshold&#34;
+          },
+          &#34;type&#34;: &#34;and&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;deny&#34;,
+        &#34;name&#34;: &#34;multi_factor_deny&#34;,
+        &#34;priority&#34;: 49,
+        &#34;when&#34;: &#34;(fraud_score &gt; 0.9 or velocity_flag == true) and customer_age_days &lt; 30&#34;,
+        &#34;when_ast&#34;: {
+          &#34;left&#34;: {
+            &#34;left&#34;: {
+              &#34;field&#34;: &#34;fraud_score&#34;,
+              &#34;op&#34;: &#34;&gt;&#34;,
+              &#34;type&#34;: &#34;compare&#34;,
+              &#34;value&#34;: 0.9
+            },
+            &#34;right&#34;: {
+              &#34;field&#34;: &#34;velocity_flag&#34;,
+              &#34;op&#34;: &#34;==&#34;,
+              &#34;type&#34;: &#34;compare&#34;,
+              &#34;value&#34;: true
+            },
+            &#34;type&#34;: &#34;or&#34;
+          },
+          &#34;right&#34;: {
+            &#34;field&#34;: &#34;customer_age_days&#34;,
+            &#34;op&#34;: &#34;&lt;&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: 30
+          },
+          &#34;type&#34;: &#34;and&#34;
+        }
+      },
+      {
+        &#34;action&#34;: &#34;require_review&#34;,
+        &#34;name&#34;: &#34;high_risk_score&#34;,
+        &#34;priority&#34;: 40,
+        &#34;when&#34;: &#34;risk_score &gt;= high_risk_threshold&#34;,
+        &#34;when_ast&#34;: {
+          &#34;field&#34;: &#34;risk_score&#34;,
+          &#34;op&#34;: &#34;&gt;=&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: &#34;high_risk_threshold&#34;
+        }
+      }
+    ],
+    &#34;version&#34;: &#34;1.0.0&#34;
+  },
+  &#34;erp_modules&#34;: [],
+  &#34;i18n&#34;: {},
+  &#34;master_data&#34;: {
+    &#34;entities&#34;: [
+      &#34;customer_credit_profile&#34;,
+      &#34;credit_limit&#34;,
+      &#34;payment_history&#34;
+    ]
+  },
+  &#34;name&#34;: &#34;CreditControl&#34;,
+  &#34;provides&#34;: [
+    &#34;credit_limit_checks&#34;,
+    &#34;hold_release&#34;,
+    &#34;credit_scoring&#34;
+  ],
+  &#34;requires&#34;: [
+    &#34;audit_events&#34;,
+    &#34;customer_master&#34;
+  ],
+  &#34;rule_engine&#34;: {
+    &#34;default_decision&#34;: &#34;allow&#34;,
+    &#34;type&#34;: &#34;deterministic&#34;
+  },
+  &#34;rules&#34;: [
+    {
+      &#34;action&#34;: &#34;deny&#34;,
+      &#34;name&#34;: &#34;tenant_required&#34;,
+      &#34;priority&#34;: 100,
+      &#34;when&#34;: &#34;tenant_id missing&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;tenant_id&#34;,
+        &#34;negated&#34;: false,
+        &#34;type&#34;: &#34;missing&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;allow&#34;,
+      &#34;name&#34;: &#34;customer_present&#34;,
+      &#34;priority&#34;: 99,
+      &#34;when&#34;: &#34;customer_id not missing&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;customer_id&#34;,
+        &#34;negated&#34;: true,
+        &#34;type&#34;: &#34;missing&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;deny&#34;,
+      &#34;name&#34;: &#34;over_limit&#34;,
+      &#34;priority&#34;: 90,
+      &#34;when&#34;: &#34;order_total &gt; credit_limit&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;order_total&#34;,
+        &#34;op&#34;: &#34;&gt;&#34;,
+        &#34;type&#34;: &#34;compare&#34;,
+        &#34;value&#34;: &#34;credit_limit&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;deny&#34;,
+      &#34;name&#34;: &#34;under_minimum&#34;,
+      &#34;priority&#34;: 89,
+      &#34;when&#34;: &#34;order_total &lt; 100&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;order_total&#34;,
+        &#34;op&#34;: &#34;&lt;&#34;,
+        &#34;type&#34;: &#34;compare&#34;,
+        &#34;value&#34;: 100
+      }
+    },
+    {
+      &#34;action&#34;: &#34;require_review&#34;,
+      &#34;name&#34;: &#34;at_limit&#34;,
+      &#34;priority&#34;: 88,
+      &#34;when&#34;: &#34;order_total &gt;= credit_limit&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;order_total&#34;,
+        &#34;op&#34;: &#34;&gt;=&#34;,
+        &#34;type&#34;: &#34;compare&#34;,
+        &#34;value&#34;: &#34;credit_limit&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;allow&#34;,
+      &#34;name&#34;: &#34;safe_order&#34;,
+      &#34;priority&#34;: 87,
+      &#34;when&#34;: &#34;order_total &lt;= 1000&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;order_total&#34;,
+        &#34;op&#34;: &#34;&lt;=&#34;,
+        &#34;type&#34;: &#34;compare&#34;,
+        &#34;value&#34;: 1000
+      }
+    },
+    {
+      &#34;action&#34;: &#34;allow&#34;,
+      &#34;name&#34;: &#34;premium_customer&#34;,
+      &#34;priority&#34;: 86,
+      &#34;when&#34;: &#34;customer_tier == premium&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;customer_tier&#34;,
+        &#34;op&#34;: &#34;==&#34;,
+        &#34;type&#34;: &#34;compare&#34;,
+        &#34;value&#34;: &#34;premium&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;require_review&#34;,
+      &#34;name&#34;: &#34;non_standard_currency&#34;,
+      &#34;priority&#34;: 85,
+      &#34;when&#34;: &#34;currency != KES&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;currency&#34;,
+        &#34;op&#34;: &#34;!=&#34;,
+        &#34;type&#34;: &#34;compare&#34;,
+        &#34;value&#34;: &#34;KES&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;require_review&#34;,
+      &#34;name&#34;: &#34;high_risk_region&#34;,
+      &#34;priority&#34;: 80,
+      &#34;when&#34;: &#34;country in [NG, SD, LY]&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;country&#34;,
+        &#34;negated&#34;: false,
+        &#34;type&#34;: &#34;in&#34;,
+        &#34;values&#34;: [
+          &#34;NG&#34;,
+          &#34;SD&#34;,
+          &#34;LY&#34;
+        ]
+      }
+    },
+    {
+      &#34;action&#34;: &#34;allow&#34;,
+      &#34;name&#34;: &#34;approved_currency&#34;,
+      &#34;priority&#34;: 79,
+      &#34;when&#34;: &#34;currency in [KES, UGX, TZS, USD, EUR]&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;currency&#34;,
+        &#34;negated&#34;: false,
+        &#34;type&#34;: &#34;in&#34;,
+        &#34;values&#34;: [
+          &#34;KES&#34;,
+          &#34;UGX&#34;,
+          &#34;TZS&#34;,
+          &#34;USD&#34;,
+          &#34;EUR&#34;
+        ]
+      }
+    },
+    {
+      &#34;action&#34;: &#34;require_review&#34;,
+      &#34;name&#34;: &#34;blocked_category&#34;,
+      &#34;priority&#34;: 78,
+      &#34;when&#34;: &#34;product_category not in [food, medicine, education]&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;product_category&#34;,
+        &#34;negated&#34;: true,
+        &#34;type&#34;: &#34;in&#34;,
+        &#34;values&#34;: [
+          &#34;food&#34;,
+          &#34;medicine&#34;,
+          &#34;education&#34;
+        ]
+      }
+    },
+    {
+      &#34;action&#34;: &#34;require_review&#34;,
+      &#34;name&#34;: &#34;high_value_new_customer&#34;,
+      &#34;priority&#34;: 70,
+      &#34;when&#34;: &#34;order_total &gt; 100000 and customer_age_days &lt; 90&#34;,
+      &#34;when_ast&#34;: {
+        &#34;left&#34;: {
+          &#34;field&#34;: &#34;order_total&#34;,
+          &#34;op&#34;: &#34;&gt;&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: 100000
+        },
+        &#34;right&#34;: {
+          &#34;field&#34;: &#34;customer_age_days&#34;,
+          &#34;op&#34;: &#34;&lt;&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: 90
+        },
+        &#34;type&#34;: &#34;and&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;deny&#34;,
+      &#34;name&#34;: &#34;risk_and_overdue&#34;,
+      &#34;priority&#34;: 69,
+      &#34;when&#34;: &#34;risk_score &gt; high_risk_threshold and days_overdue &gt; max_days_overdue&#34;,
+      &#34;when_ast&#34;: {
+        &#34;left&#34;: {
+          &#34;field&#34;: &#34;risk_score&#34;,
+          &#34;op&#34;: &#34;&gt;&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: &#34;high_risk_threshold&#34;
+        },
+        &#34;right&#34;: {
+          &#34;field&#34;: &#34;days_overdue&#34;,
+          &#34;op&#34;: &#34;&gt;&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: &#34;max_days_overdue&#34;
+        },
+        &#34;type&#34;: &#34;and&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;deny&#34;,
+      &#34;name&#34;: &#34;fraud_pattern&#34;,
+      &#34;priority&#34;: 68,
+      &#34;when&#34;: &#34;velocity_score &gt; 0.8 and geo_anomaly == true&#34;,
+      &#34;when_ast&#34;: {
+        &#34;left&#34;: {
+          &#34;field&#34;: &#34;velocity_score&#34;,
+          &#34;op&#34;: &#34;&gt;&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: 0.8
+        },
+        &#34;right&#34;: {
+          &#34;field&#34;: &#34;geo_anomaly&#34;,
+          &#34;op&#34;: &#34;==&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: true
+        },
+        &#34;type&#34;: &#34;and&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;require_review&#34;,
+      &#34;name&#34;: &#34;urgent_review&#34;,
+      &#34;priority&#34;: 60,
+      &#34;when&#34;: &#34;amount &gt; 500000 or customer_tier == vip&#34;,
+      &#34;when_ast&#34;: {
+        &#34;left&#34;: {
+          &#34;field&#34;: &#34;amount&#34;,
+          &#34;op&#34;: &#34;&gt;&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: 500000
+        },
+        &#34;right&#34;: {
+          &#34;field&#34;: &#34;customer_tier&#34;,
+          &#34;op&#34;: &#34;==&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: &#34;vip&#34;
+        },
+        &#34;type&#34;: &#34;or&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;deny&#34;,
+      &#34;name&#34;: &#34;any_block_reason&#34;,
+      &#34;priority&#34;: 59,
+      &#34;when&#34;: &#34;is_blacklisted == true or is_frozen == true&#34;,
+      &#34;when_ast&#34;: {
+        &#34;left&#34;: {
+          &#34;field&#34;: &#34;is_blacklisted&#34;,
+          &#34;op&#34;: &#34;==&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: true
+        },
+        &#34;right&#34;: {
+          &#34;field&#34;: &#34;is_frozen&#34;,
+          &#34;op&#34;: &#34;==&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: true
+        },
+        &#34;type&#34;: &#34;or&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;require_review&#34;,
+      &#34;name&#34;: &#34;complex_approval&#34;,
+      &#34;priority&#34;: 50,
+      &#34;when&#34;: &#34;(amount &gt; 50000 or is_international == true) and risk_score &lt; review_threshold&#34;,
+      &#34;when_ast&#34;: {
+        &#34;left&#34;: {
+          &#34;left&#34;: {
+            &#34;field&#34;: &#34;amount&#34;,
+            &#34;op&#34;: &#34;&gt;&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: 50000
+          },
+          &#34;right&#34;: {
+            &#34;field&#34;: &#34;is_international&#34;,
+            &#34;op&#34;: &#34;==&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: true
+          },
+          &#34;type&#34;: &#34;or&#34;
+        },
+        &#34;right&#34;: {
+          &#34;field&#34;: &#34;risk_score&#34;,
+          &#34;op&#34;: &#34;&lt;&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: &#34;review_threshold&#34;
+        },
+        &#34;type&#34;: &#34;and&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;deny&#34;,
+      &#34;name&#34;: &#34;multi_factor_deny&#34;,
+      &#34;priority&#34;: 49,
+      &#34;when&#34;: &#34;(fraud_score &gt; 0.9 or velocity_flag == true) and customer_age_days &lt; 30&#34;,
+      &#34;when_ast&#34;: {
+        &#34;left&#34;: {
+          &#34;left&#34;: {
+            &#34;field&#34;: &#34;fraud_score&#34;,
+            &#34;op&#34;: &#34;&gt;&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: 0.9
+          },
+          &#34;right&#34;: {
+            &#34;field&#34;: &#34;velocity_flag&#34;,
+            &#34;op&#34;: &#34;==&#34;,
+            &#34;type&#34;: &#34;compare&#34;,
+            &#34;value&#34;: true
+          },
+          &#34;type&#34;: &#34;or&#34;
+        },
+        &#34;right&#34;: {
+          &#34;field&#34;: &#34;customer_age_days&#34;,
+          &#34;op&#34;: &#34;&lt;&#34;,
+          &#34;type&#34;: &#34;compare&#34;,
+          &#34;value&#34;: 30
+        },
+        &#34;type&#34;: &#34;and&#34;
+      }
+    },
+    {
+      &#34;action&#34;: &#34;require_review&#34;,
+      &#34;name&#34;: &#34;high_risk_score&#34;,
+      &#34;priority&#34;: 40,
+      &#34;when&#34;: &#34;risk_score &gt;= high_risk_threshold&#34;,
+      &#34;when_ast&#34;: {
+        &#34;field&#34;: &#34;risk_score&#34;,
+        &#34;op&#34;: &#34;&gt;=&#34;,
+        &#34;type&#34;: &#34;compare&#34;,
+        &#34;value&#34;: &#34;high_risk_threshold&#34;
+      }
+    }
+  ],
+  &#34;runtime&#34;: {},
+  &#34;screens&#34;: {},
+  &#34;streaming&#34;: {},
+  &#34;theme&#34;: {},
+  &#34;ui&#34;: {}
+}</pre>
+    </details>
+  </article>
+  <article class="apg-card">
+    <h2 class="text-base font-semibold text-gray-900 mb-3">Result</h2>
+    
+    <dl class="space-y-2 mb-4">
+      
+      <div><dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">actions</dt><dd class="text-sm text-gray-700 break-words">[{&#34;action&#34;: &#34;deny&#34;, &#34;decision&#34;: &#34;deny&#34;, &#34;rule&#34;: &#34;tenant_required&#34;}, {&#34;action&#34;: &#34;allow&#34;, &#34;decision&#34;: &#34;allow&#34;, &#34;rule&#34;: &#34;customer_present&#34;}, {&#34;action&#34;: &#34;require_review&#34;, &#34;decision&#34;: &#34;require_review&#34;, &#34;rule&#34;: &#34;high_risk_score&#34;}]</dd></div>
+      
+      <div><dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">context</dt><dd class="text-sm text-gray-700 break-words">{&#34;amount&#34;: 60000, &#34;is_international&#34;: true, &#34;risk_score&#34;: 10}</dd></div>
+      
+      <div><dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">decision</dt><dd class="text-sm text-gray-700 break-words">deny</dd></div>
+      
+      <div><dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">effective_context</dt><dd class="text-sm text-gray-700 break-words">{&#34;amount&#34;: 60000, &#34;currency&#34;: &#34;KES&#34;, &#34;default_limit&#34;: 50000, &#34;high_risk_threshold&#34;: 0.7, &#34;is_international&#34;: true, &#34;max_days_overdue&#34;: 30, &#34;review_threshold&#34;: 0.5, &#34;risk_score&#34;: 10}</dd></div>
+      
+      <div><dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">matched_rules</dt><dd class="text-sm text-gray-700 break-words">[&#34;tenant_required&#34;, &#34;customer_present&#34;, &#34;high_risk_score&#34;]</dd></div>
+      
+    </dl>
+    <details>
+      <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw result JSON</summary>
+      <pre>{
+  &quot;actions&quot;: [
+    {
+      &quot;action&quot;: &quot;deny&quot;,
+      &quot;decision&quot;: &quot;deny&quot;,
+      &quot;rule&quot;: &quot;tenant_required&quot;
+    },
+    {
+      &quot;action&quot;: &quot;allow&quot;,
+      &quot;decision&quot;: &quot;allow&quot;,
+      &quot;rule&quot;: &quot;customer_present&quot;
+    },
+    {
+      &quot;action&quot;: &quot;require_review&quot;,
+      &quot;decision&quot;: &quot;require_review&quot;,
+      &quot;rule&quot;: &quot;high_risk_score&quot;
+    }
+  ],
+  &quot;context&quot;: {
+    &quot;amount&quot;: 60000,
+    &quot;is_international&quot;: true,
+    &quot;risk_score&quot;: 10
+  },
+  &quot;decision&quot;: &quot;deny&quot;,
+  &quot;effective_context&quot;: {
+    &quot;amount&quot;: 60000,
+    &quot;currency&quot;: &quot;KES&quot;,
+    &quot;default_limit&quot;: 50000,
+    &quot;high_risk_threshold&quot;: 0.7,
+    &quot;is_international&quot;: true,
+    &quot;max_days_overdue&quot;: 30,
+    &quot;review_threshold&quot;: 0.5,
+    &quot;risk_score&quot;: 10
+  },
+  &quot;matched_rules&quot;: [
+    &quot;tenant_required&quot;,
+    &quot;customer_present&quot;,
+    &quot;high_risk_score&quot;
+  ]
+}</pre>
+    </details>
+    
+  </article>
+</section></main><div id="apg-toast-root" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div><dialog id="apg-confirm-dialog" class="apg-dialog"><form method="dialog" class="apg-dialog-panel"><h2 id="apg-confirm-title">Confirm action</h2><p id="apg-confirm-message" class="text-sm text-gray-600">Are you sure?</p><div class="flex items-center justify-end gap-2 mt-4"><button value="cancel" class="apg-btn apg-btn-secondary" type="submit">Cancel</button><button value="confirm" class="apg-btn apg-btn-danger" type="submit">Delete</button></div></form></dialog><script>function apgToast(m,t){var c=t==="error"?"bg-red-600":"bg-gray-900";var el=document.createElement("div");el.className=c+" text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto transition-all duration-300 opacity-0 translate-y-2";el.textContent=m;document.getElementById("apg-toast-root").appendChild(el);requestAnimationFrame(function(){el.classList.remove("opacity-0","translate-y-2");});setTimeout(function(){el.classList.add("opacity-0");setTimeout(function(){el.remove();},300);},3000);}document.addEventListener("htmx:afterOnLoad",function(e){var t=e.detail.xhr.getResponseHeader("HX-Trigger");if(!t)return;try{var d=JSON.parse(t);if(d.apgToast)apgToast(d.apgToast.msg,d.apgToast.type||"success");}catch(ex){}});function apgApplyTheme(m){var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;var b=document.getElementById("apg-theme-toggle");if(b){b.setAttribute("aria-label","Theme: "+m);b.textContent=m==="dark"?"Dark":m==="light"?"Light":"System";}}function apgCycleTheme(){var order=["system","light","dark"];var cur=localStorage.getItem("apg-theme")||"system";var next=order[(order.indexOf(cur)+1)%order.length];localStorage.setItem("apg-theme",next);apgApplyTheme(next);}document.addEventListener("DOMContentLoaded",function(){apgApplyTheme(localStorage.getItem("apg-theme")||"system");});function apgConfirm(message,ok){var d=document.getElementById("apg-confirm-dialog");if(!d||!d.showModal){var nativeConfirm=window["confirm"];if(nativeConfirm&&nativeConfirm(message))ok();return;}document.getElementById("apg-confirm-message").textContent=message;var done=false;function close(){if(done)return;done=true;d.removeEventListener("close",onclose);}function onclose(){var v=d.returnValue;close();if(v==="confirm")ok();}d.addEventListener("close",onclose);d.showModal();}function apgConfirmSubmit(form,message){apgConfirm(message||"Delete this record?",function(){form.dataset.apgConfirmed="1";form.requestSubmit();});return false;}document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(".apg-topnav a").forEach(function(a){if(a.getAttribute("href")===location.pathname){a.classList.add("active");a.setAttribute("aria-current","page");}});});function apgSetSidebar(collapsed){document.documentElement.classList.toggle("apg-sidebar-collapsed",collapsed);try{localStorage.setItem("apg-sidebar-collapsed",collapsed?"1":"0");}catch(e){}}function apgToggleSidebar(){if(matchMedia("(max-width: 767px)").matches){document.documentElement.classList.toggle("apg-sidebar-open");}else{apgSetSidebar(!document.documentElement.classList.contains("apg-sidebar-collapsed"));}}function apgCloseSidebar(){document.documentElement.classList.remove("apg-sidebar-open");}try{if(localStorage.getItem("apg-sidebar-collapsed")==="1")document.documentElement.classList.add("apg-sidebar-collapsed");}catch(e){}function apgSyncOffline(){var b=document.getElementById("apg-offline-banner");if(b)b.hidden=navigator.onLine;}window.addEventListener("online",apgSyncOffline);window.addEventListener("offline",apgSyncOffline);if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/static/sw.js").catch(function(){});});}document.addEventListener("keydown",function(e){if(e.key==="Escape")apgCloseSidebar();});document.addEventListener("DOMContentLoaded",apgSyncOffline);</script><div id="apg-cmd" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onclick="if(event.target===this)apgCmdClose()"><div class="mx-auto mt-[15vh] max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"><div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100"><svg class="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9 a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg><input id="apg-cmd-input" type="text" placeholder="Search records, entities..." autocomplete="off" class="flex-1 text-sm outline-none placeholder-gray-400" oninput="apgCmdSearch(this.value)"><kbd class="text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">Esc</kbd></div><div id="apg-cmd-results" class="max-h-80 overflow-y-auto py-2"><p class="text-xs text-gray-400 text-center py-8">Type to search...</p></div></div></div><script>document.addEventListener("keydown",function(e){if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();apgCmdOpen();}if(e.key==="Escape")apgCmdClose();});function apgCmdOpen(){document.getElementById("apg-cmd").classList.remove("hidden");document.getElementById("apg-cmd-input").focus();}function apgCmdClose(){document.getElementById("apg-cmd").classList.add("hidden");document.getElementById("apg-cmd-input").value="";document.getElementById("apg-cmd-results").innerHTML='<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>';}var _cmdTimer;function apgCmdSearch(q){clearTimeout(_cmdTimer);if(!q.trim()){document.getElementById("apg-cmd-results").innerHTML='<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>';return;}_cmdTimer=setTimeout(function(){fetch("/api/search?q="+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(d){var el=document.getElementById("apg-cmd-results");if(!d.results||!d.results.length){el.innerHTML='<p class="text-xs text-gray-400 text-center py-8">No results</p>';return;}el.innerHTML=d.results.map(function(r){return '<a href="/ui/entities/'+encodeURIComponent(r.entity)+'/'+encodeURIComponent(r.id)+'"'+'  onclick="apgCmdClose()"'+'  class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group">'+'<span class="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center text-xs font-bold text-blue-600 flex-shrink-0">'+r.entity.charAt(0).toUpperCase()+'</span>'+'<div class="min-w-0"><p class="text-sm font-medium text-gray-900 truncate">'+r.label+'</p>'+'<p class="text-xs text-gray-400 truncate">'+r.entity+'</p></div>'+'</a>';}).join("");});},200);}</script></body></html>
