@@ -1,0 +1,60 @@
+<section class="max-w-2xl mx-auto">
+  <p class="text-sm text-gray-500 mb-6">
+    <a href="/ui" class="hover:text-blue-600">Application</a> /
+    <a href="/ui/workflows" class="hover:text-blue-600">Workflows</a> /
+    <span class="font-semibold text-gray-900">{{ workflow.name }}</span>
+  </p>
+
+  {% if completed %}
+  <div class="apg-card text-center py-12">
+    <div class="text-5xl mb-4" aria-hidden="true">✓</div>
+    <h1 class="text-xl font-bold text-gray-900 mb-2">{{ workflow.name }} complete</h1>
+    <p class="text-gray-500 text-sm mb-6">Your {{ entity_name }} record has been created successfully.</p>
+    <div class="flex items-center justify-center gap-3 flex-wrap">
+      <a href="/ui/entities/{{ safe_entity }}" class="apg-btn">View all {{ entity_name }} records</a>
+      <a href="/ui/workflows/{{ safe_entity }}/{{ safe_workflow_id }}" class="apg-btn apg-btn-secondary">Start again</a>
+      <a href="/ui/workflows" class="apg-btn apg-btn-secondary">All workflows</a>
+    </div>
+  </div>
+  {% else %}
+  <div class="text-center mb-8">
+    <div class="text-4xl mb-3" aria-hidden="true">{{ workflow.icon }}</div>
+    <h1 class="text-xl font-bold text-gray-900">{{ workflow.name }}</h1>
+    <p class="text-sm text-gray-500 mt-1">{{ workflow.description }}</p>
+  </div>
+
+  <ol class="flex items-center gap-0 mb-8 px-2" aria-label="Workflow progress">
+    {% for item in progress %}
+    <li class="flex items-center gap-1.5 text-xs font-medium {{ item.class_name }}">
+      <span class="w-5 h-5 rounded-full flex items-center justify-center text-xs {{ item.badge_class }}">{{ item.label }}</span>
+      <span class="hidden sm:block">{{ item.title }}</span>
+    </li>
+    {% if not loop.last %}
+    <li class="flex-1 h-px bg-gray-200 mx-1" aria-hidden="true"><span class="block h-px bg-blue-600" style="width:{{ '100%' if loop.index0 < step_index else '0%' }}"></span></li>
+    {% endif %}
+    {% endfor %}
+  </ol>
+
+  <article class="apg-card overflow-hidden">
+    <header class="px-6 py-4 border-b border-gray-100 bg-gray-50 -mx-4 -mt-4 mb-4">
+      <h2 class="font-semibold text-gray-900">Step {{ step_index + 1 }} of {{ total_steps }}: {{ step.title }}</h2>
+      <p class="text-sm text-gray-500 mt-0.5">{{ step.subtitle }}</p>
+    </header>
+    {% if error %}
+    <div role="alert" class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="{{ next_url }}" class="space-y-4">
+      {{ hidden_fields | safe }}
+      {{ step_inputs | safe }}
+      <div class="flex items-center justify-between pt-4 border-t border-gray-100 mt-6">
+        {% if step_index > 0 %}
+        <a href="/ui/workflows/{{ safe_entity }}/{{ safe_workflow_id }}/step/{{ step_index - 1 }}" class="apg-btn apg-btn-secondary">Back</a>
+        {% else %}
+        <a href="/ui/workflows" class="apg-btn apg-btn-secondary">Cancel</a>
+        {% endif %}
+        <button type="submit" class="apg-btn">{{ next_label }}</button>
+      </div>
+    </form>
+  </article>
+  {% endif %}
+</section>

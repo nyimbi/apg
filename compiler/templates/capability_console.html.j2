@@ -1,0 +1,52 @@
+<section class="mb-6">
+  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <a href="/capabilities" class="hover:text-blue-600">Capability catalog</a> / <span class="font-semibold text-gray-900">{{ name }}</span></p>
+  <h1 class="text-xl font-bold text-gray-900">{{ name }}</h1>
+</section>
+
+{% if error %}
+<div role="alert" class="bg-red-50 border border-red-200 text-red-700">{{ error }}</div>
+{% endif %}
+
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <form method="post" action="/ui/capabilities/{{ safe_name }}/rules/evaluate" class="space-y-4">
+    <h2 class="text-base font-semibold text-gray-900">Rules Evaluate</h2>
+    <label>Context JSON <textarea name="context_json" rows="8">{}</textarea></label>
+    <button type="submit" class="apg-btn">Evaluate</button>
+  </form>
+  <form method="post" action="/ui/capabilities/{{ safe_name }}/configuration/resolve" class="space-y-4">
+    <h2 class="text-base font-semibold text-gray-900">Configuration Resolve</h2>
+    <label>Overrides JSON <textarea name="configuration_json" rows="8">{}</textarea></label>
+    <button type="submit" class="apg-btn">Resolve</button>
+  </form>
+  <form method="post" action="/ui/capabilities/{{ safe_name }}/approval/plan" class="space-y-4">
+    <h2 class="text-base font-semibold text-gray-900">Approval Plan</h2>
+    <label>Context JSON <textarea name="context_json" rows="8">{}</textarea></label>
+    <button type="submit" class="apg-btn">Plan</button>
+  </form>
+</section>
+
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+  <article class="apg-card">
+    <h2 class="text-base font-semibold text-gray-900 mb-3">Description</h2>
+    <details open>
+      <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw capability JSON</summary>
+      <pre>{{ description_json }}</pre>
+    </details>
+  </article>
+  <article class="apg-card">
+    <h2 class="text-base font-semibold text-gray-900 mb-3">Result</h2>
+    {% if result %}
+    <dl class="space-y-2 mb-4">
+      {% for key, value in result_items %}
+      <div><dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ key }}</dt><dd class="text-sm text-gray-700 break-words">{{ value }}</dd></div>
+      {% endfor %}
+    </dl>
+    <details>
+      <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw result JSON</summary>
+      <pre>{{ result_json_html | safe }}</pre>
+    </details>
+    {% else %}
+    <p class="text-sm text-gray-500">Run a capability operation to view results.</p>
+    {% endif %}
+  </article>
+</section>

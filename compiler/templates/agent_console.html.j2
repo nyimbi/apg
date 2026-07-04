@@ -1,0 +1,43 @@
+<section class="mb-6">
+  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <a href="/agents" class="hover:text-blue-600">Agent catalog</a> / <span class="font-semibold text-gray-900">{{ name }}</span></p>
+  <h1 class="text-xl font-bold text-gray-900">{{ name }}</h1>
+  <p class="text-sm text-gray-500 mt-1">{{ 'Team console' if team else 'Agent console' }}</p>
+</section>
+
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <article class="apg-card lg:col-span-2 flex flex-col min-h-16">
+    <div class="flex-1 space-y-3 mb-4">
+      <div class="rounded-lg bg-gray-50 border border-gray-200 p-4">
+        <p class="text-sm text-gray-600">Submit a prompt and optional JSON payload. Streaming output is added in the live UI work package.</p>
+      </div>
+      {% if error %}
+      <div role="alert" class="bg-red-50 border border-red-200 text-red-700">{{ error }}</div>
+      {% endif %}
+      {% if result %}
+      <div class="rounded-lg border border-gray-200 p-4 bg-white">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Response</p>
+        <pre>{{ result_json }}</pre>
+      </div>
+      {% endif %}
+    </div>
+    <form method="post" action="{{ action }}" class="space-y-4">
+      <label>Message <input name="message" type="text" autocomplete="off"></label>
+      <label>Payload JSON <textarea name="payload_json" rows="8">{}</textarea></label>
+      <button type="submit" class="apg-btn">Invoke</button>
+    </form>
+  </article>
+
+  <aside class="apg-card">
+    <h2 class="text-base font-semibold text-gray-900 mb-3">Configuration</h2>
+    <details open>
+      <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw description JSON</summary>
+      <pre>{{ description_json }}</pre>
+    </details>
+    {% if result %}
+    <details class="mt-4">
+      <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw response JSON</summary>
+      <pre>{{ result_json }}</pre>
+    </details>
+    {% endif %}
+  </aside>
+</section>

@@ -237,6 +237,11 @@ pre code { background: transparent; padding: 0; color: inherit; }
 @keyframes apg-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .apg-loading .apg-skeleton-row { height: 40px; margin-bottom: 8px; }
 .htmx-request .apg-content-area { opacity: 0.6; transition: opacity 0.2s; }
+.apg-skip-link { position: fixed; top: 0.5rem; left: 0.5rem; z-index: 10000; transform: translateY(-150%); background: var(--apg-primary); color: #fff; padding: 0.5rem 0.75rem; border-radius: var(--apg-radius-sm); font-weight: 600; }
+.apg-skip-link:focus { transform: translateY(0); }
+.apg-dialog { border: 0; padding: 0; border-radius: var(--apg-radius); background: transparent; color: var(--apg-text); }
+.apg-dialog::backdrop { background: rgba(0,0,0,0.45); }
+.apg-dialog-panel { width: min(92vw, 28rem); margin: 0; padding: var(--apg-space-4); }
 
 .hero-gradient { background: linear-gradient(135deg, var(--apg-primary), var(--apg-accent)); }
 .apg-kanban-col { min-height: 12rem; }
@@ -347,6 +352,7 @@ pre code { background: transparent; padding: 0; color: inherit; }
 .mx-auto { margin-left: auto; margin-right: auto; }
 .mx-1 { margin-left: 0.25rem; margin-right: 0.25rem; }
 .-mx-1 { margin-left: -0.25rem; margin-right: -0.25rem; }
+.-mx-4 { margin-left: -1rem; margin-right: -1rem; }
 .mt-0\.5 { margin-top: 0.125rem; }
 .mt-1 { margin-top: 0.25rem; }
 .mt-1\.5 { margin-top: 0.375rem; }
@@ -356,6 +362,7 @@ pre code { background: transparent; padding: 0; color: inherit; }
 .mt-6 { margin-top: 1.5rem; }
 .mt-8 { margin-top: 2rem; }
 .mt-\[15vh\] { margin-top: 15vh; }
+.-mt-4 { margin-top: -1rem; }
 .mb-0\.5 { margin-bottom: 0.125rem; }
 .mb-1 { margin-bottom: 0.25rem; }
 .mb-2 { margin-bottom: 0.5rem; }
@@ -407,6 +414,7 @@ pre code { background: transparent; padding: 0; color: inherit; }
 .pt-4 { padding-top: 1rem; }
 .pb-4 { padding-bottom: 1rem; }
 .pb-6 { padding-bottom: 1.5rem; }
+.pb-3 { padding-bottom: 0.75rem; }
 .pl-1 { padding-left: 0.25rem; }
 .pl-2 { padding-left: 0.5rem; }
 .pl-3 { padding-left: 0.75rem; }
@@ -596,6 +604,8 @@ pre code { background: transparent; padding: 0; color: inherit; }
 @media (min-width: 1024px) {
 	.lg\:flex-row { flex-direction: row; }
 	.lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+	.lg\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.lg\:col-span-2 { grid-column: span 2 / span 2; }
 	.lg\:w-72 { width: 18rem; }
 }
 @media (min-width: 1280px) {

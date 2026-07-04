@@ -3664,6 +3664,14 @@ def _html_page(title: str, body: str) -> str:
     )
     toast_js = (
         '<div id="apg-toast-root" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>'
+        '<dialog id="apg-confirm-dialog" class="apg-dialog">'
+        '<form method="dialog" class="apg-dialog-panel">'
+        '<h2 id="apg-confirm-title">Confirm action</h2>'
+        '<p id="apg-confirm-message" class="text-sm text-gray-600">Are you sure?</p>'
+        '<div class="flex items-center justify-end gap-2 mt-4">'
+        '<button value="cancel" class="apg-btn apg-btn-secondary" type="submit">Cancel</button>'
+        '<button value="confirm" class="apg-btn apg-btn-danger" type="submit">Delete</button>'
+        '</div></form></dialog>'
         '<script>'
         'function apgToast(m,t){{'
         'var c=t==="error"?"bg-red-600":"bg-gray-900";'
@@ -3682,6 +3690,9 @@ def _html_page(title: str, body: str) -> str:
         'function apgApplyTheme(m){{var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;var b=document.getElementById("apg-theme-toggle");if(b){{b.setAttribute("aria-label","Theme: "+m);b.textContent=m==="dark"?"Dark":m==="light"?"Light":"System";}}}}'
         'function apgCycleTheme(){{var order=["system","light","dark"];var cur=localStorage.getItem("apg-theme")||"system";var next=order[(order.indexOf(cur)+1)%order.length];localStorage.setItem("apg-theme",next);apgApplyTheme(next);}}'
         'document.addEventListener("DOMContentLoaded",function(){{apgApplyTheme(localStorage.getItem("apg-theme")||"system");}});'
+        'function apgConfirm(message,ok){{var d=document.getElementById("apg-confirm-dialog");if(!d||!d.showModal){{var nativeConfirm=window["confirm"];if(nativeConfirm&&nativeConfirm(message))ok();return;}}document.getElementById("apg-confirm-message").textContent=message;var done=false;function close(){{if(done)return;done=true;d.removeEventListener("close",onclose);}}function onclose(){{var v=d.returnValue;close();if(v==="confirm")ok();}}d.addEventListener("close",onclose);d.showModal();}}'
+        'function apgConfirmSubmit(form,message){{apgConfirm(message||"Delete this record?",function(){{form.dataset.apgConfirmed="1";form.requestSubmit();}});return false;}}'
+        'document.addEventListener("DOMContentLoaded",function(){{document.querySelectorAll(".apg-topnav a").forEach(function(a){{if(a.getAttribute("href")===location.pathname){{a.classList.add("active");a.setAttribute("aria-current","page");}}}});}});'
         '</script>'
     )
     skeleton_css = (
@@ -3712,6 +3723,7 @@ def _html_page(title: str, body: str) -> str:
         f"<title>{{safe_title}} — {{safe_module}}</title>"
         "</head>"
         '<body class="min-h-full bg-gray-50 text-gray-900">'
+        '<a class="apg-skip-link" href="#content">Skip to content</a>'
         f'<header class="apg-topbar sticky top-0 z-50" role="banner">'
         f'  <a class="apg-logo" href="/ui">{{safe_module}}</a>'
         f'  <nav class="apg-topnav ml-4">'
@@ -3721,10 +3733,20 @@ def _html_page(title: str, body: str) -> str:
         f'  </nav>'
         f'  <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">System</button>'
         f'</header>'
-        f'<main class="apg-content" id="main-content">{{body}}</main>'
+        f'<main class="apg-content" id="content" tabindex="-1">{{body}}</main>'
         f"{{toast_js}}"
         f"{{cmd_palette_html}}"
         "</body></html>"
+    )
+
+
+def _jinja_required_page(title: str = "Application UI") -> str:
+    safe_title = html.escape(title)
+    return (
+        f'<section class="apg-card">'
+        f'<h1>{{safe_title}}</h1>'
+        f'<p>This application requires Jinja2 — pip install -r requirements.txt.</p>'
+        f'</section>'
     )
 
 
@@ -4092,42 +4114,28 @@ APP_WORKFLOWS: dict[str, list[dict]] = _build_app_workflows()
 def _ui_workflow_list_html() -> tuple[int, str]:
     """Render the list of all available workflows across all entities."""
     total = sum(len(wfs) for wfs in APP_WORKFLOWS.values())
-    cards = []
+    workflow_items = []
     for entity_name, workflows in APP_WORKFLOWS.items():
         for wf in workflows:
             safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
             safe_wf_id = html.escape(quote(wf["id"], safe=""), quote=True)
-            cards.append(
-                f'<a href="/ui/workflows/{{safe_entity}}/{{safe_wf_id}}"'
-                f'   class="group block bg-white rounded-xl border border-gray-200 p-5 hover:border-blue-400 hover:shadow-md transition-all">'
-                f'<div class="flex items-start gap-3 mb-3">'
-                f'  <span class="text-2xl" aria-hidden="true">{{html.escape(wf["icon"])}}</span>'
-                f'  <div>'
-                f'    <h3 class="font-semibold text-gray-900 group-hover:text-blue-600 text-sm">{{html.escape(wf["name"])}}</h3>'
-                f'    <p class="text-xs text-gray-400 mt-0.5">{{html.escape(entity_name)}} · {{len(wf["steps"])}} steps</p>'
-                f'  </div>'
-                f'</div>'
-                f'<p class="text-xs text-gray-500 leading-relaxed">{{html.escape(wf["description"])}}</p>'
-                f'<div class="mt-3 flex items-center gap-1">'
-                + "".join(
-                    f'<div class="h-1.5 flex-1 rounded-full bg-gray-100 first:bg-blue-400"></div>'
-                    for _ in wf["steps"]
-                )
-                + f'</div>'
-                f'</a>'
-            )
-    grid = f'<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{{"".join(cards)}}</div>' if cards else "<p>No workflows available.</p>"
-    body = (
-        '<nav class="flex items-center gap-2 text-sm mb-6 text-gray-500">'
-        '<a href="/ui" class="hover:text-blue-600">Application</a>'
-        '<span>/</span><span class="font-semibold text-gray-900">Workflows</span></nav>'
-        f'<div class="flex items-center justify-between mb-6">'
-        f'<div><h1 class="text-xl font-bold text-gray-900">Workflows</h1>'
-        f'<p class="text-sm text-gray-500 mt-1">{{total}} guided workflows across {{len(APP_WORKFLOWS)}} entities</p></div>'
-        f'</div>'
-        + grid
+            workflow_items.append({{
+                "id": wf["id"],
+                "name": wf["name"],
+                "description": wf["description"],
+                "icon": wf["icon"],
+                "entity": entity_name,
+                "step_count": len(wf["steps"]),
+                "steps": wf["steps"],
+                "href": f"/ui/workflows/{{safe_entity}}/{{safe_wf_id}}",
+            }})
+    tmpl_body = _render_template(
+        "workflow_list.html.j2",
+        workflows=workflow_items,
+        total=total,
+        entity_count=len(APP_WORKFLOWS),
     )
-    return 200, _html_page("Workflows", body)
+    return 200, _html_page("Workflows", tmpl_body if tmpl_body is not None else _jinja_required_page("Workflows"))
 
 
 def _ui_workflow_wizard_html(
@@ -4152,20 +4160,17 @@ def _ui_workflow_wizard_html(
         record_data = dict(accumulated)
         result = create_record(entity_name, record_data)
         if result.get("ok"):
-            record_id = result.get("record", {{}}).get("id", "")
             safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
-            body = (
-                f'<div class="max-w-lg mx-auto text-center py-12">'
-                f'<div class="text-5xl mb-4">✅</div>'
-                f'<h1 class="text-xl font-bold text-gray-900 mb-2">{{html.escape(wf["name"])}} complete!</h1>'
-                f'<p class="text-gray-500 text-sm mb-6">Your {{html.escape(entity_name)}} record has been created successfully.</p>'
-                f'<div class="flex items-center justify-center gap-3 flex-wrap">'
-                f'<a href="/ui/entities/{{safe_entity}}" class="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">View all {{html.escape(entity_name)}} records →</a>'
-                f'<a href="/ui/workflows/{{safe_entity}}/{{html.escape(quote(workflow_id, safe=""), quote=True)}}" class="px-5 py-2.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">Start again</a>'
-                f'<a href="/ui/workflows" class="px-5 py-2.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">All workflows</a>'
-                f'</div></div>'
+            safe_wf_id = html.escape(quote(workflow_id, safe=""), quote=True)
+            tmpl_body = _render_template(
+                "workflow_wizard.html.j2",
+                completed=True,
+                workflow=wf,
+                entity_name=entity_name,
+                safe_entity=safe_entity,
+                safe_workflow_id=safe_wf_id,
             )
-            return 200, _html_page(wf["name"], body)
+            return 200, _html_page(wf["name"], tmpl_body if tmpl_body is not None else _jinja_required_page(wf["name"]))
         else:
             error = result.get("error") or "Failed to create record"
             step_index = total_steps - 1  # Stay on last step
@@ -4175,19 +4180,16 @@ def _ui_workflow_wizard_html(
     safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
     safe_wf_id = html.escape(quote(workflow_id, safe=""), quote=True)
 
-    # Progress bar
-    pct = int((step_index / total_steps) * 100)
-    step_indicators = "".join(
-        f'<div class="flex items-center gap-1.5 text-xs font-medium '
-        f'{{("text-blue-600" if i == step_index else "text-gray-400 opacity-60")}}">'
-        f'<span class="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs '
-        f'{{("bg-blue-600" if i < step_index else "bg-blue-600" if i == step_index else "bg-gray-200 text-gray-500")}}">'
-        f'{{("✓" if i < step_index else str(i + 1))}}</span>'
-        f'<span class="hidden sm:block">{{html.escape(steps[i]["title"])}}</span></div>'
-        + (f'<div class="flex-1 h-px bg-gray-200 mx-1"><div class="h-px bg-blue-600 transition-all" style="width:{{("100%" if i < step_index else "0%")}}"></div></div>'
-           if i < total_steps - 1 else "")
-        for i in range(total_steps)
-    )
+    progress = []
+    for i, item in enumerate(steps):
+        complete = i < step_index
+        current = i == step_index
+        progress.append({{
+            "title": item["title"],
+            "label": "✓" if complete else str(i + 1),
+            "class_name": "text-blue-600" if current or complete else "text-gray-400 opacity-60",
+            "badge_class": "bg-blue-600 text-white" if current or complete else "bg-gray-200 text-gray-500",
+        }})
 
     # Hidden fields to carry accumulated data through steps
     hidden_fields = "".join(
@@ -4208,39 +4210,24 @@ def _ui_workflow_wizard_html(
         if error else ""
     )
 
-    body = (
-        # Breadcrumb
-        f'<nav class="flex items-center gap-2 text-sm mb-6 text-gray-500">'
-        f'<a href="/ui" class="hover:text-blue-600">Application</a><span>/</span>'
-        f'<a href="/ui/workflows" class="hover:text-blue-600">Workflows</a><span>/</span>'
-        f'<span class="font-semibold text-gray-900">{{html.escape(wf["name"])}}</span></nav>'
-        # Header
-        f'<div class="max-w-2xl mx-auto">'
-        f'<div class="text-center mb-8">'
-        f'<div class="text-4xl mb-3">{{html.escape(wf["icon"])}}</div>'
-        f'<h1 class="text-xl font-bold text-gray-900">{{html.escape(wf["name"])}}</h1>'
-        f'<p class="text-sm text-gray-500 mt-1">{{html.escape(wf["description"])}}</p>'
-        f'</div>'
-        # Step progress
-        f'<div class="flex items-center gap-0 mb-8 px-2">{{step_indicators}}</div>'
-        # Step card
-        f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">'
-        f'<div class="px-6 py-4 border-b border-gray-100 bg-gray-50">'
-        f'<h2 class="font-semibold text-gray-900">Step {{step_index + 1}} of {{total_steps}}: {{html.escape(step["title"])}}</h2>'
-        f'<p class="text-sm text-gray-500 mt-0.5">{{html.escape(step.get("subtitle", ""))}}</p>'
-        f'</div>'
-        f'<div class="p-6">'
-        f'{{error_html}}'
-        f'<form method="post" action="{{next_url}}" class="space-y-4">'
-        f'{{hidden_fields}}'
-        f'{{step_inputs}}'
-        f'<div class="flex items-center justify-between pt-4 border-t border-gray-100 mt-6">'
-        + (f'<a href="/ui/workflows/{{safe_entity}}/{{safe_wf_id}}/step/{{step_index - 1}}" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">← Back</a>'
-           if step_index > 0 else f'<a href="/ui/workflows" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">← Cancel</a>')
-        + f'<button type="submit" class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">{{next_label}}</button>'
-        f'</div></form></div></div></div>'
+    tmpl_body = _render_template(
+        "workflow_wizard.html.j2",
+        completed=False,
+        workflow=wf,
+        entity_name=entity_name,
+        safe_entity=safe_entity,
+        safe_workflow_id=safe_wf_id,
+        step=step,
+        step_index=step_index,
+        total_steps=total_steps,
+        progress=progress,
+        hidden_fields=hidden_fields,
+        step_inputs=step_inputs,
+        next_url=next_url,
+        next_label=next_label,
+        error=error,
     )
-    return 200, _html_page(wf["name"], body)
+    return 200, _html_page(wf["name"], tmpl_body if tmpl_body is not None else _jinja_required_page(wf["name"]))
 
 
 def _landing_page_html() -> str:
@@ -4399,43 +4386,22 @@ def _ui_database_catalog_html() -> tuple[int, str]:
     status = database_status()
     status_code = 200 if status["valid"] else 422
     status_label = "valid" if status["valid"] else "invalid"
-    database_items: list[str] = []
-    for database in list_databases():
-        database_name = str(database.get("name", "database"))
-        schema_rows: list[str] = []
-        for schema in database.get("schemas", []):
-            schema_name = str(schema.get("name", "default"))
-            table_names = ", ".join(
-                html.escape(str(table.get("name", "table")))
-                for table in schema.get("tables", [])
-            ) or "no tables"
-            schema_rows.append(
-                f"<li><strong>{{html.escape(schema_name)}}</strong>: {{table_names}}</li>"
-            )
-        schemas_html = "".join(schema_rows) or "<li>No schemas declared.</li>"
-        database_items.append(
-            f"<section><h2>{{html.escape(database_name)}}</h2>"
-            f'<p><a href="/databases/{{html.escape(database_name, quote=True)}}/schemas">'
-            "Schema JSON</a></p>"
-            f"<ul>{{schemas_html}}</ul></section>"
-        )
-    databases_html = "".join(database_items) or "<p>No databases declared.</p>"
-    validation_html = html.escape(json.dumps(status["validation"], indent=2, sort_keys=True))
-    body = (
-        "<h1>Databases</h1>"
-        f"<p>Status: <strong>{{html.escape(status_label)}}</strong>; "
-        f"{{status['database_count']}} database(s), "
-        f"{{status['schema_count']}} schema(s), "
-        f"{{status['table_count']}} table(s), "
-        f"{{status['reference_count']}} reference(s).</p>"
-        '<nav><a href="/ui">Application UI</a> | '
-        '<a href="/databases">Database JSON</a> | '
-        '<a href="/databases/status">Status JSON</a> | '
-        '<a href="/relationships">Relationships</a></nav>'
-        f"{{databases_html}}"
-        f"<h2>Validation</h2><pre>{{validation_html}}</pre>"
+    databases = list_databases()
+    graph = relationship_graph()
+    relationships = [
+        {{"source": edge.get("source", ""), "target": edge.get("target", "")}}
+        for edge in graph.get("edges", [])
+        if isinstance(edge, dict)
+    ]
+    tmpl_body = _render_template(
+        "database_catalog.html.j2",
+        status=status,
+        status_label=status_label,
+        databases=databases,
+        relationships=relationships,
+        validation_json=json.dumps(status["validation"], indent=2, sort_keys=True),
     )
-    return status_code, _html_page("Databases", body)
+    return status_code, _html_page("Databases", tmpl_body if tmpl_body is not None else _jinja_required_page("Databases"))
 
 
 def _field_relationship(entity_name: str, field_name: str) -> Dict[str, Any] | None:
@@ -4725,7 +4691,7 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
             f'</form>'
             f'<form method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}/delete" class="inline">'
             f'<input type="hidden" name="expected_revision" value="{{revision}}">'
-            f'<button type="submit" onclick="return confirm(this.dataset.msg)" data-msg="Delete this record?"'
+            f'<button type="submit" onclick="return apgConfirmSubmit(this.form, this.dataset.msg)" data-msg="Delete this record?"'
             f' class="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>'
             f'</form>'
             f'</div>'
@@ -4765,12 +4731,13 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
         'window.apgBulkDelete=function(){{'
         'var cc=document.querySelectorAll(".apg-row-cb:checked");'
         'if(!cc.length)return;'
-        'if(!confirm("Delete "+cc.length+" record(s)? This cannot be undone."))return;'
+        'apgConfirm("Delete "+cc.length+" record(s)? This cannot be undone.",function(){{'
         'var ids=Array.from(cc).map(function(c){{return c.dataset.rowId;}}).join(",");'
         'var entity=document.getElementById("apg-bulk-bar").dataset.entity;'
         'var fd=new FormData();fd.append("ids",ids);'
         'fetch("/ui/entities/"+entity+"/records/bulk_delete",{{method:"POST",headers:{{"Content-Type":"application/x-www-form-urlencoded"}},body:"ids="+encodeURIComponent(ids)}})'
         '.then(function(r){{if(r.redirected||r.ok)window.location.reload();}});'
+        '}});'
         '}};'
         'document.addEventListener("change",function(e){{if(e.target.classList.contains("apg-row-cb"))upd();}});'
         'document.addEventListener("click",function(e){{'
@@ -5224,136 +5191,69 @@ def _ui_debug_html(run_id: str | None = None) -> tuple[int, str]:
     runs = list_workflow_runs()
     cb_status = circuit_breaker_status()
     subs = dict(APG_EVENT_SUBSCRIPTIONS)
-    # Run detail
-    detail_html = ""
+    def _badge(status: str) -> str:
+        if status in {{"completed", "closed", "success"}}:
+            return "apg-badge-success"
+        if status in {{"failed", "open", "circuit_open"}}:
+            return "apg-badge-danger"
+        return "apg-badge-warning"
+
+    selected_run = None
     if run_id:
         try:
-            run = get_workflow_run(run_id)
+            raw_run = get_workflow_run(run_id)
         except KeyError:
-            run = None
-        if run:
-            trace = run.get("trace", [])
-            trace_rows = []
-            for t in trace:
-                status_cls = (
-                    "bg-green-100 text-green-800" if t.get("status") == "completed"
-                    else "bg-red-100 text-red-800" if t.get("status") in {{"failed", "circuit_open"}}
-                    else "bg-yellow-100 text-yellow-800"
-                )
-                attempts = t.get("attempts", [])
-                attempts_html = f', {{len(attempts)}} attempt(s)' if len(attempts) > 1 else ""
-                trace_rows.append(
-                    f'<tr class="border-b border-gray-50">'
-                    f'<td class="px-4 py-2 text-xs font-mono text-gray-500">{{t.get("index", "")}}</td>'
-                    f'<td class="px-4 py-2 text-sm font-medium">{{html.escape(str(t.get("step", "")))}}</td>'
-                    f'<td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold {{status_cls}}">{{html.escape(str(t.get("status", "")))}}</span></td>'
-                    f'<td class="px-4 py-2 text-xs text-gray-500">{{html.escape(str(t.get("timeout_spec", "")))}}{{attempts_html}}</td>'
-                    f'</tr>'
-                )
-            # Journal timeline
-            journal = _get_journal(run_id)
-            ev_color_map = {{"step_completed": "bg-green-400", "step_failed": "bg-red-400", "saga_compensating": "bg-orange-400", "signal_received": "bg-purple-400"}}
-            journal_items = []
-            for ev in journal:
-                ev_color = ev_color_map.get(ev["event_type"], "bg-gray-400")
-                journal_items.append(
-                    f'<li class="ml-6 mb-3 relative">'
-                    f'<span class="absolute flex items-center justify-center w-6 h-6 rounded-full -left-3 ring-2 ring-white {{ev_color}}"></span>'
-                    f'<div class="pl-1">'
-                    f'<p class="text-xs font-semibold text-gray-900">#{{ev["seq"]}} {{html.escape(ev["event_type"].replace("_"," ").title())}}</p>'
-                    f'<p class="text-xs text-gray-500">Step: {{html.escape(str(ev["step"]))}} \xb7 {{html.escape(ev["ts"][:19].replace("T"," "))}} UTC</p>'
-                    f'<p class="text-xs font-mono text-gray-300 truncate">{{html.escape(ev["hash"][:16])}}...</p>'
-                    f'</div></li>'
-                )
-            journal_html = (
-                f'<div class="px-4 py-3 border-t border-gray-100">'
-                f'<h3 class="text-xs font-semibold text-gray-700 mb-2">Event Journal</h3>'
-                f'<ol class="relative border-l border-gray-200 ml-3">'
-                + ("".join(journal_items) if journal_items else '<li class="ml-6"><p class="text-xs text-gray-400">No journal events yet.</p></li>')
-                + f'</ol></div>'
-            )
-            detail_html = (
-                f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
-                f'<div class="px-4 py-3 border-b border-gray-100"><h2 class="text-sm font-semibold">Run: {{html.escape(str(run_id))}}'
-                f' <span class="ml-2 text-xs text-gray-400">{{html.escape(str(run.get("workflow","")))}}</span></h2></div>'
-                f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
-                f'<tr><th class="px-4 py-2 text-left">#</th><th class="px-4 py-2 text-left">Step</th>'
-                f'<th class="px-4 py-2 text-left">Status</th><th class="px-4 py-2 text-left">Notes</th></tr></thead>'
-                f'<tbody>{{" ".join(trace_rows)}}</tbody></table>'
-                + journal_html
-                + f'</div>'
-            )
-    # Run list
-    run_rows = []
-    for r in sorted(runs, key=lambda x: str(x.get("id", "")), reverse=True)[:50]:
-        rid = html.escape(str(r.get("id", "")))
-        wf = html.escape(str(r.get("workflow", "")))
-        st = html.escape(str(r.get("status", "")))
-        sc = "bg-green-100 text-green-800" if st == "completed" else "bg-red-100 text-red-800" if st == "failed" else "bg-yellow-100 text-yellow-800"
-        run_rows.append(
-            f'<tr class="hover:bg-gray-50 border-b border-gray-50">'
-            f'<td class="px-4 py-2 text-xs font-mono"><a href="/ui/debug/{{rid}}" class="text-apg-primary hover:underline">{{rid}}</a></td>'
-            f'<td class="px-4 py-2 text-sm">{{wf}}</td>'
-            f'<td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold {{sc}}">{{st}}</span></td>'
-            f'<td class="px-4 py-2 text-xs text-gray-400">{{len(r.get("trace", []))}} steps</td>'
-            f'</tr>'
-        )
-    # Circuit breakers section
-    cb_rows = []
-    for k, v in cb_status.items():
-        st = v.get("state", "closed")
-        sc = "bg-green-100 text-green-800" if st == "closed" else "bg-red-100 text-red-800" if st == "open" else "bg-yellow-100 text-yellow-800"
-        cb_rows.append(
-            f'<tr class="border-b border-gray-50">'
-            f'<td class="px-4 py-2 text-xs font-mono">{{html.escape(k)}}</td>'
-            f'<td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full text-xs font-semibold {{sc}}">{{st}}</span></td>'
-            f'<td class="px-4 py-2 text-xs tabular-nums">{{v.get("failures", 0)}}</td>'
-            f'</tr>'
-        )
-    cb_section = (
-        f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
-        f'<div class="px-4 py-3 border-b border-gray-100"><h2 class="text-sm font-semibold text-gray-900">Circuit Breakers</h2></div>'
-        + (f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
-           f'<tr><th class="px-4 py-2 text-left">Key</th><th class="px-4 py-2 text-left">State</th><th class="px-4 py-2 text-left">Failures</th></tr></thead>'
-           f'<tbody>{{" ".join(cb_rows)}}</tbody></table>' if cb_rows else
-           f'<p class="px-4 py-6 text-sm text-gray-400 text-center">No circuit breakers tripped.</p>')
-        + f'</div>'
-    )
-    # Event subscriptions section
-    sub_rows = [
-        f'<tr class="border-b border-gray-50"><td class="px-4 py-2 text-xs font-mono">{{html.escape(ev)}}</td>'
-        f'<td class="px-4 py-2 text-xs text-gray-600">{{html.escape(", ".join(wfs))}}</td></tr>'
-        for ev, wfs in subs.items()
+            raw_run = None
+        if raw_run:
+            selected_run = {{
+                "id": str(raw_run.get("id", run_id)),
+                "workflow": str(raw_run.get("workflow", "")),
+                "trace": [
+                    {{
+                        "index": str(step.get("index", "")),
+                        "step": str(step.get("step", "")),
+                        "status": str(step.get("status", "")),
+                        "notes": str(step.get("timeout_spec", "")),
+                        "badge_class": _badge(str(step.get("status", ""))),
+                    }}
+                    for step in raw_run.get("trace", [])
+                    if isinstance(step, dict)
+                ],
+            }}
+    run_items = [
+        {{
+            "id": str(run.get("id", "")),
+            "workflow": str(run.get("workflow", "")),
+            "status": str(run.get("status", "")),
+            "badge_class": _badge(str(run.get("status", ""))),
+            "step_count": len(run.get("trace", [])),
+        }}
+        for run in sorted(runs, key=lambda item: str(item.get("id", "")), reverse=True)[:50]
+        if isinstance(run, dict)
     ]
-    sub_section = (
-        f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
-        f'<div class="px-4 py-3 border-b border-gray-100"><h2 class="text-sm font-semibold text-gray-900">Event Subscriptions</h2></div>'
-        + (f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
-           f'<tr><th class="px-4 py-2 text-left">Event</th><th class="px-4 py-2 text-left">Subscribed Workflows</th></tr></thead>'
-           f'<tbody>{{" ".join(sub_rows)}}</tbody></table>' if sub_rows else
-           f'<p class="px-4 py-6 text-sm text-gray-400 text-center">No active subscriptions.</p>')
-        + f'</div>'
+    breaker_items = [
+        {{
+            "key": str(key),
+            "state": str(value.get("state", "closed")) if isinstance(value, dict) else "closed",
+            "failures": value.get("failures", 0) if isinstance(value, dict) else 0,
+            "badge_class": _badge(str(value.get("state", "closed")) if isinstance(value, dict) else "closed"),
+        }}
+        for key, value in sorted(cb_status.items())
+    ]
+    subscription_items = [
+        {{"event": str(event), "workflows": ", ".join(str(item) for item in workflows)}}
+        for event, workflows in sorted(subs.items())
+    ]
+    tmpl_body = _render_template(
+        "debug_console.html.j2",
+        selected_run=selected_run,
+        runs=run_items,
+        circuit_breakers=breaker_items,
+        subscriptions=subscription_items,
     )
-    body = (
-        f'<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500">'
-        f'<a href="/ui" class="hover:text-apg-primary">Application</a><span>/</span>'
-        f'<span class="font-semibold text-gray-900">Flow Debugger</span></nav>'
-        + detail_html
-        + f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5">'
-        + f'<div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">'
-        + f'<h2 class="text-sm font-semibold text-gray-900">Workflow Runs</h2>'
-        + f'<span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{len(runs)}} total</span></div>'
-        + (f'<table class="w-full text-sm"><thead class="bg-gray-50 text-xs font-semibold text-gray-500">'
-           f'<tr><th class="px-4 py-2 text-left">Run ID</th><th class="px-4 py-2 text-left">Workflow</th>'
-           f'<th class="px-4 py-2 text-left">Status</th><th class="px-4 py-2 text-left">Steps</th></tr></thead>'
-           f'<tbody>{{" ".join(run_rows)}}</tbody></table>' if run_rows else
-           f'<p class="px-4 py-10 text-sm text-gray-400 text-center">No workflow runs yet.</p>')
-        + f'</div>'
-        + cb_section
-        + sub_section
-    )
-    return 200, _html_page("Flow Debugger", body)
-
+    if tmpl_body is not None:
+        return 200, _html_page("Flow Debugger", tmpl_body)
+    return 200, _html_page("Flow Debugger", _jinja_required_page("Flow Debugger"))
 
 def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, str]:
     parts = [part for part in path.split("/") if part]
@@ -5440,20 +5340,17 @@ def _ui_agent_console_html(name: str, result: Dict[str, Any] | None = None, erro
         title = "Unknown agent team" if team else "Unknown agent"
         return 404, _html_page(title, f"<h1>{{title}}</h1><p>{{html.escape(name)}}</p>")
     action = f"/ui/{{'agent-teams' if team else 'agents'}}/{{html.escape(name, quote=True)}}/invoke"
-    description = html.escape(json.dumps(catalog[name], indent=2, sort_keys=True))
-    result_html = _result_section(result, error)
-    body = (
-        '<nav><a href="/ui">Application</a> | <a href="/agents">Agent catalog</a></nav>'
-        f"<h1>{{html.escape(name)}}</h1>"
-        f"<pre>{{description}}</pre>"
-        f'<form method="post" action="{{action}}">'
-        '<label>Message <input name="message" type="text"></label><br>'
-        '<label>Payload JSON<br><textarea name="payload_json" rows="8" cols="80">{{}}</textarea></label><br>'
-        '<button type="submit">Invoke</button>'
-        '</form>'
-        f"{{result_html}}"
+    tmpl_body = _render_template(
+        "agent_console.html.j2",
+        name=name,
+        team=team,
+        action=action,
+        description_json=json.dumps(catalog[name], indent=2, sort_keys=True),
+        result=result,
+        result_json=json.dumps(result, indent=2, sort_keys=True) if result is not None else "",
+        error=error,
     )
-    return 200, _html_page(name, body)
+    return 200, _html_page(name, tmpl_body if tmpl_body is not None else _jinja_required_page(name))
 
 
 def _ui_capability_console_html(name: str, result: Dict[str, Any] | None = None, error: str = "") -> tuple[int, str]:
@@ -5461,31 +5358,26 @@ def _ui_capability_console_html(name: str, result: Dict[str, Any] | None = None,
     capabilities = app.get("capability_descriptions", {{}})
     if name not in capabilities:
         return 404, _html_page("Unknown capability", f"<h1>Unknown capability</h1><p>{{html.escape(name)}}</p>")
-    description = html.escape(json.dumps(capabilities[name], indent=2, sort_keys=True))
     safe_name = html.escape(name, quote=True)
-    result_html = _result_section(result, error)
-    body = (
-        '<nav><a href="/ui">Application</a> | <a href="/capabilities">Capability catalog</a></nav>'
-        f"<h1>{{html.escape(name)}}</h1>"
-        f"<pre>{{description}}</pre>"
-        f'<form method="post" action="/ui/capabilities/{{safe_name}}/rules/evaluate">'
-        '<h2>Evaluate Rules</h2>'
-        '<label>Context JSON<br><textarea name="context_json" rows="8" cols="80">{{}}</textarea></label><br>'
-        '<button type="submit">Evaluate</button>'
-        '</form>'
-        f'<form method="post" action="/ui/capabilities/{{safe_name}}/configuration/resolve">'
-        '<h2>Resolve Configuration</h2>'
-        '<label>Overrides JSON<br><textarea name="configuration_json" rows="8" cols="80">{{}}</textarea></label><br>'
-        '<button type="submit">Resolve</button>'
-        '</form>'
-        f'<form method="post" action="/ui/capabilities/{{safe_name}}/approval/plan">'
-        '<h2>Plan Approval</h2>'
-        '<label>Context JSON<br><textarea name="context_json" rows="8" cols="80">{{}}</textarea></label><br>'
-        '<button type="submit">Plan</button>'
-        '</form>'
-        f"{{result_html}}"
+    result_items = []
+    if isinstance(result, dict):
+        for key, value in sorted(result.items()):
+            if isinstance(value, (dict, list)):
+                result_items.append((str(key), json.dumps(value, sort_keys=True)))
+            else:
+                result_items.append((str(key), str(value)))
+    tmpl_body = _render_template(
+        "capability_console.html.j2",
+        name=name,
+        safe_name=safe_name,
+        description_json=json.dumps(capabilities[name], indent=2, sort_keys=True),
+        result=result,
+        result_items=result_items,
+        result_json=json.dumps(result, indent=2, sort_keys=True) if result is not None else "",
+        result_json_html=html.escape(json.dumps(result, indent=2, sort_keys=True)) if result is not None else "",
+        error=error,
     )
-    return 200, _html_page(name, body)
+    return 200, _html_page(name, tmpl_body if tmpl_body is not None else _jinja_required_page(name))
 
 
 def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:

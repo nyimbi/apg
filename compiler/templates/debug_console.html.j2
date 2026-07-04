@@ -1,0 +1,83 @@
+<section class="mb-6">
+  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <span class="font-semibold text-gray-900">Debug</span></p>
+  <h1 class="text-xl font-bold text-gray-900">Flow Debugger</h1>
+  <p class="text-sm text-gray-500 mt-1">Workflow runs, event journals, and circuit breaker state.</p>
+</section>
+
+{% if selected_run %}
+<article class="apg-card">
+  <header class="apg-card-header">
+    <h2 class="text-base font-semibold text-gray-900">Run: {{ selected_run.id }}</h2>
+    <span class="apg-badge apg-badge-neutral">{{ selected_run.workflow }}</span>
+  </header>
+  {% if selected_run.trace %}
+  <ol class="space-y-3">
+    {% for step in selected_run.trace %}
+    <li class="border border-gray-200 rounded-lg p-3">
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-sm font-medium text-gray-900">{{ step.step }}</p>
+        <span class="apg-badge {{ step.badge_class }}">{{ step.status }}</span>
+      </div>
+      <p class="text-xs text-gray-500 mt-1">Step {{ step.index }}{% if step.notes %} · {{ step.notes }}{% endif %}</p>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="text-sm text-gray-500">No steps recorded for this run.</p>
+  {% endif %}
+</article>
+{% endif %}
+
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <article class="apg-card">
+    <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Recent Runs</h2></header>
+    {% if runs %}
+    <div class="apg-table-wrap">
+      <table class="apg-table">
+        <thead><tr><th>Run</th><th>Workflow</th><th>Status</th><th>Steps</th></tr></thead>
+        <tbody>
+          {% for run in runs %}
+          <tr>
+            <td><a href="/ui/debug/{{ run.id }}" class="font-mono hover:underline">{{ run.id }}</a></td>
+            <td>{{ run.workflow }}</td>
+            <td><span class="apg-badge {{ run.badge_class }}">{{ run.status }}</span></td>
+            <td>{{ run.step_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-500">No workflow runs yet.</p>
+    {% endif %}
+  </article>
+
+  <article class="apg-card">
+    <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Circuit Breakers</h2></header>
+    {% if circuit_breakers %}
+    <dl class="space-y-3">
+      {% for item in circuit_breakers %}
+      <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
+        <dt class="font-mono text-xs text-gray-600">{{ item.key }}</dt>
+        <dd><span class="apg-badge {{ item.badge_class }}">{{ item.state }}</span> <span class="text-xs text-gray-400">{{ item.failures }} failures</span></dd>
+      </div>
+      {% endfor %}
+    </dl>
+    {% else %}
+    <p class="text-sm text-gray-500">No circuit breakers tripped.</p>
+    {% endif %}
+  </article>
+</section>
+
+<section class="apg-card">
+  <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Event Subscriptions</h2></header>
+  {% if subscriptions %}
+  <ul class="space-y-2">
+    {% for item in subscriptions %}
+    <li class="text-sm text-gray-600"><span class="font-mono">{{ item.event }}</span> → {{ item.workflows }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-gray-500">No event subscriptions declared.</p>
+  {% endif %}
+</section>

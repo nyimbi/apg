@@ -1,0 +1,37 @@
+<section class="mb-6">
+  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <span class="font-semibold text-gray-900">Workflows</span></p>
+  <div class="flex items-center justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">Workflows</h1>
+      <p class="text-sm text-gray-500 mt-1">{{ total }} guided workflows across {{ entity_count }} entities</p>
+    </div>
+  </div>
+</section>
+
+{% if workflows %}
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  {% for workflow in workflows %}
+  <article class="apg-card group">
+    <div class="flex items-start gap-3 mb-3">
+      <span class="text-2xl" aria-hidden="true">{{ workflow.icon }}</span>
+      <div class="min-w-0">
+        <h2 class="font-semibold text-gray-900 group-hover:text-blue-600 text-sm mb-1">{{ workflow.name }}</h2>
+        <p class="text-xs text-gray-400">{{ workflow.entity }} · {{ workflow.step_count }} steps</p>
+      </div>
+    </div>
+    <p class="text-xs text-gray-500 leading-relaxed mb-4">{{ workflow.description }}</p>
+    <div class="flex items-center gap-1 mb-4" aria-hidden="true">
+      {% for step in workflow.steps %}
+      <div class="h-1.5 flex-1 rounded-full {{ 'bg-blue-500' if loop.first else 'bg-gray-100' }}"></div>
+      {% endfor %}
+    </div>
+    <a href="{{ workflow.href }}" class="apg-btn">Start</a>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<section class="apg-card text-center py-10">
+  <h2 class="text-base font-semibold text-gray-900 mb-2">No workflows available</h2>
+  <p class="text-sm text-gray-500">Declare entities with fields to generate guided workflows.</p>
+</section>
+{% endif %}

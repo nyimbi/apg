@@ -1,0 +1,60 @@
+<section class="mb-6">
+  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <span class="font-semibold text-gray-900">Databases</span></p>
+  <h1 class="text-xl font-bold text-gray-900">Databases</h1>
+  <p class="text-sm text-gray-500 mt-1">{{ status.database_count }} database(s), {{ status.schema_count }} schema(s), {{ status.table_count }} table(s), {{ status.reference_count }} reference(s).</p>
+  <p class="text-sm text-gray-500 mt-1">Status: <strong>{{ status_label }}</strong></p>
+</section>
+
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+  {% for database in databases %}
+  <article class="apg-card">
+    <header class="apg-card-header">
+      <h2 class="text-base font-semibold text-gray-900">{{ database.name }}</h2>
+      <a class="text-sm hover:underline" href="/databases/{{ database.name }}/schemas">Schema JSON</a>
+    </header>
+    {% for schema in database.schemas %}
+    <section class="mb-4">
+      <h3 class="text-sm font-semibold text-gray-700">{{ schema.name }}</h3>
+      {% if schema.tables %}
+      <div class="space-y-3">
+        {% for table in schema.tables %}
+        <div class="border border-gray-200 rounded-lg p-3">
+          <p class="font-medium text-sm text-gray-900">{{ table.name }}</p>
+          {% if table.columns %}
+          <ul class="mt-2 space-y-1">
+            {% for column in table.columns %}
+            <li class="text-xs text-gray-500"><span class="font-mono text-gray-700">{{ column.name }}</span> · {{ column.type }}</li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-xs text-gray-400 mt-2">No columns declared.</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-xs text-gray-400">No tables declared.</p>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </article>
+  {% endfor %}
+</section>
+
+<section class="apg-card">
+  <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Relationships</h2></header>
+  {% if relationships %}
+  <ul class="space-y-2">
+    {% for relationship in relationships %}
+    <li class="text-sm text-gray-600"><span class="font-mono">{{ relationship.source }}</span> → <span class="font-mono">{{ relationship.target }}</span></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-gray-500">No relationships declared.</p>
+  {% endif %}
+</section>
+
+<section class="apg-card">
+  <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Validation</h2><span class="apg-badge {{ 'apg-badge-success' if status.valid else 'apg-badge-danger' }}">{{ status_label }}</span></header>
+  <pre>{{ validation_json }}</pre>
+</section>

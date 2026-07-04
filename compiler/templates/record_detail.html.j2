@@ -50,7 +50,7 @@
       <form method="post"
             action="/ui/entities/{{ safe_entity }}/records/{{ safe_record_id }}/delete"
             class="inline"
-            onsubmit="return confirm('Delete this record? This cannot be undone.')">
+            onsubmit="return apgConfirmSubmit(this, 'Delete this record? This cannot be undone.')">
         <input type="hidden" name="expected_revision" value="{{ revision }}">
         <button type="submit"
                 class="px-3 py-1.5 text-sm font-medium border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors">
