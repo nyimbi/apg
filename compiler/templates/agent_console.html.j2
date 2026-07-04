@@ -5,10 +5,10 @@
 </section>
 
 <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-  <article class="apg-card lg:col-span-2 flex flex-col min-h-16">
-    <div class="flex-1 space-y-3 mb-4">
+  <article class="apg-card lg:col-span-2 flex flex-col min-h-16" data-apg-live="{{ live_topic }}">
+    <div id="apg-agent-stream" class="flex-1 space-y-3 mb-4" aria-live="polite" aria-busy="false">
       <div class="rounded-lg bg-gray-50 border border-gray-200 p-4">
-        <p class="text-sm text-gray-600">Submit a prompt and optional JSON payload. Streaming output is added in the live UI work package.</p>
+        <p class="text-sm text-gray-600">Submit a prompt and optional JSON payload.</p>
       </div>
       {% if error %}
       <div role="alert" class="bg-red-50 border border-red-200 text-red-700">{{ error }}</div>
@@ -16,14 +16,18 @@
       {% if result %}
       <div class="rounded-lg border border-gray-200 p-4 bg-white">
         <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Response</p>
-        <pre>{{ result_json }}</pre>
+        <div class="apg-agent-output">{{ result_html|safe }}</div>
       </div>
       {% endif %}
     </div>
-    <form method="post" action="{{ action }}" class="space-y-4">
+    <form method="post" action="{{ action }}" class="space-y-4" data-apg-stream-target="#apg-agent-stream">
       <label>Message <input name="message" type="text" autocomplete="off"></label>
       <label>Payload JSON <textarea name="payload_json" rows="8">{}</textarea></label>
-      <button type="submit" class="apg-btn">Invoke</button>
+      <label class="flex items-center gap-2"><input name="stream" type="checkbox" value="true"> Stream when supported</label>
+      <div class="flex items-center gap-2">
+        <button type="submit" class="apg-btn">Invoke</button>
+        <button type="button" class="apg-btn apg-btn-secondary" onclick="document.getElementById('apg-agent-stream').setAttribute('aria-busy','false')">Stop</button>
+      </div>
     </form>
   </article>
 

@@ -453,7 +453,7 @@ class PythonCodeGenerator:
 	def _load_static_assets() -> dict[str, str]:
 		"""Load vendored UI assets to emit into generated static/ output."""
 		asset_dir = Path(__file__).parent / "assets"
-		asset_files = ("apg.css", "htmx.min.js", "sortable.min.js", "uplot.min.js", "uplot.min.css", "apg-charts.js")
+		asset_files = ("apg.css", "htmx.min.js", "sortable.min.js", "uplot.min.js", "uplot.min.css", "apg-charts.js", "apg-sse.js")
 		assets: dict[str, str] = {}
 		for asset_name in asset_files:
 			asset_path = asset_dir / asset_name
@@ -483,7 +483,11 @@ import importlib
 import html
 import json
 import os
+import queue as _queue
+import re
 import sys
+import threading as _threading
+import time as _time
 from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -508,12 +512,78 @@ APG_CONNECTOR_REGISTRY: list[Dict[str, Any]] = []
 APG_ACTIVITY_LOG: Dict[str, list[Dict[str, Any]]] = {{}}
 WORKFLOW_EVENT_JOURNAL: Dict[str, list[Dict[str, Any]]] = {{}}
 WORKFLOW_SIGNALS: Dict[str, list[str]] = {{}}
+APG_LIVE_LOCK = _threading.Lock()
+APG_LIVE_SUBSCRIBERS: list[Dict[str, Any]] = []
 TENANT_SCOPED_ENTITIES: set[str] = {{
     e["name"] for e in ENTITIES
     if any(str(f.get("name")) == "tenant_id" for f in e.get("fields", []))
 }}
 SEMANTIC_MODEL: Dict[str, Any] = {semantic_model!r}
 APG_UI_TEMPLATES: Dict[str, str] = {ui_templates!r}
+
+
+def _live_topic_list(raw_topics: str | None = None) -> list[str]:
+    topics = [
+        topic.strip()
+        for topic in str(raw_topics or "").split(",")
+        if topic.strip()
+    ]
+    return topics or ["*"]
+
+
+def _subscribe_live_events(topics: list[str]) -> tuple[Any, Any]:
+    subscriber = {{"topics": set(topics), "queue": _queue.Queue(maxsize=100)}}
+    with APG_LIVE_LOCK:
+        APG_LIVE_SUBSCRIBERS.append(subscriber)
+
+    def unsubscribe() -> None:
+        with APG_LIVE_LOCK:
+            if subscriber in APG_LIVE_SUBSCRIBERS:
+                APG_LIVE_SUBSCRIBERS.remove(subscriber)
+
+    return subscriber["queue"], unsubscribe
+
+
+def _publish_live_event(topic: str, event_type: str, data: Dict[str, Any]) -> None:
+    message = {{
+        "topic": topic,
+        "event": event_type,
+        "data": data,
+        "ts": _time.time(),
+    }}
+    with APG_LIVE_LOCK:
+        subscribers = list(APG_LIVE_SUBSCRIBERS)
+    for subscriber in subscribers:
+        topics = subscriber.get("topics", set())
+        if "*" not in topics and topic not in topics:
+            continue
+        try:
+            subscriber["queue"].put_nowait(message)
+        except _queue.Full:
+            continue
+
+
+def _sse_format(message: Dict[str, Any]) -> str:
+    event_name = str(message.get("event", "message"))
+    payload = json.dumps(message, sort_keys=True)
+    return f"event: {{event_name}}\\ndata: {{payload}}\\n\\n"
+
+
+def _sse_stream(raw_topics: str | None = None):
+    topics = _live_topic_list(raw_topics)
+    queue, unsubscribe = _subscribe_live_events(topics)
+    try:
+        yield ": connected\\n\\n"
+        yield _sse_format({{"topic": "system", "event": "apg-ready", "data": {{"topics": topics}}}})
+        while True:
+            try:
+                message = queue.get(timeout=15)
+            except _queue.Empty:
+                yield ": heartbeat\\n\\n"
+                continue
+            yield _sse_format(message)
+    finally:
+        unsubscribe()
 
 
 def _optional_module(name: str) -> Optional[Any]:
@@ -570,6 +640,11 @@ def _journal_append(run_id: str, event_type: str, step: str, data: Dict[str, Any
     raw = f"{{prev_hash}}{{entry['seq']}}{{entry['event_type']}}{{entry['step']}}{{entry['ts']}}"
     entry["hash"] = _hashlib.sha256(raw.encode()).hexdigest()
     WORKFLOW_EVENT_JOURNAL[run_id].append(entry)
+    _publish_live_event(
+        f"workflow:run:{{run_id}}",
+        "workflow",
+        {{"run_id": run_id, "event_type": event_type, "step": step, "data": data}},
+    )
     if _APG_PG_URL:
         _pg_save_journal_entry(entry)
 
@@ -2061,6 +2136,8 @@ def _record_event(
         event["after"] = dict(after)
     NEXT_EVENT_ID += 1
     EVENT_LOG.append(event)
+    _publish_live_event("events", "record", event)
+    _publish_live_event(f"entity:{{entity_name}}", "record", event)
     return dict(event)
 
 
@@ -3689,6 +3766,7 @@ def _html_page(title: str, body: str) -> str:
         '<script defer src="/static/sortable.min.js"></script>'
         '<script defer src="/static/uplot.min.js"></script>'
         '<script defer src="/static/apg-charts.js"></script>'
+        '<script defer src="/static/apg-sse.js"></script>'
     )
     toast_js = (
         '<div id="apg-toast-root" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>'
@@ -4204,6 +4282,7 @@ def _ui_workflow_wizard_html(
                 entity_name=entity_name,
                 safe_entity=safe_entity,
                 safe_workflow_id=safe_wf_id,
+                workflow_topic=f"workflow:run:{{workflow_id}}",
             )
             return 200, _html_page(wf["name"], tmpl_body if tmpl_body is not None else _jinja_required_page(wf["name"]))
         else:
@@ -4261,6 +4340,7 @@ def _ui_workflow_wizard_html(
         next_url=next_url,
         next_label=next_label,
         error=error,
+        workflow_topic=f"workflow:run:{{workflow_id}}",
     )
     return 200, _html_page(wf["name"], tmpl_body if tmpl_body is not None else _jinja_required_page(wf["name"]))
 
@@ -5077,6 +5157,11 @@ def _ui_workflow_step_post(
         return 404, _html_page("Workflow not found", "<h1>Workflow not found</h1>")
 
     next_step = step_index + 1
+    _publish_live_event(
+        f"workflow:run:{{workflow_id}}",
+        "workflow",
+        {{"workflow": workflow_id, "entity": entity_name, "step_index": step_index, "next_step": next_step}},
+    )
     return _ui_workflow_wizard_html(entity_name, workflow_id, next_step, accumulated)
 
 
@@ -5485,6 +5570,39 @@ def _result_section(result: Dict[str, Any] | None = None, error: str = "") -> st
     return "<h2>Result</h2><pre>" + html.escape(json.dumps(result, indent=2, sort_keys=True)) + "</pre>"
 
 
+def _sanitize_agent_markdown(value: Any) -> str:
+    text = value if isinstance(value, str) else json.dumps(value, indent=2, sort_keys=True)
+    escaped = html.escape(str(text), quote=True)
+    escaped = re.sub(r"`([^`]+)`", r"<code>\\1</code>", escaped)
+    escaped = re.sub(r"\\*\\*([^*]+)\\*\\*", r"<strong>\\1</strong>", escaped)
+    lines = escaped.splitlines() or [""]
+    html_lines: list[str] = []
+    in_list = False
+    for line in lines:
+        if line.startswith("- "):
+            if not in_list:
+                html_lines.append("<ul>")
+                in_list = True
+            html_lines.append("<li>" + line[2:] + "</li>")
+            continue
+        if in_list:
+            html_lines.append("</ul>")
+            in_list = False
+        html_lines.append(line)
+    if in_list:
+        html_lines.append("</ul>")
+    return "<br>".join(html_lines)
+
+
+def _agent_display_text(result: Dict[str, Any] | None) -> Any:
+    if not isinstance(result, dict):
+        return ""
+    for key in ("output", "response", "message", "text", "content"):
+        if key in result:
+            return result[key]
+    return result
+
+
 def _ui_agent_console_html(name: str, result: Dict[str, Any] | None = None, error: str = "", team: bool = False) -> tuple[int, str]:
     app = describe_application()
     catalog_key = "ai_agent_team_descriptions" if team else "ai_agent_descriptions"
@@ -5501,7 +5619,9 @@ def _ui_agent_console_html(name: str, result: Dict[str, Any] | None = None, erro
         description_json=json.dumps(catalog[name], indent=2, sort_keys=True),
         result=result,
         result_json=json.dumps(result, indent=2, sort_keys=True) if result is not None else "",
+        result_html=_sanitize_agent_markdown(_agent_display_text(result)) if result is not None else "",
         error=error,
+        live_topic=f"agent:{{name}}",
     )
     return 200, _html_page(name, tmpl_body if tmpl_body is not None else _jinja_required_page(name))
 
@@ -5561,6 +5681,8 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
         message = form_record.get("message")
         if message:
             request_payload["message"] = message
+        if str(form_record.get("stream", "")).lower() in {{"1", "true", "yes", "on"}}:
+            request_payload["stream"] = True
         status, result = _agent_invocation_payload(f"/agents/{{parts[2]}}/invoke", request_payload)
         _status, html_payload = _ui_agent_console_html(parts[2], result=result if status == 200 else None, error="" if status == 200 else result.get("error", "agent invocation failed"))
         return status, {{"html": html_payload}}
@@ -5572,6 +5694,8 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
         message = form_record.get("message")
         if message:
             request_payload["message"] = message
+        if str(form_record.get("stream", "")).lower() in {{"1", "true", "yes", "on"}}:
+            request_payload["stream"] = True
         status, result = _agent_invocation_payload(f"/agent-teams/{{parts[2]}}/invoke", request_payload)
         _status, html_payload = _ui_agent_console_html(parts[2], result=result if status == 200 else None, error="" if status == 200 else result.get("error", "team invocation failed"), team=True)
         return status, {{"html": html_payload}}
@@ -6109,15 +6233,35 @@ def _agent_invocation_payload(path: str, payload: Dict[str, Any]) -> tuple[int, 
     parts = [part for part in path.split("/") if part]
     try:
         if len(parts) == 3 and parts[0] == "agents" and parts[2] in {{"invoke", "run"}}:
+            topic = f"agent:{{parts[1]}}"
+            _publish_live_event(topic, "agent-token", {{"status": "started", "token": ""}})
+            if payload.get("stream"):
+                streamer = getattr(AI_AGENTS, "stream_agent", None)
+                if streamer is not None:
+                    chunks: list[str] = []
+                    for chunk in streamer(parts[1], payload):
+                        token = chunk.get("token", "") if isinstance(chunk, dict) else str(chunk)
+                        if token:
+                            chunks.append(token)
+                            _publish_live_event(topic, "agent-token", {{"token": token}})
+                    result = {{"agent": parts[1], "status": "completed", "output": "".join(chunks), "streamed": True}}
+                    _publish_live_event(topic, "agent-result", result)
+                    return 200, result
             invoker = getattr(AI_AGENTS, "invoke_agent", None)
             if invoker is None:
                 return 404, {{"error": "agent_invocation_unavailable"}}
-            return 200, invoker(parts[1], payload)
+            result = invoker(parts[1], payload)
+            _publish_live_event(topic, "agent-result", result if isinstance(result, dict) else {{"output": result}})
+            return 200, result
         if len(parts) == 3 and parts[0] in {{"agent-teams", "teams"}} and parts[2] in {{"invoke", "run"}}:
+            topic = f"agent:{{parts[1]}}"
+            _publish_live_event(topic, "agent-token", {{"status": "started", "token": ""}})
             invoker = getattr(AI_AGENTS, "invoke_team", None)
             if invoker is None:
                 return 404, {{"error": "team_invocation_unavailable"}}
-            return 200, invoker(parts[1], payload)
+            result = invoker(parts[1], payload)
+            _publish_live_event(topic, "agent-result", result if isinstance(result, dict) else {{"output": result}})
+            return 200, result
     except KeyError as error:
         return 404, {{"error": "unknown_agent_composition", "name": str(error).strip("'")}}
     return 404, {{"error": "not_found", "path": path}}
@@ -6572,6 +6716,15 @@ def _flask_api_get(api_path):
         auth_err = _check_mutation_auth()
         if auth_err:
             return auth_err
+    if path == "/events" and (
+        "text/event-stream" in (_flask_request.headers.get("Accept") or "")
+        or _flask_request.args.get("topics") is not None
+    ):
+        return _FlaskResponse(
+            _sse_stream(_flask_request.args.get("topics")),
+            content_type="text/event-stream; charset=utf-8",
+            headers={{"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}},
+        )
     if _capability_screen(path) is not None:
         status, html_payload = _capability_screen_payload(path)
         return _FlaskResponse(html_payload, status=status, content_type="text/html; charset=utf-8")

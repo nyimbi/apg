@@ -54,9 +54,11 @@ def test_generated_ui_routes_resolve_required_templates():
 			safe_name="Probe",
 			description_json="{}",
 			result=None,
+			result_html="",
 			result_items=[],
 			result_json="",
 			error="",
+			live_topic="agent:Probe",
 		)
 		assert rendered is not None
 		assert "This application requires Jinja2" not in rendered

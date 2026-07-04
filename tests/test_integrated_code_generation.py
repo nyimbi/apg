@@ -89,6 +89,7 @@ def test_default_python_generation_integrates_agents_and_capabilities():
         "requirements.txt",
         "static/apg.css",
         "static/apg-charts.js",
+        "static/apg-sse.js",
         "static/htmx.min.js",
         "static/sortable.min.js",
         "static/uplot.min.css",

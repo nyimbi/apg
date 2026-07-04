@@ -273,6 +273,12 @@ pre code { background: transparent; padding: 0; color: inherit; }
 .apg-donut { display: block; width: min(100%, 14rem); margin: 0 auto; transform: rotate(-90deg); }
 .apg-progress { height: 0.65rem; overflow: hidden; border-radius: var(--apg-radius-full); background: var(--apg-bg-hover); }
 .apg-progress span { display: block; height: 100%; background: var(--apg-primary); }
+.apg-live-pill { margin-bottom: .75rem; border: 1px solid var(--apg-primary); color: var(--apg-primary); background: var(--apg-surface); border-radius: var(--apg-radius-full); padding: .35rem .75rem; font-size: .75rem; font-weight: 600; }
+.apg-agent-output { color: var(--apg-text); line-height: 1.6; overflow-wrap: anywhere; }
+.apg-agent-output code { font-size: .8rem; }
+.apg-agent-output ul { margin: .5rem 0 .5rem 1.25rem; list-style: disc; }
+.apg-stream-cursor::after { content: ""; display: inline-block; width: .5rem; height: 1rem; margin-left: .25rem; background: var(--apg-primary); animation: apg-blink 1s steps(2,start) infinite; vertical-align: text-bottom; }
+@keyframes apg-blink { 50% { opacity: 0; } }
 
 .hero-gradient { background: linear-gradient(135deg, var(--apg-primary), var(--apg-accent)); }
 .apg-kanban-col { min-height: 12rem; }
