@@ -4357,6 +4357,18 @@ def _coerce_value_for_type(value: Any, apg_type: str) -> Any:
             return True
         if normalized in {{"false", "0", "no", "off"}}:
             return False
+    if expected in {{"array", "object"}}:
+        text = value.strip()
+        if not text:
+            return [] if expected == "array" else {{}}
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return value
+        if expected == "array" and isinstance(parsed, list):
+            return parsed
+        if expected == "object" and isinstance(parsed, dict):
+            return parsed
     return value
 
 
@@ -4608,8 +4620,21 @@ APP_WORKFLOWS: dict[str, list[dict]] = _build_app_workflows()
 def _ui_workflow_list_html() -> tuple[int, str]:
     """Render the list of all available workflows across all entities."""
     total = sum(len(wfs) for wfs in APP_WORKFLOWS.values())
+    recent_runs = [
+        {{
+            "id": str(run.get("id", "")),
+            "workflow": str(run.get("workflow", "")),
+            "entity": str(run.get("entity", "")),
+            "status": str(run.get("status", "")),
+            "step_count": len(run.get("trace", [])),
+            "href": f"/ui/debug/{{quote(str(run.get('id', '')), safe='')}}",
+        }}
+        for run in sorted(list_workflow_runs(), key=lambda item: str(item.get("id", "")), reverse=True)[:5]
+        if isinstance(run, dict)
+    ]
     workflow_items = []
     for entity_name, workflows in APP_WORKFLOWS.items():
+        entity_run_count = sum(1 for run in list_workflow_runs() if str(run.get("entity", "")) == entity_name)
         for wf in workflows:
             safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
             safe_wf_id = html.escape(quote(wf["id"], safe=""), quote=True)
@@ -4621,15 +4646,77 @@ def _ui_workflow_list_html() -> tuple[int, str]:
                 "entity": entity_name,
                 "step_count": len(wf["steps"]),
                 "steps": wf["steps"],
+                "run_count": entity_run_count,
                 "href": f"/ui/workflows/{{safe_entity}}/{{safe_wf_id}}",
             }})
     tmpl_body = _render_template(
         "workflow_list.html.j2",
         workflows=workflow_items,
+        recent_runs=recent_runs,
         total=total,
         entity_count=len(APP_WORKFLOWS),
+        run_count=len(list_workflow_runs()),
     )
     return 200, _html_page("Workflows", tmpl_body if tmpl_body is not None else _jinja_required_page("Workflows"))
+
+
+def _record_ui_workflow_run(
+    workflow: dict,
+    entity_name: str,
+    workflow_id: str,
+    payload: dict,
+    record_result: dict,
+) -> dict:
+    """Record a generated UI wizard run in the shared workflow run store."""
+    global NEXT_WORKFLOW_RUN_ID
+    run_id = f"workflow-run-{{NEXT_WORKFLOW_RUN_ID}}"
+    NEXT_WORKFLOW_RUN_ID += 1
+    steps = list(workflow.get("steps", []))
+    trace = []
+    completed_steps = []
+    for index, step in enumerate(steps):
+        title = str(step.get("title") or f"Step {{index + 1}}")
+        completed_steps.append(title)
+        trace.append({{
+            "index": index,
+            "step": title,
+            "status": "completed",
+            "notes": str(step.get("subtitle", "")),
+            "field_count": len(step.get("fields", [])),
+        }})
+    record = dict(record_result.get("record", {{}})) if isinstance(record_result.get("record"), dict) else {{}}
+    run = {{
+        "id": run_id,
+        "workflow": str(workflow.get("name") or workflow_id),
+        "workflow_id": workflow_id,
+        "entity": entity_name,
+        "status": "completed",
+        "started_at": completed_steps[0] if completed_steps else "start",
+        "completed_at": completed_steps[-1] if completed_steps else "complete",
+        "steps": completed_steps,
+        "completed_steps": completed_steps,
+        "pending_steps": [],
+        "trace": trace,
+        "payload": dict(payload),
+        "record": record,
+        "created_record_id": str(record.get("id", "")),
+        "compensations": [],
+    }}
+    event = _record_event("workflow.run", workflow_id, after=run)
+    run["event_id"] = event["id"]
+    WORKFLOW_RUNS[run_id] = dict(run)
+    if _APG_PG_URL:
+        _pg_save_workflow_run(run)
+    persistence_error = _persist_record_store()
+    if persistence_error:
+        run["persistence_error"] = persistence_error
+        WORKFLOW_RUNS[run_id] = dict(run)
+    _publish_live_event(
+        f"workflow:run:{{workflow_id}}",
+        "workflow",
+        {{"workflow": workflow_id, "entity": entity_name, "run_id": run_id, "status": "completed"}},
+    )
+    return dict(run)
 
 
 def _ui_workflow_wizard_html(
@@ -4652,10 +4739,13 @@ def _ui_workflow_wizard_html(
     # Final step: show summary and create record
     if step_index >= total_steps:
         record_data = dict(accumulated)
-        result = create_record(entity_name, record_data)
-        if result.get("ok"):
+        create_status, result = create_record(entity_name, record_data)
+        if create_status in {{200, 201}}:
+            run = _record_ui_workflow_run(wf, entity_name, workflow_id, record_data, result)
             safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
             safe_wf_id = html.escape(quote(workflow_id, safe=""), quote=True)
+            safe_run_id = html.escape(quote(str(run.get("id", "")), safe=""), quote=True)
+            safe_record_id = html.escape(quote(str(run.get("created_record_id", "")), safe=""), quote=True)
             tmpl_body = _render_template(
                 "workflow_wizard.html.j2",
                 completed=True,
@@ -4663,6 +4753,9 @@ def _ui_workflow_wizard_html(
                 entity_name=entity_name,
                 safe_entity=safe_entity,
                 safe_workflow_id=safe_wf_id,
+                run=run,
+                safe_run_id=safe_run_id,
+                safe_record_id=safe_record_id,
                 workflow_topic=f"workflow:run:{{workflow_id}}",
             )
             return 200, _html_page(wf["name"], tmpl_body if tmpl_body is not None else _jinja_required_page(wf["name"]))
@@ -4698,7 +4791,7 @@ def _ui_workflow_wizard_html(
     # Navigation buttons
     is_last = step_index == total_steps - 1
     next_label = "Create Record ✓" if is_last else "Next →"
-    next_url = f"/ui/workflows/{{safe_entity}}/{{safe_wf_id}}/step/{{step_index + 1}}"
+    next_url = f"/ui/workflows/{{safe_entity}}/{{safe_wf_id}}/step/{{step_index}}"
 
     error_html = (
         f'<div role="alert" class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">⚠ {{html.escape(error)}}</div>'

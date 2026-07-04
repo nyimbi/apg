@@ -328,3 +328,70 @@ def test_generated_forms_use_native_validation_and_contextual_errors():
 	status, json_fragment = namespace["_ui_field_edit_html"]("Customer", "1", "tags")
 	assert status == 200
 	assert "<textarea" in json_fragment
+
+
+def test_generated_workflow_wizard_advances_sequentially_and_records_runs():
+	result = compile_apg_file("examples/01_minimal_customer_records/main.apg")
+	assert result.success, result.errors
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	status, html = namespace["_ui_payload"]("/ui/workflows/Customer/create_customer")
+	assert status == 200
+	assert 'action="/ui/workflows/Customer/create_customer/step/0"' in html
+	assert "Step 1 of 6: Identity" in html
+
+	status, payload = namespace["_ui_post_payload"](
+		"/ui/workflows/Customer/create_customer/step/0",
+		{
+			"customer_number": "WF-1001",
+			"email": "workflow@example.com",
+			"phone": "+254711111111",
+			"status": "active",
+		},
+	)
+	assert status == 200
+	assert "Step 2 of 6: Core Details" in payload["html"]
+	assert "Step 3 of 6" not in payload["html"]
+
+	final_status, final_payload = namespace["_ui_post_payload"](
+		"/ui/workflows/Customer/create_customer/step/5",
+		{
+			"__acc_customer_number": "WF-1001",
+			"__acc_email": "workflow@example.com",
+			"__acc_phone": "+254711111111",
+			"__acc_status": "active",
+			"__acc_credit_limit": "12",
+			"__acc_loyalty_points": "12",
+			"__acc_discount_rate": "12",
+			"__acc_registered_at": "2026-07-04",
+			"__acc_legal_name": "Workflow Co",
+			"__acc_secondary_email": "ops@example.com",
+			"__acc_company_name": "Workflow Co",
+			"__acc_is_active": "true",
+			"__acc_is_verified": "true",
+			"date_of_birth": "2026-07-04",
+			"tags": "[\"workflow\"]",
+			"preferences": "{}",
+			"metadata": "{}",
+		},
+	)
+	assert final_status == 200
+	assert "Recorded run" in final_payload["html"]
+	assert "Inspect run" in final_payload["html"]
+	assert "Open created record" in final_payload["html"]
+
+	runs = namespace["list_workflow_runs"]()
+	assert len(runs) == 1
+	assert runs[0]["id"] == "workflow-run-1"
+	assert runs[0]["status"] == "completed"
+	assert runs[0]["entity"] == "Customer"
+	assert len(runs[0]["trace"]) == 6
+	assert runs[0]["record"]["tags"] == ["workflow"]
+	assert runs[0]["record"]["preferences"] == {}
+
+	status, list_html = namespace["_ui_payload"]("/ui/workflows")
+	assert status == 200
+	assert "1 recorded runs" in list_html
+	assert "Recent runs" in list_html
+	assert "workflow-run-1" in list_html

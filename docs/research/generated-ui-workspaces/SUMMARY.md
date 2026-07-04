@@ -411,6 +411,71 @@ Validation evidence:
 - Full suite: `1480 passed, 1 skipped, 3 warnings in 742.32s`.
 - PythonCodeGenerator tripwire clean.
 
+### workflow-list-wizard-run-progress
+
+Status: complete.
+
+Intended commit:
+
+```text
+ux(workflow-list-wizard-run-progress): record wizard runs and fix step flow
+```
+
+Files:
+
+- `compiler/code_generator.py`
+- `compiler/templates/workflow_list.html.j2`
+- `compiler/templates/workflow_wizard.html.j2`
+- `tests/test_generated_ui_dashboard.py`
+- `examples/01_minimal_customer_records/output/app.py`
+- `examples/02_customer_orders_relationship/output/app.py`
+- `examples/03_inventory_typed_records/output/app.py`
+- `examples/04_order_fulfillment_model/output/app.py`
+- `examples/05_single_support_agent/output/app.py`
+- `examples/06_support_agent_team/output/app.py`
+- `examples/07_multi_runtime_agent_team/output/app.py`
+- `examples/08_basic_capability_contract/output/app.py`
+- `examples/09_capability_rules_configuration/output/app.py`
+- `examples/10_themed_i18n_streaming_capability/output/app.py`
+- `examples/11_screen_composition_relationships/output/app.py`
+- `examples/12_finance_general_ledger/output/app.py`
+- `examples/13_procurement_approval_workbench/output/app.py`
+- `examples/14_inventory_warehouse_operations/output/app.py`
+- `examples/15_manufacturing_quality_control/output/app.py`
+- `examples/16_hr_payroll_operations/output/app.py`
+- `examples/17_crm_sales_pipeline/output/app.py`
+- `examples/18_operations_dashboard_capability/output/app.py`
+- `examples/19_multi_capability_dependency_suite/output/app.py`
+- `examples/20_enterprise_erp_platform/output/app.py`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/README.md`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/thinking.md`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/sources.md`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/rationale.md`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/before-workflow-list.html`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/before-workflow-list.headers`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/before-wizard-step.html`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/before-wizard-step.headers`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/before-wizard-post.html`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/before-wizard-post.headers`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/after-wizard-step.html`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/after-wizard-step.headers`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/after-wizard-complete.html`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/after-workflow-list.html`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/after-workflow-list.headers`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/after-workflow-runs.json`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/after-debug-run.html`
+- `docs/research/generated-ui-workspaces/workflow-list-wizard-run-progress/assets/after-debug-run.headers`
+- `docs/research/generated-ui-workspaces/SUMMARY.md`
+
+Validation evidence:
+
+- Live before audit: example 01 `/ui/workflows`, `/ui/workflows/Customer/create_customer`, and first wizard POST booted at `127.0.0.1:20892`.
+- Live after audit: regenerated example 01 full customer wizard booted at `127.0.0.1:20894`, advanced through all six steps, created `workflow-run-1`, and rendered `/ui/debug/workflow-run-1`.
+- Regenerated all 20 numbered examples through `APGCompiler.compile_file()`.
+- Targeted tests: `8 passed in 15.99s`.
+- Full suite: `1481 passed, 1 skipped, 3 warnings in 714.85s`.
+- PythonCodeGenerator tripwire clean.
+
 ## Verdicts
 
 | Workspace | Before | After | Status |
@@ -421,6 +486,7 @@ Validation evidence:
 | kanban | `view=kanban` silently fell back to the entity list because the template used unsupported Jinja loop control; movement was pointer-only. | Template renders with default Jinja, cards have keyboard/server move controls, board context is preserved after moves, columns have drill-through and WIP guidance. | Complete |
 | record-detail-activity-related | Related records caused raw JSON fallback; no copy link or prev/next navigation; title selection preferred generated numbers. | Full record template renders with related records, filtered related links, activity/notes, copy link, next/previous navigation, and human-readable titles. | Complete |
 | create-edit-forms-drawer-inline-edit | Create drawer bypassed native validation, structured fields used single-line text inputs, failed creates returned a contextless fragment, and inline edit controls were not type-aware. | Native required/type validation, helper text, JSON textareas, contextual error recovery, draft guard, Ctrl/Cmd-S submit, and semantic inline edit controls. | Complete |
+| workflow-list-wizard-run-progress | Wizard skipped every other step, successful UI workflows left no run history/debug trace, completion had no run link, and structured textarea values could fail final validation. | Wizard advances sequentially, successful completions record shared workflow runs, recent runs appear on the list, completion links to record/debugger, and array/object strings are coerced. | Complete |
 
 ## Defect Ledger
 
@@ -453,3 +519,8 @@ Validation evidence:
 | create-edit-forms-drawer-inline-edit | Failed creates lost the surrounding workspace context. | Re-rendered the entity workspace with the validation notice instead of returning a bare fragment. | Resolved |
 | create-edit-forms-drawer-inline-edit | Inline editing treated typed values as generic text. | Generated semantic controls for numbers, dates, email/phone/url, and structured fields. | Resolved |
 | create-edit-forms-drawer-inline-edit | Drawer edits could be discarded accidentally and had no keyboard submit affordance. | Added dirty-state guard through the shared confirm modal and Ctrl/Cmd-S form submission. | Resolved |
+| workflow-list-wizard-run-progress | Wizard form action and POST handler both advanced the step, skipping every other step. | Rendered form actions to the current step and kept advancement in the POST handler. | Resolved |
+| workflow-list-wizard-run-progress | Completed UI wizards did not create workflow runs. | Recorded successful wizard completion in the shared `WORKFLOW_RUNS` store with a trace and created-record metadata. | Resolved |
+| workflow-list-wizard-run-progress | Workflow list had no run history context. | Added recorded run counts and a recent-runs panel linking to the debugger. | Resolved |
+| workflow-list-wizard-run-progress | Completion state had no direct debugger or created-record path. | Added recorded-run summary plus `Open created record` and `Inspect run` links. | Resolved |
+| workflow-list-wizard-run-progress | Structured textarea values remained strings through record coercion. | Parsed array/object JSON strings in `_coerce_value_for_type()`. | Resolved |

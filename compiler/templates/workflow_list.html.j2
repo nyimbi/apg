@@ -3,20 +3,22 @@
   <div class="flex items-center justify-between gap-4 flex-wrap">
     <div>
       <h1 class="text-xl font-bold text-gray-900">Workflows</h1>
-      <p class="text-sm text-gray-500 mt-1">{{ total }} guided workflows across {{ entity_count }} entities</p>
+      <p class="text-sm text-gray-500 mt-1">{{ total }} guided workflows across {{ entity_count }} entities · {{ run_count }} recorded runs</p>
     </div>
+    <a href="/ui/debug" class="apg-btn apg-btn-secondary">Run history</a>
   </div>
 </section>
 
 {% if workflows %}
-<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:col-span-2">
   {% for workflow in workflows %}
   <article class="apg-card group">
     <div class="flex items-start gap-3 mb-3">
       <span class="text-2xl" aria-hidden="true">{{ workflow.icon }}</span>
       <div class="min-w-0">
         <h2 class="font-semibold text-gray-900 group-hover:text-blue-600 text-sm mb-1">{{ workflow.name }}</h2>
-        <p class="text-xs text-gray-400">{{ workflow.entity }} · {{ workflow.step_count }} steps</p>
+        <p class="text-xs text-gray-400">{{ workflow.entity }} · {{ workflow.step_count }} steps · {{ workflow.run_count }} runs</p>
       </div>
     </div>
     <p class="text-xs text-gray-500 leading-relaxed mb-4">{{ workflow.description }}</p>
@@ -28,6 +30,29 @@
     <a href="{{ workflow.href }}" class="apg-btn">Start</a>
   </article>
   {% endfor %}
+  </div>
+
+  <aside class="apg-card">
+    <header class="apg-card-header">
+      <h2 class="text-base font-semibold text-gray-900">Recent runs</h2>
+      <a href="/ui/debug" class="text-xs text-apg-primary hover:underline">Open debugger</a>
+    </header>
+    {% if recent_runs %}
+    <ol class="space-y-3">
+      {% for run in recent_runs %}
+      <li class="border border-gray-100 rounded-lg p-3">
+        <div class="flex items-center justify-between gap-3">
+          <a href="{{ run.href }}" class="font-mono text-xs text-gray-900 hover:underline">{{ run.id }}</a>
+          <span class="apg-badge apg-badge-success">{{ run.status }}</span>
+        </div>
+        <p class="text-xs text-gray-500 mt-1">{{ run.workflow }}{% if run.entity %} · {{ run.entity }}{% endif %} · {{ run.step_count }} steps</p>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="text-sm text-gray-500">Completed wizard runs will appear here and in the flow debugger.</p>
+    {% endif %}
+  </aside>
 </section>
 {% else %}
 <section class="apg-card text-center py-10">

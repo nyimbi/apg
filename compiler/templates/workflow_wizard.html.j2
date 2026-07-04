@@ -10,7 +10,23 @@
     <div class="text-5xl mb-4" aria-hidden="true">✓</div>
     <h1 class="text-xl font-bold text-gray-900 mb-2">{{ workflow.name }} complete</h1>
     <p class="text-gray-500 text-sm mb-6">Your {{ entity_name }} record has been created successfully.</p>
+    {% if run %}
+    <div class="mx-auto mb-6 max-w-sm rounded-xl border border-gray-200 bg-gray-50 p-4 text-left">
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Recorded run</p>
+        <span class="apg-badge apg-badge-success">{{ run.status }}</span>
+      </div>
+      <p class="mt-2 font-mono text-sm text-gray-900">{{ run.id }}</p>
+      <p class="mt-1 text-xs text-gray-500">{{ run.completed_steps | length }} steps completed{% if run.created_record_id %} · Record {{ run.created_record_id }}{% endif %}</p>
+    </div>
+    {% endif %}
     <div class="flex items-center justify-center gap-3 flex-wrap">
+      {% if safe_record_id %}
+      <a href="/ui/entities/{{ safe_entity }}/{{ safe_record_id }}" class="apg-btn">Open created record</a>
+      {% endif %}
+      {% if safe_run_id %}
+      <a href="/ui/debug/{{ safe_run_id }}" class="apg-btn apg-btn-secondary">Inspect run</a>
+      {% endif %}
       <a href="/ui/entities/{{ safe_entity }}" class="apg-btn">View all {{ entity_name }} records</a>
       <a href="/ui/workflows/{{ safe_entity }}/{{ safe_workflow_id }}" class="apg-btn apg-btn-secondary">Start again</a>
       <a href="/ui/workflows" class="apg-btn apg-btn-secondary">All workflows</a>
