@@ -193,6 +193,44 @@ p { margin: 0 0 var(--apg-space-3); }
 .apg-table td { padding: var(--apg-space-2) var(--apg-space-3); border-bottom: 1px solid var(--apg-border); vertical-align: middle; }
 .apg-table tbody tr:hover { background: var(--apg-bg-hover); }
 .apg-table-wrap { overflow-x: auto; border: 1px solid var(--apg-border); border-radius: var(--apg-radius); background: var(--apg-bg-card); }
+.apg-list-toolbar { display: grid; gap: var(--apg-space-3); }
+.apg-view-strip { display: flex; flex-wrap: wrap; gap: var(--apg-space-2); }
+.apg-view-tab {
+	display: inline-flex;
+	flex-direction: column;
+	gap: 1px;
+	min-width: 8rem;
+	min-height: 44px;
+	padding: var(--apg-space-2) var(--apg-space-3);
+	border: 1px solid var(--apg-border);
+	border-radius: var(--apg-radius-sm);
+	background: var(--apg-surface);
+	color: var(--apg-text);
+	text-decoration: none;
+}
+.apg-view-tab:hover { text-decoration: none; border-color: var(--apg-primary); opacity: 1; }
+.apg-view-tab.active,
+.apg-view-tab[aria-current="page"] { border-color: var(--apg-primary); background: color-mix(in srgb, var(--apg-primary), transparent 92%); }
+.apg-view-tab span { font-size: .875rem; font-weight: 700; }
+.apg-view-tab small { color: var(--apg-muted); font-size: .72rem; }
+.apg-search-form { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; }
+.apg-filter-chip-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--apg-space-2); }
+.apg-filter-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--apg-space-2);
+	min-height: 32px;
+	padding: .25rem .55rem;
+	border-radius: var(--apg-radius-full);
+	background: var(--apg-bg-hover);
+	color: var(--apg-text);
+	font-size: .75rem;
+}
+.apg-filter-chip a { color: var(--apg-muted); font-weight: 700; }
+.apg-filter-clear { font-size: .75rem; font-weight: 600; }
+.apg-filter-panel { border-top: 1px solid var(--apg-border); padding-top: var(--apg-space-2); }
+.apg-filter-panel summary,
+.apg-developer-panel summary { font-size: .75rem; color: var(--apg-muted); cursor: pointer; user-select: none; }
 
 .apg-badge {
 	display: inline-flex;
@@ -482,6 +520,7 @@ html[dir="rtl"] .apg-sidebar-backdrop { inset: 0; }
 .pl-2 { padding-left: 0.5rem; }
 .pl-3 { padding-left: 0.75rem; }
 .pl-8 { padding-left: 2rem; }
+.pl-14 { padding-left: 3.5rem; }
 .pr-1 { padding-right: 0.25rem; }
 .pr-8 { padding-right: 2rem; }
 .rounded { border-radius: 0.25rem; }

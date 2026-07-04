@@ -5183,7 +5183,7 @@ def _ui_records_query_form_html(entity_name: str, query: Dict[str, list[str]]) -
         f'{{html.escape(option or "none")}}</option>'
         for option in sort_options
     )
-    selected_order = (_ui_query_value(query, "order") or "asc").lower()
+    selected_order = (_ui_query_value(query, "dir") or _ui_query_value(query, "order") or "asc").lower()
     order_select = "".join(
         f'<option value="{{option}}"{{" selected" if option == selected_order else ""}}>{{option}}</option>'
         for option in ["asc", "desc"]
@@ -5196,13 +5196,136 @@ def _ui_records_query_form_html(entity_name: str, query: Dict[str, list[str]]) -
         f'<fieldset><legend>Query records</legend>'
         f"{{filters}}"
         f'<label>Sort <select name="sort">{{sort_select}}</select></label>'
-        f'<label>Order <select name="order">{{order_select}}</select></label>'
+        f'<label>Order <select name="dir">{{order_select}}</select></label>'
         f'<label>Limit <input type="number" min="0" step="1" name="limit" value="{{limit_value}}"></label>'
         f'<label>Offset <input type="number" min="0" step="1" name="offset" value="{{offset_value}}"></label>'
         '<button type="submit">Apply</button> '
         f'<a href="/ui/entities/{{safe_entity_path}}">Reset</a>'
         '</fieldset></form>'
     )
+
+
+def _ui_entity_query_path(
+    entity_name: str,
+    query: Dict[str, list[str]] | None = None,
+    updates: Dict[str, Any] | None = None,
+    drops: set[str] | None = None,
+) -> str:
+    safe_entity_path = quote(entity_name, safe="")
+    params: Dict[str, list[str]] = {{}}
+    drops = set(drops or set())
+    for key, values in (query or {{}}).items():
+        if key in drops or not values:
+            continue
+        params[str(key)] = [str(values[-1])]
+    for key, value in (updates or {{}}).items():
+        if value is None or str(value) == "":
+            params.pop(str(key), None)
+        else:
+            params[str(key)] = [str(value)]
+    pairs: list[str] = []
+    for key in sorted(params):
+        for value in params[key]:
+            pairs.append(f"{{quote(str(key), safe='')}}={{quote(str(value), safe='')}}")
+    suffix = "?" + "&".join(pairs) if pairs else ""
+    return f"/ui/entities/{{safe_entity_path}}{{suffix}}"
+
+
+def _ui_saved_views(entity_name: str, query: Dict[str, list[str]], fields: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
+    status_field = _status_field_name(fields)
+    q = _ui_query_value(query, "q")
+    sort_field = _ui_query_value(query, "sort")
+    sort_dir = (_ui_query_value(query, "dir") or _ui_query_value(query, "order") or "asc").lower()
+    active_filters = {{
+        key: values[-1]
+        for key, values in query.items()
+        if key.startswith("filter.") and values and values[-1] not in ("", None)
+    }}
+
+    def active(expected: Dict[str, Any]) -> bool:
+        expected_filters = {{
+            key: value
+            for key, value in expected.items()
+            if key.startswith("filter.")
+        }}
+        expected_q = str(expected.get("q") or "")
+        expected_sort = str(expected.get("sort") or "")
+        expected_dir = str(expected.get("dir") or "asc").lower()
+        return (
+            q == expected_q
+            and sort_field == expected_sort
+            and sort_dir == expected_dir
+            and active_filters == expected_filters
+        )
+
+    views = [
+        {{
+            "name": "All records",
+            "description": "Complete table",
+            "url": _ui_entity_query_path(entity_name),
+            "active": active({{}}),
+        }},
+        {{
+            "name": "Recently added",
+            "description": "Newest first",
+            "url": _ui_entity_query_path(entity_name, updates={{"sort": "id", "dir": "desc"}}),
+            "active": active({{"sort": "id", "dir": "desc"}}),
+        }},
+    ]
+    if status_field:
+        status_key = f"filter.{{status_field}}"
+        views.append({{
+            "name": "Active",
+            "description": f"{{status_field.replace('_', ' ').title()}} is active",
+            "url": _ui_entity_query_path(entity_name, updates={{status_key: "active"}}),
+            "active": active({{status_key: "active"}}),
+        }})
+        observed_values = sorted({{
+            str(record.get(status_field))
+            for record in list_records(entity_name)
+            if record.get(status_field) not in (None, "")
+        }})
+        for value in observed_values[:4]:
+            if value.lower() == "active":
+                continue
+            views.append({{
+                "name": value.replace("_", " ").title(),
+                "description": f"{{status_field.replace('_', ' ').title()}} filter",
+                "url": _ui_entity_query_path(entity_name, updates={{status_key: value}}),
+                "active": active({{status_key: value}}),
+            }})
+    return views
+
+
+def _ui_active_filter_chips(entity_name: str, query: Dict[str, list[str]]) -> list[Dict[str, str]]:
+    chips: list[Dict[str, str]] = []
+    q = _ui_query_value(query, "q")
+    if q:
+        chips.append({{
+            "label": "Search",
+            "value": q,
+            "clear_url": _ui_entity_query_path(entity_name, query, drops={{"q", "page"}}),
+        }})
+    for key in sorted(query):
+        if not key.startswith("filter."):
+            continue
+        value = _ui_query_value(query, key)
+        if not value:
+            continue
+        chips.append({{
+            "label": key.removeprefix("filter.").replace("_", " ").title(),
+            "value": value,
+            "clear_url": _ui_entity_query_path(entity_name, query, drops={{key, "page"}}),
+        }})
+    sort_field = _ui_query_value(query, "sort")
+    if sort_field:
+        sort_dir = (_ui_query_value(query, "dir") or _ui_query_value(query, "order") or "asc").lower()
+        chips.append({{
+            "label": "Sort",
+            "value": f"{{sort_field}} {{sort_dir}}",
+            "clear_url": _ui_entity_query_path(entity_name, query, drops={{"sort", "dir", "order", "page"}}),
+        }})
+    return chips
 
 
 def _ui_create_form_html(entity_name: str, fields: list[Dict[str, Any]]) -> str:
@@ -5216,7 +5339,7 @@ def _ui_create_form_html(entity_name: str, fields: list[Dict[str, Any]]) -> str:
     return '<div class="space-y-3">' + "".join(parts) + "</div>"
 
 
-def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | None = None, sort_field: str = "", sort_dir: str = "asc", q: str = "") -> str:
+def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | None = None, sort_field: str = "", sort_dir: str = "asc", q: str = "", query: Dict[str, list[str]] | None = None) -> str:
     records = records if records is not None else list_records(entity_name)
     if not records:
         return "<p>No records yet.</p>"
@@ -5225,7 +5348,6 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
     # Show at most 6 columns to keep table readable; id always first
     display_cols = ["id"] + [c for c in field_names if c != "id"][:5]
     safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
-    q_part = f"&q={{html.escape(quote(q, safe=''), quote=True)}}" if q else ""
     header_cells = []
     for col in display_cols:
         label = html.escape((col[:-3].replace("_", " ").title() + " ID") if col.endswith("_id") else col.replace("_", " ").title())
@@ -5233,9 +5355,10 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
         sort_icon = ""
         if sort_field == col:
             sort_icon = " ▼" if sort_dir == "desc" else " ▲"
+        sort_url = html.escape(_ui_entity_query_path(entity_name, query, {{"sort": col, "dir": next_dir, "page": None}}), quote=True)
         header_cells.append(
             f'<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">'
-            f'<a href="/ui/entities/{{safe_entity}}?sort={{html.escape(col)}}&dir={{next_dir}}{{q_part}}"'
+            f'<a href="{{sort_url}}"'
             f' class="hover:text-gray-900 transition-colors">{{label}}{{sort_icon}}</a>'
             f'</th>'
         )
@@ -5335,7 +5458,7 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
     )
     return (
         bulk_bar
-        + f'<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">'
+        + f'<div class="apg-table-wrap shadow-sm overflow-hidden">'
         + f'<div class="overflow-x-auto">'
         + f'<table class="w-full">'
         + f'<thead class="bg-gray-50 border-b border-gray-100">'
@@ -5362,7 +5485,7 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
     # Full-text search: filter records where any string field contains q
     q = query.get("q", [""])[0].strip() if "q" in query else ""
     sort_field = query.get("sort", [""])[0].strip()
-    sort_dir = query.get("dir", ["asc"])[0].strip().lower()
+    sort_dir = (query.get("dir") or query.get("order") or ["asc"])[0].strip().lower()
     if sort_dir not in ("asc", "desc"):
         sort_dir = "asc"
     # Pagination
@@ -5406,7 +5529,16 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
     status_field_names = {{"status", "state", "stage", "phase"}}
     has_kanban = any(str(f.get("name", "")).lower() in status_field_names for f in fields)
 
-    records_table = _ui_records_table_html(entity_name, paginated, sort_field=sort_field, sort_dir=sort_dir, q=q)
+    records_table = _ui_records_table_html(entity_name, paginated, sort_field=sort_field, sort_dir=sort_dir, q=q, query=query)
+    pagination_pages = [
+        {{"number": p, "url": _ui_entity_query_path(entity_name, query, {{"page": p, "per": per}})}}
+        for p in range(1, total_pages + 1)
+        if p >= page - 2 and p <= page + 2
+    ]
+    per_page_options = [
+        {{"value": n, "url": _ui_entity_query_path(entity_name, query, {{"page": 1, "per": n}})}}
+        for n in [10, 25, 50, 100, 200]
+    ]
 
     # Prefer Jinja2 template for rich UI; fall back to f-string builder for zero-dep mode
     create_inputs = _ui_create_form_html(entity_name, fields)
@@ -5424,6 +5556,11 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
         create_inputs=create_inputs,
         notice=html.escape(notice) if notice else "",
         query=query,
+        saved_views=_ui_saved_views(entity_name, query, fields),
+        active_filters=_ui_active_filter_chips(entity_name, query),
+        clear_filters_url=_ui_entity_query_path(entity_name),
+        developer_api_url=f"/entities/{{quote(entity_name, safe='')}}/records",
+        csv_url=f"/entities/{{quote(entity_name, safe='')}}/records.csv",
         has_kanban=has_kanban,
         q=html.escape(q) if q else "",
         sort_field=sort_field,
@@ -5431,6 +5568,12 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
         page=page,
         per=per,
         total_pages=total_pages,
+        prev_page_url=_ui_entity_query_path(entity_name, query, {{"page": page - 1, "per": per}}) if page > 1 else "",
+        next_page_url=_ui_entity_query_path(entity_name, query, {{"page": page + 1, "per": per}}) if page < total_pages else "",
+        first_page_url=_ui_entity_query_path(entity_name, query, {{"page": 1, "per": per}}),
+        last_page_url=_ui_entity_query_path(entity_name, query, {{"page": total_pages, "per": per}}),
+        pagination_pages=pagination_pages,
+        per_page_options=per_page_options,
         records_json=html.escape(json.dumps(paginated, indent=2, sort_keys=True)),
         query_form=query_form,
     )

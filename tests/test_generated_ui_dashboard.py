@@ -63,3 +63,49 @@ def test_generated_home_dashboard_prioritizes_workspace_actions():
 	assert "ERPAnalyst" in html
 	assert "PrivacyAgent" in html
 	assert "ERPAdvisors" in html
+
+
+def test_generated_entity_list_exposes_saved_views_and_filter_state():
+	result = compile_apg_file("examples/20_enterprise_erp_platform/main.apg")
+	assert result.success, result.errors
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	create_status, create_payload = namespace["create_record"](
+		"Vendor",
+		{
+			"vendor_number": "V-001",
+			"legal_name": "Acme Components",
+			"tax_id": "KE-123",
+			"payment_terms": "net_30",
+			"currency": "KES",
+			"bank_account": "100200",
+			"status": "active",
+			"country": "KE",
+		},
+	)
+	assert create_status == 201, create_payload
+
+	status, html = namespace["_ui_payload"]("/ui/entities/Vendor")
+	assert status == 200
+	assert 'aria-label="Saved views"' in html
+	assert "All records" in html
+	assert "Recently added" in html
+	assert "Active" in html
+	assert "Developer exports" in html
+	assert "API JSON" in html
+	assert "Record JSON" not in html
+	assert "apg-table-wrap" in html
+	assert "Acme Components" in html
+
+	status, filtered = namespace["_ui_payload"](
+		"/ui/entities/Vendor",
+		{"filter.status": ["active"], "sort": ["id"], "dir": ["desc"], "q": ["Acme"]},
+	)
+	assert status == 200
+	assert "Status: active" in filtered
+	assert "Search: Acme" in filtered
+	assert "Sort: id desc" in filtered
+	assert "filter.status=active" in filtered
+	assert "q=Acme" in filtered
+	assert "dir=asc&amp;filter.status=active&amp;q=Acme&amp;sort=id" in filtered

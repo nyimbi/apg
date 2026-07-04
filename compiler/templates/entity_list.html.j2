@@ -1,7 +1,7 @@
 {# entity_list.html.j2 — APG entity list + create form
    Variables: entity_name, entity_type, safe_entity, fields, records,
               total, count, records_table, create_inputs, notice, query,
-              has_kanban (bool), q (search term) #}
+              saved_views, active_filters, has_kanban (bool), q (search term) #}
 
 {# Breadcrumb + view toggle #}
 <nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">
@@ -20,14 +20,6 @@
        class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">
       Analytics
     </a>
-    <a href="/entities/{{ safe_entity }}/records.csv"
-       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-500 hover:border-emerald-400 hover:text-emerald-600 transition-colors">
-      ↓ CSV
-    </a>
-    <a href="/entities/{{ safe_entity }}/records"
-       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-500 hover:border-gray-300 transition-colors">
-      API JSON ↗
-    </a>
     <button type="button" class="apg-btn" onclick="document.getElementById('apg-create-drawer').showModal();">
       New {{ entity_name }}
     </button>
@@ -41,19 +33,50 @@
 </div>
 {% endif %}
 
-{# Search bar #}
-<form method="get" action="/ui/entities/{{ safe_entity }}" class="mb-5">
-  <div class="relative max-w-sm">
-    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">🔍</span>
-    <input type="text" name="q" value="{{ q or '' }}"
-           placeholder="Search {{ entity_name }} records…"
-           class="w-full pl-8 pr-8 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">
-    {% if q %}
-    <a href="/ui/entities/{{ safe_entity }}"
-       class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs leading-none">✕</a>
-    {% endif %}
+<section class="apg-card apg-list-toolbar" aria-label="{{ entity_name }} table controls">
+  <div class="apg-view-strip" aria-label="Saved views">
+    {% for view in saved_views %}
+    <a href="{{ view.url }}"
+       class="apg-view-tab{% if view.active %} active{% endif %}"
+       {% if view.active %}aria-current="page"{% endif %}>
+      <span>{{ view.name }}</span>
+      <small>{{ view.description }}</small>
+    </a>
+    {% endfor %}
   </div>
-</form>
+
+  <form method="get" action="/ui/entities/{{ safe_entity }}" class="apg-search-form">
+    <label class="sr-only" for="apg-entity-search">Search {{ entity_name }} records</label>
+    <div class="relative">
+      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">Search</span>
+      <input id="apg-entity-search" type="text" name="q" value="{{ q or '' }}"
+             placeholder="Search {{ entity_name }} records..."
+             class="w-full pl-14 pr-8 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">
+      {% if q %}
+      <a href="{{ clear_filters_url }}"
+         aria-label="Clear search"
+         class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs leading-none">x</a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if active_filters %}
+  <div class="apg-filter-chip-row" aria-label="Active filters">
+    {% for chip in active_filters %}
+    <span class="apg-filter-chip">
+      <span>{{ chip.label }}: {{ chip.value }}</span>
+      <a href="{{ chip.clear_url }}" aria-label="Clear {{ chip.label }}">x</a>
+    </span>
+    {% endfor %}
+    <a href="{{ clear_filters_url }}" class="apg-filter-clear">Clear all</a>
+  </div>
+  {% endif %}
+
+  <details class="apg-filter-panel"{% if active_filters %} open{% endif %}>
+    <summary>Advanced filter</summary>
+    <div class="mt-2">{{ query_form | safe }}</div>
+  </details>
+</section>
 
 <dialog id="apg-create-drawer" class="apg-drawer" aria-labelledby="apg-create-title">
   <form method="post" action="/ui/entities/{{ safe_entity }}/records" novalidate class="apg-drawer-panel">
@@ -115,33 +138,31 @@
     <nav class="mt-4 flex items-center justify-between flex-wrap gap-3" aria-label="Pagination">
       <div class="flex items-center gap-1 flex-wrap">
         {% if page > 1 %}
-        <a href="/ui/entities/{{ safe_entity }}?page={{ page - 1 }}&per={{ per }}{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+        <a href="{{ prev_page_url }}"
            class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">← Prev</a>
         {% else %}
         <span class="px-3 py-1.5 text-sm border border-gray-100 rounded-lg text-gray-300 select-none">← Prev</span>
         {% endif %}
 
         {% if page > 3 %}
-        <a href="/ui/entities/{{ safe_entity }}?page=1&per={{ per }}{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+        <a href="{{ first_page_url }}"
            class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">1</a>
         {% if page > 4 %}<span class="px-1 text-xs text-gray-400">…</span>{% endif %}
         {% endif %}
 
-        {% for p in range(1, total_pages + 1) %}
-        {% if p >= page - 2 and p <= page + 2 %}
-        <a href="/ui/entities/{{ safe_entity }}?page={{ p }}&per={{ per }}{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
-           class="px-3 py-1.5 text-sm rounded-lg {% if p == page %}bg-apg-primary text-white font-semibold{% else %}border border-gray-200 text-gray-600 hover:border-apg-primary hover:text-apg-primary{% endif %} transition-colors">{{ p }}</a>
-        {% endif %}
+        {% for page_link in pagination_pages %}
+        <a href="{{ page_link.url }}"
+           class="px-3 py-1.5 text-sm rounded-lg {% if page_link.number == page %}bg-apg-primary text-white font-semibold{% else %}border border-gray-200 text-gray-600 hover:border-apg-primary hover:text-apg-primary{% endif %} transition-colors">{{ page_link.number }}</a>
         {% endfor %}
 
         {% if page < total_pages - 2 %}
         {% if page < total_pages - 3 %}<span class="px-1 text-xs text-gray-400">…</span>{% endif %}
-        <a href="/ui/entities/{{ safe_entity }}?page={{ total_pages }}&per={{ per }}{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+        <a href="{{ last_page_url }}"
            class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">{{ total_pages }}</a>
         {% endif %}
 
         {% if page < total_pages %}
-        <a href="/ui/entities/{{ safe_entity }}?page={{ page + 1 }}&per={{ per }}{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+        <a href="{{ next_page_url }}"
            class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">Next →</a>
         {% else %}
         <span class="px-3 py-1.5 text-sm border border-gray-100 rounded-lg text-gray-300 select-none">Next →</span>
@@ -149,10 +170,10 @@
       </div>
       <div class="flex items-center gap-2 text-xs text-gray-400">
         <span>Page {{ page }} of {{ total_pages }}</span>
-        <select onchange="location.href='/ui/entities/{{ safe_entity }}?page=1&per='+this.value+'{% if sort_field %}&sort={{ sort_field }}&dir={{ sort_dir }}{% endif %}{% if q %}&q={{ q }}{% endif %}'"
+        <select onchange="location.href=this.options[this.selectedIndex].dataset.url"
                 class="px-2 py-1 border border-gray-200 rounded text-xs text-gray-500 bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-apg-primary">
-          {% for n in [10, 25, 50, 100, 200] %}
-          <option value="{{ n }}"{% if n == per %} selected{% endif %}>{{ n }} / page</option>
+          {% for option in per_page_options %}
+          <option value="{{ option.value }}" data-url="{{ option.url }}"{% if option.value == per %} selected{% endif %}>{{ option.value }} / page</option>
           {% endfor %}
         </select>
       </div>
@@ -162,12 +183,12 @@
 
 </div>
 
-<details class="mt-4">
-  <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">Advanced filter</summary>
-  <div class="mt-2">{{ query_form | safe }}</div>
-</details>
-
-<details class="mt-2">
-  <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">Record JSON</summary>
+<details class="mt-4 apg-developer-panel">
+  <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">Developer exports</summary>
+  <div class="mt-2 flex items-center gap-2 flex-wrap">
+    <a href="{{ csv_url }}" class="apg-btn apg-btn-secondary">Export CSV</a>
+    <a href="{{ developer_api_url }}" class="apg-btn apg-btn-secondary">API JSON</a>
+  </div>
+  <p class="text-xs text-gray-400 mt-3">Rendered page records</p>
   <pre class="mt-2 text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-auto max-h-64 font-mono">{{ records_json }}</pre>
 </details>
