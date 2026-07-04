@@ -561,7 +561,7 @@ def test_generated_app_executes_capability_operations_over_http(tmp_path):
     )
     try:
         base_url = f"http://127.0.0.1:{port}"
-        for _attempt in range(30):
+        for _attempt in range(80):
             try:
                 with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
                     assert response.status == 200

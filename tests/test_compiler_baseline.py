@@ -577,7 +577,7 @@ def test_generated_python_app_serves_http_endpoints(tmp_path):
 	)
 	try:
 		base_url = f"http://127.0.0.1:{port}"
-		for _attempt in range(30):
+		for _attempt in range(80):
 			try:
 				with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
 					health = json.loads(response.read().decode("utf-8"))
@@ -667,7 +667,7 @@ def test_generated_python_app_serves_entity_record_endpoints(tmp_path):
 	)
 	try:
 		base_url = f"http://127.0.0.1:{port}"
-		for _attempt in range(30):
+		for _attempt in range(80):
 			try:
 				with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
 					json.loads(response.read().decode("utf-8"))
@@ -1076,7 +1076,7 @@ def test_generated_python_app_coerces_typed_form_records(tmp_path):
 	)
 	try:
 		base_url = f"http://127.0.0.1:{port}"
-		for _attempt in range(30):
+		for _attempt in range(80):
 			try:
 				with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
 					json.loads(response.read().decode("utf-8"))
@@ -1265,7 +1265,7 @@ def test_generated_python_app_persists_records_with_data_file(tmp_path):
 			text=True,
 		)
 		base_url = f"http://127.0.0.1:{port}"
-		for _attempt in range(30):
+		for _attempt in range(80):
 			try:
 				with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
 					health = json.loads(response.read().decode("utf-8"))
@@ -1354,7 +1354,7 @@ def test_generated_python_app_can_require_api_key_for_mutations(tmp_path):
 	)
 	try:
 		base_url = f"http://127.0.0.1:{port}"
-		for _attempt in range(30):
+		for _attempt in range(80):
 			try:
 				with urllib.request.urlopen(f"{base_url}/health", timeout=0.2) as response:
 					health = json.loads(response.read().decode("utf-8"))

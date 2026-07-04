@@ -1,4 +1,4 @@
-<!--- app_index.html.j2 — APG application home page --->
+<!--- app_index.html.j2 - APG application home page --->
 {# Variables: module_name, module_description, entities, capabilities, databases,
               application_routes, ui_routes, agents, agent_teams #}
 <div class="mb-6">
@@ -7,11 +7,13 @@
 </div>
 
 {# Quick nav #}
-<nav class="flex flex-wrap gap-2 mb-8 text-sm" aria-label="API navigation">
-  <a href="/ui/workflows"
+<nav class="flex flex-wrap gap-2 mb-8 text-sm" aria-label="Workspace shortcuts">
+  {% if entities %}
+  <a href="/ui/entities/{{ entities[0].name | urlencode }}"
      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-apg-primary text-white hover:opacity-90 transition-opacity font-medium">
-    ⚡ Workflows
+    Start with {{ entities[0].name }}
   </a>
+  {% endif %}
   {% for link in api_links %}
   <a href="{{ link.url }}"
      class="inline-flex items-center px-3 py-1.5 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-apg-primary transition-colors">
@@ -25,8 +27,8 @@
   {% for stat in dashboard_stats[:4] %}
   <article class="apg-card">
     <div class="apg-stat">
-      <span class="apg-stat-value">{{ stat.value }}</span>
-      <span class="apg-stat-label">{{ stat.label }}</span>
+      <a class="apg-stat-value hover:text-apg-primary" href="/ui/entities/{{ stat.label | urlencode }}">{{ stat.value }}</a>
+      <span class="apg-stat-label">{{ stat.label }} records</span>
       <span class="apg-stat-delta">{{ stat.delta }}</span>
     </div>
     <div class="apg-chart mt-3" data-apg-chart="{{ stat.chart_id }}"></div>
@@ -35,13 +37,13 @@
   {% endfor %}
   <article class="apg-card">
     <div class="apg-stat">
-      <span class="apg-stat-value">{{ capabilities | length }}</span>
+      <a class="apg-stat-value hover:text-apg-primary" href="/ui/marketplace">{{ capabilities | length }}</a>
       <span class="apg-stat-label">Capabilities</span>
     </div>
   </article>
   <article class="apg-card">
     <div class="apg-stat">
-      <span class="apg-stat-value">{{ workflow_summary.workflow_count }}</span>
+      <a class="apg-stat-value hover:text-apg-primary" href="/ui/workflows">{{ workflow_summary.workflow_count }}</a>
       <span class="apg-stat-label">Workflows</span>
     </div>
   </article>
@@ -72,16 +74,21 @@
       {% endfor %}
     </ul>
     {% else %}
-    <div class="apg-chart-empty"><p>No activity yet</p></div>
+    <div class="apg-chart-empty">
+      <p>No activity yet</p>
+      {% if entities %}<a class="apg-btn apg-btn-secondary mt-3" href="/ui/entities/{{ entities[0].name | urlencode }}">Create the first record</a>{% endif %}
+    </div>
     {% endif %}
   </article>
   <article class="apg-card">
     <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Workflow Summary</h2>
     <p class="text-sm text-gray-500">{{ workflow_summary.workflow_count }} workflow(s), {{ workflow_summary.run_count }} run(s)</p>
+    <a class="apg-btn apg-btn-secondary mt-3" href="/ui/workflows">Open workflows</a>
   </article>
   <article class="apg-card">
     <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Agent Summary</h2>
     <p class="text-sm text-gray-500">{{ agent_summary.agent_count }} agent(s), {{ agent_summary.team_count }} team(s)</p>
+    {% if agents %}<a class="apg-btn apg-btn-secondary mt-3" href="/ui/agents/{{ agents[0].name | urlencode }}">Open agent console</a>{% endif %}
   </article>
 </section>
 
@@ -113,9 +120,9 @@
     <ul class="divide-y divide-gray-100 dark:divide-gray-700">
       {% for cap in capabilities %}
       <li class="py-2">
-        <a href="/ui/capabilities/{{ cap | urlencode }}"
+        <a href="/ui/capabilities/{{ cap.name | urlencode }}"
            class="text-sm text-apg-primary hover:underline font-medium">
-          {{ cap }}
+          {{ cap.name }}
         </a>
       </li>
       {% endfor %}
@@ -161,11 +168,11 @@
       <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Agents</h2>
     </div>
     <ul class="divide-y divide-gray-100 dark:divide-gray-700">
-      {% for agent_name in agents %}
+      {% for agent in agents %}
       <li class="py-2">
-        <a href="/ui/agents/{{ agent_name | urlencode }}"
+        <a href="/ui/agents/{{ agent.name | urlencode }}"
            class="text-sm text-apg-primary hover:underline font-medium">
-          {{ agent_name }}
+          {{ agent.name }}
         </a>
       </li>
       {% endfor %}
@@ -179,11 +186,11 @@
       <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Agent Teams</h2>
     </div>
     <ul class="divide-y divide-gray-100 dark:divide-gray-700">
-      {% for team_name in agent_teams %}
+      {% for team in agent_teams %}
       <li class="py-2">
-        <a href="/ui/agent-teams/{{ team_name | urlencode }}"
+        <a href="/ui/agent-teams/{{ team.name | urlencode }}"
            class="text-sm text-apg-primary hover:underline font-medium">
-          {{ team_name }}
+          {{ team.name }}
         </a>
       </li>
       {% endfor %}

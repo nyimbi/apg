@@ -42,3 +42,24 @@ def test_generated_dashboard_chart_specs_are_valid_for_example_20():
 	assert status == 200
 	analytics_specs = _json_scripts(analytics_html)
 	assert {spec["type"] for spec in analytics_specs} >= {"line", "donut"}
+
+
+def test_generated_home_dashboard_prioritizes_workspace_actions():
+	result = compile_apg_file("examples/20_enterprise_erp_platform/main.apg")
+	assert result.success, result.errors
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	status, html = namespace["_ui_payload"]("/ui")
+
+	assert status == 200
+	assert 'aria-label="Workspace shortcuts"' in html
+	assert "Start with Vendor" in html
+	assert "Create the first record" in html
+	assert "Open workflows" in html
+	assert "Open agent console" in html
+	assert "2 agent(s), 1 team(s)" in html
+	assert "2</a>\n      <span class=\"apg-stat-label\">Capabilities</span>" in html
+	assert "ERPAnalyst" in html
+	assert "PrivacyAgent" in html
+	assert "ERPAdvisors" in html

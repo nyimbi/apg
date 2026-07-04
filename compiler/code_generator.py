@@ -4773,6 +4773,7 @@ def _landing_page_html() -> str:
 
 def _ui_index_html() -> str:
     app = describe_application()
+    dashboard = _ui_dashboard_context(app)
     entity_links = "".join(
         f'<li><a href="/ui/entities/{{html.escape(entity["name"], quote=True)}}">'
         f'{{html.escape(entity["name"])}}</a> '
@@ -4823,28 +4824,26 @@ def _ui_index_html() -> str:
 
     # Prefer Jinja2 template; fall back to f-string for zero-dep mode
     api_links = [
-        {{"url": "/manifest",       "label": "Manifest JSON"}},
-        {{"url": "/component.json", "label": "Component JSON"}},
-        {{"url": "/capabilities",   "label": "Capabilities"}},
-        {{"url": "/agents",         "label": "Agents"}},
-        {{"url": "/events",         "label": "Events"}},
+        {{"url": "/ui/workflows",   "label": "Run workflow"}},
+        {{"url": "/ui/databases",   "label": "Inspect data model"}},
+        {{"url": "/ui/marketplace", "label": "Browse marketplace"}},
         {{"url": "/metrics",        "label": "Metrics"}},
+        {{"url": "/component.json", "label": "Component JSON"}},
+        {{"url": "/events",         "label": "Events"}},
         {{"url": "/self-test",      "label": "Self-Test"}},
-        {{"url": "/openapi.json",   "label": "API Contract"}},
-        {{"url": "/ui/databases",   "label": "Databases"}},
+        {{"url": "/openapi.json",   "label": "API contract"}},
     ]
-    dashboard = _ui_dashboard_context(app)
     tmpl_body = _render_template(
         "app_index.html.j2",
         module_name=html.escape(MODULE_NAME),
         module_description=html.escape(MODULE_DESCRIPTION or "Generated APG application"),
-        entities=ENTITIES,
-        capabilities=app.get("capabilities", []),
+        entities=dashboard["entity_cards"],
+        capabilities=dashboard["capability_cards"],
         databases=app.get("databases", []),
         application_routes=app.get("application_routes", {{}}),
         ui_routes=app.get("ui_routes", {{}}),
-        agents=app.get("ai_agents", []),
-        agent_teams=app.get("ai_agent_teams", []),
+        agents=dashboard["agent_cards"],
+        agent_teams=dashboard["agent_team_cards"],
         api_links=api_links,
         dashboard_stats=dashboard["stats"],
         status_charts=dashboard["status_charts"],
@@ -4901,8 +4900,33 @@ def _chart_json(spec: Dict[str, Any]) -> str:
 def _ui_dashboard_context(app: Dict[str, Any]) -> Dict[str, Any]:
     stats = []
     status_charts = []
+    entity_cards = [
+        dict(entity)
+        for entity in ENTITIES
+        if entity.get("type") in {{"entity", "table"}}
+    ]
+    capability_cards = [
+        dict(entity)
+        for entity in ENTITIES
+        if entity.get("type") == "capability"
+    ]
+    agent_cards = [
+        dict(entity)
+        for entity in ENTITIES
+        if entity.get("type") == "agent"
+    ]
+    agent_team_cards = [
+        dict(entity)
+        for entity in ENTITIES
+        if entity.get("type") == "agent_team"
+    ]
+    workflow_cards = [
+        dict(entity)
+        for entity in ENTITIES
+        if entity.get("type") in {{"workflow", "flow"}}
+    ]
     for entity in ENTITIES:
-        if entity.get("type") in {{"application"}}:
+        if entity.get("type") not in {{"entity", "table"}}:
             continue
         entity_name = str(entity["name"])
         records = list_records(entity_name)
@@ -4935,8 +4959,12 @@ def _ui_dashboard_context(app: Dict[str, Any]) -> Dict[str, Any]:
         "stats": stats,
         "status_charts": status_charts,
         "recent_activity": EVENT_LOG[-8:],
-        "workflow_summary": {{"workflow_count": sum(len(items) for items in APP_WORKFLOWS.values()), "run_count": len(WORKFLOW_RUNS)}},
-        "agent_summary": {{"agent_count": len(app.get("ai_agent_descriptions", {{}})), "team_count": len(app.get("ai_agent_team_descriptions", {{}}))}},
+        "workflow_summary": {{"workflow_count": len(workflow_cards), "run_count": len(WORKFLOW_RUNS)}},
+        "agent_summary": {{"agent_count": len(agent_cards), "team_count": len(agent_team_cards)}},
+        "entity_cards": entity_cards,
+        "capability_cards": capability_cards,
+        "agent_cards": agent_cards,
+        "agent_team_cards": agent_team_cards,
     }}
 
 
