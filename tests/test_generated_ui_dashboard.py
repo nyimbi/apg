@@ -177,3 +177,46 @@ def test_generated_entity_analytics_uses_record_dates_and_drilldowns():
 		{"label": "active", "value": 2},
 		{"label": "suspended", "value": 1},
 	]
+
+
+def test_generated_kanban_renders_board_and_keyboard_move_controls():
+	result = compile_apg_file("examples/20_enterprise_erp_platform/main.apg")
+	assert result.success, result.errors
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	for index, status_value in enumerate(["active", "active", "active", "active", "suspended"], start=1):
+		create_status, create_payload = namespace["create_record"](
+			"Vendor",
+			{
+				"vendor_number": f"V-{index:03d}",
+				"legal_name": f"Vendor {index}",
+				"tax_id": f"KE-{index}",
+				"payment_terms": "net_30",
+				"currency": "KES",
+				"bank_account": str(1000 + index),
+				"status": status_value,
+				"country": "KE",
+			},
+		)
+		assert create_status == 201, create_payload
+
+	status, html = namespace["_ui_payload"]("/ui/entities/Vendor", {"view": ["kanban"]})
+	assert status == 200
+	assert "Grouped by status" in html
+	assert 'aria-label="Board summary"' in html
+	assert "WIP guide" in html
+	assert "Above WIP guide" in html
+	assert "apg-kanban-card" in html
+	assert "apg-kanban-move" in html
+	assert 'name="return_view" value="kanban"' in html
+	assert "filter.status=active" in html
+	assert "This application requires Jinja2" not in html
+	assert 'aria-label="Vendor table controls"' not in html
+
+	move_status, move_payload = namespace["_ui_post_payload"](
+		"/ui/entities/Vendor/records/1",
+		{"record": {"status": "suspended", "return_view": "kanban"}},
+	)
+	assert move_status == 303
+	assert move_payload["location"] == "/ui/entities/Vendor?view=kanban"

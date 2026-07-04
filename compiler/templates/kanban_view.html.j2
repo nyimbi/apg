@@ -1,5 +1,6 @@
 {# kanban_view.html.j2 — Kanban board view for status-field entities
-   Variables: entity_name, safe_entity, columns, display_field, status_field, fields
+   Variables: entity_name, safe_entity, columns, display_field, status_field, fields,
+              status_options, total_records, wip_limit, list_url
    columns: [{"label": str, "records": [dict]}]
 #}
 
@@ -19,15 +20,17 @@
   </div>
 </nav>
 
-<div class="flex items-center gap-4 mb-5">
-  <h1 class="text-xl font-bold text-gray-900">{{ entity_name }}</h1>
-  <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
-    by {{ status_field | replace('_', ' ') }}
-  </span>
-  <span class="text-xs text-gray-400">
-    {{ columns | sum(attribute='records') | length }} total
-  </span>
-</div>
+<section class="apg-kanban-header">
+  <div>
+    <h1 class="text-xl font-bold text-gray-900">{{ entity_name }}</h1>
+    <p class="text-sm text-gray-500 mt-1">Grouped by {{ status_field | replace('_', ' ') }} with drag-and-drop or keyboard move controls.</p>
+  </div>
+  <div class="apg-kanban-summary" aria-label="Board summary">
+    <a href="{{ list_url }}" class="apg-kanban-summary-item"><strong>{{ total_records }}</strong><span>Total</span></a>
+    <span class="apg-kanban-summary-item"><strong>{{ columns | length }}</strong><span>Columns</span></span>
+    <span class="apg-kanban-summary-item"><strong>{{ wip_limit }}</strong><span>WIP guide</span></span>
+  </div>
+</section>
 
 {# Kanban board — horizontal scroll #}
 <div class="flex gap-4 overflow-x-auto pb-6 items-start -mx-1 px-1">
@@ -35,16 +38,20 @@
   <div class="flex-shrink-0 w-72">
     {# Column header #}
     <div class="flex items-center justify-between mb-3 px-1">
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 min-w-0">
         <span class="w-2.5 h-2.5 rounded-full
           {% if col.label | lower in ['active', 'approved', 'paid', 'open', 'complete', 'completed', 'success', 'done'] %}bg-green-400
           {% elif col.label | lower in ['inactive', 'rejected', 'closed', 'cancelled', 'canceled', 'failed', 'expired'] %}bg-red-400
           {% elif col.label | lower in ['pending', 'draft', 'processing', 'review', 'in_progress', 'waiting'] %}bg-yellow-400
           {% else %}bg-gray-300{% endif %}"></span>
         <h2 class="text-sm font-semibold text-gray-900">{{ col.label }}</h2>
-        <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">{{ col.records | length }}</span>
+        <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">{{ col.count }}</span>
       </div>
+      <a href="{{ col.list_url }}" class="text-xs text-gray-400 hover:text-apg-primary">List</a>
     </div>
+    {% if col.over_limit %}
+    <p class="apg-kanban-wip">Above WIP guide {{ col.wip_limit }}</p>
+    {% endif %}
 
     {# Card list — apg-kanban-col enables SortableJS drag-and-drop #}
     <div class="space-y-2.5 apg-kanban-col min-h-16"
@@ -52,10 +59,9 @@
          id="apg-col-{{ col.label | urlencode }}">
       {% for record in col.records %}
       {% set rec_id = record.get('id', '') | string %}
-      <a href="/ui/entities/{{ safe_entity }}/{{ rec_id | urlencode }}"
-         data-record-id="{{ rec_id | e }}"
-         data-revision="{{ record.get('_revision', '') | string | e }}"
-         class="block bg-white rounded-xl border border-gray-200 p-4 hover:border-apg-primary hover:shadow-md transition-all group/card cursor-grab active:cursor-grabbing">
+      <article data-record-id="{{ rec_id | e }}"
+               data-revision="{{ record.get('_revision', '') | string | e }}"
+               class="apg-kanban-card bg-white rounded-xl border border-gray-200 p-4 hover:border-apg-primary hover:shadow-md transition-all group/card cursor-grab active:cursor-grabbing">
         <div class="flex items-start justify-between gap-2 mb-2.5">
           <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
                style="background: var(--apg-primary, #0ea5e9)">
@@ -63,27 +69,41 @@
           </div>
           <span class="text-xs text-gray-300 font-mono mt-1">{{ rec_id[:8] }}</span>
         </div>
-        <p class="text-sm font-semibold text-gray-900 group-hover/card:text-apg-primary transition-colors leading-tight mb-2">
+        <a href="/ui/entities/{{ safe_entity }}/{{ rec_id | urlencode }}"
+           class="block text-sm font-semibold text-gray-900 group-hover/card:text-apg-primary transition-colors leading-tight mb-2">
           {{ record.get(display_field, '—') | string | truncate(50) }}
-        </p>
+        </a>
+        {% set shown_fields = namespace(count=0) %}
         {% for f in fields %}
         {% if f.name not in ['id', '_revision', display_field, status_field] %}
         {% set fval = record.get(f.name, '') %}
-        {% if fval and fval != '' and fval != 'None' %}
+        {% if shown_fields.count < 2 and fval and fval != '' and fval != 'None' %}
         <p class="text-xs text-gray-400 truncate mt-0.5">
           <span class="font-medium text-gray-500">{{ (f.name[:-3] | replace('_', ' ') | title ~ ' ID') if f.name.endswith('_id') else (f.name | replace('_', ' ') | title) }}:</span>
           {{ fval | string | truncate(35) }}
         </p>
-        {% if loop.index >= 2 %}{% break %}{% endif %}
+        {% set shown_fields.count = shown_fields.count + 1 %}
         {% endif %}
         {% endif %}
         {% endfor %}
-      </a>
+        <form method="post" action="/ui/entities/{{ safe_entity }}/records/{{ rec_id | urlencode }}" class="apg-kanban-move">
+          <input type="hidden" name="expected_revision" value="{{ record.get('_revision', '') | string | e }}">
+          <input type="hidden" name="return_view" value="kanban">
+          <label class="sr-only" for="apg-move-{{ rec_id | e }}">Move {{ record.get(display_field, rec_id) }}</label>
+          <select id="apg-move-{{ rec_id | e }}" name="{{ status_field }}" class="apg-kanban-select">
+            {% for option in status_options %}
+            <option value="{{ option }}"{% if option == col.label %} selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="apg-btn apg-btn-secondary">Move</button>
+        </form>
+      </article>
       {% endfor %}
 
       {% if not col.records %}
       <div class="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-6 text-center apg-kanban-empty">
-        <p class="text-xs text-gray-300">Empty</p>
+        <p class="text-xs text-gray-400">No {{ col.label }} records.</p>
+        <a href="{{ col.list_url }}" class="text-xs text-apg-primary hover:underline">Open filtered list</a>
       </div>
       {% endif %}
     </div>

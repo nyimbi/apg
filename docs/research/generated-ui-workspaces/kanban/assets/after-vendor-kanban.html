@@ -1,0 +1,518 @@
+<!doctype html><html lang="en" dir="ltr" class="h-full"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><script>(function(){try{var m=localStorage.getItem("apg-theme")||"system";var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;}catch(e){}})();</script><meta name="theme-color" content="#1E5B5A"><link rel="manifest" href="/static/manifest.webmanifest"><link rel="stylesheet" href="/static/apg.css"><link rel="stylesheet" href="/static/uplot.min.css"><script defer src="/static/htmx.min.js"></script><script defer src="/static/sortable.min.js"></script><script defer src="/static/uplot.min.js"></script><script defer src="/static/apg-charts.js"></script><script defer src="/static/apg-sse.js"></script><style>.apg-skeleton{  background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);  background-size:200% 100%;  animation:apg-shimmer 1.5s infinite;  border-radius:4px;}@keyframes apg-shimmer{  0%{background-position:200% 0}  100%{background-position:-200% 0}}.apg-loading .apg-skeleton-row{height:40px;margin-bottom:8px;}.htmx-request .apg-content-area{opacity:0.6;transition:opacity 0.2s;}</style><link rel="stylesheet" href="/theme.css"><title>Vendor — Kanban — enterprise_erp</title></head><body class="min-h-full bg-gray-50 text-gray-900"><a class="apg-skip-link" href="#content">Skip to content</a><div id="apg-offline-banner" class="apg-offline-banner" role="status" hidden>Offline mode: showing cached APG screens.</div><header class="apg-topbar sticky top-0 z-50" role="banner">  <button class="apg-icon-btn" type="button" onclick="apgToggleSidebar()" aria-label="Toggle navigation">☰</button>  <a class="apg-logo" href="/ui">enterprise_erp</a>  <nav class="apg-topnav ml-4">    <a class="apg-nav-link hover:bg-gray-100" href="/ui">Home</a>    <a class="apg-nav-link hover:bg-gray-100" href="/ui/workflows">⚡ Workflows</a>    <a class="apg-nav-link hover:bg-gray-100" href="/ui/marketplace">Marketplace</a>  </nav>  <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">System</button>  <form method="post" action="/locale" class="apg-locale-form"><input type="hidden" name="next" value="/ui/entities/Vendor?view=kanban"><label class="apg-sr-only" for="apg-locale-select">Language</label><select id="apg-locale-select" name="lang" class="apg-locale-select" onchange="this.form.submit()" aria-label="Language"><option value="en" selected>en</option><option value="sw">sw</option><option value="fr">fr</option><option value="ar">ar</option><option value="ha">ha</option><option value="yo">yo</option><option value="zu">zu</option><option value="am">am</option></select></form>  </header><aside id="apg-sidebar" class="apg-sidebar" aria-label="Application navigation"><div class="apg-sidebar-section"><p class="apg-sidebar-heading">Navigate</p><a class="apg-sidebar-link" href="/ui">Dashboard</a><a class="apg-sidebar-link" href="/ui/workflows">Workflows</a><a class="apg-sidebar-link" href="/ui/databases">Databases</a><a class="apg-sidebar-link" href="/ui/marketplace">Marketplace</a></div><div class="apg-sidebar-section"><p class="apg-sidebar-heading">Entities</p><a class="apg-sidebar-link" href="/ui/entities/Vendor">Vendor</a><a class="apg-sidebar-link" href="/ui/entities/Customer">Customer</a><a class="apg-sidebar-link" href="/ui/entities/Employee">Employee</a><a class="apg-sidebar-link" href="/ui/entities/ERPDB">ERPDB</a><a class="apg-sidebar-link" href="/ui/entities/ERPCore">ERPCore</a><a class="apg-sidebar-link" href="/ui/entities/ExecutiveERP">ExecutiveERP</a><a class="apg-sidebar-link" href="/ui/entities/ERPAnalyst">ERPAnalyst</a><a class="apg-sidebar-link" href="/ui/entities/PrivacyAgent">PrivacyAgent</a><a class="apg-sidebar-link" href="/ui/entities/ERPAdvisors">ERPAdvisors</a><a class="apg-sidebar-link" href="/ui/entities/HireToRetire">HireToRetire</a><a class="apg-sidebar-link" href="/ui/entities/MonthEndClose">MonthEndClose</a><a class="apg-sidebar-link" href="/ui/entities/EnterpriseERP">EnterpriseERP</a></div><div class="apg-sidebar-section"><p class="apg-sidebar-heading">Agents</p><a class="apg-sidebar-link" href="/ui/agents/ERPAnalyst">ERPAnalyst</a><a class="apg-sidebar-link" href="/ui/agents/PrivacyAgent">PrivacyAgent</a></div></aside><div id="apg-sidebar-backdrop" class="apg-sidebar-backdrop" onclick="apgCloseSidebar()"></div><main class="apg-content apg-shell-content" id="content" tabindex="-1">
+
+
+<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">
+  <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>
+  <span>/</span>
+  <a href="/ui/entities/Vendor" class="hover:text-apg-primary transition-colors">Vendor</a>
+  <span>/</span>
+  <span class="font-semibold text-gray-900">Kanban</span>
+  <div class="ml-auto flex items-center gap-1">
+    <a href="/ui/entities/Vendor"
+       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">
+      ≡ List
+    </a>
+    <span class="px-3 py-1 text-xs bg-apg-primary text-white rounded-lg font-medium">⊞ Kanban</span>
+  </div>
+</nav>
+
+<section class="apg-kanban-header">
+  <div>
+    <h1 class="text-xl font-bold text-gray-900">Vendor</h1>
+    <p class="text-sm text-gray-500 mt-1">Grouped by status with drag-and-drop or keyboard move controls.</p>
+  </div>
+  <div class="apg-kanban-summary" aria-label="Board summary">
+    <a href="/ui/entities/Vendor" class="apg-kanban-summary-item"><strong>5</strong><span>Total</span></a>
+    <span class="apg-kanban-summary-item"><strong>2</strong><span>Columns</span></span>
+    <span class="apg-kanban-summary-item"><strong>3</strong><span>WIP guide</span></span>
+  </div>
+</section>
+
+
+<div class="flex gap-4 overflow-x-auto pb-6 items-start -mx-1 px-1">
+  
+  <div class="flex-shrink-0 w-72">
+    
+    <div class="flex items-center justify-between mb-3 px-1">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="w-2.5 h-2.5 rounded-full
+          bg-green-400
+          "></span>
+        <h2 class="text-sm font-semibold text-gray-900">active</h2>
+        <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">4</span>
+      </div>
+      <a href="/ui/entities/Vendor?filter.status=active" class="text-xs text-gray-400 hover:text-apg-primary">List</a>
+    </div>
+    
+    <p class="apg-kanban-wip">Above WIP guide 3</p>
+    
+
+    
+    <div class="space-y-2.5 apg-kanban-col min-h-16"
+         data-col-label="active"
+         id="apg-col-active">
+      
+      
+      <article data-record-id="1"
+               data-revision="1"
+               class="apg-kanban-card bg-white rounded-xl border border-gray-200 p-4 hover:border-apg-primary hover:shadow-md transition-all group/card cursor-grab active:cursor-grabbing">
+        <div class="flex items-start justify-between gap-2 mb-2.5">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+               style="background: var(--apg-primary, #0ea5e9)">
+            V
+          </div>
+          <span class="text-xs text-gray-300 font-mono mt-1">1</span>
+        </div>
+        <a href="/ui/entities/Vendor/1"
+           class="block text-sm font-semibold text-gray-900 group-hover/card:text-apg-primary transition-colors leading-tight mb-2">
+          V-001
+        </a>
+        
+        
+        
+        
+        
+        
+        
+        <p class="text-xs text-gray-400 truncate mt-0.5">
+          <span class="font-medium text-gray-500">Legal Name:</span>
+          Vendor 1
+        </p>
+        
+        
+        
+        
+        
+        
+        
+        <p class="text-xs text-gray-400 truncate mt-0.5">
+          <span class="font-medium text-gray-500">Tax ID:</span>
+          KE-1
+        </p>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        <form method="post" action="/ui/entities/Vendor/records/1" class="apg-kanban-move">
+          <input type="hidden" name="expected_revision" value="1">
+          <input type="hidden" name="return_view" value="kanban">
+          <label class="sr-only" for="apg-move-1">Move V-001</label>
+          <select id="apg-move-1" name="status" class="apg-kanban-select">
+            
+            <option value="active" selected>active</option>
+            
+            <option value="suspended">suspended</option>
+            
+          </select>
+          <button type="submit" class="apg-btn apg-btn-secondary">Move</button>
+        </form>
+      </article>
+      
+      
+      <article data-record-id="2"
+               data-revision="1"
+               class="apg-kanban-card bg-white rounded-xl border border-gray-200 p-4 hover:border-apg-primary hover:shadow-md transition-all group/card cursor-grab active:cursor-grabbing">
+        <div class="flex items-start justify-between gap-2 mb-2.5">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+               style="background: var(--apg-primary, #0ea5e9)">
+            V
+          </div>
+          <span class="text-xs text-gray-300 font-mono mt-1">2</span>
+        </div>
+        <a href="/ui/entities/Vendor/2"
+           class="block text-sm font-semibold text-gray-900 group-hover/card:text-apg-primary transition-colors leading-tight mb-2">
+          V-002
+        </a>
+        
+        
+        
+        
+        
+        
+        
+        <p class="text-xs text-gray-400 truncate mt-0.5">
+          <span class="font-medium text-gray-500">Legal Name:</span>
+          Vendor 2
+        </p>
+        
+        
+        
+        
+        
+        
+        
+        <p class="text-xs text-gray-400 truncate mt-0.5">
+          <span class="font-medium text-gray-500">Tax ID:</span>
+          KE-2
+        </p>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        <form method="post" action="/ui/entities/Vendor/records/2" class="apg-kanban-move">
+          <input type="hidden" name="expected_revision" value="1">
+          <input type="hidden" name="return_view" value="kanban">
+          <label class="sr-only" for="apg-move-2">Move V-002</label>
+          <select id="apg-move-2" name="status" class="apg-kanban-select">
+            
+            <option value="active" selected>active</option>
+            
+            <option value="suspended">suspended</option>
+            
+          </select>
+          <button type="submit" class="apg-btn apg-btn-secondary">Move</button>
+        </form>
+      </article>
+      
+      
+      <article data-record-id="3"
+               data-revision="1"
+               class="apg-kanban-card bg-white rounded-xl border border-gray-200 p-4 hover:border-apg-primary hover:shadow-md transition-all group/card cursor-grab active:cursor-grabbing">
+        <div class="flex items-start justify-between gap-2 mb-2.5">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+               style="background: var(--apg-primary, #0ea5e9)">
+            V
+          </div>
+          <span class="text-xs text-gray-300 font-mono mt-1">3</span>
+        </div>
+        <a href="/ui/entities/Vendor/3"
+           class="block text-sm font-semibold text-gray-900 group-hover/card:text-apg-primary transition-colors leading-tight mb-2">
+          V-003
+        </a>
+        
+        
+        
+        
+        
+        
+        
+        <p class="text-xs text-gray-400 truncate mt-0.5">
+          <span class="font-medium text-gray-500">Legal Name:</span>
+          Vendor 3
+        </p>
+        
+        
+        
+        
+        
+        
+        
+        <p class="text-xs text-gray-400 truncate mt-0.5">
+          <span class="font-medium text-gray-500">Tax ID:</span>
+          KE-3
+        </p>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        <form method="post" action="/ui/entities/Vendor/records/3" class="apg-kanban-move">
+          <input type="hidden" name="expected_revision" value="1">
+          <input type="hidden" name="return_view" value="kanban">
+          <label class="sr-only" for="apg-move-3">Move V-003</label>
+          <select id="apg-move-3" name="status" class="apg-kanban-select">
+            
+            <option value="active" selected>active</option>
+            
+            <option value="suspended">suspended</option>
+            
+          </select>
+          <button type="submit" class="apg-btn apg-btn-secondary">Move</button>
+        </form>
+      </article>
+      
+      
+      <article data-record-id="4"
+               data-revision="1"
+               class="apg-kanban-card bg-white rounded-xl border border-gray-200 p-4 hover:border-apg-primary hover:shadow-md transition-all group/card cursor-grab active:cursor-grabbing">
+        <div class="flex items-start justify-between gap-2 mb-2.5">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+               style="background: var(--apg-primary, #0ea5e9)">
+            V
+          </div>
+          <span class="text-xs text-gray-300 font-mono mt-1">4</span>
+        </div>
+        <a href="/ui/entities/Vendor/4"
+           class="block text-sm font-semibold text-gray-900 group-hover/card:text-apg-primary transition-colors leading-tight mb-2">
+          V-004
+        </a>
+        
+        
+        
+        
+        
+        
+        
+        <p class="text-xs text-gray-400 truncate mt-0.5">
+          <span class="font-medium text-gray-500">Legal Name:</span>
+          Vendor 4
+        </p>
+        
+        
+        
+        
+        
+        
+        
+        <p class="text-xs text-gray-400 truncate mt-0.5">
+          <span class="font-medium text-gray-500">Tax ID:</span>
+          KE-4
+        </p>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        <form method="post" action="/ui/entities/Vendor/records/4" class="apg-kanban-move">
+          <input type="hidden" name="expected_revision" value="1">
+          <input type="hidden" name="return_view" value="kanban">
+          <label class="sr-only" for="apg-move-4">Move V-004</label>
+          <select id="apg-move-4" name="status" class="apg-kanban-select">
+            
+            <option value="active" selected>active</option>
+            
+            <option value="suspended">suspended</option>
+            
+          </select>
+          <button type="submit" class="apg-btn apg-btn-secondary">Move</button>
+        </form>
+      </article>
+      
+
+      
+    </div>
+  </div>
+  
+  <div class="flex-shrink-0 w-72">
+    
+    <div class="flex items-center justify-between mb-3 px-1">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="w-2.5 h-2.5 rounded-full
+          bg-gray-300"></span>
+        <h2 class="text-sm font-semibold text-gray-900">suspended</h2>
+        <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">1</span>
+      </div>
+      <a href="/ui/entities/Vendor?filter.status=suspended" class="text-xs text-gray-400 hover:text-apg-primary">List</a>
+    </div>
+    
+
+    
+    <div class="space-y-2.5 apg-kanban-col min-h-16"
+         data-col-label="suspended"
+         id="apg-col-suspended">
+      
+      
+      <article data-record-id="5"
+               data-revision="1"
+               class="apg-kanban-card bg-white rounded-xl border border-gray-200 p-4 hover:border-apg-primary hover:shadow-md transition-all group/card cursor-grab active:cursor-grabbing">
+        <div class="flex items-start justify-between gap-2 mb-2.5">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+               style="background: var(--apg-primary, #0ea5e9)">
+            V
+          </div>
+          <span class="text-xs text-gray-300 font-mono mt-1">5</span>
+        </div>
+        <a href="/ui/entities/Vendor/5"
+           class="block text-sm font-semibold text-gray-900 group-hover/card:text-apg-primary transition-colors leading-tight mb-2">
+          V-005
+        </a>
+        
+        
+        
+        
+        
+        
+        
+        <p class="text-xs text-gray-400 truncate mt-0.5">
+          <span class="font-medium text-gray-500">Legal Name:</span>
+          Vendor 5
+        </p>
+        
+        
+        
+        
+        
+        
+        
+        <p class="text-xs text-gray-400 truncate mt-0.5">
+          <span class="font-medium text-gray-500">Tax ID:</span>
+          KE-5
+        </p>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        <form method="post" action="/ui/entities/Vendor/records/5" class="apg-kanban-move">
+          <input type="hidden" name="expected_revision" value="1">
+          <input type="hidden" name="return_view" value="kanban">
+          <label class="sr-only" for="apg-move-5">Move V-005</label>
+          <select id="apg-move-5" name="status" class="apg-kanban-select">
+            
+            <option value="active">active</option>
+            
+            <option value="suspended" selected>suspended</option>
+            
+          </select>
+          <button type="submit" class="apg-btn apg-btn-secondary">Move</button>
+        </form>
+      </article>
+      
+
+      
+    </div>
+  </div>
+  
+
+  
+</div>
+
+<script>
+(function() {
+  var entity = "Vendor";
+  var statusField = "status";
+
+  document.querySelectorAll('.apg-kanban-col').forEach(function(col) {
+    new Sortable(col, {
+      group: 'apg-kanban',
+      animation: 150,
+      ghostClass: 'opacity-30',
+      chosenClass: 'shadow-lg',
+      dragClass: 'rotate-1',
+      onEnd: function(evt) {
+        var card = evt.item;
+        var recordId = card.dataset.recordId;
+        var newCol = evt.to;
+        var newStatus = newCol.dataset.colLabel;
+        if (!recordId || !newStatus) return;
+
+        var body = {record: {}};
+        body.record[statusField] = newStatus;
+
+        fetch('/entities/' + encodeURIComponent(entity) + '/records/' + encodeURIComponent(recordId), {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(body)
+        }).then(function(r) {
+          if (r.ok) {
+            APGToast('Moved to ' + newStatus, 'success');
+          } else {
+            APGToast('Move failed — ' + r.status, 'error');
+            evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
+          }
+        }).catch(function() {
+          APGToast('Move failed', 'error');
+          evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);
+        });
+      }
+    });
+  });
+})();
+</script></main><div id="apg-toast-root" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div><dialog id="apg-confirm-dialog" class="apg-dialog"><form method="dialog" class="apg-dialog-panel"><h2 id="apg-confirm-title">Confirm action</h2><p id="apg-confirm-message" class="text-sm text-gray-600">Are you sure?</p><div class="flex items-center justify-end gap-2 mt-4"><button value="cancel" class="apg-btn apg-btn-secondary" type="submit">Cancel</button><button value="confirm" class="apg-btn apg-btn-danger" type="submit">Delete</button></div></form></dialog><script>function apgToast(m,t){var c=t==="error"?"bg-red-600":"bg-gray-900";var el=document.createElement("div");el.className=c+" text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto transition-all duration-300 opacity-0 translate-y-2";el.textContent=m;document.getElementById("apg-toast-root").appendChild(el);requestAnimationFrame(function(){el.classList.remove("opacity-0","translate-y-2");});setTimeout(function(){el.classList.add("opacity-0");setTimeout(function(){el.remove();},300);},3000);}document.addEventListener("htmx:afterOnLoad",function(e){var t=e.detail.xhr.getResponseHeader("HX-Trigger");if(!t)return;try{var d=JSON.parse(t);if(d.apgToast)apgToast(d.apgToast.msg,d.apgToast.type||"success");}catch(ex){}});function apgApplyTheme(m){var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;var b=document.getElementById("apg-theme-toggle");if(b){b.setAttribute("aria-label","Theme: "+m);b.textContent=m==="dark"?"Dark":m==="light"?"Light":"System";}}function apgCycleTheme(){var order=["system","light","dark"];var cur=localStorage.getItem("apg-theme")||"system";var next=order[(order.indexOf(cur)+1)%order.length];localStorage.setItem("apg-theme",next);apgApplyTheme(next);}document.addEventListener("DOMContentLoaded",function(){apgApplyTheme(localStorage.getItem("apg-theme")||"system");});function apgConfirm(message,ok){var d=document.getElementById("apg-confirm-dialog");if(!d||!d.showModal){var nativeConfirm=window["confirm"];if(nativeConfirm&&nativeConfirm(message))ok();return;}document.getElementById("apg-confirm-message").textContent=message;var done=false;function close(){if(done)return;done=true;d.removeEventListener("close",onclose);}function onclose(){var v=d.returnValue;close();if(v==="confirm")ok();}d.addEventListener("close",onclose);d.showModal();}function apgConfirmSubmit(form,message){apgConfirm(message||"Delete this record?",function(){form.dataset.apgConfirmed="1";form.requestSubmit();});return false;}document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(".apg-topnav a").forEach(function(a){if(a.getAttribute("href")===location.pathname){a.classList.add("active");a.setAttribute("aria-current","page");}});});function apgSetSidebar(collapsed){document.documentElement.classList.toggle("apg-sidebar-collapsed",collapsed);try{localStorage.setItem("apg-sidebar-collapsed",collapsed?"1":"0");}catch(e){}}function apgToggleSidebar(){if(matchMedia("(max-width: 767px)").matches){document.documentElement.classList.toggle("apg-sidebar-open");}else{apgSetSidebar(!document.documentElement.classList.contains("apg-sidebar-collapsed"));}}function apgCloseSidebar(){document.documentElement.classList.remove("apg-sidebar-open");}try{if(localStorage.getItem("apg-sidebar-collapsed")==="1")document.documentElement.classList.add("apg-sidebar-collapsed");}catch(e){}function apgSyncOffline(){var b=document.getElementById("apg-offline-banner");if(b)b.hidden=navigator.onLine;}window.addEventListener("online",apgSyncOffline);window.addEventListener("offline",apgSyncOffline);if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/static/sw.js").catch(function(){});});}document.addEventListener("keydown",function(e){if(e.key==="Escape")apgCloseSidebar();});document.addEventListener("DOMContentLoaded",apgSyncOffline);</script><div id="apg-cmd" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onclick="if(event.target===this)apgCmdClose()"><div class="mx-auto mt-[15vh] max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"><div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100"><svg class="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9 a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg><input id="apg-cmd-input" type="text" placeholder="Search records, entities..." autocomplete="off" class="flex-1 text-sm outline-none placeholder-gray-400" oninput="apgCmdSearch(this.value)"><kbd class="text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">Esc</kbd></div><div id="apg-cmd-results" class="max-h-80 overflow-y-auto py-2"><p class="text-xs text-gray-400 text-center py-8">Type to search...</p></div></div></div><script>document.addEventListener("keydown",function(e){if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();apgCmdOpen();}if(e.key==="Escape")apgCmdClose();});function apgCmdOpen(){document.getElementById("apg-cmd").classList.remove("hidden");document.getElementById("apg-cmd-input").focus();}function apgCmdClose(){document.getElementById("apg-cmd").classList.add("hidden");document.getElementById("apg-cmd-input").value="";document.getElementById("apg-cmd-results").innerHTML='<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>';}var _cmdTimer;function apgCmdSearch(q){clearTimeout(_cmdTimer);if(!q.trim()){document.getElementById("apg-cmd-results").innerHTML='<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>';return;}_cmdTimer=setTimeout(function(){fetch("/api/search?q="+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(d){var el=document.getElementById("apg-cmd-results");if(!d.results||!d.results.length){el.innerHTML='<p class="text-xs text-gray-400 text-center py-8">No results</p>';return;}el.innerHTML=d.results.map(function(r){return '<a href="/ui/entities/'+encodeURIComponent(r.entity)+'/'+encodeURIComponent(r.id)+'"'+'  onclick="apgCmdClose()"'+'  class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group">'+'<span class="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center text-xs font-bold text-blue-600 flex-shrink-0">'+r.entity.charAt(0).toUpperCase()+'</span>'+'<div class="min-w-0"><p class="text-sm font-medium text-gray-900 truncate">'+r.label+'</p>'+'<p class="text-xs text-gray-400 truncate">'+r.entity+'</p></div>'+'</a>';}).join("");});},200);}</script></body></html>

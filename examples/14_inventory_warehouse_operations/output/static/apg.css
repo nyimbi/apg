@@ -366,8 +366,18 @@ html[dir="rtl"].apg-sidebar-collapsed .apg-shell-content { padding-right: calc(3
 html[dir="rtl"] .apg-sidebar-backdrop { inset: 0; }
 
 .hero-gradient { background: linear-gradient(135deg, var(--apg-primary), var(--apg-accent)); }
+.apg-kanban-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--apg-space-4); margin-bottom: var(--apg-space-5); flex-wrap: wrap; }
+.apg-kanban-summary { display: flex; align-items: stretch; gap: var(--apg-space-2); flex-wrap: wrap; }
+.apg-kanban-summary-item { display: inline-flex; flex-direction: column; min-width: 5rem; padding: .5rem .75rem; border: 1px solid var(--apg-border); border-radius: var(--apg-radius-sm); background: var(--apg-bg-card); color: var(--apg-text); text-decoration: none; }
+.apg-kanban-summary-item:hover { text-decoration: none; opacity: 1; border-color: var(--apg-primary); }
+.apg-kanban-summary-item strong { font-size: 1rem; line-height: 1.1; }
+.apg-kanban-summary-item span { color: var(--apg-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .apg-kanban-col { min-height: 12rem; }
 .apg-kanban-empty { border: 1px dashed var(--apg-border); border-radius: var(--apg-radius); padding: var(--apg-space-4); color: var(--apg-muted); text-align: center; }
+.apg-kanban-wip { margin: -.35rem .25rem var(--apg-space-2); color: var(--apg-warning); font-size: .75rem; font-weight: 700; }
+.apg-kanban-card { display: block; }
+.apg-kanban-move { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--apg-space-2); align-items: center; margin: var(--apg-space-3) 0 0; padding: var(--apg-space-2) 0 0; border: 0; border-top: 1px solid var(--apg-border); border-radius: 0; background: transparent; box-shadow: none; }
+.apg-kanban-select { min-width: 0; max-width: none; padding: .4rem .55rem; font-size: .75rem; }
 .apg-tab-btn { border: 0; background: transparent; color: var(--apg-muted); border-bottom: 2px solid transparent; border-radius: 0; }
 .apg-tab-btn.active { color: var(--apg-primary); border-bottom-color: var(--apg-primary); }
 

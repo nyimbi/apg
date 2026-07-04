@@ -6061,7 +6061,18 @@ def _ui_kanban_html(entity_name: str) -> tuple[int, str]:
             seen.append(v)
     if not seen:
         seen = ["active", "inactive"]
-    columns = [{{"label": v, "records": [r for r in all_records if str(r.get(status_fname, "")) == v]}} for v in seen]
+    wip_limit = max(3, (len(all_records) + max(1, len(seen)) - 1) // max(1, len(seen))) if all_records else 3
+    columns = []
+    for value in seen:
+        column_records = [r for r in all_records if str(r.get(status_fname, "")) == value]
+        columns.append({{
+            "label": value,
+            "records": column_records,
+            "count": len(column_records),
+            "wip_limit": wip_limit,
+            "over_limit": len(column_records) > wip_limit,
+            "list_url": _ui_entity_query_path(entity_name, updates={{f"filter.{{status_fname}}": value}}),
+        }})
     # Choose display field: first non-id, non-status string field
     display_field_obj = next(
         (f for f in fields if str(f.get("type", "")).lower() in {{"str", "string", "text", "email", "varchar"}} and str(f.get("name")) not in {{"id", "_revision", status_fname}}),
@@ -6076,6 +6087,10 @@ def _ui_kanban_html(entity_name: str) -> tuple[int, str]:
         columns=columns,
         display_field=display_field,
         status_field=status_fname,
+        status_options=seen,
+        total_records=len(all_records),
+        wip_limit=wip_limit,
+        list_url=_ui_entity_query_path(entity_name),
         fields=fields,
     )
     if tmpl_body is not None:
@@ -6409,11 +6424,14 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
         entity_name = parts[2]
         record_id = parts[4]
         expected_revision = form_record.pop("expected_revision", None)
+        return_view = form_record.pop("return_view", "")
         status, response = _update_record_payload(
             f"/entities/{{entity_name}}/records/{{record_id}}",
             {{"record": form_record, "expected_revision": expected_revision}},
         )
         if status == 200:
+            if return_view == "kanban":
+                return 303, {{"location": _ui_entity_location(entity_name) + "?view=kanban"}}
             return 303, {{"location": _ui_entity_location(entity_name)}}
         return status, response
     if (

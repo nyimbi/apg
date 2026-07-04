@@ -1,0 +1,156 @@
+<!doctype html><html lang="en" dir="ltr" class="h-full"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><script>(function(){try{var m=localStorage.getItem("apg-theme")||"system";var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;}catch(e){}})();</script><meta name="theme-color" content="#1E5B5A"><link rel="manifest" href="/static/manifest.webmanifest"><link rel="stylesheet" href="/static/apg.css"><link rel="stylesheet" href="/static/uplot.min.css"><script defer src="/static/htmx.min.js"></script><script defer src="/static/sortable.min.js"></script><script defer src="/static/uplot.min.js"></script><script defer src="/static/apg-charts.js"></script><script defer src="/static/apg-sse.js"></script><style>.apg-skeleton{  background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);  background-size:200% 100%;  animation:apg-shimmer 1.5s infinite;  border-radius:4px;}@keyframes apg-shimmer{  0%{background-position:200% 0}  100%{background-position:-200% 0}}.apg-loading .apg-skeleton-row{height:40px;margin-bottom:8px;}.htmx-request .apg-content-area{opacity:0.6;transition:opacity 0.2s;}</style><link rel="stylesheet" href="/theme.css"><title>Vendor — enterprise_erp</title></head><body class="min-h-full bg-gray-50 text-gray-900"><a class="apg-skip-link" href="#content">Skip to content</a><div id="apg-offline-banner" class="apg-offline-banner" role="status" hidden>Offline mode: showing cached APG screens.</div><header class="apg-topbar sticky top-0 z-50" role="banner">  <button class="apg-icon-btn" type="button" onclick="apgToggleSidebar()" aria-label="Toggle navigation">☰</button>  <a class="apg-logo" href="/ui">enterprise_erp</a>  <nav class="apg-topnav ml-4">    <a class="apg-nav-link hover:bg-gray-100" href="/ui">Home</a>    <a class="apg-nav-link hover:bg-gray-100" href="/ui/workflows">⚡ Workflows</a>    <a class="apg-nav-link hover:bg-gray-100" href="/ui/marketplace">Marketplace</a>  </nav>  <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">System</button>  <form method="post" action="/locale" class="apg-locale-form"><input type="hidden" name="next" value="/ui/entities/Vendor?view=kanban"><label class="apg-sr-only" for="apg-locale-select">Language</label><select id="apg-locale-select" name="lang" class="apg-locale-select" onchange="this.form.submit()" aria-label="Language"><option value="en" selected>en</option><option value="sw">sw</option><option value="fr">fr</option><option value="ar">ar</option><option value="ha">ha</option><option value="yo">yo</option><option value="zu">zu</option><option value="am">am</option></select></form>  </header><aside id="apg-sidebar" class="apg-sidebar" aria-label="Application navigation"><div class="apg-sidebar-section"><p class="apg-sidebar-heading">Navigate</p><a class="apg-sidebar-link" href="/ui">Dashboard</a><a class="apg-sidebar-link" href="/ui/workflows">Workflows</a><a class="apg-sidebar-link" href="/ui/databases">Databases</a><a class="apg-sidebar-link" href="/ui/marketplace">Marketplace</a></div><div class="apg-sidebar-section"><p class="apg-sidebar-heading">Entities</p><a class="apg-sidebar-link" href="/ui/entities/Vendor">Vendor</a><a class="apg-sidebar-link" href="/ui/entities/Customer">Customer</a><a class="apg-sidebar-link" href="/ui/entities/Employee">Employee</a><a class="apg-sidebar-link" href="/ui/entities/ERPDB">ERPDB</a><a class="apg-sidebar-link" href="/ui/entities/ERPCore">ERPCore</a><a class="apg-sidebar-link" href="/ui/entities/ExecutiveERP">ExecutiveERP</a><a class="apg-sidebar-link" href="/ui/entities/ERPAnalyst">ERPAnalyst</a><a class="apg-sidebar-link" href="/ui/entities/PrivacyAgent">PrivacyAgent</a><a class="apg-sidebar-link" href="/ui/entities/ERPAdvisors">ERPAdvisors</a><a class="apg-sidebar-link" href="/ui/entities/HireToRetire">HireToRetire</a><a class="apg-sidebar-link" href="/ui/entities/MonthEndClose">MonthEndClose</a><a class="apg-sidebar-link" href="/ui/entities/EnterpriseERP">EnterpriseERP</a></div><div class="apg-sidebar-section"><p class="apg-sidebar-heading">Agents</p><a class="apg-sidebar-link" href="/ui/agents/ERPAnalyst">ERPAnalyst</a><a class="apg-sidebar-link" href="/ui/agents/PrivacyAgent">PrivacyAgent</a></div></aside><div id="apg-sidebar-backdrop" class="apg-sidebar-backdrop" onclick="apgCloseSidebar()"></div><main class="apg-content apg-shell-content" id="content" tabindex="-1">
+
+
+<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">
+  <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>
+  <span>/</span>
+  <span class="font-semibold text-gray-900">Vendor</span>
+  <div class="ml-auto flex items-center gap-1">
+    
+    <span class="px-3 py-1 text-xs bg-apg-primary text-white rounded-lg font-medium">≡ List</span>
+    <a href="/ui/entities/Vendor?view=kanban"
+       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">
+      ⊞ Kanban
+    </a>
+    
+    <a href="/ui/entities/Vendor?view=analytics"
+       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">
+      Analytics
+    </a>
+    <button type="button" class="apg-btn" onclick="document.getElementById('apg-create-drawer').showModal();">
+      New Vendor
+    </button>
+  </div>
+</nav>
+
+
+
+<section class="apg-card apg-list-toolbar" aria-label="Vendor table controls">
+  <div class="apg-view-strip" aria-label="Saved views">
+    
+    <a href="/ui/entities/Vendor"
+       class="apg-view-tab active"
+       aria-current="page">
+      <span>All records</span>
+      <small>Complete table</small>
+    </a>
+    
+    <a href="/ui/entities/Vendor?dir=desc&amp;sort=id"
+       class="apg-view-tab"
+       >
+      <span>Recently added</span>
+      <small>Newest first</small>
+    </a>
+    
+    <a href="/ui/entities/Vendor?filter.status=active"
+       class="apg-view-tab"
+       >
+      <span>Active</span>
+      <small>Status is active</small>
+    </a>
+    
+    <a href="/ui/entities/Vendor?filter.status=suspended"
+       class="apg-view-tab"
+       >
+      <span>Suspended</span>
+      <small>Status filter</small>
+    </a>
+    
+  </div>
+
+  <form method="get" action="/ui/entities/Vendor" class="apg-search-form">
+    <label class="sr-only" for="apg-entity-search">Search Vendor records</label>
+    <div class="relative">
+      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">Search</span>
+      <input id="apg-entity-search" type="text" name="q" value=""
+             placeholder="Search Vendor records..."
+             class="w-full pl-14 pr-8 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">
+      
+    </div>
+  </form>
+
+  
+
+  <details class="apg-filter-panel">
+    <summary>Advanced filter</summary>
+    <div class="mt-2"><form method="get" action="/ui/entities/Vendor"><fieldset><legend>Query records</legend><label>vendor_number <input type="text" name="filter.vendor_number" value=""></label><label>legal_name <input type="text" name="filter.legal_name" value=""></label><label>tax_id <input type="text" name="filter.tax_id" value=""></label><label>payment_terms <input type="text" name="filter.payment_terms" value=""></label><label>currency <input type="text" name="filter.currency" value=""></label><label>bank_account <input type="text" name="filter.bank_account" value=""></label><label>status <input type="text" name="filter.status" value=""></label><label>country <input type="text" name="filter.country" value=""></label><label>Sort <select name="sort"><option value="" selected>none</option><option value="id">id</option><option value="_revision">_revision</option><option value="vendor_number">vendor_number</option><option value="legal_name">legal_name</option><option value="tax_id">tax_id</option><option value="payment_terms">payment_terms</option><option value="currency">currency</option><option value="bank_account">bank_account</option><option value="status">status</option><option value="country">country</option></select></label><label>Order <select name="dir"><option value="asc" selected>asc</option><option value="desc">desc</option></select></label><label>Limit <input type="number" min="0" step="1" name="limit" value=""></label><label>Offset <input type="number" min="0" step="1" name="offset" value=""></label><button type="submit">Apply</button> <a href="/ui/entities/Vendor">Reset</a></fieldset></form></div>
+  </details>
+</section>
+
+<dialog id="apg-create-drawer" class="apg-drawer" aria-labelledby="apg-create-title">
+  <form method="post" action="/ui/entities/Vendor/records" novalidate class="apg-drawer-panel">
+    <header class="apg-card-header">
+      <div>
+        <h2 id="apg-create-title" class="text-base font-semibold text-gray-900">New Vendor</h2>
+        <p class="text-xs text-gray-400 mt-1">entity</p>
+      </div>
+      <button type="button" class="apg-btn apg-btn-secondary" onclick="document.getElementById('apg-create-drawer').close();">Close</button>
+    </header>
+    <div class="overflow-y-auto max-h-[70vh] space-y-3">
+      <div class="space-y-3"><div class="space-y-1"><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Vendor Number</label><input name="vendor_number" type="text" placeholder="Vendor Number" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white placeholder-gray-300"></div><div class="space-y-1"><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Legal Name</label><input name="legal_name" type="text" placeholder="Legal Name" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white placeholder-gray-300"></div><div class="space-y-1"><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Tax ID</label><input name="tax_id" type="text" placeholder="Tax ID" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white placeholder-gray-300"></div><div class="space-y-1"><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Payment Terms</label><input name="payment_terms" type="text" placeholder="Payment Terms" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white placeholder-gray-300"></div><div class="space-y-1"><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Currency</label><input name="currency" type="text" placeholder="Currency" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white placeholder-gray-300"></div><div class="space-y-1"><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Bank Account</label><input name="bank_account" type="text" placeholder="Bank Account" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white placeholder-gray-300"></div><div class="space-y-1"><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</label><input name="status" type="text" placeholder="Status" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white placeholder-gray-300"></div><div class="space-y-1"><label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Country</label><input name="country" type="text" placeholder="Country" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white placeholder-gray-300"></div></div>
+    </div>
+    <footer class="flex items-center justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
+      <button type="button" class="apg-btn apg-btn-secondary" onclick="document.getElementById('apg-create-drawer').close();">Cancel</button>
+      <button type="submit" class="apg-btn">Create Vendor</button>
+    </footer>
+  </form>
+</dialog>
+
+<div class="flex items-start gap-5 flex-col lg:flex-row">
+
+  
+  <section class="flex-1 min-w-0" data-apg-live="entity:Vendor">
+    <div class="flex items-center gap-3 mb-3 flex-wrap">
+      <h1 class="text-lg font-semibold text-gray-900">Vendor</h1>
+      <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
+        2 records
+      </span>
+      
+    </div>
+
+    <p class="text-xs text-gray-500 mb-2">Showing 2 of 2 matching records.</p>
+
+    
+      <div id="apg-bulk-bar" data-entity="Vendor" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-3 text-sm"><span id="apg-bulk-cnt" class="font-semibold tabular-nums"></span><button onclick="apgBulkDelete()" class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors">Delete</button><a id="apg-csv-link" href="/entities/Vendor/records.csv" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition-colors">Export CSV</a><button onclick="apgBulkClear()" class="ml-1 text-gray-400 hover:text-white leading-none text-base">✕</button></div><div class="apg-table-wrap shadow-sm overflow-hidden"><div class="overflow-x-auto"><table class="w-full"><thead class="bg-gray-50 border-b border-gray-100"><tr><th class="pl-3 pr-1 py-2.5 w-8"><input type="checkbox" class="apg-select-all w-4 h-4 rounded border-gray-300"></th><th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap"><a href="/ui/entities/Vendor?dir=asc&amp;sort=id" class="hover:text-gray-900 transition-colors">Id</a></th><th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap"><a href="/ui/entities/Vendor?dir=asc&amp;sort=vendor_number" class="hover:text-gray-900 transition-colors">Vendor Number</a></th><th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap"><a href="/ui/entities/Vendor?dir=asc&amp;sort=legal_name" class="hover:text-gray-900 transition-colors">Legal Name</a></th><th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap"><a href="/ui/entities/Vendor?dir=asc&amp;sort=tax_id" class="hover:text-gray-900 transition-colors">Tax ID</a></th><th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap"><a href="/ui/entities/Vendor?dir=asc&amp;sort=payment_terms" class="hover:text-gray-900 transition-colors">Payment Terms</a></th><th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap"><a href="/ui/entities/Vendor?dir=asc&amp;sort=currency" class="hover:text-gray-900 transition-colors">Currency</a></th><th class="px-4 py-2.5 w-28"></th></tr></thead><tbody><tr class="hover:bg-gray-50 transition-colors group/row border-b border-gray-50 last:border-0"><td class="pl-3 pr-1 py-2.5 w-8"><input type="checkbox" class="apg-row-cb w-4 h-4 rounded border-gray-300 text-apg-primary" data-row-id="1" data-rev="1"></td><td class="px-4 py-2.5"><a href="/ui/entities/Vendor/1" class="text-xs font-mono text-apg-primary hover:underline truncate block max-w-24">1</a></td><td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">V-001</td><td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">Vendor 1</td><td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">KE-1</td><td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">net_30</td><td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">KES</td><td class="px-4 py-2.5 text-right"><div class="flex items-center gap-3 justify-end opacity-0 group-hover/row:opacity-100 transition-opacity"><form method="post" action="/ui/entities/Vendor/records/1" class="inline"><input type="hidden" name="expected_revision" value="1"><input type="hidden" name="vendor_number" value="V-001"><input type="hidden" name="legal_name" value="Vendor 1"><input type="hidden" name="tax_id" value="KE-1"><input type="hidden" name="payment_terms" value="net_30"><input type="hidden" name="currency" value="KES"><input type="hidden" name="bank_account" value="1001"><input type="hidden" name="status" value="active"><input type="hidden" name="country" value="KE"><button type="submit" class="text-xs font-medium text-apg-primary hover:underline whitespace-nowrap">Edit</button></form><form method="post" action="/ui/entities/Vendor/records/1/delete" class="inline"><input type="hidden" name="expected_revision" value="1"><button type="submit" onclick="return apgConfirmSubmit(this.form, this.dataset.msg)" data-msg="Delete this record?" class="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button></form></div></td></tr><tr class="hover:bg-gray-50 transition-colors group/row border-b border-gray-50 last:border-0"><td class="pl-3 pr-1 py-2.5 w-8"><input type="checkbox" class="apg-row-cb w-4 h-4 rounded border-gray-300 text-apg-primary" data-row-id="2" data-rev="1"></td><td class="px-4 py-2.5"><a href="/ui/entities/Vendor/2" class="text-xs font-mono text-apg-primary hover:underline truncate block max-w-24">2</a></td><td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">V-002</td><td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">Vendor 2</td><td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">KE-2</td><td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">net_30</td><td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">KES</td><td class="px-4 py-2.5 text-right"><div class="flex items-center gap-3 justify-end opacity-0 group-hover/row:opacity-100 transition-opacity"><form method="post" action="/ui/entities/Vendor/records/2" class="inline"><input type="hidden" name="expected_revision" value="1"><input type="hidden" name="vendor_number" value="V-002"><input type="hidden" name="legal_name" value="Vendor 2"><input type="hidden" name="tax_id" value="KE-2"><input type="hidden" name="payment_terms" value="net_30"><input type="hidden" name="currency" value="KES"><input type="hidden" name="bank_account" value="1002"><input type="hidden" name="status" value="suspended"><input type="hidden" name="country" value="KE"><button type="submit" class="text-xs font-medium text-apg-primary hover:underline whitespace-nowrap">Edit</button></form><form method="post" action="/ui/entities/Vendor/records/2/delete" class="inline"><input type="hidden" name="expected_revision" value="1"><button type="submit" onclick="return apgConfirmSubmit(this.form, this.dataset.msg)" data-msg="Delete this record?" class="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button></form></div></td></tr></tbody></table></div></div><script>(function(){function upd(){var cc=document.querySelectorAll(".apg-row-cb:checked");var bar=document.getElementById("apg-bulk-bar");if(!bar)return;var cnt=document.getElementById("apg-bulk-cnt");if(cc.length>0){bar.classList.remove("hidden");cnt.textContent=cc.length+" selected";}else{bar.classList.add("hidden");}}window.apgBulkClear=function(){document.querySelectorAll(".apg-row-cb").forEach(function(c){c.checked=false;});upd();};window.apgBulkDelete=function(){var cc=document.querySelectorAll(".apg-row-cb:checked");if(!cc.length)return;apgConfirm("Delete "+cc.length+" record(s)? This cannot be undone.",function(){var ids=Array.from(cc).map(function(c){return c.dataset.rowId;}).join(",");var entity=document.getElementById("apg-bulk-bar").dataset.entity;var fd=new FormData();fd.append("ids",ids);fetch("/ui/entities/"+entity+"/records/bulk_delete",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"ids="+encodeURIComponent(ids)}).then(function(r){if(r.redirected||r.ok)window.location.reload();});});};document.addEventListener("change",function(e){if(e.target.classList.contains("apg-row-cb"))upd();});document.addEventListener("click",function(e){var allCb=e.target.closest(".apg-select-all");if(allCb){document.querySelectorAll(".apg-row-cb").forEach(function(c){c.checked=allCb.checked;});upd();}});})()</script>
+    
+
+    
+    
+  </section>
+
+</div>
+
+<details class="mt-4 apg-developer-panel">
+  <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">Developer exports</summary>
+  <div class="mt-2 flex items-center gap-2 flex-wrap">
+    <a href="/entities/Vendor/records.csv" class="apg-btn apg-btn-secondary">Export CSV</a>
+    <a href="/entities/Vendor/records" class="apg-btn apg-btn-secondary">API JSON</a>
+  </div>
+  <p class="text-xs text-gray-400 mt-3">Rendered page records</p>
+  <pre class="mt-2 text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-auto max-h-64 font-mono">[
+  {
+    &amp;quot;_revision&amp;quot;: 1,
+    &amp;quot;bank_account&amp;quot;: &amp;quot;1001&amp;quot;,
+    &amp;quot;country&amp;quot;: &amp;quot;KE&amp;quot;,
+    &amp;quot;currency&amp;quot;: &amp;quot;KES&amp;quot;,
+    &amp;quot;id&amp;quot;: 1,
+    &amp;quot;legal_name&amp;quot;: &amp;quot;Vendor 1&amp;quot;,
+    &amp;quot;payment_terms&amp;quot;: &amp;quot;net_30&amp;quot;,
+    &amp;quot;status&amp;quot;: &amp;quot;active&amp;quot;,
+    &amp;quot;tax_id&amp;quot;: &amp;quot;KE-1&amp;quot;,
+    &amp;quot;vendor_number&amp;quot;: &amp;quot;V-001&amp;quot;
+  },
+  {
+    &amp;quot;_revision&amp;quot;: 1,
+    &amp;quot;bank_account&amp;quot;: &amp;quot;1002&amp;quot;,
+    &amp;quot;country&amp;quot;: &amp;quot;KE&amp;quot;,
+    &amp;quot;currency&amp;quot;: &amp;quot;KES&amp;quot;,
+    &amp;quot;id&amp;quot;: 2,
+    &amp;quot;legal_name&amp;quot;: &amp;quot;Vendor 2&amp;quot;,
+    &amp;quot;payment_terms&amp;quot;: &amp;quot;net_30&amp;quot;,
+    &amp;quot;status&amp;quot;: &amp;quot;suspended&amp;quot;,
+    &amp;quot;tax_id&amp;quot;: &amp;quot;KE-2&amp;quot;,
+    &amp;quot;vendor_number&amp;quot;: &amp;quot;V-002&amp;quot;
+  }
+]</pre>
+</details></main><div id="apg-toast-root" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div><dialog id="apg-confirm-dialog" class="apg-dialog"><form method="dialog" class="apg-dialog-panel"><h2 id="apg-confirm-title">Confirm action</h2><p id="apg-confirm-message" class="text-sm text-gray-600">Are you sure?</p><div class="flex items-center justify-end gap-2 mt-4"><button value="cancel" class="apg-btn apg-btn-secondary" type="submit">Cancel</button><button value="confirm" class="apg-btn apg-btn-danger" type="submit">Delete</button></div></form></dialog><script>function apgToast(m,t){var c=t==="error"?"bg-red-600":"bg-gray-900";var el=document.createElement("div");el.className=c+" text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto transition-all duration-300 opacity-0 translate-y-2";el.textContent=m;document.getElementById("apg-toast-root").appendChild(el);requestAnimationFrame(function(){el.classList.remove("opacity-0","translate-y-2");});setTimeout(function(){el.classList.add("opacity-0");setTimeout(function(){el.remove();},300);},3000);}document.addEventListener("htmx:afterOnLoad",function(e){var t=e.detail.xhr.getResponseHeader("HX-Trigger");if(!t)return;try{var d=JSON.parse(t);if(d.apgToast)apgToast(d.apgToast.msg,d.apgToast.type||"success");}catch(ex){}});function apgApplyTheme(m){var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;var b=document.getElementById("apg-theme-toggle");if(b){b.setAttribute("aria-label","Theme: "+m);b.textContent=m==="dark"?"Dark":m==="light"?"Light":"System";}}function apgCycleTheme(){var order=["system","light","dark"];var cur=localStorage.getItem("apg-theme")||"system";var next=order[(order.indexOf(cur)+1)%order.length];localStorage.setItem("apg-theme",next);apgApplyTheme(next);}document.addEventListener("DOMContentLoaded",function(){apgApplyTheme(localStorage.getItem("apg-theme")||"system");});function apgConfirm(message,ok){var d=document.getElementById("apg-confirm-dialog");if(!d||!d.showModal){var nativeConfirm=window["confirm"];if(nativeConfirm&&nativeConfirm(message))ok();return;}document.getElementById("apg-confirm-message").textContent=message;var done=false;function close(){if(done)return;done=true;d.removeEventListener("close",onclose);}function onclose(){var v=d.returnValue;close();if(v==="confirm")ok();}d.addEventListener("close",onclose);d.showModal();}function apgConfirmSubmit(form,message){apgConfirm(message||"Delete this record?",function(){form.dataset.apgConfirmed="1";form.requestSubmit();});return false;}document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(".apg-topnav a").forEach(function(a){if(a.getAttribute("href")===location.pathname){a.classList.add("active");a.setAttribute("aria-current","page");}});});function apgSetSidebar(collapsed){document.documentElement.classList.toggle("apg-sidebar-collapsed",collapsed);try{localStorage.setItem("apg-sidebar-collapsed",collapsed?"1":"0");}catch(e){}}function apgToggleSidebar(){if(matchMedia("(max-width: 767px)").matches){document.documentElement.classList.toggle("apg-sidebar-open");}else{apgSetSidebar(!document.documentElement.classList.contains("apg-sidebar-collapsed"));}}function apgCloseSidebar(){document.documentElement.classList.remove("apg-sidebar-open");}try{if(localStorage.getItem("apg-sidebar-collapsed")==="1")document.documentElement.classList.add("apg-sidebar-collapsed");}catch(e){}function apgSyncOffline(){var b=document.getElementById("apg-offline-banner");if(b)b.hidden=navigator.onLine;}window.addEventListener("online",apgSyncOffline);window.addEventListener("offline",apgSyncOffline);if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/static/sw.js").catch(function(){});});}document.addEventListener("keydown",function(e){if(e.key==="Escape")apgCloseSidebar();});document.addEventListener("DOMContentLoaded",apgSyncOffline);</script><div id="apg-cmd" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onclick="if(event.target===this)apgCmdClose()"><div class="mx-auto mt-[15vh] max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"><div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100"><svg class="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9 a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg><input id="apg-cmd-input" type="text" placeholder="Search records, entities..." autocomplete="off" class="flex-1 text-sm outline-none placeholder-gray-400" oninput="apgCmdSearch(this.value)"><kbd class="text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">Esc</kbd></div><div id="apg-cmd-results" class="max-h-80 overflow-y-auto py-2"><p class="text-xs text-gray-400 text-center py-8">Type to search...</p></div></div></div><script>document.addEventListener("keydown",function(e){if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();apgCmdOpen();}if(e.key==="Escape")apgCmdClose();});function apgCmdOpen(){document.getElementById("apg-cmd").classList.remove("hidden");document.getElementById("apg-cmd-input").focus();}function apgCmdClose(){document.getElementById("apg-cmd").classList.add("hidden");document.getElementById("apg-cmd-input").value="";document.getElementById("apg-cmd-results").innerHTML='<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>';}var _cmdTimer;function apgCmdSearch(q){clearTimeout(_cmdTimer);if(!q.trim()){document.getElementById("apg-cmd-results").innerHTML='<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>';return;}_cmdTimer=setTimeout(function(){fetch("/api/search?q="+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(d){var el=document.getElementById("apg-cmd-results");if(!d.results||!d.results.length){el.innerHTML='<p class="text-xs text-gray-400 text-center py-8">No results</p>';return;}el.innerHTML=d.results.map(function(r){return '<a href="/ui/entities/'+encodeURIComponent(r.entity)+'/'+encodeURIComponent(r.id)+'"'+'  onclick="apgCmdClose()"'+'  class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group">'+'<span class="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center text-xs font-bold text-blue-600 flex-shrink-0">'+r.entity.charAt(0).toUpperCase()+'</span>'+'<div class="min-w-0"><p class="text-sm font-medium text-gray-900 truncate">'+r.label+'</p>'+'<p class="text-xs text-gray-400 truncate">'+r.entity+'</p></div>'+'</a>';}).join("");});},200);}</script></body></html>
