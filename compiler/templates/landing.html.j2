@@ -4,7 +4,7 @@
    landing_style: "default" | "minimal" | "corporate" | "africa"
 #}
 <!doctype html>
-<html lang="en" class="h-full">
+<html lang="{{ active_locale }}" dir="{{ text_direction }}" class="h-full">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -42,11 +42,11 @@
         <div class="flex items-center gap-3">
           <a href="/ui"
              class="px-4 py-2 text-sm font-medium bg-white/15 hover:bg-white/25 rounded-lg transition-colors">
-            Open App
+            {{ _('open_app') }}
           </a>
           <a href="/openapi.json"
              class="px-4 py-2 text-sm font-medium border border-white/30 hover:bg-white/10 rounded-lg transition-colors">
-            API Docs
+            {{ _('api_docs') }}
           </a>
         </div>
       </nav>
@@ -66,11 +66,11 @@
         <div class="flex items-center justify-center gap-3 flex-wrap">
           <a href="/ui"
              class="px-6 py-3 bg-white text-gray-900 font-semibold rounded-xl hover:bg-white/90 transition-colors shadow-lg">
-            Open Application →
+            {{ _('open_app') }} →
           </a>
           <a href="/manifest"
              class="px-6 py-3 border border-white/40 text-white font-medium rounded-xl hover:bg-white/10 transition-colors">
-            View Manifest
+            {{ _('view_manifest') }}
           </a>
         </div>
       </div>
@@ -91,7 +91,7 @@
 
   {# ── Entity cards ───────────────────────────────────────────────── #}
   <main class="max-w-6xl mx-auto px-6 py-12">
-    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-5">Data Entities</h2>
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-5">{{ _('data_entities') }}</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
       {% for entity in entities %}
       {% if entity.type != 'application' %}

@@ -81,7 +81,7 @@
       {% if fv is none or fv == '' or fv | string == 'None' %}
       <span class="text-gray-300 italic text-xs">—</span>
       {% elif sem == 'currency' %}
-      <span class="tabular-nums">{{ fv | string }}</span>
+      <span class="tabular-nums">{{ format_currency(fv) }}</span>
       {% elif sem == 'status' %}
       <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-semibold
         {% if fv | string | lower in ['active','approved','paid','open','enabled','complete','completed','success','done'] %}bg-green-100 text-green-800

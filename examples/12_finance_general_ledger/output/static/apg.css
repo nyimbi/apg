@@ -284,6 +284,12 @@ pre code { background: transparent; padding: 0; color: inherit; }
 .apg-user-menu { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto; padding: 0; border: 0; box-shadow: none; background: transparent; }
 .apg-avatar { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: var(--apg-radius-full); background: var(--apg-primary); color: #fff; font-size: .75rem; font-weight: 700; }
 .apg-user-name { max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .875rem; color: var(--apg-text); }
+.apg-locale-form { display: inline-flex; align-items: center; margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; }
+.apg-locale-select { width: auto; min-width: 4.5rem; max-width: 8rem; padding: .4rem .65rem; }
+html[dir="rtl"] .apg-shell-content { padding-left: var(--apg-space-6); padding-right: calc(var(--apg-sidebar-width) + var(--apg-space-6)); }
+html[dir="rtl"] .apg-sidebar { left: auto; right: 0; border-right: 0; border-left: 1px solid var(--apg-border); }
+html[dir="rtl"].apg-sidebar-collapsed .apg-shell-content { padding-right: calc(3.5rem + var(--apg-space-6)); }
+html[dir="rtl"] .apg-sidebar-backdrop { inset: 0; }
 
 .hero-gradient { background: linear-gradient(135deg, var(--apg-primary), var(--apg-accent)); }
 .apg-kanban-col { min-height: 12rem; }

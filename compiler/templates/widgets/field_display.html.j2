@@ -17,7 +17,7 @@
 {% elif semantic == 'image_url' and field_val %}
   <img src="{{ field_val }}" alt="{{ field.name }}" class="w-12 h-12 rounded-lg object-cover border border-gray-100">
 {% elif semantic == 'currency' and field_val %}
-  <span class="text-sm font-semibold text-gray-900 tabular-nums">{{ field_val | string | float | round(2) }}</span>
+  <span class="text-sm font-semibold text-gray-900 tabular-nums">{{ format_currency(field_val) }}</span>
 {% elif semantic == 'percent' and field_val %}
   <div class="flex items-center gap-2">
     <div class="flex-1 bg-gray-100 rounded-full h-1.5 max-w-24">

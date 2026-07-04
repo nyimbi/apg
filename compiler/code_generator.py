@@ -444,6 +444,99 @@ class PythonCodeGenerator:
 		return False
 
 	@staticmethod
+	def _module_i18n_config(module: "ModuleDeclaration") -> Dict[str, Any]:
+		languages: list[str] = []
+		default_language = "en"
+		fallback_language = "en"
+		for entity in module.entities:
+			i18n = getattr(entity, "i18n", None)
+			if not isinstance(i18n, dict):
+				continue
+			raw_supported = i18n.get("supported_languages", [])
+			if isinstance(raw_supported, list):
+				for language in raw_supported:
+					code = str(language).strip().strip('"').strip("'")
+					if code and code not in languages:
+						languages.append(code)
+			raw_default = i18n.get("default_language")
+			if raw_default:
+				default_language = str(raw_default).strip().strip('"').strip("'")
+			raw_fallback = i18n.get("fallback_language")
+			if raw_fallback:
+				fallback_language = str(raw_fallback).strip().strip('"').strip("'")
+		if "en" not in languages:
+			languages.insert(0, "en")
+		if default_language not in languages:
+			default_language = languages[0]
+		if fallback_language not in languages:
+			fallback_language = "en" if "en" in languages else default_language
+		return {
+			"supported_languages": languages,
+			"default_language": default_language,
+			"fallback_language": fallback_language,
+		}
+
+	@staticmethod
+	def _chrome_i18n_catalog(languages: list[str]) -> Dict[str, Dict[str, str]]:
+		english = {
+			"home": "Home",
+			"workflows": "Workflows",
+			"marketplace": "Marketplace",
+			"theme_system": "System",
+			"language": "Language",
+			"logout": "Logout",
+			"sign_in": "Sign in",
+			"open_app": "Open App",
+			"api_docs": "API Docs",
+			"data_entities": "Data Entities",
+			"view_manifest": "View Manifest",
+			"entities": "Entities",
+			"capabilities": "Capabilities",
+			"records": "Records",
+			"ai_agents": "AI Agents",
+		}
+		overrides = {
+			"sw": {
+				"home": "Nyumbani",
+				"workflows": "Mitiririko",
+				"marketplace": "Soko",
+				"theme_system": "Mfumo",
+				"language": "Lugha",
+				"logout": "Toka",
+				"sign_in": "Ingia",
+				"open_app": "Fungua Programu",
+				"api_docs": "Nyaraka za API",
+				"data_entities": "Vyombo vya Data",
+				"view_manifest": "Tazama Manifesti",
+				"entities": "Vyombo",
+				"capabilities": "Uwezo",
+				"records": "Rekodi",
+				"ai_agents": "Mawakala wa AI",
+			},
+			"ar": {
+				"home": "الرئيسية",
+				"workflows": "سير العمل",
+				"marketplace": "السوق",
+				"theme_system": "النظام",
+				"language": "اللغة",
+				"logout": "تسجيل الخروج",
+				"sign_in": "تسجيل الدخول",
+				"open_app": "فتح التطبيق",
+				"api_docs": "وثائق API",
+				"data_entities": "كيانات البيانات",
+				"view_manifest": "عرض البيان",
+				"entities": "الكيانات",
+				"capabilities": "القدرات",
+				"records": "السجلات",
+				"ai_agents": "وكلاء الذكاء الاصطناعي",
+			},
+		}
+		return {
+			language: {**english, **overrides.get(language, {})}
+			for language in languages
+		}
+
+	@staticmethod
 	def _landing_style_for(module: "ModuleDeclaration") -> str:
 		"""Derive a landing page style from the APG module's theme declaration."""
 		for entity in module.entities:
@@ -484,6 +577,8 @@ class PythonCodeGenerator:
 	def _generate_python_app(self, module: ModuleDeclaration) -> str:
 		"""Generate a framework-neutral Python app.py entrypoint."""
 		auth_required = self._module_requires_auth(module)
+		i18n_config = self._module_i18n_config(module)
+		i18n_catalog = self._chrome_i18n_catalog(i18n_config["supported_languages"])
 		entity_specs = [
 			self._entity_spec(entity)
 			for entity in module.entities
@@ -546,6 +641,10 @@ TENANT_SCOPED_ENTITIES: set[str] = {{
 SEMANTIC_MODEL: Dict[str, Any] = {semantic_model!r}
 APG_UI_TEMPLATES: Dict[str, str] = {ui_templates!r}
 APG_AUTH_REQUIRED = {auth_required!r}
+APG_SUPPORTED_LANGUAGES: list[str] = {i18n_config["supported_languages"]!r}
+APG_DEFAULT_LANGUAGE = {i18n_config["default_language"]!r}
+APG_FALLBACK_LANGUAGE = {i18n_config["fallback_language"]!r}
+APG_I18N: Dict[str, Dict[str, str]] = {i18n_catalog!r}
 
 
 def _live_topic_list(raw_topics: str | None = None) -> list[str]:
@@ -2110,6 +2209,57 @@ def auth_status() -> Dict[str, Any]:
         "mode": "api_key" if os.environ.get("APG_API_KEY") else "open",
         "header": "Authorization: Bearer <key> or X-APG-API-Key" if os.environ.get("APG_API_KEY") else None,
     }}
+
+
+def _active_locale() -> str:
+    try:
+        cookie_locale = _flask_request.cookies.get("apg_lang")
+        if cookie_locale in APG_SUPPORTED_LANGUAGES:
+            return str(cookie_locale)
+        accepted = _flask_request.accept_languages.best_match(APG_SUPPORTED_LANGUAGES)
+        if accepted:
+            return str(accepted)
+    except RuntimeError:
+        return APG_DEFAULT_LANGUAGE
+    return APG_DEFAULT_LANGUAGE
+
+
+def _text_direction(locale: str | None = None) -> str:
+    language = (locale or _active_locale()).split("-")[0].lower()
+    return "rtl" if language in {{"ar", "he", "fa", "ur"}} else "ltr"
+
+
+def _(key: str) -> str:
+    locale = _active_locale()
+    return (
+        APG_I18N.get(locale, {{}}).get(key)
+        or APG_I18N.get(APG_FALLBACK_LANGUAGE, {{}}).get(key)
+        or APG_I18N.get("en", {{}}).get(key)
+        or key
+    )
+
+
+def format_number(value: Any) -> str:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return html.escape(str(value))
+    if _active_locale().split("-")[0] in {{"fr", "pt"}}:
+        return f"{{number:,.2f}}".replace(",", " ").replace(".", ",")
+    return f"{{number:,.2f}}"
+
+
+def format_currency(value: Any, currency: str = "USD") -> str:
+    symbols = {{"USD": "$", "KES": "KSh", "EUR": "€", "GBP": "£"}}
+    symbol = symbols.get(str(currency).upper(), str(currency).upper() + " ")
+    return symbol + format_number(value)
+
+
+def format_date(value: Any) -> str:
+    text = str(value)
+    if _active_locale().split("-")[0] in {{"fr", "pt", "sw"}} and len(text) >= 10 and text[4:5] == "-":
+        return f"{{text[8:10]}}/{{text[5:7]}}/{{text[0:4]}}"
+    return text
 
 
 def _auth_credentials() -> Dict[str, Dict[str, Any]]:
@@ -3867,6 +4017,10 @@ def theme_stylesheet() -> str:
 def _html_page(title: str, body: str) -> str:
     safe_title = html.escape(title)
     safe_module = html.escape(MODULE_NAME)
+    locale = _active_locale()
+    direction = _text_direction(locale)
+    safe_locale = html.escape(locale, quote=True)
+    safe_direction = html.escape(direction, quote=True)
     entity_nav = "".join(
         f'<a class="apg-sidebar-link" href="/ui/entities/{{html.escape(quote(str(entity["name"]), safe=""), quote=True)}}">{{html.escape(str(entity["name"]))}}</a>'
         for entity in ENTITIES
@@ -3890,7 +4044,24 @@ def _html_page(title: str, body: str) -> str:
             '<form method="post" action="/logout" class="apg-user-menu">'
             f'<span class="apg-avatar" aria-hidden="true">{{html.escape(initials)}}</span>'
             f'<span class="apg-user-name">{{display_name}}</span>'
-            '<button class="apg-btn apg-btn-secondary" type="submit">Logout</button>'
+            f'<button class="apg-btn apg-btn-secondary" type="submit">{{_("logout")}}</button>'
+            '</form>'
+        )
+    language_menu = ""
+    if len(APG_SUPPORTED_LANGUAGES) > 1:
+        try:
+            next_url = _flask_request.full_path.rstrip("?") or "/ui"
+        except RuntimeError:
+            next_url = "/ui"
+        options = "".join(
+            f'<option value="{{html.escape(language, quote=True)}}"{{" selected" if language == locale else ""}}>{{html.escape(language)}}</option>'
+            for language in APG_SUPPORTED_LANGUAGES
+        )
+        language_menu = (
+            '<form method="post" action="/locale" class="apg-locale-form">'
+            f'<input type="hidden" name="next" value="{{html.escape(next_url, quote=True)}}">'
+            f'<label class="apg-sr-only" for="apg-locale-select">{{_("language")}}</label>'
+            f'<select id="apg-locale-select" name="lang" class="apg-locale-select" onchange="this.form.submit()" aria-label="{{_("language")}}">{{options}}</select>'
             '</form>'
         )
     sidebar_html = (
@@ -3971,7 +4142,7 @@ def _html_page(title: str, body: str) -> str:
     cmd_palette_html = {cmd_palette_literal!r}
     return (
         "<!doctype html>"
-        '<html lang="en" class="h-full"><head>'
+        f'<html lang="{{safe_locale}}" dir="{{safe_direction}}" class="h-full"><head>'
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         f"{{head_extras}}"
@@ -3985,11 +4156,12 @@ def _html_page(title: str, body: str) -> str:
         f'  <button class="apg-icon-btn" type="button" onclick="apgToggleSidebar()" aria-label="Toggle navigation">☰</button>'
         f'  <a class="apg-logo" href="/ui">{{safe_module}}</a>'
         f'  <nav class="apg-topnav ml-4">'
-        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui">Home</a>'
-        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/workflows">⚡ Workflows</a>'
-        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/marketplace">Marketplace</a>'
+        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui">{{_("home")}}</a>'
+        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/workflows">⚡ {{_("workflows")}}</a>'
+        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/marketplace">{{_("marketplace")}}</a>'
         f'  </nav>'
-        f'  <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">System</button>'
+        f'  <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">{{_("theme_system")}}</button>'
+        f'  {{language_menu}}'
         f'  {{user_menu}}'
         f'</header>'
         f'{{sidebar_html}}'
@@ -4041,6 +4213,7 @@ def _render_template(template_name: str, **context: Any) -> str | None:
                 template_name = template_name.replace(".html", ".html.j2") if ".html" in template_name else template_name + ".j2"
         # Add url encode filter
         env.filters["urlencode"] = lambda s: __import__("urllib.parse", fromlist=["quote"]).quote(str(s), safe="")
+        env.globals.update({{"_": _, "format_number": format_number, "format_currency": format_currency, "format_date": format_date}})
         tmpl = env.get_template(template_name)
         return tmpl.render(**context)
     except Exception:
@@ -4523,6 +4696,8 @@ def _landing_page_html() -> str:
         landing_style=landing_style,
         api_links=api_links,
         stats=stats,
+        active_locale=_active_locale(),
+        text_direction=_text_direction(),
     )
     if rendered is not None:
         return rendered
@@ -6845,6 +7020,19 @@ def _flask_logout_post():
         return _FlaskResponse(json.dumps({{"error": "not_found", "path": "/logout"}}), status=404, content_type="application/json; charset=utf-8")
     _flask_session.pop("apg_user", None)
     return _flask_redirect("/login")
+
+
+@_flask_app.route("/locale", methods=["POST"])
+def _flask_locale_post():
+    language = str(_flask_request.form.get("lang") or APG_DEFAULT_LANGUAGE)
+    if language not in APG_SUPPORTED_LANGUAGES:
+        language = APG_DEFAULT_LANGUAGE
+    next_url = str(_flask_request.form.get("next") or "/ui")
+    if not next_url.startswith("/"):
+        next_url = "/ui"
+    response = _flask_redirect(next_url)
+    response.set_cookie("apg_lang", language, max_age=31536000, samesite="Lax")
+    return response
 
 
 @_flask_app.route("/entities/<entity_name>/records.csv", methods=["GET"])
