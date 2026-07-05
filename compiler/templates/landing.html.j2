@@ -1,8 +1,4 @@
-{# landing.html.j2 — APG application landing page
-   Variables: module_name, module_description, entities, capabilities,
-              theme_primary, theme_accent, landing_style, api_links
-   landing_style: "default" | "minimal" | "corporate" | "africa"
-#}
+{# landing.html.j2 — APG application landing page #}
 <!doctype html>
 <html lang="{{ active_locale }}" dir="{{ text_direction }}" class="h-full">
 <head>
@@ -10,131 +6,114 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ module_name | replace('_', ' ') | title }}</title>
   <link rel="stylesheet" href="/static/apg.css">
+  <link rel="stylesheet" href="/theme.css">
   <style>
     :root {
       --brand: {{ theme_primary }};
       --accent: {{ theme_accent }};
     }
-    .hero-gradient {
-      background: linear-gradient(135deg, {{ theme_primary }} 0%, {{ theme_accent }} 100%);
-    }
-    {% if landing_style == 'minimal' %}
-    .hero-gradient { background: {{ theme_primary }}; }
-    {% elif landing_style == 'africa' %}
-    .hero-gradient {
-      background: linear-gradient(135deg, #8B1A1A 0%, {{ theme_primary }} 50%, #E9A84B 100%);
-    }
-    {% elif landing_style == 'corporate' %}
-    .hero-gradient { background: linear-gradient(180deg, #0F172A 0%, {{ theme_primary }} 100%); }
-    {% endif %}
   </style>
 </head>
-<body class="min-h-full bg-gray-50 font-sans antialiased">
+<body class="min-h-full bg-gray-50 text-gray-900 font-sans antialiased">
+  <a class="apg-skip-link" href="#content">Skip to content</a>
 
-  {# ── Hero ──────────────────────────────────────────────────────── #}
-  <div class="hero-gradient text-white">
-    <div class="max-w-6xl mx-auto px-6">
-      {# Topnav #}
-      <nav class="flex items-center justify-between py-5">
-        <span class="text-lg font-bold tracking-tight">
-          {{ module_name | replace('_', ' ') | title }}
-        </span>
-        <div class="flex items-center gap-3">
-          <a href="/ui"
-             class="px-4 py-2 text-sm font-medium bg-white/15 hover:bg-white/25 rounded-lg transition-colors">
-            {{ _('open_app') }}
-          </a>
-          <a href="/openapi.json"
-             class="px-4 py-2 text-sm font-medium border border-white/30 hover:bg-white/10 rounded-lg transition-colors">
-            {{ _('api_docs') }}
-          </a>
-        </div>
-      </nav>
+  <header class="bg-white border-b border-gray-200">
+    <nav class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between gap-4">
+      <a href="/" class="text-lg font-bold text-gray-900">{{ module_name | replace('_', ' ') | title }}</a>
+      <div class="flex items-center gap-2 flex-wrap justify-end">
+        <a href="/ui" class="apg-btn">{{ _('open_app') }}</a>
+        <a href="/ui/marketplace" class="apg-btn apg-btn-secondary">{{ _('marketplace') }}</a>
+      </div>
+    </nav>
+  </header>
 
-      {# Hero content #}
-      <div class="py-20 text-center max-w-3xl mx-auto">
-        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 text-xs font-medium mb-6">
-          <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
-          Powered by APG · Datacraft
-        </div>
-        <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-5">
-          {{ module_name | replace('_', ' ') | title }}
-        </h1>
-        <p class="text-lg text-white/80 mb-8 leading-relaxed">
-          {{ module_description or 'A fully generated application by Datacraft APG.' }}
+  <main id="content" class="max-w-6xl mx-auto px-6 py-10">
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mb-8">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Generated APG workspace</p>
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-4">{{ module_name | replace('_', ' ') | title }}</h1>
+        <p class="text-lg text-gray-600 mb-6 leading-relaxed">
+          {{ module_description or 'A generated operational application with data, workflows, automation, and integration surfaces ready to use.' }}
         </p>
-        <div class="flex items-center justify-center gap-3 flex-wrap">
-          <a href="/ui"
-             class="px-6 py-3 bg-white text-gray-900 font-semibold rounded-xl hover:bg-white/90 transition-colors shadow-lg">
-            {{ _('open_app') }} →
-          </a>
-          <a href="/manifest"
-             class="px-6 py-3 border border-white/40 text-white font-medium rounded-xl hover:bg-white/10 transition-colors">
-            {{ _('view_manifest') }}
-          </a>
+        <div class="flex items-center gap-3 flex-wrap">
+          <a href="/ui" class="apg-btn">{{ _('open_app') }}</a>
+          {% if primary_entities %}
+          <a href="/ui/entities/{{ primary_entities[0].name }}" class="apg-btn apg-btn-secondary">Open {{ primary_entities[0].name }}</a>
+          {% endif %}
+          <a href="/openapi.json" class="apg-btn apg-btn-secondary">API contract</a>
         </div>
       </div>
-    </div>
-  </div>
-
-  {# ── Stats strip ────────────────────────────────────────────────── #}
-  <div class="bg-white border-b border-gray-200 shadow-sm">
-    <div class="max-w-6xl mx-auto px-6 py-5 grid grid-cols-2 sm:grid-cols-4 gap-6 divide-x divide-gray-100">
-      {% for stat in stats %}
-      <div class="px-6 first:pl-0 last:pr-0 text-center">
-        <p class="text-2xl font-bold text-gray-900">{{ stat.value }}</p>
-        <p class="text-xs font-medium uppercase tracking-wide text-gray-400 mt-0.5">{{ stat.label }}</p>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-
-  {# ── Entity cards ───────────────────────────────────────────────── #}
-  <main class="max-w-6xl mx-auto px-6 py-12">
-    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-5">{{ _('data_entities') }}</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
-      {% for entity in entities %}
-      {% if entity.type != 'application' %}
-      <a href="/ui/entities/{{ entity.name }}"
-         class="group bg-white rounded-xl border border-gray-200 p-5 hover:border-brand hover:shadow-md transition-all">
-        <div class="flex items-start justify-between mb-3">
-          <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white text-sm font-bold"
-               style="background: var(--brand)">
-            {{ entity.name[0] | upper }}
+      <section class="apg-card" aria-label="Workspace readiness">
+        <h2 class="text-base font-semibold text-gray-900 mb-4">Workspace readiness</h2>
+        <div class="grid grid-cols-2 gap-3">
+          {% for stat in stats %}
+          <div class="border border-gray-100 rounded-lg p-3">
+            <p class="text-2xl font-bold text-gray-900">{{ stat.value }}</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ stat.label }}</p>
           </div>
-          <span class="text-xs font-medium text-gray-400 bg-gray-50 px-2 py-0.5 rounded uppercase tracking-wide">
-            {{ entity.type }}
-          </span>
+          {% endfor %}
         </div>
-        <h3 class="font-semibold text-gray-900 group-hover:text-brand transition-colors">
-          {{ entity.name }}
-        </h3>
-        <p class="text-xs text-gray-400 mt-1">
-          {{ entity.fields | length if entity.fields else entity.properties | length }} fields
-        </p>
-      </a>
-      {% endif %}
-      {% endfor %}
-    </div>
+      </section>
+    </section>
 
-    {# ── API quick links ──────────────────────────────────────────── #}
-    <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-4">API Endpoints</h2>
-    <div class="flex flex-wrap gap-2">
-      {% for link in api_links %}
-      <a href="{{ link.url }}"
-         class="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:border-brand hover:text-brand transition-colors">
-        {{ link.label }}
-      </a>
-      {% endfor %}
-    </div>
+    <section class="mb-8" aria-label="Primary actions">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-4">Start here</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for action in workspace_actions %}
+        <a href="{{ action.url }}" class="apg-card hover:border-apg-primary transition-colors">
+          <h3 class="text-sm font-semibold text-gray-900">{{ action.label }}</h3>
+          <p class="text-xs text-gray-500 mt-2">{{ action.description }}</p>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% if primary_entities %}
+    <section class="mb-8" aria-label="Data workspaces">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-4">{{ _('data_entities') }}</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for entity in primary_entities %}
+        <a href="/ui/entities/{{ entity.name }}" class="apg-card hover:border-apg-primary transition-colors">
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <span class="w-9 h-9 rounded-lg flex items-center justify-center text-white text-sm font-bold" style="background: var(--brand)">
+              {{ entity.name[0] | upper }}
+            </span>
+            <span class="apg-badge">{{ entity.type }}</span>
+          </div>
+          <h3 class="text-sm font-semibold text-gray-900">{{ entity.name }}</h3>
+          <p class="text-xs text-gray-500 mt-1">{{ entity.fields | length if entity.fields else entity.properties | length }} fields</p>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+      <article class="apg-card">
+        <h2 class="text-base font-semibold text-gray-900 mb-3">Integration readiness</h2>
+        <p class="text-sm text-gray-500 mb-4">Generated APIs and marketplace blueprints make the app connectable without external assets.</p>
+        <div class="space-y-2">
+          {% for blueprint in marketplace_blueprints[:3] %}
+          <a href="{{ blueprint.href }}" class="flex items-center justify-between gap-3 border border-gray-100 rounded-lg p-3 hover:border-apg-primary">
+            <span class="text-sm font-semibold text-gray-900">{{ blueprint.title }}</span>
+            <span class="text-xs text-gray-400">{{ blueprint.category }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </article>
+      <article class="apg-card">
+        <h2 class="text-base font-semibold text-gray-900 mb-3">Developer surfaces</h2>
+        <div class="flex flex-wrap gap-2">
+          {% for link in api_links %}
+          <a href="{{ link.url }}" class="apg-btn apg-btn-secondary">{{ link.label }}</a>
+          {% endfor %}
+        </div>
+      </article>
+    </section>
   </main>
 
-  {# ── Footer ─────────────────────────────────────────────────────── #}
   <footer class="border-t border-gray-200 py-6 text-center text-xs text-gray-400">
-    Generated by <span class="font-medium text-gray-600">APG</span> ·
-    <span>Datacraft</span> ·
-    © 2025
+    Generated by <span class="font-medium text-gray-600">APG</span> · Datacraft
   </footer>
-
 </body>
 </html>

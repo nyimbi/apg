@@ -810,6 +810,71 @@ Validation evidence:
 - Full suite: `1484 passed, 1 skipped, 3 warnings in 718.87s`.
 - PythonCodeGenerator tripwire clean.
 
+### landing-page-marketplace
+
+Status: complete.
+
+Intended commit:
+
+```text
+ux(landing-page-marketplace): fix landing and marketplace discovery
+```
+
+Files:
+
+- `compiler/code_generator.py`
+- `compiler/templates/landing.html.j2`
+- `compiler/templates/marketplace.html.j2`
+- `tests/test_generated_ui_dashboard.py`
+- `examples/01_minimal_customer_records/output/app.py`
+- `examples/02_customer_orders_relationship/output/app.py`
+- `examples/03_inventory_typed_records/output/app.py`
+- `examples/04_order_fulfillment_model/output/app.py`
+- `examples/05_single_support_agent/output/app.py`
+- `examples/06_support_agent_team/output/app.py`
+- `examples/07_multi_runtime_agent_team/output/app.py`
+- `examples/08_basic_capability_contract/output/app.py`
+- `examples/09_capability_rules_configuration/output/app.py`
+- `examples/10_themed_i18n_streaming_capability/output/app.py`
+- `examples/11_screen_composition_relationships/output/app.py`
+- `examples/12_finance_general_ledger/output/app.py`
+- `examples/13_procurement_approval_workbench/output/app.py`
+- `examples/14_inventory_warehouse_operations/output/app.py`
+- `examples/15_manufacturing_quality_control/output/app.py`
+- `examples/16_hr_payroll_operations/output/app.py`
+- `examples/17_crm_sales_pipeline/output/app.py`
+- `examples/18_operations_dashboard_capability/output/app.py`
+- `examples/19_multi_capability_dependency_suite/output/app.py`
+- `examples/20_enterprise_erp_platform/output/app.py`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/README.md`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/thinking.md`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/sources.md`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/rationale.md`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/before-root.html`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/before-root.headers`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/before-home.html`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/before-home.headers`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/before-marketplace.html`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/before-marketplace.headers`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/after-root.html`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/after-root.headers`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/after-home.html`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/after-home.headers`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/after-marketplace.html`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/after-marketplace.headers`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/after-marketplace-filtered.html`
+- `docs/research/generated-ui-workspaces/landing-page-marketplace/assets/after-marketplace-filtered.headers`
+- `docs/research/generated-ui-workspaces/SUMMARY.md`
+
+Validation evidence:
+
+- Live before audit: example 20 booted at `127.0.0.1:20907`; `/` and `/home` returned 500 due `KeyError: 'enterprise_erp'`, while `/ui/marketplace` returned a passive no-connectors empty state.
+- Live after audit: regenerated example 20 booted at `127.0.0.1:20908`; `/` and `/home` returned 200 with workspace readiness/start/integration sections, `/ui/marketplace` returned generated blueprints, and `/ui/marketplace?q=agent` returned `1 of 4 shown`.
+- Regenerated all 20 numbered examples through `uv run apg compile`.
+- Targeted tests: `3 passed in 7.47s` across landing/marketplace regression, CSS class coverage, and required template route coverage.
+- Full suite: `1485 passed, 1 skipped, 3 warnings in 722.71s`.
+- PythonCodeGenerator tripwire clean.
+
 ## Verdicts
 
 | Workspace | Before | After | Status |
@@ -826,6 +891,7 @@ Validation evidence:
 | database-catalog | Declared databases could render as empty: example 20 showed 0 schemas/tables and `/databases/ERPDB/schemas` returned `[]`. | Generated schemas are inferred from record entities, UI renders tables/columns/indexes/constraints, and schema JSON exposes the same metadata. | Complete |
 | flow-debugger | Completed UI workflow runs showed only a plain step list and had an empty journal endpoint, so the debugger lacked audit context. | UI workflow runs write journal events and render run timeline, context, payload, created-record snapshot, and journal table. | Complete |
 | login-auth-surfaces | Auth-required login worked functionally but rendered inside the normal generated app shell, used sparse labels, did not preserve username on error, and gave terse failure feedback. | Login renders in a standalone self-contained shell, labels the auth context and destination, preserves username after failed login, and keeps authenticated UI/logout behavior intact. | Complete |
+| landing-page-marketplace | Example 20 root and `/home` returned 500 from an unsafe capability-theme lookup; marketplace rendered only a no-connectors command empty state. | Landing routes render an operational workspace entry page, and marketplace provides search/category discovery plus generated integration blueprints. | Complete |
 
 ## Defect Ledger
 
@@ -887,3 +953,7 @@ Validation evidence:
 | login-auth-surfaces | Failed login did not preserve the attempted username. | Passed username through `_login_page()` and rendered it back into the username field. | Resolved |
 | login-auth-surfaces | Failure copy was terse and less recovery-oriented. | Replaced it with generic, non-enumerating auth feedback. | Resolved |
 | login-auth-surfaces | The sign-in form lacked explicit field ids and destination context. | Added labeled input ids and a visible continuation cue for the `next` target. | Resolved |
+| landing-page-marketplace | Root and `/home` crashed when `MODULE_NAME` was not a capability registry key. | Guarded optional theme lookup and fell back to default tokens. | Resolved |
+| landing-page-marketplace | Landing page was generic and API-link-heavy. | Reworked it into workspace readiness, start actions, entity links, integration readiness, and developer surfaces. | Resolved |
+| landing-page-marketplace | Marketplace empty state was a dead end when no connectors were installed. | Added generated API, record sync, workflow webhook, and agent runtime blueprints. | Resolved |
+| landing-page-marketplace | Marketplace had no discovery controls. | Added search, category filters, counts, status, and operation summaries. | Resolved |

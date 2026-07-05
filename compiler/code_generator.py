@@ -5021,9 +5021,92 @@ def _ui_workflow_wizard_html(
     return 200, _html_page(wf["name"], tmpl_body if tmpl_body is not None else _jinja_required_page(wf["name"]))
 
 
+def _marketplace_blueprints() -> list[Dict[str, Any]]:
+    app = describe_application()
+    record_entities = [entity for entity in ENTITIES if entity.get("type") not in {{"application"}}]
+    blueprints: list[Dict[str, Any]] = [
+        {{
+            "name": "generated_api",
+            "title": "Generated API",
+            "category": "API",
+            "description": "Use the generated OpenAPI contract to connect records, workflows, and metrics.",
+            "operations": ["Read OpenAPI", "Create records", "Export data"],
+            "href": "/openapi.json",
+            "status": "Ready",
+            "version": "local",
+            "file": "openapi.json",
+        }},
+        {{
+            "name": "record_sync",
+            "title": "Record sync",
+            "category": "Data",
+            "description": f"Sync {{len(record_entities)}} generated record type(s) with a downstream system.",
+            "operations": ["List records", "Create record", "Update record"],
+            "href": "/ui",
+            "status": "Blueprint",
+            "version": "local",
+            "file": "generated records",
+        }},
+    ]
+    workflows = list_workflows()
+    if workflows:
+        blueprints.append({{
+            "name": "workflow_webhooks",
+            "title": "Workflow webhooks",
+            "category": "Automation",
+            "description": "Trigger generated workflows from external events and inspect runs in the debugger.",
+            "operations": ["Start workflow", "Track run", "Read journal"],
+            "href": "/ui/workflows",
+            "status": "Blueprint",
+            "version": "local",
+            "file": "workflow routes",
+        }})
+    if app.get("ai_agents"):
+        blueprints.append({{
+            "name": "agent_runtime",
+            "title": "Agent runtime",
+            "category": "AI",
+            "description": "Connect agent invocation surfaces to chat, ticketing, or operations tools.",
+            "operations": ["Invoke agent", "Stream events", "Inspect response"],
+            "href": "/ui/agents/" + quote(str(app.get("ai_agents", [""])[0]), safe=""),
+            "status": "Blueprint",
+            "version": "local",
+            "file": "agent routes",
+        }})
+    return blueprints
+
+
+def _marketplace_cards(connectors: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
+    cards: list[Dict[str, Any]] = []
+    source = connectors if connectors else _marketplace_blueprints()
+    for connector in source:
+        operations = connector.get("operations") or []
+        category = connector.get("category") or connector.get("type") or "Connector"
+        name = str(connector.get("name") or connector.get("title") or "connector")
+        cards.append({{
+            "name": name,
+            "title": str(connector.get("title") or name.replace("_", " ").title()),
+            "category": str(category),
+            "description": str(connector.get("description") or connector.get("summary") or "Generated connector surface."),
+            "operations": operations if isinstance(operations, list) else [],
+            "operation_count": len(operations) if isinstance(operations, list) else 0,
+            "version": str(connector.get("version") or ""),
+            "status": str(connector.get("status") or ("Installed" if connectors else "Blueprint")),
+            "file": str(connector.get("file") or connector.get("base_url") or connector.get("name") or ""),
+            "href": str(connector.get("href") or ("/entities/connectors/" + quote(name, safe=""))),
+            "installed": bool(connectors),
+        }})
+    return cards
+
+
 def _landing_page_html() -> str:
     """Render the application landing page using landing.html.j2."""
-    theme = APG_CAPABILITIES.capability_theme(MODULE_NAME) if APG_CAPABILITIES and hasattr(APG_CAPABILITIES, "capability_theme") else {{}}
+    theme = {{}}
+    if APG_CAPABILITIES and hasattr(APG_CAPABILITIES, "capability_theme"):
+        try:
+            theme = APG_CAPABILITIES.capability_theme(MODULE_NAME) or {{}}
+        except Exception:
+            theme = {{}}
     tokens = theme.get("tokens", {{}}) if isinstance(theme, dict) else {{}}
     theme_primary = tokens.get("color.primary") or "#1E5B5A"
     theme_accent = tokens.get("color.accent") or "#D97706"
@@ -5042,11 +5125,24 @@ def _landing_page_html() -> str:
         {{"value": len(describe_application().get("ai_agents", [])), "label": "AI Agents"}},
         {{"value": sum(len(list_records(e["name"])) for e in ENTITIES if e.get("type") not in {{"application"}}), "label": "Records"}},
     ]
+    app = describe_application()
+    primary_entities = [entity for entity in ENTITIES if entity.get("type") not in {{"application"}}][:4]
+    workspace_actions = [
+        {{"url": "/ui", "label": "Open workspace", "description": "Start from the generated dashboard."}},
+        {{"url": "/ui/workflows", "label": "Run workflows", "description": "Complete guided operational flows."}},
+        {{"url": "/ui/marketplace", "label": "Explore integrations", "description": "Connect this app to external tools."}},
+        {{"url": "/openapi.json", "label": "Open API contract", "description": "Review machine-readable integration routes."}},
+    ]
     rendered = _render_template(
         "landing.html.j2",
         module_name=MODULE_NAME,
         module_description=MODULE_DESCRIPTION or "",
         entities=ENTITIES,
+        primary_entities=primary_entities,
+        capabilities=app.get("capabilities", []),
+        workflows=list_workflows(),
+        workspace_actions=workspace_actions,
+        marketplace_blueprints=_marketplace_blueprints(),
         theme_primary=theme_primary,
         theme_accent=theme_accent,
         landing_style=landing_style,
@@ -6652,9 +6748,34 @@ def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[i
             connectors = scan_connectors("connectors")
         except Exception:
             connectors = list(APG_CONNECTOR_REGISTRY)
+        cards = _marketplace_cards(connectors)
+        q = (query or {{}}).get("q", [""])[0].strip() if query else ""
+        active_category = (query or {{}}).get("category", ["all"])[0].strip() if query else "all"
+        categories: list[Dict[str, Any]] = []
+        for category_name in sorted({{str(card["category"]) for card in cards}}):
+            count = len([card for card in cards if card["category"] == category_name])
+            categories.append({{"name": category_name, "count": count, "active": category_name == active_category}})
+        filtered_cards = cards
+        if active_category and active_category != "all":
+            filtered_cards = [card for card in filtered_cards if card["category"] == active_category]
+        if q:
+            q_lower = q.lower()
+            filtered_cards = [
+                card for card in filtered_cards
+                if q_lower in card["title"].lower()
+                or q_lower in card["description"].lower()
+                or q_lower in card["category"].lower()
+            ]
         tmpl_body = _render_template("marketplace.html.j2",
-            connectors=connectors,
+            connectors=filtered_cards,
+            connector_count=len(cards),
+            filtered_count=len(filtered_cards),
             installed_count=len(connectors),
+            categories=categories,
+            active_category=active_category or "all",
+            query=q,
+            has_filters=bool(q or (active_category and active_category != "all")),
+            has_installed_connectors=bool(connectors),
         )
         if tmpl_body is not None:
             return 200, _html_page("Connector Marketplace", tmpl_body)

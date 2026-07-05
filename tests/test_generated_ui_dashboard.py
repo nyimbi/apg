@@ -67,6 +67,39 @@ def test_generated_home_dashboard_prioritizes_workspace_actions():
 	assert "ERPAdvisors" in html
 
 
+def test_generated_landing_and_marketplace_are_actionable():
+	result = compile_apg_file("examples/20_enterprise_erp_platform/main.apg")
+	assert result.success, result.errors
+	namespace: dict[str, object] = {}
+	exec(compile(result.generated_files["app.py"], "app.py", "exec"), namespace)
+
+	landing = namespace["_landing_page_html"]()
+	assert "Generated APG workspace" in landing
+	assert "Workspace readiness" in landing
+	assert "Start here" in landing
+	assert "Integration readiness" in landing
+	assert "Open workspace" in landing
+	assert "Open Vendor" in landing
+	assert "API contract" in landing
+	assert "500 Internal Server Error" not in landing
+
+	status, marketplace = namespace["_ui_payload"]("/ui/marketplace")
+	assert status == 200
+	assert "Connector Marketplace" in marketplace
+	assert "Marketplace discovery" in marketplace
+	assert "Generated API" in marketplace
+	assert "Record sync" in marketplace
+	assert "Workflow webhooks" in marketplace
+	assert "Agent runtime" in marketplace
+	assert "No connectors installed" not in marketplace
+
+	status, filtered = namespace["_ui_payload"]("/ui/marketplace", {"q": ["agent"]})
+	assert status == 200
+	assert "Agent runtime" in filtered
+	assert "Generated API" not in filtered
+	assert "1 of 4 shown" in filtered
+
+
 def test_generated_entity_list_exposes_saved_views_and_filter_state():
 	result = compile_apg_file("examples/20_enterprise_erp_platform/main.apg")
 	assert result.success, result.errors
