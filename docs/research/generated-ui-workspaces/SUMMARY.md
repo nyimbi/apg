@@ -736,6 +736,80 @@ Validation evidence:
 - Full suite: `1484 passed, 1 skipped, 3 warnings in 729.14s`.
 - PythonCodeGenerator tripwire clean.
 
+### login-auth-surfaces
+
+Status: complete.
+
+Intended commit:
+
+```text
+ux(login-auth-surfaces): polish generated sign-in flow
+```
+
+Files:
+
+- `compiler/code_generator.py`
+- `compiler/templates/login.html.j2`
+- `tests/test_generated_ui_auth.py`
+- `examples/01_minimal_customer_records/output/app.py`
+- `examples/02_customer_orders_relationship/output/app.py`
+- `examples/03_inventory_typed_records/output/app.py`
+- `examples/04_order_fulfillment_model/output/app.py`
+- `examples/05_single_support_agent/output/app.py`
+- `examples/06_support_agent_team/output/app.py`
+- `examples/07_multi_runtime_agent_team/output/app.py`
+- `examples/08_basic_capability_contract/output/app.py`
+- `examples/09_capability_rules_configuration/output/app.py`
+- `examples/10_themed_i18n_streaming_capability/output/app.py`
+- `examples/11_screen_composition_relationships/output/app.py`
+- `examples/12_finance_general_ledger/output/app.py`
+- `examples/13_procurement_approval_workbench/output/app.py`
+- `examples/14_inventory_warehouse_operations/output/app.py`
+- `examples/15_manufacturing_quality_control/output/app.py`
+- `examples/16_hr_payroll_operations/output/app.py`
+- `examples/17_crm_sales_pipeline/output/app.py`
+- `examples/18_operations_dashboard_capability/output/app.py`
+- `examples/19_multi_capability_dependency_suite/output/app.py`
+- `examples/20_enterprise_erp_platform/output/app.py`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/README.md`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/thinking.md`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/sources.md`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/rationale.md`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-ui-redirect.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-ui-redirect.headers`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-login.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-login.headers`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-login-error.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-login-error.headers`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-login-success.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-login-success.headers`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-authenticated-ui.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-authenticated-ui.headers`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-logout.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/before-logout.headers`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-ui-redirect.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-ui-redirect.headers`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-login.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-login.headers`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-login-error.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-login-error.headers`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-login-success.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-login-success.headers`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-authenticated-ui.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-authenticated-ui.headers`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-logout.html`
+- `docs/research/generated-ui-workspaces/login-auth-surfaces/assets/after-logout.headers`
+- `docs/research/generated-ui-workspaces/SUMMARY.md`
+
+Validation evidence:
+
+- Live before audit: auth-required generated sample booted at `127.0.0.1:20905`; unauthenticated `/ui` redirected, login rendered inside the app shell, invalid credentials returned `401`, valid credentials reached authenticated UI, and logout redirected to `/login`.
+- Live after audit: regenerated auth-required sample booted at `127.0.0.1:20906`; login rendered as a standalone auth surface, preserved username on invalid credentials, authenticated UI still rendered `Ops User` and `Logout`, and logout behavior was unchanged.
+- Regenerated all 20 numbered examples through `uv run apg compile`.
+- Targeted tests: `4 passed in 6.45s` across auth regression, CSS class coverage, and required template route coverage.
+- Full suite: `1484 passed, 1 skipped, 3 warnings in 718.87s`.
+- PythonCodeGenerator tripwire clean.
+
 ## Verdicts
 
 | Workspace | Before | After | Status |
@@ -751,6 +825,7 @@ Validation evidence:
 | capability-console-rules-config-approval | Three blank JSON boxes and generic/raw results made rules, configuration, and approvals hard to test without knowing the payload contract. | Prefilled generated contexts, preserved submitted JSON, operation-specific summaries, capability profile, and secondary raw JSON disclosures. | Complete |
 | database-catalog | Declared databases could render as empty: example 20 showed 0 schemas/tables and `/databases/ERPDB/schemas` returned `[]`. | Generated schemas are inferred from record entities, UI renders tables/columns/indexes/constraints, and schema JSON exposes the same metadata. | Complete |
 | flow-debugger | Completed UI workflow runs showed only a plain step list and had an empty journal endpoint, so the debugger lacked audit context. | UI workflow runs write journal events and render run timeline, context, payload, created-record snapshot, and journal table. | Complete |
+| login-auth-surfaces | Auth-required login worked functionally but rendered inside the normal generated app shell, used sparse labels, did not preserve username on error, and gave terse failure feedback. | Login renders in a standalone self-contained shell, labels the auth context and destination, preserves username after failed login, and keeps authenticated UI/logout behavior intact. | Complete |
 
 ## Defect Ledger
 
@@ -808,3 +883,7 @@ Validation evidence:
 | flow-debugger | Journal endpoint returned `events: []` for generated UI workflows. | Connected UI workflow recording to `WORKFLOW_EVENT_JOURNAL`, making the JSON endpoint useful. | Resolved |
 | flow-debugger | Recent runs lacked entity context. | Added entity context to the recent-runs table. | Resolved |
 | flow-debugger | Empty state did not tell users how to populate the debugger. | Updated empty recent-runs copy to direct users to complete a workflow. | Resolved |
+| login-auth-surfaces | Unauthenticated login rendered in the full app shell with sidebar/topbar affordances. | Added shell-less login rendering that keeps local assets but removes visible app navigation. | Resolved |
+| login-auth-surfaces | Failed login did not preserve the attempted username. | Passed username through `_login_page()` and rendered it back into the username field. | Resolved |
+| login-auth-surfaces | Failure copy was terse and less recovery-oriented. | Replaced it with generic, non-enumerating auth feedback. | Resolved |
+| login-auth-surfaces | The sign-in form lacked explicit field ids and destination context. | Added labeled input ids and a visible continuation cue for the `next` target. | Resolved |

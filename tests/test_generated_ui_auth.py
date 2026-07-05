@@ -45,13 +45,20 @@ def test_auth_declared_generated_ui_login_logout_flow(monkeypatch):
 		login_page = client.get("/login")
 		assert login_page.status_code == 200
 		assert b"secure_customer_app" in login_page.data
+		assert b"Secure workspace sign-in" in login_page.data
+		assert b"Continue to" in login_page.data
+		assert b'apg-login-username' in login_page.data
+		assert b'apg-login-password' in login_page.data
+		assert b'id="apg-sidebar"' not in login_page.data
 
 		rejected = client.post(
 			"/login",
 			data={"username": "operator", "password": "wrong", "next": "/ui"},
 		)
 		assert rejected.status_code == 401
-		assert b"Invalid username or password" in rejected.data
+		assert b"We could not sign you in with those credentials." in rejected.data
+		assert b'value="operator"' in rejected.data
+		assert b"Invalid username or password" not in rejected.data
 
 		accepted = client.post(
 			"/login",

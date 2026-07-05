@@ -1,0 +1,9 @@
+HTTP/1.1 302 FOUND
+Server: Werkzeug/3.1.6 Python/3.11.15
+Date: Sat, 04 Jul 2026 23:38:57 GMT
+Content-Type: text/html; charset=utf-8
+Content-Length: 217
+Location: /login?next=/ui
+Vary: Cookie
+Connection: close
+

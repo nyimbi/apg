@@ -2469,29 +2469,31 @@ def _login_required_for_path(path: str) -> bool:
     return path == "/ui" or path.startswith("/ui/")
 
 
-def _login_page(error: str = "", next_url: str = "/ui") -> str:
+def _login_page(error: str = "", next_url: str = "/ui", username: str = "") -> str:
     body = _render_template(
         "login.html.j2",
         module_name=MODULE_NAME,
         error=error,
         next_url=next_url or "/ui",
+        username=username,
     )
     if body is None:
         safe_error = html.escape(error)
         safe_next = html.escape(next_url or "/ui", quote=True)
+        safe_username = html.escape(username, quote=True)
         error_html = f'<p role="alert">{{safe_error}}</p>' if safe_error else ''
         body = (
-            '<main class="apg-login-page">'
+            '<main id="content" class="apg-login-page">'
             '<section class="apg-login-card">'
             f'<h1>{{html.escape(MODULE_NAME)}}</h1>'
             f'{{error_html}}'
             f'<form method="post" action="/login"><input type="hidden" name="next" value="{{safe_next}}">'
-            '<label>Username <input name="username" autocomplete="username"></label>'
+            f'<label>Username <input name="username" autocomplete="username" value="{{safe_username}}"></label>'
             '<label>Password <input name="password" type="password" autocomplete="current-password"></label>'
             '<button class="apg-btn" type="submit">Sign in</button></form>'
             '</section></main>'
         )
-    return _html_page("Sign in", body)
+    return _html_page("Sign in", body, shell=False)
 
 
 def _forbidden_page(message: str = "You do not have permission to view this page.") -> str:
@@ -4234,7 +4236,7 @@ def theme_stylesheet() -> str:
     return "\\n".join(lines) + "\\n"
 
 
-def _html_page(title: str, body: str) -> str:
+def _html_page(title: str, body: str, shell: bool = True) -> str:
     safe_title = html.escape(title)
     safe_module = html.escape(MODULE_NAME)
     locale = _active_locale()
@@ -4366,6 +4368,23 @@ def _html_page(title: str, body: str) -> str:
         '</style>'
     )
     cmd_palette_html = {cmd_palette_literal!r}
+    if not shell:
+        return (
+            "<!doctype html>"
+            f'<html lang="{{safe_locale}}" dir="{{safe_direction}}" class="h-full"><head>'
+            '<meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            f"{{head_extras}}"
+            f"{{skeleton_css}}"
+            '<link rel="stylesheet" href="/theme.css">'
+            f"<title>{{safe_title}} — {{safe_module}}</title>"
+            "</head>"
+            '<body class="min-h-full bg-gray-50 text-gray-900">'
+            '<a class="apg-skip-link" href="#content">Skip to content</a>'
+            f"{{body}}"
+            f"{{toast_js}}"
+            "</body></html>"
+        )
     return (
         "<!doctype html>"
         f'<html lang="{{safe_locale}}" dir="{{safe_direction}}" class="h-full"><head>'
@@ -7924,7 +7943,11 @@ def _flask_login_post():
         next_url = "/ui"
     user = _authenticate_user(username, password)
     if user is None:
-        return _FlaskResponse(_login_page("Invalid username or password.", next_url), status=401, content_type="text/html; charset=utf-8")
+        return _FlaskResponse(
+            _login_page("We could not sign you in with those credentials.", next_url, username=username),
+            status=401,
+            content_type="text/html; charset=utf-8",
+        )
     _issue_login_session(user)
     return _flask_redirect(next_url)
 

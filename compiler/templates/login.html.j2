@@ -1,15 +1,26 @@
-<main class="apg-login-page">
+<main id="content" class="apg-login-page">
   <section class="apg-login-card" aria-labelledby="apg-login-title">
-    <h1 id="apg-login-title">{{ module_name }}</h1>
-    <p class="text-sm text-gray-500 mb-4">Sign in to continue.</p>
+    <div class="mb-4">
+      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Authentication required</p>
+      <h1 id="apg-login-title">{{ module_name }}</h1>
+      <p class="text-sm text-gray-500 mt-2">Secure workspace sign-in.</p>
+    </div>
     {% if error %}
     <div role="alert" class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ error }}</div>
     {% endif %}
     <form method="post" action="/login" class="space-y-4">
       <input type="hidden" name="next" value="{{ next_url }}">
-      <label>Username <input name="username" autocomplete="username" required autofocus></label>
-      <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+      <label for="apg-login-username" class="block text-sm font-semibold text-gray-700">Username
+        <input id="apg-login-username" name="username" value="{{ username | default('') }}" autocomplete="username" required autofocus class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">
+      </label>
+      <label for="apg-login-password" class="block text-sm font-semibold text-gray-700">Password
+        <input id="apg-login-password" name="password" type="password" autocomplete="current-password" required class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">
+      </label>
       <button type="submit" class="apg-btn w-full justify-center">Sign in</button>
     </form>
+    <div class="mt-4 border border-gray-100 rounded-lg p-3">
+      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Session</p>
+      <p class="text-sm text-gray-600 mt-1">Continue to <span class="font-mono">{{ next_url }}</span> after authentication.</p>
+    </div>
   </section>
 </main>
