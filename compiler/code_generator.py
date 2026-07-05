@@ -6712,6 +6712,40 @@ def _ui_kanban_html(entity_name: str) -> tuple[int, str]:
             "over_limit": len(column_records) > wip_limit,
             "list_url": _ui_entity_query_path(entity_name, updates={{f"filter.{{status_fname}}": value}}),
         }})
+    swimlane_field = next(
+        (
+            str(f.get("name"))
+            for f in fields
+            if str(f.get("name", "")).lower() in {{"priority", "assignee", "owner", "team", "country", "tenant_id", "segment", "type"}}
+            and str(f.get("name")) not in {{"id", "_revision", status_fname}}
+        ),
+        "",
+    )
+    swimlanes: list[Dict[str, Any]] = []
+    if swimlane_field:
+        lane_values = sorted({{
+            str(record.get(swimlane_field) or "Unassigned")
+            for record in all_records
+        }})
+        for lane in lane_values[:6]:
+            lane_records = [record for record in all_records if str(record.get(swimlane_field) or "Unassigned") == lane]
+            swimlanes.append({{
+                "label": lane,
+                "count": len(lane_records),
+                "field": swimlane_field,
+                "url": _ui_entity_query_path(entity_name, updates={{f"filter.{{swimlane_field}}": lane}}),
+            }})
+    cumulative = 0
+    flow_rows = []
+    for column in columns:
+        cumulative += int(column["count"])
+        flow_rows.append({{
+            "label": column["label"],
+            "count": column["count"],
+            "cumulative": cumulative,
+            "percent": round((cumulative / max(1, len(all_records))) * 100, 1),
+            "over_limit": column["over_limit"],
+        }})
     # Choose display field: first non-id, non-status string field
     display_field_obj = next(
         (f for f in fields if str(f.get("type", "")).lower() in {{"str", "string", "text", "email", "varchar"}} and str(f.get("name")) not in {{"id", "_revision", status_fname}}),
@@ -6729,6 +6763,9 @@ def _ui_kanban_html(entity_name: str) -> tuple[int, str]:
         status_options=seen,
         total_records=len(all_records),
         wip_limit=wip_limit,
+        swimlane_field=swimlane_field,
+        swimlanes=swimlanes,
+        flow_rows=flow_rows,
         list_url=_ui_entity_query_path(entity_name),
         fields=fields,
     )

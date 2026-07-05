@@ -32,6 +32,53 @@
   </div>
 </section>
 
+<section class="apg-kanban-intelligence" aria-label="{{ entity_name }} flow intelligence">
+  <article>
+    <div class="apg-card-header">
+      <div>
+        <h2>Cumulative Flow</h2>
+        <p>Detect expanding queues before they block delivery.</p>
+      </div>
+    </div>
+    <ol class="apg-flow-list">
+      {% for row in flow_rows %}
+      <li{% if row.over_limit %} class="warn"{% endif %}>
+        <span>{{ row.label }}</span>
+        <strong>{{ row.cumulative }}</strong>
+        <small>{{ row.percent }}% cumulative · {{ row.count }} in column</small>
+      </li>
+      {% endfor %}
+    </ol>
+  </article>
+  <article>
+    <div class="apg-card-header">
+      <div>
+        <h2>Swimlanes</h2>
+        <p>{% if swimlane_field %}Grouped by {{ swimlane_field | replace('_', ' ') }}{% else %}Add owner, priority, country, or team to unlock lanes{% endif %}</p>
+      </div>
+    </div>
+    <div class="apg-swimlane-list">
+      {% for lane in swimlanes %}
+      <a href="{{ lane.url }}">
+        <span>{{ lane.label }}</span>
+        <strong>{{ lane.count }}</strong>
+      </a>
+      {% else %}
+      <p>No swimlane field detected yet.</p>
+      {% endfor %}
+    </div>
+  </article>
+  <article>
+    <div class="apg-card-header">
+      <div>
+        <h2>WIP Policy</h2>
+        <p>Limits are generated from current board shape.</p>
+      </div>
+    </div>
+    <p class="apg-kanban-policy"><strong>{{ wip_limit }}</strong> cards per column before warning. Over-limit columns stay linked to filtered record lists.</p>
+  </article>
+</section>
+
 {# Kanban board — horizontal scroll #}
 <div class="flex gap-4 overflow-x-auto pb-6 items-start -mx-1 px-1">
   {% for col in columns %}

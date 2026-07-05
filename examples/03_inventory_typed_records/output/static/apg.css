@@ -426,6 +426,18 @@ html[dir="rtl"] .apg-sidebar-backdrop { inset: 0; }
 .apg-kanban-summary-item:hover { text-decoration: none; opacity: 1; border-color: var(--apg-primary); }
 .apg-kanban-summary-item strong { font-size: 1rem; line-height: 1.1; }
 .apg-kanban-summary-item span { color: var(--apg-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.apg-kanban-intelligence { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: var(--apg-space-4); margin-bottom: var(--apg-space-5); }
+.apg-kanban-intelligence article { padding: var(--apg-space-4); border: 1px solid var(--apg-border); border-radius: var(--apg-radius); background: var(--apg-bg-card); box-shadow: var(--apg-shadow-sm); }
+.apg-kanban-intelligence h2 { margin: 0; font-size: .95rem; }
+.apg-kanban-intelligence p { margin: 0; color: var(--apg-muted); font-size: .8rem; }
+.apg-flow-list { display: grid; gap: var(--apg-space-2); margin: 0; padding: 0; list-style: none; }
+.apg-flow-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .15rem var(--apg-space-2); padding: .45rem .65rem; border-radius: var(--apg-radius-sm); background: var(--apg-bg-hover); }
+.apg-flow-list li.warn { outline: 2px solid color-mix(in srgb, var(--apg-warning), transparent 35%); }
+.apg-flow-list small { grid-column: 1 / -1; color: var(--apg-muted); }
+.apg-swimlane-list { display: flex; flex-wrap: wrap; gap: var(--apg-space-2); }
+.apg-swimlane-list a { display: inline-flex; align-items: center; gap: var(--apg-space-2); min-height: 36px; padding: .3rem .6rem; border: 1px solid var(--apg-border); border-radius: var(--apg-radius-full); text-decoration: none; }
+.apg-swimlane-list a:hover { border-color: var(--apg-primary); text-decoration: none; opacity: 1; }
+.apg-kanban-policy strong { color: var(--apg-warning); font-size: 1.3rem; }
 .apg-kanban-col { min-height: 12rem; }
 .apg-kanban-empty { border: 1px dashed var(--apg-border); border-radius: var(--apg-radius); padding: var(--apg-space-4); color: var(--apg-muted); text-align: center; }
 .apg-kanban-wip { margin: -.35rem .25rem var(--apg-space-2); color: var(--apg-warning); font-size: .75rem; font-weight: 700; }
@@ -805,6 +817,7 @@ html[dir="rtl"] .apg-sidebar-backdrop { inset: 0; }
 	.apg-dashboard-command-center { grid-template-columns: 1fr; }
 	.apg-list-intelligence { grid-template-columns: 1fr; }
 	.apg-analytics-metrics, .apg-analytics-insights, .apg-analytics-decisions { grid-template-columns: 1fr; }
+	.apg-kanban-intelligence { grid-template-columns: 1fr; }
 	.apg-topbar { padding: 0 var(--apg-space-3); overflow-x: auto; }
 	.apg-content { padding: var(--apg-space-4); }
 	.apg-sidebar { transform: translateX(-100%); }
