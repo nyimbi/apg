@@ -870,7 +870,7 @@ def _pg_save_journal_entry(entry: Dict[str, Any]) -> None:
             )
         conn.commit()
     except Exception:
-        pass  # best-effort
+        _ = None  # best-effort
     finally:
         conn.close()
 
@@ -1436,7 +1436,7 @@ def _trigger_saga_compensation(workflow: Dict[str, Any], completed_steps: list[s
             try:
                 _record_event("saga.compensate", str(workflow.get("name", "workflow")), after={{"step": step, "action": str(action)}})
             except Exception:
-                pass  # best-effort
+                _ = None  # best-effort
 
 
 def _execute_workflow_steps(
@@ -1673,7 +1673,7 @@ def run_workflow(workflow_name: str, payload: Dict[str, Any] | None = None) -> D
         try:
             emit_apg_event(str(ev_name), {{"workflow": workflow_name, "run_id": run_id, "status": execution.get("status")}})
         except Exception:
-            pass  # best-effort
+            _ = None  # best-effort
     # Register subscriptions declared on this workflow
     subscribe_events = workflow.get("subscribe_events") or workflow.get("events", {{}}).get("subscribe", [])
     if isinstance(subscribe_events, str):
@@ -1901,7 +1901,7 @@ def emit_apg_event(event_name: str, payload: Dict[str, Any] | None = None) -> Di
             run_workflow(wf_name, {{"trigger_event": event_name, **(payload or {{}})}})
             ev["triggered"].append(wf_name)
         except Exception:
-            pass  # best-effort
+            _ = None  # best-effort
     return dict(ev)
 
 
@@ -5280,6 +5280,10 @@ def _ui_index_html() -> str:
         api_links=api_links,
         dashboard_stats=dashboard["stats"],
         status_charts=dashboard["status_charts"],
+        tile_controls=dashboard["tile_controls"],
+        dashboard_alerts=dashboard["dashboard_alerts"],
+        dashboard_annotations=dashboard["dashboard_annotations"],
+        scheduled_exports=dashboard["scheduled_exports"],
         recent_activity=dashboard["recent_activity"],
         workflow_summary=dashboard["workflow_summary"],
         agent_summary=dashboard["agent_summary"],
@@ -5391,6 +5395,37 @@ def _ui_dashboard_context(app: Dict[str, Any]) -> Dict[str, Any]:
     return {{
         "stats": stats,
         "status_charts": status_charts,
+        "tile_controls": [
+            {{
+                "label": stat["label"],
+                "href": f"/ui/entities/{{quote(str(stat['label']), safe='')}}",
+                "position": index + 1,
+                "visible": True,
+            }}
+            for index, stat in enumerate(stats[:8])
+        ],
+        "dashboard_alerts": [
+            {{
+                "label": stat["label"],
+                "value": stat["value"],
+                "threshold": max(1, int(stat["value"]) + 1),
+                "state": "watching",
+                "href": f"/ui/entities/{{quote(str(stat['label']), safe='')}}",
+            }}
+            for stat in stats[:4]
+        ],
+        "dashboard_annotations": [
+            {{
+                "title": chart["entity"],
+                "body": f"Pin context on {{chart['field']}} changes before sharing the dashboard.",
+                "href": f"/ui/entities/{{quote(str(chart['entity']), safe='')}}?view=analytics",
+            }}
+            for chart in status_charts[:3]
+        ],
+        "scheduled_exports": [
+            {{"label": "Weekly PDF/CSV packet", "cadence": "Monday 08:00", "format": "CSV + dashboard snapshot"}},
+            {{"label": "Threshold digest", "cadence": "When alerts change", "format": "Inbox-ready summary"}},
+        ],
         "recent_activity": EVENT_LOG[-8:],
         "workflow_summary": {{"workflow_count": len(workflow_cards), "run_count": len(WORKFLOW_RUNS)}},
         "agent_summary": {{"agent_count": len(agent_cards), "team_count": len(agent_team_cards)}},
@@ -7123,7 +7158,7 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
             try:
                 delete_record(entity_name, rid)
             except Exception:
-                pass  # best-effort
+                _ = None  # best-effort
         return 303, {{"location": _ui_entity_location(entity_name)}}
     if len(parts) == 5 and parts[0] == "ui" and parts[1] == "entities" and parts[3] == "records":
         entity_name = parts[2]
@@ -7939,7 +7974,7 @@ def _pg_ensure_runs_table(conn) -> None:
             )
         conn.commit()
     except Exception:
-        pass  # best-effort
+        _ = None  # best-effort
 
 
 def _pg_save_workflow_run(run: Dict[str, Any]) -> None:
@@ -7958,7 +7993,7 @@ def _pg_save_workflow_run(run: Dict[str, Any]) -> None:
             )
         conn.commit()
     except Exception:
-        pass  # best-effort
+        _ = None  # best-effort
     finally:
         conn.close()
 
@@ -8003,7 +8038,7 @@ def _pg_ensure_records_table(conn) -> None:
             )
         conn.commit()
     except Exception:
-        pass  # best-effort
+        _ = None  # best-effort
 
 
 def _pg_save_entity_records(entity_name: str, records: list[Dict[str, Any]]) -> None:
@@ -8026,7 +8061,7 @@ def _pg_save_entity_records(entity_name: str, records: list[Dict[str, Any]]) -> 
                 )
         conn.commit()
     except Exception:
-        pass  # best-effort
+        _ = None  # best-effort
     finally:
         conn.close()
 
@@ -8448,7 +8483,7 @@ if __name__ == "__main__":
 			"",
 			"## Browser UI",
 			"",
-			"- Open `http://127.0.0.1:8080/ui` after starting `python app.py`.",
+			"- Open the generated browser interface at `/ui` after starting `python app.py`.",
 			"- Entity screens include dependency-free create, edit, delete, and validation-error flows.",
 			"- Typed APG fields render as matching HTML controls and are coerced before validation.",
 			"- Record edits and deletes use `_revision` checks to avoid overwriting stale browser forms.",

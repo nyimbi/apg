@@ -31,7 +31,7 @@ python app.py --validate
 
 ## Browser UI
 
-- Open `http://127.0.0.1:8080/ui` after starting `python app.py`.
+- Open the generated browser interface at `/ui` after starting `python app.py`.
 - Entity screens include dependency-free create, edit, delete, and validation-error flows.
 - Typed APG fields render as matching HTML controls and are coerced before validation.
 - Record edits and deletes use `_revision` checks to avoid overwriting stale browser forms.

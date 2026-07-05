@@ -313,6 +313,23 @@ pre code { background: transparent; padding: 0; color: inherit; }
 .apg-stat-delta { font-size: 0.8rem; font-weight: 500; }
 .apg-stat-delta.up { color: var(--apg-success); }
 .apg-stat-delta.down { color: var(--apg-danger); }
+.apg-dashboard-command-center { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--apg-space-4); }
+.apg-dashboard-panel { min-height: 100%; }
+.apg-dashboard-sort-list,
+.apg-dashboard-watch-list,
+.apg-dashboard-pin-list,
+.apg-dashboard-export-list { display: grid; gap: var(--apg-space-2); margin: 0; padding: 0; list-style: none; }
+.apg-dashboard-sort-list li,
+.apg-dashboard-watch-list li,
+.apg-dashboard-pin-list li,
+.apg-dashboard-export-list li { display: grid; gap: 0.15rem; padding: var(--apg-space-2); border: 1px solid var(--apg-border); border-radius: var(--apg-radius-sm); background: var(--apg-bg-canvas); }
+.apg-dashboard-sort-list li { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+.apg-dashboard-watch-list li { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; }
+.apg-dashboard-watch-list small,
+.apg-dashboard-export-list small { grid-column: 1 / -1; color: var(--apg-muted); }
+.apg-dashboard-pin-list p { margin: 0; color: var(--apg-muted); font-size: .8rem; }
+.apg-dashboard-export-list span { color: var(--apg-muted); font-size: .8rem; }
+.apg-drag-handle { color: var(--apg-muted); font-family: var(--apg-font-mono); cursor: grab; }
 .apg-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--apg-space-4); }
 .apg-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--apg-space-4); }
 .apg-grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--apg-space-4); }
@@ -765,6 +782,7 @@ html[dir="rtl"] .apg-sidebar-backdrop { inset: 0; }
 }
 @media (max-width: 768px) {
 	.apg-grid-2, .apg-grid-3, .apg-grid-4 { grid-template-columns: 1fr; }
+	.apg-dashboard-command-center { grid-template-columns: 1fr; }
 	.apg-analytics-metrics, .apg-analytics-insights { grid-template-columns: 1fr; }
 	.apg-topbar { padding: 0 var(--apg-space-3); overflow-x: auto; }
 	.apg-content { padding: var(--apg-space-4); }

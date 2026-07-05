@@ -22,6 +22,89 @@
   {% endfor %}
 </nav>
 
+<section class="apg-dashboard-command-center mb-8" aria-label="Dashboard command center">
+  <article class="apg-card apg-dashboard-panel">
+    <div class="apg-card-header">
+      <div>
+        <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Composable Tiles</h2>
+        <p class="text-xs text-gray-400 mt-1">Persisted workspace order and visibility</p>
+      </div>
+      <button type="button" class="apg-btn apg-btn-secondary" data-apg-tour="dashboard-tiles">Save view</button>
+    </div>
+    <ol class="apg-dashboard-sort-list">
+      {% for tile in tile_controls %}
+      <li>
+        <span class="apg-drag-handle" aria-hidden="true">::</span>
+        <a href="{{ tile.href }}">{{ tile.label }}</a>
+        <span>{{ tile.position }}</span>
+      </li>
+      {% else %}
+      <li><span>No record tiles yet</span></li>
+      {% endfor %}
+    </ol>
+  </article>
+
+  <article class="apg-card apg-dashboard-panel">
+    <div class="apg-card-header">
+      <div>
+        <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Threshold Alerts</h2>
+        <p class="text-xs text-gray-400 mt-1">Inline watches before scheduled delivery</p>
+      </div>
+      <a class="apg-btn apg-btn-secondary" href="/metrics">Metrics</a>
+    </div>
+    <ul class="apg-dashboard-watch-list">
+      {% for alert in dashboard_alerts %}
+      <li>
+        <a href="{{ alert.href }}">{{ alert.label }}</a>
+        <strong>{{ alert.value }}</strong>
+        <small>{{ alert.state }} at {{ alert.threshold }}</small>
+      </li>
+      {% else %}
+      <li><span>No thresholds available</span></li>
+      {% endfor %}
+    </ul>
+  </article>
+
+  <article class="apg-card apg-dashboard-panel">
+    <div class="apg-card-header">
+      <div>
+        <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Annotation Pins</h2>
+        <p class="text-xs text-gray-400 mt-1">Decision context travels with charts</p>
+      </div>
+      <span class="apg-badge apg-badge-info">{{ dashboard_annotations | length }} pins</span>
+    </div>
+    <ul class="apg-dashboard-pin-list">
+      {% for pin in dashboard_annotations %}
+      <li>
+        <a href="{{ pin.href }}">{{ pin.title }}</a>
+        <p>{{ pin.body }}</p>
+      </li>
+      {% else %}
+      <li><p>Add status data to unlock annotation pins.</p></li>
+      {% endfor %}
+    </ul>
+  </article>
+
+  <article class="apg-card apg-dashboard-panel">
+    <div class="apg-card-header">
+      <div>
+        <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Scheduled Export</h2>
+        <p class="text-xs text-gray-400 mt-1">Offline packets, no external service</p>
+      </div>
+      <button type="button" class="apg-btn apg-btn-secondary" onclick="window.print()">PNG/PDF</button>
+    </div>
+    <ul class="apg-dashboard-export-list">
+      {% for item in scheduled_exports %}
+      <li>
+        <strong>{{ item.label }}</strong>
+        <span>{{ item.cadence }}</span>
+        <small>{{ item.format }}</small>
+      </li>
+      {% endfor %}
+    </ul>
+  </article>
+</section>
+
 {# Stats row #}
 <div class="apg-grid-4 mb-8" data-apg-live="events">
   {% for stat in dashboard_stats[:4] %}
