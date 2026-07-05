@@ -78,6 +78,65 @@
   </details>
 </section>
 
+<section class="apg-list-intelligence" aria-label="{{ entity_name }} list intelligence">
+  <article>
+    <span>Shareable State</span>
+    <strong>{{ list_intelligence.share_url }}</strong>
+    <button type="button" class="apg-mini-btn" data-apg-copy-url="{{ list_intelligence.share_url }}">Copy</button>
+  </article>
+  <article>
+    <span>Column Memory</span>
+    <strong>{{ list_intelligence.column_controls | length }} fields</strong>
+    <div class="apg-column-chip-row">
+      {% for col in list_intelligence.column_controls %}
+      <a href="{{ col.sort_url }}" class="apg-column-chip{% if col.active %} active{% endif %}">{{ col.label }}</a>
+      {% endfor %}
+    </div>
+  </article>
+  <article>
+    <span>Virtual Window</span>
+    <strong>{{ list_intelligence.visible_window }} of {{ list_intelligence.total }}</strong>
+    <small>{{ list_intelligence.page_size }} rows per page{% if list_intelligence.filtered %} after filters{% endif %}</small>
+  </article>
+  <article>
+    <span>Keyboard Fuzzy Filter</span>
+    <strong>/ focuses search</strong>
+    <small>Bulk bar and CSV export stay offline</small>
+  </article>
+</section>
+
+<script>
+(function() {
+  var densityKey = {{ list_intelligence.density_key | tojson }};
+  var root = document.documentElement;
+  var savedDensity = localStorage.getItem(densityKey);
+  if (savedDensity === 'compact') root.classList.add('apg-density-compact');
+  document.addEventListener('click', function(event) {
+    var copy = event.target.closest('[data-apg-copy-url]');
+    if (copy && navigator.clipboard) {
+      navigator.clipboard.writeText(location.origin + copy.dataset.apgCopyUrl);
+      APGToast('List URL copied', 'success');
+    }
+  });
+  document.addEventListener('keydown', function(event) {
+    if (event.key === '/' && !/input|textarea|select/i.test(event.target.tagName || '')) {
+      var search = document.getElementById('apg-entity-search');
+      if (search) {
+        event.preventDefault();
+        search.focus();
+      }
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      var compact = !root.classList.contains('apg-density-compact');
+      root.classList.toggle('apg-density-compact', compact);
+      localStorage.setItem(densityKey, compact ? 'compact' : 'comfortable');
+      APGToast(compact ? 'Compact rows enabled' : 'Comfortable rows enabled', 'info');
+    }
+  });
+})();
+</script>
+
 <dialog id="apg-create-drawer" class="apg-drawer" aria-labelledby="apg-create-title">
   <form id="apg-create-form" method="post" action="/ui/entities/{{ safe_entity }}/records" class="apg-drawer-panel">
     <header class="apg-card-header">

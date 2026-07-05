@@ -248,6 +248,20 @@ p { margin: 0 0 var(--apg-space-3); }
 .apg-filter-panel { border-top: 1px solid var(--apg-border); padding-top: var(--apg-space-2); }
 .apg-filter-panel summary,
 .apg-developer-panel summary { font-size: .75rem; color: var(--apg-muted); cursor: pointer; user-select: none; }
+.apg-list-intelligence { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--apg-space-3); margin-bottom: var(--apg-space-4); }
+.apg-list-intelligence article { display: grid; gap: .3rem; padding: var(--apg-space-3); border: 1px solid var(--apg-border); border-radius: var(--apg-radius); background: var(--apg-bg-card); box-shadow: var(--apg-shadow-sm); min-width: 0; }
+.apg-list-intelligence span { color: var(--apg-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.apg-list-intelligence strong { color: var(--apg-text); font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apg-list-intelligence small { color: var(--apg-muted); }
+.apg-mini-btn { justify-self: start; min-height: 32px; padding: .2rem .55rem; font-size: .75rem; }
+.apg-column-chip-row { display: flex; flex-wrap: wrap; gap: .35rem; }
+.apg-column-chip { display: inline-flex; min-height: 28px; align-items: center; padding: .15rem .45rem; border: 1px solid var(--apg-border); border-radius: var(--apg-radius-full); color: var(--apg-muted); font-size: .72rem; text-decoration: none; }
+.apg-column-chip.active,
+.apg-column-chip:hover { border-color: var(--apg-primary); color: var(--apg-primary); text-decoration: none; opacity: 1; }
+:root.apg-density-compact .apg-table td,
+:root.apg-density-compact .apg-table th,
+:root.apg-density-compact table td,
+:root.apg-density-compact table th { padding-top: .35rem; padding-bottom: .35rem; }
 
 .apg-badge {
 	display: inline-flex;
@@ -783,6 +797,7 @@ html[dir="rtl"] .apg-sidebar-backdrop { inset: 0; }
 @media (max-width: 768px) {
 	.apg-grid-2, .apg-grid-3, .apg-grid-4 { grid-template-columns: 1fr; }
 	.apg-dashboard-command-center { grid-template-columns: 1fr; }
+	.apg-list-intelligence { grid-template-columns: 1fr; }
 	.apg-analytics-metrics, .apg-analytics-insights { grid-template-columns: 1fr; }
 	.apg-topbar { padding: 0 var(--apg-space-3); overflow-x: auto; }
 	.apg-content { padding: var(--apg-space-4); }

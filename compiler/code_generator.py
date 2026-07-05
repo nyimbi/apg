@@ -6046,6 +6046,28 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
     has_kanban = any(str(f.get("name", "")).lower() in status_field_names for f in fields)
 
     records_table = _ui_records_table_html(entity_name, paginated, sort_field=sort_field, sort_dir=sort_dir, q=q, query=query)
+    visible_start = offset + 1 if total_filtered else 0
+    visible_end = min(offset + len(paginated), total_filtered)
+    column_controls = [
+        {{
+            "name": str(field["name"]),
+            "label": _humanize_label(str(field["name"])),
+            "sort_url": _ui_entity_query_path(entity_name, query, {{"sort": str(field["name"]), "dir": "asc", "page": None}}),
+            "active": str(field["name"]) == sort_field,
+        }}
+        for field in fields
+        if str(field.get("name", "")) != "_revision"
+    ][:8]
+    list_intelligence = {{
+        "share_url": _ui_entity_query_path(entity_name, query),
+        "density_key": f"apg:list-density:{{entity_name}}",
+        "column_key": f"apg:list-columns:{{entity_name}}",
+        "visible_window": f"{{visible_start}}-{{visible_end}}",
+        "total": total_filtered,
+        "page_size": per,
+        "filtered": total_filtered != query_result["total"] or bool(q),
+        "column_controls": column_controls,
+    }}
     pagination_pages = [
         {{"number": p, "url": _ui_entity_query_path(entity_name, query, {{"page": p, "per": per}})}}
         for p in range(1, total_pages + 1)
@@ -6069,6 +6091,7 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
         total=query_result["total"],
         count=total_filtered,
         records_table=records_table,
+        list_intelligence=list_intelligence,
         create_inputs=create_inputs,
         notice=html.escape(notice) if notice else "",
         query=query,
