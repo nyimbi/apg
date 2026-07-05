@@ -1,0 +1,12 @@
+HTTP/1.1 200 OK
+Server: Werkzeug/3.1.6 Python/3.11.15
+Date: Sun, 05 Jul 2026 00:23:10 GMT
+Content-Disposition: inline; filename=manifest.webmanifest
+Content-Type: application/manifest+json
+Content-Length: 389
+Last-Modified: Sun, 05 Jul 2026 00:08:04 GMT
+Cache-Control: no-cache
+ETag: "1783210084.6049292-389-3200329589"
+Date: Sun, 05 Jul 2026 00:23:10 GMT
+Connection: close
+

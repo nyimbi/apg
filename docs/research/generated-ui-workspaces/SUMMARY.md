@@ -875,6 +875,140 @@ Validation evidence:
 - Full suite: `1485 passed, 1 skipped, 3 warnings in 722.71s`.
 - PythonCodeGenerator tripwire clean.
 
+### shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa
+
+Status: complete.
+
+Intended commit:
+
+```text
+ux(shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa): complete app shell controls
+```
+
+Files:
+
+- `compiler/assets/apg.css`
+- `compiler/code_generator.py`
+- `tests/test_generated_ui_pwa.py`
+- `examples/01_minimal_customer_records/output/app.py`
+- `examples/01_minimal_customer_records/output/static/apg.css`
+- `examples/01_minimal_customer_records/output/static/manifest.webmanifest`
+- `examples/01_minimal_customer_records/output/static/sw.js`
+- `examples/02_customer_orders_relationship/output/app.py`
+- `examples/02_customer_orders_relationship/output/static/apg.css`
+- `examples/02_customer_orders_relationship/output/static/manifest.webmanifest`
+- `examples/02_customer_orders_relationship/output/static/sw.js`
+- `examples/03_inventory_typed_records/output/app.py`
+- `examples/03_inventory_typed_records/output/static/apg.css`
+- `examples/03_inventory_typed_records/output/static/manifest.webmanifest`
+- `examples/03_inventory_typed_records/output/static/sw.js`
+- `examples/04_order_fulfillment_model/output/app.py`
+- `examples/04_order_fulfillment_model/output/static/apg.css`
+- `examples/04_order_fulfillment_model/output/static/manifest.webmanifest`
+- `examples/04_order_fulfillment_model/output/static/sw.js`
+- `examples/05_single_support_agent/output/app.py`
+- `examples/05_single_support_agent/output/static/apg.css`
+- `examples/05_single_support_agent/output/static/manifest.webmanifest`
+- `examples/05_single_support_agent/output/static/sw.js`
+- `examples/06_support_agent_team/output/app.py`
+- `examples/06_support_agent_team/output/static/apg.css`
+- `examples/06_support_agent_team/output/static/manifest.webmanifest`
+- `examples/06_support_agent_team/output/static/sw.js`
+- `examples/07_multi_runtime_agent_team/output/app.py`
+- `examples/07_multi_runtime_agent_team/output/static/apg.css`
+- `examples/07_multi_runtime_agent_team/output/static/manifest.webmanifest`
+- `examples/07_multi_runtime_agent_team/output/static/sw.js`
+- `examples/08_basic_capability_contract/output/app.py`
+- `examples/08_basic_capability_contract/output/static/apg.css`
+- `examples/08_basic_capability_contract/output/static/manifest.webmanifest`
+- `examples/08_basic_capability_contract/output/static/sw.js`
+- `examples/09_capability_rules_configuration/output/app.py`
+- `examples/09_capability_rules_configuration/output/static/apg.css`
+- `examples/09_capability_rules_configuration/output/static/manifest.webmanifest`
+- `examples/09_capability_rules_configuration/output/static/sw.js`
+- `examples/10_themed_i18n_streaming_capability/output/app.py`
+- `examples/10_themed_i18n_streaming_capability/output/static/apg.css`
+- `examples/10_themed_i18n_streaming_capability/output/static/manifest.webmanifest`
+- `examples/10_themed_i18n_streaming_capability/output/static/sw.js`
+- `examples/11_screen_composition_relationships/output/app.py`
+- `examples/11_screen_composition_relationships/output/static/apg.css`
+- `examples/11_screen_composition_relationships/output/static/manifest.webmanifest`
+- `examples/11_screen_composition_relationships/output/static/sw.js`
+- `examples/12_finance_general_ledger/output/app.py`
+- `examples/12_finance_general_ledger/output/static/apg.css`
+- `examples/12_finance_general_ledger/output/static/manifest.webmanifest`
+- `examples/12_finance_general_ledger/output/static/sw.js`
+- `examples/13_procurement_approval_workbench/output/app.py`
+- `examples/13_procurement_approval_workbench/output/static/apg.css`
+- `examples/13_procurement_approval_workbench/output/static/manifest.webmanifest`
+- `examples/13_procurement_approval_workbench/output/static/sw.js`
+- `examples/14_inventory_warehouse_operations/output/app.py`
+- `examples/14_inventory_warehouse_operations/output/static/apg.css`
+- `examples/14_inventory_warehouse_operations/output/static/manifest.webmanifest`
+- `examples/14_inventory_warehouse_operations/output/static/sw.js`
+- `examples/15_manufacturing_quality_control/output/app.py`
+- `examples/15_manufacturing_quality_control/output/static/apg.css`
+- `examples/15_manufacturing_quality_control/output/static/manifest.webmanifest`
+- `examples/15_manufacturing_quality_control/output/static/sw.js`
+- `examples/16_hr_payroll_operations/output/app.py`
+- `examples/16_hr_payroll_operations/output/static/apg.css`
+- `examples/16_hr_payroll_operations/output/static/manifest.webmanifest`
+- `examples/16_hr_payroll_operations/output/static/sw.js`
+- `examples/17_crm_sales_pipeline/output/app.py`
+- `examples/17_crm_sales_pipeline/output/static/apg.css`
+- `examples/17_crm_sales_pipeline/output/static/manifest.webmanifest`
+- `examples/17_crm_sales_pipeline/output/static/sw.js`
+- `examples/18_operations_dashboard_capability/output/app.py`
+- `examples/18_operations_dashboard_capability/output/static/apg.css`
+- `examples/18_operations_dashboard_capability/output/static/manifest.webmanifest`
+- `examples/18_operations_dashboard_capability/output/static/sw.js`
+- `examples/19_multi_capability_dependency_suite/output/app.py`
+- `examples/19_multi_capability_dependency_suite/output/static/apg.css`
+- `examples/19_multi_capability_dependency_suite/output/static/manifest.webmanifest`
+- `examples/19_multi_capability_dependency_suite/output/static/sw.js`
+- `examples/20_enterprise_erp_platform/output/app.py`
+- `examples/20_enterprise_erp_platform/output/static/apg.css`
+- `examples/20_enterprise_erp_platform/output/static/manifest.webmanifest`
+- `examples/20_enterprise_erp_platform/output/static/sw.js`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/README.md`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/thinking.md`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/sources.md`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/rationale.md`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-ui.html`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-ui.headers`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-entity.html`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-entity.headers`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-marketplace.html`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-marketplace.headers`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-manifest.webmanifest`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-manifest.headers`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-sw.js`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-sw.headers`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-search.json`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/before-search.headers`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-ui.html`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-ui.headers`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-entity.html`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-entity.headers`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-marketplace.html`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-marketplace.headers`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-manifest.webmanifest`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-manifest.headers`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-sw.js`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-sw.headers`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-search.json`
+- `docs/research/generated-ui-workspaces/shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa/assets/after-search.headers`
+- `docs/research/generated-ui-workspaces/SUMMARY.md`
+
+Validation evidence:
+
+- Live before audit: example 20 booted at `127.0.0.1:20909`; shell had topbar/sidebar/theme/locale/offline pieces but no visible command trigger, notification center, install/update controls, or manifest shortcuts.
+- Live after audit: regenerated example 20 booted at `127.0.0.1:20910`; `/ui`, `/ui/entities/Vendor`, `/ui/marketplace`, manifest, service worker, and search endpoint captured with visible shell controls and active navigation.
+- Regenerated all 20 numbered examples through `uv run apg compile`.
+- Targeted tests: `6 passed in 11.09s` across PWA/shell regression, CSS class coverage, and required template route coverage.
+- Full suite: `1486 passed, 1 skipped, 3 warnings in 725.84s`.
+- PythonCodeGenerator tripwire clean.
+
 ## Verdicts
 
 | Workspace | Before | After | Status |
@@ -892,6 +1026,7 @@ Validation evidence:
 | flow-debugger | Completed UI workflow runs showed only a plain step list and had an empty journal endpoint, so the debugger lacked audit context. | UI workflow runs write journal events and render run timeline, context, payload, created-record snapshot, and journal table. | Complete |
 | login-auth-surfaces | Auth-required login worked functionally but rendered inside the normal generated app shell, used sparse labels, did not preserve username on error, and gave terse failure feedback. | Login renders in a standalone self-contained shell, labels the auth context and destination, preserves username after failed login, and keeps authenticated UI/logout behavior intact. | Complete |
 | landing-page-marketplace | Example 20 root and `/home` returned 500 from an unsafe capability-theme lookup; marketplace rendered only a no-connectors command empty state. | Landing routes render an operational workspace entry page, and marketplace provides search/category discovery plus generated integration blueprints. | Complete |
+| shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa | Shell had core pieces but command access was hidden, notifications were transient only, active shell nav was incomplete, and PWA install/update affordances were invisible. | Shell exposes command, notification, install/update, theme, locale, active nav, offline, and richer PWA metadata in a persistent self-contained app frame. | Complete |
 
 ## Defect Ledger
 
@@ -957,3 +1092,7 @@ Validation evidence:
 | landing-page-marketplace | Landing page was generic and API-link-heavy. | Reworked it into workspace readiness, start actions, entity links, integration readiness, and developer surfaces. | Resolved |
 | landing-page-marketplace | Marketplace empty state was a dead end when no connectors were installed. | Added generated API, record sync, workflow webhook, and agent runtime blueprints. | Resolved |
 | landing-page-marketplace | Marketplace had no discovery controls. | Added search, category filters, counts, status, and operation summaries. | Resolved |
+| shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa | Command palette was discoverable only by knowing Ctrl/Cmd-K. | Added a visible `Search` topbar trigger and dialog semantics. | Resolved |
+| shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa | Toasts disappeared with no history. | Added notification panel and notification history for toasts, offline/online, install, and update events. | Resolved |
+| shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa | Sidebar/topnav active state was incomplete at shell level. | Added server-rendered `aria-current` for topnav and sidebar links during Flask requests. | Resolved |
+| shell-chrome-sidebar-topbar-palette-notifications-theme-i18n-pwa | PWA install/update capability was hidden. | Added install/update buttons, `beforeinstallprompt` handling, service-worker update handling, and manifest shortcuts. | Resolved |

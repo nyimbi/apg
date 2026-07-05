@@ -3598,18 +3598,28 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
     direction = _text_direction(locale)
     safe_locale = html.escape(locale, quote=True)
     safe_direction = html.escape(direction, quote=True)
+    try:
+        current_path = _flask_request.path
+    except RuntimeError:
+        current_path = "/ui"
+
+    def _shell_link(href: str, label: str, class_name: str = "apg-sidebar-link", exact: bool = False) -> str:
+        active = current_path == href if exact else (current_path == href or current_path.startswith(href + "/"))
+        aria = ' aria-current="page"' if active else ""
+        return f'<a class="{class_name}" href="{html.escape(href, quote=True)}"{aria}>{html.escape(label)}</a>'
+
     entity_nav = "".join(
-        f'<a class="apg-sidebar-link" href="/ui/entities/{html.escape(quote(str(entity["name"]), safe=""), quote=True)}">{html.escape(str(entity["name"]))}</a>'
+        _shell_link(f'/ui/entities/{quote(str(entity["name"]), safe="")}', str(entity["name"]))
         for entity in ENTITIES
         if entity.get("type") not in {"application"}
     ) or '<span class="apg-sidebar-empty">No entities</span>'
     app = describe_application()
     agent_nav = "".join(
-        f'<a class="apg-sidebar-link" href="/ui/agents/{html.escape(quote(str(name), safe=""), quote=True)}">{html.escape(str(name))}</a>'
+        _shell_link(f'/ui/agents/{quote(str(name), safe="")}', str(name))
         for name in sorted(app.get("ai_agent_descriptions", {}))
     )
     team_nav = "".join(
-        f'<a class="apg-sidebar-link" href="/ui/agent-teams/{html.escape(quote(str(name), safe=""), quote=True)}">{html.escape(str(name))}</a>'
+        _shell_link(f'/ui/agent-teams/{quote(str(name), safe="")}', str(name))
         for name in sorted(app.get("ai_agent_team_descriptions", {}))
     )
     current_user = _current_user() if APG_AUTH_REQUIRED else None
@@ -3644,10 +3654,11 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
     sidebar_html = (
         '<aside id="apg-sidebar" class="apg-sidebar" aria-label="Application navigation">'
         '<div class="apg-sidebar-section"><p class="apg-sidebar-heading">Navigate</p>'
-        '<a class="apg-sidebar-link" href="/ui">Dashboard</a>'
-        '<a class="apg-sidebar-link" href="/ui/workflows">Workflows</a>'
-        '<a class="apg-sidebar-link" href="/ui/databases">Databases</a>'
-        '<a class="apg-sidebar-link" href="/ui/marketplace">Marketplace</a></div>'
+        + _shell_link("/ui", "Dashboard", exact=True)
+        + _shell_link("/ui/workflows", "Workflows")
+        + _shell_link("/ui/databases", "Databases")
+        + _shell_link("/ui/marketplace", "Marketplace")
+        + '</div>'
         f'<div class="apg-sidebar-section"><p class="apg-sidebar-heading">Entities</p>{entity_nav}</div>'
         + (f'<div class="apg-sidebar-section"><p class="apg-sidebar-heading">Agents</p>{agent_nav}{team_nav}</div>' if agent_nav or team_nav else "")
         + '</aside><div id="apg-sidebar-backdrop" class="apg-sidebar-backdrop" onclick="apgCloseSidebar()"></div>'
@@ -3675,11 +3686,16 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         '<button value="confirm" class="apg-btn apg-btn-danger" type="submit">Delete</button>'
         '</div></form></dialog>'
         '<script>'
+        'var _apgNotifications=[];var _apgDeferredInstall=null;var _apgWasOffline=false;'
+        'function apgRenderNotifications(){var list=document.getElementById("apg-notification-list");var dot=document.getElementById("apg-notification-dot");if(!list)return;if(!_apgNotifications.length){list.innerHTML=\'<p class="apg-notification-meta">No notifications yet.</p>\';if(dot)dot.hidden=true;return;}list.innerHTML=_apgNotifications.slice(0,6).map(function(n){return \'<article class="apg-notification-item"><p class="apg-notification-title">\'+n.message+\'</p><p class="apg-notification-meta">\'+n.kind+\' - \'+n.time+\'</p></article>\';}).join("");if(dot)dot.hidden=false;}'
+        'function apgRecordNotification(message,kind){_apgNotifications.unshift({message:message,kind:kind||"info",time:new Date().toLocaleTimeString()});apgRenderNotifications();}'
+        'function apgToggleNotifications(){var p=document.getElementById("apg-notification-panel");if(!p)return;p.hidden=!p.hidden;if(!p.hidden)apgRenderNotifications();}'
         'function apgToast(m,t){'
         'var c=t==="error"?"bg-red-600":"bg-gray-900";'
         'var el=document.createElement("div");'
         'el.className=c+" text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-auto transition-all duration-300 opacity-0 translate-y-2";'
         'el.textContent=m;'
+        'apgRecordNotification(m,t||"success");'
         'document.getElementById("apg-toast-root").appendChild(el);'
         'requestAnimationFrame(function(){el.classList.remove("opacity-0","translate-y-2");});'
         'setTimeout(function(){el.classList.add("opacity-0");setTimeout(function(){el.remove();},300);},3000);'
@@ -3699,11 +3715,14 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         'function apgToggleSidebar(){if(matchMedia("(max-width: 767px)").matches){document.documentElement.classList.toggle("apg-sidebar-open");}else{apgSetSidebar(!document.documentElement.classList.contains("apg-sidebar-collapsed"));}}'
         'function apgCloseSidebar(){document.documentElement.classList.remove("apg-sidebar-open");}'
         'try{if(localStorage.getItem("apg-sidebar-collapsed")==="1")document.documentElement.classList.add("apg-sidebar-collapsed");}catch(e){}'
-        'function apgSyncOffline(){var b=document.getElementById("apg-offline-banner");if(b)b.hidden=navigator.onLine;}'
+        'function apgSyncOffline(){var b=document.getElementById("apg-offline-banner");var offline=!navigator.onLine;if(b)b.hidden=!offline;if(offline&&!_apgWasOffline){apgRecordNotification("Offline mode enabled","offline");}if(!offline&&_apgWasOffline){apgRecordNotification("Connection restored","online");}_apgWasOffline=offline;}'
         'window.addEventListener("online",apgSyncOffline);window.addEventListener("offline",apgSyncOffline);'
-        'if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/static/sw.js").catch(function(){});});}'
+        'function apgApplyUpdate(){if(window._apgWaitingWorker){window._apgWaitingWorker.postMessage({type:"SKIP_WAITING"});}}'
+        'function apgInstall(){if(!_apgDeferredInstall)return;_apgDeferredInstall.prompt();_apgDeferredInstall.userChoice.finally(function(){_apgDeferredInstall=null;var b=document.getElementById("apg-install-btn");if(b)b.hidden=true;});}'
+        'window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();_apgDeferredInstall=e;var b=document.getElementById("apg-install-btn");if(b)b.hidden=false;apgRecordNotification("App can be installed","pwa");});'
+        'if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/static/sw.js").then(function(reg){function watch(worker){if(!worker)return;worker.addEventListener("statechange",function(){if(worker.state==="installed"&&navigator.serviceWorker.controller){window._apgWaitingWorker=worker;var b=document.getElementById("apg-update-btn");if(b)b.hidden=false;apgRecordNotification("Update ready","pwa");}});}watch(reg.waiting);reg.addEventListener("updatefound",function(){watch(reg.installing);});}).catch(function(){});});navigator.serviceWorker.addEventListener("controllerchange",function(){location.reload();});}'
         'document.addEventListener("keydown",function(e){if(e.key==="Escape")apgCloseSidebar();});'
-        'document.addEventListener("DOMContentLoaded",apgSyncOffline);'
+        'document.addEventListener("DOMContentLoaded",function(){apgSyncOffline();apgRenderNotifications();});'
         '</script>'
     )
     skeleton_css = (
@@ -3723,6 +3742,10 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         '</style>'
     )
     cmd_palette_html = '<div id="apg-cmd" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onclick="if(event.target===this)apgCmdClose()"><div class="mx-auto mt-[15vh] max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"><div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100"><svg class="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9 a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg><input id="apg-cmd-input" type="text" placeholder="Search records, entities..." autocomplete="off" class="flex-1 text-sm outline-none placeholder-gray-400" oninput="apgCmdSearch(this.value)"><kbd class="text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">Esc</kbd></div><div id="apg-cmd-results" class="max-h-80 overflow-y-auto py-2"><p class="text-xs text-gray-400 text-center py-8">Type to search...</p></div></div></div><script>document.addEventListener("keydown",function(e){if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();apgCmdOpen();}if(e.key==="Escape")apgCmdClose();});function apgCmdOpen(){document.getElementById("apg-cmd").classList.remove("hidden");document.getElementById("apg-cmd-input").focus();}function apgCmdClose(){document.getElementById("apg-cmd").classList.add("hidden");document.getElementById("apg-cmd-input").value="";document.getElementById("apg-cmd-results").innerHTML=\'<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>\';}var _cmdTimer;function apgCmdSearch(q){clearTimeout(_cmdTimer);if(!q.trim()){document.getElementById("apg-cmd-results").innerHTML=\'<p class="text-xs text-gray-400 text-center py-8">Type to search...</p>\';return;}_cmdTimer=setTimeout(function(){fetch("/api/search?q="+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(d){var el=document.getElementById("apg-cmd-results");if(!d.results||!d.results.length){el.innerHTML=\'<p class="text-xs text-gray-400 text-center py-8">No results</p>\';return;}el.innerHTML=d.results.map(function(r){return \'<a href="/ui/entities/\'+encodeURIComponent(r.entity)+\'/\'+encodeURIComponent(r.id)+\'"\'+\'  onclick="apgCmdClose()"\'+\'  class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group">\'+\'<span class="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center text-xs font-bold text-blue-600 flex-shrink-0">\'+r.entity.charAt(0).toUpperCase()+\'</span>\'+\'<div class="min-w-0"><p class="text-sm font-medium text-gray-900 truncate">\'+r.label+\'</p>\'+\'<p class="text-xs text-gray-400 truncate">\'+r.entity+\'</p></div>\'+\'</a>\';}).join("");});},200);}</script>'
+    cmd_palette_html = cmd_palette_html.replace(
+        'id="apg-cmd" class="hidden',
+        'id="apg-cmd" role="dialog" aria-modal="true" aria-label="Command palette" class="hidden',
+    )
     if not shell:
         return (
             "<!doctype html>"
@@ -3757,13 +3780,23 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         f'  <button class="apg-icon-btn" type="button" onclick="apgToggleSidebar()" aria-label="Toggle navigation">☰</button>'
         f'  <a class="apg-logo" href="/ui">{safe_module}</a>'
         f'  <nav class="apg-topnav ml-4">'
-        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui">{_("home")}</a>'
-        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/workflows">⚡ {_("workflows")}</a>'
-        f'    <a class="apg-nav-link hover:bg-gray-100" href="/ui/marketplace">{_("marketplace")}</a>'
+        f'    {_shell_link("/ui", _("home"), "apg-nav-link hover:bg-gray-100", exact=True)}'
+        f'    {_shell_link("/ui/workflows", "⚡ " + _("workflows"), "apg-nav-link hover:bg-gray-100")}'
+        f'    {_shell_link("/ui/marketplace", _("marketplace"), "apg-nav-link hover:bg-gray-100")}'
         f'  </nav>'
-        f'  <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">{_("theme_system")}</button>'
-        f'  {language_menu}'
-        f'  {user_menu}'
+        f'  <span class="apg-topbar-spacer"></span>'
+        f'  <div class="apg-shell-action-row" aria-label="Shell actions">'
+        f'    <button class="apg-btn apg-btn-secondary apg-command-trigger" type="button" onclick="apgCmdOpen()" aria-haspopup="dialog">Search <kbd>⌘K</kbd></button>'
+        f'    <button id="apg-install-btn" class="apg-btn apg-btn-secondary apg-install-btn" type="button" onclick="apgInstall()" hidden>Install</button>'
+        f'    <button id="apg-update-btn" class="apg-btn apg-btn-secondary apg-install-btn" type="button" onclick="apgApplyUpdate()" hidden>Update</button>'
+        f'    <div class="apg-notification-wrap">'
+        f'      <button class="apg-btn apg-btn-secondary" type="button" onclick="apgToggleNotifications()" aria-controls="apg-notification-panel" aria-label="Notifications">Notifications<span id="apg-notification-dot" class="apg-notification-dot" hidden></span></button>'
+        f'      <section id="apg-notification-panel" class="apg-notification-panel" aria-label="Notifications" hidden><h2 class="text-sm font-semibold text-gray-900 mb-3">Notifications</h2><div id="apg-notification-list"></div></section>'
+        f'    </div>'
+        f'    <button id="apg-theme-toggle" class="apg-btn apg-btn-secondary apg-theme-toggle" type="button" onclick="apgCycleTheme()" aria-label="Theme: system">{_("theme_system")}</button>'
+        f'    {language_menu}'
+        f'    {user_menu}'
+        f'  </div>'
         f'</header>'
         f'{sidebar_html}'
         f'<main class="apg-content apg-shell-content" id="content" tabindex="-1">{body}</main>'

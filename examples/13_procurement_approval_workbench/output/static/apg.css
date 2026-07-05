@@ -144,6 +144,23 @@ p { margin: 0 0 var(--apg-space-3); }
 	background: var(--apg-surface);
 	color: var(--apg-text);
 }
+.apg-topbar-spacer { flex: 1 1 auto; }
+.apg-shell-action-row { display: inline-flex; align-items: center; gap: var(--apg-space-2); }
+.apg-install-btn[hidden] { display: none; }
+.apg-notification-wrap { position: relative; }
+.apg-notification-dot { position: absolute; top: 0.35rem; right: 0.35rem; width: 0.5rem; height: 0.5rem; border-radius: 999px; background: #dc2626; border: 2px solid var(--apg-surface); }
+.apg-notification-panel { position: absolute; right: 0; top: calc(100% + 0.5rem); z-index: 140; width: min(22rem, calc(100vw - 2rem)); background: var(--apg-surface); border: 1px solid var(--apg-border); border-radius: var(--apg-radius-lg); box-shadow: var(--apg-shadow-lg); padding: var(--apg-space-4); }
+.apg-notification-panel[hidden] { display: none; }
+.apg-notification-item { border: 1px solid var(--apg-border); border-radius: var(--apg-radius); padding: var(--apg-space-3); background: var(--apg-bg-canvas); }
+.apg-notification-item + .apg-notification-item { margin-top: var(--apg-space-2); }
+.apg-notification-title { margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--apg-text); }
+.apg-notification-meta { margin: 0.25rem 0 0; font-size: 0.72rem; color: var(--apg-muted); }
+.apg-command-trigger kbd { font-size: 0.7rem; color: var(--apg-muted); border: 1px solid var(--apg-border); border-radius: 4px; padding: 0 0.25rem; margin-left: 0.35rem; }
+.apg-command-dialog[aria-hidden="true"] { display: none; }
+.apg-command-empty { padding: var(--apg-space-6); text-align: center; color: var(--apg-muted); font-size: 0.8rem; }
+.apg-command-result { display: flex; align-items: center; gap: var(--apg-space-3); padding: 0.65rem var(--apg-space-4); color: var(--apg-text); text-decoration: none; }
+.apg-command-result:hover,
+.apg-command-result:focus-visible { background: var(--apg-bg-hover); text-decoration: none; }
 .apg-sidebar { position: fixed; top: var(--apg-topbar-height); bottom: 0; left: 0; z-index: 80; width: var(--apg-sidebar-width); overflow-y: auto; border-right: 1px solid var(--apg-border); background: var(--apg-surface); padding: var(--apg-space-4); transition: transform var(--apg-duration-base), width var(--apg-duration-base); }
 .apg-sidebar-section + .apg-sidebar-section { margin-top: var(--apg-space-5); }
 .apg-sidebar-heading { margin: 0 0 var(--apg-space-2); font-size: 0.72rem; font-weight: 700; color: var(--apg-muted); text-transform: uppercase; letter-spacing: 0.05em; }
