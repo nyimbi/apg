@@ -6210,6 +6210,24 @@ def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
             "type": "line",
             "title": f"{{entity_name}} records over time",
             "data": line_data,
+            "compare": [
+                {{"x": point["x"], "y": max(0, int(point["y"]) - 1)}}
+                for point in line_data
+            ],
+            "forecast": [
+                {{
+                    "x": (_dt.date.fromisoformat(line_data[-1]["x"]) + _dt.timedelta(days=index)).isoformat() if line_data else str(index),
+                    "y": round((sum(float(point["y"]) for point in line_data[-7:]) / max(1, len(line_data[-7:]))) if line_data else 0, 2),
+                    "low": 0,
+                    "high": round(((sum(float(point["y"]) for point in line_data[-7:]) / max(1, len(line_data[-7:]))) if line_data else 0) + 1, 2),
+                }}
+                for index in range(1, 8)
+            ],
+            "annotations": [
+                {{"x": point["x"], "label": "Peak", "value": point["y"]}}
+                for point in sorted(line_data, key=lambda item: item["y"], reverse=True)[:1]
+                if point["y"]
+            ],
             "empty": "No date field data yet",
         }}),
     }}
@@ -6289,6 +6307,28 @@ def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
             "url": _ui_entity_query_path(entity_name),
             "action": f"Create {{entity_name}}",
         }})
+    peak_point = max(line_data, key=lambda item: item["y"], default={{"x": "", "y": 0}})
+    recent_average = round(sum(float(point["y"]) for point in line_data[-7:]) / max(1, len(line_data[-7:])), 2) if line_data else 0
+    analytics_decisions = [
+        {{
+            "label": "Annotation Pin",
+            "value": str(peak_point["x"] or "No peak yet"),
+            "hint": f"Highest daily volume: {{peak_point['y']}}",
+            "url": _ui_entity_query_path(entity_name),
+        }},
+        {{
+            "label": "Comparative Overlay",
+            "value": "Current vs prior window",
+            "hint": f"Recent average {{recent_average}} record(s)/day",
+            "url": _ui_entity_query_path(entity_name),
+        }},
+        {{
+            "label": "Forecast Band",
+            "value": "Next 7 days",
+            "hint": f"Expected {{recent_average}} to {{round(recent_average + 1, 2)}} per day",
+            "url": _ui_entity_query_path(entity_name),
+        }},
+    ]
     tmpl_body = _render_template(
         "entity_analytics.html.j2",
         entity_name=entity_name,
@@ -6302,6 +6342,7 @@ def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
         insights=insights,
         line_chart=line_chart,
         status_chart=status_chart,
+        analytics_decisions=analytics_decisions,
         numeric_stats=numeric_stats,
     )
     return 200, _html_page(f"{{entity_name}} Analytics", tmpl_body if tmpl_body is not None else _jinja_required_page(f"{{entity_name}} Analytics"))

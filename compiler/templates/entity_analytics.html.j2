@@ -19,6 +19,17 @@
   {% endfor %}
 </section>
 
+<section class="apg-analytics-decisions" aria-label="{{ entity_name }} decision intelligence">
+  {% for item in analytics_decisions %}
+  <article>
+    <span>{{ item.label }}</span>
+    <strong>{{ item.value }}</strong>
+    <small>{{ item.hint }}</small>
+    <a href="{{ item.url }}">Inspect records</a>
+  </article>
+  {% endfor %}
+</section>
+
 <section class="apg-grid-2 gap-6 mb-6">
   <article class="apg-card">
     <div class="apg-card-header">
