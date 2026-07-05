@@ -1,431 +1,236 @@
-# APG Installation & Setup Guide
+# APG Installation And CLI Reference
 
-This guide covers the complete installation and setup process for the APG platform, from basic development setup to production deployment.
+This guide describes the current APG developer installation and command surface.
+It intentionally avoids older platform-stack instructions that assumed a
+monolithic server, Redis, PostgreSQL, or Docker Compose as prerequisites for
+basic compiler work.
 
-## 🚀 Quick Start Installation
+## Requirements
 
-### Prerequisites
+Minimum:
 
-1. **Python 3.9+** (Recommended: Python 3.11+)
-```bash
-python --version  # Should be 3.9 or higher
-```
+- Python 3.10 or newer, matching `setup.py`.
+- `uv` for local environment creation and repeatable command execution.
+- A POSIX-like shell for the documented commands.
 
-2. **PostgreSQL 12+** (Recommended: PostgreSQL 14+)
-```bash
-# Ubuntu/Debian
-sudo apt-get install postgresql postgresql-contrib
+Core package dependencies from `setup.py`:
 
-# macOS
-brew install postgresql
+- `antlr4-python3-runtime`
+- `click`
+- `rich`
+- `python-dateutil`
+- `Jinja2`
+- `watchdog`
+- `psutil`
+- `pydantic`
+- `uuid6`
+- `flask`
+- `httpx`
+- `sqlalchemy[asyncio]`
+- `asyncpg`
+- `alembic`
+- `nats-py`
+- `temporalio`
 
-# Verify installation
-psql --version
-```
+Development extras include `pytest`, `pytest-asyncio`, `pytest-cov`, `numpy`,
+`opencv-python`, `Pillow`, `black`, `flake8`, `mypy`, and `pre-commit`.
 
-3. **Redis 6+** (Recommended: Redis 7+)
-```bash
-# Ubuntu/Debian
-sudo apt-get install redis-server
+Optional extras exist for docs, language-server work, AI providers, and vision
+features. Generated Flask apps are still self-contained at the browser-asset
+level; static UI files are emitted into `static/`.
 
-# macOS
-brew install redis
+## Install With uv
 
-# Verify installation
-redis-server --version
-```
-
-### Basic Installation
-
-1. **Clone the Repository**
-```bash
-git clone <repository-url>
-cd apg
-```
-
-2. **Create Virtual Environment**
-```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-```
-
-3. **Install Core Dependencies**
-```bash
-pip install -r requirements.txt
-```
-
-4. **Database Setup**
-```bash
-# Create PostgreSQL database
-createdb apg_development
-
-# Set environment variables
-export DATABASE_URL="postgresql://username:password@localhost:5432/apg_development"
-export REDIS_URL="redis://localhost:6379/0"
-
-# Initialize database
-python -c "from capabilities.composition.database import init_db; init_db()"
-```
-
-5. **Start Development Server**
-```bash
-python cli.py run --debug
-```
-
-The APG platform should now be running at `http://localhost:5000`
-
-## 🛠️ Development Setup
-
-### Environment Configuration
-
-Create a `.env` file in the project root:
+From the repository root:
 
 ```bash
-# Database Configuration
-DATABASE_URL=postgresql://username:password@localhost:5432/apg_development
-REDIS_URL=redis://localhost:6379/0
-
-# Application Settings
-FLASK_ENV=development
-SECRET_KEY=your-secret-key-here
-DEBUG=True
-
-# APG Configuration
-APG_DATA_DIR=./data
-APG_LOGS_DIR=./logs
-APG_TEMP_DIR=./tmp
-
-# Optional: Blockchain Configuration
-WEB3_PROVIDER_URL=https://mainnet.infura.io/v3/YOUR_PROJECT_ID
-BLOCKCHAIN_NETWORK=ethereum
-
-# Optional: AI/ML Configuration
-PYTORCH_DEVICE=cpu  # or 'cuda' for GPU
-FEDERATED_LEARNING_ENABLED=true
-
-# Optional: Real-time Collaboration
-WEBRTC_STUN_SERVER=stun:stun.l.google.com:19302
-WEBSOCKET_REDIS_URL=redis://localhost:6379/1
+uv venv .venv
+uv pip install -e ".[dev]"
 ```
 
-### Advanced Development Dependencies
-
-For full development capabilities, install additional dependencies:
+If `.venv` already exists:
 
 ```bash
-# Blockchain development
-pip install web3 py-solc-x eth-account
-
-# Mobile development
-pip install briefcase
-
-# Advanced workflow orchestration
-pip install prefect[all] apache-airflow
-
-# AI/ML development
-pip install torch torchvision transformers
-
-# Testing and development tools
-pip install pytest pytest-asyncio pytest-cov black isort mypy
+uv pip install -e ".[dev]"
 ```
 
-## 📱 Mobile App Development Setup
-
-### BeeWare Mobile Apps
-
-1. **Install BeeWare Dependencies**
-```bash
-pip install briefcase
-cd mobile_apps/beeware
-briefcase dev
-```
-
-2. **Build Mobile Apps**
-```bash
-# Android
-briefcase build android
-
-# iOS (macOS only)
-briefcase build iOS
-
-# Cross-platform
-briefcase package
-```
-
-### Platform-Specific Requirements
-
-**Android Development:**
-- Android SDK
-- Java 8+
-- Android Studio (recommended)
-
-**iOS Development (macOS only):**
-- Xcode 12+
-- iOS Simulator
-- Apple Developer Account (for device deployment)
-
-## 🔗 Blockchain Integration Setup
-
-### Web3 Dependencies
+Verify the CLI:
 
 ```bash
-# Install Web3 dependencies
-pip install web3 py-solc-x eth-account requests
-
-# Install Solidity compiler
-python -c "from solcx import install_solc; install_solc('0.8.19')"
+apg --help
+apg doctor --json
 ```
 
-### Network Configuration
-
-Configure blockchain network endpoints in your environment:
+If your shell does not pick up the virtual environment entry point, use:
 
 ```bash
-# Ethereum Mainnet
-ETHEREUM_RPC_URL=https://mainnet.infura.io/v3/YOUR_PROJECT_ID
-
-# Polygon Network
-POLYGON_RPC_URL=https://polygon-rpc.com
-
-# Local Development
-GANACHE_RPC_URL=http://localhost:8545
+uv run apg --help
+python -m cli.main --help
 ```
 
-## 🤖 AI/ML Setup
-
-### Federated Learning
+## Compile And Run A Generated App
 
 ```bash
-# Install PyTorch (CPU version)
-pip install torch torchvision torchaudio
-
-# For GPU support (NVIDIA CUDA)
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-
-# Install additional ML dependencies
-pip install scikit-learn numpy pandas transformers
+apg compile examples/01_minimal_customer_records/main.apg --output /tmp/apg-minimal --verify
+python /tmp/apg-minimal/app.py --self-test
+python /tmp/apg-minimal/smoke_test.py
+python /tmp/apg-minimal/app.py --host 127.0.0.1 --port 8080
 ```
 
-### Configuration
+Generated apps expose a Flask HTTP server. Open `/ui` for the generated shell
+and `/openapi.json` for the generated API contract.
+
+## Runtime Environment Variables
+
+Generated apps understand these common variables:
+
+| Variable | Use |
+| --- | --- |
+| `APG_HOST` or `HOST` | Default host for `app.py`. |
+| `APG_PORT` or `PORT` | Default port for `app.py`. |
+| `APG_DEBUG=1` | Enable Flask debug mode in generated apps. |
+| `APG_SESSION_SECRET` or `APG_JWT_SECRET` | Session secret for generated auth flows. |
+| `APG_API_KEY` | Require API-key authorization for mutations. |
+| `APG_DATA_FILE` | Persist generated records to a JSON file. |
+| `APG_DATABASE_URL`, `APG_PG_URL`, or `DATABASE_URL` | Optional best-effort PostgreSQL persistence path. |
+| `APG_LANDING_STYLE` | Override generated landing style. |
+
+PostgreSQL and Redis are not required for basic compiler, docs, or generated
+app smoke-test workflows.
+
+## Full CLI Usage Reference
+
+Top-level command list from the current Click CLI:
+
+```text
+apg baseline         Run the compiler bed-down gate over numbered examples.
+apg capabilities     Inspect executable APG capability contracts.
+apg compile          Compile APG source files to Python artifacts.
+apg create           Create new APG projects from templates.
+apg deployment       Verify generated APG deployment evidence.
+apg diagnostics      Inspect or audit APG diagnostic registry coverage.
+apg docs             Audit APG documentation coverage and navigation.
+apg doctor           Check APG installation and environment.
+apg drift            Detect semantic drift between compiler and generated output.
+apg evidence         Build package and verifier evidence for an APG profile.
+apg explain          Explain symbols, diagnostics, handlers, and model items.
+apg format           Format one APG source file deterministically.
+apg graph            Emit one APG graph.
+apg graph-suite      Emit every supported APG graph kind and rendering.
+apg hygiene          Audit APG repository layout and root cleanliness.
+apg ide              Inspect APG IDE integration contracts.
+apg init             Initialize APG project in the current directory.
+apg language-server  Start or check APG language-server behavior.
+apg lint             Lint APG source without writing generated code.
+apg migrate-plan     Compare APG sources or semantic models for migration changes.
+apg model            Emit the normalized semantic model.
+apg nl-plan          Plan a bounded APG DSL patch without mutating source.
+apg package          Package generated Python artifacts for an APG profile.
+apg package-verify   Verify an existing APG package profile directory.
+apg parser-golden    Audit parser golden fixtures and grammar coverage.
+apg refactor         Refactor APG source files.
+apg release          Compile source and emit generated app release evidence.
+apg run              Run APG application output.
+apg schema           Generate SQL DDL from APG table declarations.
+apg studio           Inspect and round-trip APG Studio designer state.
+apg tooling          Run aggregate APG tooling contract checks.
+apg validate         Validate APG source and generator readiness.
+apg version          Show APG version information.
+```
+
+### Compiler Commands
 
 ```bash
-# Environment variables for AI/ML
-export PYTORCH_DEVICE=cuda  # or 'cpu'
-export FEDERATED_LEARNING_PARTICIPANTS=5
-export ML_MODEL_CACHE_DIR=./models
+apg compile <source.apg> --output <dir> --target python --verify
+apg lint <source-or-directory> --json
+apg validate <source.apg> --target python --json
+apg model <source.apg> --json
+apg format <source.apg> --check
+apg graph <source.apg> --kind er --format mermaid
+apg graph-suite <source.apg> --json
+apg drift <source.apg> --json
+apg release <source.apg> --json
+apg schema <source.apg> --json
 ```
 
-## 🐳 Docker Setup
+`python` is the only compiler target. Package commands cover web, desktop,
+mobile, and container profiles after Python generation.
 
-### Development with Docker
+### Baseline And Audit Commands
 
 ```bash
-# Build development image
-docker build -t apg:dev -f docker/Dockerfile.dev .
-
-# Run with Docker Compose
-docker-compose -f docker-compose.dev.yml up
+apg baseline examples --json
+apg baseline examples --refresh
+apg baseline examples --refresh-outputs
+apg baseline examples --update
+apg parser-golden --json
+apg diagnostics --audit-fixtures --json
+apg tooling audit --json
+apg docs audit --json
+apg hygiene audit --json
+apg hygiene audit --include-untracked --json
+apg doctor --json
 ```
 
-### Production Docker Setup
+`apg baseline --refresh` is an alias for `--refresh-outputs`.
+
+### Package, Deployment, And Evidence
 
 ```bash
-# Build production image
-docker build -t apg:prod -f docker/Dockerfile.prod .
-
-# Deploy with production compose
-docker-compose -f docker-compose.prod.yml up -d
+apg package <source.apg> --target web --out <dir> --json
+apg package <source.apg> --target desktop --out <dir> --json
+apg package <source.apg> --target mobile --out <dir> --json
+apg package <source.apg> --target container --out <dir> --json
+apg package-verify <package-dir> --json
+apg deployment verify <generated-or-package-dir> --json
+apg evidence <source.apg> --target web --out <dir> --json
 ```
 
-## 🔧 Configuration Validation
-
-### System Health Check
-
-Run the built-in system health check:
+### Capability Commands
 
 ```bash
-python -c "
-from capabilities.composition.workflow_orchestration.service import WorkflowOrchestrationService
-from capabilities.common.real_time_collaboration.service import CollaborationService
-print('✅ Core services available')
-
-# Check database connection
-from capabilities.composition.database import get_async_db_session
-print('✅ Database connection working')
-
-# Check optional dependencies
-try:
-    import web3
-    print('✅ Blockchain dependencies available')
-except ImportError:
-    print('⚠️  Blockchain dependencies not installed')
-
-try:
-    import torch
-    print('✅ AI/ML dependencies available')
-except ImportError:
-    print('⚠️  AI/ML dependencies not installed')
-"
+apg capabilities list
+apg capabilities search <query>
+apg capabilities manifest --stats
+apg capabilities contracts --json
+apg capabilities inspect <capability> --json
+apg capabilities evaluate-rules <capability> --context-json '{"tenant_id":"demo"}' --json
+apg capabilities validate-contracts --json
+apg capabilities audit --json
+apg capabilities implementation-audit --json
+apg capabilities implementation-audit --strict --json
+apg capabilities lifecycle-audit --json
+apg capabilities materialize-packages --json
+apg capabilities scaffold <domain> <code> --name "Display Name" --json
+apg capabilities publish-plan <package-dir> --json
+apg capabilities publish-apply <package-dir> --catalog <catalog.json> --json
+apg capabilities catalog <catalog.json> --json
 ```
 
-### Configuration Verification
-
-Verify your configuration:
+### IDE, Studio, And Natural-Language Planning
 
 ```bash
-python cli.py config verify
+apg language-server <source.apg> --check --json
+apg language-server <source.apg> --code-actions --json
+apg language-server <source.apg> --rename OldName --to NewName --json
+apg ide audit --json
+apg studio snapshot <source.apg> --json
+apg studio plan-edit <source.apg> --edit-json '<json>' --json
+apg nl-plan <source.apg> --prompt "add a Customer table" --json
+apg migrate-plan previous.apg current.apg --json
+apg explain <source.apg> --symbol Customer --json
 ```
 
-## 🚀 Production Installation
+## Troubleshooting
 
-### System Requirements
-
-**Minimum Production Requirements:**
-- 4 CPU cores
-- 16GB RAM
-- 100GB SSD storage
-- PostgreSQL 14+
-- Redis 7+
-- Python 3.11+
-
-**Recommended Production Requirements:**
-- 8+ CPU cores
-- 32GB RAM
-- 500GB SSD storage
-- Load balancer (nginx/HAProxy)
-- CDN for static assets
-- Monitoring (Prometheus/Grafana)
-
-### Production Dependencies
+Run:
 
 ```bash
-# Production-specific packages
-pip install gunicorn uvicorn[standard] nginx-python
-
-# Production database
-pip install psycopg2-binary
-
-# Monitoring and logging
-pip install prometheus-client structlog
+apg doctor --json
+apg docs audit --json
+apg tooling audit --json
 ```
 
-### Production Environment Variables
-
-```bash
-# Production configuration
-FLASK_ENV=production
-DEBUG=False
-SECRET_KEY=your-very-secure-secret-key
-
-# Database with connection pooling
-DATABASE_URL=postgresql://user:pass@db-host:5432/apg_prod?pool_size=20
-
-# Redis cluster
-REDIS_URL=redis://redis-cluster:6379/0
-
-# Security
-SECURE_SSL_REDIRECT=True
-SESSION_COOKIE_SECURE=True
-CSRF_COOKIE_SECURE=True
-
-# Performance
-WEB_CONCURRENCY=8
-MAX_WORKERS=16
-```
-
-### SSL/TLS Setup
-
-```bash
-# Generate SSL certificates (Let's Encrypt recommended)
-certbot --nginx -d yourdomain.com
-
-# Configure nginx for APG
-sudo cp deploy/nginx/apg.conf /etc/nginx/sites-available/
-sudo ln -s /etc/nginx/sites-available/apg.conf /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-## 🔍 Troubleshooting Installation
-
-### Common Issues
-
-**1. Database Connection Error**
-```bash
-# Check PostgreSQL service
-sudo systemctl status postgresql
-
-# Verify connection
-psql -h localhost -U username -d apg_development -c "SELECT 1;"
-```
-
-**2. Redis Connection Error**
-```bash
-# Check Redis service
-sudo systemctl status redis
-
-# Test connection
-redis-cli ping  # Should return PONG
-```
-
-**3. Python Dependencies**
-```bash
-# Clear pip cache
-pip cache purge
-
-# Reinstall dependencies
-pip install --no-cache-dir -r requirements.txt
-```
-
-**4. Web3 Dependencies**
-```bash
-# Install system dependencies for Web3
-sudo apt-get install build-essential python3-dev
-
-# Reinstall Web3 packages
-pip install --no-cache-dir web3 py-solc-x
-```
-
-### Performance Optimization
-
-**Database Optimization:**
-```sql
--- PostgreSQL performance tuning
-ALTER SYSTEM SET shared_buffers = '256MB';
-ALTER SYSTEM SET effective_cache_size = '1GB';
-ALTER SYSTEM SET maintenance_work_mem = '64MB';
-SELECT pg_reload_conf();
-```
-
-**Redis Optimization:**
-```bash
-# Redis configuration
-echo "maxmemory 512mb" >> /etc/redis/redis.conf
-echo "maxmemory-policy allkeys-lru" >> /etc/redis/redis.conf
-sudo systemctl restart redis
-```
-
-## 📋 Installation Checklist
-
-- [ ] Python 3.9+ installed and verified
-- [ ] PostgreSQL 12+ installed and running
-- [ ] Redis 6+ installed and running
-- [ ] Virtual environment created and activated
-- [ ] Core dependencies installed
-- [ ] Database initialized
-- [ ] Environment variables configured
-- [ ] Development server running
-- [ ] System health check passed
-- [ ] Optional dependencies installed (as needed)
-- [ ] Configuration validated
-
-## 📞 Support
-
-If you encounter issues during installation:
-
-1. Check the [Troubleshooting Guide](./troubleshooting.md)
-2. Review the [Configuration Guide](./configuration.md)
-3. Contact support at nyimbi@gmail.com
-
----
-
-*Next Steps: [Quick Start Guide](./quickstart.md) →*
+Use `python -m cli.main <command> --help` when debugging entry-point or virtual
+environment issues. Use `uv run` to force commands through the managed
+environment.

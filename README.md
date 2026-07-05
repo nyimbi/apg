@@ -1,329 +1,272 @@
-# APG — Application Programming Generation
+# APG - Agentic Platform Generator
 
-**259 production-grade, independently-deployable capability packages across 28 business domains.**
+APG is an Africa-first agentic application generator. It turns concise `.apg`
+specifications into self-contained Flask applications with records, workflows,
+agent consoles, capability consoles, database catalogs, PWA shell assets, and
+reviewable release evidence.
 
-> Copyright (c) 2025 Datacraft · Author: Nyimbi Odero · [www.datacraft.co.ke](https://www.datacraft.co.ke)
+APG is built for teams that need to compose serious business software quickly:
+SACCOs, fintechs, insurers, healthcare operators, pharma and supply-chain
+teams, governments, NGOs, telcos, retailers, transport operators, energy
+utilities, hospitality groups, and legal practices.
 
----
+Current source-tree inventory: 33 capability domains, 440 non-hidden
+domain/code capability directories, 322 checked `cap_spec.md` files, and 592
+`capability_contract.py` modules including build artifacts. Treat those counts
+as a repository inventory, not a claim that every package has the same runtime
+depth.
 
-## What is APG?
+## Architecture
 
-APG is two things:
+```mermaid
+flowchart LR
+    A[APG author] --> B[.apg specification]
+    B --> C[Parser and AST builder]
+    C --> D[Semantic model]
+    D --> E[Python code generator]
+    E --> F[Self-contained Flask app]
+    E --> G[static assets]
+    E --> H[semantic_model.json]
+    E --> I[smoke_test.py]
+    F --> J[records and workflows]
+    F --> K[agents and teams]
+    F --> L[capability runtime]
+    F --> M[database catalog]
+    F --> N[PWA generated UI]
+    D --> O[CLI audits, graphs, packaging, release evidence]
+    P[capabilities/] --> D
+    Q[compiler/templates/] --> E
+    R[compiler/assets/] --> G
+```
 
-1. **A capability library** — 259 world-class business capability packages (Finance, Fintech, Intelligence, Healthcare, Government, Transport, Telecom, and more) that can be installed independently or composed together.
+## Quick Start
 
-2. **A DSL** — An ultra-terse language for declaring composed business systems that compiles to production Python.
-
----
-
-## Quick Start — Use a Capability
+Install the developer environment with `uv`:
 
 ```bash
-# Install any capability independently
-pip install apg-intel-alerts
-pip install apg-fin-arc          # Accounts Receivable
-pip install apg-hcm-payroll      # Payroll (7-country PAYE)
-pip install apg-fintech-payments # M-Pesa/MTN MoMo/SWIFT
-
-# Run as standalone server (InMemory store, zero config)
-apg-intel-alerts --port 8080
-
-# Run with PostgreSQL
-apg-fin-arc --db-url postgresql+asyncpg://... --port 8080
-
-# Use the Python API
-from apg_intel_alerts import get_capability_contract, evaluate_capability_rules
-from apg_intel_alerts.service import AlertManagementService
-
-svc = AlertManagementService("my_org")        # zero external deps
-contract = get_capability_contract("my_org")  # composability interface
+uv venv .venv
+uv pip install -e ".[dev]"
 ```
 
----
-
-## 259 Capabilities Across 28 Domains
-
-| Domain | Capabilities | Highlights |
-|---|---|---|
-| **common** | 81 | auth, audl, nlpc (7,844L), moni, wflo, rag, search, ML lifecycle |
-| **fintech** | 30 | payments (M-Pesa/SWIFT), KYC (3,063L), AML, lending, crypto, DeFi |
-| **intel** | 22 | OSINT, SIGINT, threats, fusion, alerts, correlation, prediction |
-| **fin** | 7 | AR (2,251L), GL (2,987L), AP (1,963L), payroll (3,021L) |
-| **healthcare** | 9 | EMR, pharmacy, lab, patient mgmt, telemedicine |
-| **government** | 10 | tax, electoral, emergency, law enforcement, citizen services |
-| **transport** | 9 | fleet, routing, dispatch, cargo, tracking |
-| **telecom** | 10 | billing (2,143L), provisioning, network, QoS |
-| **pharma** | 9 | clinical trials, pharmacovigilance, QMS |
-| **realestate** | 10 | lease (IFRS 16), property mgmt, valuation |
-| **retail** | 5 | POS (2,147L), omnichannel, loyalty |
-| **bia** | 8 | analytics, dashboards, data warehouse, ML |
-| **ppm** | 6 | project accounting, planning, resource mgmt |
-| **hcm** | 3 | payroll, time & attendance, employee data |
-| **grc** | 6 | policy, risk assessment, audit, incident mgmt |
-| _+ 13 more_ | 39 | energy, mining, education, pharma, loc, mob, eam, ecd, crm, scm, int, composition |
-
-**Quality**: All 259 capabilities have 40–184 async service methods, 10–100 governance rules, streaming events via Bytewax, and standalone PyPI packaging.
-
----
-
-## Composability Contract
-
-Every capability exposes a machine-readable contract:
-
-```python
-from capabilities.capability_contract_registry import evaluate_rules, load_contract_registry
-
-# Discover all capabilities
-registry = load_contract_registry()
-
-# Evaluate governance rules
-result = evaluate_rules("intel_alerts", {
-    "tenant_context_present": True,
-    "operation": "record_alert",
-    "policy_attached": True,
-})
-# → {"decision": "allow", "matched_rules": [], "actions": []}
-
-# Navigate the manifest
-from capabilities.manifest import get_capability, find_capabilities, get_domain
-
-cap = get_capability("intel_alerts")        # by capability ID
-cap = get_by_path("capabilities/intel/alerts")  # by path
-cap = get_by_package("apg-intel-alerts")        # by package name
-results = find_capabilities("payroll")           # keyword search
-intel_caps = get_domain("intel")                 # domain listing
-```
-
----
-
-## APG DSL — Compose Business Systems
-
-Declare composed applications in the APG language:
+Write `clinic.apg`:
 
 ```apg
-// CRM platform in 40 lines
-module crm_platform version 1.0.0 { description: "Enterprise CRM"; }
-
-table Contact { name: str; email: str; status: str; }
-
-capability CRMCore {
-    contract: {
-        id: crm_platform_core,
-        provides: [contact_lifecycle, opportunity_pipeline, sales_analytics],
-        requires: [auth, audl, ntfy, wflo],
-        rules: [
-            {name: "large_deal_approval", when: "amount > 50000", action: require_review},
-            {name: "cross_tenant_denied", when: "contact_tenant != actor_tenant", action: deny}
-        ],
-        ui: {shell: python, routes: [
-            {name: "Pipeline", path: "/crm/pipeline", component: "Pipeline", permission: "crm:pipeline"}
-        ]},
-        theme: {name: crm_theme, tokens: {"color.primary": "#1565C0", "border.radius": "6px"}, components: {}}
-    };
+module clinic version 1.0.0 {
+    description: "Clinic operations";
 }
 
-agent SalesAssistant {
-    model: "openai:gpt-4.1-mini" ?? "ollama:llama3.2";
-    capabilities: [opportunity_pipeline];
-    memory: vector sales_memory;
+table Patient {
+    name: str;
+    phone: str;
+    status: str;
 }
 
-app CRMPlatform {
-    capabilities: [CRMCore];
-    agents: [SalesAssistant];
-    runtime: {target: python, streaming: {processor: bytewax}};
+workflow Intake {
+    steps: ["registered", "triaged", "seen"];
+}
+
+agent CarePlanner {
+    role: "care planner";
+    model: "openai:gpt-4.1-mini";
+    runtime: codex;
+    system: "Plan the next safe patient follow-up.";
 }
 ```
 
 Compile and run:
 
 ```bash
-apg compile examples/crm_platform/main.apg --output ./generated --verify
-python ./generated/app.py --host 0.0.0.0 --port 8080
+apg compile clinic.apg --output generated/clinic --verify
+python generated/clinic/app.py --host 127.0.0.1 --port 8080
 ```
 
----
+Open:
 
-## Platform Deployment
+- `http://127.0.0.1:8080/ui` for the generated app shell.
+- `http://127.0.0.1:8080/openapi.json` for the generated API contract.
+- `python generated/clinic/app.py --self-test` for runtime verification.
+- `python generated/clinic/smoke_test.py` for the generated smoke test.
+
+Refresh the numbered example baseline when compiler output changes:
 
 ```bash
-# Run the full platform with Docker Compose
-docker compose up
-
-# Run just the intelligence capabilities
-docker compose up apg-db intel-alerts intel-threats intel-osint
-
-# Run just finance
-docker compose up apg-db fin-arc fin-glr fin-apy
+apg baseline examples --refresh
 ```
 
-Services expose: `GET /health`, `GET /contract`, `POST /evaluate`, `GET /api/v1/...`
+`--refresh` is the short alias for `--refresh-outputs`.
 
----
+## Key Features
+
+- Python-first compiler pipeline: parser, AST builder, semantic model, lint,
+  validation, graphs, code generation, packaging, release evidence, and drift
+  checks.
+- Generated Flask applications with `app.py`, package exports, OpenAPI 3.1,
+  component manifests, semantic models, smoke tests, Dockerfile, environment
+  example, and optional agent/capability/application sidecars.
+- Self-contained generated UI. Browser dependencies are vendored into
+  `static/`; generated apps do not require CDN assets.
+- Capability contracts with configuration, deterministic rules, UI route
+  metadata, theme tokens, i18n metadata, streaming metadata, and package
+  lifecycle audits.
+- Agent and team composition for Codex, Claude Code, OpenCode, OpenAI, Ollama,
+  Pi, and compatible adapter runtimes.
+- Africa-first product surface: payments and financial rails are modeled around
+  MPESA, MTN MoMo, Airtel Money, Orange Money, Wave, M-Shwari, SACCO workflows,
+  USSD, multilingual UI, and low-bandwidth operational use.
+- Baseline gate for all numbered examples: semantic/lint/validate readiness,
+  graph-suite output, generated release evidence, output synchronization,
+  self-tests, smoke tests, HTTP contract probes, and Python-only targeting.
+- Current full repository test evidence: `uv run pytest tests/ -q` completed
+  with 1486 passed, 1 skipped, and 3 warnings.
+
+## Capability Domains
+
+APG currently carries 350+ capability directories across these source-tree
+domains:
+
+| Domain | Count | Typical scope |
+| --- | ---: | --- |
+| agriculture | 12 | crops, farms, irrigation, markets, weather, land, inputs |
+| insurance | 8 | claims, policies, underwriting, actuarial, distribution, microinsurance |
+| legal | 8 | matters, contracts, dispute resolution, billing, compliance, IP |
+| hospitality | 8 | property management, reservations, revenue, food and beverage, loyalty |
+| NGO | 6 | grants, donors, beneficiaries, programs, monitoring and evaluation |
+| SACCO and fintech | 33 | wallets, payments, KYC, AML, lending, agency, switch, USSD apps |
+| government | 13 | tax, permits, licensing, land, elections, emergency, citizen services |
+| healthcare | 9 | EMR, lab, pharmacy, telemedicine, patient management, registries |
+| pharma | 9 | clinical trials, compliance, distribution, manufacturing, QMS, regulatory |
+| SCM | 18 | procurement, inventory, warehouse, logistics, supplier and vendor flows |
+| HCM | 12 | employee data, payroll, benefits, recruitment, learning, time attendance |
+| CRM | 13 | sales force, marketing, orders, customer service, field service |
+| retail | 5 | POS, loyalty, promotions, omnichannel, store inventory |
+| transport | 10 | fleet, dispatch, delivery, routing, maintenance, fuel, scheduling |
+| telecom | 10 | billing, orders, QoS, provisioning, inventory, network, security |
+| energy | 6 | metering, billing, generation, grid, renewables, distribution |
+| finance | 21 | GL, AR, AP, cash, budgeting, assets, tax, treasury, reporting |
+| manufacturing | 15 | BOM, MRP, MES, QMS, shop floor, PLM, MRO, planning |
+| real estate | 10 | leases, property, tenants, maintenance, valuation, renewals |
+| intelligence | 22 | OSINT, alerts, fusion, threats, geoint, sigint, dark web, reporting |
+| common platform | 105 | auth, audit, cache, connectors, doc intelligence, workflows, search |
+| other platform domains | 55 | BI, CKM, composition, EAM, education, GRC, ITSM, loc, mining, mobile, PDE, PPM, procurement |
+
+Seven common infrastructure capabilities are called out because generated apps
+and business domains repeatedly compose them:
+
+- `common/obs` - observability
+- `common/dcat` - data catalog
+- `common/fflag` - feature flags
+- `common/gql` - GraphQL
+- `common/ussd` - USSD
+- `common/docint` - document intelligence
+- `common/pmin` - process mining
+
+## Generated UI Workspaces
+
+Every generated Flask app can expose these 14 workspaces when the APG source
+contains the matching records, workflows, agents, capabilities, databases, or
+auth metadata:
+
+1. Home dashboard with operational cards, charts, shortcuts, and activity.
+2. Entity list tables with saved-view style query links, filters, sorting,
+   pagination, import/export, and CSV export.
+3. Kanban boards for entities with `status`, `state`, `stage`, or `phase`.
+4. Record detail pages with field display, inline edit, related lists, revision
+   checks, and activity timelines.
+5. Create/edit drawers and form fragments with typed inputs, validation errors,
+   HTMX swaps, and optimistic UI feedback.
+6. Workflow list workspace.
+7. Workflow wizard with step navigation, run progress, journals, signals,
+   resume, and compensation paths.
+8. Streaming agent console.
+9. Streaming agent-team console.
+10. Capability console for rules, configuration resolution/validation,
+    approvals, health, theme, screens, and streaming metadata.
+11. Database catalog with schemas, tables, columns, indexes, relationships, and
+    status.
+12. Flow debugger for workflow runs, event journals, circuit breakers, and
+    subscriptions.
+13. Login/auth surfaces with session login, logout, protected UI redirects, and
+    API-key/JWT-aware mutation checks.
+14. Landing page plus full app shell with sidebar, topbar, command palette,
+    notifications, theme toggle, i18n switcher, install/update controls,
+    offline banner, manifest, and service worker.
+
+Generated static assets are copied into each output directory:
+
+```text
+static/
+  apg.css
+  htmx.min.js
+  sortable.min.js
+  uplot.min.js
+  uplot.min.css
+  apg-charts.js
+  apg-sse.js
+  manifest.webmanifest
+  sw.js
+  icon.svg
+```
+
+The generated app loads those local assets; no CDN is required.
 
 ## CLI
 
+Primary command:
+
 ```bash
-# Capability discovery
-apg capabilities search alerts
-apg capabilities manifest --stats
-apg capabilities manifest --domain intel
-apg capabilities manifest --capability intel_alerts
-
-# Contract validation
-apg capabilities validate-contracts
-
-# Build all packages
-./scripts/build_all_packages.sh
+apg --help
 ```
 
----
+Important workflows:
+
+```bash
+apg compile <source.apg> --output <dir> --verify
+apg lint <source-or-directory> --json
+apg validate <source.apg> --target python --json
+apg model <source.apg> --json
+apg graph-suite <source.apg> --json
+apg release <source.apg> --json
+apg package <source.apg> --target web --out <dir> --json
+apg baseline examples --refresh
+apg docs audit --json
+apg tooling audit --json
+apg doctor --json
+apg capabilities contracts --json
+apg capabilities scaffold <domain> <code> --name "Display Name" --json
+apg capabilities implementation-audit --json
+```
+
+The advertised compiler target is `python`. Web, desktop, mobile, and container
+delivery are package profiles over generated Python artifacts.
 
 ## Documentation
 
-| Document | Description |
-|---|---|
-| `docs/composability_contract.md` | Complete contract schema reference (1,384 lines) |
-| `docs/capability_development_guide.md` | How to build a new capability (2,108 lines) |
-| `docs/capability_integration_guide.md` | Integration patterns and testing guide |
-| `capabilities/MANIFEST.md` | Full index of all 259 capabilities (13,857 lines) |
-| `capabilities/COMPOSABILITY.md` | Dependency graph (1,900 edges, 0 broken) |
+- [Documentation index](docs/README.md)
+- [Installation and CLI reference](docs/installation.md)
+- [Quick start](docs/quickstart.md)
+- [Architecture](docs/architecture.md)
+- [Developer guide](docs/developer_guide.md)
+- [Generated UI](docs/generated_ui.md)
+- [Capabilities](docs/capabilities/README.md)
+- [Tooling](docs/tooling.md)
+- [Research summary for this docs refresh](docs/research/docs-update/)
 
----
+## Repository Map
 
-## Example Platform Programs
-
-Fully compilable APG programs demonstrating capability composition:
-
-| Example | Pattern | Demonstrates |
-|---|---|---|
-| `examples/crm_platform/` | Hub-and-Spoke | CRM + AI agent + workflows |
-| `examples/accounting_platform/` | Layered | GL + AR + AP + IFRS rules |
-| `examples/erp_platform/` | Full ERP | Procure-to-pay, order-to-cash, hire-to-retire |
-| `examples/intelligence_platform/` | Pipeline | OSINT → Fusion → Alerts |
-| `examples/fintech_platform/` | Africa-first | M-Pesa, KYC tiers, AML, CBK rules |
-| `examples/healthcare_platform/` | Clinical | EMR → Pharmacy → Lab |
-
----
-
-## Project Structure
-
-```
+```text
 apg/
-├── capabilities/               # 259 capability packages
-│   ├── MANIFEST.json           # Machine-readable index
-│   ├── MANIFEST.md             # Human-readable index (13,857 lines)
-│   ├── manifest.py             # Bidirectional navigation API
-│   ├── COMPOSABILITY.md        # Dependency graph
-│   ├── <domain>/<code>/        # Each capability directory
-│   │   ├── capability_contract.py
-│   │   ├── models.py
-│   │   ├── service.py          # 40-184 async methods
-│   │   ├── api.py
-│   │   ├── app.py              # Standalone server
-│   │   ├── pyproject.toml      # PyPI package
-│   │   ├── domain/adapters.py  # Protocol interfaces
-│   │   ├── database/store.py   # InMemory + PostgreSQL
-│   │   └── alembic/            # DB migrations
-├── compiler/                   # APG language compiler
-├── examples/                   # 6 platform APG programs
-├── docs/                       # Reference documentation
-├── tests/                      # 200+ tests (0 collection errors)
-├── spec/apg.g4                 # ANTLR4 grammar
-├── docker-compose.yml          # Platform deployment
-├── Dockerfile.capability       # Standalone capability container
-└── .github/workflows/ci.yml    # CI pipeline
+  cli/                  current Click-based APG CLI
+  cli.py                legacy argparse compatibility surface
+  compiler/             parser, semantic model, generator, audits, templates
+  compiler/assets/      vendored generated-app static assets
+  compiler/templates/   generated UI Jinja templates
+  capabilities/         package-backed capability source tree
+  examples/             numbered APG examples and checked generated output
+  tests/                compiler, CLI, generated app, UI, and audit tests
+  docs/                 developer and platform documentation
+  setup.py              package metadata and dependencies
 ```
-
----
 
 ## License
 
-Proprietary — © 2025 Datacraft · [nyimbi@gmail.com](mailto:nyimbi@gmail.com)
-
----
-
-## Running Generated Applications
-
-### Compile
-
-```bash
-apg compile myapp.apg --output ./out/myapp
-```
-
-Generated output in `./out/myapp/` is a **self-contained Python package** — zero dependencies, stdlib only:
-
-```
-app.py              ← main entry point
-smoke_test.py       ← contract test runner
-requirements.txt    ← empty by default (no pip install needed)
-Dockerfile          ← container deployment
-.env.example        ← environment variable reference
-semantic_model.json ← APG semantic model
-```
-
-### Run
-
-```bash
-cd out/myapp
-python app.py                           # starts on http://127.0.0.1:8080
-python app.py --host 0.0.0.0 --port 3000
-APG_HOST=0.0.0.0 APG_PORT=3000 python app.py   # env vars
-docker build -t myapp . && docker run -p 8080:8080 myapp
-```
-
-### Verify
-
-```bash
-python app.py --self-test       # validates contracts, routes, component manifest
-python app.py --validate        # contract validation (exit 0/1)
-python app.py --describe        # application JSON description
-python app.py --semantic-model  # full APG semantic model
-python smoke_test.py            # importable contract test runner
-```
-
-### Core endpoints (always present)
-
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /health` | Runtime health + validation summary |
-| `GET /component.json` | Composable component manifest |
-| `GET /semantic-model.json` | Full APG semantic model |
-| `GET /openapi.json` | OpenAPI 3.1 spec |
-| `GET /self-test` | Smoke test results |
-| `GET /applications` | Application manifest |
-| `GET /capabilities` | Capability registry |
-| `GET /entities` | Entity schemas |
-| `GET /workflows` | Workflow definitions |
-| `GET /agents` | AI agent definitions |
-| `GET /ui` | Generated HTML application console |
-
-### UI routes
-
-```
-http://127.0.0.1:8080/ui                     # application index
-http://127.0.0.1:8080/ui/entities/<Name>     # entity CRUD screen
-http://127.0.0.1:8080/ui/capabilities/<name> # capability console
-http://127.0.0.1:8080/ui/agents/<name>       # AI agent workbench
-```
-
-### Configuration
-
-| Env var | Default | Purpose |
-|---------|---------|---------|
-| `APG_HOST` | `127.0.0.1` | Bind host |
-| `APG_PORT` | `8080` | Bind port |
-| `APG_DATA_FILE` | _(in-memory)_ | JSON persistence path |
-| `APG_API_KEY` | _(none)_ | Require `Authorization: Bearer <key>` on mutations |
-| `APG_DEBUG` | `0` | Set to `1` for HTTP request logging |
-
-### Capability packages
-
-Each compiled capability also ships as a standalone Python package:
-
-```bash
-pip install apg-fintech-gateway
-apg-fintech-gateway --port 8080
-# or
-python -m capabilities.fintech.gateway.app --port 8080
-```
+Copyright (c) 2025 Datacraft. Author: Nyimbi Odero.

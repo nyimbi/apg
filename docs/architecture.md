@@ -1,582 +1,192 @@
-# APG Architecture Overview
+# APG Architecture
 
-The Application Program Generator (APG) is built on a modern, composable architecture designed for scalability, maintainability, and extensibility. This document provides a comprehensive overview of the system architecture and design principles.
+APG is the Agentic Platform Generator: a Python-first compiler and capability
+platform for producing self-contained Flask business applications from `.apg`
+source.
 
-## 🏗️ System Architecture
+This document reflects the current repository state, not older aspirations for
+a monolithic platform stack.
 
-### High-Level Architecture
+## System View
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        APG Platform                          │
-├─────────────────────────────────────────────────────────────┤
-│  🎯 User Interfaces                                         │
-│  ├─ Web Dashboard (React/TypeScript)                        │
-│  ├─ Mobile Apps (BeeWare/Python)                            │
-│  ├─ CLI Tools (Python Click)                                │
-│  └─ API Endpoints (REST/GraphQL)                            │
-├─────────────────────────────────────────────────────────────┤
-│  🚀 Core Services Layer                                     │
-│  ├─ Workflow Orchestration (Prefect/Celery/Airflow)        │
-│  ├─ AI/ML Services (Federated Learning/PyTorch)             │
-│  ├─ Real-time Collaboration (WebRTC/WebSocket)              │
-│  ├─ Blockchain Integration (Web3/Smart Contracts)           │
-│  └─ Security & Authentication (JWT/OAuth2/MFA)              │
-├─────────────────────────────────────────────────────────────┤
-│  🧩 Composable Capabilities                                 │
-│  ├─ Business Operations (ERP/CRM/HCM)                       │
-│  ├─ AI & Intelligence (Computer Vision/NLP/RAG)             │
-│  ├─ Communication (Notifications/Messaging)                 │
-│  ├─ Security Operations (Biometrics/Access Control)         │
-│  └─ Integration Services (API Mesh/Event Streaming)         │
-├─────────────────────────────────────────────────────────────┤
-│  💾 Data & Storage Layer                                    │
-│  ├─ PostgreSQL (Primary Database)                           │
-│  ├─ Redis (Caching/Session/Real-time)                       │
-│  ├─ Vector Databases (AI/ML)                                │
-│  └─ File Storage (Local/S3/IPFS)                            │
-├─────────────────────────────────────────────────────────────┤
-│  🔧 Infrastructure Layer                                    │
-│  ├─ Container Orchestration (Docker/Kubernetes)             │
-│  ├─ Load Balancing (nginx/HAProxy)                          │
-│  ├─ Monitoring (Prometheus/Grafana)                         │
-│  └─ CI/CD Pipelines (GitHub Actions)                        │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    S[.apg source] --> P[Parser]
+    P --> A[AST builder]
+    A --> M[Semantic model]
+    M --> L[Lint, validate, diagnostics]
+    M --> G[Graph and drift tools]
+    M --> C[Python code generator]
+    C --> APP[Generated Flask app]
+    C --> AS[Generated static assets]
+    C --> SM[semantic_model.json]
+    C --> ST[smoke_test.py]
+    CAP[capabilities/] --> M
+    TPL[compiler/templates/] --> C
+    VND[compiler/assets/] --> AS
+    APP --> UI[Generated UI workspaces]
+    APP --> API[OpenAPI and JSON routes]
+    APP --> RT[records, workflows, agents, capabilities]
+    APP --> PWA[manifest and service worker]
+    CLI[apg CLI] --> P
+    CLI --> M
+    CLI --> C
+    CLI --> QA[baseline, docs, tooling, release evidence]
 ```
 
-## 🎯 Design Principles
+## Core Layers
 
-### 1. Composable Architecture
-- **Modular Capabilities**: Each capability is self-contained with its own models, services, and views
-- **Plug-and-Play**: Capabilities can be easily added, removed, or configured
-- **Loose Coupling**: Minimal dependencies between capabilities
-- **Standard Interfaces**: Consistent APIs and integration patterns
+| Layer | Current owner | Contract |
+| --- | --- | --- |
+| CLI | `cli/` | Click command groups exposed by `apg=cli.main:cli`. |
+| Legacy CLI | `cli.py` | Backward-compatible argparse helper path. |
+| Parser | `compiler/parser.py`, grammar artifacts | Parse `.apg` source. |
+| AST | `compiler/ast_builder.py` | Convert parse output into declarations. |
+| Semantic model | `compiler/semantic_model.py` | Emit normalized `apg.semantic-model.v1`. |
+| Diagnostics | `compiler/diagnostics.py` and lint/validate modules | Explain invalid or risky source. |
+| Generator | `compiler/code_generator.py` | Emit generated Flask apps, sidecars, docs, tests, and static assets. |
+| UI templates | `compiler/templates/` | Jinja workspace templates embedded in generated apps. |
+| UI assets | `compiler/assets/` | Local browser assets copied into generated `static/`. |
+| Capability contracts | `capabilities/**/capability_contract.py` | Configuration, rules, UI, theme, i18n, streaming, package metadata. |
+| Baseline gate | `compiler/baseline.py` and CLI command | Numbered-example compile and runtime evidence. |
 
-### 2. Production-Ready Implementation
-- **Real SDKs**: All integrations use production-grade SDKs and libraries
-- **No Mocks**: Complete elimination of mock implementations and placeholders
-- **Comprehensive Error Handling**: Specific exception types with proper recovery mechanisms
-- **Performance Optimized**: Real-time metrics, caching, and optimization
+## Generated Flask Runtime
 
-### 3. Event-Driven Architecture
-- **Asynchronous Processing**: Non-blocking operations throughout the system
-- **Event Streaming**: Real-time event processing and distribution
-- **Message Queues**: Reliable task distribution and processing
-- **Reactive Components**: Components respond to state changes automatically
+The generated `app.py` is a Flask server with:
 
-### 4. Security-First Design
-- **Zero Trust**: Every request is authenticated and authorized
-- **Defense in Depth**: Multiple layers of security controls
-- **Encryption**: Data encrypted at rest and in transit
-- **Audit Trails**: Comprehensive logging and audit capabilities
+- application metadata and semantic model
+- OpenAPI 3.1
+- component manifest
+- health, metrics, self-test, validation, describe, and semantic-model routes
+- CRUD routes for generated entities
+- workflow run, signal, resume, and compensation routes
+- agent and agent-team invocation routes
+- capability health, rules, configuration, approval, theme, screen, language,
+  and streaming routes
+- database catalog and relationship routes
+- `/ui` workspace routes
+- optional login/logout/locale routes
+- server-sent event stream support
+- local JSON persistence through `APG_DATA_FILE`
+- optional best-effort PostgreSQL persistence through database URL variables
 
-## 🏛️ Core Components
+Generated apps are not React apps and do not require a frontend build step.
 
-### Application Layer
+## Generated UI Architecture
 
-**Web Dashboard**
-- React-based single-page application
-- TypeScript for type safety
-- Real-time WebSocket connections
-- Responsive design for all devices
+The UI is server-rendered HTML with HTMX-enhanced fragments. It uses:
 
-**Mobile Applications**
-- BeeWare-based Python apps
-- Cross-platform (iOS/Android)
-- Native performance with Python simplicity
-- Offline-first architecture with sync capabilities
+- `compiler/templates/*.html.j2`
+- `compiler/assets/apg.css`
+- vendored `htmx`, `sortable`, and `uPlot`
+- generated `apg-charts.js` and `apg-sse.js`
+- generated manifest and service worker
 
-**CLI Tools**
-- Python Click-based command interface
-- Code generation and scaffolding
-- Development and deployment automation
-- Interactive and scriptable operations
+The persistent shell provides sidebar navigation, topbar navigation, command
+palette, notifications, theme switching, language switching, PWA install/update
+controls, and offline status. Workspace routes are described in
+[Generated UI](generated_ui.md).
 
-### Service Layer
+## Capability Architecture
 
-**Workflow Orchestration Service**
-```python
-class WorkflowOrchestrationService:
-    """
-    Multi-engine workflow orchestration supporting:
-    - Prefect for modern Python workflows
-    - Apache Airflow for complex DAG processing
-    - Celery for distributed task execution
-    - Native Python for simple workflows
-    """
-    
-    engines: Dict[str, WorkflowEngine]
-    execution_context: ExecutionContext
-    monitoring: WorkflowMonitor
+Capability packages live under `capabilities/<domain>/<code>/`. The inventory
+currently spans 33 domains and 440 non-hidden domain/code directories.
+
+Standard package surfaces include:
+
+```text
+capability_contract.py
+cap_spec.md
+models.py
+service.py
+api.py
+views.py
+blueprint.py
+semantic_model.json
+package_manifest.json
+tests/
+docs/
+domain/
+database/
+alembic/
 ```
 
-**AI/ML Service**
-```python
-class FederatedLearningService:
-    """
-    Production federated learning implementation:
-    - Real parameter aggregation (FedAvg, weighted)
-    - Differential privacy with calibrated noise
-    - Secure multiparty computation
-    - Byzantine-robust aggregation
-    """
-    
-    aggregators: List[ModelAggregator]
-    privacy_engine: DifferentialPrivacyEngine
-    security_protocols: SecureMultipartyComputation
+Not every capability directory has every surface. Use audits to distinguish
+domain-specific implementations from materialized baselines, mixed packages, or
+contract-only packages:
+
+```bash
+apg capabilities validate-contracts --json
+apg capabilities implementation-audit --json
+apg capabilities lifecycle-audit --json
 ```
 
-**Blockchain Service**
-```python
-class BlockchainService:
-    """
-    Multi-chain Web3 integration:
-    - Smart contract compilation and deployment
-    - DeFi protocol integration (Aave, Uniswap)
-    - Cross-chain transaction management
-    - IPFS storage integration
-    """
-    
-    web3_providers: Dict[BlockchainNetwork, Web3]
-    contract_compiler: SolidityCompiler
-    defi_protocols: Dict[str, DeFiProtocol]
+## Data And Persistence
+
+Generated apps start dependency-light:
+
+- in-memory record store
+- optional JSON file persistence through `APG_DATA_FILE`
+- optional PostgreSQL persistence if a database URL and driver are available
+- semantic model and database catalog emitted as generated metadata
+
+PostgreSQL, Redis, NATS, Temporal, and SQLAlchemy are package dependencies for
+platform and capability work, but they are not required to compile a simple APG
+file or run a generated local app.
+
+## Security Model
+
+Generated apps include:
+
+- optional generated login session flow when auth metadata requires it
+- mutation authorization through generated checks
+- API-key support with `APG_API_KEY`
+- session secret support with `APG_SESSION_SECRET` or `APG_JWT_SECRET`
+- tenant scoping based on `tenant_id` fields and request headers
+- capability rules and approvals through deterministic contract functions
+
+Capability packages may add stronger security boundaries, but docs should name
+the package-level evidence instead of implying all generated apps include a
+full enterprise IAM stack by default.
+
+## Release And Verification Architecture
+
+APG verification is command-driven:
+
+```bash
+apg lint <source.apg> --json
+apg validate <source.apg> --target python --json
+apg model <source.apg> --json
+apg graph-suite <source.apg> --json
+apg compile <source.apg> --output /tmp/apg-out --verify
+apg release <source.apg> --json
+apg package <source.apg> --target web --out /tmp/apg-package --json
+apg package-verify /tmp/apg-package --json
+apg deployment verify /tmp/apg-package --json
+apg baseline examples --json
+apg tooling audit --json
 ```
 
-### Data Layer
+The baseline gate covers all numbered examples and is the main compiler
+bed-down proof. The current full test target is:
 
-**Database Architecture**
-```sql
--- PostgreSQL with advanced features
-- JSONB for flexible document storage
-- Full-text search with GIN indexes
-- Partitioning for large datasets
-- Streaming replication for high availability
+```bash
+uv run pytest tests/ -q
 ```
 
-**Caching Strategy**
-```python
-# Multi-level caching
-- Application cache (in-memory)
-- Redis cache (distributed)
-- Database query cache
-- CDN for static assets
-```
+with 1486 passed, 1 skipped, and 3 warnings.
 
-**Vector Storage**
-```python
-# AI/ML data storage
-- Embeddings storage for RAG
-- Model parameters for federated learning
-- Feature vectors for similarity search
-- Time-series data for analytics
-```
+## Extension Points
 
-## 🔄 Data Flow Architecture
+Add functionality at the earliest owning layer:
 
-### Request Processing Flow
+- syntax: grammar, parser fixtures, AST builder
+- meaning: semantic model, diagnostics, graph output
+- execution: code generator and generated runtime tests
+- UI: templates, CSS/assets, generated UI tests
+- capability behavior: capability package and focused package tests
+- documentation: docs audit and links
+- delivery: package, deployment, release evidence commands
 
-```
-1. Request Reception
-   ├─ Load Balancer (nginx/HAProxy)
-   ├─ SSL Termination
-   └─ Rate Limiting
-
-2. Authentication & Authorization
-   ├─ JWT Token Validation
-   ├─ Role-Based Access Control
-   ├─ Multi-Factor Authentication
-   └─ Audit Logging
-
-3. Service Processing
-   ├─ Route to Appropriate Service
-   ├─ Business Logic Execution
-   ├─ Data Validation
-   └─ Transaction Management
-
-4. Data Operations
-   ├─ Database Queries
-   ├─ Cache Operations
-   ├─ External API Calls
-   └─ File System Operations
-
-5. Response Generation
-   ├─ Data Serialization
-   ├─ Response Formatting
-   ├─ Caching Headers
-   └─ Compression
-```
-
-### Event Processing Flow
-
-```
-1. Event Generation
-   ├─ User Actions
-   ├─ System Events
-   ├─ External Webhooks
-   └─ Scheduled Tasks
-
-2. Event Routing
-   ├─ Event Classification
-   ├─ Topic Assignment
-   ├─ Priority Queuing
-   └─ Load Distribution
-
-3. Event Processing
-   ├─ Handler Execution
-   ├─ State Updates
-   ├─ Side Effects
-   └─ Notification Dispatch
-
-4. Event Storage
-   ├─ Event Log
-   ├─ State Snapshots
-   ├─ Audit Trail
-   └─ Analytics Data
-```
-
-## 🧩 Capability Architecture
-
-### Capability Structure
-
-Each capability follows a standardized structure:
-
-```
-capability/
-├── __init__.py           # Capability registration
-├── models.py             # Domain models and data contracts
-├── service.py            # Business logic
-├── views.py              # UI manifest and view adapters
-├── api.py                # API endpoints or adapter surface
-├── blueprint.py          # Composition registration
-├── cap_spec.md           # Capability specification
-├── desired_outcome.md    # Requirements document
-└── tests/                # Comprehensive tests
-```
-
-### Capability Composition
-
-```python
-class CapabilityComposer:
-    """
-    Orchestrates capability composition:
-    - Dependency resolution
-    - Configuration management
-    - Runtime integration
-    - Health monitoring
-    """
-    
-    def compose_capabilities(
-        self, 
-        requirements: List[CapabilityRequirement]
-    ) -> ComposedApplication:
-        # Resolve dependencies
-        resolved_deps = self.dependency_resolver.resolve(requirements)
-        
-        # Generate configuration
-        config = self.config_generator.generate(resolved_deps)
-        
-        # Create application instance
-        app = self.application_factory.create(config)
-        
-        # Initialize capabilities
-        for capability in resolved_deps:
-            capability.initialize(app)
-            
-        return app
-```
-
-## 🔐 Security Architecture
-
-### Authentication Flow
-
-```
-1. Initial Authentication
-   ├─ Username/Password
-   ├─ Social OAuth (Google/GitHub)
-   ├─ LDAP/Active Directory
-   └─ Biometric Authentication
-
-2. Multi-Factor Authentication
-   ├─ SMS/Email OTP
-   ├─ TOTP Applications
-   ├─ Hardware Tokens
-   └─ Biometric Verification
-
-3. Session Management
-   ├─ JWT Token Generation
-   ├─ Refresh Token Rotation
-   ├─ Session Invalidation
-   └─ Concurrent Session Control
-```
-
-### Authorization Model
-
-```python
-class AccessControlService:
-    """
-    Attribute-Based Access Control (ABAC):
-    - Subject attributes (user, role, group)
-    - Resource attributes (type, owner, classification)
-    - Environment attributes (time, location, device)
-    - Action attributes (read, write, delete, execute)
-    """
-    
-    def authorize(
-        self,
-        subject: Subject,
-        resource: Resource,
-        action: Action,
-        environment: Environment
-    ) -> AuthorizationDecision:
-        # Evaluate policies
-        applicable_policies = self.policy_engine.find_policies(
-            subject, resource, action, environment
-        )
-        
-        # Apply policy evaluation
-        decision = self.policy_engine.evaluate(applicable_policies)
-        
-        # Log authorization decision
-        self.audit_logger.log_authorization(
-            subject, resource, action, decision
-        )
-        
-        return decision
-```
-
-## 📊 Monitoring & Observability
-
-### Metrics Collection
-
-```python
-# Application metrics
-- Request/response times
-- Error rates and types
-- Business KPIs
-- Resource utilization
-
-# Infrastructure metrics
-- CPU, memory, disk usage
-- Network throughput
-- Database performance
-- Cache hit rates
-
-# Business metrics
-- User engagement
-- Feature usage
-- Workflow completion rates
-- System efficiency
-```
-
-### Logging Strategy
-
-```python
-# Structured logging with correlation IDs
-logger = structlog.get_logger(__name__)
-
-logger.info(
-    "workflow_execution_started",
-    workflow_id=workflow_id,
-    user_id=user_id,
-    execution_id=execution_id,
-    timestamp=datetime.utcnow(),
-    context=execution_context
-)
-```
-
-## 🚀 Scalability Architecture
-
-### Horizontal Scaling
-
-```yaml
-# Kubernetes deployment example
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: apg-web
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: apg-web
-  template:
-    spec:
-      containers:
-      - name: apg-web
-        image: apg:latest
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "500m"
-          limits:
-            memory: "1Gi"
-            cpu: "1000m"
-```
-
-### Database Scaling
-
-```python
-# Read replicas for scaling
-class DatabaseManager:
-    def __init__(self):
-        self.write_db = create_engine(WRITE_DB_URL)
-        self.read_replicas = [
-            create_engine(url) for url in READ_REPLICA_URLS
-        ]
-        
-    def get_read_connection(self):
-        # Load balance across read replicas
-        return random.choice(self.read_replicas)
-        
-    def get_write_connection(self):
-        return self.write_db
-```
-
-## 🔄 Integration Patterns
-
-### API Gateway Pattern
-
-```python
-class APIGateway:
-    """
-    Centralized API management:
-    - Request routing
-    - Rate limiting
-    - Authentication
-    - Response transformation
-    - Circuit breaking
-    """
-    
-    def route_request(self, request: Request) -> Response:
-        # Authenticate request
-        user = self.auth_service.authenticate(request)
-        
-        # Apply rate limiting
-        self.rate_limiter.check_limits(user, request)
-        
-        # Route to appropriate service
-        service = self.service_registry.find_service(request.path)
-        
-        # Execute with circuit breaker
-        return self.circuit_breaker.execute(
-            lambda: service.handle_request(request)
-        )
-```
-
-### Event Sourcing Pattern
-
-```python
-class EventStore:
-    """
-    Event sourcing for audit and replay:
-    - Immutable event log
-    - State reconstruction
-    - Temporal queries
-    - Event replay
-    """
-    
-    def append_event(self, stream_id: str, event: Event):
-        # Store event immutably
-        self.storage.append(stream_id, event)
-        
-        # Update projections
-        self.projection_manager.apply_event(event)
-        
-        # Publish to subscribers
-        self.event_publisher.publish(event)
-```
-
-## 📈 Performance Considerations
-
-### Caching Strategy
-
-```python
-# Multi-level caching
-@cache(ttl=300, key_prefix="user_profile")
-def get_user_profile(user_id: str) -> UserProfile:
-    # Database query cached for 5 minutes
-    return database.query(UserProfile).filter_by(id=user_id).first()
-
-@cache(ttl=3600, key_prefix="workflow_template")
-def get_workflow_template(template_id: str) -> WorkflowTemplate:
-    # Template cached for 1 hour
-    return database.query(WorkflowTemplate).filter_by(id=template_id).first()
-```
-
-### Database Optimization
-
-```sql
--- Index optimization
-CREATE INDEX CONCURRENTLY idx_workflow_user_status 
-ON workflows (user_id, status) 
-WHERE status IN ('running', 'pending');
-
--- Partitioning for large tables
-CREATE TABLE audit_logs (
-    id BIGSERIAL,
-    timestamp TIMESTAMPTZ NOT NULL,
-    user_id UUID,
-    action TEXT,
-    details JSONB
-) PARTITION BY RANGE (timestamp);
-```
-
-## 🔮 Future Architecture Considerations
-
-### Microservices Evolution
-
-```python
-# Migration path to microservices
-class ServiceMesh:
-    """
-    Gradual migration to microservices:
-    - Service discovery
-    - Load balancing
-    - Circuit breaking
-    - Distributed tracing
-    """
-    
-    def extract_service(
-        self, 
-        capability: Capability
-    ) -> MicroService:
-        # Extract capability as microservice
-        service = MicroService(capability)
-        
-        # Configure service mesh
-        self.configure_mesh(service)
-        
-        # Deploy service
-        self.deploy_service(service)
-        
-        return service
-```
-
-### Cloud-Native Features
-
-```yaml
-# Kubernetes operators for APG
-apiVersion: v1
-kind: CustomResourceDefinition
-metadata:
-  name: apgapplications.apg.datacraft.co.ke
-spec:
-  group: apg.datacraft.co.ke
-  versions:
-  - name: v1
-    schema:
-      openAPIV3Schema:
-        type: object
-        properties:
-          spec:
-            type: object
-            properties:
-              capabilities:
-                type: array
-                items:
-                  type: string
-```
-
----
-
-*Next: [Configuration Guide](./configuration.md) →*
+Avoid adding dependencies or framework assumptions unless the current source and
+tests require them.
