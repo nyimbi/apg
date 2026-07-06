@@ -138,7 +138,9 @@
 </script>
 
 <dialog id="apg-create-drawer" class="apg-drawer" aria-labelledby="apg-create-title">
-  <form id="apg-create-form" method="post" action="/ui/entities/{{ safe_entity }}/records" class="apg-drawer-panel">
+  <form id="apg-create-form" method="post" action="/ui/entities/{{ safe_entity }}/records" class="apg-drawer-panel"
+        data-apg-draft-key="{{ form_intelligence.draft_key }}"
+        data-apg-undo-seconds="{{ form_intelligence.undo_seconds }}">
     <header class="apg-card-header">
       <div>
         <h2 id="apg-create-title" class="text-base font-semibold text-gray-900">New {{ entity_name }}</h2>
@@ -146,6 +148,42 @@
       </div>
       <button type="button" class="apg-btn apg-btn-secondary" onclick="document.getElementById('apg-create-drawer').close();">Close</button>
     </header>
+    <section class="apg-form-intelligence" aria-label="{{ entity_name }} form intelligence">
+      <article>
+        <span>Autosave Draft</span>
+        <strong id="apg-draft-state">Ready</strong>
+        <small>Restores locally before submit</small>
+      </article>
+      <article>
+        <span>Async Field Validation</span>
+        <strong id="apg-validation-state">{{ form_intelligence.validation_fields | length }} fields watched</strong>
+        <small>{{ form_intelligence.required_fields | length }} required</small>
+      </article>
+      <article>
+        <span>Smart Defaults</span>
+        {% if form_intelligence.smart_defaults %}
+        <div class="apg-default-chip-row">
+          {% for item in form_intelligence.smart_defaults %}
+          <button type="button" class="apg-default-chip" data-apg-default-field="{{ item.field }}" data-apg-default-value="{{ item.value }}">{{ item.label }}</button>
+          {% endfor %}
+        </div>
+        {% else %}
+        <strong>No sibling defaults</strong>
+        {% endif %}
+      </article>
+      <article>
+        <span>Dependency Tree</span>
+        {% if form_intelligence.dependency_edges %}
+        <ul class="apg-dependency-tree">
+          {% for edge in form_intelligence.dependency_edges %}
+          <li>{{ edge.from }} -> {{ edge.to }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <small>No conditional edges detected</small>
+        {% endif %}
+      </article>
+    </section>
     <div class="overflow-y-auto max-h-[70vh] space-y-3">
       {{ create_inputs | safe }}
     </div>
@@ -161,14 +199,90 @@
   var drawer = document.getElementById('apg-create-drawer');
   var form = document.getElementById('apg-create-form');
   if (!drawer || !form) return;
+  var draftKey = form.dataset.apgDraftKey;
+  var undoSeconds = parseInt(form.dataset.apgUndoSeconds || '5', 10);
+  var draftState = document.getElementById('apg-draft-state');
+  var validationState = document.getElementById('apg-validation-state');
+  var pendingSubmit = null;
   var dirty = false;
-  form.addEventListener('input', function() { dirty = true; });
-  form.addEventListener('submit', function() { dirty = false; });
+  function serializeForm() {
+    var data = {};
+    Array.prototype.forEach.call(form.elements, function(field) {
+      if (!field.name || field.type === 'hidden' || field.type === 'submit' || field.type === 'button') return;
+      data[field.name] = field.type === 'checkbox' ? field.checked : field.value;
+    });
+    return data;
+  }
+  function restoreDraft() {
+    if (!draftKey || !localStorage.getItem(draftKey)) return;
+    var data = {};
+    try { data = JSON.parse(localStorage.getItem(draftKey) || '{}'); } catch (error) { data = {}; }
+    Object.keys(data).forEach(function(name) {
+      var field = form.elements[name];
+      if (!field) return;
+      if (field.type === 'checkbox') field.checked = !!data[name];
+      else field.value = data[name];
+    });
+    dirty = true;
+    if (draftState) draftState.textContent = 'Draft restored';
+    APGToast('Draft restored locally', 'info');
+  }
+  function saveDraft() {
+    if (!draftKey) return;
+    localStorage.setItem(draftKey, JSON.stringify(serializeForm()));
+    if (draftState) draftState.textContent = 'Saved locally';
+  }
+  function validateLater() {
+    if (validationState) validationState.textContent = 'Checking...';
+    window.setTimeout(function() {
+      var invalid = form.querySelectorAll(':invalid').length;
+      if (validationState) validationState.textContent = invalid ? invalid + ' field warnings' : 'Ready to submit';
+    }, 180);
+  }
+  restoreDraft();
+  form.addEventListener('input', function() {
+    dirty = true;
+    saveDraft();
+    validateLater();
+  });
+  form.addEventListener('click', function(event) {
+    var chip = event.target.closest('[data-apg-default-field]');
+    if (!chip) return;
+    var field = form.elements[chip.dataset.apgDefaultField];
+    if (!field) return;
+    field.value = chip.dataset.apgDefaultValue || '';
+    dirty = true;
+    saveDraft();
+    validateLater();
+    APGToast('Smart default applied', 'success');
+  });
+  form.addEventListener('submit', function(event) {
+    if (form.dataset.apgSubmitArmed === '1') {
+      localStorage.removeItem(draftKey);
+      dirty = false;
+      return;
+    }
+    event.preventDefault();
+    if (pendingSubmit) window.clearTimeout(pendingSubmit);
+    APGToast('Submitting in ' + undoSeconds + 's. Press Escape to undo.', 'info');
+    pendingSubmit = window.setTimeout(function() {
+      form.dataset.apgSubmitArmed = '1';
+      form.requestSubmit();
+    }, undoSeconds * 1000);
+  });
   drawer.addEventListener('cancel', function(event) {
+    if (pendingSubmit) {
+      window.clearTimeout(pendingSubmit);
+      pendingSubmit = null;
+      APGToast('Submit undone', 'success');
+      event.preventDefault();
+      return;
+    }
     if (!dirty) return;
     event.preventDefault();
     apgConfirm('Discard this draft?', function() {
       dirty = false;
+      if (draftKey) localStorage.removeItem(draftKey);
       drawer.close();
     });
   });

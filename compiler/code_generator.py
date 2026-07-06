@@ -6068,6 +6068,43 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
         "filtered": total_filtered != query_result["total"] or bool(q),
         "column_controls": column_controls,
     }}
+    sibling_source = all_records[0] if all_records else {{}}
+    smart_defaults = []
+    for field in fields:
+        field_name = str(field.get("name", ""))
+        if field_name in {{"id", "_revision"}} or field_name.endswith("_id"):
+            continue
+        value = sibling_source.get(field_name, "")
+        if value in (None, "", []):
+            continue
+        smart_defaults.append({{
+            "field": field_name,
+            "label": _humanize_label(field_name),
+            "value": html.escape(_ui_record_display_value(value)[:72], quote=True),
+        }})
+        if len(smart_defaults) >= 3:
+            break
+    required_fields = [
+        _humanize_label(str(field.get("name", "")))
+        for field in fields
+        if bool(field.get("required")) and str(field.get("name", "")) not in {{"id", "_revision"}}
+    ]
+    validation_fields = [
+        _humanize_label(str(field.get("name", "")))
+        for field in fields
+        if str(field.get("name", "")) not in {{"id", "_revision"}}
+    ][:5]
+    form_intelligence = {{
+        "draft_key": f"apg:create-draft:{{entity_name}}",
+        "undo_seconds": 5,
+        "smart_defaults": smart_defaults,
+        "required_fields": required_fields,
+        "validation_fields": validation_fields,
+        "dependency_edges": [
+            {{"from": item["label"], "to": "Submit readiness"}}
+            for item in smart_defaults[:3]
+        ],
+    }}
     pagination_pages = [
         {{"number": p, "url": _ui_entity_query_path(entity_name, query, {{"page": p, "per": per}})}}
         for p in range(1, total_pages + 1)
@@ -6092,6 +6129,7 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
         count=total_filtered,
         records_table=records_table,
         list_intelligence=list_intelligence,
+        form_intelligence=form_intelligence,
         create_inputs=create_inputs,
         notice=html.escape(notice) if notice else "",
         query=query,

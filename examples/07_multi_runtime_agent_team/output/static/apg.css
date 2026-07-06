@@ -281,6 +281,14 @@ p { margin: 0 0 var(--apg-space-3); }
 .apg-badge-neutral { background: var(--apg-bg-hover); color: var(--apg-muted); }
 
 form, .apg-form { padding: var(--apg-space-4); background: var(--apg-bg-card); border: 1px solid var(--apg-border); border-radius: var(--apg-radius); box-shadow: var(--apg-shadow-sm); }
+.apg-form-intelligence { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--apg-space-3); margin-bottom: var(--apg-space-4); }
+.apg-form-intelligence article { display: grid; gap: .3rem; min-width: 0; padding: var(--apg-space-3); border: 1px solid var(--apg-border); border-radius: var(--apg-radius); background: var(--apg-bg-canvas); }
+.apg-form-intelligence span { color: var(--apg-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0; }
+.apg-form-intelligence strong { overflow: hidden; color: var(--apg-text); font-size: .9rem; text-overflow: ellipsis; white-space: nowrap; }
+.apg-form-intelligence small { color: var(--apg-muted); }
+.apg-default-chip-row { display: flex; flex-wrap: wrap; gap: .35rem; }
+.apg-default-chip { min-height: 30px; padding: .2rem .5rem; border: 1px solid var(--apg-border); border-radius: var(--apg-radius-full); background: var(--apg-surface); color: var(--apg-text); font-size: .72rem; }
+.apg-dependency-tree { display: grid; gap: .25rem; margin: 0; padding: 0; list-style: none; color: var(--apg-muted); font-size: .75rem; }
 label { display: block; margin-bottom: var(--apg-space-1); font-size: 0.875rem; font-weight: 500; color: var(--apg-text); }
 input, select, textarea {
 	width: 100%;
@@ -836,6 +844,7 @@ html[dir="rtl"] .apg-sidebar-backdrop { inset: 0; }
 	.apg-grid-2, .apg-grid-3, .apg-grid-4 { grid-template-columns: 1fr; }
 	.apg-dashboard-command-center { grid-template-columns: 1fr; }
 	.apg-list-intelligence { grid-template-columns: 1fr; }
+	.apg-form-intelligence { grid-template-columns: 1fr; }
 	.apg-analytics-metrics, .apg-analytics-insights, .apg-analytics-decisions { grid-template-columns: 1fr; }
 	.apg-kanban-intelligence { grid-template-columns: 1fr; }
 	.apg-detail-command-center { grid-template-columns: 1fr; }
