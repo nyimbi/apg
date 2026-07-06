@@ -3663,6 +3663,24 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         _shell_link(f'/ui/agent-teams/{quote(str(name), safe="")}', str(name))
         for name in sorted(app.get("ai_agent_team_descriptions", {}))
     )
+    shell_commands = [
+        {"label": "Dashboard", "url": "/ui", "kind": "Navigate", "hint": "Open generated home dashboard"},
+        {"label": "Workflows", "url": "/ui/workflows", "kind": "Navigate", "hint": "Run guided operational flows"},
+        {"label": "Databases", "url": "/ui/databases", "kind": "Navigate", "hint": "Inspect schemas and generated tables"},
+        {"label": "Marketplace", "url": "/ui/marketplace", "kind": "Navigate", "hint": "Compare generated integration blueprints"},
+        {"label": "Flow debugger", "url": "/ui/debug", "kind": "Operate", "hint": "Replay workflow runs"},
+        {"label": "OpenAPI contract", "url": "/openapi.json", "kind": "Developer", "hint": "Inspect generated API contract"},
+        {"label": "Self-test", "url": "/self-test", "kind": "Developer", "hint": "Check runtime health"},
+    ]
+    for entity in ENTITIES:
+        if entity.get("type") not in {"application"}:
+            entity_name = str(entity.get("name", ""))
+            shell_commands.append({"label": entity_name, "url": f"/ui/entities/{quote(entity_name, safe='')}", "kind": "Entity", "hint": "Open generated data workspace"})
+    for name in sorted(app.get("ai_agent_descriptions", {})):
+        shell_commands.append({"label": str(name), "url": f"/ui/agents/{quote(str(name), safe='')}", "kind": "Agent", "hint": "Open agent console"})
+    for name in sorted(app.get("ai_agent_team_descriptions", {})):
+        shell_commands.append({"label": str(name), "url": f"/ui/agent-teams/{quote(str(name), safe='')}", "kind": "Team", "hint": "Open team console"})
+    shell_command_json = json.dumps(shell_commands)
     current_user = _current_user() if APG_AUTH_REQUIRED else None
     user_menu = ""
     if current_user:
@@ -3787,6 +3805,37 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         'id="apg-cmd" class="hidden',
         'id="apg-cmd" role="dialog" aria-modal="true" aria-label="Command palette" class="hidden',
     )
+    shell_supplement_js = (
+        '<section id="apg-tour" class="apg-tour" aria-label="Shell onboarding" hidden>'
+        '<div class="apg-tour-panel">'
+        '<span>Shell tour</span><h2>Command-first generated workspace</h2>'
+        '<p id="apg-tour-copy">Use the command center to jump across generated pages, APIs, entities, and operations.</p>'
+        '<div class="apg-tour-actions"><button type="button" class="apg-btn apg-btn-secondary" onclick="apgTourClose()">Skip</button><button type="button" class="apg-btn" onclick="apgTourNext()">Next</button></div>'
+        '</div></section>'
+        '<script>'
+        'window.APGToast=window.APGToast||apgToast;'
+        'var APG_SHELL_COMMANDS=' + shell_command_json + ';'
+        'var _apgTourStep=0;'
+        'var _apgTourCopy=["Use Command Center for generated navigation, APIs, entities, agents, and operations.","Recent items follow you across APG workspaces without server state.","Notifications, undo toasts, theme, install, update, and offline mode live in the shell."];'
+        'function apgShellRecentKey(){return "apg:shell:recent:"+location.host;}'
+        'function apgShellReadRecent(){try{return JSON.parse(localStorage.getItem(apgShellRecentKey())||"[]");}catch(e){return [];}}'
+        'function apgShellWriteRecent(items){try{localStorage.setItem(apgShellRecentKey(),JSON.stringify(items.slice(0,8)));}catch(e){}}'
+        'function apgShellTrackRecent(){var title=(document.title||location.pathname).replace(" — "," - ");var item={label:title,url:location.pathname+location.search,kind:"Recent",hint:"Last opened workspace"};var items=apgShellReadRecent().filter(function(x){return x.url!==item.url;});items.unshift(item);apgShellWriteRecent(items);}'
+        'function apgShellCommandMarkup(items,empty){if(!items.length)return \'<p class="apg-command-empty">\'+(empty||"No commands") + \'</p>\';return items.map(function(r){return \'<a href="\'+r.url+\'" onclick="apgCmdClose()" class="apg-command-result"><span class="apg-command-kind">\'+r.kind+\'</span><div><strong>\'+r.label+\'</strong><small>\'+(r.hint||r.url)+\'</small></div></a>\';}).join("");}'
+        'function apgShellRenderDefault(){var recent=apgShellReadRecent();var el=document.getElementById("apg-cmd-results");if(!el)return;el.innerHTML=\'<div class="apg-command-section"><header><span>Command Center</span><button type="button" onclick="apgShellClearRecent()">Clear recent</button></header>\'+apgShellCommandMarkup(APG_SHELL_COMMANDS.slice(0,7),"No commands")+\'</div><div class="apg-command-section"><header><span>Recent Items</span></header>\'+apgShellCommandMarkup(recent,"No recent items yet")+\'</div>\';}'
+        'function apgShellRenderRecentOnly(){apgCmdOpen();var el=document.getElementById("apg-cmd-results");if(el)el.innerHTML=\'<div class="apg-command-section"><header><span>Recent Items</span><button type="button" onclick="apgShellClearRecent()">Clear recent</button></header>\'+apgShellCommandMarkup(apgShellReadRecent(),"No recent items yet")+\'</div>\';}'
+        'function apgCmdOpen(){var d=document.getElementById("apg-cmd");var i=document.getElementById("apg-cmd-input");if(!d||!i)return;d.classList.remove("hidden");i.focus();apgCmdSearch(i.value||"");}'
+        'function apgCmdClose(){var d=document.getElementById("apg-cmd");var i=document.getElementById("apg-cmd-input");if(!d||!i)return;d.classList.add("hidden");i.value="";apgShellRenderDefault();}'
+        'function apgCmdSearch(q){var query=(q||"").trim().toLowerCase();if(!query){apgShellRenderDefault();return;}var matches=APG_SHELL_COMMANDS.concat(apgShellReadRecent()).filter(function(r){return (r.label+" "+r.kind+" "+(r.hint||"")).toLowerCase().indexOf(query)>=0;}).slice(0,12);var el=document.getElementById("apg-cmd-results");if(el)el.innerHTML=apgShellCommandMarkup(matches,"No commands match");}'
+        'function apgUndoToast(message,label,undo){var root=document.getElementById("apg-toast-root");if(!root){apgToast(message,"info");return;}var el=document.createElement("div");el.className="apg-undo-toast";el.innerHTML="<span>"+message+"</span><button type=\"button\">"+(label||"Undo")+"</button>";el.querySelector("button").onclick=function(){try{undo&&undo();}finally{el.remove();apgToast("Undo applied","success");}};root.appendChild(el);setTimeout(function(){if(el.parentNode)el.remove();},7000);apgRecordNotification(message,"undo");}'
+        'function apgShellClearRecent(){var previous=apgShellReadRecent();apgShellWriteRecent([]);apgShellRenderDefault();apgUndoToast("Recent items cleared","Undo",function(){apgShellWriteRecent(previous);apgShellRenderDefault();});}'
+        'function apgTourOpen(){_apgTourStep=0;var t=document.getElementById("apg-tour");if(t)t.hidden=false;apgTourPaint();}'
+        'function apgTourPaint(){var c=document.getElementById("apg-tour-copy");if(c)c.textContent=_apgTourCopy[_apgTourStep]||_apgTourCopy[0];}'
+        'function apgTourNext(){_apgTourStep+=1;if(_apgTourStep>=_apgTourCopy.length){apgTourClose();return;}apgTourPaint();}'
+        'function apgTourClose(){var t=document.getElementById("apg-tour");if(t)t.hidden=true;try{localStorage.setItem("apg:shell-tour-seen","1");}catch(e){}}'
+        'document.addEventListener("DOMContentLoaded",function(){apgShellTrackRecent();apgShellRenderDefault();if(!localStorage.getItem("apg:shell-tour-seen"))setTimeout(apgTourOpen,600);});'
+        '</script>'
+    )
     if not shell:
         return (
             "<!doctype html>"
@@ -3827,7 +3876,9 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         f'  </nav>'
         f'  <span class="apg-topbar-spacer"></span>'
         f'  <div class="apg-shell-action-row" aria-label="Shell actions">'
-        f'    <button class="apg-btn apg-btn-secondary apg-command-trigger" type="button" onclick="apgCmdOpen()" aria-haspopup="dialog">Search <kbd>⌘K</kbd></button>'
+        f'    <button class="apg-btn apg-btn-secondary apg-command-trigger" type="button" onclick="apgCmdOpen()" aria-haspopup="dialog">Command <kbd>⌘K</kbd></button>'
+        f'    <button class="apg-btn apg-btn-secondary apg-recent-trigger" type="button" onclick="apgShellRenderRecentOnly()">Recent</button>'
+        f'    <button class="apg-btn apg-btn-secondary apg-tour-trigger" type="button" onclick="apgTourOpen()">Tour</button>'
         f'    <button id="apg-install-btn" class="apg-btn apg-btn-secondary apg-install-btn" type="button" onclick="apgInstall()" hidden>Install</button>'
         f'    <button id="apg-update-btn" class="apg-btn apg-btn-secondary apg-install-btn" type="button" onclick="apgApplyUpdate()" hidden>Update</button>'
         f'    <div class="apg-notification-wrap">'
@@ -3843,6 +3894,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         f'<main class="apg-content apg-shell-content" id="content" tabindex="-1">{body}</main>'
         f"{toast_js}"
         f"{cmd_palette_html}"
+        f"{shell_supplement_js}"
         "</body></html>"
     )
 
