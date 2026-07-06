@@ -6976,6 +6976,71 @@ def _ui_debug_html(run_id: str | None = None) -> tuple[int, str]:
                 for step in raw_run.get("trace", [])
                 if isinstance(step, dict)
             ]
+            cumulative_ms = 0
+            replay_frames = []
+            breakpoint_items = []
+            for step in trace:
+                duration_text = str(step.get("duration_ms", ""))
+                duration_ms = int(duration_text) if duration_text.isdigit() else 0
+                cumulative_ms += duration_ms
+                field_count_text = str(step.get("field_count", ""))
+                field_count = int(field_count_text) if field_count_text.isdigit() else 0
+                replay_frames.append({{
+                    "index": step.get("index", ""),
+                    "step": step.get("step", ""),
+                    "status": step.get("status", ""),
+                    "badge_class": step.get("badge_class", "apg-badge-neutral"),
+                    "duration_ms": duration_ms,
+                    "cumulative_ms": cumulative_ms,
+                    "fields": step.get("fields", ""),
+                    "reason": "Replay checkpoint with field inputs" if field_count else "Replay checkpoint",
+                }})
+                status_text = str(step.get("status", ""))
+                if status_text not in {{"completed", "success", ""}} or duration_ms >= 225 or field_count >= 3:
+                    breakpoint_items.append({{
+                        "index": step.get("index", ""),
+                        "step": step.get("step", ""),
+                        "reason": "Inspect status" if status_text not in {{"completed", "success", ""}} else ("Slowest step" if duration_ms >= 225 else "High field fan-in"),
+                        "key": f"apg:debug-breakpoint:{{run_id}}:{{step.get('index', '')}}",
+                    }})
+            if not breakpoint_items and trace:
+                breakpoint_items.append({{
+                    "index": trace[-1].get("index", ""),
+                    "step": trace[-1].get("step", ""),
+                    "reason": "Final state checkpoint",
+                    "key": f"apg:debug-breakpoint:{{run_id}}:{{trace[-1].get('index', '')}}",
+                }})
+            variable_items = []
+            payload = raw_run.get("payload", {{}})
+            record = raw_run.get("record", {{}})
+            variable_sources = [
+                ("Payload", payload if isinstance(payload, dict) else {{}}),
+                ("Created record", record if isinstance(record, dict) else {{}}),
+                ("Run", {{
+                    "run_id": raw_run.get("id", run_id),
+                    "workflow": raw_run.get("workflow", ""),
+                    "workflow_id": raw_run.get("workflow_id", ""),
+                    "entity": raw_run.get("entity", ""),
+                    "status": raw_run.get("status", ""),
+                    "event_id": raw_run.get("event_id", ""),
+                }}),
+            ]
+            for source, values in variable_sources:
+                for name, value in sorted(values.items(), key=lambda item: str(item[0]))[:8]:
+                    variable_items.append({{
+                        "source": source,
+                        "name": str(name),
+                        "value": json.dumps(value, sort_keys=True) if isinstance(value, (dict, list)) else str(value),
+                    }})
+            debug_intelligence = {{
+                "verdict": "Replay-ready" if trace else "No trace captured",
+                "replay_count": len(replay_frames),
+                "breakpoint_count": len(breakpoint_items),
+                "variable_count": len(variable_items),
+                "replay_frames": replay_frames,
+                "breakpoints": breakpoint_items,
+                "variables": variable_items,
+            }}
             selected_run = {{
                 "id": str(raw_run.get("id", run_id)),
                 "workflow": str(raw_run.get("workflow", "")),
@@ -7007,6 +7072,7 @@ def _ui_debug_html(run_id: str | None = None) -> tuple[int, str]:
                     for step in raw_run.get("trace", [])
                     if isinstance(step, dict) and str(step.get("duration_ms", "")).isdigit()
                 ),
+                "debug_intelligence": debug_intelligence,
             }}
     run_items = [
         {{

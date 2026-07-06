@@ -37,11 +37,76 @@
       </div>
     </section>
 
+    {% if selected_run.debug_intelligence %}
+    <section class="apg-debugger-grid mb-4" aria-label="Replay debugger">
+      <article class="apg-debugger-panel">
+        <div>
+          <span>Step replay</span>
+          <strong>{{ selected_run.debug_intelligence.replay_count }} checkpoint{{ '' if selected_run.debug_intelligence.replay_count == 1 else 's' }}</strong>
+          <small>{{ selected_run.debug_intelligence.verdict }}</small>
+        </div>
+        {% if selected_run.debug_intelligence.replay_frames %}
+        <ol class="apg-replay-rail">
+          {% for frame in selected_run.debug_intelligence.replay_frames %}
+          <li>
+            <button type="button" class="apg-replay-dot" data-apg-replay-target="apg-step-{{ frame.index }}" aria-label="Replay {{ frame.step }}">{{ frame.index }}</button>
+            <div>
+              <strong>{{ frame.step }}</strong>
+              <small>{{ frame.reason }} · +{{ frame.duration_ms }} ms · {{ frame.cumulative_ms }} ms total</small>
+            </div>
+            <span class="apg-badge {{ frame.badge_class }}">{{ frame.status }}</span>
+          </li>
+          {% endfor %}
+        </ol>
+        {% endif %}
+      </article>
+
+      <article class="apg-debugger-panel">
+        <div>
+          <span>Breakpoint planner</span>
+          <strong>{{ selected_run.debug_intelligence.breakpoint_count }} suggestion{{ '' if selected_run.debug_intelligence.breakpoint_count == 1 else 's' }}</strong>
+          <small>Saved locally per run</small>
+        </div>
+        {% if selected_run.debug_intelligence.breakpoints %}
+        <ul class="apg-breakpoint-list">
+          {% for point in selected_run.debug_intelligence.breakpoints %}
+          <li>
+            <div>
+              <strong>{{ point.step }}</strong>
+              <small>{{ point.reason }}</small>
+            </div>
+            <button type="button" class="apg-mini-btn" data-apg-breakpoint-key="{{ point.key }}" data-apg-breakpoint-step="{{ point.step }}">Set</button>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </article>
+
+      <article class="apg-debugger-panel">
+        <div>
+          <span>Variable inspector</span>
+          <strong>{{ selected_run.debug_intelligence.variable_count }} captured</strong>
+          <small>Payload, record, and run identifiers</small>
+        </div>
+        {% if selected_run.debug_intelligence.variables %}
+        <dl class="apg-variable-inspector">
+          {% for item in selected_run.debug_intelligence.variables %}
+          <div>
+            <dt>{{ item.source }} · {{ item.name }}</dt>
+            <dd>{{ item.value }}</dd>
+          </div>
+          {% endfor %}
+        </dl>
+        {% endif %}
+      </article>
+    </section>
+    {% endif %}
+
     {% if selected_run.trace %}
     <h3 class="text-sm font-semibold text-gray-900 mb-3">Run timeline</h3>
     <ol class="space-y-3">
       {% for step in selected_run.trace %}
-      <li class="border border-gray-200 rounded-lg p-3">
+      <li id="apg-step-{{ step.index }}" class="border border-gray-200 rounded-lg p-3">
         <div class="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <p class="text-sm font-medium text-gray-900">{{ step.step }}</p>
@@ -110,6 +175,31 @@
   <p class="text-sm text-gray-500">No journal events recorded for this run.</p>
   {% endif %}
 </section>
+
+{% if selected_run and selected_run.debug_intelligence %}
+<script>
+(function () {
+  document.addEventListener('click', function (event) {
+    var replay = event.target.closest('[data-apg-replay-target]');
+    if (replay) {
+      var target = document.getElementById(replay.dataset.apgReplayTarget || '');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('apg-replay-focus');
+        setTimeout(function () { target.classList.remove('apg-replay-focus'); }, 1600);
+      }
+      return;
+    }
+    var breakpoint = event.target.closest('[data-apg-breakpoint-key]');
+    if (!breakpoint) return;
+    localStorage.setItem(breakpoint.dataset.apgBreakpointKey, breakpoint.dataset.apgBreakpointStep || '');
+    breakpoint.textContent = 'Set';
+    breakpoint.setAttribute('aria-pressed', 'true');
+    APGToast('Breakpoint saved locally', 'success');
+  });
+})();
+</script>
+{% endif %}
 {% endif %}
 
 <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
