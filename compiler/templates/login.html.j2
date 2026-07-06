@@ -18,9 +18,96 @@
       </label>
       <button type="submit" class="apg-btn w-full justify-center">Sign in</button>
     </form>
-    <div class="mt-4 border border-gray-100 rounded-lg p-3">
-      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Session</p>
-      <p class="text-sm text-gray-600 mt-1">Continue to <span class="font-mono">{{ next_url }}</span> after authentication.</p>
-    </div>
+    {% if auth_intelligence %}
+    <section class="apg-auth-intelligence" aria-label="Authentication options">
+      <article class="apg-auth-panel">
+        <span>{{ auth_intelligence.passkey.label }}</span>
+        <strong data-apg-passkey-status>{{ auth_intelligence.passkey.status }}</strong>
+        <small>{{ auth_intelligence.passkey.detail }}</small>
+        <button type="button" class="apg-mini-btn" data-apg-passkey-check>Check device</button>
+      </article>
+      <article class="apg-auth-panel">
+        <span>{{ auth_intelligence.magic_link.label }}</span>
+        <strong>Stage passwordless handoff</strong>
+        <small>Continue to <span class="font-mono">{{ auth_intelligence.magic_link.next_url }}</span> after verification.</small>
+        <button type="button" class="apg-mini-btn" data-apg-magic-link data-apg-magic-key="{{ auth_intelligence.magic_link.storage_key }}" data-apg-next-url="{{ auth_intelligence.magic_link.next_url }}">Stage link</button>
+      </article>
+      <article class="apg-auth-panel">
+        <span>Device sessions</span>
+        <strong>{{ auth_intelligence.devices | length }} context rows</strong>
+        <ul class="apg-auth-device-list">
+          {% for device in auth_intelligence.devices %}
+          <li data-apg-device-row="{{ device.id }}">
+            <div>
+              <strong>{{ device.label }}</strong>
+              <small>{{ device.detail }}</small>
+            </div>
+            <button type="button" class="apg-mini-btn" data-apg-device-dismiss="{{ device.id }}">{{ device.status }}</button>
+          </li>
+          {% endfor %}
+        </ul>
+      </article>
+      <article class="apg-auth-panel apg-auth-lockout" data-apg-lockout-panel hidden>
+        <span>Lockout recovery</span>
+        <strong>Repeated failures detected</strong>
+        <ol>
+          {% for step in auth_intelligence.lockout.recovery_steps %}
+          <li>{{ step }}</li>
+          {% endfor %}
+        </ol>
+        <button type="button" class="apg-mini-btn" data-apg-clear-lockout>Clear local counter</button>
+      </article>
+    </section>
+    <script>
+    (function () {
+      var toast = function (message, kind) {
+        if (window.APGToast) window.APGToast(message, kind || 'info');
+      };
+      var attemptKey = '{{ auth_intelligence.lockout.attempt_key }}';
+      var threshold = {{ auth_intelligence.lockout.threshold }};
+      var panel = document.querySelector('[data-apg-lockout-panel]');
+      var attempts = parseInt(localStorage.getItem(attemptKey) || '0', 10) || 0;
+      {% if auth_intelligence.lockout.error_seen %}
+      attempts += 1;
+      localStorage.setItem(attemptKey, String(attempts));
+      {% endif %}
+      if (panel && attempts >= threshold) panel.hidden = false;
+      document.addEventListener('click', function (event) {
+        var passkey = event.target.closest('[data-apg-passkey-check]');
+        if (passkey) {
+          var status = document.querySelector('[data-apg-passkey-status]');
+          var supported = !!window.PublicKeyCredential;
+          if (status) status.textContent = supported ? 'Passkey-capable device' : 'Passkeys unavailable here';
+          toast(supported ? 'Passkey support detected' : 'Passkey support not detected', supported ? 'success' : 'info');
+          return;
+        }
+        var magic = event.target.closest('[data-apg-magic-link]');
+        if (magic) {
+          var username = document.getElementById('apg-login-username');
+          localStorage.setItem(magic.dataset.apgMagicKey, JSON.stringify({
+            username: username ? username.value : '',
+            next: magic.dataset.apgNextUrl || '/ui',
+            requestedAt: new Date().toISOString()
+          }));
+          toast('Magic-link intent staged locally', 'success');
+          return;
+        }
+        var dismiss = event.target.closest('[data-apg-device-dismiss]');
+        if (dismiss) {
+          var row = document.querySelector('[data-apg-device-row="' + dismiss.dataset.apgDeviceDismiss + '"]');
+          if (row) row.hidden = true;
+          toast('Device row dismissed locally', 'info');
+          return;
+        }
+        var clear = event.target.closest('[data-apg-clear-lockout]');
+        if (clear) {
+          localStorage.removeItem(attemptKey);
+          if (panel) panel.hidden = true;
+          toast('Local lockout counter cleared', 'success');
+        }
+      });
+    })();
+    </script>
+    {% endif %}
   </section>
 </main>

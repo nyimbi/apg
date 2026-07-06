@@ -2478,6 +2478,46 @@ def _login_required_for_path(path: str) -> bool:
     return path == "/ui" or path.startswith("/ui/")
 
 
+def _login_auth_intelligence(next_url: str = "/ui", username: str = "", error: str = "") -> Dict[str, Any]:
+    return {{
+        "passkey": {{
+            "label": "Passkey readiness",
+            "status": "Browser check pending",
+            "detail": "Generated app keeps credential verification server-side; this control checks WebAuthn availability for future enrollment.",
+        }},
+        "magic_link": {{
+            "label": "Magic-link intent",
+            "username": username,
+            "next_url": next_url or "/ui",
+            "storage_key": "apg:auth:magic-link-intent",
+        }},
+        "devices": [
+            {{
+                "id": "current-browser",
+                "label": "Current browser",
+                "detail": "Session starts after successful sign-in",
+                "status": "pending",
+            }},
+            {{
+                "id": "generated-session",
+                "label": "Generated Flask session",
+                "detail": "Stored in the signed app session cookie",
+                "status": "ready",
+            }},
+        ],
+        "lockout": {{
+            "attempt_key": "apg:auth:failed-attempts",
+            "threshold": 3,
+            "error_seen": bool(error),
+            "recovery_steps": [
+                "Confirm the generated APG_AUTH_USERNAME and APG_AUTH_PASSWORD environment values.",
+                "Use a recovery admin session or rotate the generated session secret if local cookies are stale.",
+                "Clear the local failed-attempt counter after confirming the operator identity.",
+            ],
+        }},
+    }}
+
+
 def _login_page(error: str = "", next_url: str = "/ui", username: str = "") -> str:
     body = _render_template(
         "login.html.j2",
@@ -2485,6 +2525,7 @@ def _login_page(error: str = "", next_url: str = "/ui", username: str = "") -> s
         error=error,
         next_url=next_url or "/ui",
         username=username,
+        auth_intelligence=_login_auth_intelligence(next_url or "/ui", username, error),
     )
     if body is None:
         safe_error = html.escape(error)
