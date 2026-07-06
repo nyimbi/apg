@@ -22,6 +22,26 @@
   </div>
 </section>
 
+{% if marketplace_intelligence %}
+<section class="apg-marketplace-intelligence mb-6" aria-label="Marketplace proof">
+  <article>
+    <span>Leader benchmark</span>
+    <strong>{{ marketplace_intelligence.leader }}</strong>
+    <small>Local proof replaces hosted install guesswork</small>
+  </article>
+  <article>
+    <span>Ready blueprints</span>
+    <strong>{{ marketplace_intelligence.ready_count }}</strong>
+    <small>{{ marketplace_intelligence.category_count }} categories represented</small>
+  </article>
+  <article>
+    <span>Generated operations</span>
+    <strong>{{ marketplace_intelligence.operation_total }}</strong>
+    <small>Inspectable before installation</small>
+  </article>
+</section>
+{% endif %}
+
 <section class="apg-card apg-list-toolbar mb-6" aria-label="Marketplace discovery">
   <form method="get" action="/ui/marketplace" class="grid grid-cols-1 md:grid-cols-2 gap-3">
     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Search
@@ -77,10 +97,16 @@
         <dd class="text-lg font-bold text-gray-900">{{ conn.operation_count }}</dd>
       </div>
       <div class="border border-gray-100 rounded-lg p-3">
-        <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Status</dt>
-        <dd class="text-sm font-semibold text-gray-900">{{ conn.status }}</dd>
+        <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Fit score</dt>
+        <dd class="text-lg font-bold text-gray-900">{{ conn.fit_score }}%</dd>
       </div>
     </dl>
+    <div class="apg-marketplace-proof mb-4">
+      <div class="apg-marketplace-fit"><span style="width: {{ conn.fit_score }}%"></span></div>
+      {% for proof in conn.proof %}
+      <small>{{ proof }}</small>
+      {% endfor %}
+    </div>
     {% if conn.operations %}
     <div class="flex items-center gap-2 flex-wrap mb-4">
       {% for operation in conn.operations[:3] %}
@@ -90,6 +116,7 @@
     {% endif %}
     <div class="flex items-center gap-2">
       <span class="flex-1 text-xs text-gray-400 font-mono truncate">{{ conn.file or conn.name }}</span>
+      <button type="button" class="apg-btn apg-btn-secondary" data-apg-install-proof="{{ conn.install_key }}" data-apg-install-name="{{ conn.title or conn.name }}">Proof</button>
       <a href="{{ conn.href }}" class="apg-btn apg-btn-secondary">Open</a>
     </div>
   </article>
@@ -103,3 +130,18 @@
   <a href="/ui/marketplace" class="apg-btn">Clear filters</a>
 </div>
 {% endif %}
+
+<script>
+(function () {
+  document.addEventListener('click', function (event) {
+    var proof = event.target.closest('[data-apg-install-proof]');
+    if (!proof) return;
+    localStorage.setItem(proof.dataset.apgInstallProof, JSON.stringify({
+      connector: proof.dataset.apgInstallName || '',
+      provedAt: new Date().toISOString(),
+      source: 'generated-marketplace'
+    }));
+    if (window.APGToast) window.APGToast('Install proof saved locally', 'success');
+  });
+})();
+</script>

@@ -56,6 +56,50 @@
       </section>
     </section>
 
+    {% if capability_compare %}
+    <section class="apg-marketplace-compare mb-8" aria-label="Capability compare">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Capability compare</p>
+        <h2 class="text-base font-semibold text-gray-900">Generated proof beats marketplace promises</h2>
+      </div>
+      <div class="apg-table-wrap">
+        <table class="apg-table">
+          <thead><tr><th>Surface</th><th>APG proof</th><th>Leader weakness closed</th><th>Inspect</th></tr></thead>
+          <tbody>
+            {% for row in capability_compare %}
+            <tr>
+              <td class="font-semibold">{{ row.surface }}</td>
+              <td>{{ row.apg }}</td>
+              <td>{{ row.leader_gap }}</td>
+              <td><a href="{{ row.proof }}" class="apg-btn apg-btn-secondary apg-mini-btn">Open</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if live_demo %}
+    <section class="apg-live-demo-boot mb-8" aria-label="Live demo boot">
+      <header>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Live demo boot</p>
+        <h2 class="text-base font-semibold text-gray-900">{{ live_demo.headline }}</h2>
+      </header>
+      <ol>
+        {% for step in live_demo.steps %}
+        <li>
+          <span>{{ loop.index }}</span>
+          <div>
+            <a href="{{ step.url }}" class="font-semibold text-gray-900">{{ step.label }}</a>
+            <small>{{ step.detail }}</small>
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endif %}
+
     <section class="mb-8" aria-label="Primary actions">
       <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-4">Start here</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -110,6 +154,23 @@
         </div>
       </article>
     </section>
+
+    {% if marketplace_intelligence %}
+    <section class="apg-install-proof-ledger mb-8" aria-label="Install proof ledger">
+      <header>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Install proof</p>
+        <h2 class="text-base font-semibold text-gray-900">Local evidence for {{ marketplace_intelligence.leader }}-class evaluation</h2>
+      </header>
+      <div>
+        {% for item in marketplace_intelligence.install_proof %}
+        <a href="{{ item.url }}">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
   </main>
 
   <footer class="border-t border-gray-200 py-6 text-center text-xs text-gray-400">

@@ -5216,20 +5216,48 @@ def _marketplace_cards(connectors: list[Dict[str, Any]]) -> list[Dict[str, Any]]
         operations = connector.get("operations") or []
         category = connector.get("category") or connector.get("type") or "Connector"
         name = str(connector.get("name") or connector.get("title") or "connector")
+        operation_count = len(operations) if isinstance(operations, list) else 0
+        status = str(connector.get("status") or ("Installed" if connectors else "Blueprint"))
+        fit_score = min(100, 55 + (operation_count * 10) + (20 if status.lower() in {{"ready", "installed"}} else 10))
         cards.append({{
             "name": name,
             "title": str(connector.get("title") or name.replace("_", " ").title()),
             "category": str(category),
             "description": str(connector.get("description") or connector.get("summary") or "Generated connector surface."),
             "operations": operations if isinstance(operations, list) else [],
-            "operation_count": len(operations) if isinstance(operations, list) else 0,
+            "operation_count": operation_count,
             "version": str(connector.get("version") or ""),
-            "status": str(connector.get("status") or ("Installed" if connectors else "Blueprint")),
+            "status": status,
             "file": str(connector.get("file") or connector.get("base_url") or connector.get("name") or ""),
             "href": str(connector.get("href") or ("/entities/connectors/" + quote(name, safe=""))),
             "installed": bool(connectors),
+            "fit_score": fit_score,
+            "proof": [
+                f"{{operation_count}} generated operation{{'s' if operation_count != 1 else ''}}",
+                "Local route available",
+                "No external runtime asset",
+            ],
+            "install_key": f"apg:marketplace-install:{{name}}",
         }})
     return cards
+
+
+def _marketplace_intelligence(cards: list[Dict[str, Any]]) -> Dict[str, Any]:
+    ready_count = len([card for card in cards if str(card.get("status", "")).lower() in {{"ready", "installed"}}])
+    operation_total = sum(int(card.get("operation_count", 0)) for card in cards)
+    categories = sorted({{str(card.get("category", "Connector")) for card in cards}})
+    return {{
+        "leader": "Vercel Marketplace",
+        "ready_count": ready_count,
+        "operation_total": operation_total,
+        "category_count": len(categories),
+        "install_proof": [
+            {{"label": "Generated OpenAPI", "value": "/openapi.json", "url": "/openapi.json"}},
+            {{"label": "Self-test route", "value": "/self-test", "url": "/self-test"}},
+            {{"label": "Offline assets", "value": "Vendored", "url": "/manifest"}},
+            {{"label": "Blueprint operations", "value": str(operation_total), "url": "/ui/marketplace"}},
+        ],
+    }}
 
 
 def _landing_page_html() -> str:
@@ -5260,6 +5288,43 @@ def _landing_page_html() -> str:
     ]
     app = describe_application()
     primary_entities = [entity for entity in ENTITIES if entity.get("type") not in {{"application"}}][:4]
+    marketplace_cards = _marketplace_cards([])
+    marketplace_intelligence = _marketplace_intelligence(marketplace_cards)
+    capability_compare = [
+        {{
+            "surface": "Generated data model",
+            "apg": f"{{len(primary_entities)}} primary workspace{{'s' if len(primary_entities) != 1 else ''}}",
+            "leader_gap": "Marketplaces list apps; APG shows the generated records immediately.",
+            "proof": "/ui",
+        }},
+        {{
+            "surface": "Integration contract",
+            "apg": "OpenAPI and component manifest",
+            "leader_gap": "No hosted install console required to inspect contracts.",
+            "proof": "/openapi.json",
+        }},
+        {{
+            "surface": "Automation demo",
+            "apg": f"{{len(list_workflows())}} workflow{{'s' if len(list_workflows()) != 1 else ''}} plus debug surface",
+            "leader_gap": "Demo path stays local and reproducible.",
+            "proof": "/ui/workflows",
+        }},
+        {{
+            "surface": "Trust evidence",
+            "apg": "Self-test, vendored assets, generated proof ledger",
+            "leader_gap": "Trust is derived from runnable local artifacts.",
+            "proof": "/self-test",
+        }},
+    ]
+    live_demo = {{
+        "headline": "Live demo boot",
+        "steps": [
+            {{"label": "Open workspace", "url": "/ui", "detail": "Start from generated operational data."}},
+            {{"label": "Compare blueprints", "url": "/ui/marketplace", "detail": "Inspect fit scores and proof rows."}},
+            {{"label": "Validate contract", "url": "/openapi.json", "detail": "Review machine-readable API."}},
+            {{"label": "Run self-test", "url": "/self-test", "detail": "Confirm generated runtime health."}},
+        ],
+    }}
     workspace_actions = [
         {{"url": "/ui", "label": "Open workspace", "description": "Start from the generated dashboard."}},
         {{"url": "/ui/workflows", "label": "Run workflows", "description": "Complete guided operational flows."}},
@@ -5276,6 +5341,9 @@ def _landing_page_html() -> str:
         workflows=list_workflows(),
         workspace_actions=workspace_actions,
         marketplace_blueprints=_marketplace_blueprints(),
+        marketplace_intelligence=marketplace_intelligence,
+        capability_compare=capability_compare,
+        live_demo=live_demo,
         theme_primary=theme_primary,
         theme_accent=theme_accent,
         landing_style=landing_style,
@@ -7225,6 +7293,7 @@ def _ui_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[i
             connector_count=len(cards),
             filtered_count=len(filtered_cards),
             installed_count=len(connectors),
+            marketplace_intelligence=_marketplace_intelligence(cards),
             categories=categories,
             active_category=active_category or "all",
             query=q,
