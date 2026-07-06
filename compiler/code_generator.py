@@ -4979,6 +4979,54 @@ def _ui_workflow_wizard_html(
     steps = wf["steps"]
     total_steps = len(steps)
     accumulated = accumulated or {{}}
+    workflow_history = [
+        run for run in WORKFLOW_RUNS.values()
+        if str(run.get("workflow_id", "")) == workflow_id or str(run.get("workflow", "")) == str(wf.get("name", ""))
+    ]
+    trace_durations: Dict[int, list[int]] = {{}}
+    for run in workflow_history:
+        for trace in run.get("trace", []) if isinstance(run.get("trace", []), list) else []:
+            if not isinstance(trace, dict):
+                continue
+            try:
+                trace_index = int(trace.get("index", 0))
+                trace_ms = int(trace.get("duration_ms", 0))
+            except (TypeError, ValueError):
+                continue
+            if trace_ms > 0:
+                trace_durations.setdefault(trace_index, []).append(trace_ms)
+    estimated_steps = []
+    for i, item in enumerate(steps):
+        fields_for_step = list(item.get("fields", []))
+        observed = trace_durations.get(i, [])
+        estimate_ms = int(sum(observed) / len(observed)) if observed else 90000 + (len(fields_for_step) * 15000)
+        state = "completed" if i < step_index else "current" if i == step_index else "queued"
+        estimated_steps.append({{
+            "title": str(item.get("title") or f"Step {{i + 1}}"),
+            "estimate": f"{{max(1, round(estimate_ms / 1000))}}s",
+            "state": state,
+            "field_count": len(fields_for_step),
+            "rollback_url": f"/ui/workflows/{{html.escape(quote(entity_name, safe=''), quote=True)}}/{{html.escape(quote(workflow_id, safe=''), quote=True)}}/step/{{i}}" if i < step_index else "",
+        }})
+    remaining_seconds = 0
+    for item in estimated_steps[step_index:]:
+        try:
+            remaining_seconds += int(str(item.get("estimate", "0s")).rstrip("s"))
+        except ValueError:
+            remaining_seconds += 0
+    workflow_intelligence = {{
+        "remaining": f"{{remaining_seconds}}s",
+        "history_count": len(workflow_history),
+        "estimated_steps": estimated_steps,
+        "rollback_links": [item for item in estimated_steps if item.get("rollback_url")],
+        "template_key": f"apg:workflow-template:{{entity_name}}:{{workflow_id}}",
+        "template_payload": {{
+            "entity": entity_name,
+            "workflow": workflow_id,
+            "name": str(wf.get("name", workflow_id)),
+            "steps": [str(item.get("title") or "") for item in steps],
+        }},
+    }}
 
     # Final step: show summary and create record
     if step_index >= total_steps:
@@ -5001,6 +5049,7 @@ def _ui_workflow_wizard_html(
                 safe_run_id=safe_run_id,
                 safe_record_id=safe_record_id,
                 workflow_topic=f"workflow:run:{{workflow_id}}",
+                workflow_intelligence=workflow_intelligence,
             )
             return 200, _html_page(wf["name"], tmpl_body if tmpl_body is not None else _jinja_required_page(wf["name"]))
         else:
@@ -5059,6 +5108,7 @@ def _ui_workflow_wizard_html(
         next_label=next_label,
         error=error,
         workflow_topic=f"workflow:run:{{workflow_id}}",
+        workflow_intelligence=workflow_intelligence,
     )
     return 200, _html_page(wf["name"], tmpl_body if tmpl_body is not None else _jinja_required_page(wf["name"]))
 

@@ -31,6 +31,24 @@
       <a href="/ui/workflows/{{ safe_entity }}/{{ safe_workflow_id }}" class="apg-btn apg-btn-secondary">Start again</a>
       <a href="/ui/workflows" class="apg-btn apg-btn-secondary">All workflows</a>
     </div>
+    {% if workflow_intelligence %}
+    <section class="apg-workflow-intelligence mt-6" aria-label="Workflow completion intelligence">
+      <article>
+        <span>Duration Estimate</span>
+        <strong>Completed</strong>
+        <small>{{ workflow_intelligence.history_count }} comparable run{{ 's' if workflow_intelligence.history_count != 1 else '' }}</small>
+      </article>
+      <article>
+        <span>Rollback Map</span>
+        <strong>{{ workflow_intelligence.rollback_links | length }} restore points</strong>
+        <small>Inspect run for compensation details</small>
+      </article>
+      <article>
+        <span>Save Template</span>
+        <button type="button" class="apg-mini-btn" data-apg-workflow-template="{{ workflow_intelligence.template_payload | tojson }}" data-apg-workflow-template-key="{{ workflow_intelligence.template_key }}">Save local template</button>
+      </article>
+    </section>
+    {% endif %}
   </div>
   {% else %}
   <div class="text-center mb-8">
@@ -50,6 +68,42 @@
     {% endif %}
     {% endfor %}
   </ol>
+
+  {% if workflow_intelligence %}
+  <section class="apg-workflow-intelligence" aria-label="Workflow intelligence">
+    <article>
+      <span>Live Duration Estimate</span>
+      <strong>{{ workflow_intelligence.remaining }} remaining</strong>
+      <small>{{ workflow_intelligence.history_count }} historical run{{ 's' if workflow_intelligence.history_count != 1 else '' }} blended with schema defaults</small>
+    </article>
+    <article>
+      <span>Rollback To Step</span>
+      {% if workflow_intelligence.rollback_links %}
+      <div class="apg-workflow-rollback-row">
+        {% for item in workflow_intelligence.rollback_links %}
+        <a href="{{ item.rollback_url }}">{{ loop.index }}. {{ item.title }}</a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <strong>No completed steps yet</strong>
+      {% endif %}
+    </article>
+    <article>
+      <span>Save As Template</span>
+      <button type="button" class="apg-mini-btn" data-apg-workflow-template="{{ workflow_intelligence.template_payload | tojson }}" data-apg-workflow-template-key="{{ workflow_intelligence.template_key }}">Save local template</button>
+      <small>Stores step shape in this browser</small>
+    </article>
+  </section>
+  <ol class="apg-workflow-estimate-list" aria-label="Estimated workflow steps">
+    {% for item in workflow_intelligence.estimated_steps %}
+    <li class="{{ item.state }}">
+      <span>{{ item.title }}</span>
+      <strong>{{ item.estimate }}</strong>
+      <small>{{ item.field_count }} fields · {{ item.state }}</small>
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
 
   <article class="apg-card overflow-hidden">
     <header class="px-6 py-4 border-b border-gray-100 bg-gray-50 -mx-4 -mt-4 mb-4">
@@ -74,3 +128,14 @@
   </article>
   {% endif %}
 </section>
+
+<script>
+(function() {
+  document.addEventListener('click', function(event) {
+    var trigger = event.target.closest('[data-apg-workflow-template]');
+    if (!trigger) return;
+    localStorage.setItem(trigger.dataset.apgWorkflowTemplateKey, trigger.dataset.apgWorkflowTemplate);
+    APGToast('Workflow template saved locally', 'success');
+  });
+})();
+</script>
