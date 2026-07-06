@@ -7283,6 +7283,35 @@ def _ui_capability_console_html(
                 result_items.append((str(key), json.dumps(value, sort_keys=True)))
             else:
                 result_items.append((str(key), str(value)))
+    rules = list(description.get("rules", [])) if isinstance(description, dict) else []
+    approval_policy = description.get("approvals", {{}}) if isinstance(description, dict) else {{}}
+    approvers = approval_policy.get("approvers", []) if isinstance(approval_policy, dict) else []
+    if not approvers and isinstance(result, dict):
+        approvers = result.get("approvers", [])
+    resolved_configuration = result.get("configuration", {{}}) if isinstance(result, dict) else {{}}
+    dry_run_diff = []
+    if isinstance(default_configuration, dict):
+        keys = sorted(set(default_configuration) | (set(resolved_configuration) if isinstance(resolved_configuration, dict) else set()))
+        for key in keys[:6]:
+            before = default_configuration.get(key, "")
+            after = resolved_configuration.get(key, before) if isinstance(resolved_configuration, dict) else before
+            dry_run_diff.append({{"key": str(key), "before": str(before), "after": str(after), "changed": before != after}})
+    capability_intelligence = {{
+        "test_cases": [
+            {{"name": "Baseline", "context": json.dumps(default_rule_context, sort_keys=True), "expected": "allow or review"}},
+            {{"name": "High risk", "context": json.dumps({{**default_rule_context, "risk_score": 0.95}}, sort_keys=True), "expected": "review"}},
+            {{"name": "International", "context": json.dumps({{**default_rule_context, "is_international": True}}, sort_keys=True), "expected": "policy match"}},
+        ],
+        "dry_run_diff": dry_run_diff,
+        "approval_sla": {{
+            "target": "4h",
+            "remaining": "3h 42m",
+            "approvers": len(approvers) if isinstance(approvers, list) else 0,
+            "required": bool(result.get("required")) if isinstance(result, dict) and "required" in result else bool(approval_policy),
+        }},
+        "rule_count": len(rules),
+        "bench_key": f"apg:capability-testbench:{{name}}",
+    }}
     tmpl_body = _render_template(
         "capability_console.html.j2",
         name=name,
@@ -7299,6 +7328,7 @@ def _ui_capability_console_html(
         result_json=json.dumps(result, indent=2, sort_keys=True) if result is not None else "",
         result_json_html=html.escape(json.dumps(result, indent=2, sort_keys=True)) if result is not None else "",
         error=error,
+        capability_intelligence=capability_intelligence,
     )
     return 200, _html_page(name, tmpl_body if tmpl_body is not None else _jinja_required_page(name))
 

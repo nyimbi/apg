@@ -4,6 +4,7 @@
 {% set configuration_json = configuration_json | default('{}') %}
 {% set approval_context_json = approval_context_json | default('{}') %}
 {% set description = description | default({}) %}
+{% set capability_intelligence = capability_intelligence | default({}) %}
 
 <section class="mb-6">
   <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <a href="/capabilities" class="hover:text-blue-600">Capability catalog</a> / <span class="font-semibold text-gray-900">{{ name }}</span></p>
@@ -20,6 +21,50 @@
 
 {% if error %}
 <div role="alert" class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm mb-4">{{ error }}</div>
+{% endif %}
+
+{% if capability_intelligence %}
+<section class="apg-capability-intelligence" aria-label="{{ name }} capability intelligence">
+  <article>
+    <div class="apg-capability-intel-head">
+      <span>Rule Test-bench</span>
+      <strong>{{ capability_intelligence.rule_count }} rules</strong>
+    </div>
+    <div class="apg-capability-test-row">
+      {% for item in capability_intelligence.test_cases %}
+      <button type="button" data-apg-rule-context="{{ item.context }}" data-apg-testbench-key="{{ capability_intelligence.bench_key }}">
+        {{ item.name }}
+        <small>{{ item.expected }}</small>
+      </button>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article>
+    <div class="apg-capability-intel-head">
+      <span>Dry-run Diff</span>
+      <strong>{{ capability_intelligence.dry_run_diff | selectattr('changed') | list | length }} changes</strong>
+    </div>
+    <dl class="apg-capability-diff">
+      {% for item in capability_intelligence.dry_run_diff %}
+      <div class="{{ 'changed' if item.changed else '' }}">
+        <dt>{{ item.key }}</dt>
+        <dd><span>{{ item.before }}</span><strong>{{ item.after }}</strong></dd>
+      </div>
+      {% endfor %}
+    </dl>
+  </article>
+
+  <article>
+    <div class="apg-capability-intel-head">
+      <span>Approval SLA</span>
+      <strong>{{ capability_intelligence.approval_sla.remaining }}</strong>
+    </div>
+    <p class="text-sm text-gray-600">{{ capability_intelligence.approval_sla.approvers }} approver{{ 's' if capability_intelligence.approval_sla.approvers != 1 else '' }} · target {{ capability_intelligence.approval_sla.target }}</p>
+    <div class="apg-sla-bar"><span style="width:72%"></span></div>
+    <small>{{ 'Approval required' if capability_intelligence.approval_sla.required else 'No approval required yet' }}</small>
+  </article>
+</section>
 {% endif %}
 
 <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -56,6 +101,19 @@
     <button type="submit" class="apg-btn">Plan approval</button>
   </form>
 </section>
+
+<script>
+(function() {
+  document.addEventListener('click', function(event) {
+    var test = event.target.closest('[data-apg-rule-context]');
+    if (!test) return;
+    var input = document.querySelector('textarea[name="context_json"]');
+    if (input) input.value = JSON.stringify(JSON.parse(test.dataset.apgRuleContext || '{}'), null, 2);
+    localStorage.setItem(test.dataset.apgTestbenchKey, test.dataset.apgRuleContext || '{}');
+    APGToast('Rule test case loaded', 'info');
+  });
+})();
+</script>
 
 <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
   <article class="apg-card">
