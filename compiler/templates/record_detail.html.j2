@@ -112,6 +112,70 @@
 {% endif %}
 </div>
 
+{% if detail_intelligence %}
+<section class="apg-detail-command-center" aria-label="Record intelligence">
+  <article class="apg-detail-command-card">
+    <div class="apg-detail-command-head">
+      <span>Change Diff Timeline</span>
+      <strong>rev. {{ revision }}</strong>
+    </div>
+    {% if detail_intelligence.diff_fields %}
+    <ol class="apg-detail-diff-list">
+      {% for item in detail_intelligence.diff_fields %}
+      <li>
+        <span>{{ item.name }}</span>
+        <strong>{{ item.value }}</strong>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="apg-detail-empty">No populated fields to compare yet.</p>
+    {% endif %}
+    <small>{{ detail_intelligence.activity_count }} activity events captured</small>
+  </article>
+
+  <article class="apg-detail-command-card">
+    <div class="apg-detail-command-head">
+      <span>Related Record Graph</span>
+      <strong>{{ related_count }} links</strong>
+    </div>
+    {% if detail_intelligence.related_graph %}
+    <div class="apg-detail-graph">
+      <div class="apg-detail-node apg-detail-node-root">{{ entity_name }}</div>
+      {% for rel in detail_intelligence.related_graph %}
+      <a class="apg-detail-node" href="{{ rel.url }}">
+        {{ rel.entity }}
+        <small>{{ rel.count }} via {{ rel.field }}</small>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="apg-detail-empty">No downstream records reference this item yet.</p>
+    {% endif %}
+  </article>
+
+  <article class="apg-detail-command-card">
+    <div class="apg-detail-command-head">
+      <span>Create Sibling Context</span>
+      <strong>{{ detail_intelligence.sibling_fields | length }} defaults</strong>
+    </div>
+    {% if detail_intelligence.sibling_fields %}
+    <dl class="apg-detail-sibling-list">
+      {% for item in detail_intelligence.sibling_fields %}
+      <div>
+        <dt>{{ item.name }}</dt>
+        <dd>{{ item.value or 'Empty' }}</dd>
+      </div>
+      {% endfor %}
+    </dl>
+    {% else %}
+    <p class="apg-detail-empty">No safe sibling defaults detected.</p>
+    {% endif %}
+    <a href="{{ detail_intelligence.create_sibling_url }}" class="apg-detail-action">Start from this shape</a>
+  </article>
+</section>
+{% endif %}
+
 {# Tab bar #}
 <div class="flex items-center gap-1 border-b border-gray-200 mb-6">
   <button onclick="apgTab('details')" id="apg-tab-details"

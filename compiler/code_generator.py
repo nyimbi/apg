@@ -6524,6 +6524,46 @@ def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
         str(f.get("name", "")): _ui_field_semantic(str(f.get("name", "")), str(f.get("type", "")))
         for f in display_fields
     }}
+    activity_events = _get_activity(entity_name, record_id)
+    diff_fields: list[Dict[str, str]] = []
+    for field in display_fields:
+        field_name = str(field.get("name", ""))
+        if field_name == "id":
+            continue
+        value = record.get(field_name, "")
+        if value in (None, "", []):
+            continue
+        diff_fields.append({{
+            "name": field_name.replace("_", " ").title(),
+            "value": html.escape(str(value)[:72]),
+            "state": "current",
+        }})
+        if len(diff_fields) >= 4:
+            break
+    sibling_fields = [
+        {{
+            "name": str(field.get("name", "")).replace("_", " ").title(),
+            "value": html.escape(str(record.get(str(field.get("name", "")), ""))[:48]),
+        }}
+        for field in display_fields
+        if str(field.get("name", "")) not in {{"id", "_revision"}} and not str(field.get("name", "")).endswith("_id")
+    ][:3]
+    related_graph = [
+        {{
+            "entity": html.escape(str(rel.get("entity", ""))),
+            "count": int(rel.get("count", 0)),
+            "field": html.escape(str(rel.get("fk_field", ""))),
+            "url": str(rel.get("list_url", "")),
+        }}
+        for rel in related_lists[:4]
+    ]
+    detail_intelligence = {{
+        "diff_fields": diff_fields,
+        "related_graph": related_graph,
+        "sibling_fields": sibling_fields,
+        "activity_count": len(activity_events),
+        "create_sibling_url": _ui_entity_query_path(entity_name),
+    }}
     tmpl_body = _render_template(
         "record_detail.html.j2",
         entity_name=html.escape(entity_name),
@@ -6542,7 +6582,8 @@ def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
         next_record_url=next_record_url,
         record_url=record_url,
         has_kanban=has_kanban,
-        activity_events=_get_activity(entity_name, record_id),
+        activity_events=activity_events,
+        detail_intelligence=detail_intelligence,
     )
     if tmpl_body is not None:
         return 200, _html_page(title or entity_name, tmpl_body)
