@@ -28,6 +28,54 @@
   </article>
 </section>
 
+{% if database_intelligence %}
+<section class="apg-database-intelligence" aria-label="Database intelligence">
+  <article>
+    <div class="apg-database-intel-head">
+      <span>Schema Diff</span>
+      <strong>{{ database_intelligence.schema_diff | length }} checks</strong>
+    </div>
+    <dl class="apg-schema-diff">
+      {% for item in database_intelligence.schema_diff %}
+      <div class="{{ item.state }}">
+        <dt>{{ item.label }}</dt>
+        <dd><span>{{ item.before }}</span><strong>{{ item.after }}</strong></dd>
+      </div>
+      {% endfor %}
+    </dl>
+  </article>
+
+  <article>
+    <div class="apg-database-intel-head">
+      <span>ER Mini-map</span>
+      <strong>{{ database_intelligence.er_nodes | length }} nodes</strong>
+    </div>
+    <div class="apg-er-minimap">
+      {% for node in database_intelligence.er_nodes %}
+      <a href="#table-{{ node.database }}-{{ node.schema }}-{{ node.label }}">
+        {{ node.label }}
+        <small>{{ node.columns }} columns</small>
+      </a>
+      {% endfor %}
+    </div>
+    <small>{{ database_intelligence.er_edges | length }} relationship edges indexed</small>
+  </article>
+
+  <article>
+    <div class="apg-database-intel-head">
+      <span>Query Playground</span>
+      <strong>{{ database_intelligence.query_examples | length }} snippets</strong>
+    </div>
+    <div class="apg-query-playground">
+      {% for item in database_intelligence.query_examples %}
+      <button type="button" data-apg-query="{{ item.sql }}">{{ item.label }}</button>
+      {% endfor %}
+      <textarea id="apg-query-buffer" rows="4" readonly>{{ database_intelligence.query_examples[0].sql if database_intelligence.query_examples else 'select 1;' }}</textarea>
+    </div>
+  </article>
+</section>
+{% endif %}
+
 {% if databases %}
 <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
   {% for database in databases %}
@@ -76,6 +124,18 @@
   </article>
   {% endfor %}
 </section>
+
+<script>
+(function() {
+  document.addEventListener('click', function(event) {
+    var query = event.target.closest('[data-apg-query]');
+    if (!query) return;
+    var buffer = document.getElementById('apg-query-buffer');
+    if (buffer) buffer.value = query.dataset.apgQuery || '';
+    APGToast('Query snippet loaded', 'info');
+  });
+})();
+</script>
 {% else %}
 <section class="apg-card text-center">
   <h2 class="text-base font-semibold text-gray-900">No databases declared</h2>

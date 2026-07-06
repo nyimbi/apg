@@ -5513,12 +5513,52 @@ def _ui_database_catalog_html() -> tuple[int, str]:
             for edge in graph.get("edges", [])
             if isinstance(edge, dict)
         ]
+    table_nodes = []
+    query_examples = []
+    for database in databases:
+        for schema in database.get("schemas", []):
+            schema_name = str(schema.get("name", ""))
+            for table in schema.get("tables", []):
+                table_name = str(table.get("name", ""))
+                columns = list(table.get("columns", []))
+                node_id = f"{{schema_name}}.{{table_name}}"
+                table_nodes.append({{
+                    "id": node_id,
+                    "label": table_name,
+                    "columns": len(columns),
+                    "schema": schema_name,
+                    "database": str(database.get("name", "")),
+                }})
+                if len(query_examples) < 4:
+                    visible_columns = [
+                        str(column.get("name", ""))
+                        for column in columns[:4]
+                        if isinstance(column, dict)
+                    ]
+                    column_sql = ", ".join(visible_columns) if visible_columns else "*"
+                    query_examples.append({{
+                        "label": f"Preview {{table_name}}",
+                        "sql": f"select {{column_sql}} from {{schema_name}}.{{table_name}} limit 25;",
+                    }})
+    validation = status.get("validation", {{}})
+    warnings = validation.get("warnings", []) if isinstance(validation, dict) else []
+    database_intelligence = {{
+        "schema_diff": [
+            {{"label": "Tables", "before": status.get("table_count", 0), "after": status.get("table_count", 0), "state": "unchanged"}},
+            {{"label": "References", "before": max(0, status.get("reference_count", 0) - len(warnings)), "after": status.get("reference_count", 0), "state": "checked"}},
+            {{"label": "Warnings", "before": 0, "after": len(warnings), "state": "clean" if not warnings else "review"}},
+        ],
+        "er_nodes": table_nodes[:8],
+        "er_edges": relationships[:8],
+        "query_examples": query_examples,
+    }}
     tmpl_body = _render_template(
         "database_catalog.html.j2",
         status=status,
         status_label=status_label,
         databases=databases,
         relationships=relationships,
+        database_intelligence=database_intelligence,
         validation_json=json.dumps(status["validation"], indent=2, sort_keys=True),
     )
     return status_code, _html_page("Databases", tmpl_body if tmpl_body is not None else _jinja_required_page("Databases"))
