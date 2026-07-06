@@ -4,6 +4,7 @@
 {% set result_status = result_status | default('') %}
 {% set team_members = team_members | default([]) %}
 {% set team_flow = team_flow | default([]) %}
+{% set agent_intelligence = agent_intelligence | default({}) %}
 <section class="mb-6">
   <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <a href="/agents" class="hover:text-blue-600">Agent catalog</a> / <span class="font-semibold text-gray-900">{{ name }}</span></p>
   <div class="flex items-start justify-between gap-4 flex-wrap">
@@ -26,6 +27,15 @@
       </div>
       <span class="text-xs text-gray-400">{{ live_topic }}</span>
     </header>
+
+    {% if agent_intelligence %}
+    <section class="apg-agent-meter" aria-label="Streaming meter">
+      <article><span>Tokens</span><strong>{{ agent_intelligence.stream_meter.tokens }}</strong></article>
+      <article><span>Rate</span><strong>{{ agent_intelligence.stream_meter.rate }}</strong></article>
+      <article><span>Cost</span><strong>{{ agent_intelligence.stream_meter.cost }}</strong></article>
+      <article><span>Chars</span><strong>{{ agent_intelligence.stream_meter.chars }}</strong></article>
+    </section>
+    {% endif %}
 
     <div id="apg-agent-stream" class="flex-1 space-y-3 mb-4" aria-live="polite" aria-busy="false">
       {% if not user_message and not result and not error %}
@@ -66,6 +76,9 @@
       <div class="flex items-center justify-between gap-3 flex-wrap">
         <label class="flex items-center gap-2 text-sm text-gray-600"><input name="stream" type="checkbox" value="true"> Stream when supported</label>
         <div class="flex items-center gap-2">
+          {% if agent_intelligence %}
+          <button type="button" class="apg-btn apg-btn-secondary" data-apg-agent-branch="{{ agent_intelligence.branch_seed }}" data-apg-agent-branch-key="{{ agent_intelligence.branch_key }}">Fork</button>
+          {% endif %}
           <button type="submit" class="apg-btn">Send</button>
           <button type="button" class="apg-btn apg-btn-secondary" onclick="document.getElementById('apg-agent-stream').setAttribute('aria-busy','false')">Stop</button>
         </div>
@@ -105,6 +118,49 @@
     </section>
     {% endif %}
 
+    {% if agent_intelligence %}
+    <section class="apg-card">
+      <h2 class="text-base font-semibold text-gray-900 mb-3">Tool-call inspector</h2>
+      {% if agent_intelligence.tool_calls %}
+      <ol class="apg-agent-tool-list">
+        {% for tool in agent_intelligence.tool_calls %}
+        <li>
+          <span>{{ tool.name }}</span>
+          <strong>{{ tool.status }}</strong>
+          <small>{{ tool.source }}</small>
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <p class="text-sm text-gray-500">No declared tools for this console.</p>
+      {% endif %}
+    </section>
+
+    <section class="apg-card">
+      <h2 class="text-base font-semibold text-gray-900 mb-3">Prompt library</h2>
+      <div class="apg-agent-prompt-list">
+        {% for prompt in agent_intelligence.prompt_library %}
+        <button type="button" data-apg-prompt="{{ prompt.prompt }}" data-apg-prompt-key="{{ agent_intelligence.library_key }}">
+          <span>{{ prompt.name }}</span>
+          <small>{{ prompt.version }}</small>
+        </button>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="apg-card">
+      <h2 class="text-base font-semibold text-gray-900 mb-3">Run compare</h2>
+      <dl class="apg-agent-compare">
+        {% for item in agent_intelligence.run_compare %}
+        <div>
+          <dt>{{ item.label }}</dt>
+          <dd><span>{{ item.left }}</span><strong>{{ item.right }}</strong></dd>
+        </div>
+        {% endfor %}
+      </dl>
+    </section>
+    {% endif %}
+
     <section class="apg-card">
       <h2 class="text-base font-semibold text-gray-900 mb-3">Configuration</h2>
       {% if description.role %}<p class="text-sm text-gray-600"><span class="font-medium text-gray-900">Role:</span> {{ description.role }}</p>{% endif %}
@@ -139,3 +195,23 @@
     </section>
   </aside>
 </section>
+
+<script>
+(function() {
+  document.addEventListener('click', function(event) {
+    var branch = event.target.closest('[data-apg-agent-branch]');
+    if (branch) {
+      localStorage.setItem(branch.dataset.apgAgentBranchKey, branch.dataset.apgAgentBranch || '');
+      APGToast('Conversation branch saved', 'success');
+      return;
+    }
+    var prompt = event.target.closest('[data-apg-prompt]');
+    if (prompt) {
+      localStorage.setItem(prompt.dataset.apgPromptKey, prompt.dataset.apgPrompt || '');
+      var input = document.querySelector('textarea[name="message"]');
+      if (input) input.value = prompt.dataset.apgPrompt || '';
+      APGToast('Prompt version loaded', 'info');
+    }
+  });
+})();
+</script>

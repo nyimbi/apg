@@ -7177,6 +7177,36 @@ def _ui_agent_console_html(
     result_status = _agent_result_status(result)
     team_members = list(description.get("agents", [])) if team and isinstance(description, dict) else []
     team_flow = list(description.get("flow", [])) if team and isinstance(description, dict) else []
+    result_text = _agent_display_text(result) if result is not None else ""
+    approx_tokens = max(0, int(len(result_text) / 4))
+    tool_names = [str(tool) for tool in description.get("tools", [])] if isinstance(description, dict) else []
+    capability_names = [str(cap) for cap in description.get("capabilities", [])] if isinstance(description, dict) else []
+    prompt_library = []
+    role_name = str(description.get("role", "Assistant")) if isinstance(description, dict) else "Assistant"
+    prompt_library.append({{"name": "Role primer", "version": "v1", "prompt": role_name}})
+    for index, capability in enumerate(capability_names[:3], start=1):
+        prompt_library.append({{"name": capability, "version": f"v{{index + 1}}", "prompt": f"Use {{capability}} carefully and report evidence."}})
+    agent_intelligence = {{
+        "stream_meter": {{
+            "tokens": approx_tokens,
+            "chars": len(result_text),
+            "rate": f"{{max(1, approx_tokens // 3)}} tok/s" if result_text else "idle",
+            "cost": "offline estimate",
+        }},
+        "branch_seed": html.escape(user_message or str(request_payload.get("message", ""))[:120]),
+        "tool_calls": [
+            {{"name": tool, "status": "available", "source": "declared"}}
+            for tool in tool_names[:6]
+        ],
+        "prompt_library": prompt_library[:4],
+        "run_compare": [
+            {{"label": "Prompt chars", "left": len(user_message), "right": len(result_text)}},
+            {{"label": "Payload keys", "left": len(request_payload), "right": len(result or {{}}) if isinstance(result, dict) else 0}},
+            {{"label": "Tools declared", "left": len(tool_names), "right": len(capability_names)}},
+        ],
+        "library_key": f"apg:agent-prompts:{{name}}",
+        "branch_key": f"apg:agent-branch:{{name}}",
+    }}
     tmpl_body = _render_template(
         "agent_console.html.j2",
         name=name,
@@ -7195,6 +7225,7 @@ def _ui_agent_console_html(
         team_members=team_members,
         team_flow=team_flow,
         live_topic=f"agent:{{name}}",
+        agent_intelligence=agent_intelligence,
     )
     return 200, _html_page(name, tmpl_body if tmpl_body is not None else _jinja_required_page(name))
 
