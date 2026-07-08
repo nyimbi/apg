@@ -17,6 +17,69 @@ def _json_scripts(html: str) -> list[dict]:
 	return specs
 
 
+def _compile_generated_app(source: str) -> tuple[str, dict[str, object]]:
+	result = APGCompiler().compile_string(source, "generated_security.apg")
+	assert result.success, result.errors
+	namespace: dict[str, object] = {}
+	app_source = result.generated_files["app.py"]
+	exec(compile(app_source, "app.py", "exec"), namespace)
+	return app_source, namespace
+
+
+def test_generated_shell_treats_search_recent_and_notification_text_as_data():
+	app_source, namespace = _compile_generated_app(
+		"""
+module generated_security version 1.0.0 {
+	description: "Generated shell security regression";
+}
+
+table Customer {
+	name: str;
+	status: str;
+}
+"""
+	)
+	malicious_label = '<img src=x onerror=alert("apg")>'
+
+	create_status, create_payload = namespace["create_record"](
+		"Customer",
+		{"name": malicious_label, "status": "active"},
+	)
+	assert create_status == 201, create_payload
+
+	search_status, search_payload = namespace["_route_payload"](
+		"/api/search",
+		{"q": ["onerror"]},
+	)
+	assert search_status == 200
+	assert search_payload["results"][0]["label"] == malicious_label[:60]
+
+	ui_status, entity_html = namespace["_ui_payload"]("/ui/entities/Customer")
+	assert ui_status == 200
+	assert malicious_label not in entity_html
+	assert "<img src=x" not in entity_html
+	assert "&amp;lt;img src=x onerror=alert" in entity_html
+
+	assert "function apgCmdResultNode" in app_source
+	assert 'title.textContent=String(r&&r.label||"")' in app_source
+	assert "function apgShellSafeUrl" in app_source
+	assert "function apgShellCleanItem" in app_source
+	assert 'label.textContent=r.label' in app_source
+	assert 'title.textContent=String(n&&n.message||"")' in app_source
+	assert 'text.textContent=String(message||"")' in app_source
+
+	for stale_sink in (
+		"apgShellCommandMarkup",
+		"list.innerHTML=_apgNotifications",
+		"el.innerHTML=apgShellCommandMarkup",
+		"href=\"'+r.url+'\"",
+		"<strong>'+r.label+'</strong>",
+		"<span>'+message+'</span>",
+		"'+r.label+'</p>",
+	):
+		assert stale_sink not in app_source
+
+
 def test_generated_dashboard_chart_specs_are_valid_for_example_20():
 	result = compile_apg_file("examples/20_enterprise_erp_platform/main.apg")
 	assert result.success, result.errors
