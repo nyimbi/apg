@@ -8676,6 +8676,40 @@ _flask_app = _FlaskApp("app", root_path=os.path.abspath(os.path.dirname(globals(
 _flask_app.secret_key = os.environ.get("APG_SESSION_SECRET") or os.environ.get("APG_JWT_SECRET") or "apg-generated-session-secret"
 
 
+_APG_SECURITY_HEADERS: Dict[str, str] = {{
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "base-uri 'self'; "
+        "object-src 'none'; "
+        "frame-ancestors 'none'; "
+        "form-action 'self'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "connect-src 'self'; "
+        "worker-src 'self' blob:; "
+        "manifest-src 'self'"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
+}}
+
+
+@_flask_app.after_request
+def _apply_security_headers(response: _FlaskResponse) -> _FlaskResponse:
+    for header_name, header_value in _APG_SECURITY_HEADERS.items():
+        if header_name not in response.headers:
+            response.headers[header_name] = header_value
+    if _flask_request.is_secure and "Strict-Transport-Security" not in response.headers:
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    return response
+
+
 @_flask_app.before_request
 def _setup_tenant() -> Any:
     tid = _flask_request.headers.get("X-APG-Tenant") or _flask_request.headers.get("X-Tenant-ID")

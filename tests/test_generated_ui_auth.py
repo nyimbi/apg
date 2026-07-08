@@ -29,6 +29,51 @@ def _generated_namespace(source: str = AUTH_SOURCE) -> dict[str, object]:
 	return namespace
 
 
+def _assert_security_headers(response) -> None:
+	headers = response.headers
+	assert headers["X-Content-Type-Options"] == "nosniff"
+	assert headers["X-Frame-Options"] == "DENY"
+	assert headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+	assert "camera=()" in headers["Permissions-Policy"]
+	assert headers["Cross-Origin-Opener-Policy"] == "same-origin"
+	assert headers["Cross-Origin-Resource-Policy"] == "same-origin"
+	csp = headers["Content-Security-Policy"]
+	assert "default-src 'self'" in csp
+	assert "script-src 'self' 'unsafe-inline'" in csp
+	assert "style-src 'self' 'unsafe-inline'" in csp
+	assert "object-src 'none'" in csp
+	assert "frame-ancestors 'none'" in csp
+	assert "form-action 'self'" in csp
+
+
+def test_generated_flask_responses_apply_security_headers():
+	source = """
+module open_customer_app version 1.0.0 {}
+entity Customer { name: str; }
+"""
+	namespace = _generated_namespace(source)
+	app = namespace["_flask_app"]
+
+	with app.test_client() as client:
+		for response in (
+			client.get("/ui"),
+			client.get("/openapi.json"),
+			client.get("/theme.css"),
+			client.post("/locale", data={"lang": "en", "next": "/ui"}),
+		):
+			_assert_security_headers(response)
+
+		plain = client.get("/ui")
+		assert "Strict-Transport-Security" not in plain.headers
+
+		secure = client.get("/ui", base_url="https://localhost")
+		_assert_security_headers(secure)
+		assert (
+			secure.headers["Strict-Transport-Security"]
+			== "max-age=63072000; includeSubDomains"
+		)
+
+
 def test_auth_declared_generated_ui_login_logout_flow(monkeypatch):
 	monkeypatch.setenv(
 		"APG_AUTH_USERS",
