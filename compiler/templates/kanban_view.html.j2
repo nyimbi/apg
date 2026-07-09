@@ -134,6 +134,7 @@
         {% endif %}
         {% endfor %}
         <form method="post" action="/ui/entities/{{ safe_entity }}/records/{{ rec_id | urlencode }}" class="apg-kanban-move">
+          {{ csrf_input() | safe }}
           <input type="hidden" name="expected_revision" value="{{ record.get('_revision', '') | string | e }}">
           <input type="hidden" name="return_view" value="kanban">
           <label class="sr-only" for="apg-move-{{ rec_id | e }}">Move {{ record.get(display_field, rec_id) }}</label>

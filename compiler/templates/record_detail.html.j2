@@ -66,6 +66,7 @@
             action="/ui/entities/{{ safe_entity }}/records/{{ safe_record_id }}/delete"
             class="inline"
             onsubmit="return apgConfirmSubmit(this, 'Delete this record? This cannot be undone.')">
+        {{ csrf_input() | safe }}
         <input type="hidden" name="expected_revision" value="{{ revision }}">
         <button type="submit"
                 class="px-3 py-1.5 text-sm font-medium border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors">
@@ -352,6 +353,7 @@
       <form method="post"
             action="/ui/entities/{{ safe_entity }}/records/{{ safe_record_id }}/note"
             class="mt-8 flex gap-3">
+        {{ csrf_input() | safe }}
         <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
              style="background: var(--apg-primary, #0ea5e9)">A</div>
         <div class="flex-1">

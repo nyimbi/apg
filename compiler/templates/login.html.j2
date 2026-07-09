@@ -9,6 +9,7 @@
     <div role="alert" class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ error }}</div>
     {% endif %}
     <form method="post" action="/login" class="space-y-4">
+      {{ csrf_input() | safe }}
       <input type="hidden" name="next" value="{{ next_url }}">
       <label for="apg-login-username" class="block text-sm font-semibold text-gray-700">Username
         <input id="apg-login-username" name="username" value="{{ username | default('') }}" autocomplete="username" required autofocus class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">

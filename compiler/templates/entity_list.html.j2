@@ -141,6 +141,7 @@
   <form id="apg-create-form" method="post" action="/ui/entities/{{ safe_entity }}/records" class="apg-drawer-panel"
         data-apg-draft-key="{{ form_intelligence.draft_key }}"
         data-apg-undo-seconds="{{ form_intelligence.undo_seconds }}">
+    {{ csrf_input() | safe }}
     <header class="apg-card-header">
       <div>
         <h2 id="apg-create-title" class="text-base font-semibold text-gray-900">New {{ entity_name }}</h2>

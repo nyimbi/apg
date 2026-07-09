@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from compiler.compiler import APGCompiler
 
 
@@ -10,7 +12,7 @@ module secure_customer_app version 1.0.0 {
 	description: "Secure generated UI";
 }
 
-entity Customer {
+table Customer {
 	name: str;
 	email: str;
 }
@@ -46,6 +48,15 @@ def _assert_security_headers(response) -> None:
 	assert "form-action 'self'" in csp
 
 
+def _csrf_token_from_html(payload: bytes) -> str:
+	match = re.search(
+		r'name="apg_csrf_token"\s+value="([^"]+)"',
+		payload.decode("utf-8"),
+	)
+	assert match is not None
+	return match.group(1)
+
+
 def test_generated_flask_responses_apply_security_headers():
 	source = """
 module open_customer_app version 1.0.0 {}
@@ -74,6 +85,92 @@ entity Customer { name: str; }
 		)
 
 
+def test_generated_session_forms_require_csrf_token(monkeypatch):
+	monkeypatch.setenv(
+		"APG_AUTH_USERS",
+		'{"operator": {"password": "secret", "name": "Ops User", "roles": ["admin"], "permissions": ["*"]}}',
+	)
+	namespace = _generated_namespace()
+	app = namespace["_flask_app"]
+
+	with app.test_client() as client:
+		login_page = client.get("/login")
+		login_token = _csrf_token_from_html(login_page.data)
+
+		rejected_login = client.post(
+			"/login",
+			data={"username": "operator", "password": "secret", "next": "/ui"},
+		)
+		assert rejected_login.status_code == 400
+		assert rejected_login.get_json()["error"] == "csrf_failed"
+
+		accepted_login = client.post(
+			"/login",
+			data={
+				"username": "operator",
+				"password": "secret",
+				"next": "/ui",
+				"apg_csrf_token": login_token,
+			},
+		)
+		assert accepted_login.status_code == 302
+
+		ui = client.get("/ui/entities/Customer")
+		ui_token = _csrf_token_from_html(ui.data)
+
+		missing_token = client.post(
+			"/ui/entities/Customer/records",
+			data={"name": "Forged", "email": "forged@example.com"},
+		)
+		assert missing_token.status_code == 400
+		assert missing_token.get_json()["error"] == "csrf_failed"
+		assert namespace["list_records"]("Customer") == []
+
+		created = client.post(
+			"/ui/entities/Customer/records",
+			data={
+				"name": "Asha",
+				"email": "asha@example.com",
+				"apg_csrf_token": ui_token,
+			},
+		)
+		assert created.status_code == 303
+		assert namespace["list_records"]("Customer")[0]["name"] == "Asha"
+
+		logout_without_token = client.post("/logout")
+		assert logout_without_token.status_code == 400
+		assert client.get("/ui").status_code == 200
+
+		logout = client.post("/logout", data={"apg_csrf_token": ui_token})
+		assert logout.status_code == 302
+		assert client.get("/ui").status_code == 302
+
+
+def test_generated_api_key_mutations_do_not_require_csrf(monkeypatch):
+	monkeypatch.setenv("APG_API_KEY", "test-key")
+	source = """
+module open_customer_app version 1.0.0 {}
+entity Customer { name: str; email: str; }
+"""
+	namespace = _generated_namespace(source)
+	app = namespace["_flask_app"]
+
+	with app.test_client() as client:
+		forbidden = client.post(
+			"/entities/Customer/records",
+			json={"record": {"name": "No Key", "email": "nokey@example.com"}},
+		)
+		assert forbidden.status_code == 401
+
+		created = client.post(
+			"/entities/Customer/records",
+			json={"record": {"name": "Header Key", "email": "key@example.com"}},
+			headers={"X-APG-API-Key": "test-key"},
+		)
+		assert created.status_code == 201
+		assert namespace["list_records"]("Customer")[0]["name"] == "Header Key"
+
+
 def test_auth_declared_generated_ui_login_logout_flow(monkeypatch):
 	monkeypatch.setenv(
 		"APG_AUTH_USERS",
@@ -95,10 +192,16 @@ def test_auth_declared_generated_ui_login_logout_flow(monkeypatch):
 		assert b'apg-login-username' in login_page.data
 		assert b'apg-login-password' in login_page.data
 		assert b'id="apg-sidebar"' not in login_page.data
+		login_token = _csrf_token_from_html(login_page.data)
 
 		rejected = client.post(
 			"/login",
-			data={"username": "operator", "password": "wrong", "next": "/ui"},
+			data={
+				"username": "operator",
+				"password": "wrong",
+				"next": "/ui",
+				"apg_csrf_token": login_token,
+			},
 		)
 		assert rejected.status_code == 401
 		assert b"We could not sign you in with those credentials." in rejected.data
@@ -107,7 +210,12 @@ def test_auth_declared_generated_ui_login_logout_flow(monkeypatch):
 
 		accepted = client.post(
 			"/login",
-			data={"username": "operator", "password": "secret", "next": "/ui"},
+			data={
+				"username": "operator",
+				"password": "secret",
+				"next": "/ui",
+				"apg_csrf_token": login_token,
+			},
 		)
 		assert accepted.status_code == 302
 		assert accepted.headers["Location"] == "/ui"
@@ -115,8 +223,9 @@ def test_auth_declared_generated_ui_login_logout_flow(monkeypatch):
 		ui = client.get("/ui")
 		assert ui.status_code == 200
 		assert b"Ops User" in ui.data
+		ui_token = _csrf_token_from_html(ui.data)
 
-		logout = client.post("/logout")
+		logout = client.post("/logout", data={"apg_csrf_token": ui_token})
 		assert logout.status_code == 302
 		assert logout.headers["Location"] == "/login"
 		assert client.get("/ui").status_code == 302

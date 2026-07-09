@@ -69,6 +69,7 @@
 
 <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
   <form method="post" action="/ui/capabilities/{{ safe_name }}/rules/evaluate" class="apg-card space-y-4">
+    {{ csrf_input() | safe }}
     <div>
       <h2 class="text-base font-semibold text-gray-900">Rules evaluation</h2>
       <p class="text-xs text-gray-500 mt-1">Test policy decisions with an explicit request context.</p>
@@ -80,6 +81,7 @@
   </form>
 
   <form method="post" action="/ui/capabilities/{{ safe_name }}/configuration/resolve" class="apg-card space-y-4">
+    {{ csrf_input() | safe }}
     <div>
       <h2 class="text-base font-semibold text-gray-900">Configuration</h2>
       <p class="text-xs text-gray-500 mt-1">Preview resolved configuration after overrides.</p>
@@ -91,6 +93,7 @@
   </form>
 
   <form method="post" action="/ui/capabilities/{{ safe_name }}/approval/plan" class="apg-card space-y-4">
+    {{ csrf_input() | safe }}
     <div>
       <h2 class="text-base font-semibold text-gray-900">Approval plan</h2>
       <p class="text-xs text-gray-500 mt-1">Identify approvers and review requirements before execution.</p>

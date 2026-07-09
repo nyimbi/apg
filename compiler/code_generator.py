@@ -689,6 +689,7 @@ import json
 import os
 import queue as _queue
 import re
+import secrets
 import sys
 import threading as _threading
 import time as _time
@@ -2493,6 +2494,93 @@ def _current_user() -> Dict[str, Any] | None:
     return dict(user) if isinstance(user, dict) else None
 
 
+def _csrf_token() -> str:
+    try:
+        token = _flask_session.get("apg_csrf_token")
+    except RuntimeError:
+        return ""
+    if not isinstance(token, str) or not token:
+        token = secrets.token_urlsafe(32)
+        _flask_session["apg_csrf_token"] = token
+    return token
+
+
+def _csrf_input() -> str:
+    token = _csrf_token()
+    if not token:
+        return ""
+    return f'<input type="hidden" name="apg_csrf_token" value="{{html.escape(token, quote=True)}}">'
+
+
+def _csrf_payload_token() -> str:
+    if _flask_request.is_json:
+        data = _flask_request.get_json(silent=True) or {{}}
+        if isinstance(data, dict):
+            token = data.get("apg_csrf_token") or data.get("csrf_token")
+            if token:
+                return str(token)
+    return str(
+        _flask_request.form.get("apg_csrf_token")
+        or _flask_request.headers.get("X-APG-CSRF-Token")
+        or _flask_request.headers.get("X-CSRF-Token")
+        or ""
+    )
+
+
+def _has_header_auth(headers: Any) -> bool:
+    authorization = headers.get("Authorization", "")
+    supplied_key = headers.get("X-APG-API-Key")
+    if authorization.startswith("Bearer "):
+        token = authorization.removeprefix("Bearer ").strip()
+        jwt_secret = os.environ.get("APG_JWT_SECRET")
+        jwt_pubkey = os.environ.get("APG_JWT_PUBLIC_KEY")
+        if (jwt_secret or jwt_pubkey) and _jwt_lib is not None:
+            try:
+                key = jwt_pubkey or jwt_secret
+                alg = "RS256" if jwt_pubkey else "HS256"
+                _jwt_lib.decode(token, key, algorithms=[alg])
+                return True
+            except Exception:
+                return False
+        supplied_key = token
+    required_key = os.environ.get("APG_API_KEY")
+    return bool(required_key and supplied_key == required_key)
+
+
+def _csrf_required_for_request() -> bool:
+    if _flask_request.method not in {{"POST", "PUT", "PATCH", "DELETE"}}:
+        return False
+    if _has_header_auth(_flask_request.headers):
+        return False
+    path = _flask_request.path.rstrip("/") or "/"
+    if path == "/login":
+        return APG_AUTH_REQUIRED
+    current_user = _current_user()
+    if path in {{"/logout", "/locale"}}:
+        return APG_AUTH_REQUIRED and current_user is not None
+    if path == "/ui" or path.startswith("/ui/"):
+        return APG_AUTH_REQUIRED and current_user is not None
+    return False
+
+
+def _csrf_failure_response() -> _FlaskResponse:
+    return _FlaskResponse(
+        json.dumps({{"error": "csrf_failed", "message": "Refresh the generated page and resubmit the form."}}),
+        status=400,
+        content_type="application/json; charset=utf-8",
+    )
+
+
+def _check_csrf_token():
+    if not _csrf_required_for_request():
+        return None
+    expected = _flask_session.get("apg_csrf_token")
+    supplied = _csrf_payload_token()
+    if isinstance(expected, str) and supplied and hmac.compare_digest(expected, supplied):
+        return None
+    return _csrf_failure_response()
+
+
 def _login_required_for_path(path: str) -> bool:
     if not APG_AUTH_REQUIRED:
         return False
@@ -2558,7 +2646,7 @@ def _login_page(error: str = "", next_url: str = "/ui", username: str = "") -> s
             '<section class="apg-login-card">'
             f'<h1>{{html.escape(MODULE_NAME)}}</h1>'
             f'{{error_html}}'
-            f'<form method="post" action="/login"><input type="hidden" name="next" value="{{safe_next}}">'
+            f'<form method="post" action="/login">{{_csrf_input()}}<input type="hidden" name="next" value="{{safe_next}}">'
             f'<label>Username <input name="username" autocomplete="username" value="{{safe_username}}"></label>'
             '<label>Password <input name="password" type="password" autocomplete="current-password"></label>'
             '<button class="apg-btn" type="submit">Sign in</button></form>'
@@ -4363,6 +4451,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         initials = "".join(part[:1].upper() for part in display_name.split()[:2]) or "U"
         user_menu = (
             '<form method="post" action="/logout" class="apg-user-menu">'
+            f'{{_csrf_input()}}'
             f'<span class="apg-avatar" aria-hidden="true">{{html.escape(initials)}}</span>'
             f'<span class="apg-user-name">{{display_name}}</span>'
             f'<button class="apg-btn apg-btn-secondary" type="submit">{{_("logout")}}</button>'
@@ -4380,6 +4469,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         )
         language_menu = (
             '<form method="post" action="/locale" class="apg-locale-form">'
+            f'{{_csrf_input()}}'
             f'<input type="hidden" name="next" value="{{html.escape(next_url, quote=True)}}">'
             f'<label class="apg-sr-only" for="apg-locale-select">{{_("language")}}</label>'
             f'<select id="apg-locale-select" name="lang" class="apg-locale-select" onchange="this.form.submit()" aria-label="{{_("language")}}">{{options}}</select>'
@@ -4620,7 +4710,14 @@ def _render_template(template_name: str, **context: Any) -> str | None:
                 template_name = template_name.replace(".html", ".html.j2") if ".html" in template_name else template_name + ".j2"
         # Add url encode filter
         env.filters["urlencode"] = lambda s: __import__("urllib.parse", fromlist=["quote"]).quote(str(s), safe="")
-        env.globals.update({{"_": _, "format_number": format_number, "format_currency": format_currency, "format_date": format_date}})
+        env.globals.update({{
+            "_": _,
+            "format_number": format_number,
+            "format_currency": format_currency,
+            "format_date": format_date,
+            "csrf_token": _csrf_token,
+            "csrf_input": _csrf_input,
+        }})
         tmpl = env.get_template(template_name)
         return tmpl.render(**context)
     except Exception:
@@ -6186,12 +6283,14 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
         action = (
             f'<div class="flex items-center gap-3 justify-end opacity-0 group-hover/row:opacity-100 transition-opacity">'
             f'<form method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}" class="inline">'
+            f'{{_csrf_input()}}'
             f'<input type="hidden" name="expected_revision" value="{{revision}}">'
             f'{{edit_hidden}}'
             f'<button type="submit"'
             f' class="text-xs font-medium text-apg-primary hover:underline whitespace-nowrap">Edit</button>'
             f'</form>'
             f'<form method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}/delete" class="inline">'
+            f'{{_csrf_input()}}'
             f'<input type="hidden" name="expected_revision" value="{{revision}}">'
             f'<button type="submit" onclick="return apgConfirmSubmit(this.form, this.dataset.msg)" data-msg="Delete this record?"'
             f' class="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>'
@@ -6236,8 +6335,9 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
         'apgConfirm("Delete "+cc.length+" record(s)? This cannot be undone.",function(){{'
         'var ids=Array.from(cc).map(function(c){{return c.dataset.rowId;}}).join(",");'
         'var entity=document.getElementById("apg-bulk-bar").dataset.entity;'
-        'var fd=new FormData();fd.append("ids",ids);'
-        'fetch("/ui/entities/"+entity+"/records/bulk_delete",{{method:"POST",headers:{{"Content-Type":"application/x-www-form-urlencoded"}},body:"ids="+encodeURIComponent(ids)}})'
+        'var csrf=document.querySelector("input[name=apg_csrf_token]");'
+        'var token=csrf?csrf.value:"";'
+        'fetch("/ui/entities/"+entity+"/records/bulk_delete",{{method:"POST",headers:{{"Content-Type":"application/x-www-form-urlencoded","X-APG-CSRF-Token":token}},body:"ids="+encodeURIComponent(ids)+"&apg_csrf_token="+encodeURIComponent(token)}})'
         '.then(function(r){{if(r.redirected||r.ok)window.location.reload();}});'
         '}});'
         '}};'
@@ -6446,6 +6546,7 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
         f"<p><code>{{html.escape(entity.get('type', 'entity'))}}</code></p>"
         f"{{notice_html}}"
         f'<form method="post" action="/ui/entities/{{safe_entity}}/records">'
+        f"{{_csrf_input()}}"
         f"{{inputs}}"
         '<button type="submit">Create record</button>'
         "</form>"
@@ -6971,6 +7072,7 @@ def _ui_field_edit_html(entity_name: str, record_id: str, field_name: str) -> tu
         f'<dt class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{{label}}</dt>'
         f'<dd>'
         f'<form hx-post="{{patch_url}}" hx-target="#{{fld_id}}" hx-swap="outerHTML" class="flex flex-col gap-1.5">'
+        f'{{_csrf_input()}}'
         f'<input type="hidden" name="expected_revision" value="{{revision}}">'
         f'{{input_html}}'
         f'<div class="flex gap-2">'
@@ -8720,6 +8822,9 @@ def _setup_tenant() -> Any:
 
 
 def _check_mutation_auth():
+    csrf_err = _check_csrf_token()
+    if csrf_err:
+        return csrf_err
     if _authorized(_flask_request.headers):
         return None
     status, response = _auth_failure_payload()
@@ -8753,6 +8858,9 @@ def _flask_login_get():
 def _flask_login_post():
     if not APG_AUTH_REQUIRED:
         return _FlaskResponse(json.dumps({{"error": "not_found", "path": "/login"}}), status=404, content_type="application/json; charset=utf-8")
+    csrf_err = _check_csrf_token()
+    if csrf_err:
+        return csrf_err
     username = str(_flask_request.form.get("username") or "")
     password = str(_flask_request.form.get("password") or "")
     next_url = str(_flask_request.form.get("next") or "/ui")
@@ -8773,12 +8881,18 @@ def _flask_login_post():
 def _flask_logout_post():
     if not APG_AUTH_REQUIRED:
         return _FlaskResponse(json.dumps({{"error": "not_found", "path": "/logout"}}), status=404, content_type="application/json; charset=utf-8")
+    csrf_err = _check_csrf_token()
+    if csrf_err:
+        return csrf_err
     _flask_session.pop("apg_user", None)
     return _flask_redirect("/login")
 
 
 @_flask_app.route("/locale", methods=["POST"])
 def _flask_locale_post():
+    csrf_err = _check_csrf_token()
+    if csrf_err:
+        return csrf_err
     language = str(_flask_request.form.get("lang") or APG_DEFAULT_LANGUAGE)
     if language not in APG_SUPPORTED_LANGUAGES:
         language = APG_DEFAULT_LANGUAGE
