@@ -745,6 +745,7 @@ APG_DEFAULT_LANGUAGE = {i18n_config["default_language"]!r}
 APG_FALLBACK_LANGUAGE = {i18n_config["fallback_language"]!r}
 APG_I18N: Dict[str, Dict[str, str]] = {i18n_catalog!r}
 _APG_OPENAPI_SPEC: Dict[str, Any] | None = None
+_APG_FIELD_ACL = json.loads(os.environ.get("APG_FIELD_ACL", "{{}}"))
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -2166,6 +2167,84 @@ def _record_metadata(entity_name: str, record_id: Any, create: bool = False) -> 
     return metadata
 
 
+def _row_ownership_enabled() -> bool:
+    return _env_flag("APG_ROW_OWNERSHIP")
+
+
+def _apg_current_session_user() -> Dict[str, Any] | None:
+    try:
+        return _current_user()
+    except RuntimeError:
+        return None
+
+
+def _apg_current_uses_header_auth() -> bool:
+    try:
+        return _has_header_auth(_flask_request.headers)
+    except RuntimeError:
+        return False
+
+
+def _apg_current_user_role() -> str:
+    user = _apg_current_session_user()
+    if isinstance(user, dict):
+        roles = user.get("roles", [])
+        if isinstance(roles, list) and roles:
+            return str(roles[0])
+    if _apg_current_uses_header_auth():
+        return "api"
+    return "anonymous"
+
+
+def _apg_current_user_permissions() -> set[str]:
+    user = _apg_current_session_user()
+    if not isinstance(user, dict):
+        return set()
+    permissions = user.get("permissions", [])
+    if not isinstance(permissions, list):
+        return set()
+    return {{str(permission) for permission in permissions}}
+
+
+def _apg_current_owner_id() -> str:
+    user = _apg_current_session_user()
+    if isinstance(user, dict) and user.get("username"):
+        return str(user["username"])
+    if _apg_current_uses_header_auth():
+        return str(os.environ.get("APG_API_KEY_OWNER") or "api")
+    return "anonymous"
+
+
+def _apg_current_user_unrestricted() -> bool:
+    return _apg_current_user_role().strip().lower() == "admin" or "*" in _apg_current_user_permissions()
+
+
+def _record_owner_visible(record: Dict[str, Any]) -> bool:
+    if not _row_ownership_enabled() or _apg_current_user_unrestricted():
+        return True
+    return str(record.get("owner_id", "")) == _apg_current_owner_id()
+
+
+def _field_acl_allows(entity_name: str, field_name: str) -> bool:
+    if not isinstance(_APG_FIELD_ACL, dict):
+        return True
+    entity_acl = _APG_FIELD_ACL.get(entity_name)
+    if not isinstance(entity_acl, dict) or field_name not in entity_acl:
+        return True
+    allowed_roles = entity_acl.get(field_name)
+    if not isinstance(allowed_roles, list):
+        return True
+    return _apg_current_user_role() in {{str(role) for role in allowed_roles}}
+
+
+def _field_acl_public_copy(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
+    return {{
+        key: value
+        for key, value in dict(record).items()
+        if _field_acl_allows(entity_name, str(key))
+    }}
+
+
 def _record_public_copy(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
     public = dict(record)
     metadata = _record_metadata(entity_name, public.get("id"), create=True) or {{}}
@@ -2206,14 +2285,14 @@ def list_records(
             name: [
                 _record_public_copy(name, record)
                 for record in RECORD_STORE[name]
-                if include_deleted or not _record_deleted(name, record)
+                if (include_deleted or not _record_deleted(name, record)) and _record_owner_visible(record)
             ]
             for name in sorted(ENTITY_NAMES)
     }}
     return [
         _record_public_copy(entity_name, record)
         for record in RECORD_STORE[entity_name]
-        if include_deleted or not _record_deleted(entity_name, record)
+        if (include_deleted or not _record_deleted(entity_name, record)) and _record_owner_visible(record)
     ]
 
 
@@ -2232,7 +2311,7 @@ _RECORD_QUERY_CONTROL_KEYS = {{
     "sort_dir",
 }}
 
-_RECORD_LIFECYCLE_FIELDS = ("created_at", "updated_at", "deleted_at")
+_RECORD_LIFECYCLE_FIELDS = ("created_at", "updated_at", "deleted_at", "owner_id")
 
 
 def _strip_record_lifecycle_fields(record: Dict[str, Any]) -> Dict[str, Any]:
@@ -2278,7 +2357,7 @@ def _query_includes_deleted(query: Dict[str, list[str]]) -> bool:
 
 
 def _record_field_names(entity_name: str) -> set[str]:
-    names = {{"id", "_revision", "created_at", "updated_at", "deleted_at"}}
+    names = {{"id", "_revision", "created_at", "updated_at", "deleted_at", "owner_id"}}
     for field in _field_specs(entity_name):
         field_name = str(field.get("name", ""))
         if field_name:
@@ -3242,8 +3321,10 @@ def _apg_audit_write(payload: Dict[str, Any]) -> None:
 def _apg_audit_event(action: str, entity: str = "auth", user: str | None = None) -> None:
     try:
         request_id = getattr(_flask_g, "request_id", "")
+        extra = getattr(_flask_g, "apg_audit_extra", None)
     except RuntimeError:
         request_id = ""
+        extra = None
     payload = {{
         "audit": True,
         "action": action,
@@ -3252,6 +3333,8 @@ def _apg_audit_event(action: str, entity: str = "auth", user: str | None = None)
         "user": user if user is not None else _apg_audit_user(),
         "ts": _datetime.datetime.utcnow().isoformat() + "Z",
     }}
+    if isinstance(extra, dict):
+        payload.update(extra)
     _apg_audit_write(payload)
 
 
@@ -3274,6 +3357,7 @@ def _record_event(
     entity_name: str,
     before: Dict[str, Any] | None = None,
     after: Dict[str, Any] | None = None,
+    changed_fields: list[str] | None = None,
 ) -> Dict[str, Any]:
     global NEXT_EVENT_ID
     record = after if after is not None else before if before is not None else {{}}
@@ -3287,6 +3371,8 @@ def _record_event(
         event["before"] = dict(before)
     if after is not None:
         event["after"] = dict(after)
+    if changed_fields is not None:
+        event["changed_fields"] = list(changed_fields)
     NEXT_EVENT_ID += 1
     EVENT_LOG.append(event)
     _publish_live_event("events", "record", event)
@@ -3301,6 +3387,8 @@ def _prepare_new_record(record: Dict[str, Any], entity_name: str = "") -> Dict[s
     prepared.setdefault("created_at", now)
     prepared.setdefault("updated_at", now)
     prepared.setdefault("deleted_at", None)
+    if _row_ownership_enabled():
+        prepared["owner_id"] = _apg_current_owner_id()
     # Auto-inject tenant_id for tenant-scoped entities
     tid = _tenant_id()
     if tid and entity_name in TENANT_SCOPED_ENTITIES:
@@ -3340,6 +3428,7 @@ def _record_schema(entity: Dict[str, Any], partial: bool = False) -> Dict[str, A
         "created_at": {{"type": "string"}},
         "updated_at": {{"type": "string"}},
         "deleted_at": {{"oneOf": [{{"type": "string"}}, {{"type": "null"}}]}},
+        "owner_id": {{"oneOf": [{{"type": "string"}}, {{"type": "null"}}]}},
     }}
     required_fields: list[str] = []
     for field in fields:
@@ -5668,6 +5757,7 @@ def _sqlite_expected_columns(entity_name: str) -> list[Dict[str, str]]:
     columns: list[Dict[str, str]] = [
         {{"name": "id", "ddl": "TEXT PRIMARY KEY", "migration": "TEXT"}},
         {{"name": "_revision", "ddl": "INTEGER DEFAULT 1 NOT NULL", "migration": "INTEGER"}},
+        {{"name": "owner_id", "ddl": "TEXT DEFAULT NULL", "migration": "TEXT"}},
     ]
     for field in _field_specs(entity_name):
         field_name = str(field.get("name", "")).strip()
@@ -5832,6 +5922,7 @@ def _sqlite_store_record(entity_name: str, record: Dict[str, Any]) -> None:
     row: Dict[str, Any] = {{
         "id": str(record.get("id")),
         "_revision": int(record.get("_revision", 1)),
+        "owner_id": record.get("owner_id"),
         "created_at": record.get("created_at") or metadata.get("created_at"),
         "updated_at": record.get("updated_at") or metadata.get("updated_at"),
         "deleted_at": record.get("deleted_at") if "deleted_at" in record else metadata.get("deleted_at"),
@@ -9081,6 +9172,8 @@ def _record_by_id(entity_name: str, record_id: str, *, include_deleted: bool = F
         if str(record.get("id")) == str(record_id):
             if not include_deleted and _record_deleted(entity_name, record):
                 return None
+            if not _record_owner_visible(record):
+                return None
             return _record_public_copy(entity_name, record)
     return None
 
@@ -9161,6 +9254,20 @@ def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = 
             return 400, {{"error": "invalid_field"}}
         if result.get("error") == "include_deleted_requires_admin":
             return 403, {{"error": "include_deleted_requires_admin"}}
+        if style == "records":
+            result = dict(result)
+            result["data"] = [
+                _field_acl_public_copy(entity_name, record)
+                for record in result.get("data", [])
+                if isinstance(record, dict)
+            ]
+        else:
+            result = dict(result)
+            result["records"] = [
+                _field_acl_public_copy(entity_name, record)
+                for record in result.get("records", [])
+                if isinstance(record, dict)
+            ]
         return 200, result
     include_deleted_requested = _query_includes_deleted(query or {{}})
     if include_deleted_requested and not _records_admin_allowed():
@@ -9169,7 +9276,7 @@ def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = 
     record = _record_by_id(entity_name, record_id, include_deleted=include_deleted)
     if record is None:
         return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
-    return 200, {{"entity": entity_name, "record": record}}
+    return 200, {{"entity": entity_name, "record": _field_acl_public_copy(entity_name, record)}}
 
 
 def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, Dict[str, Any]]:
@@ -9667,6 +9774,17 @@ def _update_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
             conflict = _revision_conflict(existing, _expected_revision(payload))
             if conflict is not None:
                 return 409, conflict
+            current_row = _record_public_copy(entity_name, existing)
+            changed_fields = [
+                key
+                for key in record_update
+                if str(record_update[key]) != str(current_row.get(key, ""))
+            ]
+            try:
+                if _flask_request.method == "PUT":
+                    _flask_g.apg_audit_extra = {{"changed_fields": changed_fields}}
+            except RuntimeError:
+                pass
             updated = dict(existing)
             updated.update(record_update)
             updated["id"] = existing.get("id")
@@ -9683,7 +9801,7 @@ def _update_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
             _sqlite_store_record(entity_name, updated)
             if persist:
                 _sqlite_commit()
-            event = _record_event("update", entity_name, before=existing, after=updated)
+            event = _record_event("update", entity_name, before=existing, after=updated, changed_fields=changed_fields)
             _log_activity(entity_name, str(record_id), "updated", detail="Fields updated")
             if persist:
                 persistence_error = _persist_record_store()
