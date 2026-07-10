@@ -699,6 +699,7 @@ import sqlite3 as _sqlite3
 import sys
 import threading as _threading
 import time as _time
+import urllib.request as _urllib_request, hmac as _hmac_mod, hashlib as _hashlib_mod, threading as _threading_mod, time as _time_mod
 import uuid as _uuid
 from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse, session as _flask_session, g as _flask_g
 from pathlib import Path
@@ -9465,6 +9466,7 @@ def _create_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
         persistence_error = _persist_record_store()
         if persistence_error:
             return 500, {{"error": "persistence_failed", "message": persistence_error}}
+        _apg_deliver_webhook("entity.created", entity_name, record.get("id"), payload, _apg_request_id())
     return 201, {{
         "entity": entity_name,
         "record": _record_public_copy(entity_name, record),
@@ -9565,6 +9567,7 @@ def _update_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
                 persistence_error = _persist_record_store()
                 if persistence_error:
                     return 500, {{"error": "persistence_failed", "message": persistence_error}}
+                _apg_deliver_webhook("entity.updated", entity_name, record_id, payload, _apg_request_id())
             return 200, {{"entity": entity_name, "record": _record_public_copy(entity_name, updated), "event": event}}
     return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
 
@@ -9644,6 +9647,7 @@ def _delete_record_payload(path: str, *, persist: bool = True) -> tuple[int, Dic
                 persistence_error = _persist_record_store()
                 if persistence_error:
                     return 500, {{"error": "persistence_failed", "message": persistence_error}}
+                _apg_deliver_webhook("entity.deleted", entity_name, record_id, {{}}, _apg_request_id())
             return 200, {{
                 "entity": entity_name,
                 "deleted": _record_public_copy(entity_name, existing),
@@ -10022,6 +10026,43 @@ def _pg_load_entity_records(entity_name: str) -> list[Dict[str, Any]]:
         return []
     finally:
         conn.close()
+
+
+def _apg_request_id() -> str:
+    try:
+        return str(getattr(_flask_g, "request_id", "") or "")
+    except RuntimeError:
+        return ""
+
+
+def _apg_deliver_webhook(event, entity, record_id, data, req_id):
+    urls = [u.strip() for u in os.environ.get("APG_WEBHOOK_URL", "").split(",") if u.strip()]
+    if not urls:
+        return
+    secret = os.environ.get("APG_WEBHOOK_SECRET", "").encode()
+    payload = json.dumps({{"event": event, "entity": entity, "id": str(record_id), "data": data, "ts": _datetime.datetime.utcnow().isoformat() + "Z", "req_id": req_id}}).encode()
+    sig = "sha256=" + _hmac_mod.new(secret, payload, _hashlib_mod.sha256).hexdigest() if secret else ""
+
+    def _send():
+        for url in urls:
+            for delay in (0, 1, 2, 4):
+                try:
+                    if delay:
+                        _time_mod.sleep(delay)
+                    req = _urllib_request.Request(
+                        url,
+                        data=payload,
+                        method="POST",
+                        headers={{"Content-Type": "application/json", "X-APG-Signature": sig, "X-APG-Event": event}},
+                    )
+                    with _urllib_request.urlopen(req, timeout=5):
+                        pass
+                    break
+                except Exception as _e:
+                    _logging.getLogger("apg").warning("webhook delivery failed url=%s err=%s", url, _e)
+
+    _threading_mod.Thread(target=_send, daemon=True).start()
+
 
 _sqlite_init_database()
 _load_record_store()
