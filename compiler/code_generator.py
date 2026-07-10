@@ -683,6 +683,7 @@ Generated from APG source as dependency-free Python artifacts.
 from __future__ import annotations
 
 import importlib
+import hashlib
 import html
 import hmac
 import json
@@ -754,6 +755,124 @@ def _session_cookie_samesite() -> str:
     value = str(os.environ.get("APG_SESSION_COOKIE_SAMESITE", "Lax")).strip()
     normalized = value[:1].upper() + value[1:].lower() if value else "Lax"
     return normalized if normalized in {{"Lax", "Strict", "None"}} else "Lax"
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(str(os.environ.get(name, "")).strip() or default)
+    except ValueError:
+        return default
+
+
+_APG_SCRYPT_N = 2**17
+_APG_SCRYPT_R = 8
+_APG_SCRYPT_P = 1
+_APG_PBKDF2_ITERATIONS = 600000
+_APG_MAX_PASSWORD_BYTES = 1024
+_APG_SCRYPT_MAXMEM = 256 * 1024 * 1024
+
+
+def hash_password(password: str, *, scheme: str = "scrypt", iterations: int | None = None, n: int | None = None, r: int | None = None, p: int | None = None) -> str:
+    """Hash a password for APG_AUTH_USERS `password_hash` entries.
+
+    scrypt (memory-hard) is the default; pbkdf2_sha256 is supported for
+    imported credentials. Both verify with the standard library only.
+    """
+    password_bytes = str(password).encode("utf-8")
+    if len(password_bytes) > _APG_MAX_PASSWORD_BYTES:
+        raise ValueError("password exceeds the maximum supported length")
+    salt = secrets.token_bytes(16)
+    if scheme == "pbkdf2_sha256":
+        rounds = int(iterations or _APG_PBKDF2_ITERATIONS)
+        digest = hashlib.pbkdf2_hmac("sha256", password_bytes, salt, rounds)
+        return f"pbkdf2_sha256${{rounds}}${{salt.hex()}}${{digest.hex()}}"
+    if scheme != "scrypt":
+        raise ValueError(f"unsupported password hash scheme: {{scheme}}")
+    cost_n = int(n or _APG_SCRYPT_N)
+    cost_r = int(r or _APG_SCRYPT_R)
+    cost_p = int(p or _APG_SCRYPT_P)
+    digest = hashlib.scrypt(password_bytes, salt=salt, n=cost_n, r=cost_r, p=cost_p, maxmem=_APG_SCRYPT_MAXMEM, dklen=32)
+    return f"scrypt${{cost_n}}${{cost_r}}${{cost_p}}${{salt.hex()}}${{digest.hex()}}"
+
+
+def _verify_password_hash(stored: str, password: str) -> bool:
+    password_bytes = str(password).encode("utf-8")
+    if len(password_bytes) > _APG_MAX_PASSWORD_BYTES:
+        return False
+    try:
+        parts = str(stored).split("$")
+        if parts[0] == "scrypt" and len(parts) == 6:
+            cost_n, cost_r, cost_p = int(parts[1]), int(parts[2]), int(parts[3])
+            salt = bytes.fromhex(parts[4])
+            expected = bytes.fromhex(parts[5])
+            digest = hashlib.scrypt(password_bytes, salt=salt, n=cost_n, r=cost_r, p=cost_p, maxmem=_APG_SCRYPT_MAXMEM, dklen=len(expected))
+            return hmac.compare_digest(digest, expected)
+        if parts[0] == "pbkdf2_sha256" and len(parts) == 4:
+            rounds = int(parts[1])
+            salt = bytes.fromhex(parts[2])
+            expected = bytes.fromhex(parts[3])
+            digest = hashlib.pbkdf2_hmac("sha256", password_bytes, salt, rounds)
+            return hmac.compare_digest(digest, expected)
+    except (ValueError, TypeError, IndexError):
+        return False
+    return False
+
+
+_APG_DUMMY_PASSWORD_HASH: str | None = None
+
+
+def _dummy_password_verify() -> None:
+    """Burn KDF-equivalent time so unknown users are indistinguishable from bad passwords."""
+    global _APG_DUMMY_PASSWORD_HASH
+    if _APG_DUMMY_PASSWORD_HASH is None:
+        _APG_DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(16), scheme="pbkdf2_sha256")
+    _verify_password_hash(_APG_DUMMY_PASSWORD_HASH, "apg-dummy-verification")
+
+
+# Per-process sliding-window login throttle. For multi-worker deployments,
+# replace with a shared store (e.g. Redis) keyed the same way.
+_APG_LOGIN_ATTEMPTS: Dict[str, list[float]] = {{}}
+_APG_LOGIN_LOCK = _threading.Lock()
+
+
+def _login_throttle_settings() -> tuple[int, float]:
+    max_attempts = max(1, _env_int("APG_LOGIN_MAX_ATTEMPTS", 5))
+    window = float(max(1, _env_int("APG_LOGIN_WINDOW_SECONDS", 300)))
+    return max_attempts, window
+
+
+def _login_throttle_key(username: str) -> str:
+    try:
+        remote = _flask_request.remote_addr or "unknown"
+    except RuntimeError:
+        remote = "unknown"
+    return f"{{username}}|{{remote}}"
+
+
+def _login_retry_after(key: str) -> int:
+    """Seconds until the next attempt is allowed; 0 when not throttled."""
+    max_attempts, window = _login_throttle_settings()
+    now = _time.monotonic()
+    with _APG_LOGIN_LOCK:
+        attempts = [stamp for stamp in _APG_LOGIN_ATTEMPTS.get(key, []) if now - stamp < window]
+        _APG_LOGIN_ATTEMPTS[key] = attempts
+        if len(attempts) < max_attempts:
+            return 0
+        return max(1, int(window - (now - attempts[0])) + 1)
+
+
+def _register_login_failure(key: str) -> None:
+    _, window = _login_throttle_settings()
+    now = _time.monotonic()
+    with _APG_LOGIN_LOCK:
+        attempts = [stamp for stamp in _APG_LOGIN_ATTEMPTS.get(key, []) if now - stamp < window]
+        attempts.append(now)
+        _APG_LOGIN_ATTEMPTS[key] = attempts
+
+
+def _clear_login_failures(key: str) -> None:
+    with _APG_LOGIN_LOCK:
+        _APG_LOGIN_ATTEMPTS.pop(key, None)
 
 
 def _live_topic_list(raw_topics: str | None = None) -> list[str]:
@@ -2467,12 +2586,13 @@ def _auth_credentials() -> Dict[str, Dict[str, Any]]:
                 if isinstance(spec, dict):
                     result[str(username)] = {{
                         "password": str(spec.get("password", "")),
+                        "password_hash": str(spec.get("password_hash", "")),
                         "name": str(spec.get("name", username)),
                         "roles": list(spec.get("roles", ["user"])) if isinstance(spec.get("roles", []), list) else ["user"],
                         "permissions": list(spec.get("permissions", [])) if isinstance(spec.get("permissions", []), list) else [],
                     }}
                 else:
-                    result[str(username)] = {{"password": str(spec), "name": str(username), "roles": ["user"], "permissions": []}}
+                    result[str(username)] = {{"password": str(spec), "password_hash": "", "name": str(username), "roles": ["user"], "permissions": []}}
             if result:
                 return result
     username = os.environ.get("APG_AUTH_USERNAME", "admin")
@@ -2480,6 +2600,7 @@ def _auth_credentials() -> Dict[str, Dict[str, Any]]:
     return {{
         username: {{
             "password": password,
+            "password_hash": os.environ.get("APG_AUTH_PASSWORD_HASH", ""),
             "name": os.environ.get("APG_AUTH_DISPLAY_NAME", username),
             "roles": ["admin"],
             "permissions": ["*"],
@@ -2488,10 +2609,17 @@ def _auth_credentials() -> Dict[str, Dict[str, Any]]:
 
 
 def _authenticate_user(username: str, password: str) -> Dict[str, Any] | None:
+    if len(str(password).encode("utf-8")) > _APG_MAX_PASSWORD_BYTES:
+        return None
     user = _auth_credentials().get(username)
     if not user:
+        _dummy_password_verify()
         return None
-    if not hmac.compare_digest(str(user.get("password", "")), str(password)):
+    stored_hash = str(user.get("password_hash", "") or "")
+    if stored_hash:
+        if not _verify_password_hash(stored_hash, password):
+            return None
+    elif not hmac.compare_digest(str(user.get("password", "")), str(password)):
         return None
     return {{
         "username": username,
@@ -2502,6 +2630,9 @@ def _authenticate_user(username: str, password: str) -> Dict[str, Any] | None:
 
 
 def _issue_login_session(user: Dict[str, Any]) -> Dict[str, Any]:
+    # Rotate the session on privilege change so a pre-login (fixated) session
+    # value never survives authentication.
+    _flask_session.clear()
     _flask_session["apg_user"] = user
     token = ""
     jwt_secret = os.environ.get("APG_JWT_SECRET")
@@ -2704,7 +2835,14 @@ def _authorized(headers: Any) -> bool:
         supplied_key = token
     required_key = os.environ.get("APG_API_KEY")
     if required_key:
-        return supplied_key == required_key
+        return bool(supplied_key) and hmac.compare_digest(str(supplied_key), str(required_key))
+    if _production_mode():
+        # Secure by default: with no API key or JWT configured, production
+        # mutations require an authenticated (CSRF-verified) session user.
+        try:
+            return _current_user() is not None
+        except RuntimeError:
+            return False
     return True
 
 
@@ -8810,6 +8948,7 @@ _flask_app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE=_APG_SESSION_COOKIE_SAMESITE,
     SESSION_COOKIE_SECURE=_APG_SESSION_COOKIE_SECURE,
+    MAX_CONTENT_LENGTH=max(1, _env_int("APG_MAX_BODY_BYTES", 16 * 1024 * 1024)),
 )
 
 
@@ -8847,8 +8986,55 @@ def _apply_security_headers(response: _FlaskResponse) -> _FlaskResponse:
     return response
 
 
+def _error_response_wants_json() -> bool:
+    if _flask_request.path.startswith("/api/") or _flask_request.path == "/api":
+        return True
+    accept = str(_flask_request.headers.get("Accept", ""))
+    return "application/json" in accept and "text/html" not in accept
+
+
+def _apg_error_response(status: int, error_code: str, title: str, message: str) -> _FlaskResponse:
+    if _error_response_wants_json():
+        return _FlaskResponse(
+            json.dumps({{"error": error_code, "message": message, "path": _flask_request.path}}),
+            status=status,
+            content_type="application/json; charset=utf-8",
+        )
+    body = (
+        '<section class="apg-error-page" role="alert">'
+        f"<h1>{{html.escape(title)}}</h1>"
+        f"<p>{{html.escape(message)}}</p>"
+        '<p><a href="/">Return to the home page</a></p>'
+        "</section>"
+    )
+    return _FlaskResponse(_html_page(title, body, shell=False), status=status, content_type="text/html; charset=utf-8")
+
+
+@_flask_app.errorhandler(404)
+def _apg_not_found(_error: Any) -> _FlaskResponse:
+    return _apg_error_response(404, "not_found", "Page not found", "The requested path does not exist in this generated app.")
+
+
+@_flask_app.errorhandler(405)
+def _apg_method_not_allowed(_error: Any) -> _FlaskResponse:
+    return _apg_error_response(405, "method_not_allowed", "Method not allowed", "That HTTP method is not supported for this path.")
+
+
+@_flask_app.errorhandler(413)
+def _apg_payload_too_large(_error: Any) -> _FlaskResponse:
+    return _apg_error_response(413, "payload_too_large", "Payload too large", "The request body exceeds the configured APG_MAX_BODY_BYTES limit.")
+
+
+@_flask_app.errorhandler(500)
+def _apg_internal_error(_error: Any) -> _FlaskResponse:
+    return _apg_error_response(500, "internal_error", "Something went wrong", "The generated app hit an unexpected error. Details were logged server-side.")
+
+
 @_flask_app.before_request
 def _setup_tenant() -> Any:
+    body_limit = _flask_app.config.get("MAX_CONTENT_LENGTH")
+    if body_limit and (_flask_request.content_length or 0) > body_limit:
+        return _apg_error_response(413, "payload_too_large", "Payload too large", "The request body exceeds the configured APG_MAX_BODY_BYTES limit.")
     tid = _flask_request.headers.get("X-APG-Tenant") or _flask_request.headers.get("X-Tenant-ID")
     _TENANT_LOCAL.tenant_id = tid or None
     if _login_required_for_path(_flask_request.path) and _current_user() is None:
@@ -8901,13 +9087,25 @@ def _flask_login_post():
     next_url = str(_flask_request.form.get("next") or "/ui")
     if not next_url.startswith("/"):
         next_url = "/ui"
+    throttle_key = _login_throttle_key(username)
+    retry_after = _login_retry_after(throttle_key)
+    if retry_after:
+        response = _FlaskResponse(
+            _login_page("Too many sign-in attempts. Wait a moment and try again.", next_url, username=username),
+            status=429,
+            content_type="text/html; charset=utf-8",
+        )
+        response.headers["Retry-After"] = str(retry_after)
+        return response
     user = _authenticate_user(username, password)
     if user is None:
+        _register_login_failure(throttle_key)
         return _FlaskResponse(
             _login_page("We could not sign you in with those credentials.", next_url, username=username),
             status=401,
             content_type="text/html; charset=utf-8",
         )
+    _clear_login_failures(throttle_key)
     _issue_login_session(user)
     return _flask_redirect(next_url)
 
@@ -9012,6 +9210,8 @@ def _flask_api_get(api_path):
         return _FlaskResponse(html_payload, status=status, content_type="text/html; charset=utf-8")
     query = {{k: v for k, v in _flask_request.args.lists()}}
     status, payload = _route_payload(path, query)
+    if status == 404 and "text/html" in str(_flask_request.headers.get("Accept", "")):
+        return _apg_error_response(404, "not_found", "Page not found", "The requested path does not exist in this generated app.")
     return _FlaskResponse(json.dumps(payload), status=status, content_type="application/json; charset=utf-8")
 
 
