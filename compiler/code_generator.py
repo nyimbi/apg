@@ -732,6 +732,30 @@ APG_FALLBACK_LANGUAGE = {i18n_config["fallback_language"]!r}
 APG_I18N: Dict[str, Dict[str, str]] = {i18n_catalog!r}
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {{"1", "true", "yes", "on"}}
+
+
+def _production_mode() -> bool:
+    return _env_flag("APG_PRODUCTION") or str(os.environ.get("APG_ENV", "")).strip().lower() in {{"prod", "production"}}
+
+
+def _generated_session_secret() -> str:
+    configured = os.environ.get("APG_SESSION_SECRET") or os.environ.get("APG_JWT_SECRET")
+    if configured:
+        return configured
+    return secrets.token_urlsafe(48)
+
+
+def _session_cookie_samesite() -> str:
+    value = str(os.environ.get("APG_SESSION_COOKIE_SAMESITE", "Lax")).strip()
+    normalized = value[:1].upper() + value[1:].lower() if value else "Lax"
+    return normalized if normalized in {{"Lax", "Strict", "None"}} else "Lax"
+
+
 def _live_topic_list(raw_topics: str | None = None) -> list[str]:
     topics = [
         topic.strip()
@@ -8775,7 +8799,18 @@ def _pg_load_entity_records(entity_name: str) -> list[Dict[str, Any]]:
 _load_record_store()
 
 _flask_app = _FlaskApp("app", root_path=os.path.abspath(os.path.dirname(globals().get("__file__", None) or ".")))
-_flask_app.secret_key = os.environ.get("APG_SESSION_SECRET") or os.environ.get("APG_JWT_SECRET") or "apg-generated-session-secret"
+_flask_app.secret_key = _generated_session_secret()
+_APG_SESSION_COOKIE_SAMESITE = _session_cookie_samesite()
+_APG_SESSION_COOKIE_SECURE = (
+    _env_flag("APG_SESSION_COOKIE_SECURE", _production_mode())
+    or _APG_SESSION_COOKIE_SAMESITE == "None"
+)
+_flask_app.config.update(
+    SESSION_COOKIE_NAME=os.environ.get("APG_SESSION_COOKIE_NAME", "apg_session"),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE=_APG_SESSION_COOKIE_SAMESITE,
+    SESSION_COOKIE_SECURE=_APG_SESSION_COOKIE_SECURE,
+)
 
 
 _APG_SECURITY_HEADERS: Dict[str, str] = {{

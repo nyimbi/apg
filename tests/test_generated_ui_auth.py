@@ -57,6 +57,13 @@ def _csrf_token_from_html(payload: bytes) -> str:
 	return match.group(1)
 
 
+def _session_cookie_header(response) -> str:
+	for header in response.headers.getlist("Set-Cookie"):
+		if header.startswith("apg_session="):
+			return header
+	raise AssertionError("missing generated session cookie")
+
+
 def test_generated_flask_responses_apply_security_headers():
 	source = """
 module open_customer_app version 1.0.0 {}
@@ -83,6 +90,57 @@ entity Customer { name: str; }
 			secure.headers["Strict-Transport-Security"]
 			== "max-age=63072000; includeSubDomains"
 		)
+
+
+def test_generated_session_secret_uses_config_or_ephemeral_secret(monkeypatch):
+	monkeypatch.delenv("APG_SESSION_SECRET", raising=False)
+	monkeypatch.delenv("APG_JWT_SECRET", raising=False)
+	namespace = _generated_namespace()
+	app = namespace["_flask_app"]
+
+	assert app.secret_key
+	assert app.secret_key != "apg-generated-session-secret"
+	assert len(app.secret_key) >= 32
+
+	monkeypatch.setenv("APG_SESSION_SECRET", "configured-session-secret-value")
+	configured_namespace = _generated_namespace()
+	configured_app = configured_namespace["_flask_app"]
+	assert configured_app.secret_key == "configured-session-secret-value"
+
+
+def test_generated_session_cookie_is_hardened(monkeypatch):
+	monkeypatch.setenv(
+		"APG_AUTH_USERS",
+		'{"operator": {"password": "secret", "name": "Ops User", "roles": ["admin"], "permissions": ["*"]}}',
+	)
+	monkeypatch.setenv("APG_SESSION_SECRET", "configured-session-secret-value")
+	monkeypatch.setenv("APG_SESSION_COOKIE_SECURE", "true")
+	namespace = _generated_namespace()
+	app = namespace["_flask_app"]
+
+	assert app.config["SESSION_COOKIE_NAME"] == "apg_session"
+	assert app.config["SESSION_COOKIE_HTTPONLY"] is True
+	assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+	assert app.config["SESSION_COOKIE_SECURE"] is True
+
+	with app.test_client() as client:
+		login_page = client.get("/login", base_url="https://localhost")
+		login_token = _csrf_token_from_html(login_page.data)
+		accepted_login = client.post(
+			"/login",
+			base_url="https://localhost",
+			data={
+				"username": "operator",
+				"password": "secret",
+				"next": "/ui",
+				"apg_csrf_token": login_token,
+			},
+		)
+
+	session_cookie = _session_cookie_header(accepted_login)
+	assert "HttpOnly" in session_cookie
+	assert "SameSite=Lax" in session_cookie
+	assert "Secure" in session_cookie
 
 
 def test_generated_session_forms_require_csrf_token(monkeypatch):
