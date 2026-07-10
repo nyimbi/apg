@@ -1027,6 +1027,24 @@ class SemanticAnalyzer:
 							entity, "reference"
 						))
 
+			if isinstance(entity, DatabaseDeclaration):
+				self._validate_database_relationship_references(entity)
+
+	def _validate_database_relationship_references(self, database: DatabaseDeclaration) -> None:
+		"""Validate DBML column references point at declared tables."""
+		for schema in database.schemas:
+			table_names = {table.name for table in schema.tables}
+			for table in schema.tables:
+				for column in table.columns:
+					reference = column.reference or {}
+					target_table = reference.get("table")
+					if target_table and target_table not in table_names:
+						self.errors.append(SemanticError(
+							f"Relationship in database '{database.name}' references undefined entity/table '{target_table}'",
+							database,
+							"reference",
+						))
+
 	def print_errors(self):
 		"""Print all errors and warnings"""
 		if self.errors:

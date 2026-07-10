@@ -695,6 +695,7 @@ import os
 import queue as _queue
 import re
 import secrets
+import sqlite3 as _sqlite3
 import sys
 import threading as _threading
 import time as _time
@@ -702,7 +703,7 @@ import uuid as _uuid
 from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse, session as _flask_session, g as _flask_g
 from pathlib import Path
 from typing import Any, Dict, Optional
-from urllib.parse import parse_qs, quote, urlencode
+from urllib.parse import parse_qs, quote, unquote, urlencode
 
 
 MODULE_NAME = {module.name!r}
@@ -716,6 +717,7 @@ ENTITIES = {entity_specs!r}
 _APG_ENTITIES = ENTITIES
 ENTITY_NAMES = {{entity["name"] for entity in _APG_ENTITIES}}
 RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {{entity["name"]: [] for entity in ENTITIES}}
+RECORD_METADATA: Dict[str, Dict[str, Dict[str, Any]]] = {{entity["name"]: {{}} for entity in ENTITIES}}
 NEXT_RECORD_IDS: Dict[str, int] = {{entity["name"]: 1 for entity in ENTITIES}}
 EVENT_LOG: list[Dict[str, Any]] = []
 NEXT_EVENT_ID = 1
@@ -727,6 +729,7 @@ APG_CONNECTOR_REGISTRY: list[Dict[str, Any]] = []
 APG_ACTIVITY_LOG: Dict[str, list[Dict[str, Any]]] = {{}}
 WORKFLOW_EVENT_JOURNAL: Dict[str, list[Dict[str, Any]]] = {{}}
 WORKFLOW_SIGNALS: Dict[str, list[str]] = {{}}
+APG_RECORD_LOCK = _threading.RLock()
 APG_LIVE_LOCK = _threading.Lock()
 APG_LIVE_SUBSCRIBERS: list[Dict[str, Any]] = []
 TENANT_SCOPED_ENTITIES: set[str] = {{
@@ -1255,6 +1258,11 @@ def _database_column_specs(entity: Dict[str, Any]) -> list[Dict[str, Any]]:
                 "cardinality": relationship.get("cardinality", "many-to-one"),
             }}
         columns.append(column)
+    columns.extend([
+        {{"name": "created_at", "type": "string", "required": True, "nullable": False, "primary_key": False}},
+        {{"name": "updated_at", "type": "string", "required": True, "nullable": False, "primary_key": False}},
+        {{"name": "deleted_at", "type": "string", "required": False, "nullable": True, "primary_key": False}},
+    ])
     return columns
 
 
@@ -2136,19 +2144,83 @@ def database_status() -> Dict[str, Any]:
     }}
 
 
-def list_records(entity_name: str | None = None) -> Dict[str, list[Dict[str, Any]]] | list[Dict[str, Any]]:
+def _record_timestamp() -> str:
+    return _datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _record_metadata_key(record_id: Any) -> str:
+    return str(record_id)
+
+
+def _record_metadata(entity_name: str, record_id: Any, create: bool = False) -> Dict[str, Any] | None:
+    if record_id in (None, ""):
+        return None
+    entity_metadata = RECORD_METADATA.setdefault(entity_name, {{}})
+    key = _record_metadata_key(record_id)
+    metadata = entity_metadata.get(key)
+    if metadata is None and create:
+        now = _record_timestamp()
+        metadata = {{"created_at": now, "updated_at": now, "deleted_at": None}}
+        entity_metadata[key] = metadata
+    return metadata
+
+
+def _record_public_copy(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
+    public = dict(record)
+    metadata = _record_metadata(entity_name, public.get("id"), create=True) or {{}}
+    for key in ("created_at", "updated_at", "deleted_at"):
+        if public.get(key) in (None, "") and metadata.get(key) not in (None, ""):
+            public[key] = metadata.get(key)
+    public.setdefault("created_at", metadata.get("created_at") or _record_timestamp())
+    public.setdefault("updated_at", metadata.get("updated_at") or public["created_at"])
+    public.setdefault("deleted_at", metadata.get("deleted_at"))
+    return public
+
+
+def _record_deleted(entity_name: str, record: Dict[str, Any]) -> bool:
+    if record.get("deleted_at") not in (None, ""):
+        return True
+    metadata = _record_metadata(entity_name, record.get("id"))
+    return bool(metadata and metadata.get("deleted_at"))
+
+
+def _raw_records_by_entity(*, include_deleted: bool = True) -> Dict[str, list[Dict[str, Any]]]:
+    return {{
+        entity_name: [
+            _record_public_copy(entity_name, record)
+            for record in RECORD_STORE[entity_name]
+            if include_deleted or not _record_deleted(entity_name, record)
+        ]
+        for entity_name in sorted(ENTITY_NAMES)
+    }}
+
+
+def list_records(
+    entity_name: str | None = None,
+    *,
+    include_deleted: bool = False,
+) -> Dict[str, list[Dict[str, Any]]] | list[Dict[str, Any]]:
     if entity_name is None:
         return {{
-            name: [dict(record) for record in records]
-            for name, records in RECORD_STORE.items()
+            name: [
+                _record_public_copy(name, record)
+                for record in RECORD_STORE[name]
+                if include_deleted or not _record_deleted(name, record)
+            ]
+            for name in sorted(ENTITY_NAMES)
     }}
-    return [dict(record) for record in RECORD_STORE[entity_name]]
+    return [
+        _record_public_copy(entity_name, record)
+        for record in RECORD_STORE[entity_name]
+        if include_deleted or not _record_deleted(entity_name, record)
+    ]
 
 
 _RECORD_QUERY_CONTROL_KEYS = {{
     "after",
     "dir",
     "format",
+    "include_deleted",
     "limit",
     "offset",
     "order",
@@ -2159,6 +2231,15 @@ _RECORD_QUERY_CONTROL_KEYS = {{
     "sort_dir",
 }}
 
+_RECORD_LIFECYCLE_FIELDS = ("created_at", "updated_at", "deleted_at")
+
+
+def _strip_record_lifecycle_fields(record: Dict[str, Any]) -> Dict[str, Any]:
+    sanitized = dict(record)
+    for field_name in _RECORD_LIFECYCLE_FIELDS:
+        sanitized.pop(field_name, None)
+    return sanitized
+
 
 def _record_query_value(query: Dict[str, list[str]], name: str, default: Any = None) -> Any:
     values = query.get(name)
@@ -2168,8 +2249,35 @@ def _record_query_value(query: Dict[str, list[str]], name: str, default: Any = N
     return default if value is None else value
 
 
+def _truthy_query_value(value: Any) -> bool:
+    return str(value or "").strip().lower() in {{"1", "true", "yes", "on"}}
+
+
+def _records_admin_allowed() -> bool:
+    if not APG_AUTH_REQUIRED:
+        return True
+    try:
+        if _has_header_auth(_flask_request.headers):
+            return True
+    except RuntimeError:
+        pass
+    try:
+        user = _current_user()
+    except RuntimeError:
+        user = None
+    if not isinstance(user, dict):
+        return False
+    roles = {{str(role).lower() for role in user.get("roles", [])}}
+    permissions = {{str(permission) for permission in user.get("permissions", [])}}
+    return "admin" in roles or "*" in permissions or "records:include_deleted" in permissions
+
+
+def _query_includes_deleted(query: Dict[str, list[str]]) -> bool:
+    return _truthy_query_value(_record_query_value(query, "include_deleted", "0"))
+
+
 def _record_field_names(entity_name: str) -> set[str]:
-    names = {{"id", "_revision"}}
+    names = {{"id", "_revision", "created_at", "updated_at", "deleted_at"}}
     for field in _field_specs(entity_name):
         field_name = str(field.get("name", ""))
         if field_name:
@@ -2248,7 +2356,17 @@ def query_records(
     paginate: bool = True,
 ) -> Dict[str, Any]:
     query = query or {{}}
-    records = list_records(entity_name)
+    include_deleted_requested = _query_includes_deleted(query)
+    if include_deleted_requested and not _records_admin_allowed():
+        return {{
+            "error": "include_deleted_requires_admin",
+            "entity": entity_name,
+            "records": [],
+            "data": [],
+            "count": 0,
+            "total": 0,
+        }}
+    records = list_records(entity_name, include_deleted=include_deleted_requested)
     filters, filter_error = _record_query_filters(entity_name, query)
     if filter_error is not None:
         return _invalid_record_query_result(entity_name, response_style)
@@ -2436,9 +2554,31 @@ def _sync_next_workflow_run_id() -> None:
     NEXT_WORKFLOW_RUN_ID = max(numeric_ids, default=0) + 1
 
 
+def _normalize_record_metadata() -> None:
+    for entity_name in ENTITY_NAMES:
+        entity_metadata = RECORD_METADATA.setdefault(entity_name, {{}})
+        for record in RECORD_STORE[entity_name]:
+            record_id = record.get("id")
+            if record_id in (None, ""):
+                continue
+            metadata = entity_metadata.get(_record_metadata_key(record_id))
+            if not isinstance(metadata, dict):
+                metadata = {{}}
+                entity_metadata[_record_metadata_key(record_id)] = metadata
+            now = _record_timestamp()
+            metadata.setdefault("created_at", record.get("created_at") or now)
+            metadata.setdefault("updated_at", record.get("updated_at") or metadata.get("created_at", now))
+            metadata.setdefault("deleted_at", record.get("deleted_at"))
+            record.setdefault("created_at", metadata.get("created_at"))
+            record.setdefault("updated_at", metadata.get("updated_at"))
+            record.setdefault("deleted_at", metadata.get("deleted_at"))
+
+
 def _load_record_store() -> None:
     path = _data_path()
     if path is None or not path.exists():
+        _sqlite_load_records()
+        _normalize_record_metadata()
         return
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -2458,6 +2598,19 @@ def _load_record_store() -> None:
                 for record in entity_records
                 if isinstance(record, dict)
             ]
+    raw_metadata = loaded.get("record_metadata", {{}})
+    if isinstance(raw_metadata, dict):
+        RECORD_METADATA.clear()
+        for entity_name in ENTITY_NAMES:
+            entity_metadata = raw_metadata.get(entity_name, {{}})
+            if isinstance(entity_metadata, dict):
+                RECORD_METADATA[entity_name] = {{
+                    str(record_id): dict(metadata)
+                    for record_id, metadata in entity_metadata.items()
+                    if isinstance(metadata, dict)
+                }}
+            else:
+                RECORD_METADATA[entity_name] = {{}}
     raw_events = loaded.get("events", [])
     if isinstance(raw_events, list):
         EVENT_LOG.clear()
@@ -2489,11 +2642,13 @@ def _load_record_store() -> None:
             pg_records = _pg_load_entity_records(entity_name)
             if pg_records:
                 RECORD_STORE[entity_name] = pg_records
+    _sqlite_load_records()
+    _normalize_record_metadata()
 
 
 def _persist_record_store() -> str | None:
     if _APG_PG_URL:
-        for entity_name, records in list_records().items():
+        for entity_name, records in _raw_records_by_entity().items():
             _pg_save_entity_records(entity_name, records)
     path = _data_path()
     if path is None:
@@ -2501,7 +2656,8 @@ def _persist_record_store() -> str | None:
     payload = {{
         "module": MODULE_NAME,
         "version": MODULE_VERSION,
-        "records": list_records(),
+        "records": _raw_records_by_entity(),
+        "record_metadata": RECORD_METADATA,
         "events": list_events(),
         "workflow_runs": {{run_id: dict(run) for run_id, run in WORKFLOW_RUNS.items()}},
         "next_record_ids": dict(NEXT_RECORD_IDS),
@@ -2533,7 +2689,7 @@ def storage_status(include_records: bool = False) -> Dict[str, Any]:
 
 def metrics_snapshot() -> Dict[str, Any]:
     record_counts = {{
-        entity_name: len(RECORD_STORE[entity_name])
+        entity_name: len(list_records(entity_name))
         for entity_name in sorted(ENTITY_NAMES)
     }}
     event_counts: Dict[str, int] = {{}}
@@ -3140,6 +3296,10 @@ def _record_event(
 def _prepare_new_record(record: Dict[str, Any], entity_name: str = "") -> Dict[str, Any]:
     prepared = dict(record)
     prepared.setdefault("_revision", 1)
+    now = _record_timestamp()
+    prepared.setdefault("created_at", now)
+    prepared.setdefault("updated_at", now)
+    prepared.setdefault("deleted_at", None)
     # Auto-inject tenant_id for tenant-scoped entities
     tid = _tenant_id()
     if tid and entity_name in TENANT_SCOPED_ENTITIES:
@@ -3176,6 +3336,9 @@ def _record_schema(entity: Dict[str, Any], partial: bool = False) -> Dict[str, A
     schema_properties: Dict[str, Any] = {{
         "id": {{"oneOf": [{{"type": "integer"}}, {{"type": "string"}}]}},
         "_revision": {{"type": "integer"}},
+        "created_at": {{"type": "string"}},
+        "updated_at": {{"type": "string"}},
+        "deleted_at": {{"oneOf": [{{"type": "string"}}, {{"type": "null"}}]}},
     }}
     required_fields: list[str] = []
     for field in fields:
@@ -3309,6 +3472,41 @@ def _record_import_response_schema(schema_name: str) -> Dict[str, Any]:
             "failed": {{"type": "integer"}},
         }},
         "required": ["entity", "imported", "errors", "count", "failed"],
+    }}
+
+
+def _record_bulk_body_schema(schema_name: str) -> Dict[str, Any]:
+    return {{
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {{
+            "create": {{"type": "array", "items": _schema_ref(schema_name)}},
+            "update": {{"type": "array", "items": _schema_ref(schema_name)}},
+            "delete": {{
+                "type": "array",
+                "items": {{
+                    "oneOf": [
+                        {{"type": "integer"}},
+                        {{"type": "string"}},
+                        {{"type": "object", "additionalProperties": True}},
+                    ]
+                }},
+            }},
+        }},
+    }}
+
+
+def _record_bulk_response_schema() -> Dict[str, Any]:
+    return {{
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {{
+            "created": {{"type": "integer"}},
+            "updated": {{"type": "integer"}},
+            "deleted": {{"type": "integer"}},
+            "errors": {{"type": "array", "items": {{"type": "object", "additionalProperties": True}}}},
+        }},
+        "required": ["created", "updated", "deleted", "errors"],
     }}
 
 
@@ -3972,8 +4170,18 @@ def _build_openapi_document() -> Dict[str, Any]:
             {{"name": "q", "in": "query", "required": False, "description": "LIKE search across string fields"}},
             {{"name": "sort", "in": "query", "required": False, "description": "Field to sort by"}},
             {{"name": "sort_dir", "in": "query", "required": False, "description": "asc or desc"}},
+            {{"name": "include_deleted", "in": "query", "required": False, "description": "Admin-only flag to include soft-deleted records"}},
             {{"name": "format", "in": "query", "required": False, "description": "Use csv for RFC 4180 export"}},
         ]
+        paths[f"/records/{{entity_name}}/bulk"] = {{
+            "post": _api_operation(
+                f"Bulk mutate {{entity_name}} records",
+                "Bulk record mutation result",
+                request_body=True,
+                request_schema=_record_bulk_body_schema(schema_name),
+                response_schema=_record_bulk_response_schema(),
+            ),
+        }}
         paths[f"/records/{{entity_name}}/{{{{id}}}}"] = {{
             "get": _api_operation(
                 f"Fetch {{entity_name}} record",
@@ -3991,6 +4199,13 @@ def _build_openapi_document() -> Dict[str, Any]:
                 f"Delete {{entity_name}} record",
                 "Deleted record",
                 response_schema=_record_mutation_response_schema(schema_name, record_key="deleted"),
+            ),
+        }}
+        paths[f"/records/{{entity_name}}/{{{{id}}}}/restore"] = {{
+            "delete": _api_operation(
+                f"Restore {{entity_name}} record",
+                "Restored record",
+                response_schema=_record_mutation_response_schema(schema_name),
             ),
         }}
         paths[f"/entities/{{entity_name}}/records"] = {{
@@ -4014,6 +4229,7 @@ def _build_openapi_document() -> Dict[str, Any]:
             {{"name": "order", "in": "query", "required": False, "description": "asc or desc"}},
             {{"name": "limit", "in": "query", "required": False, "description": "Maximum records to return"}},
             {{"name": "offset", "in": "query", "required": False, "description": "Records to skip"}},
+            {{"name": "include_deleted", "in": "query", "required": False, "description": "Admin-only flag to include soft-deleted records"}},
         ]
         paths[f"/entities/{{entity_name}}/records/export"] = {{
             "get": _api_operation(
@@ -4365,6 +4581,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             return "_agent_invocation_payload"
         if (route.startswith("/agent-teams/") or route.startswith("/teams/")) and route.endswith(("/invoke", "/run")):
             return "_agent_invocation_payload"
+        if route.startswith("/records/") and route.endswith("/bulk"):
+            return "_create_record_payload"
         if route.startswith("/records/") and route.count("/") == 2:
             return "_create_record_payload"
         if route.startswith("/entities/") and (route.endswith("/records") or route.endswith("/records/import")):
@@ -5399,6 +5617,222 @@ def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = Fa
         "entity": entity_name,
         "errors": errors,
     }}
+
+
+_APG_SQLITE_CONN: _sqlite3.Connection | None = None
+
+
+def _sqlite_path_from_env() -> str:
+    explicit_path = os.environ.get("APG_SQLITE_PATH") or os.environ.get("APG_DB_PATH")
+    if explicit_path:
+        return explicit_path
+    database_url = os.environ.get("APG_DATABASE_URL") or os.environ.get("DATABASE_URL") or ""
+    if database_url.startswith("sqlite:///"):
+        path = unquote(database_url.removeprefix("sqlite:///"))
+        return path or ":memory:"
+    if database_url == "sqlite:///:memory:":
+        return ":memory:"
+    return ":memory:"
+
+
+_APG_SQLITE_PATH = _sqlite_path_from_env()
+
+
+def _sqlite_identifier(identifier: str) -> str:
+    return '"' + str(identifier).replace('"', '""') + '"'
+
+
+def _sqlite_storage_type(apg_type: str) -> str:
+    schema_type = _json_schema_type(apg_type)
+    if schema_type in {{"integer", "boolean"}}:
+        return "INTEGER"
+    if schema_type == "number":
+        return "REAL"
+    return "TEXT"
+
+
+def _sqlite_expected_columns(entity_name: str) -> list[Dict[str, str]]:
+    columns: list[Dict[str, str]] = [
+        {{"name": "id", "ddl": "TEXT PRIMARY KEY", "migration": "TEXT"}},
+        {{"name": "_revision", "ddl": "INTEGER DEFAULT 1 NOT NULL", "migration": "INTEGER"}},
+    ]
+    for field in _field_specs(entity_name):
+        field_name = str(field.get("name", "")).strip()
+        if not field_name or field_name in {{"id", "_revision", "created_at", "updated_at", "deleted_at"}}:
+            continue
+        storage_type = _sqlite_storage_type(str(field.get("type", "any")))
+        ddl = storage_type + (" NOT NULL" if field.get("required", False) else "")
+        columns.append({{"name": field_name, "ddl": ddl, "migration": storage_type}})
+    columns.extend([
+        {{"name": "created_at", "ddl": "TEXT DEFAULT (datetime('now')) NOT NULL", "migration": "TEXT"}},
+        {{"name": "updated_at", "ddl": "TEXT DEFAULT (datetime('now')) NOT NULL", "migration": "TEXT"}},
+        {{"name": "deleted_at", "ddl": "TEXT NULL", "migration": "TEXT"}},
+    ])
+    return columns
+
+
+def _sqlite_connection() -> _sqlite3.Connection | None:
+    global _APG_SQLITE_CONN
+    if _APG_SQLITE_CONN is not None:
+        return _APG_SQLITE_CONN
+    try:
+        if _APG_SQLITE_PATH != ":memory:":
+            Path(_APG_SQLITE_PATH).expanduser().parent.mkdir(parents=True, exist_ok=True)
+        _APG_SQLITE_CONN = _sqlite3.connect(_APG_SQLITE_PATH, check_same_thread=False)
+        _APG_SQLITE_CONN.row_factory = _sqlite3.Row
+        return _APG_SQLITE_CONN
+    except Exception as exc:
+        _logging.getLogger("apg").warning("sqlite_init_failed: %s", exc)
+        _APG_SQLITE_CONN = None
+        return None
+
+
+def _sqlite_init_entity_table(conn: _sqlite3.Connection, entity_name: str) -> None:
+    table = _sqlite_identifier(entity_name)
+    columns = _sqlite_expected_columns(entity_name)
+    column_sql = ", ".join(_sqlite_identifier(column["name"]) + " " + column["ddl"] for column in columns)
+    conn.execute("CREATE TABLE IF NOT EXISTS " + table + " (" + column_sql + ")")
+    trigger = _sqlite_identifier("trg_" + entity_name + "_updated_at")
+    conn.execute(
+        "CREATE TRIGGER IF NOT EXISTS " + trigger + " AFTER UPDATE ON " + table + " FOR EACH ROW "
+        "BEGIN UPDATE " + table + " SET updated_at = datetime('now') WHERE id = NEW.id; END;"
+    )
+
+
+def _sqlite_auto_migrate_entity(conn: _sqlite3.Connection, entity_name: str) -> None:
+    existing = {{
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(" + _sqlite_identifier(entity_name) + ")").fetchall()
+    }}
+    for column in _sqlite_expected_columns(entity_name):
+        column_name = column["name"]
+        if column_name in existing:
+            continue
+        conn.execute(
+            "ALTER TABLE "
+            + _sqlite_identifier(entity_name)
+            + " ADD COLUMN "
+            + _sqlite_identifier(column_name)
+            + " "
+            + column["migration"]
+            + " DEFAULT NULL"
+        )
+        _logging.getLogger("apg").info("auto_migrated_column entity=%s column=%s", entity_name, column_name)
+
+
+def _sqlite_init_database() -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    try:
+        for entity_name in sorted(ENTITY_NAMES):
+            _sqlite_init_entity_table(conn, entity_name)
+            if str(os.environ.get("APG_AUTO_MIGRATE", "1")) != "0":
+                _sqlite_auto_migrate_entity(conn, entity_name)
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        _logging.getLogger("apg").warning("sqlite_schema_init_failed: %s", exc)
+
+
+def _sqlite_value(value: Any) -> Any:
+    if isinstance(value, bool):
+        return 1 if value else 0
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, sort_keys=True)
+    return value
+
+
+def _sqlite_store_record(entity_name: str, record: Dict[str, Any]) -> None:
+    conn = _sqlite_connection()
+    if conn is None or record.get("id") in (None, ""):
+        return
+    columns = _sqlite_expected_columns(entity_name)
+    metadata = _record_metadata(entity_name, record.get("id"), create=True) or {{}}
+    row: Dict[str, Any] = {{
+        "id": str(record.get("id")),
+        "_revision": int(record.get("_revision", 1)),
+        "created_at": record.get("created_at") or metadata.get("created_at"),
+        "updated_at": record.get("updated_at") or metadata.get("updated_at"),
+        "deleted_at": record.get("deleted_at") if "deleted_at" in record else metadata.get("deleted_at"),
+    }}
+    for field in _field_specs(entity_name):
+        field_name = str(field.get("name", "")).strip()
+        if field_name and field_name not in row:
+            row[field_name] = _sqlite_value(record.get(field_name))
+    column_names = [column["name"] for column in columns]
+    assignments = [
+        _sqlite_identifier(column_name) + " = excluded." + _sqlite_identifier(column_name)
+        for column_name in column_names
+        if column_name != "id"
+    ]
+    sql = (
+        "INSERT INTO "
+        + _sqlite_identifier(entity_name)
+        + " ("
+        + ", ".join(_sqlite_identifier(column_name) for column_name in column_names)
+        + ") VALUES ("
+        + ", ".join("?" for _column_name in column_names)
+        + ") ON CONFLICT(id) DO UPDATE SET "
+        + ", ".join(assignments)
+    )
+    conn.execute(sql, [_sqlite_value(row.get(column_name)) for column_name in column_names])
+
+
+def _sqlite_soft_delete_record(entity_name: str, record_id: Any) -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    conn.execute(
+        "UPDATE " + _sqlite_identifier(entity_name) + " SET deleted_at=datetime('now') WHERE id=?",
+        (str(record_id),),
+    )
+
+
+def _sqlite_restore_record(entity_name: str, record_id: Any) -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    conn.execute(
+        "UPDATE " + _sqlite_identifier(entity_name) + " SET deleted_at=NULL WHERE id=?",
+        (str(record_id),),
+    )
+
+
+def _sqlite_select_records(entity_name: str, include_deleted: bool = False) -> list[Dict[str, Any]]:
+    conn = _sqlite_connection()
+    if conn is None:
+        return []
+    sql = "SELECT * FROM " + _sqlite_identifier(entity_name)
+    if not include_deleted:
+        sql += " WHERE deleted_at IS NULL"
+    sql += " ORDER BY id"
+    return [dict(row) for row in conn.execute(sql).fetchall()]
+
+
+def _sqlite_load_records() -> None:
+    for entity_name in sorted(ENTITY_NAMES):
+        rows = _sqlite_select_records(entity_name, include_deleted=True)
+        if rows:
+            RECORD_STORE[entity_name] = [dict(row) for row in rows]
+
+
+def _sqlite_begin() -> None:
+    conn = _sqlite_connection()
+    if conn is not None:
+        conn.execute("BEGIN")
+
+
+def _sqlite_commit() -> None:
+    conn = _sqlite_connection()
+    if conn is not None:
+        conn.commit()
+
+
+def _sqlite_rollback() -> None:
+    conn = _sqlite_connection()
+    if conn is not None:
+        conn.rollback()
 
 
 def relationship_graph() -> Dict[str, Any]:
@@ -8536,12 +8970,20 @@ def _record_route(path: str) -> Dict[str, str | None] | None:
     parts = [part for part in path.split("/") if part]
     if parts == ["records"]:
         return {{"entity": None, "record_id": None, "operation": None}}
+    if len(parts) == 3 and parts[0] == "records" and parts[2] == "bulk":
+        return {{"entity": parts[1], "record_id": None, "operation": "bulk"}}
+    if len(parts) == 4 and parts[0] == "records" and parts[3] == "restore":
+        return {{"entity": parts[1], "record_id": parts[2], "operation": "restore"}}
     if len(parts) in {{2, 3}} and parts[0] == "records":
         return {{
             "entity": parts[1],
             "record_id": parts[2] if len(parts) == 3 else None,
             "operation": None,
         }}
+    if len(parts) == 5 and parts[0] == "entities" and parts[2] == "records" and parts[4] == "restore":
+        return {{"entity": parts[1], "record_id": parts[3], "operation": "restore"}}
+    if len(parts) == 4 and parts[0] == "entities" and parts[2] == "records" and parts[3] == "bulk":
+        return {{"entity": parts[1], "record_id": None, "operation": "bulk"}}
     if len(parts) in {{3, 4}} and parts[0] == "entities" and parts[2] == "records":
         operation = parts[3] if len(parts) == 4 and parts[3] in {{"export", "import"}} else None
         return {{
@@ -8552,10 +8994,12 @@ def _record_route(path: str) -> Dict[str, str | None] | None:
     return None
 
 
-def _record_by_id(entity_name: str, record_id: str) -> Dict[str, Any] | None:
+def _record_by_id(entity_name: str, record_id: str, *, include_deleted: bool = False) -> Dict[str, Any] | None:
     for record in RECORD_STORE[entity_name]:
         if str(record.get("id")) == str(record_id):
-            return dict(record)
+            if not include_deleted and _record_deleted(entity_name, record):
+                return None
+            return _record_public_copy(entity_name, record)
     return None
 
 
@@ -8592,8 +9036,14 @@ def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = 
         result = query_records(entity_name, query, response_style=style)
         if result.get("error") == "invalid_field":
             return 400, {{"error": "invalid_field"}}
+        if result.get("error") == "include_deleted_requires_admin":
+            return 403, {{"error": "include_deleted_requires_admin"}}
         return 200, result
-    record = _record_by_id(entity_name, record_id)
+    include_deleted_requested = _query_includes_deleted(query or {{}})
+    if include_deleted_requested and not _records_admin_allowed():
+        return 403, {{"error": "include_deleted_requires_admin"}}
+    include_deleted = include_deleted_requested and _records_admin_allowed()
+    record = _record_by_id(entity_name, record_id, include_deleted=include_deleted)
     if record is None:
         return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
     return 200, {{"entity": entity_name, "record": record}}
@@ -8976,10 +9426,12 @@ def _agent_invocation_payload(path: str, payload: Dict[str, Any]) -> tuple[int, 
     return 404, {{"error": "not_found", "path": path}}
 
 
-def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+def _create_record_payload(path: str, payload: Dict[str, Any], *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
     route = _record_route(path)
     if route is not None and route.get("operation") == "import":
         return _import_records_payload(str(route["entity"]), payload)
+    if route is not None and route.get("operation") == "bulk":
+        return _bulk_records_payload(path, payload)
     if route is None or route["entity"] is None or route["record_id"] is not None:
         return 404, {{"error": "not_found", "path": path}}
     entity_name = route["entity"]
@@ -8988,7 +9440,7 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     raw_record = payload.get("record", payload)
     if not isinstance(raw_record, dict):
         return 400, {{"error": "record_must_be_object"}}
-    record = coerce_record_types(entity_name, dict(raw_record))
+    record = _strip_record_lifecycle_fields(coerce_record_types(entity_name, dict(raw_record)))
     validation = validate_record(entity_name, record)
     if not validation["valid"]:
         return 422, {{"error": "record_validation_failed", **validation}}
@@ -8998,17 +9450,26 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
         return 409, {{"error": "duplicate_record_id", "entity": entity_name, "id": record["id"]}}
     record = _prepare_new_record(record, entity_name)
+    RECORD_METADATA.setdefault(entity_name, {{}})[_record_metadata_key(record["id"])] = {{
+        "created_at": record.get("created_at"),
+        "updated_at": record.get("updated_at"),
+        "deleted_at": None,
+    }}
     RECORD_STORE[entity_name].append(record)
+    _sqlite_store_record(entity_name, record)
+    if persist:
+        _sqlite_commit()
     event = _record_event("create", entity_name, after=record)
     _log_activity(entity_name, str(record.get("id", "")), "created", detail=f"Record created with {{len(record)}} fields")
-    persistence_error = _persist_record_store()
-    if persistence_error:
-        return 500, {{"error": "persistence_failed", "message": persistence_error}}
+    if persist:
+        persistence_error = _persist_record_store()
+        if persistence_error:
+            return 500, {{"error": "persistence_failed", "message": persistence_error}}
     return 201, {{
         "entity": entity_name,
-        "record": dict(record),
+        "record": _record_public_copy(entity_name, record),
         "event": event,
-        "count": len(RECORD_STORE[entity_name]),
+        "count": len(list_records(entity_name)),
     }}
 
 
@@ -9025,7 +9486,7 @@ def _import_records_payload(entity_name: str, payload: Dict[str, Any]) -> tuple[
         if not isinstance(raw_record, dict):
             errors.append({{"index": index, "errors": ["record must be object"]}})
             continue
-        record = coerce_record_types(entity_name, dict(raw_record))
+        record = _strip_record_lifecycle_fields(coerce_record_types(entity_name, dict(raw_record)))
         validation = validate_record(entity_name, record)
         if not validation["valid"]:
             errors.append({{"index": index, "errors": validation["errors"]}})
@@ -9036,10 +9497,17 @@ def _import_records_payload(entity_name: str, payload: Dict[str, Any]) -> tuple[
         elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
             errors.append({{"index": index, "errors": [f"duplicate id {{record['id']}}"]}})
             continue
-        record = _prepare_new_record(record)
+        record = _prepare_new_record(record, entity_name)
+        RECORD_METADATA.setdefault(entity_name, {{}})[_record_metadata_key(record["id"])] = {{
+            "created_at": record.get("created_at"),
+            "updated_at": record.get("updated_at"),
+            "deleted_at": None,
+        }}
         RECORD_STORE[entity_name].append(record)
-        imported.append(dict(record))
+        _sqlite_store_record(entity_name, record)
+        imported.append(_record_public_copy(entity_name, record))
         events.append(_record_event("import", entity_name, after=record))
+    _sqlite_commit()
     persistence_error = _persist_record_store()
     if persistence_error:
         return 500, {{"error": "persistence_failed", "message": persistence_error}}
@@ -9053,7 +9521,7 @@ def _import_records_payload(entity_name: str, payload: Dict[str, Any]) -> tuple[
     }}
 
 
-def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+def _update_record_payload(path: str, payload: Dict[str, Any], *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
     route = _record_route(path)
     if route is None or route["entity"] is None or route["record_id"] is None:
         return 404, {{"error": "not_found", "path": path}}
@@ -9064,32 +9532,44 @@ def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     raw_record = payload.get("record", payload)
     if not isinstance(raw_record, dict):
         return 400, {{"error": "record_must_be_object"}}
-    record_update = coerce_record_types(entity_name, dict(raw_record))
+    record_update = _strip_record_lifecycle_fields(coerce_record_types(entity_name, dict(raw_record)))
     validation = validate_record(entity_name, record_update, partial=True)
     if not validation["valid"]:
         return 422, {{"error": "record_validation_failed", **validation}}
     for index, existing in enumerate(RECORD_STORE[entity_name]):
         if str(existing.get("id")) == str(record_id):
+            if _record_deleted(entity_name, existing):
+                return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
             conflict = _revision_conflict(existing, _expected_revision(payload))
             if conflict is not None:
                 return 409, conflict
             updated = dict(existing)
             updated.update(record_update)
             updated["id"] = existing.get("id")
+            updated["created_at"] = existing.get("created_at") or _record_public_copy(entity_name, existing).get("created_at")
+            updated["updated_at"] = _record_timestamp()
+            updated["deleted_at"] = existing.get("deleted_at")
             updated["_revision"] = int(existing.get("_revision", 1)) + 1
+            metadata = _record_metadata(entity_name, updated.get("id"), create=True)
+            if metadata is not None:
+                metadata["created_at"] = updated.get("created_at")
+                metadata["updated_at"] = updated.get("updated_at")
+                metadata["deleted_at"] = updated.get("deleted_at")
             RECORD_STORE[entity_name][index] = updated
+            _sqlite_store_record(entity_name, updated)
+            if persist:
+                _sqlite_commit()
             event = _record_event("update", entity_name, before=existing, after=updated)
             _log_activity(entity_name, str(record_id), "updated", detail="Fields updated")
-            persistence_error = _persist_record_store()
-            if persistence_error:
-                return 500, {{"error": "persistence_failed", "message": persistence_error}}
-            return 200, {{"entity": entity_name, "record": dict(updated), "event": event}}
+            if persist:
+                persistence_error = _persist_record_store()
+                if persistence_error:
+                    return 500, {{"error": "persistence_failed", "message": persistence_error}}
+            return 200, {{"entity": entity_name, "record": _record_public_copy(entity_name, updated), "event": event}}
     return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
 
 
-def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
-    raw_path = path
-    path = path.split("?", 1)[0]
+def _restore_record_payload(path: str, *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
     route = _record_route(path)
     if route is None or route["entity"] is None or route["record_id"] is None:
         return 404, {{"error": "not_found", "path": path}}
@@ -9097,8 +9577,45 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
     record_id = route["record_id"]
     if entity_name not in ENTITY_NAMES:
         return 404, {{"error": "unknown_entity", "entity": entity_name}}
-    for index, existing in enumerate(RECORD_STORE[entity_name]):
+    for existing in RECORD_STORE[entity_name]:
         if str(existing.get("id")) == str(record_id):
+            before = _record_public_copy(entity_name, existing)
+            metadata = _record_metadata(entity_name, existing.get("id"), create=True)
+            if metadata is not None:
+                metadata["deleted_at"] = None
+                metadata["updated_at"] = _record_timestamp()
+            existing["deleted_at"] = None
+            existing["updated_at"] = metadata["updated_at"] if metadata is not None else _record_timestamp()
+            _sqlite_restore_record(entity_name, record_id)
+            if persist:
+                _sqlite_commit()
+            after = _record_public_copy(entity_name, existing)
+            event = _record_event("restore", entity_name, before=before, after=after)
+            _log_activity(entity_name, str(record_id), "restored", detail="Record restored")
+            if persist:
+                persistence_error = _persist_record_store()
+                if persistence_error:
+                    return 500, {{"error": "persistence_failed", "message": persistence_error}}
+            return 200, {{"entity": entity_name, "record": after, "event": event}}
+    return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
+
+
+def _delete_record_payload(path: str, *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
+    raw_path = path
+    path = path.split("?", 1)[0]
+    route = _record_route(path)
+    if route is None or route["entity"] is None or route["record_id"] is None:
+        return 404, {{"error": "not_found", "path": path}}
+    if route.get("operation") == "restore":
+        return _restore_record_payload(path, persist=persist)
+    entity_name = route["entity"]
+    record_id = route["record_id"]
+    if entity_name not in ENTITY_NAMES:
+        return 404, {{"error": "unknown_entity", "entity": entity_name}}
+    for existing in RECORD_STORE[entity_name]:
+        if str(existing.get("id")) == str(record_id):
+            if _record_deleted(entity_name, existing):
+                return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
             expected_revision = None
             if "?" in raw_path:
                 query = parse_qs(raw_path.split("?", 1)[1], keep_blank_values=True)
@@ -9111,18 +9628,159 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
             if conflict is not None:
                 return 409, conflict
             _log_activity(entity_name, str(record_id), "deleted", detail="Record deleted")
-            deleted = RECORD_STORE[entity_name].pop(index)
+            deleted = _record_public_copy(entity_name, existing)
+            metadata = _record_metadata(entity_name, existing.get("id"), create=True)
+            if metadata is not None:
+                now = _record_timestamp()
+                metadata["deleted_at"] = now
+                metadata["updated_at"] = now
+            existing["deleted_at"] = now
+            existing["updated_at"] = now
+            _sqlite_soft_delete_record(entity_name, record_id)
+            if persist:
+                _sqlite_commit()
             event = _record_event("delete", entity_name, before=deleted)
-            persistence_error = _persist_record_store()
-            if persistence_error:
-                return 500, {{"error": "persistence_failed", "message": persistence_error}}
+            if persist:
+                persistence_error = _persist_record_store()
+                if persistence_error:
+                    return 500, {{"error": "persistence_failed", "message": persistence_error}}
             return 200, {{
                 "entity": entity_name,
-                "deleted": dict(deleted),
+                "deleted": _record_public_copy(entity_name, existing),
                 "event": event,
-                "count": len(RECORD_STORE[entity_name]),
+                "count": len(list_records(entity_name)),
             }}
     return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
+
+
+def _record_state_snapshot() -> Dict[str, Any]:
+    return json.loads(json.dumps({{
+        "records": _raw_records_by_entity(),
+        "metadata": RECORD_METADATA,
+        "next_record_ids": NEXT_RECORD_IDS,
+        "events": EVENT_LOG,
+        "next_event_id": NEXT_EVENT_ID,
+        "activity": APG_ACTIVITY_LOG,
+    }}, default=str))
+
+
+def _restore_record_state(snapshot: Dict[str, Any]) -> None:
+    global NEXT_EVENT_ID
+    RECORD_STORE.clear()
+    for entity_name in ENTITY_NAMES:
+        RECORD_STORE[entity_name] = [
+            dict(record)
+            for record in snapshot.get("records", {{}}).get(entity_name, [])
+            if isinstance(record, dict)
+        ]
+    RECORD_METADATA.clear()
+    for entity_name in ENTITY_NAMES:
+        entity_metadata = snapshot.get("metadata", {{}}).get(entity_name, {{}})
+        RECORD_METADATA[entity_name] = {{
+            str(record_id): dict(metadata)
+            for record_id, metadata in entity_metadata.items()
+            if isinstance(metadata, dict)
+        }}
+    NEXT_RECORD_IDS.clear()
+    NEXT_RECORD_IDS.update({{
+        entity_name: int(snapshot.get("next_record_ids", {{}}).get(entity_name, 1))
+        for entity_name in ENTITY_NAMES
+    }})
+    EVENT_LOG.clear()
+    EVENT_LOG.extend(dict(event) for event in snapshot.get("events", []) if isinstance(event, dict))
+    NEXT_EVENT_ID = int(snapshot.get("next_event_id", 1))
+    APG_ACTIVITY_LOG.clear()
+    APG_ACTIVITY_LOG.update({{
+        str(key): list(value) if isinstance(value, list) else []
+        for key, value in snapshot.get("activity", {{}}).items()
+    }})
+
+
+def _bulk_items(payload: Dict[str, Any], key: str) -> list[Any] | None:
+    items = payload.get(key, [])
+    return items if isinstance(items, list) else None
+
+
+def _bulk_delete_record_id(item: Any) -> Any:
+    if isinstance(item, dict):
+        return item.get("id")
+    return item
+
+
+def _bulk_records_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    route = _record_route(path)
+    if route is None or route["entity"] is None or route.get("operation") != "bulk":
+        return 404, {{"error": "not_found", "path": path}}
+    entity_name = str(route["entity"])
+    if entity_name not in ENTITY_NAMES:
+        return 404, {{"error": "unknown_entity", "entity": entity_name}}
+    create_items = _bulk_items(payload, "create")
+    update_items = _bulk_items(payload, "update")
+    delete_items = _bulk_items(payload, "delete")
+    if create_items is None or update_items is None or delete_items is None:
+        return 400, {{"error": "bulk_items_must_be_arrays"}}
+    total_items = len(create_items) + len(update_items) + len(delete_items)
+    if total_items > 1000:
+        return 400, {{"error": "bulk_limit_exceeded"}}
+    result: Dict[str, Any] = {{"created": 0, "updated": 0, "deleted": 0, "errors": []}}
+    snapshot = _record_state_snapshot()
+    with APG_RECORD_LOCK:
+        try:
+            _sqlite_begin()
+            for index, item in enumerate(create_items):
+                if not isinstance(item, dict):
+                    result["errors"].append({{"op": "create", "index": index, "error": "record_must_be_object"}})
+                    continue
+                status, response = _create_record_payload("/records/" + entity_name, item, persist=False)
+                if status >= 400:
+                    result["errors"].append({{"op": "create", "index": index, "status": status, "error": response.get("error")}})
+                else:
+                    result["created"] += 1
+            for index, item in enumerate(update_items):
+                if not isinstance(item, dict):
+                    result["errors"].append({{"op": "update", "index": index, "error": "record_must_be_object"}})
+                    continue
+                record_id = item.get("id")
+                if record_id in (None, ""):
+                    result["errors"].append({{"op": "update", "index": index, "error": "missing_id"}})
+                    continue
+                update_payload = dict(item)
+                update_payload.pop("id", None)
+                status, response = _update_record_payload(
+                    "/records/" + entity_name + "/" + quote(str(record_id), safe=""),
+                    {{"record": update_payload}},
+                    persist=False,
+                )
+                if status >= 400:
+                    result["errors"].append({{"op": "update", "index": index, "status": status, "error": response.get("error")}})
+                else:
+                    result["updated"] += 1
+            for index, item in enumerate(delete_items):
+                record_id = _bulk_delete_record_id(item)
+                if record_id in (None, ""):
+                    result["errors"].append({{"op": "delete", "index": index, "error": "missing_id"}})
+                    continue
+                status, response = _delete_record_payload(
+                    "/records/" + entity_name + "/" + quote(str(record_id), safe=""),
+                    persist=False,
+                )
+                if status >= 400:
+                    result["errors"].append({{"op": "delete", "index": index, "status": status, "error": response.get("error")}})
+                else:
+                    result["deleted"] += 1
+            if result["errors"]:
+                _sqlite_rollback()
+                _restore_record_state(snapshot)
+                return 422, result
+            _sqlite_commit()
+        except Exception as exc:
+            _sqlite_rollback()
+            _restore_record_state(snapshot)
+            return 500, {{"created": 0, "updated": 0, "deleted": 0, "errors": [{{"error": "bulk_transaction_failed", "message": str(exc)}}]}}
+    persistence_error = _persist_record_store()
+    if persistence_error:
+        return 500, {{"error": "persistence_failed", "message": persistence_error}}
+    return 200, result
 
 
 def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
@@ -9220,7 +9878,16 @@ def _csv_export_body(
 
 
 import os as _os_env
-_APG_PG_URL: str | None = _os_env.environ.get("APG_DATABASE_URL") or _os_env.environ.get("APG_PG_URL") or _os_env.environ.get("DATABASE_URL") or None
+
+
+def _pg_database_url() -> str | None:
+    raw = _os_env.environ.get("APG_DATABASE_URL") or _os_env.environ.get("APG_PG_URL") or _os_env.environ.get("DATABASE_URL") or ""
+    if raw.startswith("sqlite:"):
+        return None
+    return raw or None
+
+
+_APG_PG_URL: str | None = _pg_database_url()
 
 
 def _pg_connection():
@@ -9356,7 +10023,7 @@ def _pg_load_entity_records(entity_name: str) -> list[Dict[str, Any]]:
     finally:
         conn.close()
 
-
+_sqlite_init_database()
 _load_record_store()
 _APG_OPENAPI_SPEC = _build_openapi_document()
 
