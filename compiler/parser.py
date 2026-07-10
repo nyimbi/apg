@@ -40,7 +40,12 @@ class APGSyntaxError(Exception):
 		self.line = line
 		self.column = column
 		self.source_file = source_file
-		super().__init__(f"Syntax Error at {line}:{column}: {message}")
+		super().__init__(message)
+
+	def __str__(self) -> str:
+		line = self.line if self.line > 0 else 0
+		column = self.column + 1 if self.column >= 0 else 0
+		return f"line {line}, col {column}: {self.message}"
 
 
 class APGErrorListener(ErrorListener):
@@ -49,9 +54,10 @@ class APGErrorListener(ErrorListener):
 	def __init__(self):
 		super().__init__()
 		self.errors: List[APGSyntaxError] = []
+		self.source_file: Optional[str] = None
 	
 	def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-		error = APGSyntaxError(msg, line, column)
+		error = APGSyntaxError(msg, line, column, self.source_file)
 		self.errors.append(error)
 
 
@@ -236,6 +242,7 @@ class APGParser:
 
 		# Reset error listener
 		self.error_listener.errors.clear()
+		self.error_listener.source_file = source_name
 
 		# Strip // comments before ANTLR so FLOORDIV lexer rule doesn't shadow them
 		antlr_source = _strip_comments_preserve_positions(source_code)
@@ -282,7 +289,7 @@ class APGParser:
 				'ast': None,
 				'tokens': token_stream,
 				'warnings': [],
-				'errors': [APGSyntaxError(f"Parser exception: {e}", 0, 0)],
+				'errors': [APGSyntaxError(f"Parser exception: {e}", 0, 0, source_name)],
 				'source_name': source_name,
 				'source_code': source_code,
 				'success': False
@@ -301,25 +308,88 @@ class APGParser:
 			for keyword in sorted(declaration_keywords, key=len, reverse=True)
 		) + r")\b"
 		if not re.search(declaration_pattern, source_code):
-			errors.append(APGSyntaxError("No APG declarations found", 1, 0, source_name))
+			errors.append(APGSyntaxError(
+				"No APG declarations found. Did you mean to add a module block? "
+				"Minimal example: module main version 1.0.0 { }",
+				1,
+				0,
+				source_name,
+			))
 
-		if source_code.count("{") != source_code.count("}"):
-			errors.append(APGSyntaxError("Unbalanced braces", 1, 0, source_name))
+		brace_error = self._brace_error(source_code, source_name)
+		if brace_error is not None:
+			errors.append(brace_error)
 
-		if re.search(r"\binvalid_entity\b", source_code):
-			errors.append(APGSyntaxError("Unknown entity declaration 'invalid_entity'", 1, 0, source_name))
+		for match in re.finditer(r"\binvalid_entity\b", source_code):
+			line, column = self._line_column_for_offset(source_code, match.start())
+			errors.append(APGSyntaxError("Unknown entity declaration 'invalid_entity'", line, column, source_name))
 
-		if re.search(r":\s*\([^)]*\)\s*->\s*\{", source_code):
-			errors.append(APGSyntaxError("Missing method return type", 1, 0, source_name))
+		for match in re.finditer(r":\s*\([^)]*\)\s*->\s*\{", source_code):
+			line, column = self._line_column_for_offset(source_code, match.start())
+			errors.append(APGSyntaxError(
+				"Missing method return type. Did you mean '-> void' or another valid return type?",
+				line,
+				column,
+				source_name,
+			))
 
 		for index, line in enumerate(source_code.splitlines(), start=1):
 			code = line.split("//", 1)[0].strip()
 			if not code or code.endswith(("{", "}", ";", ",")):
 				continue
 			if re.match(r"^[^\W\d]\w*\s*:\s*[^=]+=", code, re.UNICODE):
-				errors.append(APGSyntaxError("Missing semicolon", index, len(line), source_name))
+				brace_line, brace_column = self._nearest_open_brace(source_code, index)
+				hint = (
+					"Missing semicolon. Did you mean to add ';'? "
+					f"Nearest open brace is at line {brace_line}, col {brace_column + 1}."
+				)
+				errors.append(APGSyntaxError(hint, index, len(line), source_name))
 
 		return errors
+
+	def _line_column_for_offset(self, source_code: str, offset: int) -> tuple[int, int]:
+		line = source_code.count("\n", 0, offset) + 1
+		line_start = source_code.rfind("\n", 0, offset)
+		column = offset if line_start < 0 else offset - line_start - 1
+		return line, column
+
+	def _brace_error(self, source_code: str, source_name: str) -> Optional[APGSyntaxError]:
+		stack: List[int] = []
+		for index, char in enumerate(source_code):
+			if char == "{":
+				stack.append(index)
+			elif char == "}":
+				if not stack:
+					line, column = self._line_column_for_offset(source_code, index)
+					return APGSyntaxError(
+						"Unexpected closing brace. Did you mean to remove it or add an opening '{'?",
+						line,
+						column,
+						source_name,
+					)
+				stack.pop()
+		if stack:
+			offset = stack[-1]
+			line, column = self._line_column_for_offset(source_code, offset)
+			return APGSyntaxError(
+				"Unclosed brace. Did you mean to add a closing '}' for the brace opened here?",
+				line,
+				column,
+				source_name,
+			)
+		return None
+
+	def _nearest_open_brace(self, source_code: str, line_number: int) -> tuple[int, int]:
+		prefix = "\n".join(source_code.splitlines()[:line_number])
+		stack: List[int] = []
+		for index, char in enumerate(prefix):
+			if char == "{":
+				stack.append(index)
+			elif char == "}" and stack:
+				stack.pop()
+		if not stack:
+			return 1, 0
+		return self._line_column_for_offset(prefix, stack[-1])
 
 	def _source_declaration_keywords(self) -> set[str]:
 		"""Return grammar-backed top-level declaration keywords."""

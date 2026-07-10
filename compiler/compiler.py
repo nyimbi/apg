@@ -169,7 +169,16 @@ class APGCompiler:
 					try:
 						_ast.parse(content, filename=fname)
 					except SyntaxError as syn_err:
-						result.warnings.append(f"Generated code syntax warning {fname}:{syn_err.lineno}: {syn_err.msg}")
+						warning_node = ASTNode(
+							line=syn_err.lineno or 0,
+							column=(syn_err.offset - 1) if syn_err.offset else 0,
+							source_file=fname,
+						)
+						result.warnings.append(SemanticError(
+							f"Generated code syntax warning {fname}:{syn_err.lineno}: {syn_err.msg}",
+							warning_node,
+							"warning",
+						))
 
 			# Phase 6: Write output files if directory specified
 			if result.output_directory:
@@ -242,19 +251,27 @@ class APGCompiler:
 
 			# Phase 5: Correctness verification — validate all generated Python parses cleanly
 			import ast as _ast
-			syntax_errors = []
 			for fname, content in generated_files.items():
 				if fname.endswith('.py') and content:
 					try:
 						_ast.parse(content, filename=fname)
 					except SyntaxError as syn_err:
-						syntax_errors.append(
-							f"{fname}:{syn_err.lineno}: {syn_err.msg}"
+						self.logger.error(
+							"Generated code has syntax error: %s:%s: %s",
+							fname,
+							syn_err.lineno,
+							syn_err.msg,
 						)
-			if syntax_errors:
-				for err in syntax_errors:
-					self.logger.error("Generated code has syntax error: %s", err)
-					result.warnings.append(f"Generated code syntax warning: {err}")
+						warning_node = ASTNode(
+							line=syn_err.lineno or 0,
+							column=(syn_err.offset - 1) if syn_err.offset else 0,
+							source_file=fname,
+						)
+						result.warnings.append(SemanticError(
+							f"Generated code syntax warning {fname}:{syn_err.lineno}: {syn_err.msg}",
+							warning_node,
+							"warning",
+						))
 
 			result.success = True
 			result.compilation_time = time.time() - start_time

@@ -10,6 +10,7 @@ and reports semantic errors before code generation.
 from typing import Any, Dict, List, Optional, Set, Union
 from dataclasses import dataclass, field
 from enum import Enum
+import difflib
 import sys
 from pathlib import Path
 
@@ -85,6 +86,20 @@ class APGType(Enum):
 	ENTITY = "entity"
 
 
+VALID_APG_FIELD_TYPES = (
+	"str", "int", "float", "bool", "date", "datetime", "text", "uuid", "json",
+)
+
+COMMON_TYPE_HINTS = {
+	"boolean": "bool",
+	"integer": "int",
+	"number": "float",
+	"string": "str",
+}
+
+RESERVED_FIELD_NAMES = {"id", "created_at", "updated_at", "deleted_at", "owner_id"}
+
+
 @dataclass
 class Symbol:
 	"""Symbol table entry"""
@@ -156,13 +171,25 @@ class SemanticError:
 	message: str
 	node: ASTNode
 	error_type: str = "semantic"
+
+	@property
+	def line(self) -> int:
+		if self.node is None:
+			return 0
+		return self.node.line if self.node.line > 0 else 0
+
+	@property
+	def column(self) -> int:
+		if self.node is None:
+			return 0
+		return self.node.column + 1 if self.node.column >= 0 else 0
 	
 	def __str__(self) -> str:
-		if self.node is None:
-			location = "unknown:0:0"
-		else:
-			location = f"{self.node.source_file or 'unknown'}:{self.node.line}:{self.node.column}"
-		return f"{location}: {self.error_type} error: {self.message}"
+		if self.error_type == "warning":
+			return f"line {self.line}, col {self.column}: warning: {self.message}"
+		if self.error_type != "semantic":
+			return f"line {self.line}, col {self.column}: {self.error_type} error: {self.message}"
+		return f"line {self.line}, col {self.column}: {self.message}"
 
 
 # ========================================
@@ -202,7 +229,7 @@ class SemanticAnalyzer:
 			"list", "List", "dict", "Dict", "set", "Set", "tuple", "Tuple",
 			"str?", "int?", "float?", "bool?", "bytes?", "datetime?", "decimal?",
 			"vector", "embedding", "json", "uuid", "url",
-			"string", "integer", "boolean", "number", "object", "array",
+			"string", "number",
 		})
 		self.builtin_functions = self._initialize_builtins()
 	
@@ -220,7 +247,11 @@ class SemanticAnalyzer:
 		"""
 		self.errors.clear()
 		self.warnings.clear()
+		self.symbol_table = SymbolTable()
+		self.current_scope = self.symbol_table
 		self.current_module = ast
+		self.current_entity = None
+		self.current_method = None
 
 		phases = [
 			("symbol_declaration", lambda: self._declare_module_symbols(ast)),
@@ -281,7 +312,7 @@ class SemanticAnalyzer:
 		
 		if not self.symbol_table.define(entity_symbol):
 			self.errors.append(SemanticError(
-				f"Entity '{entity.name}' is already defined",
+				f"Duplicate entity name: {entity.name}",
 				entity
 			))
 			return
@@ -307,6 +338,13 @@ class SemanticAnalyzer:
 	
 	def _declare_property_symbol(self, prop: PropertyDeclaration):
 		"""Declare property symbol"""
+		if prop.name in RESERVED_FIELD_NAMES:
+			self.warnings.append(SemanticError(
+				f"Reserved field name '{prop.name}' is declared explicitly; APG generates this field automatically",
+				prop,
+				"warning",
+			))
+
 		prop_symbol = Symbol(
 			name=prop.name,
 			symbol_type=self._apg_type_from_annotation(prop.type_annotation),
@@ -317,7 +355,7 @@ class SemanticAnalyzer:
 		
 		if not self.current_scope.define(prop_symbol):
 			self.errors.append(SemanticError(
-				f"Property '{prop.name}' is already defined in this entity",
+				f"Duplicate field name: {prop.name} in entity {self.current_entity.name if self.current_entity else 'unknown'}",
 				prop
 			))
 	
@@ -364,9 +402,12 @@ class SemanticAnalyzer:
 		is_config_entity = entity.name.lower() in {"security"}
 		if entity.entity_type in _TYPED_ENTITY_TYPES and not is_config_entity:
 			for prop in entity.properties:
-				if not self._is_valid_type(prop.type_annotation):
+				if not self._is_valid_field_type(prop.type_annotation):
 					self.errors.append(SemanticError(
-						f"Unknown type '{prop.type_annotation.type_name}' for property '{prop.name}'",
+						self._unknown_type_message(
+							prop.type_annotation.type_name,
+							f"field '{prop.name}'",
+						),
 						prop
 					))
 		
@@ -382,14 +423,20 @@ class SemanticAnalyzer:
 		for param in method.parameters:
 			if not self._is_valid_type(param.type_annotation):
 				self.errors.append(SemanticError(
-					f"Unknown type '{param.type_annotation.type_name}' for parameter '{param.name}'",
+					self._unknown_type_message(
+						param.type_annotation.type_name,
+						f"parameter '{param.name}'",
+					),
 					param
 				))
 		
 		# Resolve return type
 		if method.return_type and not self._is_valid_type(method.return_type):
 			self.errors.append(SemanticError(
-				f"Unknown return type '{method.return_type.type_name}' for method '{method.name}'",
+				self._unknown_type_message(
+					method.return_type.type_name,
+					f"return type for method '{method.name}'",
+				),
 				method
 			))
 	
@@ -419,6 +466,54 @@ class SemanticAnalyzer:
 			return True
 		
 		return False
+
+	def _is_valid_field_type(self, type_annotation: TypeAnnotation) -> bool:
+		"""Check whether a field uses a valid APG field type or declared entity type."""
+		type_name = type_annotation.type_name or ""
+		base_type = type_name[:-1] if type_name.endswith("?") else type_name
+
+		if base_type in VALID_APG_FIELD_TYPES:
+			return True
+
+		symbol = self.symbol_table.lookup(base_type)
+		if symbol and symbol.symbol_type == APGType.ENTITY:
+			return True
+
+		# Keep non-type field values and complex relationship syntax from being
+		# reported as primitive-type typos.
+		if base_type.startswith(('"', "'")):
+			return True
+		if base_type.startswith('[') or base_type.startswith('{'):
+			return True
+		if '->' in base_type:
+			return True
+		if base_type.startswith('vector ') or ' ' in base_type:
+			return True
+
+		return False
+
+	def _unknown_type_message(self, type_name: str, subject: str) -> str:
+		"""Return an actionable unknown-type diagnostic message."""
+		valid_types = ", ".join(VALID_APG_FIELD_TYPES)
+		suggestion = COMMON_TYPE_HINTS.get(type_name)
+		if suggestion is None:
+			prefix_matches = [
+				valid_type for valid_type in VALID_APG_FIELD_TYPES
+				if valid_type.startswith(type_name) or type_name.startswith(valid_type)
+			]
+			matches = prefix_matches or difflib.get_close_matches(
+				type_name,
+				VALID_APG_FIELD_TYPES,
+				n=1,
+				cutoff=0.5,
+			)
+			suggestion = matches[0] if matches else None
+		if suggestion:
+			return (
+				f"Unknown type '{type_name}' for {subject}. "
+				f"Did you mean: {suggestion}? Valid types: {valid_types}"
+			)
+		return f"Unknown type '{type_name}' for {subject}. Valid types: {valid_types}"
 	
 	# ========================================
 	# Phase 3: Semantic Validation
@@ -433,6 +528,17 @@ class SemanticAnalyzer:
 	def _validate_entity_semantics(self, entity: EntityDeclaration):
 		"""Validate entity-specific semantic rules"""
 		self.current_entity = entity
+
+		if (
+			entity.entity_type in {EntityType.ENTITY, EntityType.FORM, EntityType.UI_COMPONENT}
+			and entity.name.lower() != "security"
+			and not entity.properties
+		):
+			self.warnings.append(SemanticError(
+				f"Entity {entity.name} has no fields",
+				entity,
+				"warning",
+			))
 		
 		# Validate entity type constraints
 		self._validate_entity_type_constraints(entity)

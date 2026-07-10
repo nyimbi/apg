@@ -30,7 +30,9 @@ class AIAgentParseError(Exception):
 	column: int = 0
 
 	def __str__(self) -> str:
-		return f"{self.line}:{self.column}: {self.message}"
+		line = self.line if self.line > 0 else 0
+		column = self.column + 1 if self.column >= 0 else 0
+		return f"line {line}, col {column}: {self.message}"
 
 
 def looks_like_ai_agent_composition(source: str) -> bool:

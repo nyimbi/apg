@@ -30,6 +30,19 @@ from compiler.parser import APGParser
 
 console = Console()
 
+_STDERR_COLORS = {
+	"red": "\033[31m",
+	"yellow": "\033[33m",
+}
+_STDERR_RESET = "\033[0m"
+
+
+def _stderr_message(message: str, color: str | None = None) -> None:
+	"""Print a diagnostic to stderr with ANSI color only for real terminals."""
+	if color and sys.stderr.isatty():
+		message = f"{_STDERR_COLORS[color]}{message}{_STDERR_RESET}"
+	print(message, file=sys.stderr)
+
 
 @click.command()
 @click.argument('source_file', required=False)
@@ -73,14 +86,14 @@ def compile_cmd(source_file: Optional[str], output: Optional[str], target: str,
 					break
 		
 		if not source_file or not Path(source_file).exists():
-			console.print("[red]No APG source file found. Specify file or create main.apg[/red]")
-			console.print("Try: apg init  # to initialize APG project")
-			return
+			_stderr_message("No APG source file found. Specify file or create main.apg", "red")
+			_stderr_message("Try: apg init  # to initialize APG project")
+			raise click.exceptions.Exit(1)
 	
 	source_path = Path(source_file)
 	if not source_path.exists():
-		console.print(f"[red]Source file not found: {source_file}[/red]")
-		return
+		_stderr_message(f"Source file not found: {source_file}", "red")
+		raise click.exceptions.Exit(1)
 	if catalog is not None and not catalog.exists():
 		raise click.ClickException(f"Capability catalog not found: {catalog}")
 	
@@ -117,7 +130,7 @@ def _generate_parser():
 	
 	grammar_file = Path(__file__).parent.parent / 'spec' / 'apg.g4'
 	if not grammar_file.exists():
-		console.print(f"[red]Grammar file not found: {grammar_file}[/red]")
+		_stderr_message(f"Grammar file not found: {grammar_file}", "red")
 		return
 	
 	output_dir = grammar_file.parent
@@ -159,13 +172,13 @@ def _generate_parser():
 						console.print(f"  - {file.name}")
 			else:
 				progress.update(task, description="❌ Parser generation failed")
-				console.print(f"[red]❌ ANTLR parser generation failed[/red]")
-				console.print(f"[red]Error: {result.stderr}[/red]")
+				_stderr_message("❌ ANTLR parser generation failed", "red")
+				_stderr_message(f"Error: {result.stderr}", "red")
 				
 	except FileNotFoundError:
-		console.print("[red]ANTLR4 not found. Install with: pip install antlr4-tools[/red]")
+		_stderr_message("ANTLR4 not found. Install with: pip install antlr4-tools", "red")
 	except Exception as e:
-		console.print(f"[red]Error generating parser: {e}[/red]")
+		_stderr_message(f"Error generating parser: {e}", "red")
 
 
 def _strip_generated_parser_whitespace(output_dir: Path):
@@ -211,8 +224,8 @@ def _compile_single(
 			with open(source_path, 'r', encoding='utf-8') as f:
 				source_content = f.read()
 		except Exception as e:
-			console.print(f"[red]Error reading source file: {e}[/red]")
-			return
+			_stderr_message(f"Error reading source file: {e}", "red")
+			raise click.exceptions.Exit(1)
 		progress.update(task, advance=1)
 		
 		# Compile
@@ -224,21 +237,21 @@ def _compile_single(
 		
 		if result.success:
 			progress.update(task, description="✅ Compilation successful!")
-			
+
 			console.print(f"\n[green]✅ Compilation successful![/green]")
 			console.print(f"[cyan]Time:[/cyan] {compilation_time:.2f}s")
 			console.print(f"[cyan]Generated files:[/cyan] {len(result.generated_files)}")
-			
+
 			if verbose:
 				_show_compilation_details(result, config)
-			
+
 			# Write generated files
 			output_dir = Path(config.output_directory)
 			_write_generated_files(result.generated_files, output_dir)
 
 			if verify and not _verify_generated_app(output_dir):
 				raise click.ClickException("Generated verification failed")
-			
+
 			console.print(f"\n[green]Next steps:[/green]")
 			console.print(f"  1. Inspect generated files in {config.output_directory}", soft_wrap=True)
 			console.print(f"  2. pip install -r {config.output_directory}/requirements.txt", soft_wrap=True)
@@ -247,22 +260,23 @@ def _compile_single(
 			console.print(f"  5. python {config.output_directory}/app.py --self-test", soft_wrap=True)
 			console.print(f"  6. apg compile {source_path} --output {config.output_directory} --verify", soft_wrap=True)
 			console.print("\n[green]The generated Python app is a Flask 3.x service. Use --self-test for a local health contract.[/green]")
-			
+
 		else:
 			progress.update(task, description="❌ Compilation failed")
-			
-			console.print(f"\n[red]❌ Compilation failed![/red]")
-			console.print(f"[cyan]Time:[/cyan] {compilation_time:.2f}s")
-			
+
+			_stderr_message("\n❌ Compilation failed!", "red")
+			_stderr_message(f"Time: {compilation_time:.2f}s")
+
 			if result.errors:
-				console.print(f"\n[red]Errors:[/red]")
+				_stderr_message("\nErrors:", "red")
 				for error in result.errors:
-					console.print(f"  - {error}")
-			
+					_stderr_message(f"  - {error}", "red")
+
 			if result.warnings:
-				console.print(f"\n[yellow]Warnings:[/yellow]")
+				_stderr_message("\nWarnings:", "yellow")
 				for warning in result.warnings:
-					console.print(f"  - {warning}")
+					_stderr_message(f"  - {warning}", "yellow")
+			raise click.exceptions.Exit(1)
 
 
 def _validate_compile_preflight(source_path: Path, config: CodeGenConfig, catalog: Path) -> None:
@@ -279,12 +293,13 @@ def _validate_compile_preflight(source_path: Path, config: CodeGenConfig, catalo
 		)
 		return
 
-	console.print("[red]Compilation preflight validation failed[/red]")
+	_stderr_message("Compilation preflight validation failed", "red")
 	for diagnostic in report["diagnostics"]:
 		start = diagnostic["range"]["start"]
-		console.print(
+		_stderr_message(
 			f"  {diagnostic['file']}:{start['line'] + 1}:{start['character']}: "
-			f"{diagnostic['code']} {diagnostic['severity']}: {diagnostic['message']}"
+			f"{diagnostic['code']} {diagnostic['severity']}: {diagnostic['message']}",
+			"red",
 		)
 	raise click.ClickException("Compilation preflight validation failed")
 
@@ -420,7 +435,7 @@ def _watch_and_compile(source_path: Path, config: CodeGenConfig, catalog: Path |
 			result = compiler.compile_string(source_content, source_path.stem)
 		except Exception as exc:
 			elapsed_ms = (time.monotonic() - t0) * 1000
-			click.echo(f"[{_ts()}] FAILED: {exc}")
+			_stderr_message(f"[{_ts()}] FAILED: {exc}", "red")
 			return False, 0, elapsed_ms
 		elapsed_ms = (time.monotonic() - t0) * 1000
 		if result.success:
@@ -430,9 +445,9 @@ def _watch_and_compile(source_path: Path, config: CodeGenConfig, catalog: Path |
 			return True, len(result.generated_files), elapsed_ms
 		else:
 			n_errors = len(result.errors)
-			click.echo(f"[{_ts()}] FAILED: {n_errors} error(s)")
+			_stderr_message(f"[{_ts()}] FAILED: {n_errors} error(s)", "red")
 			for err in result.errors:
-				click.echo(f"  {err}")
+				_stderr_message(f"  {err}", "red")
 			return False, 0, elapsed_ms
 
 	def _ts() -> str:
