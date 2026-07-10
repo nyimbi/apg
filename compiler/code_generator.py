@@ -702,15 +702,19 @@ import uuid as _uuid
 from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse, session as _flask_session, g as _flask_g
 from pathlib import Path
 from typing import Any, Dict, Optional
-from urllib.parse import parse_qs, quote
+from urllib.parse import parse_qs, quote, urlencode
 
 
 MODULE_NAME = {module.name!r}
 MODULE_VERSION = {module.version!r}
 MODULE_DESCRIPTION = {module.description!r}
+APG_APP_NAME = MODULE_NAME
+APG_APP_VERSION = MODULE_VERSION
+APG_APP_DESCRIPTION = MODULE_DESCRIPTION or ""
 LANDING_STYLE = {landing_style!r}
 ENTITIES = {entity_specs!r}
-ENTITY_NAMES = {{entity["name"] for entity in ENTITIES}}
+_APG_ENTITIES = ENTITIES
+ENTITY_NAMES = {{entity["name"] for entity in _APG_ENTITIES}}
 RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {{entity["name"]: [] for entity in ENTITIES}}
 NEXT_RECORD_IDS: Dict[str, int] = {{entity["name"]: 1 for entity in ENTITIES}}
 EVENT_LOG: list[Dict[str, Any]] = []
@@ -736,6 +740,7 @@ APG_SUPPORTED_LANGUAGES: list[str] = {i18n_config["supported_languages"]!r}
 APG_DEFAULT_LANGUAGE = {i18n_config["default_language"]!r}
 APG_FALLBACK_LANGUAGE = {i18n_config["fallback_language"]!r}
 APG_I18N: Dict[str, Dict[str, str]] = {i18n_catalog!r}
+_APG_OPENAPI_SPEC: Dict[str, Any] | None = None
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -2115,33 +2120,185 @@ def list_records(entity_name: str | None = None) -> Dict[str, list[Dict[str, Any
     return [dict(record) for record in RECORD_STORE[entity_name]]
 
 
-def query_records(entity_name: str, query: Dict[str, list[str]] | None = None) -> Dict[str, Any]:
-    query = query or {{}}
-    records = list_records(entity_name)
-    filters = {{
-        key.removeprefix("filter."): values[-1]
-        for key, values in query.items()
-        if values and key not in {{"limit", "offset", "sort", "order"}}
-    }}
-    # Tenant routing: auto-scope to current tenant when entity has tenant_id field
+_RECORD_QUERY_CONTROL_KEYS = {{
+    "after",
+    "dir",
+    "format",
+    "limit",
+    "offset",
+    "order",
+    "page",
+    "per",
+    "q",
+    "sort",
+    "sort_dir",
+}}
+
+
+def _record_query_value(query: Dict[str, list[str]], name: str, default: Any = None) -> Any:
+    values = query.get(name)
+    if not values:
+        return default
+    value = values[-1]
+    return default if value is None else value
+
+
+def _record_field_names(entity_name: str) -> set[str]:
+    names = {{"id", "_revision"}}
+    for field in _field_specs(entity_name):
+        field_name = str(field.get("name", ""))
+        if field_name:
+            names.add(field_name)
+    return names
+
+
+def _record_string_field_names(entity_name: str) -> list[str]:
+    names: list[str] = []
+    for field in _field_specs(entity_name):
+        field_name = str(field.get("name", ""))
+        if field_name and _json_schema_type(str(field.get("type", "any"))) == "string":
+            names.append(field_name)
+    return names
+
+
+def _record_query_filters(
+    entity_name: str,
+    query: Dict[str, list[str]],
+) -> tuple[Dict[str, Any], Dict[str, Any] | None]:
+    valid_fields = _record_field_names(entity_name)
+    filters: Dict[str, Any] = {{}}
+    for key, values in query.items():
+        if not values:
+            continue
+        field_name: str | None = None
+        if key.startswith("filter[") and key.endswith("]"):
+            field_name = key[len("filter["):-1]
+        elif key.startswith("filter."):
+            field_name = key.removeprefix("filter.")
+        elif key not in _RECORD_QUERY_CONTROL_KEYS and key in valid_fields:
+            field_name = key
+        if field_name is None:
+            continue
+        if field_name not in valid_fields:
+            return filters, {{"error": "invalid_field"}}
+        filters[field_name] = values[-1]
     tid = _tenant_id()
     if tid and entity_name in TENANT_SCOPED_ENTITIES and "tenant_id" not in filters:
         filters["tenant_id"] = tid
+    return filters, None
+
+
+def _record_sort_key(record: Dict[str, Any], field_name: str) -> tuple[int, float, str]:
+    value = record.get(field_name)
+    if value is None:
+        return (1, 0.0, "")
+    if isinstance(value, bool):
+        return (0, 1.0 if value else 0.0, "")
+    if isinstance(value, (int, float)):
+        return (0, float(value), "")
+    text = str(value)
+    try:
+        return (0, float(text), text.lower())
+    except ValueError:
+        return (0, 0.0, text.lower())
+
+
+def _invalid_record_query_result(entity_name: str, response_style: str) -> Dict[str, Any]:
+    key = "data" if response_style == "records" else "records"
+    return {{
+        "error": "invalid_field",
+        "entity": entity_name,
+        key: [],
+        "count": 0,
+        "total": 0,
+        "next_cursor": None,
+    }}
+
+
+def query_records(
+    entity_name: str,
+    query: Dict[str, list[str]] | None = None,
+    *,
+    response_style: str = "legacy",
+    paginate: bool = True,
+) -> Dict[str, Any]:
+    query = query or {{}}
+    records = list_records(entity_name)
+    filters, filter_error = _record_query_filters(entity_name, query)
+    if filter_error is not None:
+        return _invalid_record_query_result(entity_name, response_style)
     records = [
         record
         for record in records
         if all(str(record.get(field, "")) == str(expected) for field, expected in filters.items())
     ]
-    sort_field = query.get("sort", [None])[-1]
+    q = str(_record_query_value(query, "q", "") or "").strip().lower()
+    if q:
+        string_fields = _record_string_field_names(entity_name)
+        records = [
+            record
+            for record in records
+            if any(q in str(record.get(field, "")).lower() for field in string_fields)
+        ]
+    default_sort = "id" if response_style == "records" else None
+    sort_field = _record_query_value(query, "sort", default_sort)
+    valid_fields = _record_field_names(entity_name)
     if sort_field:
-        reverse = query.get("order", ["asc"])[-1].lower() == "desc"
-        records = sorted(records, key=lambda record: str(record.get(sort_field, "")), reverse=reverse)
+        sort_field = str(sort_field)
+        if sort_field not in valid_fields:
+            return _invalid_record_query_result(entity_name, response_style)
+    direction_source = _record_query_value(query, "sort_dir", _record_query_value(query, "order", "asc"))
+    sort_dir = str(direction_source or "asc").lower()
+    if sort_dir not in {{"asc", "desc"}}:
+        sort_dir = "asc"
+    if sort_field:
+        records = sorted(
+            records,
+            key=lambda record: _record_sort_key(record, str(sort_field)),
+            reverse=sort_dir == "desc",
+        )
     total = len(records)
+    if response_style == "records":
+        if paginate:
+            raw_limit = _record_query_value(query, "limit", "50")
+            try:
+                parsed_limit = int(raw_limit)
+            except (TypeError, ValueError):
+                parsed_limit = 50
+            parsed_limit = max(1, min(1000, parsed_limit))
+            after = _record_query_value(query, "after", None)
+            start_index = 0
+            if after not in (None, ""):
+                for index, record in enumerate(records):
+                    if str(record.get("id")) == str(after):
+                        start_index = index + 1
+                        break
+            page_records = records[start_index:start_index + parsed_limit]
+            next_cursor = None
+            if page_records and start_index + len(page_records) < total:
+                next_cursor = page_records[-1].get("id")
+        else:
+            parsed_limit = None
+            after = None
+            page_records = records
+            next_cursor = None
+        return {{
+            "entity": entity_name,
+            "data": page_records,
+            "next_cursor": next_cursor,
+            "total": total,
+            "count": len(page_records),
+            "limit": parsed_limit,
+            "after": after,
+            "filters": filters,
+            "sort": sort_field or "id",
+            "sort_dir": sort_dir,
+        }}
     try:
-        offset = max(0, int(query.get("offset", ["0"])[-1]))
+        offset = max(0, int(_record_query_value(query, "offset", "0")))
     except (TypeError, ValueError):
         offset = 0
-    limit = query.get("limit", [None])[-1]
+    limit = _record_query_value(query, "limit", None)
     try:
         parsed_limit = int(limit) if limit not in (None, "") else None
     except (TypeError, ValueError):
@@ -2159,7 +2316,7 @@ def query_records(entity_name: str, query: Dict[str, list[str]] | None = None) -
         "limit": parsed_limit,
         "filters": filters,
         "sort": sort_field,
-        "order": query.get("order", ["asc"])[-1],
+        "order": sort_dir,
     }}
 
 
@@ -3005,6 +3162,25 @@ def _record_list_response_schema(schema_name: str) -> Dict[str, Any]:
     }}
 
 
+def _record_cursor_list_response_schema(schema_name: str) -> Dict[str, Any]:
+    return {{
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {{
+            "data": {{"type": "array", "items": _schema_ref(schema_name)}},
+            "next_cursor": {{
+                "oneOf": [
+                    {{"type": "integer"}},
+                    {{"type": "string"}},
+                    {{"type": "null"}},
+                ]
+            }},
+            "total": {{"type": "integer"}},
+        }},
+        "required": ["data", "next_cursor", "total"],
+    }}
+
+
 def _record_item_response_schema(schema_name: str) -> Dict[str, Any]:
     return {{
         "type": "object",
@@ -3656,7 +3832,7 @@ def _api_operation(
     return operation
 
 
-def openapi_document() -> Dict[str, Any]:
+def _build_openapi_document() -> Dict[str, Any]:
     paths: Dict[str, Any] = {{
         "/health": {{"get": _api_operation("Application health", "Health report", response_schema=_schema_ref("HealthReport"))}},
         "/component.json": {{"get": _api_operation("Composable component manifest", "APG component manifest", response_schema=_schema_ref("ComponentManifest"))}},
@@ -3690,12 +3866,55 @@ def openapi_document() -> Dict[str, Any]:
         "/ui/databases": {{"get": _api_operation("Generated database catalog UI", "HTML database catalog")}},
     }}
     schemas: Dict[str, Any] = _database_openapi_schemas()
-    for entity in ENTITIES:
+    for entity in _APG_ENTITIES:
         entity_name = str(entity["name"])
         schema_name = f"{{entity_name}}Record"
         patch_schema_name = f"{{entity_name}}RecordPatch"
         schemas[schema_name] = _record_schema(entity)
         schemas[patch_schema_name] = _record_schema(entity, partial=True)
+        paths[f"/records/{{entity_name}}"] = {{
+            "get": _api_operation(
+                f"List {{entity_name}} records",
+                "Paginated record list",
+                response_schema=_record_cursor_list_response_schema(schema_name),
+            ),
+            "post": _api_operation(
+                f"Create {{entity_name}} record",
+                "Created record",
+                status="201",
+                request_body=True,
+                request_schema=_record_body_schema(schema_name),
+                response_schema=_record_mutation_response_schema(schema_name),
+            ),
+        }}
+        paths[f"/records/{{entity_name}}"]["get"]["parameters"] = [
+            {{"name": "limit", "in": "query", "required": False, "description": "Maximum records to return, default 50, max 1000"}},
+            {{"name": "after", "in": "query", "required": False, "description": "Cursor record id"}},
+            {{"name": "filter[<field>]", "in": "query", "required": False, "description": "Exact field filter"}},
+            {{"name": "q", "in": "query", "required": False, "description": "LIKE search across string fields"}},
+            {{"name": "sort", "in": "query", "required": False, "description": "Field to sort by"}},
+            {{"name": "sort_dir", "in": "query", "required": False, "description": "asc or desc"}},
+            {{"name": "format", "in": "query", "required": False, "description": "Use csv for RFC 4180 export"}},
+        ]
+        paths[f"/records/{{entity_name}}/{{{{id}}}}"] = {{
+            "get": _api_operation(
+                f"Fetch {{entity_name}} record",
+                "Record",
+                response_schema=_record_item_response_schema(schema_name),
+            ),
+            "put": _api_operation(
+                f"Update {{entity_name}} record",
+                "Updated record",
+                request_body=True,
+                request_schema=_record_body_schema(patch_schema_name),
+                response_schema=_record_mutation_response_schema(schema_name),
+            ),
+            "delete": _api_operation(
+                f"Delete {{entity_name}} record",
+                "Deleted record",
+                response_schema=_record_mutation_response_schema(schema_name, record_key="deleted"),
+            ),
+        }}
         paths[f"/entities/{{entity_name}}/records"] = {{
             "get": _api_operation(
                 f"List {{entity_name}} records",
@@ -3814,9 +4033,9 @@ def openapi_document() -> Dict[str, Any]:
     return {{
         "openapi": "3.1.0",
         "info": {{
-            "title": MODULE_NAME,
-            "version": MODULE_VERSION,
-            "description": MODULE_DESCRIPTION,
+            "title": APG_APP_NAME,
+            "version": APG_APP_VERSION,
+            "description": APG_APP_DESCRIPTION,
         }},
         "paths": paths,
         "components": {{
@@ -3827,6 +4046,12 @@ def openapi_document() -> Dict[str, Any]:
             }},
         }},
     }}
+
+
+def openapi_document() -> Dict[str, Any]:
+    if _APG_OPENAPI_SPEC is None:
+        return _build_openapi_document()
+    return json.loads(json.dumps(_APG_OPENAPI_SPEC))
 
 
 def validate_component_manifest_contract() -> Dict[str, Any]:
@@ -4052,6 +4277,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             return "_route_payload"
         if route.startswith("/capabilities/") and route.endswith("/health"):
             return "_route_payload"
+        if route.startswith("/records/"):
+            return "_records_payload_with_query"
         if route.startswith("/entities/") and "/records" in route:
             return "_records_payload_with_query"
         return None
@@ -4060,6 +4287,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             return "_agent_invocation_payload"
         if (route.startswith("/agent-teams/") or route.startswith("/teams/")) and route.endswith(("/invoke", "/run")):
             return "_agent_invocation_payload"
+        if route.startswith("/records/") and route.count("/") == 2:
+            return "_create_record_payload"
         if route.startswith("/entities/") and (route.endswith("/records") or route.endswith("/records/import")):
             return "_create_record_payload"
         if route in {{"/rules/evaluate", "/capabilities/rules/evaluate"}} or (
@@ -4086,10 +4315,14 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             return "_workflow_run_payload"
         return None
     if method == "put":
+        if route.startswith("/records/") and "/{{id}}" in route:
+            return "_update_record_payload"
         if route.startswith("/entities/") and "/records/{{id}}" in route:
             return "_update_record_payload"
         return None
     if method == "delete":
+        if route.startswith("/records/") and "/{{id}}" in route:
+            return "_delete_record_payload"
         if route.startswith("/entities/") and "/records/{{id}}" in route:
             return "_delete_record_payload"
         return None
@@ -8199,6 +8432,11 @@ def _records_payload(path: str) -> tuple[int, Dict[str, Any]]:
     return _records_payload_with_query(path, {{}})
 
 
+def _records_api_collection_path(path: str) -> bool:
+    parts = [part for part in path.split("/") if part]
+    return len(parts) == 2 and parts[0] == "records"
+
+
 def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, Dict[str, Any]]:
     route = _record_route(path)
     if route is None:
@@ -8219,7 +8457,11 @@ def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = 
     if operation is not None:
         return 405, {{"error": "method_not_allowed", "operation": operation}}
     if record_id is None:
-        return 200, query_records(entity_name, query)
+        style = "records" if _records_api_collection_path(path) else "legacy"
+        result = query_records(entity_name, query, response_style=style)
+        if result.get("error") == "invalid_field":
+            return 400, {{"error": "invalid_field"}}
+        return 200, result
     record = _record_by_id(entity_name, record_id)
     if record is None:
         return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
@@ -8814,18 +9056,35 @@ def _put_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any
     return 404, {{"error": "not_found", "path": path}}
 
 
-def _csv_export_body(entity_name: str) -> bytes:
-    records = list_records(entity_name)
-    if not records:
-        return b""
+def _csv_export_columns(entity_name: str, records: list[Dict[str, Any]]) -> list[str]:
+    cols: list[str] = ["id"]
+    for field in _field_specs(entity_name):
+        field_name = str(field.get("name", ""))
+        if field_name and field_name not in cols and field_name != "_revision":
+            cols.append(field_name)
+    for record in records:
+        for key in record.keys():
+            key_text = str(key)
+            if key_text not in cols and key_text != "_revision":
+                cols.append(key_text)
+    return cols
+
+
+def _csv_export_body(
+    entity_name: str,
+    query: Dict[str, list[str]] | None = None,
+    records: list[Dict[str, Any]] | None = None,
+) -> bytes:
+    if records is None:
+        result = query_records(entity_name, query or {{}}, response_style="records", paginate=False)
+        records = result.get("data", []) if result.get("error") != "invalid_field" else []
     import io, csv as _csv
-    fields = _field_specs(entity_name)
-    cols = [str(f["name"]) for f in fields if str(f["name"]) != "_revision"] or list(records[0].keys())
-    buf = io.StringIO()
-    w = _csv.writer(buf)
+    cols = _csv_export_columns(entity_name, records)
+    buf = io.StringIO(newline="")
+    w = _csv.writer(buf, lineterminator="\\r\\n")
     w.writerow(cols)
     for rec in records:
-        w.writerow([str(rec.get(c, "")) for c in cols])
+        w.writerow([rec.get(c, "") for c in cols])
     return buf.getvalue().encode("utf-8")
 
 
@@ -8968,6 +9227,7 @@ def _pg_load_entity_records(entity_name: str) -> list[Dict[str, Any]]:
 
 
 _load_record_store()
+_APG_OPENAPI_SPEC = _build_openapi_document()
 
 _flask_app = _FlaskApp("app", root_path=os.path.abspath(os.path.dirname(globals().get("__file__", None) or ".")))
 _flask_app.secret_key = _generated_session_secret()
@@ -9270,9 +9530,9 @@ def _apply_security_headers(response: _FlaskResponse) -> _FlaskResponse:
 
 # Wave C HTTP efficiency: cache semantics, conditional GET, and gzip.
 _APG_GZIP_MIN_BYTES = 860
-_APG_STATIC_CACHE_CONTROL = "public, max-age=31536000, immutable"
+_APG_STATIC_CACHE_CONTROL = "public,max-age=31536000,immutable"
 _APG_RECORDS_CACHE_CONTROL = "no-cache"
-_APG_PRIVATE_CACHE_CONTROL = "no-store, private"
+_APG_PRIVATE_CACHE_CONTROL = "no-store,private"
 
 
 def _add_vary_header(response: _FlaskResponse, value: str) -> _FlaskResponse:
@@ -9323,7 +9583,7 @@ def _maybe_compress(response: _FlaskResponse) -> _FlaskResponse:
     return response
 
 
-def _is_records_list_response(response: _FlaskResponse) -> bool:
+def _is_records_get_response(response: _FlaskResponse) -> bool:
     if _flask_request.method != "GET":
         return False
     if int(response.status_code) != 200:
@@ -9333,12 +9593,11 @@ def _is_records_list_response(response: _FlaskResponse) -> bool:
     if _current_user() is not None:
         return False
     path = _flask_request.path.rstrip("/") or "/"
-    parts = [part for part in path.split("/") if part]
-    return len(parts) == 2 and parts[0] == "records" and parts[1] in ENTITY_NAMES
+    return path.startswith("/records/")
 
 
 def _maybe_apply_records_etag(response: _FlaskResponse) -> _FlaskResponse:
-    if not _is_records_list_response(response):
+    if not _is_records_get_response(response):
         return response
     body = response.get_data()
     etag = '"' + hashlib.sha256(body).hexdigest()[:16] + '"'
@@ -9527,6 +9786,32 @@ def _flask_locale_post():
     return response
 
 
+@_flask_app.route("/api-docs", methods=["GET"])
+def _flask_api_docs():
+    if not _env_flag("APG_SWAGGER_UI"):
+        return _apg_error_response(404, "not_found", "Page not found", "Swagger UI is not enabled for this generated app.")
+    html_doc = (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<title>APG API Docs</title>'
+        '<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">'
+        '</head><body><div id="swagger-ui"></div>'
+        '<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>'
+        '<script>SwaggerUIBundle({{url:"/openapi.json",dom_id:"#swagger-ui"}});</script>'
+        '</body></html>'
+    )
+    response = _FlaskResponse(html_doc, content_type="text/html; charset=utf-8")
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+        "script-src 'self' 'unsafe-inline' https://unpkg.com; "
+        "img-src 'self' data: https://unpkg.com; "
+        "font-src 'self' data: https://unpkg.com; "
+        "connect-src 'self'"
+    )
+    return response
+
+
 @_flask_app.route("/entities/<entity_name>/records.csv", methods=["GET"])
 def _flask_csv_export(entity_name):
     return _FlaskResponse(_csv_export_body(entity_name), content_type="text/csv; charset=utf-8")
@@ -9573,6 +9858,71 @@ def _flask_ui_post(subpath=""):
     return _FlaskResponse(_ui_error_payload(path, response), status=status, content_type="text/html; charset=utf-8")
 
 
+def _records_csv_requested(path: str, query: Dict[str, list[str]]) -> bool:
+    return _records_api_collection_path(path) and str(_record_query_value(query, "format", "") or "").lower() == "csv"
+
+
+def _records_next_link(next_cursor: Any) -> str:
+    args: list[tuple[str, str]] = []
+    for key, values in _flask_request.args.lists():
+        if key == "after":
+            continue
+        for value in values:
+            args.append((key, value))
+    args.append(("after", str(next_cursor)))
+    return f'<{{_flask_request.base_url}}?{{urlencode(args)}}>; rel="next"'
+
+
+def _records_response_headers(path: str, payload: Dict[str, Any]) -> Dict[str, str]:
+    if not _records_api_collection_path(path):
+        return {{}}
+    next_cursor = payload.get("next_cursor")
+    if next_cursor in (None, ""):
+        return {{}}
+    return {{"Link": _records_next_link(next_cursor)}}
+
+
+def _records_response_payload(path: str, payload: Dict[str, Any]) -> Any:
+    if not _records_api_collection_path(path):
+        return payload
+    compat = str(_flask_request.headers.get("X-APG-Compat", "")).strip().lower()
+    if compat == "v1":
+        return payload.get("data", [])
+    return payload
+
+
+def _records_csv_response(path: str, query: Dict[str, list[str]]) -> _FlaskResponse:
+    route = _record_route(path)
+    if route is None or route["entity"] is None or route["record_id"] is not None:
+        return _FlaskResponse(
+            json.dumps({{"error": "not_found", "path": path}}),
+            status=404,
+            content_type="application/json; charset=utf-8",
+        )
+    entity_name = str(route["entity"])
+    if entity_name not in ENTITY_NAMES:
+        return _FlaskResponse(
+            json.dumps({{"error": "unknown_entity", "entity": entity_name}}),
+            status=404,
+            content_type="application/json; charset=utf-8",
+        )
+    result = query_records(entity_name, query, response_style="records", paginate=False)
+    if result.get("error") == "invalid_field":
+        return _FlaskResponse(
+            json.dumps({{"error": "invalid_field"}}),
+            status=400,
+            content_type="application/json; charset=utf-8",
+        )
+    safe_entity = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in entity_name) or "records"
+    filename = f"{{safe_entity}}_{{_datetime.date.today().isoformat()}}.csv"
+    return _FlaskResponse(
+        _csv_export_body(entity_name, records=result.get("data", [])),
+        status=200,
+        content_type="text/csv; charset=utf-8",
+        headers={{"Content-Disposition": f'attachment; filename="{{filename}}"'}},
+    )
+
+
 _APG_GET_PUBLIC = frozenset({{"/health", "/auth", "/openapi.json", "/metrics", "/describe"}})
 
 
@@ -9599,10 +9949,17 @@ def _flask_api_get(api_path):
         status, html_payload = _application_screen_payload(path)
         return _FlaskResponse(html_payload, status=status, content_type="text/html; charset=utf-8")
     query = {{k: v for k, v in _flask_request.args.lists()}}
+    if _records_csv_requested(path, query):
+        return _records_csv_response(path, query)
     status, payload = _route_payload(path, query)
     if status == 404 and "text/html" in str(_flask_request.headers.get("Accept", "")):
         return _apg_error_response(404, "not_found", "Page not found", "The requested path does not exist in this generated app.")
-    return _FlaskResponse(json.dumps(payload), status=status, content_type="application/json; charset=utf-8")
+    response_payload = _records_response_payload(path, payload) if status == 200 else payload
+    response = _FlaskResponse(json.dumps(response_payload), status=status, content_type="application/json; charset=utf-8")
+    if status == 200 and isinstance(payload, dict):
+        for header_name, header_value in _records_response_headers(path, payload).items():
+            response.headers[header_name] = header_value
+    return response
 
 
 @_flask_app.route("/<path:api_path>", methods=["POST"])
