@@ -11,6 +11,7 @@ from pathlib import Path
 import json
 import logging
 import re
+import sys
 
 # Import compiler components
 from .parser import APGParser, APGSyntaxError
@@ -65,6 +66,7 @@ class CompilationResult:
 	
 	def print_summary(self):
 		"""Print compilation summary"""
+		diagnostic_stream = sys.stderr
 		if self.success:
 			print(f"✓ Compilation successful in {self.compilation_time:.2f}s")
 			print(f"  Generated {len(self.generated_files)} files for {self.target_language}")
@@ -74,18 +76,18 @@ class CompilationResult:
 			print(f"✗ Compilation failed in {self.compilation_time:.2f}s")
 		
 		if self.errors:
-			print(f"  {len(self.errors)} error(s)")
+			print(f"  {len(self.errors)} error(s)", file=diagnostic_stream)
 			for error in self.errors[:5]:  # Show first 5 errors
-				print(f"    {error}")
+				print(f"    {error}", file=diagnostic_stream)
 			if len(self.errors) > 5:
-				print(f"    ... and {len(self.errors) - 5} more errors")
+				print(f"    ... and {len(self.errors) - 5} more errors", file=diagnostic_stream)
 		
 		if self.warnings:
-			print(f"  {len(self.warnings)} warning(s)")
+			print(f"  {len(self.warnings)} warning(s)", file=diagnostic_stream)
 			for warning in self.warnings[:3]:  # Show first 3 warnings
-				print(f"    {warning}")
+				print(f"    {warning}", file=diagnostic_stream)
 			if len(self.warnings) > 3:
-				print(f"    ... and {len(self.warnings) - 3} more warnings")
+				print(f"    ... and {len(self.warnings) - 3} more warnings", file=diagnostic_stream)
 
 
 # ========================================

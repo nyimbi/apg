@@ -169,20 +169,26 @@ class SymbolTable:
 class SemanticError:
 	"""Semantic analysis error"""
 	message: str
-	node: ASTNode
+	node: Optional[ASTNode]
 	error_type: str = "semantic"
 
 	@property
 	def line(self) -> int:
 		if self.node is None:
-			return 0
-		return self.node.line if self.node.line > 0 else 0
+			return 1
+		return self.node.line if self.node.line > 0 else 1
 
 	@property
 	def column(self) -> int:
 		if self.node is None:
-			return 0
-		return self.node.column + 1 if self.node.column >= 0 else 0
+			return 1
+		return self.node.column + 1 if self.node.column >= 0 else 1
+
+	@property
+	def source_file(self) -> Optional[str]:
+		if self.node is None:
+			return None
+		return self.node.source_file
 	
 	def __str__(self) -> str:
 		if self.error_type == "warning":

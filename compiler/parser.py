@@ -43,8 +43,8 @@ class APGSyntaxError(Exception):
 		super().__init__(message)
 
 	def __str__(self) -> str:
-		line = self.line if self.line > 0 else 0
-		column = self.column + 1 if self.column >= 0 else 0
+		line = self.line if self.line > 0 else 1
+		column = self.column + 1 if self.column >= 0 else 1
 		return f"line {line}, col {column}: {self.message}"
 
 

@@ -44,6 +44,19 @@ def _stderr_message(message: str, color: str | None = None) -> None:
 	print(message, file=sys.stderr)
 
 
+def _emit_compilation_diagnostics(result) -> None:
+	"""Print compiler errors and warnings to stderr with severity colors."""
+	if result.errors:
+		_stderr_message("\nErrors:", "red")
+		for error in result.errors:
+			_stderr_message(f"  - {error}", "red")
+
+	if result.warnings:
+		_stderr_message("\nWarnings:", "yellow")
+		for warning in result.warnings:
+			_stderr_message(f"  - {warning}", "yellow")
+
+
 @click.command()
 @click.argument('source_file', required=False)
 @click.option('--output', '-o', help='Output directory')
@@ -241,6 +254,7 @@ def _compile_single(
 			console.print(f"\n[green]✅ Compilation successful![/green]")
 			console.print(f"[cyan]Time:[/cyan] {compilation_time:.2f}s")
 			console.print(f"[cyan]Generated files:[/cyan] {len(result.generated_files)}")
+			_emit_compilation_diagnostics(result)
 
 			if verbose:
 				_show_compilation_details(result, config)
@@ -266,16 +280,7 @@ def _compile_single(
 
 			_stderr_message("\n❌ Compilation failed!", "red")
 			_stderr_message(f"Time: {compilation_time:.2f}s")
-
-			if result.errors:
-				_stderr_message("\nErrors:", "red")
-				for error in result.errors:
-					_stderr_message(f"  - {error}", "red")
-
-			if result.warnings:
-				_stderr_message("\nWarnings:", "yellow")
-				for warning in result.warnings:
-					_stderr_message(f"  - {warning}", "yellow")
+			_emit_compilation_diagnostics(result)
 			raise click.exceptions.Exit(1)
 
 

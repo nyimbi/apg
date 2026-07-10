@@ -78,6 +78,8 @@ table Foo {
 	)
 
 	assert result.success is True
+	assert "line " in _diagnostic_text(result.warnings)
+	assert "col " in _diagnostic_text(result.warnings)
 	assert any(
 		isinstance(warning, SemanticError)
 		and warning.error_type == "warning"
