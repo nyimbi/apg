@@ -1334,21 +1334,36 @@ class _InMemoryRedis:
 				yield key
 
 
-class _RedisModule:
-	"""Drop-in stub for the `redis` package exposing only what APG tests need."""
+class _RedisRouter:
+	"""`redis`-shaped facade.
+
+	Routes `redis://memory` URLs to the in-memory stub so dependency-light and
+	test environments behave identically whether or not the real SDK is
+	installed; every other URL and attribute delegates to the real package.
+	"""
 
 	_InMemoryRedis = _InMemoryRedis
 
-	@staticmethod
-	def from_url(url: str, **kwargs: Any) -> _InMemoryRedis:
-		return _InMemoryRedis()
+	def __init__(self, real_module: Any | None) -> None:
+		self._real = real_module
+
+	def from_url(self, url: str, **kwargs: Any) -> Any:
+		if self._real is None or str(url).startswith("redis://memory"):
+			return _InMemoryRedis()
+		return self._real.from_url(url, **kwargs)
+
+	def __getattr__(self, name: str) -> Any:
+		if self._real is None:
+			raise AttributeError(name)
+		return getattr(self._real, name)
 
 
 try:
 	import redis as _real_redis  # type: ignore
-	redis = _real_redis
 except ImportError:
-	redis = _RedisModule()  # type: ignore[assignment]
+	_real_redis = None
+
+redis = _RedisRouter(_real_redis)  # type: ignore[assignment]
 
 
 class NativeWorkflowService:

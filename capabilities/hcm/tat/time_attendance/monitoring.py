@@ -102,9 +102,23 @@ class Alert:
 
 
 class MonitoringMetrics:
-	"""Prometheus metrics for Time & Attendance"""
-	
+	"""Prometheus metrics for Time & Attendance.
+
+	Process-wide singleton: prometheus_client collectors may register with the
+	default registry only once per process, so every consumer shares one set.
+	"""
+
+	_instance: "MonitoringMetrics | None" = None
+
+	def __new__(cls) -> "MonitoringMetrics":
+		if cls._instance is None:
+			cls._instance = super().__new__(cls)
+		return cls._instance
+
 	def __init__(self):
+		if getattr(self, "_collectors_ready", False):
+			return
+		self._collectors_ready = True
 		# API Performance Metrics
 		self.request_duration = Histogram(
 			'ta_request_duration_seconds',

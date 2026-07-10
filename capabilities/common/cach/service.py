@@ -1686,17 +1686,17 @@ async def _apply_compression_method(self, data: bytes, algorithm):
 	if _CA and algorithm == _CA.LZ4:
 		if lz4_frame:
 			compressed = lz4_frame.compress(data)
-			return compressed, algorithm, len(data)/len(compressed) if compressed else 1.0
+			return compressed, algorithm, len(compressed)/len(data) if data else 1.0
 		return data, _CA.NONE, 1.0
 	elif _CA and algorithm == _CA.ZSTD:
 		if zstandard:
 			compressed = zstandard.ZstdCompressor().compress(data)
-			return compressed, algorithm, len(data)/len(compressed) if compressed else 1.0
+			return compressed, algorithm, len(compressed)/len(data) if data else 1.0
 		return data, _CA.NONE, 1.0
 	buf = io.BytesIO()
 	with gzip.GzipFile(fileobj=buf, mode='wb') as gz: gz.write(data)
 	comp = buf.getvalue()
-	return comp, (_CA.GZIP if _CA else algorithm), len(data)/len(comp) if comp else 1.0
+	return comp, (_CA.GZIP if _CA else algorithm), len(comp)/len(data) if data else 1.0
 
 def _default_compression_algorithm_method(self):
 	try:

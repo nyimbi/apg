@@ -125,7 +125,12 @@ def discover_contract_paths(root: Path | str | None = None) -> list[Path]:
 		if path.name == CONTRACT_FILENAME and "__pycache__" not in path.parts
 	)
 
-	# Discover capabilities installed as standalone PyPI packages.
+	# Discover capabilities installed as standalone PyPI packages — but only
+	# for the default registry. An explicit *root* scopes discovery to that
+	# tree (e.g. lint fixtures, vendored catalogs) and must not absorb
+	# whatever apg-* packages happen to be installed on the host.
+	if root is not None:
+		return sorted(paths)
 	try:
 		for ep in importlib.metadata.entry_points(group="apg.capabilities"):
 			try:
