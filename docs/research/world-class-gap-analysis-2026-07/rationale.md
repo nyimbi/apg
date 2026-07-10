@@ -16,6 +16,12 @@ Each gap was scored against five questions:
 
 P1 means the gap blocks APG from being credibly world-class for common app-builder workloads. P2 means the gap is important for enterprise adoption or developer experience, but apps can still be built manually around it. P3 means the feature improves correctness or convenience, but does not decide whether APG can replace the benchmark tools.
 
+## Why The Benchmarks Matter
+
+The named benchmarks are intentionally mixed: Retool, Budibase, and Appsmith represent internal-tool builders; Directus represents a data/content platform with strong relational and file primitives; Wasp represents an ownable-code app generator. APG does not need to copy their architecture, because APG's advantage is ownable generated Python plus domain capabilities. It does need to make their common primitives at least as easy to express.
+
+That is why the P1 list is not "things competitors market heavily." It is the set of primitives that appear repeatedly across the benchmark docs and ordinary business apps: relationships, files, email/notifications, and localization. The P2 list then covers enterprise/developer workflow depth: async work, tenant isolation, IDE packaging, and debugging. P3 contains expressiveness and operations conveniences that become much easier once the P1/P2 contracts exist.
+
 ## Why Relationships Are P1.1
 
 Relationships are the core missing modeling primitive. Without first-class `belongs_to`, `has_many`, and many-to-many semantics, APG cannot reliably generate:

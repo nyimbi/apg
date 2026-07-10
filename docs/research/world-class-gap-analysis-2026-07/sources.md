@@ -44,6 +44,8 @@ This file records the evidence consulted for `README.md` and `rationale.md`. Loc
 
 ## External Competitor References
 
+Official product documentation was preferred for competitor feature calibration. The checks focused on whether each benchmark exposes the relevant primitive directly, not whether its implementation is better than APG's generated-code model.
+
 ### Retool
 
 - https://docs.retool.com/apps/guides/forms-inputs/file-inputs - file input guide.
@@ -53,6 +55,8 @@ This file records the evidence consulted for `README.md` and `rationale.md`. Loc
 - https://docs.retool.com/workflows/tutorial - scheduled/automation workflow tutorial.
 - https://docs.retool.com/org-users/concepts/internationalization - internationalization concept docs.
 - https://docs.retool.com/apps/guides/app-management/localization - app localization guide.
+
+Evidence used: file input docs cover file-type, file-count, parsing, validation, file size, and styling controls; Workflows docs cover building, scheduling, and monitoring jobs/alerts/ETL tasks; i18n/localization docs cover org-level translations and app localization.
 
 ### Budibase
 
@@ -64,6 +68,8 @@ This file records the evidence consulted for `README.md` and `rationale.md`. Loc
 - https://docs.budibase.com/docs/automation-building-101 - automation building guide.
 - https://docs.budibase.com/docs/translations - translations settings docs.
 
+Evidence used: relationships docs cover bidirectional row relationships; attachment docs cover attachment and attachment-list fields; automation docs cover backend logic such as sending email when data changes; translations docs cover user-facing text configuration.
+
 ### Wasp
 
 - https://wasp.sh/docs/data-model/entities - entity and data-model docs.
@@ -74,6 +80,8 @@ This file records the evidence consulted for `README.md` and `rationale.md`. Loc
 - https://wasp.sh/docs/editor-setup - editor setup docs.
 - https://github.com/wasp-lang/vscode-wasp - Wasp VS Code extension repository.
 
+Evidence used: entity docs ground Wasp's Prisma-backed data model and relationships; file upload docs cover Multer-based uploads; email docs cover app email sending; jobs docs cover background/recurring work; editor setup docs and the extension repository calibrate APG's IDE gap.
+
 ### Appsmith
 
 - https://docs.appsmith.com/reference/widgets/filepicker - Filepicker widget reference.
@@ -82,6 +90,8 @@ This file records the evidence consulted for `README.md` and `rationale.md`. Loc
 - https://docs.appsmith.com/workflows - Appsmith Workflows overview.
 - https://docs.appsmith.com/workflows/reference/workflow-triggers - workflow trigger docs, including scheduled trigger.
 - https://docs.appsmith.com/workflows/tutorials/create-workflow - basic workflow tutorial.
+
+Evidence used: Filepicker docs establish a first-class upload widget; SMTP docs establish email-sending integration; workflow docs and workflow-trigger docs establish automation, webhook, datasource, and scheduled-trigger expectations.
 
 ### Directus
 
@@ -93,6 +103,8 @@ This file records the evidence consulted for `README.md` and `rationale.md`. Loc
 - https://directus.com/docs/guides/content/translations - content translations guide.
 - https://directus.com/docs/guides/data-model/fields - field/data-model guide.
 
+Evidence used: relationship docs cover Many-to-One, One-to-Many, Many-to-Many, Many-to-Any, and translations; file docs cover upload/manage/access flows; Flows docs cover event-driven automation; translations docs cover localized content.
+
 ### Tooling References
 
 - https://code.visualstudio.com/api/language-extensions/language-server-extension-guide - VS Code language server extension guide.
@@ -100,6 +112,6 @@ This file records the evidence consulted for `README.md` and `rationale.md`. Loc
 
 ## External Research Notes
 
-- A native researcher subagent was attempted for sidecar source gathering but failed with an external deployment 404. The final source list above was gathered directly instead.
+- Official docs were checked directly for the competitor-specific P1/P2 gap calibration in this document.
 - Official docs were preferred over vendor comparison blogs for the post Waves A-L gap list.
 - Prior `docs/research/app-generator-competitive-landscape-2026/sources.md` remains the broader source inventory for market-level claims outside this narrower gap analysis.

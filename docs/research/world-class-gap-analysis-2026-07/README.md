@@ -16,6 +16,12 @@ The shortest path to "world-class" is therefore:
 2. Close P2 enterprise/developer workflow gaps: generated background jobs, first-class multi-tenancy, VS Code extension hardening, and a Debug Adapter Protocol surface.
 3. Close P3 expressiveness gaps: Excel import/export, computed fields, enum types, and field validation rules DSL.
 
+## Required Input Snapshot
+
+The requested `git log --oneline -25` read shows a recent uplift sequence ending at `37ef9b4f docs(research): world-class gap analysis post Waves A-L`, with Wave L row/column governance, Wave K FTS5 and generated tests, Wave J outbound webhooks, Wave I lifecycle/bulk patterns, Wave G responsive/dark/print UI, Wave F production hardening, Wave E OpenAPI/pagination/filtering/CSV, Wave D accessibility/CSP nonce work, Wave B ops endpoints/metrics/logging, and Wave A auth/security hardening. Compiler diagnostics commits are present twice in the window and are treated here as the Wave H diagnostics track.
+
+The requested `capabilities/` read shows broad domain coverage: `agriculture`, `auth_rbac`, `bia`, `ckm`, `common`, `composition`, `crm`, `eam`, `ecd`, `education`, `energy`, `fin`, `fintech`, `government`, `grc`, `hcm`, `healthcare`, `hospitality`, `insurance`, `int`, `intel`, `itsm`, `legal`, `loc`, `mfg`, `mining`, `mob`, `ngo`, `pde`, `pharma`, `ppm`, `proc`, `realestate`, `retail`, `scm`, `telecom`, and `transport`. That breadth strengthens APG's market position, but it does not by itself close the DSL/runtime gaps below.
+
 ## 1. Shipped: Waves A-L
 
 Evidence caveat: the required `git log --oneline -25` contains named commits for Waves A, B, D, E, F, G, I, J, K, and L. It also contains compiler diagnostics commits without an explicit "Wave H" label. The generated app code and tests contain HTTP efficiency coverage corresponding to the original Wave C plan, but the current worktree also has unrelated uncommitted changes, so this document treats Wave C as "implemented in local generator evidence" and Wave H as "compiler diagnostics wave, not consistently labeled in history."
@@ -45,6 +51,10 @@ APG now has a credible foundation in areas where runtime low-code platforms are 
 - Generated UI workspaces beyond basic CRUD: dashboards, kanban, workflow wizard, agent/team console, capability console, database catalog, flow debugger, auth, PWA shell, i18n switcher, command palette, and offline banner.
 
 The gap is that many capability and UI strengths are still metadata or platform-level services rather than language-level promises that compile into generated app behavior every time.
+
+### Evidence Boundary
+
+The shipped-wave claims are based on direct repository evidence: commit subjects, generated runtime code, and focused regression tests. The gap claims are deliberately narrower. APG does contain adjacent surface area such as DBML-style relationship refs, i18n runtime helpers, tenant-scoped filtering when `tenant_id` exists, workflow/run metadata, enum/computed grammar productions, and VS Code/LSP scaffolding. A gap is listed only where the current repo evidence does not show an end-to-end contract across grammar, semantic model, generated runtime, generated UI, OpenAPI, CLI/LSP support, examples, and tests.
 
 ## 2. Remaining Gaps vs Retool, Budibase, Wasp, Appsmith, Directus
 
