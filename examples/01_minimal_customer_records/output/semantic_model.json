@@ -106,11 +106,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 38
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 38
         }
       },
       "references": []
@@ -122,12 +122,12 @@
       "name": "Customer.company_name",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 18
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 18
         }
       },
       "references": []
@@ -139,12 +139,12 @@
       "name": "Customer.credit_limit",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 20
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 20
         }
       },
       "references": []
@@ -156,12 +156,12 @@
       "name": "Customer.customer_number",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 11
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 11
         }
       },
       "references": []
@@ -173,12 +173,12 @@
       "name": "Customer.date_of_birth",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 28
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 28
         }
       },
       "references": []
@@ -190,12 +190,12 @@
       "name": "Customer.discount_rate",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 22
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 22
         }
       },
       "references": []
@@ -207,12 +207,12 @@
       "name": "Customer.email",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 13
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 13
         }
       },
       "references": []
@@ -224,12 +224,12 @@
       "name": "Customer.is_active",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 24
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 24
         }
       },
       "references": []
@@ -241,12 +241,12 @@
       "name": "Customer.is_verified",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 25
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 25
         }
       },
       "references": []
@@ -258,12 +258,12 @@
       "name": "Customer.legal_name",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 12
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 12
         }
       },
       "references": []
@@ -275,12 +275,12 @@
       "name": "Customer.loyalty_points",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 21
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 21
         }
       },
       "references": []
@@ -292,12 +292,12 @@
       "name": "Customer.metadata",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 35
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 35
         }
       },
       "references": []
@@ -309,12 +309,12 @@
       "name": "Customer.phone",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 14
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 14
         }
       },
       "references": []
@@ -326,12 +326,12 @@
       "name": "Customer.preferences",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 31
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 31
         }
       },
       "references": []
@@ -343,12 +343,12 @@
       "name": "Customer.registered_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 27
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 27
         }
       },
       "references": []
@@ -360,12 +360,12 @@
       "name": "Customer.secondary_email",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 16
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 16
         }
       },
       "references": []
@@ -377,12 +377,12 @@
       "name": "Customer.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 33
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 33
         }
       },
       "references": []
@@ -394,12 +394,12 @@
       "name": "Customer.tags",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 30
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 30
         }
       },
       "references": []
@@ -412,11 +412,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 5
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 5
         }
       },
       "references": []
@@ -429,11 +429,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 9
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 9
         }
       },
       "references": []

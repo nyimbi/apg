@@ -166,7 +166,7 @@
   {% endif %}
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   var entity = {{ safe_entity | tojson }};
   var statusField = {{ status_field | tojson }};

@@ -115,7 +115,7 @@
       <span class="apg-stat-delta">{{ stat.delta }}</span>
     </div>
     <div class="apg-chart mt-3" data-apg-chart="{{ stat.chart_id }}"></div>
-    <script id="{{ stat.chart_id }}" type="application/json">{{ stat.spec_json | safe }}</script>
+    <script id="{{ stat.chart_id }}" type="application/json" nonce="{{ csp_nonce }}">{{ stat.spec_json | safe }}</script>
   </article>
   {% endfor %}
   <article class="apg-card">
@@ -141,7 +141,7 @@
       <a class="text-xs hover:underline" href="/ui/entities/{{ chart.entity | urlencode }}?view=analytics">Analytics</a>
     </div>
     <div class="apg-chart" data-apg-chart="{{ chart.chart_id }}"></div>
-    <script id="{{ chart.chart_id }}" type="application/json">{{ chart.spec_json | safe }}</script>
+    <script id="{{ chart.chart_id }}" type="application/json" nonce="{{ csp_nonce }}">{{ chart.spec_json | safe }}</script>
   </article>
   {% endfor %}
 </section>

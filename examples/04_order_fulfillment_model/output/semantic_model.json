@@ -253,11 +253,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 98
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 98
         }
       },
       "references": []
@@ -269,12 +269,12 @@
       "name": "Order.customer_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 11
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 11
         }
       },
       "references": []
@@ -286,12 +286,12 @@
       "name": "Order.order_number",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 10
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 10
         }
       },
       "references": []
@@ -303,12 +303,12 @@
       "name": "Order.priority",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 14
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 14
         }
       },
       "references": []
@@ -320,12 +320,12 @@
       "name": "Order.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 12
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 12
         }
       },
       "references": []
@@ -337,12 +337,12 @@
       "name": "Order.total",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 13
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 13
         }
       },
       "references": []
@@ -354,12 +354,12 @@
       "name": "PaymentRetry.attempt",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 38
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 38
         }
       },
       "references": []
@@ -371,12 +371,12 @@
       "name": "PaymentRetry.order_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 37
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 37
         }
       },
       "references": []
@@ -388,12 +388,12 @@
       "name": "PaymentRetry.retry_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 36
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 36
         }
       },
       "references": []
@@ -405,12 +405,12 @@
       "name": "PaymentRetry.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 39
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 39
         }
       },
       "references": []
@@ -422,12 +422,12 @@
       "name": "Return.order_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 29
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 29
         }
       },
       "references": []
@@ -439,12 +439,12 @@
       "name": "Return.reason",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 30
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 30
         }
       },
       "references": []
@@ -456,12 +456,12 @@
       "name": "Return.refund_amount",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 32
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 32
         }
       },
       "references": []
@@ -473,12 +473,12 @@
       "name": "Return.return_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 28
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 28
         }
       },
       "references": []
@@ -490,12 +490,12 @@
       "name": "Return.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 31
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 31
         }
       },
       "references": []
@@ -507,12 +507,12 @@
       "name": "Shipment.carrier",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 20
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 20
         }
       },
       "references": []
@@ -524,12 +524,12 @@
       "name": "Shipment.delivered_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 24
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 24
         }
       },
       "references": []
@@ -541,12 +541,12 @@
       "name": "Shipment.dispatched_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 23
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 23
         }
       },
       "references": []
@@ -558,12 +558,12 @@
       "name": "Shipment.order_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 19
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 19
         }
       },
       "references": []
@@ -575,12 +575,12 @@
       "name": "Shipment.shipment_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 18
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 18
         }
       },
       "references": []
@@ -592,12 +592,12 @@
       "name": "Shipment.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 22
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 22
         }
       },
       "references": []
@@ -609,12 +609,12 @@
       "name": "Shipment.tracking_number",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 21
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 21
         }
       },
       "references": []
@@ -627,11 +627,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 5
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 5
         }
       },
       "references": []
@@ -644,11 +644,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 9
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 9
         }
       },
       "references": []
@@ -661,11 +661,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 35
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 35
         }
       },
       "references": []
@@ -678,11 +678,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 27
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 27
         }
       },
       "references": []
@@ -695,11 +695,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 17
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 17
         }
       },
       "references": []
@@ -712,11 +712,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 42
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 42
         }
       },
       "references": []
@@ -729,11 +729,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 78
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 78
         }
       },
       "references": []

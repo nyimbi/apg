@@ -234,11 +234,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 64
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 64
         }
       },
       "related_locations": [],
@@ -254,11 +254,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 64
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 64
         }
       },
       "related_locations": [],
@@ -425,11 +425,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 98
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 98
         }
       },
       "references": []
@@ -442,11 +442,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 65
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 65
         }
       },
       "references": []
@@ -458,12 +458,12 @@
       "name": "BinLocation.aisle",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 23
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 23
         }
       },
       "references": []
@@ -475,12 +475,12 @@
       "name": "BinLocation.bin_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 21
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 21
         }
       },
       "references": []
@@ -492,12 +492,12 @@
       "name": "BinLocation.current_count",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 27
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 27
         }
       },
       "references": []
@@ -509,12 +509,12 @@
       "name": "BinLocation.is_active",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 28
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 28
         }
       },
       "references": []
@@ -526,12 +526,12 @@
       "name": "BinLocation.max_capacity",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 26
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 26
         }
       },
       "references": []
@@ -543,12 +543,12 @@
       "name": "BinLocation.position",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 25
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 25
         }
       },
       "references": []
@@ -560,12 +560,12 @@
       "name": "BinLocation.shelf",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 24
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 24
         }
       },
       "references": []
@@ -577,12 +577,12 @@
       "name": "BinLocation.warehouse_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 22
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 22
         }
       },
       "references": []
@@ -594,12 +594,12 @@
       "name": "InventoryItem.bin_location",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 17
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 17
         }
       },
       "references": []
@@ -611,12 +611,12 @@
       "name": "InventoryItem.cost_price",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 15
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 15
         }
       },
       "references": []
@@ -628,12 +628,12 @@
       "name": "InventoryItem.description",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 10
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 10
         }
       },
       "references": []
@@ -645,12 +645,12 @@
       "name": "InventoryItem.quantity_on_hand",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 12
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 12
         }
       },
       "references": []
@@ -662,12 +662,12 @@
       "name": "InventoryItem.quantity_reserved",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 13
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 13
         }
       },
       "references": []
@@ -679,12 +679,12 @@
       "name": "InventoryItem.reorder_point",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 14
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 14
         }
       },
       "references": []
@@ -696,12 +696,12 @@
       "name": "InventoryItem.sku",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 9
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 9
         }
       },
       "references": []
@@ -713,12 +713,12 @@
       "name": "InventoryItem.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 16
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 16
         }
       },
       "references": []
@@ -730,12 +730,12 @@
       "name": "InventoryItem.unit_of_measure",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 11
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 11
         }
       },
       "references": []
@@ -747,12 +747,12 @@
       "name": "StockMovement.from_bin",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 34
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 34
         }
       },
       "references": []
@@ -764,12 +764,12 @@
       "name": "StockMovement.item_sku",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 33
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 33
         }
       },
       "references": []
@@ -781,12 +781,12 @@
       "name": "StockMovement.movement_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 32
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 32
         }
       },
       "references": []
@@ -798,12 +798,12 @@
       "name": "StockMovement.movement_type",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 36
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 36
         }
       },
       "references": []
@@ -815,12 +815,12 @@
       "name": "StockMovement.performed_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 40
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 40
         }
       },
       "references": []
@@ -832,12 +832,12 @@
       "name": "StockMovement.performed_by",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 39
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 39
         }
       },
       "references": []
@@ -849,12 +849,12 @@
       "name": "StockMovement.quantity",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 37
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 37
         }
       },
       "references": []
@@ -866,12 +866,12 @@
       "name": "StockMovement.reference",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 38
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 38
         }
       },
       "references": []
@@ -883,12 +883,12 @@
       "name": "StockMovement.to_bin",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 35
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 35
         }
       },
       "references": []
@@ -901,11 +901,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 44
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 44
         }
       },
       "references": []
@@ -918,11 +918,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 4
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 4
         }
       },
       "references": []
@@ -935,11 +935,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 52
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 52
         }
       },
       "references": []
@@ -952,11 +952,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 20
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 20
         }
       },
       "references": []
@@ -969,11 +969,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 8
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 8
         }
       },
       "references": []
@@ -986,11 +986,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 31
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 31
         }
       },
       "references": []
@@ -1003,11 +1003,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 88
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 88
         }
       },
       "references": []

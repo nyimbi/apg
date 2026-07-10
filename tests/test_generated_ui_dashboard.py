@@ -12,7 +12,11 @@ from compiler.compiler import APGCompiler, compile_apg_file
 
 def _json_scripts(html: str) -> list[dict]:
 	specs: list[dict] = []
-	for match in re.finditer(r'<script id="[^"]+" type="application/json">(.*?)</script>', html, re.DOTALL):
+	for match in re.finditer(
+		r'<script\b(?=[^>]*\btype="application/json")[^>]*>(.*?)</script>',
+		html,
+		re.DOTALL,
+	):
 		specs.append(json.loads(match.group(1)))
 	return specs
 

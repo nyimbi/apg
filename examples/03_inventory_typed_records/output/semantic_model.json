@@ -38,7 +38,28 @@
     "source": "inventory_records.apg",
     "target": "python"
   },
-  "diagnostics": [],
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "inventory_records.apg",
+      "fixes": [],
+      "message": "Reserved field name 'created_at' is declared explicitly; APG generates this field automatically",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 32
+        },
+        "start": {
+          "character": 4,
+          "line": 32
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
   "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
@@ -107,11 +128,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 63
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 63
         }
       },
       "references": []
@@ -123,12 +144,12 @@
       "name": "InventoryItem.attributes",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 43
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 43
         }
       },
       "references": []
@@ -140,12 +161,12 @@
       "name": "InventoryItem.barcode",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 13
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 13
         }
       },
       "references": []
@@ -157,12 +178,12 @@
       "name": "InventoryItem.best_before",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 35
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 35
         }
       },
       "references": []
@@ -174,12 +195,12 @@
       "name": "InventoryItem.categories",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 42
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 42
         }
       },
       "references": []
@@ -191,12 +212,12 @@
       "name": "InventoryItem.cost_price",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 21
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 21
         }
       },
       "references": []
@@ -208,12 +229,12 @@
       "name": "InventoryItem.created_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 33
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 33
         }
       },
       "references": []
@@ -225,12 +246,12 @@
       "name": "InventoryItem.description",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 12
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 12
         }
       },
       "references": []
@@ -242,12 +263,12 @@
       "name": "InventoryItem.dimensions",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 44
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 44
         }
       },
       "references": []
@@ -259,12 +280,12 @@
       "name": "InventoryItem.image_thumbnail",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 39
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 39
         }
       },
       "references": []
@@ -276,12 +297,12 @@
       "name": "InventoryItem.is_active",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 27
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 27
         }
       },
       "references": []
@@ -293,12 +314,12 @@
       "name": "InventoryItem.is_hazardous",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 29
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 29
         }
       },
       "references": []
@@ -310,12 +331,12 @@
       "name": "InventoryItem.is_serialised",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 28
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 28
         }
       },
       "references": []
@@ -327,12 +348,12 @@
       "name": "InventoryItem.last_counted_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 34
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 34
         }
       },
       "references": []
@@ -344,12 +365,12 @@
       "name": "InventoryItem.metadata",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 45
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 45
         }
       },
       "references": []
@@ -361,12 +382,12 @@
       "name": "InventoryItem.notes",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 14
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 14
         }
       },
       "references": []
@@ -378,12 +399,12 @@
       "name": "InventoryItem.quantity_on_hand",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 17
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 17
         }
       },
       "references": []
@@ -395,12 +416,12 @@
       "name": "InventoryItem.quantity_on_order",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 19
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 19
         }
       },
       "references": []
@@ -412,12 +433,12 @@
       "name": "InventoryItem.quantity_reserved",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 18
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 18
         }
       },
       "references": []
@@ -429,12 +450,12 @@
       "name": "InventoryItem.reorder_point",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 23
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 23
         }
       },
       "references": []
@@ -446,12 +467,12 @@
       "name": "InventoryItem.reorder_quantity",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 24
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 24
         }
       },
       "references": []
@@ -463,12 +484,12 @@
       "name": "InventoryItem.reorder_time",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 36
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 36
         }
       },
       "references": []
@@ -480,12 +501,12 @@
       "name": "InventoryItem.requires_refrigeration",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 30
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 30
         }
       },
       "references": []
@@ -497,12 +518,12 @@
       "name": "InventoryItem.sku",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 11
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 11
         }
       },
       "references": []
@@ -514,12 +535,12 @@
       "name": "InventoryItem.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 48
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 48
         }
       },
       "references": []
@@ -531,12 +552,12 @@
       "name": "InventoryItem.unit_price",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 20
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 20
         }
       },
       "references": []
@@ -548,12 +569,12 @@
       "name": "InventoryItem.warehouse_location",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 49
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 49
         }
       },
       "references": []
@@ -565,12 +586,12 @@
       "name": "InventoryItem.weight_kg",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 22
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 22
         }
       },
       "references": []
@@ -582,12 +603,12 @@
       "name": "StockMovement.item_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 54
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 54
         }
       },
       "references": []
@@ -599,12 +620,12 @@
       "name": "StockMovement.movement_date",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 59
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 59
         }
       },
       "references": []
@@ -616,12 +637,12 @@
       "name": "StockMovement.movement_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 53
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 53
         }
       },
       "references": []
@@ -633,12 +654,12 @@
       "name": "StockMovement.movement_type",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 55
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 55
         }
       },
       "references": []
@@ -650,12 +671,12 @@
       "name": "StockMovement.notes",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 58
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 58
         }
       },
       "references": []
@@ -667,12 +688,12 @@
       "name": "StockMovement.performed_by",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 60
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 60
         }
       },
       "references": []
@@ -684,12 +705,12 @@
       "name": "StockMovement.quantity",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 56
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 56
         }
       },
       "references": []
@@ -701,12 +722,12 @@
       "name": "StockMovement.reference",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 57
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 57
         }
       },
       "references": []
@@ -719,11 +740,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 5
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 5
         }
       },
       "references": []
@@ -736,11 +757,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 9
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 9
         }
       },
       "references": []
@@ -753,11 +774,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 52
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 52
         }
       },
       "references": []

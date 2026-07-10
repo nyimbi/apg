@@ -682,6 +682,8 @@ Generated from APG source as dependency-free Python artifacts.
 
 from __future__ import annotations
 
+import base64
+import gzip
 import importlib
 import hashlib
 import html
@@ -2670,6 +2672,18 @@ def _csrf_input() -> str:
     return f'<input type="hidden" name="apg_csrf_token" value="{{html.escape(token, quote=True)}}">'
 
 
+def _csp_nonce() -> str:
+    try:
+        return str(getattr(_flask_g, "csp_nonce", "") or "")
+    except RuntimeError:
+        return ""
+
+
+def _script_nonce_attr() -> str:
+    nonce = html.escape(_csp_nonce(), quote=True)
+    return f' nonce="{{nonce}}"' if nonce else ""
+
+
 def _csrf_payload_token() -> str:
     if _flask_request.is_json:
         data = _flask_request.get_json(silent=True) or {{}}
@@ -4461,6 +4475,9 @@ def theme_stylesheet() -> str:
         "}}",
         "@media (prefers-color-scheme: dark) {{ :root:not([data-theme='light']) {{ --apg-surface: #1e2028; --apg-border: #30363d; --apg-text: #e6edf3; --apg-muted: #8b949e; --apg-bg-canvas: #0d1117; --apg-bg-card: #161b22; --apg-bg-hover: rgba(255,255,255,0.06); }} }}",
         ":root[data-theme='dark'], :root.dark {{ --apg-surface: #1e2028; --apg-border: #30363d; --apg-text: #e6edf3; --apg-muted: #8b949e; --apg-bg-canvas: #0d1117; --apg-bg-card: #161b22; --apg-bg-hover: rgba(255,255,255,0.06); }}",
+        "body.apg-density-compact .apg-table th, body.apg-density-compact .apg-table td, body.apg-density-compact table th, body.apg-density-compact table td {{ padding-top: 0.75rem; padding-bottom: 0.75rem; }}",
+        "body.apg-density-comfortable .apg-table th, body.apg-density-comfortable .apg-table td, body.apg-density-comfortable table th, body.apg-density-comfortable table td {{ padding-top: 1rem; padding-bottom: 1rem; }}",
+        "body.apg-density-spacious .apg-table th, body.apg-density-spacious .apg-table td, body.apg-density-spacious table th, body.apg-density-spacious table td {{ padding-top: 1.5rem; padding-bottom: 1.5rem; }}",
     ]
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities") and hasattr(APG_CAPABILITIES, "capability_theme"):
         for capability_name in APG_CAPABILITIES.list_capabilities():
@@ -4536,6 +4553,8 @@ def theme_stylesheet() -> str:
         ".apg-btn-danger {{ background: #dc2626; border-color: #dc2626; }}",
         # Alert / notice
         "[role=alert] {{ padding: var(--apg-space-3) var(--apg-space-4); background: #fef9c3; border: 1px solid #fde68a; border-radius: var(--apg-radius-sm); margin-bottom: var(--apg-space-4); font-size: 0.875rem; }}",
+        ".apg-error-page {{ display: flex; flex-direction: column; justify-content: center; min-height: 60vh; max-width: 720px; margin: 0 auto; padding: 2rem; color: var(--apg-muted); text-align: center; }}",
+        ".apg-error-page h1 {{ color: var(--apg-text); }}",
         # Code / pre
         "pre {{ padding: var(--apg-space-4); overflow: auto; background: var(--apg-bg-canvas); border: 1px solid var(--apg-border); border-left: 3px solid var(--apg-accent); border-radius: var(--apg-radius); font-family: var(--apg-font-mono); font-size: 0.8rem; line-height: 1.6; }}",
         "code {{ font-family: var(--apg-font-mono); font-size: 0.85em; color: var(--apg-accent); background: var(--apg-bg-hover); padding: 1px 5px; border-radius: 3px; }}",
@@ -4567,6 +4586,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
     direction = _text_direction(locale)
     safe_locale = html.escape(locale, quote=True)
     safe_direction = html.escape(direction, quote=True)
+    script_nonce_attr = _script_nonce_attr()
     try:
         current_path = _flask_request.path
     except RuntimeError:
@@ -4653,7 +4673,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         + '</aside><div id="apg-sidebar-backdrop" class="apg-sidebar-backdrop" onclick="apgCloseSidebar()"></div>'
     )
     head_extras = (
-        '<script>(function(){{try{{var m=localStorage.getItem("apg-theme")||"system";var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;}}catch(e){{}}}})();</script>'
+        '<script' + script_nonce_attr + '>(function(){{try{{var m=localStorage.getItem("apg-theme")||"system";var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;}}catch(e){{}}}})();</script>'
         '<meta name="theme-color" content="#1E5B5A">'
         '<link rel="manifest" href="/static/manifest.webmanifest">'
         '<link rel="stylesheet" href="/static/apg.css">'
@@ -4665,7 +4685,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         '<script defer src="/static/apg-sse.js"></script>'
     )
     toast_js = (
-        '<div id="apg-toast-root" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>'
+        '<div id="apg-toast-root" role="status" aria-live="polite" aria-atomic="true" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>'
         '<dialog id="apg-confirm-dialog" class="apg-dialog">'
         '<form method="dialog" class="apg-dialog-panel">'
         '<h2 id="apg-confirm-title">Confirm action</h2>'
@@ -4674,7 +4694,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         '<button value="cancel" class="apg-btn apg-btn-secondary" type="submit">Cancel</button>'
         '<button value="confirm" class="apg-btn apg-btn-danger" type="submit">Delete</button>'
         '</div></form></dialog>'
-        '<script>'
+        f'<script{{script_nonce_attr}}>'
         'var _apgNotifications=[];var _apgDeferredInstall=null;var _apgWasOffline=false;'
         'function apgClearChildren(el){{while(el&&el.firstChild)el.removeChild(el.firstChild);}}'
         'function apgRenderNotifications(){{var list=document.getElementById("apg-notification-list");var dot=document.getElementById("apg-notification-dot");if(!list)return;apgClearChildren(list);if(!_apgNotifications.length){{var empty=document.createElement("p");empty.className="apg-notification-meta";empty.textContent="No notifications yet.";list.appendChild(empty);if(dot)dot.hidden=true;return;}}_apgNotifications.slice(0,6).forEach(function(n){{var article=document.createElement("article");article.className="apg-notification-item";var title=document.createElement("p");title.className="apg-notification-title";title.textContent=String(n&&n.message||"");var meta=document.createElement("p");meta.className="apg-notification-meta";meta.textContent=String(n&&n.kind||"info")+" - "+String(n&&n.time||"");article.appendChild(title);article.appendChild(meta);list.appendChild(article);}});if(dot)dot.hidden=false;}}'
@@ -4697,7 +4717,11 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         '}});'
         'function apgApplyTheme(m){{var d=document.documentElement;if(m==="dark"||m==="light")d.setAttribute("data-theme",m);else d.removeAttribute("data-theme");d.dataset.themeMode=m;var b=document.getElementById("apg-theme-toggle");if(b){{b.setAttribute("aria-label","Theme: "+m);b.textContent=m==="dark"?"Dark":m==="light"?"Light":"System";}}}}'
         'function apgCycleTheme(){{var order=["system","light","dark"];var cur=localStorage.getItem("apg-theme")||"system";var next=order[(order.indexOf(cur)+1)%order.length];localStorage.setItem("apg-theme",next);apgApplyTheme(next);}}'
+        'function apgApplyDensity(m){{var order=["compact","comfortable","spacious"];if(order.indexOf(m)<0)m="comfortable";var b=document.body;if(b){{order.forEach(function(x){{b.classList.remove("apg-density-"+x);}});b.classList.add("apg-density-"+m);}}var t=document.getElementById("apg-density-toggle");if(t){{var label=m.charAt(0).toUpperCase()+m.slice(1);t.textContent=label;t.setAttribute("aria-label","Density: "+m);}}}}'
+        'function apgCycleDensity(){{var order=["compact","comfortable","spacious"];var cur=localStorage.getItem("apg-density")||"comfortable";var next=order[(order.indexOf(cur)+1)%order.length];localStorage.setItem("apg-density",next);apgApplyDensity(next);}}'
         'document.addEventListener("DOMContentLoaded",function(){{apgApplyTheme(localStorage.getItem("apg-theme")||"system");}});'
+        'document.addEventListener("DOMContentLoaded",function(){{apgApplyDensity(localStorage.getItem("apg-density")||"comfortable");}});'
+        'document.addEventListener("click",function(e){{if(e.target.closest("[data-apg-density-toggle]"))apgCycleDensity();}});'
         'function apgConfirm(message,ok){{var d=document.getElementById("apg-confirm-dialog");if(!d||!d.showModal){{var nativeConfirm=window["confirm"];if(nativeConfirm&&nativeConfirm(message))ok();return;}}document.getElementById("apg-confirm-message").textContent=message;var done=false;function close(){{if(done)return;done=true;d.removeEventListener("close",onclose);}}function onclose(){{var v=d.returnValue;close();if(v==="confirm")ok();}}d.addEventListener("close",onclose);d.showModal();}}'
         'function apgConfirmSubmit(form,message){{apgConfirm(message||"Delete this record?",function(){{form.dataset.apgConfirmed="1";form.requestSubmit();}});return false;}}'
         'document.addEventListener("DOMContentLoaded",function(){{document.querySelectorAll(".apg-topnav a").forEach(function(a){{if(a.getAttribute("href")===location.pathname){{a.classList.add("active");a.setAttribute("aria-current","page");}}}});}});'
@@ -4716,7 +4740,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         '</script>'
     )
     skeleton_css = (
-        '<style>'
+        f'<style{{script_nonce_attr}}>'
         '.apg-skeleton{{'
         '  background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);'
         '  background-size:200% 100%;'
@@ -4732,6 +4756,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         '</style>'
     )
     cmd_palette_html = {cmd_palette_literal!r}
+    cmd_palette_html = cmd_palette_html.replace('<script>', f'<script{{script_nonce_attr}}>')
     cmd_palette_html = cmd_palette_html.replace(
         'id="apg-cmd" class="hidden',
         'id="apg-cmd" role="dialog" aria-modal="true" aria-label="Command palette" class="hidden',
@@ -4743,7 +4768,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         '<p id="apg-tour-copy">Use the command center to jump across generated pages, APIs, entities, and operations.</p>'
         '<div class="apg-tour-actions"><button type="button" class="apg-btn apg-btn-secondary" onclick="apgTourClose()">Skip</button><button type="button" class="apg-btn" onclick="apgTourNext()">Next</button></div>'
         '</div></section>'
-        '<script>'
+        f'<script{{script_nonce_attr}}>'
         'window.APGToast=window.APGToast||apgToast;'
         'var APG_SHELL_COMMANDS=' + shell_command_json + ';'
         'var _apgTourStep=0;'
@@ -4816,6 +4841,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         f'    <button class="apg-btn apg-btn-secondary apg-tour-trigger" type="button" onclick="apgTourOpen()">Tour</button>'
         f'    <button id="apg-install-btn" class="apg-btn apg-btn-secondary apg-install-btn" type="button" onclick="apgInstall()" hidden>Install</button>'
         f'    <button id="apg-update-btn" class="apg-btn apg-btn-secondary apg-install-btn" type="button" onclick="apgApplyUpdate()" hidden>Update</button>'
+        f'    <button id="apg-density-toggle" data-apg-density-toggle class="apg-btn apg-btn-secondary apg-density-toggle" type="button" aria-label="Density: comfortable">Comfortable</button>'
         f'    <div class="apg-notification-wrap">'
         f'      <button class="apg-btn apg-btn-secondary" type="button" onclick="apgToggleNotifications()" aria-controls="apg-notification-panel" aria-label="Notifications">Notifications<span id="apg-notification-dot" class="apg-notification-dot" hidden></span></button>'
         f'      <section id="apg-notification-panel" class="apg-notification-panel" aria-label="Notifications" hidden><h2 class="text-sm font-semibold text-gray-900 mb-3">Notifications</h2><div id="apg-notification-list"></div></section>'
@@ -4882,7 +4908,9 @@ def _render_template(template_name: str, **context: Any) -> str | None:
             "format_date": format_date,
             "csrf_token": _csrf_token,
             "csrf_input": _csrf_input,
+            "csp_nonce": _csp_nonce(),
         }})
+        context.setdefault("csp_nonce", _csp_nonce())
         tmpl = env.get_template(template_name)
         return tmpl.render(**context)
     except Exception:
@@ -6412,7 +6440,7 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
             sort_icon = " ▼" if sort_dir == "desc" else " ▲"
         sort_url = html.escape(_ui_entity_query_path(entity_name, query, {{"sort": col, "dir": next_dir, "page": None}}), quote=True)
         header_cells.append(
-            f'<th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">'
+            f'<th scope="col" class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">'
             f'<a href="{{sort_url}}"'
             f' class="hover:text-gray-900 transition-colors">{{label}}{{sort_icon}}</a>'
             f'</th>'
@@ -6429,18 +6457,19 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
             f' data-row-id="{{raw_record_id}}" data-rev="{{revision}}">'
             f'</td>'
         )
-        cells = [cb_cell]
+        cells = []
         for col in display_cols:
             val = html.escape(_ui_record_display_value(record.get(col)))
             if col == "id":
                 cells.append(
-                    f'<td class="px-4 py-2.5">'
+                    f'<td scope="row" class="px-4 py-2.5">'
                     f'<a href="/ui/entities/{{safe_entity}}/{{record_id}}"'
                     f' class="text-xs font-mono text-apg-primary hover:underline truncate block max-w-24">{{val[:16]}}</a>'
                     f'</td>'
                 )
             else:
                 cells.append(f'<td class="px-4 py-2.5 text-sm text-gray-700 max-w-xs truncate">{{val}}</td>')
+        cells.append(cb_cell)
         edit_hidden = "".join(
             f'<input type="hidden" name="{{html.escape(str(f["name"]), quote=True)}}" value="{{html.escape(str(record.get(str(f["name"]), "") or ""), quote=True)}}">'
             for f in fields if str(f.get("name")) not in {{"id", "_revision"}}
@@ -6481,7 +6510,7 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
         f'</div>'
     )
     bulk_js = (
-        '<script>'
+        f'<script{{_script_nonce_attr()}}>'
         '(function(){{'
         'function upd(){{'
         'var cc=document.querySelectorAll(".apg-row-cb:checked");'
@@ -6519,10 +6548,11 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
         + f'<div class="apg-table-wrap shadow-sm overflow-hidden">'
         + f'<div class="overflow-x-auto">'
         + f'<table class="w-full">'
+        + f'<caption class="apg-sr-only">{{html.escape(entity_name)}} records</caption>'
         + f'<thead class="bg-gray-50 border-b border-gray-100">'
         + f'<tr>'
-        + f'<th class="pl-3 pr-1 py-2.5 w-8"><input type="checkbox" class="apg-select-all w-4 h-4 rounded border-gray-300"></th>'
-        + f'{{header}}<th class="px-4 py-2.5 w-28"></th></tr>'
+        + f'{{header}}<th scope="col" class="pl-3 pr-1 py-2.5 w-8"><input type="checkbox" class="apg-select-all w-4 h-4 rounded border-gray-300" aria-label="Select all {{html.escape(entity_name)}} records"></th>'
+        + f'<th scope="col" class="px-4 py-2.5 w-28">Actions</th></tr>'
         + f'</thead>'
         + f'<tbody>{{"".join(rows)}}</tbody>'
         + f'</table>'
@@ -9122,6 +9152,7 @@ _APG_OPS_QUIET_PATHS = frozenset({{"/livez", "/readyz"}})
 
 @_flask_app.before_request
 def _apg_ops_before_request() -> None:
+    _flask_g.csp_nonce = base64.b64encode(os.urandom(16)).decode("ascii")
     request_id = str(_flask_request.headers.get("X-Request-ID") or "").strip() or str(_uuid.uuid4())
     _flask_g.request_id = request_id
     _flask_g.apg_request_started_at = _time.perf_counter()
@@ -9197,8 +9228,9 @@ def _flask_prometheus_metrics() -> _FlaskResponse:
     return _FlaskResponse(_apg_metrics_text(), status=200, content_type="text/plain; version=0.0.4; charset=utf-8")
 
 
-_APG_SECURITY_HEADERS: Dict[str, str] = {{
-    "Content-Security-Policy": (
+def _content_security_policy() -> str:
+    nonce = _csp_nonce()
+    return (
         "default-src 'self'; "
         "base-uri 'self'; "
         "object-src 'none'; "
@@ -9206,12 +9238,15 @@ _APG_SECURITY_HEADERS: Dict[str, str] = {{
         "form-action 'self'; "
         "img-src 'self' data: blob:; "
         "font-src 'self' data:; "
-        "style-src 'self' 'unsafe-inline'; "
-        "script-src 'self' 'unsafe-inline'; "
+        f"style-src 'self' 'nonce-{{nonce}}'; "
+        f"script-src 'self' 'nonce-{{nonce}}'; "
         "connect-src 'self'; "
         "worker-src 'self' blob:; "
         "manifest-src 'self'"
-    ),
+    )
+
+
+_APG_SECURITY_HEADERS: Dict[str, str] = {{
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -9223,12 +9258,122 @@ _APG_SECURITY_HEADERS: Dict[str, str] = {{
 
 @_flask_app.after_request
 def _apply_security_headers(response: _FlaskResponse) -> _FlaskResponse:
+    if "Content-Security-Policy" not in response.headers:
+        response.headers["Content-Security-Policy"] = _content_security_policy()
     for header_name, header_value in _APG_SECURITY_HEADERS.items():
         if header_name not in response.headers:
             response.headers[header_name] = header_value
     if _flask_request.is_secure and "Strict-Transport-Security" not in response.headers:
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
     return response
+
+
+# Wave C HTTP efficiency: cache semantics, conditional GET, and gzip.
+_APG_GZIP_MIN_BYTES = 860
+_APG_STATIC_CACHE_CONTROL = "public, max-age=31536000, immutable"
+_APG_RECORDS_CACHE_CONTROL = "no-cache"
+_APG_PRIVATE_CACHE_CONTROL = "no-store, private"
+
+
+def _add_vary_header(response: _FlaskResponse, value: str) -> _FlaskResponse:
+    existing = [
+        item.strip()
+        for item in str(response.headers.get("Vary", "")).split(",")
+        if item.strip()
+    ]
+    existing_lower = {{item.lower() for item in existing}}
+    if value.lower() not in existing_lower:
+        existing.append(value)
+        response.headers["Vary"] = ", ".join(existing)
+    return response
+
+
+def _request_accepts_gzip() -> bool:
+    accepted = str(_flask_request.headers.get("Accept-Encoding", "")).lower()
+    return any(part.split(";", 1)[0].strip() == "gzip" for part in accepted.split(","))
+
+
+def _compressible_mimetype(response: _FlaskResponse) -> bool:
+    mimetype = str(response.mimetype or "").lower()
+    return mimetype.startswith("text/") or mimetype == "application/json"
+
+
+def _maybe_compress(response: _FlaskResponse) -> _FlaskResponse:
+    if _env_flag("APG_DISABLE_GZIP"):
+        return response
+    if not _request_accepts_gzip():
+        return response
+    if response.is_streamed or response.direct_passthrough:
+        return response
+    if response.headers.get("Content-Encoding"):
+        return response
+    status = int(response.status_code)
+    if status < 200 or status >= 300:
+        return response
+    if not _compressible_mimetype(response):
+        return response
+    body = response.get_data()
+    if len(body) <= _APG_GZIP_MIN_BYTES:
+        return response
+    compressed = gzip.compress(body)
+    response.set_data(compressed)
+    response.headers["Content-Encoding"] = "gzip"
+    response.headers["Content-Length"] = str(len(compressed))
+    _add_vary_header(response, "Accept-Encoding")
+    return response
+
+
+def _is_records_list_response(response: _FlaskResponse) -> bool:
+    if _flask_request.method != "GET":
+        return False
+    if int(response.status_code) != 200:
+        return False
+    if str(response.mimetype or "").lower() != "application/json":
+        return False
+    if _current_user() is not None:
+        return False
+    path = _flask_request.path.rstrip("/") or "/"
+    parts = [part for part in path.split("/") if part]
+    return len(parts) == 2 and parts[0] == "records" and parts[1] in ENTITY_NAMES
+
+
+def _maybe_apply_records_etag(response: _FlaskResponse) -> _FlaskResponse:
+    if not _is_records_list_response(response):
+        return response
+    body = response.get_data()
+    etag = '"' + hashlib.sha256(body).hexdigest()[:16] + '"'
+    response.headers["ETag"] = etag
+    requested = [
+        item.strip()
+        for item in str(_flask_request.headers.get("If-None-Match", "")).split(",")
+        if item.strip()
+    ]
+    if etag in requested:
+        response.status_code = 304
+        response.set_data(b"")
+        response.headers["ETag"] = etag
+        response.headers.pop("Content-Length", None)
+    return response
+
+
+def _apply_cache_control(response: _FlaskResponse) -> _FlaskResponse:
+    path = _flask_request.path.rstrip("/") or "/"
+    if path.startswith("/static/") or path.startswith("/apg-static/"):
+        response.headers["Cache-Control"] = _APG_STATIC_CACHE_CONTROL
+    elif _flask_request.method == "GET" and (path == "/records" or path.startswith("/records/")):
+        response.headers["Cache-Control"] = _APG_RECORDS_CACHE_CONTROL
+    elif _flask_request.method == "GET" and (path == "/login" or path == "/ui" or path.startswith("/ui/")):
+        response.headers["Cache-Control"] = _APG_PRIVATE_CACHE_CONTROL
+    return response
+
+
+@_flask_app.after_request
+def _apg_http_efficiency_after_request(response: _FlaskResponse) -> _FlaskResponse:
+    response = _apply_cache_control(response)
+    response = _maybe_apply_records_etag(response)
+    if int(response.status_code) == 304:
+        return response
+    return _maybe_compress(response)
 
 
 def _error_response_wants_json() -> bool:

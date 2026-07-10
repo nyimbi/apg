@@ -41,8 +41,9 @@ def _assert_security_headers(response) -> None:
 	assert headers["Cross-Origin-Resource-Policy"] == "same-origin"
 	csp = headers["Content-Security-Policy"]
 	assert "default-src 'self'" in csp
-	assert "script-src 'self' 'unsafe-inline'" in csp
-	assert "style-src 'self' 'unsafe-inline'" in csp
+	assert "script-src 'self' 'nonce-" in csp
+	assert "style-src 'self' 'nonce-" in csp
+	assert "unsafe-inline" not in csp
 	assert "object-src 'none'" in csp
 	assert "frame-ancestors 'none'" in csp
 	assert "form-action 'self'" in csp

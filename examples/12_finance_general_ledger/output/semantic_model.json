@@ -446,11 +446,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 43
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 43
         }
       },
       "related_locations": [],
@@ -639,11 +639,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 128
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 128
         }
       },
       "references": []
@@ -656,11 +656,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 44
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 44
         }
       },
       "references": []
@@ -672,12 +672,12 @@
       "name": "Account.account_code",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 10
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 10
         }
       },
       "references": []
@@ -689,12 +689,12 @@
       "name": "Account.account_name",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 11
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 11
         }
       },
       "references": []
@@ -706,12 +706,12 @@
       "name": "Account.account_type",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 12
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 12
         }
       },
       "references": []
@@ -723,12 +723,12 @@
       "name": "Account.currency",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 14
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 14
         }
       },
       "references": []
@@ -740,12 +740,12 @@
       "name": "Account.is_active",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 15
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 15
         }
       },
       "references": []
@@ -757,12 +757,12 @@
       "name": "Account.is_control",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 16
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 16
         }
       },
       "references": []
@@ -774,12 +774,12 @@
       "name": "Account.normal_balance",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 17
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 17
         }
       },
       "references": []
@@ -791,12 +791,12 @@
       "name": "Account.parent_code",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 13
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 13
         }
       },
       "references": []
@@ -808,12 +808,12 @@
       "name": "JournalEntry.description",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 25
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 25
         }
       },
       "references": []
@@ -825,12 +825,12 @@
       "name": "JournalEntry.entry_date",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 24
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 24
         }
       },
       "references": []
@@ -842,12 +842,12 @@
       "name": "JournalEntry.journal_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 21
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 21
         }
       },
       "references": []
@@ -859,12 +859,12 @@
       "name": "JournalEntry.period",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 23
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 23
         }
       },
       "references": []
@@ -876,12 +876,12 @@
       "name": "JournalEntry.posted_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 30
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 30
         }
       },
       "references": []
@@ -893,12 +893,12 @@
       "name": "JournalEntry.posted_by",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 29
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 29
         }
       },
       "references": []
@@ -910,12 +910,12 @@
       "name": "JournalEntry.reference",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 22
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 22
         }
       },
       "references": []
@@ -927,12 +927,12 @@
       "name": "JournalEntry.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 26
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 26
         }
       },
       "references": []
@@ -944,12 +944,12 @@
       "name": "JournalEntry.total_credit",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 28
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 28
         }
       },
       "references": []
@@ -961,12 +961,12 @@
       "name": "JournalEntry.total_debit",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 27
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 27
         }
       },
       "references": []
@@ -978,12 +978,12 @@
       "name": "JournalLine.account_code",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 36
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 36
         }
       },
       "references": []
@@ -995,12 +995,12 @@
       "name": "JournalLine.cost_centre",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 39
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 39
         }
       },
       "references": []
@@ -1012,12 +1012,12 @@
       "name": "JournalLine.credit",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 38
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 38
         }
       },
       "references": []
@@ -1029,12 +1029,12 @@
       "name": "JournalLine.debit",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 37
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 37
         }
       },
       "references": []
@@ -1046,12 +1046,12 @@
       "name": "JournalLine.journal_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 35
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 35
         }
       },
       "references": []
@@ -1063,12 +1063,12 @@
       "name": "JournalLine.line_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 34
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 34
         }
       },
       "references": []
@@ -1080,12 +1080,12 @@
       "name": "JournalLine.memo",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 41
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 41
         }
       },
       "references": []
@@ -1097,12 +1097,12 @@
       "name": "JournalLine.project",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 40
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 40
         }
       },
       "references": []
@@ -1115,11 +1115,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 5
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 5
         }
       },
       "references": []
@@ -1132,11 +1132,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 9
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 9
         }
       },
       "references": []
@@ -1149,11 +1149,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 20
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 20
         }
       },
       "references": []
@@ -1166,11 +1166,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 33
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 33
         }
       },
       "references": []

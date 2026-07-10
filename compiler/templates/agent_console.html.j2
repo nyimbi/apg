@@ -197,7 +197,7 @@
   </aside>
 </section>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   document.addEventListener('click', function(event) {
     var branch = event.target.closest('[data-apg-agent-branch]');

@@ -105,7 +105,7 @@
   </article>
 </section>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   var densityKey = {{ list_intelligence.density_key | tojson }};
   var root = document.documentElement;
@@ -195,7 +195,7 @@
   </form>
 </dialog>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   var drawer = document.getElementById('apg-create-drawer');
   var form = document.getElementById('apg-create-form');

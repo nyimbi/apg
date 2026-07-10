@@ -7,7 +7,7 @@
   <title>{{ module_name | replace('_', ' ') | title }}</title>
   <link rel="stylesheet" href="/static/apg.css">
   <link rel="stylesheet" href="/theme.css">
-  <style>
+  <style nonce="{{ csp_nonce }}">
     :root {
       --brand: {{ theme_primary }};
       --accent: {{ theme_accent }};
@@ -64,11 +64,12 @@
       </div>
       <div class="apg-table-wrap">
         <table class="apg-table">
-          <thead><tr><th>Surface</th><th>APG proof</th><th>Leader weakness closed</th><th>Inspect</th></tr></thead>
+          <caption class="apg-sr-only">{{ module_name }} capability compare records</caption>
+          <thead><tr><th scope="col">Surface</th><th scope="col">APG proof</th><th scope="col">Leader weakness closed</th><th scope="col">Inspect</th></tr></thead>
           <tbody>
             {% for row in capability_compare %}
             <tr>
-              <td class="font-semibold">{{ row.surface }}</td>
+              <td scope="row" class="font-semibold">{{ row.surface }}</td>
               <td>{{ row.apg }}</td>
               <td>{{ row.leader_gap }}</td>
               <td><a href="{{ row.proof }}" class="apg-btn apg-btn-secondary apg-mini-btn">Open</a></td>

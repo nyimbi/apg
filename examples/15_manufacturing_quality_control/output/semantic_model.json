@@ -285,11 +285,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 31
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 31
         }
       },
       "related_locations": [],
@@ -305,11 +305,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 31
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 31
         }
       },
       "related_locations": [],
@@ -499,11 +499,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 92
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 92
         }
       },
       "references": []
@@ -516,11 +516,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 32
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 32
         }
       },
       "references": []
@@ -532,12 +532,12 @@
       "name": "QualityInspection.defect_count",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 26
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 26
         }
       },
       "references": []
@@ -549,12 +549,12 @@
       "name": "QualityInspection.defect_rate",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 27
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 27
         }
       },
       "references": []
@@ -566,12 +566,12 @@
       "name": "QualityInspection.inspected_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 28
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 28
         }
       },
       "references": []
@@ -583,12 +583,12 @@
       "name": "QualityInspection.inspection_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 21
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 21
         }
       },
       "references": []
@@ -600,12 +600,12 @@
       "name": "QualityInspection.inspection_type",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 24
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 24
         }
       },
       "references": []
@@ -617,12 +617,12 @@
       "name": "QualityInspection.inspector_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 23
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 23
         }
       },
       "references": []
@@ -634,12 +634,12 @@
       "name": "QualityInspection.notes",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 29
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 29
         }
       },
       "references": []
@@ -651,12 +651,12 @@
       "name": "QualityInspection.result",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 25
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 25
         }
       },
       "references": []
@@ -668,12 +668,12 @@
       "name": "QualityInspection.work_order_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 22
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 22
         }
       },
       "references": []
@@ -685,12 +685,12 @@
       "name": "WorkOrder.completed_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 16
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 16
         }
       },
       "references": []
@@ -702,12 +702,12 @@
       "name": "WorkOrder.product_code",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 10
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 10
         }
       },
       "references": []
@@ -719,12 +719,12 @@
       "name": "WorkOrder.production_line",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 17
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 17
         }
       },
       "references": []
@@ -736,12 +736,12 @@
       "name": "WorkOrder.quantity_planned",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 11
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 11
         }
       },
       "references": []
@@ -753,12 +753,12 @@
       "name": "WorkOrder.quantity_produced",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 12
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 12
         }
       },
       "references": []
@@ -770,12 +770,12 @@
       "name": "WorkOrder.quantity_rejected",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 13
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 13
         }
       },
       "references": []
@@ -787,12 +787,12 @@
       "name": "WorkOrder.started_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 15
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 15
         }
       },
       "references": []
@@ -804,12 +804,12 @@
       "name": "WorkOrder.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 14
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 14
         }
       },
       "references": []
@@ -821,12 +821,12 @@
       "name": "WorkOrder.work_order_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 9
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 9
         }
       },
       "references": []
@@ -839,11 +839,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 4
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 4
         }
       },
       "references": []
@@ -856,11 +856,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 20
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 20
         }
       },
       "references": []
@@ -873,11 +873,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 8
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 8
         }
       },
       "references": []
@@ -890,11 +890,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 73
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 73
         }
       },
       "references": []

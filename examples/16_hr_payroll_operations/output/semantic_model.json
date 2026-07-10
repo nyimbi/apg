@@ -678,11 +678,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 52
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 52
         }
       },
       "references": []
@@ -695,11 +695,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 63
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 63
         }
       },
       "references": []
@@ -712,11 +712,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 73
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 73
         }
       },
       "references": []
@@ -729,11 +729,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 152
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 152
         }
       },
       "references": []
@@ -746,11 +746,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 80
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 80
         }
       },
       "references": []
@@ -762,12 +762,12 @@
       "name": "Employee.bank_account",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 20
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 20
         }
       },
       "references": []
@@ -779,12 +779,12 @@
       "name": "Employee.currency",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 19
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 19
         }
       },
       "references": []
@@ -796,12 +796,12 @@
       "name": "Employee.department",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 13
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 13
         }
       },
       "references": []
@@ -813,12 +813,12 @@
       "name": "Employee.email",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 12
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 12
         }
       },
       "references": []
@@ -830,12 +830,12 @@
       "name": "Employee.employee_number",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 9
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 9
         }
       },
       "references": []
@@ -847,12 +847,12 @@
       "name": "Employee.employment_type",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 15
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 15
         }
       },
       "references": []
@@ -864,12 +864,12 @@
       "name": "Employee.first_name",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 10
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 10
         }
       },
       "references": []
@@ -881,12 +881,12 @@
       "name": "Employee.hire_date",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 16
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 16
         }
       },
       "references": []
@@ -898,12 +898,12 @@
       "name": "Employee.is_active",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 24
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 24
         }
       },
       "references": []
@@ -915,12 +915,12 @@
       "name": "Employee.last_name",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 11
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 11
         }
       },
       "references": []
@@ -932,12 +932,12 @@
       "name": "Employee.nhif_number",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 23
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 23
         }
       },
       "references": []
@@ -949,12 +949,12 @@
       "name": "Employee.nssf_number",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 22
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 22
         }
       },
       "references": []
@@ -966,12 +966,12 @@
       "name": "Employee.position",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 14
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 14
         }
       },
       "references": []
@@ -983,12 +983,12 @@
       "name": "Employee.salary",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 18
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 18
         }
       },
       "references": []
@@ -1000,12 +1000,12 @@
       "name": "Employee.tax_pin",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 21
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 21
         }
       },
       "references": []
@@ -1017,12 +1017,12 @@
       "name": "Employee.termination_date",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 17
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 17
         }
       },
       "references": []
@@ -1034,12 +1034,12 @@
       "name": "PayRun.approved_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 36
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 36
         }
       },
       "references": []
@@ -1051,12 +1051,12 @@
       "name": "PayRun.approved_by",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 35
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 35
         }
       },
       "references": []
@@ -1068,12 +1068,12 @@
       "name": "PayRun.pay_date",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 30
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 30
         }
       },
       "references": []
@@ -1085,12 +1085,12 @@
       "name": "PayRun.pay_run_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 28
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 28
         }
       },
       "references": []
@@ -1102,12 +1102,12 @@
       "name": "PayRun.period",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 29
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 29
         }
       },
       "references": []
@@ -1119,12 +1119,12 @@
       "name": "PayRun.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 31
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 31
         }
       },
       "references": []
@@ -1136,12 +1136,12 @@
       "name": "PayRun.total_deductions",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 33
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 33
         }
       },
       "references": []
@@ -1153,12 +1153,12 @@
       "name": "PayRun.total_gross",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 32
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 32
         }
       },
       "references": []
@@ -1170,12 +1170,12 @@
       "name": "PayRun.total_net",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 34
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 34
         }
       },
       "references": []
@@ -1187,12 +1187,12 @@
       "name": "Payslip.employee_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 42
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 42
         }
       },
       "references": []
@@ -1204,12 +1204,12 @@
       "name": "Payslip.gross_pay",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 43
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 43
         }
       },
       "references": []
@@ -1221,12 +1221,12 @@
       "name": "Payslip.net_pay",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 48
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 48
         }
       },
       "references": []
@@ -1238,12 +1238,12 @@
       "name": "Payslip.nhif_employee",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 46
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 46
         }
       },
       "references": []
@@ -1255,12 +1255,12 @@
       "name": "Payslip.nssf_employee",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 45
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 45
         }
       },
       "references": []
@@ -1272,12 +1272,12 @@
       "name": "Payslip.other_deductions",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 47
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 47
         }
       },
       "references": []
@@ -1289,12 +1289,12 @@
       "name": "Payslip.pay_run_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 41
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 41
         }
       },
       "references": []
@@ -1306,12 +1306,12 @@
       "name": "Payslip.paye_tax",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 44
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 44
         }
       },
       "references": []
@@ -1323,12 +1323,12 @@
       "name": "Payslip.payment_status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 49
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 49
         }
       },
       "references": []
@@ -1340,12 +1340,12 @@
       "name": "Payslip.payslip_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 40
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 40
         }
       },
       "references": []
@@ -1358,11 +1358,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 63
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 63
         }
       },
       "references": []
@@ -1375,11 +1375,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 4
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 4
         }
       },
       "references": []
@@ -1392,11 +1392,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 8
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 8
         }
       },
       "references": []
@@ -1409,11 +1409,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 27
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 27
         }
       },
       "references": []
@@ -1426,11 +1426,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 39
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 39
         }
       },
       "references": []
@@ -1443,11 +1443,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 121
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 121
         }
       },
       "references": []
@@ -1460,11 +1460,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 142
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 142
         }
       },
       "references": []
@@ -1477,11 +1477,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 108
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 108
         }
       },
       "references": []

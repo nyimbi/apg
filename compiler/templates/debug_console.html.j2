@@ -157,11 +157,12 @@
   {% if selected_run.journal %}
   <div class="apg-table-wrap">
     <table class="apg-table">
-      <thead><tr><th>Seq</th><th>Event</th><th>Step</th><th>Time</th><th>Data</th></tr></thead>
+      <caption class="apg-sr-only">{{ selected_run.workflow }} journal records</caption>
+      <thead><tr><th scope="col">Seq</th><th scope="col">Event</th><th scope="col">Step</th><th scope="col">Time</th><th scope="col">Data</th></tr></thead>
       <tbody>
         {% for event in selected_run.journal %}
         <tr>
-          <td class="font-mono">{{ event.seq }}</td>
+          <td scope="row" class="font-mono">{{ event.seq }}</td>
           <td><span class="apg-badge apg-badge-neutral">{{ event.event_type }}</span></td>
           <td>{{ event.step }}</td>
           <td class="font-mono text-xs">{{ event.ts }}</td>
@@ -177,7 +178,7 @@
 </section>
 
 {% if selected_run and selected_run.debug_intelligence %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
   document.addEventListener('click', function (event) {
     var replay = event.target.closest('[data-apg-replay-target]');
@@ -208,11 +209,12 @@
     {% if runs %}
     <div class="apg-table-wrap">
       <table class="apg-table">
-        <thead><tr><th>Run</th><th>Workflow</th><th>Entity</th><th>Status</th><th>Steps</th></tr></thead>
+        <caption class="apg-sr-only">Workflow run records</caption>
+        <thead><tr><th scope="col">Run</th><th scope="col">Workflow</th><th scope="col">Entity</th><th scope="col">Status</th><th scope="col">Steps</th></tr></thead>
         <tbody>
           {% for run in runs %}
           <tr>
-            <td><a href="/ui/debug/{{ run.id }}" class="font-mono hover:underline">{{ run.id }}</a></td>
+            <td scope="row"><a href="/ui/debug/{{ run.id }}" class="font-mono hover:underline">{{ run.id }}</a></td>
             <td>{{ run.workflow }}</td>
             <td>{{ run.entity }}</td>
             <td><span class="apg-badge {{ run.badge_class }}">{{ run.status }}</span></td>

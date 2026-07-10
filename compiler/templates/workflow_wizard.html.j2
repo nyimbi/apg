@@ -130,7 +130,7 @@
   {% endif %}
 </section>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   document.addEventListener('click', function(event) {
     var trigger = event.target.closest('[data-apg-workflow-template]');

@@ -59,7 +59,7 @@
         <button type="button" class="apg-mini-btn" data-apg-clear-lockout>Clear local counter</button>
       </article>
     </section>
-    <script>
+    <script nonce="{{ csp_nonce }}">
     (function () {
       var toast = function (message, kind) {
         if (window.APGToast) window.APGToast(message, kind || 'info');

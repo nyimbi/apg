@@ -424,7 +424,28 @@
     "source": "crm_sales.apg",
     "target": "python"
   },
-  "diagnostics": [],
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_sales.apg",
+      "fixes": [],
+      "message": "Reserved field name 'created_at' is declared explicitly; APG generates this field automatically",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 21
+        },
+        "start": {
+          "character": 4,
+          "line": 21
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
   "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
@@ -559,11 +580,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 91
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 91
         }
       },
       "references": []
@@ -576,11 +597,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 40
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 40
         }
       },
       "references": []
@@ -593,11 +614,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 57
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 57
         }
       },
       "references": []
@@ -609,12 +630,12 @@
       "name": "Lead.company",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 17
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 17
         }
       },
       "references": []
@@ -626,12 +647,12 @@
       "name": "Lead.created_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 22
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 22
         }
       },
       "references": []
@@ -643,12 +664,12 @@
       "name": "Lead.email",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 15
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 15
         }
       },
       "references": []
@@ -660,12 +681,12 @@
       "name": "Lead.first_name",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 13
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 13
         }
       },
       "references": []
@@ -677,12 +698,12 @@
       "name": "Lead.last_name",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 14
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 14
         }
       },
       "references": []
@@ -694,12 +715,12 @@
       "name": "Lead.lead_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 12
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 12
         }
       },
       "references": []
@@ -711,12 +732,12 @@
       "name": "Lead.notes",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 23
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 23
         }
       },
       "references": []
@@ -728,12 +749,12 @@
       "name": "Lead.owner_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 21
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 21
         }
       },
       "references": []
@@ -745,12 +766,12 @@
       "name": "Lead.phone",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 16
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 16
         }
       },
       "references": []
@@ -762,12 +783,12 @@
       "name": "Lead.score",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 20
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 20
         }
       },
       "references": []
@@ -779,12 +800,12 @@
       "name": "Lead.source",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 18
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 18
         }
       },
       "references": []
@@ -796,12 +817,12 @@
       "name": "Lead.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 19
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 19
         }
       },
       "references": []
@@ -813,12 +834,12 @@
       "name": "Opportunity.account_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 29
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 29
         }
       },
       "references": []
@@ -830,12 +851,12 @@
       "name": "Opportunity.amount",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 32
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 32
         }
       },
       "references": []
@@ -847,12 +868,12 @@
       "name": "Opportunity.competitor",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 36
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 36
         }
       },
       "references": []
@@ -864,12 +885,12 @@
       "name": "Opportunity.expected_close",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 34
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 34
         }
       },
       "references": []
@@ -881,12 +902,12 @@
       "name": "Opportunity.lead_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 28
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 28
         }
       },
       "references": []
@@ -898,12 +919,12 @@
       "name": "Opportunity.loss_reason",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 37
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 37
         }
       },
       "references": []
@@ -915,12 +936,12 @@
       "name": "Opportunity.name",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 30
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 30
         }
       },
       "references": []
@@ -932,12 +953,12 @@
       "name": "Opportunity.opportunity_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 27
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 27
         }
       },
       "references": []
@@ -949,12 +970,12 @@
       "name": "Opportunity.owner_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 35
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 35
         }
       },
       "references": []
@@ -966,12 +987,12 @@
       "name": "Opportunity.probability",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 33
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 33
         }
       },
       "references": []
@@ -983,12 +1004,12 @@
       "name": "Opportunity.stage",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 31
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 31
         }
       },
       "references": []
@@ -1001,11 +1022,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 4
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 4
         }
       },
       "references": []
@@ -1018,11 +1039,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 11
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 11
         }
       },
       "references": []
@@ -1035,11 +1056,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 26
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 26
         }
       },
       "references": []

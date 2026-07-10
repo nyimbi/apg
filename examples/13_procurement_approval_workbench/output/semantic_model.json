@@ -317,15 +317,35 @@
       "docs_url": "docs/tooling.md#semantic-model-contract",
       "file": "procurement_workbench.apg",
       "fixes": [],
+      "message": "Reserved field name 'created_at' is declared explicitly; APG generates this field automatically",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 26
+        },
+        "start": {
+          "character": 4,
+          "line": 26
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "procurement_workbench.apg",
+      "fixes": [],
       "message": "Database 'ProcurementDB' should have connection configuration",
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 9
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 9
         }
       },
       "related_locations": [],
@@ -341,11 +361,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 39
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 39
         }
       },
       "related_locations": [],
@@ -361,11 +381,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 39
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 39
         }
       },
       "related_locations": [],
@@ -381,11 +401,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 39
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 39
         }
       },
       "related_locations": [],
@@ -609,11 +629,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 123
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 123
         }
       },
       "references": []
@@ -626,11 +646,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 40
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 40
         }
       },
       "references": []
@@ -643,11 +663,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 10
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 10
         }
       },
       "references": []
@@ -659,12 +679,12 @@
       "name": "PurchaseRequest.amount",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 21
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 21
         }
       },
       "references": []
@@ -676,12 +696,12 @@
       "name": "PurchaseRequest.budget_code",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 26
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 26
         }
       },
       "references": []
@@ -693,12 +713,12 @@
       "name": "PurchaseRequest.created_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 27
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 27
         }
       },
       "references": []
@@ -710,12 +730,12 @@
       "name": "PurchaseRequest.currency",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 22
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 22
         }
       },
       "references": []
@@ -727,12 +747,12 @@
       "name": "PurchaseRequest.department",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 19
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 19
         }
       },
       "references": []
@@ -744,12 +764,12 @@
       "name": "PurchaseRequest.description",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 20
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 20
         }
       },
       "references": []
@@ -761,12 +781,12 @@
       "name": "PurchaseRequest.justification",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 25
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 25
         }
       },
       "references": []
@@ -778,12 +798,12 @@
       "name": "PurchaseRequest.priority",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 23
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 23
         }
       },
       "references": []
@@ -795,12 +815,12 @@
       "name": "PurchaseRequest.request_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 17
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 17
         }
       },
       "references": []
@@ -812,12 +832,12 @@
       "name": "PurchaseRequest.requestor_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 18
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 18
         }
       },
       "references": []
@@ -829,12 +849,12 @@
       "name": "PurchaseRequest.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 24
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 24
         }
       },
       "references": []
@@ -846,12 +866,12 @@
       "name": "SupplierQuote.amount",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 34
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 34
         }
       },
       "references": []
@@ -863,12 +883,12 @@
       "name": "SupplierQuote.quote_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 31
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 31
         }
       },
       "references": []
@@ -880,12 +900,12 @@
       "name": "SupplierQuote.request_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 32
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 32
         }
       },
       "references": []
@@ -897,12 +917,12 @@
       "name": "SupplierQuote.status",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 37
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 37
         }
       },
       "references": []
@@ -914,12 +934,12 @@
       "name": "SupplierQuote.submitted_at",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 36
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 36
         }
       },
       "references": []
@@ -931,12 +951,12 @@
       "name": "SupplierQuote.supplier_id",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 33
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 33
         }
       },
       "references": []
@@ -948,12 +968,12 @@
       "name": "SupplierQuote.validity_days",
       "range": {
         "end": {
-          "character": 1,
-          "line": 0
+          "character": 5,
+          "line": 35
         },
         "start": {
-          "character": 0,
-          "line": 0
+          "character": 4,
+          "line": 35
         }
       },
       "references": []
@@ -966,11 +986,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 5
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 5
         }
       },
       "references": []
@@ -983,11 +1003,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 16
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 16
         }
       },
       "references": []
@@ -1000,11 +1020,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 30
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 30
         }
       },
       "references": []
@@ -1017,11 +1037,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 0
+          "line": 89
         },
         "start": {
           "character": 0,
-          "line": 0
+          "line": 89
         }
       },
       "references": []

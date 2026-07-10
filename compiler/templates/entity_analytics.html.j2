@@ -39,7 +39,7 @@
       </div>
     </div>
     <div class="apg-chart" data-apg-chart="{{ line_chart.id }}"></div>
-    <script id="{{ line_chart.id }}" type="application/json">{{ line_chart.spec_json | safe }}</script>
+    <script id="{{ line_chart.id }}" type="application/json" nonce="{{ csp_nonce }}">{{ line_chart.spec_json | safe }}</script>
   </article>
   <article class="apg-card">
     <div class="apg-card-header">
@@ -49,7 +49,7 @@
       </div>
     </div>
     <div class="apg-chart" data-apg-chart="{{ status_chart.id }}"></div>
-    <script id="{{ status_chart.id }}" type="application/json">{{ status_chart.spec_json | safe }}</script>
+    <script id="{{ status_chart.id }}" type="application/json" nonce="{{ csp_nonce }}">{{ status_chart.spec_json | safe }}</script>
     {% if status_rows %}
     <div class="apg-status-drilldown" aria-label="Status drilldown">
       {% for row in status_rows %}

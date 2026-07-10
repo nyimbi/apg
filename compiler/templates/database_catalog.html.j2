@@ -125,7 +125,7 @@
   {% endfor %}
 </section>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   document.addEventListener('click', function(event) {
     var query = event.target.closest('[data-apg-query]');
@@ -158,18 +158,19 @@
           </header>
           <div class="apg-table-wrap">
             <table class="apg-table">
+              <caption class="apg-sr-only">{{ table.name }} records</caption>
               <thead>
                 <tr>
-                  <th>Column</th>
-                  <th>Type</th>
-                  <th>Constraints</th>
-                  <th>Reference</th>
+                  <th scope="col">Column</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Constraints</th>
+                  <th scope="col">Reference</th>
                 </tr>
               </thead>
               <tbody>
                 {% for column in table.columns %}
                 <tr>
-                  <td><span class="font-mono text-gray-900">{{ column.name }}</span></td>
+                  <td scope="row"><span class="font-mono text-gray-900">{{ column.name }}</span></td>
                   <td><span class="apg-badge apg-badge-neutral">{{ column.type }}</span></td>
                   <td>
                     <div class="flex items-center gap-2 flex-wrap">
