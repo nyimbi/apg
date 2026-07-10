@@ -754,10 +754,20 @@ def _production_mode() -> bool:
     return _env_flag("APG_PRODUCTION") or str(os.environ.get("APG_ENV", "")).strip().lower() in {{"prod", "production"}}
 
 
+def _apg_production_env_enabled() -> bool:
+    return str(os.environ.get("APG_PRODUCTION", "")).strip() == "1"
+
+
+def _configured_session_secret() -> str:
+    return str(os.environ.get("APG_SECRET_KEY") or os.environ.get("APG_SESSION_SECRET") or os.environ.get("APG_JWT_SECRET") or "")
+
+
 def _generated_session_secret() -> str:
-    configured = os.environ.get("APG_SESSION_SECRET") or os.environ.get("APG_JWT_SECRET")
+    configured = _configured_session_secret()
     if configured:
         return configured
+    if _apg_production_env_enabled():
+        return "dev-secret-key-change-me"
     return secrets.token_urlsafe(48)
 
 
@@ -772,6 +782,21 @@ def _env_int(name: str, default: int) -> int:
         return int(str(os.environ.get(name, "")).strip() or default)
     except ValueError:
         return default
+
+
+def _validate_startup_configuration() -> None:
+    try:
+        if not _apg_production_env_enabled():
+            return
+        if _flask_app.secret_key == "dev-secret-key-change-me":
+            raise RuntimeError("Set APG_SECRET_KEY in production")
+        if _flask_app.config.get("SESSION_COOKIE_SECURE") is False:
+            _logging.getLogger("apg").warning("APG_PRODUCTION is enabled but SESSION_COOKIE_SECURE is false.")
+    except RuntimeError:
+        if _apg_production_env_enabled():
+            raise
+    except Exception as exc:
+        _logging.getLogger("apg").warning("APG startup validation skipped: %s", exc)
 
 
 _APG_SCRYPT_N = 2**17
@@ -3025,6 +3050,59 @@ def _auth_failure_payload() -> tuple[int, Dict[str, Any]]:
         "error": "unauthorized",
         "message": "Set Authorization: Bearer <key> or X-APG-API-Key to mutate this APG app.",
     }}
+
+
+_APG_AUDIT_LOGGER = _logging.getLogger("apg.audit")
+_APG_AUDIT_FILE_LOCK = _threading.Lock()
+
+
+def _apg_audit_user(default: str = "api") -> str:
+    try:
+        explicit = getattr(_flask_g, "apg_user", "")
+        if explicit:
+            return str(explicit)
+        user = _current_user()
+    except RuntimeError:
+        user = None
+    if isinstance(user, dict) and user.get("username"):
+        return str(user["username"])
+    return default
+
+
+def _apg_audit_write(payload: Dict[str, Any]) -> None:
+    json_line = json.dumps(payload)
+    _APG_AUDIT_LOGGER.info(json_line)
+    if not os.environ.get("APG_AUDIT_LOG_FILE"):
+        return
+    try:
+        with _APG_AUDIT_FILE_LOCK:
+            with open(os.environ["APG_AUDIT_LOG_FILE"], "a", encoding="utf-8") as audit_file:
+                audit_file.write(json_line + "\\n")
+    except Exception as exc:
+        _APG_AUDIT_LOGGER.warning("audit_file_write_failed: %s", exc)
+
+
+def _apg_audit_event(action: str, entity: str = "auth", user: str | None = None) -> None:
+    try:
+        request_id = getattr(_flask_g, "request_id", "")
+    except RuntimeError:
+        request_id = ""
+    payload = {{
+        "audit": True,
+        "action": action,
+        "entity": entity,
+        "req_id": request_id,
+        "user": user if user is not None else _apg_audit_user(),
+        "ts": _datetime.datetime.utcnow().isoformat() + "Z",
+    }}
+    _apg_audit_write(payload)
+
+
+def _apg_audit_entity_from_path(path: str) -> str:
+    parts = [part for part in str(path).split("/") if part]
+    if len(parts) >= 2 and parts[0] == "records":
+        return parts[1]
+    return ""
 
 
 def list_events(entity_name: str | None = None) -> list[Dict[str, Any]]:
@@ -9243,6 +9321,7 @@ _flask_app.config.update(
     SESSION_COOKIE_SECURE=_APG_SESSION_COOKIE_SECURE,
     MAX_CONTENT_LENGTH=max(1, _env_int("APG_MAX_BODY_BYTES", 16 * 1024 * 1024)),
 )
+_validate_startup_configuration()
 
 
 # Wave B ops hardening: structured JSON logging.
@@ -9638,25 +9717,38 @@ def _apg_http_efficiency_after_request(response: _FlaskResponse) -> _FlaskRespon
 def _error_response_wants_json() -> bool:
     if _flask_request.path.startswith("/api/") or _flask_request.path == "/api":
         return True
+    if _flask_request.path.startswith("/records/") or _flask_request.path == "/records":
+        return True
     accept = str(_flask_request.headers.get("Accept", ""))
     return "application/json" in accept and "text/html" not in accept
 
 
-def _apg_error_response(status: int, error_code: str, title: str, message: str) -> _FlaskResponse:
+def _apg_error_response(
+    status: int,
+    error_code: str,
+    title: str,
+    message: str | None = None,
+    extra_headers: Dict[str, str] | None = None,
+) -> _FlaskResponse:
+    message = message if message is not None else title
     if _error_response_wants_json():
-        return _FlaskResponse(
+        response = _FlaskResponse(
             json.dumps({{"error": error_code, "message": message, "path": _flask_request.path}}),
             status=status,
             content_type="application/json; charset=utf-8",
         )
-    body = (
-        '<section class="apg-error-page" role="alert">'
-        f"<h1>{{html.escape(title)}}</h1>"
-        f"<p>{{html.escape(message)}}</p>"
-        '<p><a href="/">Return to the home page</a></p>'
-        "</section>"
-    )
-    return _FlaskResponse(_html_page(title, body, shell=False), status=status, content_type="text/html; charset=utf-8")
+    else:
+        body = (
+            '<section class="apg-error-page" role="alert">'
+            f"<h1>{{html.escape(title)}}</h1>"
+            f"<p>{{html.escape(message)}}</p>"
+            '<p><a href="/">Return to the home page</a></p>'
+            "</section>"
+        )
+        response = _FlaskResponse(_html_page(title, body, shell=False), status=status, content_type="text/html; charset=utf-8")
+    for header_name, header_value in (extra_headers or {{}}).items():
+        response.headers[header_name] = header_value
+    return response
 
 
 @_flask_app.errorhandler(404)
@@ -9679,6 +9771,67 @@ def _apg_internal_error(_error: Any) -> _FlaskResponse:
     return _apg_error_response(500, "internal_error", "Something went wrong", "The generated app hit an unexpected error. Details were logged server-side.")
 
 
+# Wave F app hardening: request rate limits, JSON guard, and audit events.
+_APG_RATE_BUCKETS = {{}}
+_APG_RATE_LOCK = _threading.Lock()
+_APG_RATE_EXEMPT_PATHS = ("/livez", "/readyz", "/metrics")
+
+
+def _apg_rate_is_authenticated() -> bool:
+    try:
+        return _current_user() is not None or _has_header_auth(_flask_request.headers)
+    except RuntimeError:
+        return False
+
+
+def _apg_rate_limit_guard() -> _FlaskResponse | None:
+    if _flask_request.path in _APG_RATE_EXEMPT_PATHS:
+        return None
+    anon_limit = max(1, _env_int("APG_RATE_LIMIT_ANON", 100))
+    auth_limit = max(1, _env_int("APG_RATE_LIMIT_AUTH", 1000))
+    limit = auth_limit if _apg_rate_is_authenticated() else anon_limit
+    refill_per_second = float(limit) / 60.0
+    now = _time.monotonic()
+    ip = str(_flask_request.remote_addr or "unknown")
+    with _APG_RATE_LOCK:
+        bucket = _APG_RATE_BUCKETS.get(ip, [float(limit), now])
+        tokens = min(float(limit), float(bucket[0]) + max(0.0, now - float(bucket[1])) * refill_per_second)
+        if tokens < 1.0:
+            _APG_RATE_BUCKETS[ip] = [tokens, now]
+            return _apg_error_response(
+                429,
+                "rate_limited",
+                "Too many requests",
+                extra_headers={{"Retry-After": "60"}},
+            )
+        _APG_RATE_BUCKETS[ip] = [tokens - 1.0, now]
+    return None
+
+
+def _apg_content_type_guard() -> _FlaskResponse | None:
+    if _flask_request.method not in ("POST", "PUT"):
+        return None
+    if not _flask_request.path.startswith("/records/"):
+        return None
+    content_type = _flask_request.content_type or ""
+    if content_type and not content_type.startswith("application/json"):
+        return _apg_error_response(415, "unsupported_media_type", "Content-Type must be application/json")
+    return None
+
+
+def _audited_record_mutation() -> bool:
+    return _flask_request.method in ("POST", "PUT", "DELETE") and _flask_request.path.startswith("/records/")
+
+
+@_flask_app.after_request
+def _apg_audit_after_request(response: _FlaskResponse) -> _FlaskResponse:
+    if _audited_record_mutation():
+        entity = _apg_audit_entity_from_path(_flask_request.path)
+        action = {{"POST": "create", "PUT": "update", "DELETE": "delete"}}[_flask_request.method]
+        _apg_audit_event(action, entity=entity)
+    return response
+
+
 @_flask_app.before_request
 def _setup_tenant() -> Any:
     body_limit = _flask_app.config.get("MAX_CONTENT_LENGTH")
@@ -9688,6 +9841,12 @@ def _setup_tenant() -> Any:
     _TENANT_LOCAL.tenant_id = tid or None
     if _login_required_for_path(_flask_request.path) and _current_user() is None:
         return _flask_redirect("/login?next=" + quote(_flask_request.full_path.rstrip("?") or "/ui", safe="/?=&%"))
+    content_type_error = _apg_content_type_guard()
+    if content_type_error is not None:
+        return content_type_error
+    rate_limited = _apg_rate_limit_guard()
+    if rate_limited is not None:
+        return rate_limited
     return None
 
 
@@ -9739,6 +9898,7 @@ def _flask_login_post():
     throttle_key = _login_throttle_key(username)
     retry_after = _login_retry_after(throttle_key)
     if retry_after:
+        _apg_audit_event("login_failed", user=username or "api")
         response = _FlaskResponse(
             _login_page("Too many sign-in attempts. Wait a moment and try again.", next_url, username=username),
             status=429,
@@ -9749,6 +9909,7 @@ def _flask_login_post():
     user = _authenticate_user(username, password)
     if user is None:
         _register_login_failure(throttle_key)
+        _apg_audit_event("login_failed", user=username or "api")
         return _FlaskResponse(
             _login_page("We could not sign you in with those credentials.", next_url, username=username),
             status=401,
@@ -9756,6 +9917,7 @@ def _flask_login_post():
         )
     _clear_login_failures(throttle_key)
     _issue_login_session(user)
+    _apg_audit_event("login", user=str(user.get("username", username)))
     return _flask_redirect(next_url)
 
 
@@ -9766,6 +9928,8 @@ def _flask_logout_post():
     csrf_err = _check_csrf_token()
     if csrf_err:
         return csrf_err
+    user = _current_user()
+    _apg_audit_event("logout", user=str(user.get("username", "")) if isinstance(user, dict) else "api")
     _flask_session.pop("apg_user", None)
     return _flask_redirect("/login")
 
