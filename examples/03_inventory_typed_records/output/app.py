@@ -12,6 +12,8 @@ import hashlib
 import html
 import hmac
 import json
+import datetime as _datetime
+import logging as _logging
 import os
 import queue as _queue
 import re
@@ -19,7 +21,8 @@ import secrets
 import sys
 import threading as _threading
 import time as _time
-from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse, session as _flask_session
+import uuid as _uuid
+from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse, session as _flask_session, g as _flask_g
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, quote
@@ -8275,6 +8278,248 @@ _flask_app.config.update(
     SESSION_COOKIE_SECURE=_APG_SESSION_COOKIE_SECURE,
     MAX_CONTENT_LENGTH=max(1, _env_int("APG_MAX_BODY_BYTES", 16 * 1024 * 1024)),
 )
+
+
+# Wave B ops hardening: structured JSON logging.
+_APG_JSON_LOGS_ENABLED = _env_flag("APG_JSON_LOGS") or _production_mode()
+_APG_LOGGER = _logging.getLogger("apg.generated")
+
+
+class _APGJsonLogFormatter(_logging.Formatter):
+    def format(self, record: _logging.LogRecord) -> str:
+        req_id = str(getattr(record, "req_id", "") or "")
+        method = str(getattr(record, "method", "") or "")
+        path = str(getattr(record, "path", "") or "")
+        try:
+            req_id = req_id or str(getattr(_flask_g, "request_id", "") or "")
+            method = method or str(getattr(_flask_request, "method", "") or "")
+            path = path or str(getattr(_flask_request, "path", "") or "")
+        except RuntimeError:
+            _ = None
+        try:
+            status = int(getattr(record, "status", 0) or 0)
+        except (TypeError, ValueError):
+            status = 0
+        try:
+            ms = int(getattr(record, "ms", 0) or 0)
+        except (TypeError, ValueError):
+            ms = 0
+        payload = {
+            "ts": _datetime.datetime.now(_datetime.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+            "level": record.levelname,
+            "msg": record.getMessage(),
+            "req_id": req_id,
+            "method": method,
+            "path": path,
+            "status": status,
+            "ms": ms,
+        }
+        return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+
+
+def _configure_json_logging() -> None:
+    if not _APG_JSON_LOGS_ENABLED:
+        return
+    handler = _logging.StreamHandler()
+    handler.setFormatter(_APGJsonLogFormatter())
+    for logger in (_logging.getLogger("werkzeug"), _flask_app.logger, _APG_LOGGER):
+        logger.handlers = [handler]
+        logger.setLevel(_logging.INFO)
+        logger.propagate = False
+
+
+_configure_json_logging()
+
+
+# Wave B ops hardening: Prometheus text metrics.
+_APG_METRICS_ENABLED = _env_flag("APG_METRICS")
+_APG_METRICS_TOKEN = os.environ.get("APG_METRICS_TOKEN") or ""
+_APG_METRICS_LOCK = _threading.Lock()
+_APG_METRIC_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+_APG_HTTP_REQUESTS_TOTAL: Dict[tuple[str, str, str], int] = {}
+_APG_HTTP_REQUEST_DURATION: Dict[tuple[str, str], Dict[str, Any]] = {}
+_APG_ACTIVE_REQUESTS = 0
+
+
+def _apg_path_template(path: str | None = None) -> str:
+    raw_path = str(path or _flask_request.path or "/").split("?", 1)[0].rstrip("/") or "/"
+    parts = [part for part in raw_path.split("/") if part]
+    if not parts:
+        return "/"
+    if len(parts) >= 3 and parts[0] == "records":
+        parts[2] = ":id"
+    if len(parts) >= 4 and parts[0] == "entities" and parts[2] == "records":
+        parts[3] = ":id"
+    if len(parts) >= 4 and parts[0] == "ui" and parts[1] == "entities":
+        parts[3] = ":id"
+    if len(parts) >= 3 and parts[0] == "workflows" and parts[1] == "runs":
+        parts[2] = ":id"
+    for index, value in enumerate(parts):
+        if value.isdigit() or re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", value):
+            parts[index] = ":id"
+        elif re.fullmatch(r"(?:record|run|workflow-run|event)-[A-Za-z0-9_-]+", value):
+            parts[index] = ":id"
+    return "/" + "/".join(parts)
+
+
+def _apg_metrics_inc_active() -> None:
+    global _APG_ACTIVE_REQUESTS
+    with _APG_METRICS_LOCK:
+        _APG_ACTIVE_REQUESTS += 1
+
+
+def _apg_metrics_dec_active() -> None:
+    global _APG_ACTIVE_REQUESTS
+    with _APG_METRICS_LOCK:
+        _APG_ACTIVE_REQUESTS = max(0, _APG_ACTIVE_REQUESTS - 1)
+
+
+def _apg_metrics_observe(method: str, path_template: str, status: int, duration_s: float) -> None:
+    request_key = (method.upper(), path_template, str(int(status)))
+    duration_key = (method.upper(), path_template)
+    with _APG_METRICS_LOCK:
+        _APG_HTTP_REQUESTS_TOTAL[request_key] = _APG_HTTP_REQUESTS_TOTAL.get(request_key, 0) + 1
+        stats = _APG_HTTP_REQUEST_DURATION.setdefault(duration_key, {"count": 0, "sum": 0.0, "buckets": [0 for _ in _APG_METRIC_BUCKETS]})
+        stats["count"] += 1
+        stats["sum"] += max(0.0, float(duration_s))
+        for index, bucket in enumerate(_APG_METRIC_BUCKETS):
+            if duration_s <= bucket:
+                stats["buckets"][index] += 1
+
+
+def _apg_metric_escape(value: str) -> str:
+    backslash = chr(92)
+    return (
+        str(value)
+        .replace(backslash, backslash + backslash)
+        .replace(chr(10), backslash + "n")
+        .replace(chr(34), backslash + chr(34))
+    )
+
+
+def _apg_metric_labels(labels: Dict[str, str]) -> str:
+    return ",".join(f'{name}="{_apg_metric_escape(value)}"' for name, value in labels.items())
+
+
+def _apg_metrics_text() -> str:
+    with _APG_METRICS_LOCK:
+        request_counts = dict(_APG_HTTP_REQUESTS_TOTAL)
+        durations = {
+            key: {"count": value["count"], "sum": value["sum"], "buckets": list(value["buckets"])}
+            for key, value in _APG_HTTP_REQUEST_DURATION.items()
+        }
+        active_requests = _APG_ACTIVE_REQUESTS
+    lines = [
+        "# HELP apg_http_requests_total Total HTTP requests handled by the generated APG app.",
+        "# TYPE apg_http_requests_total counter",
+    ]
+    for (method, path_template, status), count in sorted(request_counts.items()):
+        labels = _apg_metric_labels({"method": method, "path_template": path_template, "status": status})
+        lines.append(f"apg_http_requests_total{{{labels}}} {count}")
+    lines.extend([
+        "# HELP apg_http_request_duration_seconds HTTP request latency in seconds.",
+        "# TYPE apg_http_request_duration_seconds histogram",
+    ])
+    for (method, path_template), stats in sorted(durations.items()):
+        base_labels = {"method": method, "path_template": path_template}
+        for bucket, bucket_count in zip(_APG_METRIC_BUCKETS, stats["buckets"]):
+            labels = _apg_metric_labels({**base_labels, "le": ("%g" % bucket)})
+            lines.append(f"apg_http_request_duration_seconds_bucket{{{labels}}} {bucket_count}")
+        labels = _apg_metric_labels({**base_labels, "le": "+Inf"})
+        lines.append(f"apg_http_request_duration_seconds_bucket{{{labels}}} {stats['count']}")
+        labels = _apg_metric_labels(base_labels)
+        lines.append(f"apg_http_request_duration_seconds_count{{{labels}}} {stats['count']}")
+        lines.append(f"apg_http_request_duration_seconds_sum{{{labels}}} {stats['sum']:.6f}")
+    lines.extend([
+        "# HELP apg_active_requests Active HTTP requests currently being processed.",
+        "# TYPE apg_active_requests gauge",
+        f"apg_active_requests {active_requests}",
+        "",
+    ])
+    return "\n".join(lines)
+
+
+# Wave B ops hardening: X-Request-ID propagation and request lifecycle.
+_APG_APP_START_MONOTONIC = _time.monotonic()
+_APG_READY = False
+_APG_OPS_QUIET_PATHS = frozenset({"/livez", "/readyz"})
+
+
+@_flask_app.before_request
+def _apg_ops_before_request() -> None:
+    request_id = str(_flask_request.headers.get("X-Request-ID") or "").strip() or str(_uuid.uuid4())
+    _flask_g.request_id = request_id
+    _flask_g.apg_request_started_at = _time.perf_counter()
+    _flask_g.apg_path_template = _apg_path_template(_flask_request.path)
+    if _APG_METRICS_ENABLED:
+        _apg_metrics_inc_active()
+    if _APG_JSON_LOGS_ENABLED and _flask_request.path not in _APG_OPS_QUIET_PATHS:
+        _APG_LOGGER.info(
+            "request_start",
+            extra={
+                "req_id": request_id,
+                "method": _flask_request.method,
+                "path": _flask_request.path,
+                "status": 0,
+                "ms": 0,
+            },
+        )
+    return None
+
+
+@_flask_app.after_request
+def _apg_ops_after_request(response: _FlaskResponse) -> _FlaskResponse:
+    global _APG_READY
+    request_id = str(getattr(_flask_g, "request_id", "") or "").strip() or str(_uuid.uuid4())
+    response.headers["X-Request-ID"] = request_id
+    started_at = getattr(_flask_g, "apg_request_started_at", None)
+    try:
+        elapsed_s = max(0.0, _time.perf_counter() - float(started_at)) if started_at is not None else 0.0
+    except (TypeError, ValueError):
+        elapsed_s = 0.0
+    status = int(response.status_code)
+    path_template = str(getattr(_flask_g, "apg_path_template", "") or _apg_path_template(_flask_request.path))
+    if _APG_METRICS_ENABLED:
+        _apg_metrics_observe(_flask_request.method, path_template, status, elapsed_s)
+        _apg_metrics_dec_active()
+    if status < 400:
+        _APG_READY = True
+    if _APG_JSON_LOGS_ENABLED and _flask_request.path not in _APG_OPS_QUIET_PATHS:
+        _APG_LOGGER.info(
+            "request_finish",
+            extra={
+                "req_id": request_id,
+                "method": _flask_request.method,
+                "path": _flask_request.path,
+                "status": status,
+                "ms": int(round(elapsed_s * 1000)),
+            },
+        )
+    return response
+
+
+# Wave B ops hardening: Kubernetes liveness/readiness endpoints.
+@_flask_app.route("/livez", methods=["GET"])
+def _flask_livez() -> _FlaskResponse:
+    payload = {"status": "ok", "uptime_s": int(max(0.0, _time.monotonic() - _APG_APP_START_MONOTONIC))}
+    return _FlaskResponse(json.dumps(payload), status=200, content_type="application/json")
+
+
+@_flask_app.route("/readyz", methods=["GET"])
+def _flask_readyz() -> _FlaskResponse:
+    if _APG_READY:
+        return _FlaskResponse(json.dumps({"status": "ready"}), status=200, content_type="application/json")
+    return _FlaskResponse(json.dumps({"status": "starting"}), status=503, content_type="application/json")
+
+
+@_flask_app.route("/metrics", methods=["GET"])
+def _flask_prometheus_metrics() -> _FlaskResponse:
+    if not _APG_METRICS_ENABLED:
+        status, payload = _route_payload("/metrics", {k: v for k, v in _flask_request.args.lists()})
+        return _FlaskResponse(json.dumps(payload), status=status, content_type="application/json; charset=utf-8")
+    if _APG_METRICS_TOKEN and not hmac.compare_digest(str(_flask_request.headers.get("X-Metrics-Token") or ""), _APG_METRICS_TOKEN):
+        return _FlaskResponse("unauthorized\n", status=401, content_type="text/plain; version=0.0.4; charset=utf-8")
+    return _FlaskResponse(_apg_metrics_text(), status=200, content_type="text/plain; version=0.0.4; charset=utf-8")
 
 
 _APG_SECURITY_HEADERS: Dict[str, str] = {
