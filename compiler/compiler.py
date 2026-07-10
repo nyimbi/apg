@@ -19,6 +19,24 @@ from .semantic_analyzer import SemanticAnalyzer, SemanticError
 from .code_generator import CodeGenerator, CodeGenConfig
 
 
+_GENERATED_TEST_ENV_KEYS = (
+	"APG_API_KEY",
+	"APG_AUTH_USERS",
+	"APG_AUTO_MIGRATE",
+	"APG_DATABASE_URL",
+	"APG_DATA_FILE",
+	"APG_DATA_PATH",
+	"APG_DB_PATH",
+	"APG_ENV",
+	"APG_JWT_SECRET",
+	"APG_PG_URL",
+	"APG_PRODUCTION",
+	"APG_SESSION_SECRET",
+	"APG_SQLITE_PATH",
+	"DATABASE_URL",
+)
+
+
 # ========================================
 # Compilation Result Types
 # ========================================
@@ -128,6 +146,7 @@ class APGCompiler:
 		
 		try:
 			self.logger.info(f"Compiling APG file: {source_file}")
+			source_text = Path(source_file).read_text(encoding="utf-8")
 			
 			# Phase 1: Parse source file
 			parse_result = self._parse_file(source_file)
@@ -160,6 +179,8 @@ class APGCompiler:
 			
 			# Phase 4: Code Generation
 			generated_files = self._generate_code(ast, result.target_language)
+			if CodeGenerator.normalize_target(result.target_language) == "python":
+				generated_files.update(self._generate_test_scaffolding(ast, source_text))
 			result.generated_files = generated_files
 
 			# Phase 5: Validate all generated Python parses cleanly
@@ -247,6 +268,8 @@ class APGCompiler:
 			
 			# Phase 4: Code Generation (including deployment-bundle artefacts)
 			generated_files = self._generate_code(ast, result.target_language)
+			if CodeGenerator.normalize_target(result.target_language) == "python":
+				generated_files.update(self._generate_test_scaffolding(ast, source_code))
 			result.generated_files = generated_files
 
 			# Phase 5: Correctness verification — validate all generated Python parses cleanly
@@ -451,6 +474,170 @@ class APGCompiler:
 		except Exception as e:
 			self.logger.error(f"Code generation failed: {e}")
 			raise
+
+	def _python_identifier(self, value: str, default: str = "generated") -> str:
+		"""Return a safe lowercase Python identifier fragment."""
+		identifier = re.sub(r"\W+", "_", str(value)).strip("_").lower()
+		if not identifier:
+			identifier = default
+		if identifier[0].isdigit():
+			identifier = "_" + identifier
+		return identifier
+
+	def _is_generated_test_string_type(self, type_name: str) -> bool:
+		return str(type_name or "any").strip().lower() in {
+			"str",
+			"string",
+			"text",
+			"varchar",
+			"char",
+			"email",
+		}
+
+	def _generated_test_entity_specs(self, ast: ModuleDeclaration) -> List[Dict[str, Any]]:
+		specs: List[Dict[str, Any]] = []
+		for entity in getattr(ast, "entities", []):
+			entity_name = str(getattr(entity, "name", "") or "").strip()
+			if not entity_name or entity_name.lower() == "security":
+				continue
+			fields: List[Dict[str, str]] = []
+			for prop in getattr(entity, "properties", []) or []:
+				field_name = str(getattr(prop, "name", "") or "").strip()
+				if not field_name:
+					continue
+				type_annotation = getattr(prop, "type_annotation", None)
+				type_name = str(getattr(type_annotation, "type_name", "") or "any")
+				fields.append({"name": field_name, "type": type_name})
+			specs.append({"name": entity_name, "fields": fields})
+		return specs
+
+	def _generated_test_value(self, entity_name: str, field_name: str, type_name: str, *, searchable: bool = False) -> Any:
+		normalized = str(type_name or "any").strip().lower()
+		if self._is_generated_test_string_type(normalized):
+			if searchable:
+				return f"{entity_name} Wave K Needle"
+			return f"sample {field_name}"
+		if normalized in {"int", "integer", "serial", "bigint", "smallint"}:
+			return 7
+		if normalized in {"float", "double", "decimal", "number", "numeric", "money"}:
+			return 7.5
+		if normalized in {"bool", "boolean"}:
+			return True
+		if normalized in {"list", "array", "set"}:
+			return []
+		if normalized in {"dict", "map", "object", "json", "jsonb"}:
+			return {}
+		return f"sample {field_name}"
+
+	def _generate_test_scaffolding(self, ast: ModuleDeclaration, source_code: str) -> Dict[str, str]:
+		"""Generate pytest scaffolding for the compiled Flask application."""
+		module_name = self._python_identifier(getattr(ast, "name", "main"), "main")
+		entities = self._generated_test_entity_specs(ast)
+		first_entity = entities[0] if entities else {"name": "Record", "fields": []}
+		entity_name = str(first_entity["name"])
+		entity_slug = self._python_identifier(entity_name, "record")
+		fields = list(first_entity.get("fields", []))
+		string_fields = [
+			field for field in fields
+			if self._is_generated_test_string_type(str(field.get("type", "")))
+		]
+		search_field = string_fields[0]["name"] if string_fields else ""
+		payload: Dict[str, Any] = {}
+		for field in fields:
+			field_name = str(field["name"])
+			payload[field_name] = self._generated_test_value(
+				entity_name,
+				field_name,
+				str(field.get("type", "any")),
+				searchable=field_name == search_field,
+			)
+		search_value = str(payload.get(search_field, "")) if search_field else ""
+		search_term = "Needle" if search_value else ""
+		env_keys = ",\n\t".join(repr(key) for key in _GENERATED_TEST_ENV_KEYS)
+		conftest = f'''"""Pytest fixtures for the generated APG application."""
+
+from __future__ import annotations
+
+import pytest
+
+from compiler.compiler import APGCompiler
+
+
+APG_SOURCE = {source_code!r}
+APG_MODULE_NAME = {module_name!r}
+_GENERATED_TEST_ENV_KEYS = (
+	{env_keys},
+)
+
+
+@pytest.fixture()
+def generated_app_client(monkeypatch):
+	for key in _GENERATED_TEST_ENV_KEYS:
+		monkeypatch.delenv(key, raising=False)
+	result = APGCompiler().compile_string(APG_SOURCE, APG_MODULE_NAME)
+	assert result.success, result.errors
+	namespace = {{"__file__": "generated_app.py"}}
+	exec(compile(result.generated_files["app.py"], "generated_app.py", "exec"), namespace)
+	app = namespace["_flask_app"]
+	app.config["TESTING"] = True
+	return app.test_client()
+'''
+		test_lines = [
+			'"""Generated smoke, CRUD, and search tests for this APG app."""',
+			"",
+			"from __future__ import annotations",
+			"",
+			"import pytest",
+			"",
+			"",
+			"def test_smoke_livez(generated_app_client):",
+			"\tassert generated_app_client.get('/livez').status_code == 200",
+			"",
+			"",
+			f"def test_crud_{entity_slug}(generated_app_client):",
+			f"\tpayload = {payload!r}",
+			f"\tcreated_response = generated_app_client.post('/records/{entity_name}', json={{'record': payload}})",
+			"\tassert created_response.status_code == 201, created_response.get_json()",
+			"\tcreated = created_response.get_json()['record']",
+			f"\tlist_response = generated_app_client.get('/records/{entity_name}')",
+			"\tassert list_response.status_code == 200, list_response.get_json()",
+			"\tlisted = list_response.get_json()",
+			"\trecords = listed.get('data', listed.get('records', []))",
+			"\tassert any(str(record.get('id')) == str(created['id']) for record in records)",
+			f"\tdelete_response = generated_app_client.delete('/records/{entity_name}/' + str(created['id']))",
+			"\tassert delete_response.status_code == 200, delete_response.get_json()",
+			f"\tafter_delete_response = generated_app_client.get('/records/{entity_name}')",
+			"\tassert after_delete_response.status_code == 200, after_delete_response.get_json()",
+			"\tafter_delete = after_delete_response.get_json()",
+			"\tafter_records = after_delete.get('data', after_delete.get('records', []))",
+			"\tassert all(str(record.get('id')) != str(created['id']) for record in after_records)",
+			"",
+			"",
+		]
+		if search_field:
+			test_lines.extend([
+				f"def test_search_{entity_slug}(generated_app_client):",
+				f"\tpayload = {payload!r}",
+				f"\tcreated_response = generated_app_client.post('/records/{entity_name}', json={{'record': payload}})",
+				"\tassert created_response.status_code == 201, created_response.get_json()",
+				"\tcreated = created_response.get_json()['record']",
+				f"\tsearch_response = generated_app_client.get('/records/{entity_name}/search', query_string={{'q': {search_term!r}, 'limit': '5'}})",
+				"\tassert search_response.status_code == 200, search_response.get_json()",
+				"\tmatches = search_response.get_json()",
+				"\tassert isinstance(matches, list)",
+				"\tassert any(str(record.get('id')) == str(created['id']) for record in matches)",
+				"",
+			])
+		else:
+			test_lines.extend([
+				f"def test_search_{entity_slug}(generated_app_client):",
+				"\tpytest.skip('first entity has no string fields')",
+				"",
+			])
+		return {
+			"tests/conftest.py": conftest,
+			f"tests/test_{module_name}.py": "\n".join(test_lines),
+		}
 	
 	def _write_output_files(self, generated_files: Dict[str, str], output_dir: Path):
 		"""Write generated files to disk"""

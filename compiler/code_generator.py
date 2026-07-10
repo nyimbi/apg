@@ -4174,6 +4174,18 @@ def _build_openapi_document() -> Dict[str, Any]:
             {{"name": "include_deleted", "in": "query", "required": False, "description": "Admin-only flag to include soft-deleted records"}},
             {{"name": "format", "in": "query", "required": False, "description": "Use csv for RFC 4180 export"}},
         ]
+        if _record_string_field_names(entity_name):
+            paths[f"/records/{{entity_name}}/search"] = {{
+                "get": _api_operation(
+                    f"Search {{entity_name}} records",
+                    "FTS5 record search",
+                    response_schema={{"type": "array", "items": _schema_ref(schema_name)}},
+                ),
+            }}
+            paths[f"/records/{{entity_name}}/search"]["get"]["parameters"] = [
+                {{"name": "q", "in": "query", "required": True, "description": "FTS5 query text"}},
+                {{"name": "limit", "in": "query", "required": False, "description": "Maximum records to return"}},
+            ]
         paths[f"/records/{{entity_name}}/bulk"] = {{
             "post": _api_operation(
                 f"Bulk mutate {{entity_name}} records",
@@ -5672,6 +5684,72 @@ def _sqlite_expected_columns(entity_name: str) -> list[Dict[str, str]]:
     return columns
 
 
+def _sqlite_fts_identifier(identifier: str) -> str:
+    text = str(identifier)
+    return text if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", text) else _sqlite_identifier(text)
+
+
+def _sqlite_init_entity_fts(conn: _sqlite3.Connection, entity_name: str) -> None:
+    str_fields = _record_string_field_names(entity_name)
+    if not str_fields:
+        return
+    entity_sql = _sqlite_fts_identifier(entity_name)
+    fts_table = entity_name + "_fts"
+    fts_sql = _sqlite_fts_identifier(fts_table)
+    str_fields_csv = ",".join(_sqlite_fts_identifier(field) for field in str_fields)
+    new_str_fields = ",".join("new." + _sqlite_fts_identifier(field) for field in str_fields)
+    conn.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS "
+        + fts_sql
+        + " USING fts5("
+        + str_fields_csv
+        + ", content="
+        + entity_sql
+        + ", content_rowid=id)"
+    )
+    conn.execute(
+        "CREATE TRIGGER IF NOT EXISTS "
+        + _sqlite_fts_identifier(fts_table + "_ai")
+        + " AFTER INSERT ON "
+        + entity_sql
+        + " BEGIN INSERT INTO "
+        + fts_sql
+        + "(rowid,"
+        + str_fields_csv
+        + ") VALUES (new.id,"
+        + new_str_fields
+        + "); END;"
+    )
+    conn.execute(
+        "CREATE TRIGGER IF NOT EXISTS "
+        + _sqlite_fts_identifier(fts_table + "_ad")
+        + " AFTER DELETE ON "
+        + entity_sql
+        + " BEGIN INSERT INTO "
+        + fts_sql
+        + "("
+        + fts_sql
+        + ",rowid) VALUES('delete',old.id); END;"
+    )
+    conn.execute(
+        "CREATE TRIGGER IF NOT EXISTS "
+        + _sqlite_fts_identifier(fts_table + "_au")
+        + " AFTER UPDATE ON "
+        + entity_sql
+        + " BEGIN INSERT INTO "
+        + fts_sql
+        + "("
+        + fts_sql
+        + ",rowid) VALUES('delete',old.id); INSERT INTO "
+        + fts_sql
+        + "(rowid,"
+        + str_fields_csv
+        + ") VALUES(new.id,"
+        + new_str_fields
+        + "); END;"
+    )
+
+
 def _sqlite_connection() -> _sqlite3.Connection | None:
     global _APG_SQLITE_CONN
     if _APG_SQLITE_CONN is not None:
@@ -5693,6 +5771,7 @@ def _sqlite_init_entity_table(conn: _sqlite3.Connection, entity_name: str) -> No
     columns = _sqlite_expected_columns(entity_name)
     column_sql = ", ".join(_sqlite_identifier(column["name"]) + " " + column["ddl"] for column in columns)
     conn.execute("CREATE TABLE IF NOT EXISTS " + table + " (" + column_sql + ")")
+    _sqlite_init_entity_fts(conn, entity_name)
     trigger = _sqlite_identifier("trg_" + entity_name + "_updated_at")
     conn.execute(
         "CREATE TRIGGER IF NOT EXISTS " + trigger + " AFTER UPDATE ON " + table + " FOR EACH ROW "
@@ -8971,6 +9050,8 @@ def _record_route(path: str) -> Dict[str, str | None] | None:
     parts = [part for part in path.split("/") if part]
     if parts == ["records"]:
         return {{"entity": None, "record_id": None, "operation": None}}
+    if len(parts) == 3 and parts[0] == "records" and parts[2] == "search":
+        return {{"entity": parts[1], "record_id": None, "operation": "search"}}
     if len(parts) == 3 and parts[0] == "records" and parts[2] == "bulk":
         return {{"entity": parts[1], "record_id": None, "operation": "bulk"}}
     if len(parts) == 4 and parts[0] == "records" and parts[3] == "restore":
@@ -9013,6 +9094,45 @@ def _records_api_collection_path(path: str) -> bool:
     return len(parts) == 2 and parts[0] == "records"
 
 
+def _records_search_limit(query: Dict[str, list[str]] | None) -> int:
+    raw_limit = _record_query_value(query or {{}}, "limit", 20)
+    try:
+        parsed = int(raw_limit)
+    except (TypeError, ValueError):
+        parsed = 20
+    return max(1, min(parsed, 1000))
+
+
+def search_records(entity_name: str, query: Dict[str, list[str]] | None = None) -> list[Dict[str, Any]]:
+    q = str(_record_query_value(query or {{}}, "q", "") or "").strip()
+    if not q or not _record_string_field_names(entity_name):
+        return []
+    conn = _sqlite_connection()
+    if conn is None:
+        return []
+    entity_sql = _sqlite_fts_identifier(entity_name)
+    fts_sql = _sqlite_fts_identifier(entity_name + "_fts")
+    sql = (
+        "SELECT * FROM "
+        + entity_sql
+        + " WHERE id IN (SELECT rowid FROM "
+        + fts_sql
+        + " WHERE "
+        + fts_sql
+        + " MATCH ?) AND deleted_at IS NULL LIMIT ?"
+    )
+    try:
+        rows = conn.execute(sql, (q, _records_search_limit(query))).fetchall()
+    except _sqlite3.DatabaseError:
+        return []
+    records: list[Dict[str, Any]] = []
+    for row in rows:
+        record = _record_by_id(entity_name, row["id"])
+        if record is not None:
+            records.append(record)
+    return records
+
+
 def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, Dict[str, Any]]:
     route = _record_route(path)
     if route is None:
@@ -9030,6 +9150,8 @@ def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = 
             "records": list_records(entity_name),
             "count": len(list_records(entity_name)),
         }}
+    if operation == "search":
+        return 200, search_records(entity_name, query)
     if operation is not None:
         return 405, {{"error": "method_not_allowed", "operation": operation}}
     if record_id is None:
