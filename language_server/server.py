@@ -1,866 +1,746 @@
-"""
-APG Language Server Implementation
-==================================
-
-Language Server Protocol implementation for APG language features including:
-- Syntax highlighting and validation
-- IntelliSense and code completion
-- Error diagnostics
-- Symbol navigation and references
-- Hover information and documentation
-"""
+#!/usr/bin/env python3
+"""Stdlib-only APG Language Server Protocol server over stdio."""
 
 from __future__ import annotations
 
-import asyncio
-import logging
-import os
-import sys
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
-from urllib.parse import urlparse
+import argparse
 import json
+import re
+import sys
+import traceback
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, BinaryIO
+from urllib.parse import unquote, urlparse
 
-# LSP Protocol implementation
-try:
-	from pygls.server import LanguageServer
-	from pygls.protocol import LanguageServerProtocol
-	from pygls.features import (
-		COMPLETION, DEFINITION, HOVER, REFERENCES, DOCUMENT_SYMBOLS,
-		DIAGNOSTIC, TEXT_DOCUMENT_DID_OPEN, TEXT_DOCUMENT_DID_CHANGE,
-		TEXT_DOCUMENT_DID_SAVE, TEXT_DOCUMENT_DID_CLOSE, INITIALIZED
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+	sys.path.insert(0, str(REPO_ROOT))
+
+from compiler.compiler import APGCompiler
+from compiler.parser import APGSyntaxError
+from compiler.semantic_analyzer import SemanticError
+
+
+TEXT_DOCUMENT_SYNC_INCREMENTAL = 2
+
+COMPLETION_KIND_TEXT = 1
+COMPLETION_KIND_FIELD = 5
+COMPLETION_KIND_CLASS = 7
+COMPLETION_KIND_PROPERTY = 10
+COMPLETION_KIND_KEYWORD = 14
+COMPLETION_KIND_SNIPPET = 15
+COMPLETION_KIND_TYPE_PARAMETER = 25
+
+DIAGNOSTIC_SEVERITY_ERROR = 1
+
+TYPE_ORDER = ["str", "int", "float", "bool", "date", "datetime", "text", "uuid", "json", "file"]
+TYPE_DOCS = {
+	"str": ("String value for short text.", "name: str;"),
+	"int": ("Integer number.", "quantity: int;"),
+	"float": ("Floating-point number.", "price: float;"),
+	"bool": ("Boolean true or false value.", "active: bool;"),
+	"date": ("Calendar date without a time component.", "due_date: date;"),
+	"datetime": ("Timestamp with date and time.", "created_at: datetime;"),
+	"text": ("Long-form text content.", "notes: text;"),
+	"uuid": ("Universally unique identifier.", "record_id: uuid;"),
+	"json": ("Structured JSON object or array.", "metadata: json;"),
+	"file": ("Uploaded or referenced file value.", "attachment: file;"),
+}
+
+KEYWORD_DOCS = {
+	"module": "Declares an APG module and version boundary.",
+	"entity": "Declares a named APG entity with fields and relationships.",
+	"table": "Declares a database-backed APG entity.",
+	"security": "Declares security configuration for an APG module or capability.",
+	"authentication": "Configures whether requests require authentication.",
+	"required": "Marks a setting or field as required.",
+	"has_many": "Declares a one-to-many relationship to another entity.",
+	"belongs_to": "Declares ownership or foreign-key style relationship to another entity.",
+	"has_one": "Declares a one-to-one relationship to another entity.",
+	"through": "Names the junction entity used by a has_many relationship.",
+}
+
+VALIDATORS = ["@min_length", "@max_length", "@min", "@max", "@email", "@pattern", "@optional", "@required"]
+RELATIONSHIP_KEYWORDS = [
+	("has_many", "has_many ${1:Entity};"),
+	("belongs_to", "belongs_to ${1:Entity};"),
+	("has_one", "has_one ${1:Entity};"),
+]
+
+
+@dataclass
+class FieldInfo:
+	name: str
+	type_name: str
+	line: int
+	character: int
+
+
+@dataclass
+class RelationshipInfo:
+	kind: str
+	target: str
+	line: int
+	character: int
+
+
+@dataclass
+class EntityInfo:
+	kind: str
+	name: str
+	line: int
+	character: int
+	body_start: int
+	body_end: int
+	fields: list[FieldInfo] = field(default_factory=list)
+	relationships: list[RelationshipInfo] = field(default_factory=list)
+
+	@property
+	def range(self) -> dict[str, Any]:
+		return {
+			"start": {"line": self.line, "character": self.character},
+			"end": {"line": self.line, "character": self.character + len(self.name)},
+		}
+
+
+@dataclass
+class DocumentState:
+	uri: str
+	text: str
+	version: int | None = None
+	path: Path | None = None
+	entities: list[EntityInfo] = field(default_factory=list)
+
+	def refresh(self) -> None:
+		self.entities = parse_entities(self.text)
+
+	def entity_names(self) -> list[str]:
+		return sorted({entity.name for entity in self.entities})
+
+	def entity_by_name(self, name: str) -> EntityInfo | None:
+		for entity in self.entities:
+			if entity.name == name:
+				return entity
+		return None
+
+
+def _line_starts(text: str) -> list[int]:
+	starts = [0]
+	for index, char in enumerate(text):
+		if char == "\n":
+			starts.append(index + 1)
+	return starts
+
+
+def offset_to_position(text: str, offset: int) -> tuple[int, int]:
+	offset = max(0, min(offset, len(text)))
+	starts = _line_starts(text)
+	low = 0
+	high = len(starts) - 1
+	while low <= high:
+		mid = (low + high) // 2
+		if starts[mid] <= offset:
+			low = mid + 1
+		else:
+			high = mid - 1
+	line = max(0, high)
+	return line, offset - starts[line]
+
+
+def position_to_offset(text: str, position: dict[str, Any]) -> int:
+	line = max(0, int(position.get("line", 0)))
+	character = max(0, int(position.get("character", 0)))
+	starts = _line_starts(text)
+	if line >= len(starts):
+		return len(text)
+	line_start = starts[line]
+	line_end = starts[line + 1] - 1 if line + 1 < len(starts) else len(text)
+	return min(line_start + character, line_end)
+
+
+def line_prefix(text: str, position: dict[str, Any]) -> str:
+	line = max(0, int(position.get("line", 0)))
+	character = max(0, int(position.get("character", 0)))
+	lines = text.splitlines()
+	if line >= len(lines):
+		return ""
+	return lines[line][:character]
+
+
+def _matching_brace(text: str, open_offset: int) -> int:
+	depth = 0
+	index = open_offset
+	quote: str | None = None
+	escaped = False
+	line_comment = False
+	block_comment = False
+	while index < len(text):
+		char = text[index]
+		next_char = text[index + 1] if index + 1 < len(text) else ""
+		if line_comment:
+			if char == "\n":
+				line_comment = False
+			index += 1
+			continue
+		if block_comment:
+			if char == "*" and next_char == "/":
+				block_comment = False
+				index += 2
+			else:
+				index += 1
+			continue
+		if quote:
+			if escaped:
+				escaped = False
+			elif char == "\\":
+				escaped = True
+			elif char == quote:
+				quote = None
+			index += 1
+			continue
+		if char == "/" and next_char == "/":
+			line_comment = True
+			index += 2
+			continue
+		if char == "/" and next_char == "*":
+			block_comment = True
+			index += 2
+			continue
+		if char in {"'", '"'}:
+			quote = char
+			index += 1
+			continue
+		if char == "{":
+			depth += 1
+		elif char == "}":
+			depth -= 1
+			if depth == 0:
+				return index
+		index += 1
+	return len(text)
+
+
+def parse_entities(text: str) -> list[EntityInfo]:
+	entities: list[EntityInfo] = []
+	pattern = re.compile(r"\b(entity|table)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{")
+	for match in pattern.finditer(text):
+		open_brace = text.find("{", match.start())
+		if open_brace < 0:
+			continue
+		close_brace = _matching_brace(text, open_brace)
+		line, character = offset_to_position(text, match.start(2))
+		entity = EntityInfo(
+			kind=match.group(1),
+			name=match.group(2),
+			line=line,
+			character=character,
+			body_start=open_brace + 1,
+			body_end=close_brace,
+		)
+		body = text[entity.body_start:entity.body_end]
+		entity.fields = _parse_fields(body, entity.body_start, text)
+		entity.relationships = _parse_relationships(body, entity.body_start, text)
+		entities.append(entity)
+	return entities
+
+
+def _parse_fields(body: str, body_offset: int, source: str) -> list[FieldInfo]:
+	fields: list[FieldInfo] = []
+	pattern = re.compile(
+		r"(?:^|(?<=;))\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^=;{\n]+?)(?:\s*=.*?)?\s*;",
+		re.MULTILINE | re.DOTALL,
 	)
-	from lsprotocol.types import (
-		CompletionItem, CompletionItemKind, CompletionParams,
-		Location, Position, Range, Diagnostic, DiagnosticSeverity,
-		DocumentSymbol, SymbolKind, DocumentSymbolParams,
-		DefinitionParams, HoverParams, Hover, MarkupContent, MarkupKind,
-		ReferenceParams, InitializeParams, InitializeResult,
-		ServerCapabilities, TextDocumentSyncKind,
-		CompletionOptions, HoverOptions, DefinitionOptions,
-		ReferencesOptions, DocumentSymbolOptions
+	for match in pattern.finditer(body):
+		type_text = match.group(2).strip()
+		if type_text.startswith("(") or type_text.startswith("async"):
+			continue
+		type_name = type_text.split("@", 1)[0].strip()
+		line, character = offset_to_position(source, body_offset + match.start(1))
+		fields.append(FieldInfo(match.group(1), type_name, line, character))
+	return fields
+
+
+def _parse_relationships(body: str, body_offset: int, source: str) -> list[RelationshipInfo]:
+	relationships: list[RelationshipInfo] = []
+	pattern = re.compile(
+		r"(?:^|;)\s*(has_many|belongs_to|has_one)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s+through\s+[A-Za-z_][A-Za-z0-9_]*)?\s*;",
+		re.MULTILINE,
 	)
-	LSP_AVAILABLE = True
-except ImportError:
-	LSP_AVAILABLE = False
-	# Create dummy classes for when LSP libraries aren't available
-	class LanguageServer: pass
-	class LanguageServerProtocol: pass
-
-# APG Compiler imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from apg.compiler.parser import APGParser, APGSyntaxError
-from apg.compiler.ast_builder import ASTBuilder, ModuleDeclaration, EntityDeclaration, PropertyDeclaration, MethodDeclaration
-from apg.compiler.semantic_analyzer import SemanticAnalyzer, SemanticError, Symbol
-from language_server.semantic_service import (
-	build_language_service_snapshot,
-	code_actions as service_code_actions,
-	completion_items as service_completion_items,
-	definition as service_definition,
-	document_symbols as service_document_symbols,
-	hover as service_hover,
-	references as service_references,
-)
+	for match in pattern.finditer(body):
+		line, character = offset_to_position(source, body_offset + match.start(1))
+		relationships.append(RelationshipInfo(match.group(1), match.group(2), line, character))
+	return relationships
 
 
-# ========================================
-# APG Language Server Implementation
-# ========================================
+def word_at_position(text: str, position: dict[str, Any]) -> tuple[str, dict[str, Any]] | tuple[None, None]:
+	offset = position_to_offset(text, position)
+	if offset == len(text) or (offset < len(text) and not _is_word_char(text[offset])):
+		if offset > 0 and _is_word_char(text[offset - 1]):
+			offset -= 1
+	start = offset
+	end = offset
+	while start > 0 and _is_word_char(text[start - 1]):
+		start -= 1
+	while end < len(text) and _is_word_char(text[end]):
+		end += 1
+	if start == end:
+		return None, None
+	start_line, start_char = offset_to_position(text, start)
+	end_line, end_char = offset_to_position(text, end)
+	return text[start:end], {
+		"start": {"line": start_line, "character": start_char},
+		"end": {"line": end_line, "character": end_char},
+	}
+
+
+def _is_word_char(char: str) -> bool:
+	return char.isalnum() or char in {"_", "@"}
+
+
+def _completion_item(
+	label: str,
+	kind: int = COMPLETION_KIND_TEXT,
+	detail: str | None = None,
+	insert_text: str | None = None,
+) -> dict[str, Any]:
+	item: dict[str, Any] = {"label": label, "kind": kind}
+	if detail:
+		item["detail"] = detail
+	if insert_text:
+		item["insertText"] = insert_text
+	return item
+
+
+def _dedupe_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+	seen: set[str] = set()
+	unique: list[dict[str, Any]] = []
+	for item in items:
+		label = str(item.get("label", ""))
+		if label in seen:
+			continue
+		seen.add(label)
+		unique.append(item)
+	return unique
+
 
 class APGLanguageServer:
-	"""
-	APG Language Server providing IDE integration features.
-	
-	Features:
-	- Real-time syntax validation
-	- Intelligent code completion
-	- Symbol definitions and references
-	- Hover documentation
-	- Document outline/symbols
-	- Error diagnostics with suggestions
-	"""
-	
-	def __init__(self):
-		if not LSP_AVAILABLE:
-			raise ImportError("Language Server libraries not available. Install with: pip install pygls lsprotocol")
-		
-		self.server = LanguageServer("apg-language-server", "1.0.0")
-		self.parser = APGParser()
-		self.ast_builder = ASTBuilder()
-		self.semantic_analyzer = SemanticAnalyzer()
-		
-		# Document cache
-		self.documents: Dict[str, str] = {}
-		self.parsed_documents: Dict[str, ModuleDeclaration] = {}
-		self.diagnostics_cache: Dict[str, List[Diagnostic]] = {}
-		self.snapshots: Dict[str, Dict[str, Any]] = {}
-		
-		# APG language keywords and built-ins
-		self.keywords = [
-			"module", "version", "description", "author", "license",
-			"agent", "digital_twin", "workflow", "db", "api", "form",
-			"import", "export", "from", "as",
-			"str", "int", "float", "bool", "list", "dict", "void", "any",
-			"if", "else", "for", "while", "return", "break", "continue",
-			"true", "false", "null", "async", "await",
-			"table", "schema", "trigger", "procedure", "function", "view",
-			"vector", "embedding", "halfvec", "sparsevec"
-		]
-		
-		self.builtin_functions = [
-			"len", "str", "int", "float", "bool", "now", "log", "print",
-			"query", "execute", "generate_embedding", "vector_similarity"
-		]
-		
-		self.entity_types = ["agent", "digital_twin", "workflow", "db", "api", "form"]
-		
-		self._setup_handlers()
-		
-		self.logger = logging.getLogger(__name__)
-	
-	def _setup_handlers(self):
-		"""Setup LSP message handlers"""
-		
-		@self.server.feature(INITIALIZED)
-		def initialized(ls, params):
-			"""Handle initialization complete"""
-			self.logger.info("APG Language Server initialized")
-		
-		@self.server.feature(TEXT_DOCUMENT_DID_OPEN)
-		async def did_open(ls, params):
-			"""Handle document open"""
-			uri = params.text_document.uri
-			text = params.text_document.text
-			self.documents[uri] = text
-			await self._validate_document(uri, text)
-		
-		@self.server.feature(TEXT_DOCUMENT_DID_CHANGE)
-		async def did_change(ls, params):
-			"""Handle document changes"""
-			uri = params.text_document.uri
-			# Get the full text from the change
-			if params.content_changes:
-				text = params.content_changes[0].text
-				self.documents[uri] = text
-				await self._validate_document(uri, text)
-		
-		@self.server.feature(TEXT_DOCUMENT_DID_SAVE)
-		async def did_save(ls, params):
-			"""Handle document save"""
-			uri = params.text_document.uri
-			if uri in self.documents:
-				await self._validate_document(uri, self.documents[uri])
-		
-		@self.server.feature(TEXT_DOCUMENT_DID_CLOSE)
-		def did_close(ls, params):
-			"""Handle document close"""
-			uri = params.text_document.uri
-			self.documents.pop(uri, None)
-			self.parsed_documents.pop(uri, None)
-			self.diagnostics_cache.pop(uri, None)
-			self.snapshots.pop(uri, None)
-		
-		@self.server.feature(COMPLETION)
-		async def completion(ls, params: CompletionParams) -> List[CompletionItem]:
-			"""Provide code completion"""
-			return await self._get_completions(params)
-		
-		@self.server.feature(HOVER)
-		async def hover(ls, params: HoverParams) -> Optional[Hover]:
-			"""Provide hover information"""
-			return await self._get_hover_info(params)
-		
-		@self.server.feature(DEFINITION)
-		async def definition(ls, params: DefinitionParams) -> Optional[List[Location]]:
-			"""Go to definition"""
-			return await self._get_definition(params)
-		
-		@self.server.feature(REFERENCES)
-		async def references(ls, params: ReferenceParams) -> Optional[List[Location]]:
-			"""Find references"""
-			return await self._get_references(params)
-		
-		@self.server.feature(DOCUMENT_SYMBOLS)
-		async def document_symbols(ls, params: DocumentSymbolParams) -> List[DocumentSymbol]:
-			"""Get document symbols for outline"""
-			return await self._get_document_symbols(params)
-	
-	async def _validate_document(self, uri: str, text: str):
-		"""Validate document and send diagnostics"""
-		try:
-			file_path = self._uri_to_path(uri)
-			snapshot = build_language_service_snapshot(text, file_path)
-			self.snapshots[uri] = snapshot
-			diagnostics = [
-				self._to_lsp_diagnostic(item)
-				for item in snapshot.get("diagnostics", [])
-			]
-			self.diagnostics_cache[uri] = diagnostics
-			self.server.publish_diagnostics(uri, diagnostics)
-			
-		except Exception as e:
-			self.logger.error(f"Error validating document {uri}: {e}")
-			# Send error diagnostic
-			error_diagnostic = Diagnostic(
-				range=Range(
-					start=Position(line=0, character=0),
-					end=Position(line=0, character=10)
-				),
-				message=f"Language server error: {str(e)}",
-				severity=DiagnosticSeverity.Error,
-				source="apg-server"
-			)
-			self.server.publish_diagnostics(uri, [error_diagnostic])
-	
-	async def _get_completions(self, params: CompletionParams) -> List[CompletionItem]:
-		"""Get code completion suggestions"""
-		uri = params.text_document.uri
-		position = params.position
-		
-		try:
-			text = self.documents.get(uri, "")
-			snapshot = self.snapshots.get(uri) or build_language_service_snapshot(text, self._uri_to_path(uri))
-			self.snapshots[uri] = snapshot
-			completions = service_completion_items(
-				snapshot["semantic_model"],
-				source=text,
-				line=position.line,
-				character=position.character,
-			)
-			return [
-				CompletionItem(
-					label=item["label"],
-					kind=self._completion_kind(item["kind"]),
-					detail=item.get("detail"),
-					insert_text=item.get("insert_text"),
-				)
-				for item in completions
-			]
-		
-		except Exception as e:
-			self.logger.error(f"Error getting completions: {e}")
-		
-		return []
-	
-	async def _get_hover_info(self, params: HoverParams) -> Optional[Hover]:
-		"""Get hover information for symbol under cursor"""
-		uri = params.text_document.uri
-		position = params.position
-		
-		try:
-			# Get word at position
-			text = self.documents.get(uri, "")
-			word = self._get_word_at_position(text, position)
-			
-			if not word:
+	def __init__(self, stdin: BinaryIO | None = None, stdout: BinaryIO | None = None):
+		self.stdin = stdin or sys.stdin.buffer
+		self.stdout = stdout or sys.stdout.buffer
+		self.documents: dict[str, DocumentState] = {}
+		self._shutdown_requested = False
+		self._exit_requested = False
+
+	def run(self) -> None:
+		while not self._exit_requested:
+			message = self._read_message()
+			if message is None:
+				break
+			self._handle_message(message)
+
+	def _read_message(self) -> dict[str, Any] | None:
+		headers: dict[str, str] = {}
+		while True:
+			line = self.stdin.readline()
+			if line == b"":
 				return None
-			
-			snapshot = self.snapshots.get(uri) or build_language_service_snapshot(text, self._uri_to_path(uri))
-			self.snapshots[uri] = snapshot
-			content = service_hover(snapshot["semantic_model"], word)
-			if content:
-				return Hover(
-					contents=MarkupContent(
-						kind=MarkupKind.Markdown,
-						value=content["value"],
-					)
-				)
-		
-		except Exception as e:
-			self.logger.error(f"Error getting hover info: {e}")
-		
-		return None
-	
-	async def _get_definition(self, params: DefinitionParams) -> Optional[List[Location]]:
-		"""Go to symbol definition"""
-		uri = params.text_document.uri
-		position = params.position
-		
+			if line in {b"\r\n", b"\n"}:
+				break
+			name, _, value = line.decode("ascii", errors="replace").partition(":")
+			if name:
+				headers[name.lower()] = value.strip()
 		try:
-			text = self.documents.get(uri, "")
-			word = self._get_word_at_position(text, position)
-			
-			if not word:
-				return None
-			snapshot = self.snapshots.get(uri) or build_language_service_snapshot(text, self._uri_to_path(uri))
-			self.snapshots[uri] = snapshot
-			location = service_definition(snapshot["semantic_model"], word)
-			if location:
-				return [Location(uri=uri, range=self._to_lsp_range(location["range"]))]
-		
-		except Exception as e:
-			self.logger.error(f"Error getting definition: {e}")
-		
-		return None
-	
-	async def _get_references(self, params: ReferenceParams) -> Optional[List[Location]]:
-		"""Find all references to symbol"""
-		uri = params.text_document.uri
-		position = params.position
-		
-		try:
-			text = self.documents.get(uri, "")
-			word = self._get_word_at_position(text, position)
-			
-			if not word:
-				return None
-			
-			reference_locations = service_references(text, word, self._uri_to_path(uri))
-			return [
-				Location(uri=uri, range=self._to_lsp_range(location["range"]))
-				for location in reference_locations
-			]
-		
-		except Exception as e:
-			self.logger.error(f"Error getting references: {e}")
-		
-		return None
-	
-	async def _get_document_symbols(self, params: DocumentSymbolParams) -> List[DocumentSymbol]:
-		"""Get document symbols for outline view"""
-		uri = params.text_document.uri
-		
-		try:
-			text = self.documents.get(uri, "")
-			snapshot = self.snapshots.get(uri) or build_language_service_snapshot(text, self._uri_to_path(uri))
-			self.snapshots[uri] = snapshot
-			return [self._to_document_symbol(symbol) for symbol in service_document_symbols(snapshot["semantic_model"])]
-		
-		except Exception as e:
-			self.logger.error(f"Error getting document symbols: {e}")
-			return []
-	
-	# ========================================
-	# Helper methods
-	# ========================================
-	
-	def _uri_to_path(self, uri: str) -> str:
-		"""Convert URI to file path"""
-		parsed = urlparse(uri)
-		return parsed.path
-
-	def _to_lsp_position(self, position: Dict[str, Any]) -> Position:
-		"""Convert semantic-service position data to an LSP position."""
-		return Position(
-			line=max(0, int(position.get("line", 0))),
-			character=max(0, int(position.get("character", 0))),
-		)
-
-	def _to_lsp_range(self, value: Dict[str, Any]) -> Range:
-		"""Convert semantic-service range data to an LSP range."""
-		return Range(
-			start=self._to_lsp_position(value.get("start", {})),
-			end=self._to_lsp_position(value.get("end", value.get("start", {}))),
-		)
-
-	def _to_lsp_diagnostic(self, value: Dict[str, Any]) -> Diagnostic:
-		"""Convert shared APG diagnostic JSON to an LSP diagnostic."""
-		severity_name = str(value.get("severity", "error")).lower()
-		severity = {
-			"error": DiagnosticSeverity.Error,
-			"warning": DiagnosticSeverity.Warning,
-			"information": DiagnosticSeverity.Information,
-			"info": DiagnosticSeverity.Information,
-			"hint": DiagnosticSeverity.Hint,
-		}.get(severity_name, DiagnosticSeverity.Error)
-		return Diagnostic(
-			range=self._to_lsp_range(value.get("range", {})),
-			message=str(value.get("message", "")),
-			severity=severity,
-			source="apg-semantic-model",
-			code=str(value.get("code", "")) or None,
-		)
-
-	def _completion_kind(self, kind: str) -> CompletionItemKind:
-		"""Map service completion kinds to LSP completion kinds."""
-		return {
-			"Class": CompletionItemKind.Class,
-			"Function": CompletionItemKind.Function,
-			"Interface": CompletionItemKind.Interface,
-			"Keyword": CompletionItemKind.Keyword,
-			"Module": CompletionItemKind.Module,
-			"Property": CompletionItemKind.Property,
-			"TypeParameter": CompletionItemKind.TypeParameter,
-			"Variable": CompletionItemKind.Variable,
-		}.get(kind, CompletionItemKind.Text)
-
-	def _symbol_kind(self, kind: str) -> SymbolKind:
-		"""Map semantic symbol kinds to LSP symbol kinds."""
-		return {
-			"agent": SymbolKind.Class,
-			"app": SymbolKind.Module,
-			"capability": SymbolKind.Interface,
-			"composition": SymbolKind.Module,
-			"database": SymbolKind.Namespace,
-			"field": SymbolKind.Property,
-			"flow": SymbolKind.Event,
-			"form": SymbolKind.Object,
-			"module": SymbolKind.Module,
-			"operation": SymbolKind.Function,
-			"package": SymbolKind.Package,
-			"screen": SymbolKind.Object,
-			"table": SymbolKind.Class,
-			"view": SymbolKind.Object,
-		}.get(kind, SymbolKind.Variable)
-
-	def _to_document_symbol(self, value: Dict[str, Any]) -> DocumentSymbol:
-		"""Convert semantic-service document symbol data to an LSP document symbol."""
-		return DocumentSymbol(
-			name=value["name"],
-			kind=self._symbol_kind(value.get("kind", "")),
-			range=self._to_lsp_range(value.get("range", {})),
-			selection_range=self._to_lsp_range(value.get("selection_range", value.get("range", {}))),
-			children=[self._to_document_symbol(child) for child in value.get("children", [])],
-		)
-	
-	def _get_word_at_position(self, text: str, position: Position) -> Optional[str]:
-		"""Get word at cursor position"""
-		lines = text.split('\n')
-		if position.line >= len(lines):
+			length = int(headers.get("content-length", "0"))
+		except ValueError:
 			return None
-		
-		line = lines[position.line]
-		if position.character >= len(line):
+		if length <= 0:
 			return None
-		
-		# Find word boundaries
-		start = position.character
-		end = position.character
-		
-		# Move start backward to word beginning
-		while start > 0 and (line[start - 1].isalnum() or line[start - 1] == '_'):
-			start -= 1
-		
-		# Move end forward to word end
-		while end < len(line) and (line[end].isalnum() or line[end] == '_'):
-			end += 1
-		
-		return line[start:end] if start < end else None
-	
-	def _is_in_entity_context(self, line_prefix: str) -> bool:
-		"""Check if cursor is in entity declaration context"""
-		return any(entity_type in line_prefix for entity_type in self.entity_types)
-	
-	def _is_in_property_context(self, line_prefix: str) -> bool:
-		"""Check if cursor is in property declaration context"""
-		return ':' in line_prefix and '=' not in line_prefix
-	
-	def _is_in_method_context(self, line_prefix: str) -> bool:
-		"""Check if cursor is in method declaration context"""
-		return '(' in line_prefix and ')' in line_prefix and '->' in line_prefix
-	
-	def _is_in_database_context(self, line_prefix: str) -> bool:
-		"""Check if cursor is in database/DBML context"""
-		db_keywords = ['table', 'schema', 'trigger', 'procedure', 'function', 'view']
-		return any(keyword in line_prefix for keyword in db_keywords)
-	
-	def _get_keyword_completions(self) -> List[CompletionItem]:
-		"""Get keyword completions"""
-		return [
-			CompletionItem(
-				label=keyword,
-				kind=CompletionItemKind.Keyword,
-				detail=f"APG keyword: {keyword}"
-			)
-			for keyword in self.keywords
-		]
-	
-	def _get_builtin_completions(self) -> List[CompletionItem]:
-		"""Get builtin function completions"""
-		return [
-			CompletionItem(
-				label=func,
-				kind=CompletionItemKind.Function,
-				detail=f"APG builtin function: {func}",
-				insert_text=f"{func}($0)"
-			)
-			for func in self.builtin_functions
-		]
-	
-	def _get_entity_completions(self) -> List[CompletionItem]:
-		"""Get entity-specific completions"""
-		return [
-			CompletionItem(
-				label="name",
-				kind=CompletionItemKind.Property,
-				detail="Entity name property",
-				insert_text="name: str = \"$1\";"
-			),
-			CompletionItem(
-				label="description",
-				kind=CompletionItemKind.Property,
-				detail="Entity description property",
-				insert_text="description: str = \"$1\";"
-			),
-			CompletionItem(
-				label="process",
-				kind=CompletionItemKind.Method,
-				detail="Main processing method",
-				insert_text="process: () -> $1 = {\n\t$2\n};"
-			)
-		]
-	
-	def _get_property_completions(self) -> List[CompletionItem]:
-		"""Get property type completions"""
-		return [
-			CompletionItem(
-				label="str",
-				kind=CompletionItemKind.TypeParameter,
-				detail="String type"
-			),
-			CompletionItem(
-				label="int",
-				kind=CompletionItemKind.TypeParameter,
-				detail="Integer type"
-			),
-			CompletionItem(
-				label="float",
-				kind=CompletionItemKind.TypeParameter,
-				detail="Float type"
-			),
-			CompletionItem(
-				label="bool",
-				kind=CompletionItemKind.TypeParameter,
-				detail="Boolean type"
-			),
-			CompletionItem(
-				label="list[str]",
-				kind=CompletionItemKind.TypeParameter,
-				detail="List of strings"
-			),
-			CompletionItem(
-				label="dict[str, any]",
-				kind=CompletionItemKind.TypeParameter,
-				detail="Dictionary type"
-			)
-		]
-	
-	def _get_method_completions(self) -> List[CompletionItem]:
-		"""Get method-specific completions"""
-		return [
-			CompletionItem(
-				label="return",
-				kind=CompletionItemKind.Keyword,
-				detail="Return statement",
-				insert_text="return $1;"
-			),
-			CompletionItem(
-				label="if",
-				kind=CompletionItemKind.Snippet,
-				detail="If statement",
-				insert_text="if ($1) {\n\t$2\n}"
-			),
-			CompletionItem(
-				label="for",
-				kind=CompletionItemKind.Snippet,
-				detail="For loop",
-				insert_text="for ($1 in $2) {\n\t$3\n}"
-			)
-		]
-	
-	def _get_database_completions(self) -> List[CompletionItem]:
-		"""Get database/DBML completions"""
-		return [
-			CompletionItem(
-				label="table",
-				kind=CompletionItemKind.Class,
-				detail="Database table",
-				insert_text="table $1 {\n\t$2\n}"
-			),
-			CompletionItem(
-				label="serial [pk]",
-				kind=CompletionItemKind.Property,
-				detail="Primary key column",
-				insert_text="id serial [pk]"
-			),
-			CompletionItem(
-				label="varchar(255)",
-				kind=CompletionItemKind.TypeParameter,
-				detail="Variable character column"
-			),
-			CompletionItem(
-				label="vector(1536)",
-				kind=CompletionItemKind.TypeParameter,
-				detail="Vector embedding column"
-			)
-		]
-	
-	def _get_symbol_completions(self, ast: ModuleDeclaration) -> List[CompletionItem]:
-		"""Get symbol completions from AST"""
-		completions = []
-		
-		for entity in ast.entities:
-			# Add entity name
-			completions.append(CompletionItem(
-				label=entity.name,
-				kind=CompletionItemKind.Class,
-				detail=f"APG {entity.entity_type.value}: {entity.name}"
-			))
-			
-			# Add entity properties
-			for prop in entity.properties:
-				completions.append(CompletionItem(
-					label=prop.name,
-					kind=CompletionItemKind.Property,
-					detail=f"Property: {prop.type_annotation.type_name}"
-				))
-			
-			# Add entity methods
-			for method in entity.methods:
-				completions.append(CompletionItem(
-					label=method.name,
-					kind=CompletionItemKind.Method,
-					detail=f"Method: {method.name}()",
-					insert_text=f"{method.name}($0)"
-				))
-		
-		return completions
-	
-	def _create_keyword_hover(self, keyword: str) -> Hover:
-		"""Create hover info for keyword"""
-		descriptions = {
-			"module": "Declares an APG module with version and metadata",
-			"agent": "Defines an autonomous agent with properties and methods",
-			"digital_twin": "Creates a digital twin representation of a physical entity",
-			"workflow": "Defines a workflow with steps and execution logic",
-			"db": "Declares a database with schema and tables",
-			"str": "String data type",
-			"int": "Integer data type",
-			"float": "Floating-point number data type",
-			"bool": "Boolean data type (true/false)",
-			"list": "List/array data type",
-			"dict": "Dictionary/map data type"
-		}
-		
-		description = descriptions.get(keyword, f"APG keyword: {keyword}")
-		
-		return Hover(
-			contents=MarkupContent(
-				kind=MarkupKind.Markdown,
-				value=f"**{keyword}**\n\n{description}"
-			)
-		)
-	
-	def _create_builtin_hover(self, function: str) -> Hover:
-		"""Create hover info for builtin function"""
-		descriptions = {
-			"len": "Returns the length of a list, string, or dictionary",
-			"str": "Converts value to string",
-			"int": "Converts value to integer",
-			"float": "Converts value to float",
-			"bool": "Converts value to boolean",
-			"now": "Returns current timestamp",
-			"print": "Prints value to console",
-			"query": "Executes database query",
-			"execute": "Executes database command"
-		}
-		
-		description = descriptions.get(function, f"APG builtin function: {function}")
-		
-		return Hover(
-			contents=MarkupContent(
-				kind=MarkupKind.Markdown,
-				value=f"**{function}()**\n\n{description}"
-			)
-		)
-	
-	def _create_symbol_hover(self, symbol_info: Dict[str, Any]) -> Hover:
-		"""Create hover info for symbol"""
-		symbol_type = symbol_info.get('type', 'symbol')
-		name = symbol_info.get('name', 'unknown')
-		details = symbol_info.get('details', '')
-		
-		return Hover(
-			contents=MarkupContent(
-				kind=MarkupKind.Markdown,
-				value=f"**{name}** ({symbol_type})\n\n{details}"
-			)
-		)
-	
-	def _find_symbol_info(self, ast: ModuleDeclaration, symbol_name: str) -> Optional[Dict[str, Any]]:
-		"""Find information about a symbol in the AST"""
-		# Check entities
-		for entity in ast.entities:
-			if entity.name == symbol_name:
-				return {
-					'name': entity.name,
-					'type': entity.entity_type.value,
-					'details': f"APG {entity.entity_type.value} entity"
-				}
-			
-			# Check properties
-			for prop in entity.properties:
-				if prop.name == symbol_name:
-					return {
-						'name': prop.name,
-						'type': 'property',
-						'details': f"Property of type {prop.type_annotation.type_name}"
-					}
-			
-			# Check methods
-			for method in entity.methods:
-				if method.name == symbol_name:
-					return_type = method.return_type.type_name if method.return_type else 'void'
-					params = ', '.join([f"{p.name}: {p.type_annotation.type_name}" for p in method.parameters])
-					return {
-						'name': method.name,
-						'type': 'method',
-						'details': f"Method({params}) -> {return_type}"
-					}
-		
-		return None
-	
-	def _find_symbol_definition(self, ast: ModuleDeclaration, symbol_name: str) -> Optional[Range]:
-		"""Find the definition location of a symbol"""
-		# This would need to track line/column information from the AST
-		# For now, return None as a placeholder
-		return None
-	
-	def _find_symbol_references(self, text: str, symbol_name: str) -> List[Range]:
-		"""Find all references to a symbol in text"""
-		references = []
-		lines = text.split('\n')
-		
-		for line_num, line in enumerate(lines):
-			col = 0
-			while True:
-				col = line.find(symbol_name, col)
-				if col == -1:
-					break
-				
-				# Check if it's a whole word
-				if ((col == 0 or not line[col-1].isalnum()) and 
-					(col + len(symbol_name) >= len(line) or not line[col + len(symbol_name)].isalnum())):
-					references.append(Range(
-						start=Position(line=line_num, character=col),
-						end=Position(line=line_num, character=col + len(symbol_name))
-					))
-				
-				col += 1
-		
-		return references
-	
-	def _extract_document_symbols(self, ast: ModuleDeclaration) -> List[DocumentSymbol]:
-		"""Extract document symbols from AST for outline view"""
-		symbols = []
-		
-		# Module symbol
-		module_symbol = DocumentSymbol(
-			name=ast.name,
-			kind=SymbolKind.Module,
-			range=Range(start=Position(line=0, character=0), end=Position(line=0, character=10)),
-			selection_range=Range(start=Position(line=0, character=0), end=Position(line=0, character=10)),
-			children=[]
-		)
-		
-		# Add entities as children
-		for entity in ast.entities:
-			entity_symbol = DocumentSymbol(
-				name=entity.name,
-				kind=SymbolKind.Class,
-				range=Range(start=Position(line=0, character=0), end=Position(line=0, character=10)),
-				selection_range=Range(start=Position(line=0, character=0), end=Position(line=0, character=10)),
-				children=[]
-			)
-			
-			# Add properties
-			for prop in entity.properties:
-				prop_symbol = DocumentSymbol(
-					name=prop.name,
-					kind=SymbolKind.Property,
-					range=Range(start=Position(line=0, character=0), end=Position(line=0, character=10)),
-					selection_range=Range(start=Position(line=0, character=0), end=Position(line=0, character=10))
-				)
-				entity_symbol.children.append(prop_symbol)
-			
-			# Add methods
-			for method in entity.methods:
-				method_symbol = DocumentSymbol(
-					name=method.name,
-					kind=SymbolKind.Method,
-					range=Range(start=Position(line=0, character=0), end=Position(line=0, character=10)),
-					selection_range=Range(start=Position(line=0, character=0), end=Position(line=0, character=10))
-				)
-				entity_symbol.children.append(method_symbol)
-			
-			module_symbol.children.append(entity_symbol)
-		
-		symbols.append(module_symbol)
-		return symbols
-	
-	def run(self, host: str = "127.0.0.1", port: int = 2087):
-		"""Start the language server"""
-		if not LSP_AVAILABLE:
-			print("Error: Language Server libraries not available.")
-			print("Install with: pip install pygls lsprotocol")
+		body = self.stdin.read(length)
+		if not body:
+			return None
+		return json.loads(body.decode("utf-8"))
+
+	def _write_message(self, payload: dict[str, Any]) -> None:
+		body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+		header = f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
+		self.stdout.write(header + body)
+		self.stdout.flush()
+
+	def _handle_message(self, message: dict[str, Any]) -> None:
+		if "method" not in message:
 			return
-		
-		print(f"Starting APG Language Server on {host}:{port}")
-		self.server.start_tcp(host, port)
+		method = str(message["method"])
+		request_id = message.get("id")
+		params = message.get("params") or {}
+		try:
+			if request_id is None:
+				self._handle_notification(method, params)
+			else:
+				result = self._handle_request(method, params)
+				self._write_message({"jsonrpc": "2.0", "id": request_id, "result": result})
+		except JsonRpcError as error:
+			if request_id is not None:
+				self._write_message({
+					"jsonrpc": "2.0",
+					"id": request_id,
+					"error": {"code": error.code, "message": error.message},
+				})
+			else:
+				self._log_exception(method)
+		except Exception:
+			self._log_exception(method)
+			if request_id is not None:
+				self._write_message({
+					"jsonrpc": "2.0",
+					"id": request_id,
+					"error": {"code": -32603, "message": "Internal error"},
+				})
+
+	def _handle_request(self, method: str, params: dict[str, Any]) -> Any:
+		if method == "initialize":
+			return create_initialize_result()
+		if method == "shutdown":
+			self._shutdown_requested = True
+			return None
+		if method == "textDocument/completion":
+			return self._completion(params)
+		if method == "textDocument/hover":
+			return self._hover(params)
+		if method == "textDocument/definition":
+			return self._definition(params)
+		raise JsonRpcError(-32601, f"Method not found: {method}")
+
+	def _handle_notification(self, method: str, params: dict[str, Any]) -> None:
+		if method == "initialized":
+			return
+		if method == "exit":
+			self._exit_requested = True
+			return
+		if method == "textDocument/didOpen":
+			doc = params.get("textDocument", {})
+			uri = str(doc.get("uri", ""))
+			if not uri:
+				return
+			state = DocumentState(
+				uri=uri,
+				text=str(doc.get("text", "")),
+				version=doc.get("version"),
+				path=uri_to_path(uri),
+			)
+			state.refresh()
+			self.documents[uri] = state
+			self._publish_diagnostics(uri)
+			return
+		if method == "textDocument/didChange":
+			doc = params.get("textDocument", {})
+			uri = str(doc.get("uri", ""))
+			state = self.documents.get(uri)
+			if state is None:
+				state = DocumentState(uri=uri, text="", path=uri_to_path(uri))
+				self.documents[uri] = state
+			state.version = doc.get("version", state.version)
+			for change in params.get("contentChanges", []):
+				state.text = apply_text_change(state.text, change)
+			state.refresh()
+			self._publish_diagnostics(uri)
+			return
+		if method == "textDocument/didClose":
+			doc = params.get("textDocument", {})
+			self.documents.pop(str(doc.get("uri", "")), None)
+
+	def _completion(self, params: dict[str, Any]) -> list[dict[str, Any]]:
+		uri = str(params.get("textDocument", {}).get("uri", ""))
+		position = params.get("position", {})
+		state = self._document_state(uri)
+		prefix = line_prefix(state.text, position)
+		offset = position_to_offset(state.text, position)
+		entity = entity_at_offset(state, offset)
+
+		items: list[dict[str, Any]] = []
+		if _looks_like_validator_context(prefix):
+			items.extend(
+				_completion_item(label, COMPLETION_KIND_PROPERTY, "APG field validator", label)
+				for label in VALIDATORS
+			)
+			return _dedupe_items(items)
+
+		if in_security_block(state.text, offset):
+			return [_completion_item(
+				"authentication: required;",
+				COMPLETION_KIND_PROPERTY,
+				"Require authentication for this security block",
+				"authentication: required;",
+			)]
+
+		if re.search(r"\b(?:has_many|belongs_to)\s+$", prefix):
+			return [
+				_completion_item(name, COMPLETION_KIND_CLASS, "Entity relationship target", name)
+				for name in state.entity_names()
+			]
+
+		if re.search(r"\bentity\s+$", prefix):
+			return [
+				_completion_item(name, COMPLETION_KIND_CLASS, "Entity defined in current file", name)
+				for name in state.entity_names()
+			]
+
+		if re.search(r"\b[A-Za-z_][A-Za-z0-9_]*\s*:\s*$", prefix):
+			return [
+				_completion_item(type_name, COMPLETION_KIND_TYPE_PARAMETER, TYPE_DOCS[type_name][0], type_name)
+				for type_name in TYPE_ORDER
+			]
+
+		if entity and prefix.strip() == "":
+			items.extend(
+				_completion_item(label, COMPLETION_KIND_KEYWORD, KEYWORD_DOCS[label], insert_text)
+				for label, insert_text in RELATIONSHIP_KEYWORDS
+			)
+			items.extend(self._same_named_entity_field_completions(state, entity))
+			return _dedupe_items(items)
+
+		return []
+
+	def _same_named_entity_field_completions(self, state: DocumentState, entity: EntityInfo) -> list[dict[str, Any]]:
+		current_fields = {field.name for field in entity.fields}
+		candidates: list[dict[str, Any]] = []
+		for other in self._other_documents_for_entity_fields(state):
+			other_entity = other.entity_by_name(entity.name)
+			if not other_entity:
+				continue
+			for field_info in other_entity.fields:
+				if field_info.name in current_fields:
+					continue
+				insert_text = f"{field_info.name}: {field_info.type_name};"
+				candidates.append(_completion_item(
+					field_info.name,
+					COMPLETION_KIND_FIELD,
+					f"Field from {entity.name} in another APG file",
+					insert_text,
+				))
+		return candidates
+
+	def _other_documents_for_entity_fields(self, state: DocumentState) -> list[DocumentState]:
+		docs = [doc for uri, doc in self.documents.items() if uri != state.uri]
+		if state.path and state.path.parent.exists():
+			for path in sorted(state.path.parent.glob("*.apg"))[:50]:
+				if path == state.path:
+					continue
+				try:
+					uri = path.as_uri()
+					if uri in self.documents:
+						continue
+					doc = DocumentState(uri=uri, text=path.read_text(encoding="utf-8"), path=path)
+					doc.refresh()
+					docs.append(doc)
+				except OSError:
+					continue
+		return docs
+
+	def _hover(self, params: dict[str, Any]) -> dict[str, Any] | None:
+		uri = str(params.get("textDocument", {}).get("uri", ""))
+		position = params.get("position", {})
+		state = self._document_state(uri)
+		word, word_range = word_at_position(state.text, position)
+		if not word:
+			return None
+		value = self._hover_markdown(state, word, position)
+		if value is None:
+			return None
+		return {"contents": {"kind": "markdown", "value": value}, "range": word_range}
+
+	def _hover_markdown(self, state: DocumentState, word: str, position: dict[str, Any]) -> str | None:
+		if word in TYPE_DOCS:
+			description, example = TYPE_DOCS[word]
+			return f"**{word}**\n\n{description}\n\nExample:\n\n```apg\n{example}\n```"
+		if word in KEYWORD_DOCS:
+			return f"**{word}**\n\n{KEYWORD_DOCS[word]}"
+		relation = relation_target_at_position(state.text, position)
+		if relation == word:
+			entity = state.entity_by_name(word)
+			if entity:
+				return entity_summary_markdown(entity)
+		entity = state.entity_by_name(word)
+		if entity:
+			return entity_summary_markdown(entity)
+		return None
+
+	def _definition(self, params: dict[str, Any]) -> dict[str, Any] | None:
+		uri = str(params.get("textDocument", {}).get("uri", ""))
+		position = params.get("position", {})
+		state = self._document_state(uri)
+		word, _ = word_at_position(state.text, position)
+		if not word or relation_target_at_position(state.text, position) != word:
+			return None
+		entity = state.entity_by_name(word)
+		if not entity:
+			return None
+		return {"uri": uri, "range": entity.range}
+
+	def _publish_diagnostics(self, uri: str) -> None:
+		state = self._document_state(uri)
+		diagnostics = compile_diagnostics(state.text)
+		self._write_message({
+			"jsonrpc": "2.0",
+			"method": "textDocument/publishDiagnostics",
+			"params": {"uri": uri, "diagnostics": diagnostics},
+		})
+
+	def _document_state(self, uri: str) -> DocumentState:
+		state = self.documents.get(uri)
+		if state is not None:
+			return state
+		state = DocumentState(uri=uri, text="", path=uri_to_path(uri))
+		state.refresh()
+		self.documents[uri] = state
+		return state
+
+	def _log_exception(self, method: str) -> None:
+		print(f"APG LSP error while handling {method}", file=sys.stderr)
+		traceback.print_exc(file=sys.stderr)
 
 
-# ========================================
-# Server Capabilities Configuration
-# ========================================
-
-def create_server_capabilities() -> ServerCapabilities:
-	"""Create server capabilities for initialization"""
-	return ServerCapabilities(
-		text_document_sync=TextDocumentSyncKind.Full,
-		completion_provider=CompletionOptions(
-			trigger_characters=['.', ':', '(', '[', '{']
-		),
-		hover_provider=HoverOptions(),
-		definition_provider=DefinitionOptions(),
-		references_provider=ReferencesOptions(),
-		document_symbol_provider=DocumentSymbolOptions()
-	)
+class JsonRpcError(Exception):
+	def __init__(self, code: int, message: str):
+		super().__init__(message)
+		self.code = code
+		self.message = message
 
 
-# ========================================
-# CLI Entry Point
-# ========================================
+def create_server_capabilities() -> dict[str, Any]:
+	return {
+		"textDocumentSync": TEXT_DOCUMENT_SYNC_INCREMENTAL,
+		"completionProvider": {"triggerCharacters": [" ", ":"]},
+		"hoverProvider": True,
+		"diagnosticProvider": True,
+		"definitionProvider": True,
+	}
+
+
+def create_initialize_result() -> dict[str, Any]:
+	return {
+		"capabilities": create_server_capabilities(),
+		"serverInfo": {"name": "apg-language-server", "version": "1.0.0"},
+	}
+
+
+def uri_to_path(uri: str) -> Path | None:
+	parsed = urlparse(uri)
+	if parsed.scheme != "file":
+		return None
+	path = unquote(parsed.path)
+	if sys.platform.startswith("win") and re.match(r"^/[A-Za-z]:", path):
+		path = path[1:]
+	return Path(path)
+
+
+def apply_text_change(text: str, change: dict[str, Any]) -> str:
+	if "range" not in change:
+		return str(change.get("text", ""))
+	start = position_to_offset(text, change.get("range", {}).get("start", {}))
+	end = position_to_offset(text, change.get("range", {}).get("end", {}))
+	return text[:start] + str(change.get("text", "")) + text[end:]
+
+
+def entity_at_offset(state: DocumentState, offset: int) -> EntityInfo | None:
+	for entity in state.entities:
+		if entity.body_start <= offset <= entity.body_end:
+			return entity
+	return None
+
+
+def in_security_block(text: str, offset: int) -> bool:
+	pattern = re.compile(r"\bsecurity(?:\s+[A-Za-z_][A-Za-z0-9_]*)?\s*\{")
+	for match in pattern.finditer(text):
+		open_brace = text.find("{", match.start())
+		close_brace = _matching_brace(text, open_brace)
+		if open_brace < offset <= close_brace:
+			return True
+	return False
+
+
+def relation_target_at_position(text: str, position: dict[str, Any]) -> str | None:
+	line_number = int(position.get("line", 0))
+	lines = text.splitlines()
+	if line_number < 0 or line_number >= len(lines):
+		return None
+	line = lines[line_number]
+	match = re.search(r"\b(has_many|belongs_to)\s+([A-Za-z_][A-Za-z0-9_]*)\b", line)
+	return match.group(2) if match else None
+
+
+def entity_summary_markdown(entity: EntityInfo) -> str:
+	if entity.fields:
+		fields = ", ".join(f"{field.name}: {field.type_name}" for field in entity.fields)
+	else:
+		fields = "No fields declared."
+	return f"**{entity.name}** ({entity.kind})\n\nFields: {fields}"
+
+
+def compile_diagnostics(text: str) -> list[dict[str, Any]]:
+	try:
+		result = APGCompiler().compile_string(text, "hover")
+	except Exception as error:
+		return [_exception_diagnostic(error)]
+	return [_diagnostic_from_error(error) for error in result.errors]
+
+
+def _diagnostic_from_error(error: APGSyntaxError | SemanticError | Exception) -> dict[str, Any]:
+	line = max(0, int(getattr(error, "line", 1) or 1) - 1)
+	raw_column = int(getattr(error, "column", 0) or 0)
+	if isinstance(error, SemanticError):
+		character = max(0, raw_column - 1)
+	else:
+		character = max(0, raw_column)
+	message = str(getattr(error, "message", "") or str(error))
+	return {
+		"range": {
+			"start": {"line": line, "character": character},
+			"end": {"line": line, "character": character + 1},
+		},
+		"severity": DIAGNOSTIC_SEVERITY_ERROR,
+		"source": "apg",
+		"message": message,
+		"code": error.__class__.__name__,
+	}
+
+
+def _exception_diagnostic(error: Exception) -> dict[str, Any]:
+	return {
+		"range": {
+			"start": {"line": 0, "character": 0},
+			"end": {"line": 0, "character": 1},
+		},
+		"severity": DIAGNOSTIC_SEVERITY_ERROR,
+		"source": "apg-language-server",
+		"message": f"Language server diagnostic failure: {error}",
+		"code": "LanguageServerError",
+	}
+
+
+def _looks_like_validator_context(prefix: str) -> bool:
+	return prefix.endswith("@") or bool(re.search(r"@[A-Za-z_]*$", prefix))
+
 
 def start_language_server(host: str = "127.0.0.1", port: int = 2087) -> None:
-	"""Start the APG language server over TCP."""
-	server = APGLanguageServer()
-	server.run(host, port)
+	"""Start the APG language server over stdio.
+
+	``host`` and ``port`` are accepted for compatibility with the older CLI
+	surface, but stdio is the only supported transport for this dependency-free
+	server.
+	"""
+	_ = (host, port)
+	APGLanguageServer().run()
 
 
-def main():
-	"""Main entry point for APG language server"""
-	import argparse
-	
-	parser = argparse.ArgumentParser(description="APG Language Server")
-	parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
-	parser.add_argument("--port", type=int, default=2087, help="Port to bind to")
-	parser.add_argument("--log-level", default="INFO", help="Log level")
-	parser.add_argument("--stdio", action="store_true", help="Use stdio transport")
-	
-	args = parser.parse_args()
-	
-	# Configure logging
-	logging.basicConfig(
-		level=getattr(logging, args.log_level.upper()),
-		format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-	)
-	
-	if not LSP_AVAILABLE:
-		print("Error: Language Server Protocol libraries not installed.")
-		print("Install with: pip install pygls lsprotocol")
-		sys.exit(1)
-	
-	try:
-		server = APGLanguageServer()
-		if args.stdio:
-			server.server.start_io()
-		else:
-			server.run(args.host, args.port)
-	except KeyboardInterrupt:
-		print("\nShutting down APG Language Server")
-	except Exception as e:
-		print(f"Error starting language server: {e}")
-		sys.exit(1)
+def main() -> None:
+	parser = argparse.ArgumentParser(description="APG Language Server over stdio")
+	parser.add_argument("--stdio", action="store_true", help="Accepted for compatibility; stdio is always used")
+	parser.add_argument("--host", default="127.0.0.1", help=argparse.SUPPRESS)
+	parser.add_argument("--port", type=int, default=2087, help=argparse.SUPPRESS)
+	parser.parse_args()
+	start_language_server()
 
 
 if __name__ == "__main__":

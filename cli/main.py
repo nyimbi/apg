@@ -262,15 +262,9 @@ def language_server(
 	if source_file is not None:
 		raise click.ClickException("SOURCE_FILE is only accepted with --check, --code-actions, or --rename")
 
-	console.print(f"[blue]Starting APG Language Server on {host}:{port}[/blue]")
-	
-	try:
-		from language_server.server import start_language_server
-		start_language_server(host, port)
-	except ImportError:
-		console.print("[red]Language server not available. Install with: pip install apg-language-server[/red]")
-	except KeyboardInterrupt:
-		console.print("\n[yellow]Language server stopped[/yellow]")
+	_ = (host, port)
+	server_script = apg_root / "language_server" / "server.py"
+	os.execv(sys.executable, [sys.executable, str(server_script)])
 
 
 _INIT_TEMPLATES: dict[str, str] = {
