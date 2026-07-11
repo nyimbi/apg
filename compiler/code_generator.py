@@ -428,12 +428,20 @@ class PythonCodeGenerator:
 
 		def field_spec(property: Any) -> Dict[str, Any]:
 			type_name = property.type_annotation.type_name if property.type_annotation else "any"
+			is_computed = bool(getattr(property, "is_computed", False))
 			spec = {
 				"name": property.name,
 				"type": type_name,
-				"required": property.is_required,
+				"required": False if is_computed else property.is_required,
 			}
-			if property.default_value is not None:
+			if is_computed:
+				spec["computed"] = True
+				spec["expression"] = str(
+					getattr(property, "computed_expression", None)
+					or property.default_value
+					or ""
+				).strip()
+			elif property.default_value is not None:
 				spec["default"] = self._expression_value(property.default_value)
 			if type_name in enum_values_by_name:
 				spec["enum"] = list(enum_values_by_name[type_name])
@@ -581,7 +589,7 @@ class PythonCodeGenerator:
 
 	@staticmethod
 	def _module_i18n_config(module: "ModuleDeclaration") -> Dict[str, Any]:
-		languages: list[str] = []
+		languages: list[str] = ["en", "sw", "fr", "ar"]
 		default_language = "en"
 		fallback_language = "en"
 		for entity in module.entities:
@@ -600,8 +608,6 @@ class PythonCodeGenerator:
 			raw_fallback = i18n.get("fallback_language")
 			if raw_fallback:
 				fallback_language = str(raw_fallback).strip().strip('"').strip("'")
-		if "en" not in languages:
-			languages.insert(0, "en")
 		if default_language not in languages:
 			default_language = languages[0]
 		if fallback_language not in languages:
@@ -614,12 +620,27 @@ class PythonCodeGenerator:
 
 	@staticmethod
 	def _chrome_i18n_catalog(languages: list[str]) -> Dict[str, Dict[str, str]]:
+		required = (
+			"save",
+			"cancel",
+			"delete",
+			"confirm",
+			"error",
+			"success",
+			"loading",
+			"no_records",
+			"search",
+			"login",
+			"logout",
+		)
 		english = {
+			"cancel": "Cancel",
 			"home": "Home",
 			"workflows": "Workflows",
 			"marketplace": "Marketplace",
 			"theme_system": "System",
 			"language": "Language",
+			"login": "Login",
 			"logout": "Logout",
 			"sign_in": "Sign in",
 			"open_app": "Open App",
@@ -628,45 +649,19 @@ class PythonCodeGenerator:
 			"view_manifest": "View Manifest",
 			"entities": "Entities",
 			"capabilities": "Capabilities",
+			"confirm": "Confirm",
+			"delete": "Delete",
+			"error": "Error",
+			"loading": "Loading",
+			"no_records": "No records",
 			"records": "Records",
+			"save": "Save",
+			"search": "Search",
+			"success": "Success",
 			"ai_agents": "AI Agents",
 		}
-		overrides = {
-			"sw": {
-				"home": "Nyumbani",
-				"workflows": "Mitiririko",
-				"marketplace": "Soko",
-				"theme_system": "Mfumo",
-				"language": "Lugha",
-				"logout": "Toka",
-				"sign_in": "Ingia",
-				"open_app": "Fungua Programu",
-				"api_docs": "Nyaraka za API",
-				"data_entities": "Vyombo vya Data",
-				"view_manifest": "Tazama Manifesti",
-				"entities": "Vyombo",
-				"capabilities": "Uwezo",
-				"records": "Rekodi",
-				"ai_agents": "Mawakala wa AI",
-			},
-			"ar": {
-				"home": "الرئيسية",
-				"workflows": "سير العمل",
-				"marketplace": "السوق",
-				"theme_system": "النظام",
-				"language": "اللغة",
-				"logout": "تسجيل الخروج",
-				"sign_in": "تسجيل الدخول",
-				"open_app": "فتح التطبيق",
-				"api_docs": "وثائق API",
-				"data_entities": "كيانات البيانات",
-				"view_manifest": "عرض البيان",
-				"entities": "الكيانات",
-				"capabilities": "القدرات",
-				"records": "السجلات",
-				"ai_agents": "وكلاء الذكاء الاصطناعي",
-			},
-		}
+		placeholder = {key: "" for key in required}
+		overrides = {"sw": placeholder, "fr": placeholder, "ar": placeholder}
 		return {
 			language: {**english, **overrides.get(language, {})}
 			for language in languages
@@ -814,6 +809,7 @@ Generated from APG source as dependency-free Python artifacts.
 from __future__ import annotations
 
 import base64
+import collections
 import gzip
 import importlib
 import hashlib
@@ -830,6 +826,7 @@ import secrets
 import smtplib as _smtplib
 import sqlite3 as _sqlite3
 import sys
+import threading
 import threading as _threading
 import time as _time
 import urllib.request as _urllib_request, hmac as _hmac_mod, hashlib as _hashlib_mod, threading as _threading_mod, time as _time_mod
@@ -867,9 +864,17 @@ WORKFLOW_SIGNALS: Dict[str, list[str]] = {{}}
 APG_RECORD_LOCK = _threading.RLock()
 APG_LIVE_LOCK = _threading.Lock()
 APG_LIVE_SUBSCRIBERS: list[Dict[str, Any]] = []
+_APG_JOB_QUEUE = collections.deque()
+_APG_JOB_LOCK = threading.Lock()
+_APG_JOB_HANDLERS: Dict[str, Any] = {{}}
+_APG_JOB_WORKERS: list[threading.Thread] = []
+_APG_JOB_WORKERS_STARTED = False
+APG_MULTI_TENANT_ENABLED = str(os.environ.get("APG_MULTI_TENANT", "")).strip().lower() in {{"1", "true", "yes", "on"}}
+APG_TENANT_DEFAULT = "default"
+APG_TENANT_HEADER_DEFAULT = "X-APG-Tenant"
 TENANT_SCOPED_ENTITIES: set[str] = {{
     e["name"] for e in ENTITIES
-    if any(str(f.get("name")) == "tenant_id" for f in e.get("fields", []))
+    if APG_MULTI_TENANT_ENABLED or any(str(f.get("name")) == "tenant_id" for f in e.get("fields", []))
 }}
 SEMANTIC_MODEL: Dict[str, Any] = {semantic_model!r}
 APG_UI_TEMPLATES: Dict[str, str] = {ui_templates!r}
@@ -877,7 +882,8 @@ APG_AUTH_REQUIRED = {auth_required!r}
 APG_SUPPORTED_LANGUAGES: list[str] = {i18n_config["supported_languages"]!r}
 APG_DEFAULT_LANGUAGE = {i18n_config["default_language"]!r}
 APG_FALLBACK_LANGUAGE = {i18n_config["fallback_language"]!r}
-APG_I18N: Dict[str, Dict[str, str]] = {i18n_catalog!r}
+_APG_STRINGS: Dict[str, Dict[str, str]] = {i18n_catalog!r}
+APG_I18N: Dict[str, Dict[str, str]] = _APG_STRINGS
 _APG_OPENAPI_SPEC: Dict[str, Any] | None = None
 _APG_FIELD_ACL = json.loads(os.environ.get("APG_FIELD_ACL", "{{}}"))
 
@@ -923,6 +929,8 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+_APG_JOB_WORKER_THREADS = max(1, _env_int("APG_WORKER_THREADS", 2))
+_APG_JOB_MAX_RETRIES = max(1, _env_int("APG_JOB_MAX_RETRIES", 3))
 _APG_EMAIL_THREADS: list[_threading_mod.Thread] = []
 
 
@@ -1421,11 +1429,16 @@ def _database_column_specs(entity: Dict[str, Any]) -> list[Dict[str, Any]]:
     columns: list[Dict[str, Any]] = [
         {{"name": "id", "type": "integer", "required": True, "nullable": False, "primary_key": True}}
     ]
+    if APG_MULTI_TENANT_ENABLED:
+        columns.append({{"name": "tenant_id", "type": "string", "required": True, "nullable": False, "primary_key": False}})
     for field in entity.get("fields", []):
         if not isinstance(field, dict):
             continue
+        if field.get("computed"):
+            continue
         field_name = str(field.get("name", "")).strip()
-        if not field_name or field_name == "id":
+        existing_column_names = {{str(column.get("name")) for column in columns}}
+        if not field_name or field_name == "id" or field_name in existing_column_names:
             continue
         required = bool(field.get("required", False))
         column: Dict[str, Any] = {{
@@ -2264,8 +2277,58 @@ def circuit_breaker_status() -> Dict[str, Any]:
 _TENANT_LOCAL = _apg_threading.local()
 
 
+def _tenant_header_name() -> str:
+    configured = str(os.environ.get("APG_TENANT_HEADER", "") or "").strip()
+    return configured or APG_TENANT_HEADER_DEFAULT
+
+
+def _tenant_header_value() -> str | None:
+    try:
+        header_name = _tenant_header_name()
+        value = _flask_request.headers.get(header_name)
+        if value is None and header_name.lower() == APG_TENANT_HEADER_DEFAULT.lower():
+            value = _flask_request.headers.get("X-Tenant-ID")
+    except RuntimeError:
+        return None
+    if value in (None, ""):
+        return None
+    value_text = str(value).strip()
+    return value_text or None
+
+
+def _tenant_admin_bypass() -> bool:
+    try:
+        if str(_flask_request.headers.get("X-APG-Admin", "")).strip() != "1":
+            return False
+        admin_key = os.environ.get("APG_ADMIN_KEY")
+        if not admin_key:
+            return False
+        authorization = _flask_request.headers.get("Authorization", "")
+        supplied_key = _flask_request.headers.get("X-APG-API-Key")
+        if authorization.startswith("Bearer "):
+            supplied_key = authorization.removeprefix("Bearer ").strip()
+        return bool(supplied_key) and hmac.compare_digest(str(supplied_key), str(admin_key))
+    except RuntimeError:
+        return False
+
+
 def _tenant_id() -> str | None:
-    return getattr(_TENANT_LOCAL, "tenant_id", None)
+    tenant = getattr(_TENANT_LOCAL, "tenant_id", None)
+    if tenant not in (None, ""):
+        tenant_text = str(tenant).strip()
+        if tenant_text:
+            return tenant_text
+    return APG_TENANT_DEFAULT if APG_MULTI_TENANT_ENABLED else None
+
+
+def _tenant_scope_enabled(entity_name: str) -> bool:
+    return APG_MULTI_TENANT_ENABLED or entity_name in TENANT_SCOPED_ENTITIES
+
+
+def _record_tenant_visible(entity_name: str, record: Dict[str, Any]) -> bool:
+    if not _tenant_scope_enabled(entity_name) or _tenant_admin_bypass():
+        return True
+    return str(record.get("tenant_id") or APG_TENANT_DEFAULT) == str(_tenant_id() or APG_TENANT_DEFAULT)
 
 
 def _subscribe_workflow_event(event_name: str, workflow_name: str) -> None:
@@ -2444,7 +2507,7 @@ def _record_public_copy(entity_name: str, record: Dict[str, Any]) -> Dict[str, A
     public.setdefault("created_at", metadata.get("created_at") or _record_timestamp())
     public.setdefault("updated_at", metadata.get("updated_at") or public["created_at"])
     public.setdefault("deleted_at", metadata.get("deleted_at"))
-    return public
+    return _apply_computed_fields(entity_name, public)
 
 
 def _record_deleted(entity_name: str, record: Dict[str, Any]) -> bool:
@@ -2454,10 +2517,21 @@ def _record_deleted(entity_name: str, record: Dict[str, Any]) -> bool:
     return bool(metadata and metadata.get("deleted_at"))
 
 
+def _record_stored_copy(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
+    stored = dict(record)
+    for field_name in _computed_field_names(entity_name):
+        stored.pop(field_name, None)
+    metadata = _record_metadata(entity_name, stored.get("id"), create=True) or {{}}
+    for key in ("created_at", "updated_at", "deleted_at"):
+        if stored.get(key) in (None, "") and metadata.get(key) not in (None, ""):
+            stored[key] = metadata.get(key)
+    return stored
+
+
 def _raw_records_by_entity(*, include_deleted: bool = True) -> Dict[str, list[Dict[str, Any]]]:
     return {{
         entity_name: [
-            _record_public_copy(entity_name, record)
+            _record_stored_copy(entity_name, record)
             for record in RECORD_STORE[entity_name]
             if include_deleted or not _record_deleted(entity_name, record)
         ]
@@ -2475,14 +2549,18 @@ def list_records(
             name: [
                 _record_public_copy(name, record)
                 for record in RECORD_STORE[name]
-                if (include_deleted or not _record_deleted(name, record)) and _record_owner_visible(record)
+                if (include_deleted or not _record_deleted(name, record))
+                and _record_owner_visible(record)
+                and _record_tenant_visible(name, record)
             ]
             for name in sorted(ENTITY_NAMES)
     }}
     return [
         _record_public_copy(entity_name, record)
         for record in RECORD_STORE[entity_name]
-        if (include_deleted or not _record_deleted(entity_name, record)) and _record_owner_visible(record)
+        if (include_deleted or not _record_deleted(entity_name, record))
+        and _record_owner_visible(record)
+        and _record_tenant_visible(entity_name, record)
     ]
 
 
@@ -2508,6 +2586,8 @@ def _strip_record_lifecycle_fields(record: Dict[str, Any]) -> Dict[str, Any]:
     sanitized = dict(record)
     for field_name in _RECORD_LIFECYCLE_FIELDS:
         sanitized.pop(field_name, None)
+    if APG_MULTI_TENANT_ENABLED:
+        sanitized.pop("tenant_id", None)
     return sanitized
 
 
@@ -2548,6 +2628,8 @@ def _query_includes_deleted(query: Dict[str, list[str]]) -> bool:
 
 def _record_field_names(entity_name: str) -> set[str]:
     names = {{"id", "_revision", "created_at", "updated_at", "deleted_at", "owner_id"}}
+    if _tenant_scope_enabled(entity_name):
+        names.add("tenant_id")
     for field in _field_specs(entity_name):
         field_name = str(field.get("name", ""))
         if not field_name:
@@ -2561,7 +2643,7 @@ def _record_field_names(entity_name: str) -> set[str]:
 
 def _record_string_field_names(entity_name: str) -> list[str]:
     names: list[str] = []
-    for field in _field_specs(entity_name):
+    for field in _stored_field_specs(entity_name):
         if _is_file_field(field):
             continue
         field_name = str(field.get("name", ""))
@@ -2592,7 +2674,12 @@ def _record_query_filters(
             return filters, {{"error": "invalid_field"}}
         filters[field_name] = values[-1]
     tid = _tenant_id()
-    if tid and entity_name in TENANT_SCOPED_ENTITIES and "tenant_id" not in filters:
+    if (
+        tid
+        and _tenant_scope_enabled(entity_name)
+        and not _tenant_admin_bypass()
+        and "tenant_id" not in filters
+    ):
         filters["tenant_id"] = tid
     return filters, None
 
@@ -2848,6 +2935,8 @@ def _normalize_record_metadata() -> None:
             record.setdefault("created_at", metadata.get("created_at"))
             record.setdefault("updated_at", metadata.get("updated_at"))
             record.setdefault("deleted_at", metadata.get("deleted_at"))
+            if APG_MULTI_TENANT_ENABLED:
+                record.setdefault("tenant_id", APG_TENANT_DEFAULT)
 
 
 def _load_record_store() -> None:
@@ -2915,7 +3004,7 @@ def _load_record_store() -> None:
             if rid and rid not in WORKFLOW_RUNS:
                 WORKFLOW_RUNS[rid] = run
         for entity_name in list(RECORD_STORE.keys()):
-            pg_records = _pg_load_entity_records(entity_name)
+            pg_records = _pg_load_entity_records(entity_name, tenant_scoped=False)
             if pg_records:
                 RECORD_STORE[entity_name] = pg_records
     _sqlite_load_records()
@@ -3141,7 +3230,163 @@ def auth_status() -> Dict[str, Any]:
     }}
 
 
+_APG_REQUIRED_LOCALE_KEYS = (
+    "save",
+    "cancel",
+    "delete",
+    "confirm",
+    "error",
+    "success",
+    "loading",
+    "no_records",
+    "search",
+    "login",
+    "logout",
+)
+
+
+def _locale_base_dir() -> Path:
+    configured = str(os.environ.get("APG_LOCALE_DIR", "") or "").strip()
+    if configured:
+        return Path(configured)
+    try:
+        return Path(globals().get("__file__", ".")).resolve().parent / "locales"
+    except Exception:
+        return Path("locales")
+
+
+def _locale_file_path() -> Path | None:
+    configured = str(os.environ.get("APG_LOCALE_FILE", "") or "").strip()
+    return Path(configured) if configured else None
+
+
+def _read_locale_json(path: Path) -> Any | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _flat_locale_strings(value: Any) -> Dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    result: Dict[str, str] = {{}}
+    for key, item in value.items():
+        if isinstance(item, (dict, list)):
+            return None
+        result[str(key)] = str(item)
+    return result
+
+
+def _locale_file_catalog() -> Dict[str, Dict[str, str]]:
+    catalog: Dict[str, Dict[str, str]] = {{}}
+    locale_dir = _locale_base_dir()
+    if locale_dir.is_dir():
+        for path in sorted(locale_dir.glob("*.json")):
+            parsed = _read_locale_json(path)
+            flat = _flat_locale_strings(parsed)
+            if flat is not None:
+                catalog[path.stem] = flat
+                continue
+            if isinstance(parsed, dict):
+                for language, strings in parsed.items():
+                    nested = _flat_locale_strings(strings)
+                    if nested is not None:
+                        catalog[str(language)] = nested
+    configured_path = _locale_file_path()
+    if configured_path is not None:
+        parsed = _read_locale_json(configured_path)
+        flat = _flat_locale_strings(parsed)
+        configured_language = str(os.environ.get("APG_LOCALE", "") or "").strip()
+        if flat is not None:
+            catalog["custom"] = flat
+            if configured_language:
+                catalog[configured_language] = flat
+        elif isinstance(parsed, dict):
+            for language, strings in parsed.items():
+                nested = _flat_locale_strings(strings)
+                if nested is not None:
+                    catalog[str(language)] = nested
+    return catalog
+
+
+def _configure_runtime_i18n() -> None:
+    global _APG_STRINGS, APG_I18N, APG_SUPPORTED_LANGUAGES, APG_DEFAULT_LANGUAGE, APG_FALLBACK_LANGUAGE
+    catalog: Dict[str, Dict[str, str]] = json.loads(json.dumps(_APG_STRINGS))
+    english_defaults = dict(catalog.get("en", {{}}))
+    for language, strings in _locale_file_catalog().items():
+        base = dict(catalog.get(language, english_defaults))
+        base.update(strings)
+        catalog[language] = base
+    configured_language = str(os.environ.get("APG_LOCALE", "") or "").strip()
+    if configured_language:
+        catalog.setdefault(configured_language, dict(english_defaults))
+        APG_DEFAULT_LANGUAGE = configured_language
+    if APG_DEFAULT_LANGUAGE not in catalog:
+        catalog[APG_DEFAULT_LANGUAGE] = dict(english_defaults)
+    if APG_FALLBACK_LANGUAGE not in catalog:
+        APG_FALLBACK_LANGUAGE = "en" if "en" in catalog else APG_DEFAULT_LANGUAGE
+    fallback = dict(catalog.get(APG_FALLBACK_LANGUAGE, english_defaults))
+    for language, strings in list(catalog.items()):
+        merged = dict(fallback)
+        merged.update(strings)
+        for key in _APG_REQUIRED_LOCALE_KEYS:
+            merged.setdefault(key, english_defaults.get(key, key.replace("_", " ").title()))
+        catalog[language] = merged
+    _APG_STRINGS = catalog
+    APG_I18N = _APG_STRINGS
+    APG_SUPPORTED_LANGUAGES = sorted(catalog)
+
+
+def _export_locale_if_requested() -> None:
+    if not _env_flag("APG_EXPORT_LOCALE"):
+        return
+    path = _locale_base_dir() / "en.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(APG_I18N.get("en", {{}}), indent=2, sort_keys=True), encoding="utf-8")
+    except OSError as exc:
+        _logging.getLogger("apg").warning("locale_export_failed: %s", exc)
+
+
+def _locale_file_payload(language: str) -> Any | None:
+    if not re.match(r"^[A-Za-z0-9_-]+$", str(language)):
+        return None
+    locale_path = _locale_base_dir() / (str(language) + ".json")
+    if locale_path.is_file():
+        parsed = _read_locale_json(locale_path)
+        if parsed is not None:
+            return parsed
+    configured_path = _locale_file_path()
+    if configured_path is not None:
+        configured_language = str(os.environ.get("APG_LOCALE", "") or "").strip()
+        if language == "custom" or (configured_language and language == configured_language):
+            parsed = _read_locale_json(configured_path)
+            if parsed is not None:
+                return parsed
+    return None
+
+
+def _locale_payload(language: str) -> Dict[str, Any] | None:
+    file_payload = _locale_file_payload(language)
+    if isinstance(file_payload, dict):
+        return file_payload
+    if language in APG_I18N:
+        return dict(APG_I18N[language])
+    primary = str(language).split("-", 1)[0]
+    if primary in APG_I18N:
+        return dict(APG_I18N[primary])
+    return None
+
+
+_configure_runtime_i18n()
+_export_locale_if_requested()
+
+
 def _active_locale() -> str:
+    configured_language = str(os.environ.get("APG_LOCALE", "") or "").strip()
+    if configured_language in APG_I18N:
+        return configured_language
     try:
         cookie_locale = _flask_request.cookies.get("apg_lang")
         if cookie_locale in APG_SUPPORTED_LANGUAGES:
@@ -3159,14 +3404,18 @@ def _text_direction(locale: str | None = None) -> str:
     return "rtl" if language in {{"ar", "he", "fa", "ur"}} else "ltr"
 
 
-def _(key: str) -> str:
+def _apg_t(key: str) -> str:
     locale = _active_locale()
     return (
-        APG_I18N.get(locale, {{}}).get(key)
-        or APG_I18N.get(APG_FALLBACK_LANGUAGE, {{}}).get(key)
-        or APG_I18N.get("en", {{}}).get(key)
+        _APG_STRINGS.get(locale, {{}}).get(key)
+        or _APG_STRINGS.get(APG_FALLBACK_LANGUAGE, {{}}).get(key)
+        or _APG_STRINGS.get("en", {{}}).get(key)
         or key
     )
+
+
+def _(key: str) -> str:
+    return _apg_t(key)
 
 
 def format_number(value: Any) -> str:
@@ -3332,8 +3581,12 @@ def _has_header_auth(headers: Any) -> bool:
             except Exception:
                 return False
         supplied_key = token
-    required_key = os.environ.get("APG_API_KEY")
-    return bool(required_key and supplied_key == required_key)
+    required_keys = [os.environ.get("APG_API_KEY"), os.environ.get("APG_ADMIN_KEY")]
+    return any(
+        bool(required_key and supplied_key)
+        and hmac.compare_digest(str(supplied_key), str(required_key))
+        for required_key in required_keys
+    )
 
 
 def _csrf_required_for_request() -> bool:
@@ -3467,6 +3720,9 @@ def _authorized(headers: Any) -> bool:
             except Exception:
                 return False
         supplied_key = token
+    admin_key = os.environ.get("APG_ADMIN_KEY")
+    if admin_key and supplied_key and hmac.compare_digest(str(supplied_key), str(admin_key)):
+        return True
     required_key = os.environ.get("APG_API_KEY")
     if required_key:
         return bool(supplied_key) and hmac.compare_digest(str(supplied_key), str(required_key))
@@ -3590,7 +3846,9 @@ def _prepare_new_record(record: Dict[str, Any], entity_name: str = "") -> Dict[s
         prepared["owner_id"] = _apg_current_owner_id()
     # Auto-inject tenant_id for tenant-scoped entities
     tid = _tenant_id()
-    if tid and entity_name in TENANT_SCOPED_ENTITIES:
+    if APG_MULTI_TENANT_ENABLED and entity_name:
+        prepared["tenant_id"] = tid or APG_TENANT_DEFAULT
+    elif tid and entity_name in TENANT_SCOPED_ENTITIES:
         prepared.setdefault("tenant_id", tid)
     return prepared
 
@@ -3629,10 +3887,14 @@ def _record_schema(entity: Dict[str, Any], partial: bool = False) -> Dict[str, A
         "deleted_at": {{"oneOf": [{{"type": "string"}}, {{"type": "null"}}]}},
         "owner_id": {{"oneOf": [{{"type": "string"}}, {{"type": "null"}}]}},
     }}
+    if _tenant_scope_enabled(str(entity["name"])):
+        schema_properties["tenant_id"] = {{"type": "string"}}
     required_fields: list[str] = []
     for field in fields:
         field_name = str(field["name"])
         field_schema: Dict[str, Any] = {{"type": _json_schema_type(str(field.get("type", "any")))}}
+        if field.get("computed"):
+            field_schema["readOnly"] = True
         enum_values = field.get("enum") if isinstance(field.get("enum"), list) else []
         if enum_values:
             field_schema["enum"] = list(enum_values)
@@ -3652,7 +3914,7 @@ def _record_schema(entity: Dict[str, Any], partial: bool = False) -> Dict[str, A
             elif rule == "pattern":
                 field_schema["pattern"] = str(validator.get("pattern", value or ""))
         schema_properties[field_name] = field_schema
-        if not partial and field.get("required", False):
+        if not partial and field.get("required", False) and not field.get("computed"):
             required_fields.append(field_name)
     schema: Dict[str, Any] = {{
         "type": "object",
@@ -3848,6 +4110,39 @@ def _database_openapi_schemas() -> Dict[str, Any]:
                 "entities": {{"type": "array", "items": generic_object}},
             }},
             "required": ["entities"],
+        }},
+        "JobCreateRequest": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "type": {{"type": "string"}},
+                "payload": generic_object,
+            }},
+            "required": ["type"],
+        }},
+        "JobCreateResponse": {{
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {{
+                "job_id": {{"type": "string"}},
+            }},
+            "required": ["job_id"],
+        }},
+        "JobStatus": {{
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {{
+                "id": {{"type": "string"}},
+                "type": {{"type": "string"}},
+                "payload": generic_object,
+                "status": {{"enum": ["pending", "running", "done", "failed"]}},
+                "created_at": {{"type": "string"}},
+                "started_at": nullable_string,
+                "finished_at": nullable_string,
+                "attempts": {{"type": "integer"}},
+                "last_error": nullable_string,
+            }},
+            "required": ["id", "type", "payload", "status", "created_at", "attempts"],
         }},
         "WorkflowSpec": {{
             "type": "object",
@@ -4437,6 +4732,12 @@ def _build_openapi_document() -> Dict[str, Any]:
         "/workflows/runs/{{id}}": {{"get": _api_operation("Workflow run detail", "Generated workflow run state", response_schema=_schema_ref("WorkflowRunResult"))}},
         "/workflows/runs/{{id}}/resume": {{"post": _api_operation("Resume workflow run", "Workflow resume result", request_body=True, request_schema=_schema_ref("WorkflowRunRequest"), response_schema=_schema_ref("WorkflowRunResult"))}},
         "/workflows/runs/{{id}}/compensate": {{"post": _api_operation("Execute workflow compensations", "Workflow compensation result", request_body=True, request_schema=_schema_ref("WorkflowCompensationRequest"), response_schema=_schema_ref("WorkflowCompensationResult"))}},
+        "/jobs": {{
+            "get": _api_operation("List background jobs", "Background job list", response_schema={{"type": "array", "items": _schema_ref("JobStatus")}}),
+            "post": _api_operation("Enqueue background job", "Created background job", status="201", request_body=True, request_schema=_schema_ref("JobCreateRequest"), response_schema=_schema_ref("JobCreateResponse")),
+        }},
+        "/jobs/{{id}}": {{"get": _api_operation("Background job status", "Background job detail", response_schema=_schema_ref("JobStatus"))}},
+        "/jobs/{{id}}/retry": {{"post": _api_operation("Retry failed background job", "Requeued background job", request_body=True, request_schema={{"type": "object", "additionalProperties": True}}, response_schema=_schema_ref("JobCreateResponse"))}},
         "/databases": {{"get": _api_operation("Database catalog", "Database schema and connection metadata", response_schema=_schema_ref("DatabaseCatalog"))}},
         "/databases/status": {{"get": _api_operation("Database validation status", "Database schema validation and counts", response_schema=_schema_ref("DatabaseStatus"))}},
         "/relationships": {{"get": _api_operation("Entity relationship graph", "Relationship graph", response_schema=_schema_ref("RelationshipGraph"))}},
@@ -5538,7 +5839,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         _shell_link(f'/ui/entities/{{quote(str(entity["name"]), safe="")}}', str(entity["name"]))
         for entity in ENTITIES
         if entity.get("type") not in {{"application"}}
-    ) or '<span class="apg-sidebar-empty">No entities</span>'
+    ) or f'<span class="apg-sidebar-empty">{{html.escape(_("no_records"))}}</span>'
     app = describe_application()
     agent_nav = "".join(
         _shell_link(f'/ui/agents/{{quote(str(name), safe="")}}', str(name))
@@ -5621,15 +5922,19 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         '<script defer src="/static/apg-charts.js"></script>'
         '<script defer src="/static/apg-sse.js"></script>'
     )
+    confirm_label = html.escape(_("confirm"))
+    cancel_label = html.escape(_("cancel"))
+    delete_label = html.escape(_("delete"))
+    delete_prompt = json.dumps(_("delete") + " this record?")
     toast_js = (
         '<div id="apg-toast-root" role="status" aria-live="polite" aria-atomic="true" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>'
         '<dialog id="apg-confirm-dialog" class="apg-dialog">'
         '<form method="dialog" class="apg-dialog-panel">'
-        '<h2 id="apg-confirm-title">Confirm action</h2>'
+        f'<h2 id="apg-confirm-title">{{confirm_label}}</h2>'
         '<p id="apg-confirm-message" class="text-sm text-gray-600">Are you sure?</p>'
         '<div class="flex items-center justify-end gap-2 mt-4">'
-        '<button value="cancel" class="apg-btn apg-btn-secondary" type="submit">Cancel</button>'
-        '<button value="confirm" class="apg-btn apg-btn-danger" type="submit">Delete</button>'
+        f'<button value="cancel" class="apg-btn apg-btn-secondary" type="submit">{{cancel_label}}</button>'
+        f'<button value="confirm" class="apg-btn apg-btn-danger" type="submit">{{delete_label}}</button>'
         '</div></form></dialog>'
         f'<script{{script_nonce_attr}}>'
         'var _apgNotifications=[];var _apgDeferredInstall=null;var _apgWasOffline=false;'
@@ -5660,7 +5965,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         'document.addEventListener("DOMContentLoaded",function(){{apgApplyDensity(localStorage.getItem("apg-density")||"comfortable");}});'
         'document.addEventListener("click",function(e){{if(e.target.closest("[data-apg-density-toggle]"))apgCycleDensity();}});'
         'function apgConfirm(message,ok){{var d=document.getElementById("apg-confirm-dialog");if(!d||!d.showModal){{var nativeConfirm=window["confirm"];if(nativeConfirm&&nativeConfirm(message))ok();return;}}document.getElementById("apg-confirm-message").textContent=message;var done=false;function close(){{if(done)return;done=true;d.removeEventListener("close",onclose);}}function onclose(){{var v=d.returnValue;close();if(v==="confirm")ok();}}d.addEventListener("close",onclose);d.showModal();}}'
-        'function apgConfirmSubmit(form,message){{apgConfirm(message||"Delete this record?",function(){{form.dataset.apgConfirmed="1";form.requestSubmit();}});return false;}}'
+        'function apgConfirmSubmit(form,message){{apgConfirm(message||' + delete_prompt + ',function(){{form.dataset.apgConfirmed="1";form.requestSubmit();}});return false;}}'
         'document.addEventListener("DOMContentLoaded",function(){{document.querySelectorAll(".apg-topnav a").forEach(function(a){{if(a.getAttribute("href")===location.pathname){{a.classList.add("active");a.setAttribute("aria-current","page");}}}});}});'
         'function apgSetSidebar(collapsed){{document.documentElement.classList.toggle("apg-sidebar-collapsed",collapsed);try{{localStorage.setItem("apg-sidebar-collapsed",collapsed?"1":"0");}}catch(e){{}}}}'
         'function apgToggleSidebar(){{if(matchMedia("(max-width: 767px)").matches){{document.documentElement.classList.toggle("apg-sidebar-open");}}else{{apgSetSidebar(!document.documentElement.classList.contains("apg-sidebar-collapsed"));}}}}'
@@ -5839,7 +6144,8 @@ def _render_template(template_name: str, **context: Any) -> str | None:
         # Add url encode filter
         env.filters["urlencode"] = lambda s: __import__("urllib.parse", fromlist=["quote"]).quote(str(s), safe="")
         env.globals.update({{
-            "_": _,
+            "_": _apg_t,
+            "_apg_t": _apg_t,
             "format_number": format_number,
             "format_currency": format_currency,
             "format_date": format_date,
@@ -5872,6 +6178,44 @@ def _field_specs(entity_name: str) -> list[Dict[str, Any]]:
         {{"name": property_name, "type": "any", "required": True}}
         for property_name in entity.get("properties", [])
     ]
+
+
+def _computed_field_specs(entity_name: str) -> list[Dict[str, Any]]:
+    return [field for field in _field_specs(entity_name) if field.get("computed")]
+
+
+def _stored_field_specs(entity_name: str) -> list[Dict[str, Any]]:
+    return [field for field in _field_specs(entity_name) if not field.get("computed")]
+
+
+def _computed_field_names(entity_name: str) -> set[str]:
+    return {{
+        str(field.get("name", ""))
+        for field in _computed_field_specs(entity_name)
+        if str(field.get("name", "")).strip()
+    }}
+
+
+def _apply_computed_fields(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
+    public = dict(record)
+    local_values = dict(public)
+    for field in _computed_field_specs(entity_name):
+        field_name = str(field.get("name", "")).strip()
+        expression = str(field.get("expression", "") or "").strip()
+        if not field_name or not expression:
+            continue
+        try:
+            public[field_name] = eval(expression, {{"__builtins__": {{}}}}, dict(local_values))
+        except Exception as exc:
+            _logging.getLogger("apg").warning(
+                "computed_field_failed entity=%s field=%s err=%s",
+                entity_name,
+                field_name,
+                exc,
+            )
+            public[field_name] = None
+        local_values[field_name] = public[field_name]
+    return public
 
 
 def _is_file_field(field: Dict[str, Any]) -> bool:
@@ -6144,7 +6488,11 @@ def _coerce_value_for_type(value: Any, apg_type: str) -> Any:
 
 def coerce_record_types(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
     coerced = dict(record)
+    for field_name in _computed_field_names(entity_name):
+        coerced.pop(field_name, None)
     for field in _field_specs(entity_name):
+        if field.get("computed"):
+            continue
         field_name = str(field["name"])
         if _is_file_field(field):
             coerced.pop(field_name, None)
@@ -6242,6 +6590,8 @@ def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = Fa
     errors: list[str] = []
     fields = _field_specs(entity_name)
     for field in fields:
+        if field.get("computed"):
+            continue
         field_name = str(field["name"])
         if _is_file_field(field):
             path_field = field_name + "_path"
@@ -6328,9 +6678,12 @@ def _sqlite_expected_columns(entity_name: str) -> list[Dict[str, str]]:
         {{"name": "_revision", "ddl": "INTEGER DEFAULT 1 NOT NULL", "migration": "INTEGER"}},
         {{"name": "owner_id", "ddl": "TEXT DEFAULT NULL", "migration": "TEXT"}},
     ]
-    for field in _field_specs(entity_name):
+    if APG_MULTI_TENANT_ENABLED:
+        columns.append({{"name": "tenant_id", "ddl": "TEXT NOT NULL DEFAULT 'default'", "migration": "TEXT NOT NULL DEFAULT 'default'"}})
+    for field in _stored_field_specs(entity_name):
         field_name = str(field.get("name", "")).strip()
-        if not field_name or field_name in {{"id", "_revision", "created_at", "updated_at", "deleted_at"}}:
+        existing_column_names = {{column["name"] for column in columns}}
+        if not field_name or field_name in {{"id", "_revision", "created_at", "updated_at", "deleted_at"}} or field_name in existing_column_names:
             continue
         if _is_file_field(field):
             columns.extend([
@@ -6472,8 +6825,11 @@ def _sqlite_auto_migrate_entity(conn: _sqlite3.Connection, entity_name: str) -> 
             + " ADD COLUMN "
             + _sqlite_identifier(column_name)
             + " "
-            + column["migration"]
-            + " DEFAULT NULL"
+            + (
+                column["migration"]
+                if "DEFAULT" in column["migration"].upper() or "NOT NULL" in column["migration"].upper()
+                else column["migration"] + " DEFAULT NULL"
+            )
         )
         _logging.getLogger("apg").info("auto_migrated_column entity=%s column=%s", entity_name, column_name)
 
@@ -6515,7 +6871,9 @@ def _sqlite_store_record(entity_name: str, record: Dict[str, Any]) -> None:
         "updated_at": record.get("updated_at") or metadata.get("updated_at"),
         "deleted_at": record.get("deleted_at") if "deleted_at" in record else metadata.get("deleted_at"),
     }}
-    for field in _field_specs(entity_name):
+    if any(column["name"] == "tenant_id" for column in columns):
+        row["tenant_id"] = record.get("tenant_id") or APG_TENANT_DEFAULT
+    for field in _stored_field_specs(entity_name):
         field_name = str(field.get("name", "")).strip()
         if not field_name:
             continue
@@ -6549,36 +6907,51 @@ def _sqlite_soft_delete_record(entity_name: str, record_id: Any) -> None:
     conn = _sqlite_connection()
     if conn is None:
         return
-    conn.execute(
-        "UPDATE " + _sqlite_identifier(entity_name) + " SET deleted_at=datetime('now') WHERE id=?",
-        (str(record_id),),
-    )
+    sql = "UPDATE " + _sqlite_identifier(entity_name) + " SET deleted_at=datetime('now') WHERE id=?"
+    params: list[Any] = [str(record_id)]
+    if _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
+        sql += " AND tenant_id=?"
+        params.append(_tenant_id() or APG_TENANT_DEFAULT)
+    conn.execute(sql, params)
 
 
 def _sqlite_restore_record(entity_name: str, record_id: Any) -> None:
     conn = _sqlite_connection()
     if conn is None:
         return
-    conn.execute(
-        "UPDATE " + _sqlite_identifier(entity_name) + " SET deleted_at=NULL WHERE id=?",
-        (str(record_id),),
-    )
+    sql = "UPDATE " + _sqlite_identifier(entity_name) + " SET deleted_at=NULL WHERE id=?"
+    params: list[Any] = [str(record_id)]
+    if _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
+        sql += " AND tenant_id=?"
+        params.append(_tenant_id() or APG_TENANT_DEFAULT)
+    conn.execute(sql, params)
 
 
-def _sqlite_select_records(entity_name: str, include_deleted: bool = False) -> list[Dict[str, Any]]:
+def _sqlite_select_records(
+    entity_name: str,
+    include_deleted: bool = False,
+    tenant_scoped: bool = True,
+) -> list[Dict[str, Any]]:
     conn = _sqlite_connection()
     if conn is None:
         return []
     sql = "SELECT * FROM " + _sqlite_identifier(entity_name)
+    where_clauses: list[str] = []
+    params: list[Any] = []
     if not include_deleted:
-        sql += " WHERE deleted_at IS NULL"
+        where_clauses.append("deleted_at IS NULL")
+    if tenant_scoped and _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
+        where_clauses.append("tenant_id=?")
+        params.append(_tenant_id() or APG_TENANT_DEFAULT)
+    if where_clauses:
+        sql += " WHERE " + " AND ".join(where_clauses)
     sql += " ORDER BY id"
-    return [dict(row) for row in conn.execute(sql).fetchall()]
+    return [dict(row) for row in conn.execute(sql, params).fetchall()]
 
 
 def _sqlite_load_records() -> None:
     for entity_name in sorted(ENTITY_NAMES):
-        rows = _sqlite_select_records(entity_name, include_deleted=True)
+        rows = _sqlite_select_records(entity_name, include_deleted=True, tenant_scoped=False)
         if rows:
             RECORD_STORE[entity_name] = [dict(row) for row in rows]
 
@@ -7481,7 +7854,7 @@ def _ui_dashboard_context(app: Dict[str, Any]) -> Dict[str, Any]:
             continue
         entity_name = str(entity["name"])
         records = list_records(entity_name)
-        spark = {{"type": "sparkline", "title": f"{{entity_name}} records", "data": [{{"x": i, "y": len(records)}} for i in range(30)], "empty": "No records yet"}}
+        spark = {{"type": "sparkline", "title": f"{{entity_name}} records", "data": [{{"x": i, "y": len(records)}} for i in range(30)], "empty": _("no_records")}}
         stats.append({{
             "label": entity_name,
             "value": len(records),
@@ -7972,7 +8345,7 @@ def _ui_active_filter_chips(entity_name: str, query: Dict[str, list[str]]) -> li
     q = _ui_query_value(query, "q")
     if q:
         chips.append({{
-            "label": "Search",
+            "label": _("search"),
             "value": q,
             "clear_url": _ui_entity_query_path(entity_name, query, drops={{"q", "page"}}),
         }})
@@ -8012,12 +8385,14 @@ def _ui_create_form_html(entity_name: str, fields: list[Dict[str, Any]]) -> str:
 def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | None = None, sort_field: str = "", sort_dir: str = "asc", q: str = "", query: Dict[str, list[str]] | None = None) -> str:
     records = records if records is not None else list_records(entity_name)
     if not records:
-        return "<p>No records yet.</p>"
+        return f"<p>{{html.escape(_('no_records'))}}</p>"
     fields = _field_specs(entity_name)
     field_names = [str(f["name"]) for f in fields if str(f["name"]) not in {{"_revision"}}]
     # Show at most 6 columns to keep table readable; id always first
     display_cols = ["id"] + [c for c in field_names if c != "id"][:5]
     safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    delete_label = html.escape(_("delete"))
+    delete_prompt = html.escape(_("delete") + " this record?", quote=True)
     header_cells = []
     for col in display_cols:
         label = html.escape((col[:-3].replace("_", " ").title() + " ID") if col.endswith("_id") else col.replace("_", " ").title())
@@ -8073,8 +8448,8 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
             f'<form method="post" action="/ui/entities/{{safe_entity}}/records/{{record_id}}/delete" class="inline">'
             f'{{_csrf_input()}}'
             f'<input type="hidden" name="expected_revision" value="{{revision}}">'
-            f'<button type="submit" onclick="return apgConfirmSubmit(this.form, this.dataset.msg)" data-msg="Delete this record?"'
-            f' class="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>'
+            f'<button type="submit" onclick="return apgConfirmSubmit(this.form, this.dataset.msg)" data-msg="{{delete_prompt}}"'
+            f' class="text-xs text-red-400 hover:text-red-600 transition-colors">{{delete_label}}</button>'
             f'</form>'
             f'</div>'
         )
@@ -8090,7 +8465,7 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
         f' bg-gray-900 text-white rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-3 text-sm">'
         f'<span id="apg-bulk-cnt" class="font-semibold tabular-nums"></span>'
         f'<button onclick="apgBulkDelete()"'
-        f' class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors">Delete</button>'
+        f' class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors">{{delete_label}}</button>'
         f'<a id="apg-csv-link" href="/entities/{{safe_entity}}/records.csv"'
         f' class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition-colors">Export CSV</a>'
         f'<button onclick="apgBulkClear()" class="ml-1 text-gray-400 hover:text-white leading-none text-base">✕</button>'
@@ -8500,7 +8875,7 @@ def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
         }})
     if not records:
         insights.append({{
-            "title": "No records yet",
+            "title": _("no_records"),
             "body": "Create records before reading analytics.",
             "url": _ui_entity_query_path(entity_name),
             "action": f"Create {{entity_name}}",
@@ -8849,6 +9224,8 @@ def _ui_field_edit_html(entity_name: str, record_id: str, field_name: str) -> tu
             f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary">'
         )
     revision = html.escape(str(record.get("_revision", "")), quote=True)
+    save_label = html.escape(_("save"))
+    cancel_label = html.escape(_("cancel"))
     fragment = (
         f'<div id="{{fld_id}}" class="py-3 border-b border-gray-50 last:border-0">'
         f'<dt class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{{label}}</dt>'
@@ -8858,9 +9235,9 @@ def _ui_field_edit_html(entity_name: str, record_id: str, field_name: str) -> tu
         f'<input type="hidden" name="expected_revision" value="{{revision}}">'
         f'{{input_html}}'
         f'<div class="flex gap-2">'
-        f'<button type="submit" class="px-2.5 py-1 bg-apg-primary text-white text-xs font-medium rounded-lg hover:opacity-90">Save</button>'
+        f'<button type="submit" class="px-2.5 py-1 bg-apg-primary text-white text-xs font-medium rounded-lg hover:opacity-90">{{save_label}}</button>'
         f'<button type="button" hx-get="{{cancel_url}}" hx-target="#{{fld_id}}" hx-swap="outerHTML"'
-        f' class="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg">Cancel</button>'
+        f' class="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg">{{cancel_label}}</button>'
         f'</div>'
         f'</form>'
         f'</dd></div>'
@@ -9792,6 +10169,8 @@ def _record_by_id(entity_name: str, record_id: str, *, include_deleted: bool = F
                 return None
             if not _record_owner_visible(record):
                 return None
+            if not _record_tenant_visible(entity_name, record):
+                return None
             return _record_public_copy(entity_name, record)
     return None
 
@@ -9942,6 +10321,7 @@ def _delete_relationship_payload(path: str, *, persist: bool = True) -> tuple[in
             str(link.get(left_field)) == source_id
             and str(link.get(right_field)) == related_id
             and not _record_deleted(through_name, link)
+            and _record_tenant_visible(through_name, link)
         ):
             removed.append(_record_public_copy(through_name, link))
             continue
@@ -9951,12 +10331,16 @@ def _delete_relationship_payload(path: str, *, persist: bool = True) -> tuple[in
     RECORD_STORE[through_name] = remaining
     conn = _sqlite_connection()
     if conn is not None:
-        conn.execute(
+        sql = (
             "DELETE FROM " + _sqlite_identifier(through_name)
             + " WHERE " + _sqlite_identifier(left_field) + "=? AND "
-            + _sqlite_identifier(right_field) + "=?",
-            (source_id, related_id),
+            + _sqlite_identifier(right_field) + "=?"
         )
+        params: list[Any] = [source_id, related_id]
+        if _tenant_scope_enabled(through_name) and not _tenant_admin_bypass():
+            sql += " AND tenant_id=?"
+            params.append(_tenant_id() or APG_TENANT_DEFAULT)
+        conn.execute(sql, params)
     if persist:
         _sqlite_commit()
         persistence_error = _persist_record_store()
@@ -9996,17 +10380,24 @@ def search_records(entity_name: str, query: Dict[str, list[str]] | None = None) 
         return []
     entity_sql = _sqlite_fts_identifier(entity_name)
     fts_sql = _sqlite_fts_identifier(entity_name + "_fts")
+    where_clauses = [
+        "id IN (SELECT rowid FROM " + fts_sql + " WHERE " + fts_sql + " MATCH ?)",
+        "deleted_at IS NULL",
+    ]
+    params: list[Any] = [q]
+    if _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
+        where_clauses.append("tenant_id=?")
+        params.append(_tenant_id() or APG_TENANT_DEFAULT)
     sql = (
         "SELECT * FROM "
         + entity_sql
-        + " WHERE id IN (SELECT rowid FROM "
-        + fts_sql
         + " WHERE "
-        + fts_sql
-        + " MATCH ?) AND deleted_at IS NULL LIMIT ?"
+        + " AND ".join(where_clauses)
+        + " LIMIT ?"
     )
+    params.append(_records_search_limit(query))
     try:
-        rows = conn.execute(sql, (q, _records_search_limit(query))).fetchall()
+        rows = conn.execute(sql, params).fetchall()
     except _sqlite3.DatabaseError:
         return []
     records: list[Dict[str, Any]] = []
@@ -10119,6 +10510,10 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
                 return 200, describe_workflow(parts[1])
             except KeyError:
                 return 404, {{"error": "unknown_workflow", "workflow": parts[1]}}
+    if path == "/jobs":
+        return _jobs_payload(query)
+    if path.startswith("/jobs/"):
+        return _job_detail_payload(path)
     if path == "/databases":
         return 200, {{"databases": list_databases()}}
     if path == "/databases/status":
@@ -10578,6 +10973,8 @@ def _update_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
         return _record_validation_failure(validation)
     for index, existing in enumerate(RECORD_STORE[entity_name]):
         if str(existing.get("id")) == str(record_id):
+            if not _record_tenant_visible(entity_name, existing):
+                continue
             if _record_deleted(entity_name, existing):
                 return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
             conflict = _revision_conflict(existing, _expected_revision(payload))
@@ -10631,6 +11028,8 @@ def _restore_record_payload(path: str, *, persist: bool = True) -> tuple[int, Di
         return 404, {{"error": "unknown_entity", "entity": entity_name}}
     for existing in RECORD_STORE[entity_name]:
         if str(existing.get("id")) == str(record_id):
+            if not _record_tenant_visible(entity_name, existing):
+                continue
             before = _record_public_copy(entity_name, existing)
             metadata = _record_metadata(entity_name, existing.get("id"), create=True)
             if metadata is not None:
@@ -10669,6 +11068,8 @@ def _delete_record_payload(path: str, *, persist: bool = True) -> tuple[int, Dic
         return 404, {{"error": "unknown_entity", "entity": entity_name}}
     for existing in RECORD_STORE[entity_name]:
         if str(existing.get("id")) == str(record_id):
+            if not _record_tenant_visible(entity_name, existing):
+                continue
             if _record_deleted(entity_name, existing):
                 return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
             expected_revision = None
@@ -10841,6 +11242,10 @@ def _bulk_records_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict
 
 def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     path = path.rstrip("/") or "/"
+    if path == "/jobs":
+        return _create_job_payload(payload)
+    if path.startswith("/jobs/") and path.endswith("/retry"):
+        return _retry_job_payload(path)
     if path == "/events/emit":
         event_name = payload.get("name") or payload.get("event") or ""
         if not event_name:
@@ -11047,12 +11452,13 @@ def _pg_save_entity_records(entity_name: str, records: list[Dict[str, Any]]) -> 
                 rid = str(record.get("id", ""))
                 if not rid:
                     continue
+                tenant_id = str(record.get("tenant_id") or APG_TENANT_DEFAULT)
                 cur.execute(
                     "INSERT INTO apg_records (id, collection, tenant_id, data)"
                     " VALUES (%s, %s, %s, %s::jsonb)"
                     " ON CONFLICT (collection, id)"
                     " DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()",
-                    (rid, entity_name.lower(), "default", json.dumps(record, default=str))
+                    (rid, entity_name.lower(), tenant_id, json.dumps(record, default=str))
                 )
         conn.commit()
     except Exception:
@@ -11061,17 +11467,20 @@ def _pg_save_entity_records(entity_name: str, records: list[Dict[str, Any]]) -> 
         conn.close()
 
 
-def _pg_load_entity_records(entity_name: str) -> list[Dict[str, Any]]:
+def _pg_load_entity_records(entity_name: str, tenant_scoped: bool = True) -> list[Dict[str, Any]]:
     conn = _pg_connection()
     if not conn:
         return []
     try:
         _pg_ensure_records_table(conn)
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT data FROM apg_records WHERE collection = %s ORDER BY created_at",
-                (entity_name.lower(),)
-            )
+            sql = "SELECT data FROM apg_records WHERE collection = %s"
+            params: list[Any] = [entity_name.lower()]
+            if tenant_scoped and _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
+                sql += " AND tenant_id = %s"
+                params.append(_tenant_id() or APG_TENANT_DEFAULT)
+            sql += " ORDER BY created_at"
+            cur.execute(sql, tuple(params))
             rows = cur.fetchall()
         return [json.loads(row[0]) for row in rows]
     except Exception:
@@ -11116,7 +11525,321 @@ def _apg_deliver_webhook(event, entity, record_id, data, req_id):
     _threading_mod.Thread(target=_send, daemon=True).start()
 
 
+def _apg_job_timestamp() -> str:
+    return _datetime.datetime.utcnow().isoformat() + "Z"
+
+
+def _apg_init_job_store() -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    with _APG_JOB_LOCK:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS apg_jobs ("
+            "id TEXT PRIMARY KEY,"
+            "type TEXT NOT NULL,"
+            "payload TEXT NOT NULL,"
+            "status TEXT NOT NULL,"
+            "created_at TEXT NOT NULL,"
+            "started_at TEXT,"
+            "finished_at TEXT,"
+            "attempts INT NOT NULL DEFAULT 0,"
+            "last_error TEXT"
+            ")"
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_apg_jobs_status ON apg_jobs(status, created_at)")
+        conn.commit()
+
+
+def _apg_job_from_row(row: Any) -> Dict[str, Any]:
+    payload_raw = row["payload"] if "payload" in row.keys() else "{{}}"
+    try:
+        payload = json.loads(payload_raw or "{{}}")
+    except (TypeError, json.JSONDecodeError):
+        payload = {{}}
+    return {{
+        "id": str(row["id"]),
+        "type": str(row["type"]),
+        "payload": payload if isinstance(payload, dict) else {{"value": payload}},
+        "status": str(row["status"]),
+        "created_at": str(row["created_at"]),
+        "started_at": row["started_at"],
+        "finished_at": row["finished_at"],
+        "attempts": int(row["attempts"] or 0),
+        "last_error": row["last_error"],
+    }}
+
+
+def _apg_job_payload_json(payload: Dict[str, Any]) -> str:
+    return json.dumps(payload, sort_keys=True, default=str)
+
+
+def _apg_enqueue_job_dict(job: Dict[str, Any]) -> None:
+    with _APG_JOB_LOCK:
+        _APG_JOB_QUEUE.append(dict(job))
+
+
+def _apg_load_pending_jobs() -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    with _APG_JOB_LOCK:
+        conn.execute("UPDATE apg_jobs SET status='pending', started_at=NULL WHERE status='running'")
+        rows = conn.execute(
+            "SELECT * FROM apg_jobs WHERE status='pending' ORDER BY created_at"
+        ).fetchall()
+        _APG_JOB_QUEUE.clear()
+        for row in rows:
+            _APG_JOB_QUEUE.append(_apg_job_from_row(row))
+        conn.commit()
+
+
+def _apg_create_job(job_type: str, payload: Dict[str, Any] | None = None) -> tuple[int, Dict[str, Any]]:
+    job_type = str(job_type or "").strip()
+    if not job_type:
+        return 400, {{"error": "missing_job_type"}}
+    if job_type not in _APG_JOB_HANDLERS:
+        return 400, {{"error": "unknown_job_type", "type": job_type}}
+    payload = payload if isinstance(payload, dict) else {{}}
+    conn = _sqlite_connection()
+    if conn is None:
+        return 500, {{"error": "jobs_unavailable"}}
+    job = {{
+        "id": str(_uuid.uuid4()),
+        "type": job_type,
+        "payload": dict(payload),
+        "status": "pending",
+        "created_at": _apg_job_timestamp(),
+        "attempts": 0,
+        "last_error": None,
+    }}
+    with _APG_JOB_LOCK:
+        conn.execute(
+            "INSERT INTO apg_jobs (id, type, payload, status, created_at, attempts, last_error)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                job["id"],
+                job["type"],
+                _apg_job_payload_json(job["payload"]),
+                job["status"],
+                job["created_at"],
+                job["attempts"],
+                job["last_error"],
+            ),
+        )
+        conn.commit()
+        _APG_JOB_QUEUE.append(dict(job))
+    return 201, {{"job_id": job["id"]}}
+
+
+def _apg_get_job(job_id: str) -> Dict[str, Any] | None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return None
+    with _APG_JOB_LOCK:
+        row = conn.execute("SELECT * FROM apg_jobs WHERE id=?", (str(job_id),)).fetchone()
+    return _apg_job_from_row(row) if row is not None else None
+
+
+def _apg_list_jobs(status: str | None = None, limit: int = 50) -> list[Dict[str, Any]]:
+    conn = _sqlite_connection()
+    if conn is None:
+        return []
+    limit = max(1, min(int(limit or 50), 500))
+    with _APG_JOB_LOCK:
+        if status:
+            rows = conn.execute(
+                "SELECT * FROM apg_jobs WHERE status=? ORDER BY created_at DESC LIMIT ?",
+                (status, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM apg_jobs ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+    return [_apg_job_from_row(row) for row in rows]
+
+
+def _apg_dequeue_job() -> Dict[str, Any] | None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return None
+    with _APG_JOB_LOCK:
+        while _APG_JOB_QUEUE:
+            queued = dict(_APG_JOB_QUEUE.popleft())
+            job_id = str(queued.get("id", ""))
+            row = conn.execute("SELECT * FROM apg_jobs WHERE id=?", (job_id,)).fetchone()
+            if row is None:
+                continue
+            job = _apg_job_from_row(row)
+            if job.get("status") != "pending":
+                continue
+            attempts = int(job.get("attempts") or 0) + 1
+            started_at = _apg_job_timestamp()
+            conn.execute(
+                "UPDATE apg_jobs SET status='running', started_at=?, finished_at=NULL, attempts=?, last_error=NULL WHERE id=?",
+                (started_at, attempts, job_id),
+            )
+            conn.commit()
+            job.update({{"status": "running", "started_at": started_at, "finished_at": None, "attempts": attempts, "last_error": None}})
+            return job
+    return None
+
+
+def _apg_finish_job(job_id: str, status: str, last_error: str | None = None) -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    finished_at = _apg_job_timestamp() if status in {{"done", "failed"}} else None
+    with _APG_JOB_LOCK:
+        conn.execute(
+            "UPDATE apg_jobs SET status=?, finished_at=?, last_error=? WHERE id=?",
+            (status, finished_at, last_error, str(job_id)),
+        )
+        conn.commit()
+
+
+def _apg_reschedule_job(job: Dict[str, Any], error: str) -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    job_id = str(job.get("id", ""))
+    with _APG_JOB_LOCK:
+        conn.execute(
+            "UPDATE apg_jobs SET status='pending', finished_at=NULL, last_error=? WHERE id=?",
+            (error, job_id),
+        )
+        conn.commit()
+    delay = min(60.0, float(2 ** max(0, int(job.get("attempts") or 1) - 1)))
+    if delay > 0:
+        _time.sleep(delay)
+    current = _apg_get_job(job_id)
+    if current is not None and current.get("status") == "pending":
+        _apg_enqueue_job_dict(current)
+
+
+def _apg_job_worker_loop() -> None:
+    while True:
+        job = _apg_dequeue_job()
+        if job is None:
+            _time.sleep(0.1)
+            continue
+        handler = _APG_JOB_HANDLERS.get(str(job.get("type", "")))
+        try:
+            if handler is None:
+                raise RuntimeError("unknown_job_type: " + str(job.get("type", "")))
+            handler(dict(job.get("payload") or {{}}))
+        except Exception as exc:
+            last_error = str(exc)
+            if int(job.get("attempts") or 0) < _APG_JOB_MAX_RETRIES:
+                _apg_reschedule_job(job, last_error)
+            else:
+                _apg_finish_job(str(job.get("id", "")), "failed", last_error)
+        else:
+            _apg_finish_job(str(job.get("id", "")), "done", None)
+
+
+def _apg_start_job_workers() -> None:
+    global _APG_JOB_WORKERS_STARTED
+    if _APG_JOB_WORKERS_STARTED:
+        return
+    _APG_JOB_WORKERS_STARTED = True
+    for index in range(_APG_JOB_WORKER_THREADS):
+        thread = threading.Thread(target=_apg_job_worker_loop, name=f"apg-job-worker-{{index + 1}}", daemon=True)
+        _APG_JOB_WORKERS.append(thread)
+        thread.start()
+
+
+def _apg_echo_job(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return dict(payload)
+
+
+def _apg_webhook_job(payload: Dict[str, Any]) -> None:
+    _apg_deliver_webhook(
+        str(payload.get("event") or "job"),
+        str(payload.get("entity") or "job"),
+        payload.get("record_id", payload.get("id", "")),
+        payload.get("data", payload.get("payload", payload)),
+        str(payload.get("req_id") or ""),
+    )
+
+
+def _apg_email_job(payload: Dict[str, Any]) -> None:
+    _apg_send_email(
+        str(payload.get("to") or ""),
+        str(payload.get("subject") or f"{{APG_APP_NAME}} job notification"),
+        str(payload.get("body") or ""),
+    )
+
+
+def _apg_register_builtin_job_handlers() -> None:
+    _APG_JOB_HANDLERS.setdefault("apg.echo", _apg_echo_job)
+    _APG_JOB_HANDLERS.setdefault("apg.webhook", _apg_webhook_job)
+    _APG_JOB_HANDLERS.setdefault("apg.email", _apg_email_job)
+
+
+def _jobs_payload(query: Dict[str, list[str]] | None = None) -> tuple[int, Any]:
+    query = query or {{}}
+    raw_status = query.get("status", [None])[-1] if query.get("status") else None
+    status = str(raw_status).strip() if raw_status not in (None, "") else None
+    if status is not None and status not in {{"pending", "running", "done", "failed"}}:
+        return 400, {{"error": "invalid_status", "allowed": ["pending", "running", "done", "failed"]}}
+    raw_limit = query.get("limit", ["50"])[-1] if query.get("limit") else "50"
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        limit = 50
+    return 200, _apg_list_jobs(status, limit)
+
+
+def _job_detail_payload(path: str) -> tuple[int, Dict[str, Any]]:
+    parts = [part for part in path.split("/") if part]
+    if len(parts) != 2:
+        return 404, {{"error": "not_found", "path": path}}
+    job = _apg_get_job(parts[1])
+    if job is None:
+        return 404, {{"error": "job_not_found", "id": parts[1]}}
+    return 200, job
+
+
+def _create_job_payload(payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    job_payload = payload.get("payload", {{}})
+    if job_payload is None:
+        job_payload = {{}}
+    if not isinstance(job_payload, dict):
+        return 400, {{"error": "payload_must_be_object"}}
+    return _apg_create_job(str(payload.get("type", "")), job_payload)
+
+
+def _retry_job_payload(path: str) -> tuple[int, Dict[str, Any]]:
+    parts = [part for part in path.split("/") if part]
+    if len(parts) != 3 or parts[0] != "jobs" or parts[2] != "retry":
+        return 404, {{"error": "not_found", "path": path}}
+    job = _apg_get_job(parts[1])
+    if job is None:
+        return 404, {{"error": "job_not_found", "id": parts[1]}}
+    if job.get("status") != "failed":
+        return 409, {{"error": "job_not_failed", "status": job.get("status")}}
+    conn = _sqlite_connection()
+    if conn is None:
+        return 500, {{"error": "jobs_unavailable"}}
+    with _APG_JOB_LOCK:
+        conn.execute(
+            "UPDATE apg_jobs SET status='pending', started_at=NULL, finished_at=NULL, attempts=0, last_error=NULL WHERE id=?",
+            (parts[1],),
+        )
+        conn.commit()
+    job = _apg_get_job(parts[1])
+    if job is not None:
+        _apg_enqueue_job_dict(job)
+    return 202, {{"job_id": parts[1]}}
+
+
+_apg_register_builtin_job_handlers()
 _sqlite_init_database()
+_apg_init_job_store()
+_apg_load_pending_jobs()
+_apg_start_job_workers()
 _load_record_store()
 _APG_OPENAPI_SPEC = _build_openapi_document()
 
@@ -11651,8 +12374,21 @@ def _setup_tenant() -> Any:
     body_limit = _flask_app.config.get("MAX_CONTENT_LENGTH")
     if body_limit and (_flask_request.content_length or 0) > body_limit:
         return _apg_error_response(413, "payload_too_large", "Payload too large", "The request body exceeds the configured APG_MAX_BODY_BYTES limit.")
-    tid = _flask_request.headers.get("X-APG-Tenant") or _flask_request.headers.get("X-Tenant-ID")
-    _TENANT_LOCAL.tenant_id = tid or None
+    path = _flask_request.path.rstrip("/") or "/"
+    tid = _tenant_header_value()
+    if (
+        APG_MULTI_TENANT_ENABLED
+        and _production_mode()
+        and not tid
+        and not _tenant_admin_bypass()
+        and not path.startswith("/locales/")
+    ):
+        return _FlaskResponse(
+            json.dumps({{"error": "tenant_required"}}),
+            status=400,
+            content_type="application/json; charset=utf-8",
+        )
+    _TENANT_LOCAL.tenant_id = tid or (APG_TENANT_DEFAULT if APG_MULTI_TENANT_ENABLED else None)
     if _login_required_for_path(_flask_request.path) and _current_user() is None:
         return _flask_redirect("/login?next=" + quote(_flask_request.full_path.rstrip("?") or "/ui", safe="/?=&%"))
     content_type_error = _apg_content_type_guard()
@@ -11683,6 +12419,14 @@ def _flask_home():
 @_flask_app.route("/theme.css", methods=["GET"])
 def _flask_theme():
     return _FlaskResponse(theme_stylesheet(), content_type="text/css; charset=utf-8")
+
+
+@_flask_app.route("/locales/<lang>.json", methods=["GET"])
+def _flask_locale_file(lang: str):
+    payload = _locale_payload(str(lang))
+    if payload is None:
+        return _FlaskResponse(json.dumps({{"error": "locale_not_found", "locale": str(lang)}}), status=404, content_type="application/json; charset=utf-8")
+    return _FlaskResponse(json.dumps(payload, sort_keys=True), content_type="application/json; charset=utf-8")
 
 
 @_flask_app.route("/login", methods=["GET"])
