@@ -87,7 +87,7 @@ class APGType(Enum):
 
 
 VALID_APG_FIELD_TYPES = (
-	"str", "int", "float", "bool", "date", "datetime", "text", "uuid", "json",
+	"str", "int", "float", "bool", "date", "datetime", "text", "uuid", "json", "file",
 )
 
 COMMON_TYPE_HINTS = {
@@ -242,7 +242,7 @@ class SemanticAnalyzer:
 			"list", "List", "dict", "Dict", "set", "Set", "tuple", "Tuple",
 			"str?", "int?", "float?", "bool?", "bytes?", "datetime?", "decimal?",
 			"vector", "embedding", "json", "uuid", "url",
-			"string", "number",
+			"string", "number", "file",
 		})
 		self.builtin_functions = self._initialize_builtins()
 	

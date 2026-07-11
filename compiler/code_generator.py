@@ -822,16 +822,19 @@ import hmac
 import json
 import datetime as _datetime
 import logging as _logging
+import mimetypes as _mimetypes
 import os
 import queue as _queue
 import re
 import secrets
+import smtplib as _smtplib
 import sqlite3 as _sqlite3
 import sys
 import threading as _threading
 import time as _time
 import urllib.request as _urllib_request, hmac as _hmac_mod, hashlib as _hashlib_mod, threading as _threading_mod, time as _time_mod
 import uuid as _uuid
+from email.message import EmailMessage as _EmailMessage
 from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse, session as _flask_session, g as _flask_g
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -920,6 +923,54 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+_APG_EMAIL_THREADS: list[_threading_mod.Thread] = []
+
+
+def _apg_send_email(to: str, subject: str, body: str) -> None:
+    recipient = str(to or "").strip()
+    smtp_host = str(os.environ.get("APG_SMTP_HOST", "") or "").strip()
+    if not recipient or not smtp_host:
+        return
+    sender = str(
+        os.environ.get("APG_SMTP_FROM")
+        or os.environ.get("APG_SMTP_USER")
+        or "apg@localhost"
+    )
+    smtp_port = _env_int("APG_SMTP_PORT", 587)
+    smtp_user = str(os.environ.get("APG_SMTP_USER", "") or "")
+    smtp_password = str(os.environ.get("APG_SMTP_PASSWORD", "") or "")
+    message = _EmailMessage()
+    message["From"] = sender
+    message["To"] = recipient
+    message["Subject"] = str(subject)
+    message.set_content(str(body))
+
+    def _send() -> None:
+        try:
+            with _smtplib.SMTP(smtp_host, smtp_port, timeout=10) as smtp:
+                smtp.starttls()
+                if smtp_user or smtp_password:
+                    smtp.login(smtp_user, smtp_password)
+                smtp.sendmail(sender, [recipient], message.as_string())
+            _logging.getLogger("apg").info("email_sent to=%s subject=%s", recipient, subject)
+        except Exception as exc:
+            _logging.getLogger("apg").warning("email_send_failed to=%s err=%s", recipient, exc)
+
+    thread = _threading_mod.Thread(target=_send, daemon=True)
+    _APG_EMAIL_THREADS.append(thread)
+    thread.start()
+
+
+def _apg_alert_startup_failure(message: str) -> None:
+    recipient = str(os.environ.get("APG_ALERT_EMAIL", "") or "").strip()
+    if recipient:
+        _apg_send_email(
+            recipient,
+            f"{{APG_APP_NAME}} startup validation failed",
+            str(message),
+        )
+
+
 def _validate_startup_configuration() -> None:
     try:
         if not _apg_production_env_enabled():
@@ -928,8 +979,9 @@ def _validate_startup_configuration() -> None:
             raise RuntimeError("Set APG_SECRET_KEY in production")
         if _flask_app.config.get("SESSION_COOKIE_SECURE") is False:
             _logging.getLogger("apg").warning("APG_PRODUCTION is enabled but SESSION_COOKIE_SECURE is false.")
-    except RuntimeError:
+    except RuntimeError as exc:
         if _apg_production_env_enabled():
+            _apg_alert_startup_failure(str(exc))
             raise
     except Exception as exc:
         _logging.getLogger("apg").warning("APG startup validation skipped: %s", exc)
@@ -2382,6 +2434,13 @@ def _record_public_copy(entity_name: str, record: Dict[str, Any]) -> Dict[str, A
     for key in ("created_at", "updated_at", "deleted_at"):
         if public.get(key) in (None, "") and metadata.get(key) not in (None, ""):
             public[key] = metadata.get(key)
+    for field in _file_field_specs(entity_name):
+        field_name = str(field.get("name", "")).strip()
+        if not field_name:
+            continue
+        path_value = public.get(field_name + "_path")
+        if path_value not in (None, ""):
+            public[field_name + "_url"] = _file_url_for_path(entity_name, path_value)
     public.setdefault("created_at", metadata.get("created_at") or _record_timestamp())
     public.setdefault("updated_at", metadata.get("updated_at") or public["created_at"])
     public.setdefault("deleted_at", metadata.get("deleted_at"))
@@ -2491,7 +2550,11 @@ def _record_field_names(entity_name: str) -> set[str]:
     names = {{"id", "_revision", "created_at", "updated_at", "deleted_at", "owner_id"}}
     for field in _field_specs(entity_name):
         field_name = str(field.get("name", ""))
-        if field_name:
+        if not field_name:
+            continue
+        if _is_file_field(field):
+            names.update(_file_metadata_field_names(field_name))
+        else:
             names.add(field_name)
     return names
 
@@ -2499,6 +2562,8 @@ def _record_field_names(entity_name: str) -> set[str]:
 def _record_string_field_names(entity_name: str) -> list[str]:
     names: list[str] = []
     for field in _field_specs(entity_name):
+        if _is_file_field(field):
+            continue
         field_name = str(field.get("name", ""))
         if field_name and _json_schema_type(str(field.get("type", "any"))) == "string":
             names.append(field_name)
@@ -3142,11 +3207,12 @@ def _auth_credentials() -> Dict[str, Dict[str, Any]]:
                         "password": str(spec.get("password", "")),
                         "password_hash": str(spec.get("password_hash", "")),
                         "name": str(spec.get("name", username)),
+                        "email": str(spec.get("email", "")),
                         "roles": list(spec.get("roles", ["user"])) if isinstance(spec.get("roles", []), list) else ["user"],
                         "permissions": list(spec.get("permissions", [])) if isinstance(spec.get("permissions", []), list) else [],
                     }}
                 else:
-                    result[str(username)] = {{"password": str(spec), "password_hash": "", "name": str(username), "roles": ["user"], "permissions": []}}
+                    result[str(username)] = {{"password": str(spec), "password_hash": "", "name": str(username), "email": "", "roles": ["user"], "permissions": []}}
             if result:
                 return result
     username = os.environ.get("APG_AUTH_USERNAME", "admin")
@@ -3156,6 +3222,7 @@ def _auth_credentials() -> Dict[str, Dict[str, Any]]:
             "password": password,
             "password_hash": os.environ.get("APG_AUTH_PASSWORD_HASH", ""),
             "name": os.environ.get("APG_AUTH_DISPLAY_NAME", username),
+            "email": os.environ.get("APG_AUTH_EMAIL", ""),
             "roles": ["admin"],
             "permissions": ["*"],
         }}
@@ -3178,6 +3245,7 @@ def _authenticate_user(username: str, password: str) -> Dict[str, Any] | None:
     return {{
         "username": username,
         "name": str(user.get("name", username)),
+        "email": str(user.get("email", "")),
         "roles": list(user.get("roles", [])),
         "permissions": list(user.get("permissions", [])),
     }}
@@ -5806,6 +5874,169 @@ def _field_specs(entity_name: str) -> list[Dict[str, Any]]:
     ]
 
 
+def _is_file_field(field: Dict[str, Any]) -> bool:
+    return str(field.get("type", "")).rstrip("?").lower() == "file"
+
+
+def _file_field_specs(entity_name: str) -> list[Dict[str, Any]]:
+    return [field for field in _field_specs(entity_name) if _is_file_field(field)]
+
+
+def _file_metadata_field_names(field_name: str) -> list[str]:
+    return [field_name + "_path", field_name + "_mime", field_name + "_size"]
+
+
+def _upload_allowed_mime_types() -> set[str]:
+    raw = os.environ.get(
+        "APG_UPLOAD_ALLOWED_TYPES",
+        "image/jpeg,image/png,image/webp,application/pdf",
+    )
+    allowed = {{
+        item.strip().lower()
+        for item in str(raw).split(",")
+        if item.strip()
+    }}
+    return allowed or {{"image/jpeg", "image/png", "image/webp", "application/pdf"}}
+
+
+def _upload_max_bytes() -> int:
+    return max(1, _env_int("APG_UPLOAD_MAX_BYTES", 10 * 1024 * 1024))
+
+
+def _upload_root() -> Path:
+    return Path(os.environ.get("APG_UPLOAD_DIR", "./uploads")).expanduser()
+
+
+def _safe_upload_segment(value: Any, fallback: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value or "")).strip("._")
+    return safe or fallback
+
+
+def _multipart_upload_request() -> bool:
+    try:
+        return "multipart/form-data" in str(_flask_request.content_type or "")
+    except RuntimeError:
+        return False
+
+
+def _uploaded_file_mime(upload: Any) -> str:
+    mime_type = str(getattr(upload, "mimetype", "") or getattr(upload, "content_type", "") or "")
+    mime_type = mime_type.split(";", 1)[0].strip().lower()
+    if not mime_type:
+        guessed, _encoding = _mimetypes.guess_type(str(getattr(upload, "filename", "") or ""))
+        mime_type = str(guessed or "").lower()
+    return mime_type
+
+
+def _uploaded_file_extension(upload: Any, mime_type: str) -> str:
+    original = Path(str(getattr(upload, "filename", "") or "")).suffix.lower().lstrip(".")
+    if original and re.fullmatch(r"[A-Za-z0-9]{{1,12}}", original):
+        return original
+    guessed = str(_mimetypes.guess_extension(mime_type) or "").lower().lstrip(".")
+    return guessed or "bin"
+
+
+def _store_uploaded_file(entity_name: str, field_name: str, upload: Any) -> tuple[int, Dict[str, Any]]:
+    mime_type = _uploaded_file_mime(upload)
+    if mime_type not in _upload_allowed_mime_types():
+        return 415, {{
+            "error": "unsupported_media_type",
+            "field": field_name,
+            "mime": mime_type,
+        }}
+    data = upload.read()
+    try:
+        upload.stream.seek(0)
+    except Exception:
+        pass
+    size = len(data)
+    if size > _upload_max_bytes():
+        return 413, {{
+            "error": "payload_too_large",
+            "field": field_name,
+            "max_bytes": _upload_max_bytes(),
+        }}
+    safe_entity = _safe_upload_segment(entity_name, "entity")
+    upload_dir = _upload_root() / safe_entity
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    extension = _uploaded_file_extension(upload, mime_type)
+    filename = str(_uuid.uuid4()) + "." + extension
+    destination = upload_dir / filename
+    destination.write_bytes(data)
+    return 200, {{
+        "path": str(destination),
+        "mime": mime_type,
+        "size": size,
+        "filename": filename,
+    }}
+
+
+def _apply_uploaded_files(entity_name: str, record: Dict[str, Any]) -> tuple[int, Dict[str, Any]] | None:
+    if not _multipart_upload_request():
+        return None
+    for field in _file_field_specs(entity_name):
+        field_name = str(field.get("name", "")).strip()
+        if not field_name or field_name not in _flask_request.files:
+            continue
+        upload = _flask_request.files.get(field_name)
+        if upload is None or not str(getattr(upload, "filename", "") or ""):
+            continue
+        status, result = _store_uploaded_file(entity_name, field_name, upload)
+        if status != 200:
+            return status, result
+        record.pop(field_name, None)
+        record[field_name + "_path"] = result["path"]
+        record[field_name + "_mime"] = result["mime"]
+        record[field_name + "_size"] = result["size"]
+    return None
+
+
+def _file_url_for_path(entity_name: str, path: Any) -> str:
+    filename = Path(str(path or "")).name
+    if not filename:
+        return ""
+    return f"/uploads/{{quote(entity_name, safe='')}}/{{quote(filename, safe='')}}"
+
+
+def _mime_for_uploaded_filename(entity_name: str, filename: str) -> str:
+    for record in RECORD_STORE.get(entity_name, []):
+        for field in _file_field_specs(entity_name):
+            field_name = str(field.get("name", ""))
+            stored_name = Path(str(record.get(field_name + "_path", "") or "")).name
+            if stored_name == filename:
+                stored_mime = str(record.get(field_name + "_mime", "") or "")
+                if stored_mime:
+                    return stored_mime
+    guessed, _encoding = _mimetypes.guess_type(filename)
+    return str(guessed or "application/octet-stream")
+
+
+def _uploaded_file_response(entity_name: str, filename: str) -> _FlaskResponse:
+    if entity_name not in ENTITY_NAMES:
+        return _apg_error_response(404, "unknown_entity", "Unknown entity")
+    safe_filename = _safe_upload_segment(filename, "")
+    if not safe_filename or safe_filename != filename:
+        return _apg_error_response(404, "not_found", "File not found")
+    root = (_upload_root() / _safe_upload_segment(entity_name, "entity")).resolve()
+    path = (root / safe_filename).resolve()
+    if path.parent != root or not path.is_file():
+        return _apg_error_response(404, "not_found", "File not found")
+    data = path.read_bytes()
+    etag = '"' + hashlib.sha256(data).hexdigest()[:16] + '"'
+    requested = [
+        item.strip()
+        for item in str(_flask_request.headers.get("If-None-Match", "")).split(",")
+        if item.strip()
+    ]
+    if etag in requested:
+        response = _FlaskResponse(b"", status=304)
+    else:
+        response = _FlaskResponse(data, status=200, content_type=_mime_for_uploaded_filename(entity_name, safe_filename))
+        response.headers["Content-Length"] = str(len(data))
+    response.headers["ETag"] = etag
+    return response
+
+
 def _relationship_specs(entity_name: str) -> list[Dict[str, Any]]:
     entity = _entity_spec(entity_name)
     if entity is None:
@@ -5915,6 +6146,9 @@ def coerce_record_types(entity_name: str, record: Dict[str, Any]) -> Dict[str, A
     coerced = dict(record)
     for field in _field_specs(entity_name):
         field_name = str(field["name"])
+        if _is_file_field(field):
+            coerced.pop(field_name, None)
+            continue
         if field_name in coerced:
             coerced[field_name] = _coerce_value_for_type(
                 coerced[field_name],
@@ -6009,6 +6243,11 @@ def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = Fa
     fields = _field_specs(entity_name)
     for field in fields:
         field_name = str(field["name"])
+        if _is_file_field(field):
+            path_field = field_name + "_path"
+            if not partial and field.get("required", False) and path_field not in record:
+                errors.append(f"{{field_name}} is required")
+            continue
         if not partial and field.get("required", False) and field_name not in record:
             errors.append(f"{{field_name}} is required")
             continue
@@ -6092,6 +6331,13 @@ def _sqlite_expected_columns(entity_name: str) -> list[Dict[str, str]]:
     for field in _field_specs(entity_name):
         field_name = str(field.get("name", "")).strip()
         if not field_name or field_name in {{"id", "_revision", "created_at", "updated_at", "deleted_at"}}:
+            continue
+        if _is_file_field(field):
+            columns.extend([
+                {{"name": field_name + "_path", "ddl": "TEXT NULL", "migration": "TEXT"}},
+                {{"name": field_name + "_mime", "ddl": "TEXT NULL", "migration": "TEXT"}},
+                {{"name": field_name + "_size", "ddl": "INTEGER NULL", "migration": "INTEGER"}},
+            ])
             continue
         relationship = field.get("relationship") if isinstance(field.get("relationship"), dict) else {{}}
         relationship_kind = str(relationship.get("kind", ""))
@@ -6271,7 +6517,14 @@ def _sqlite_store_record(entity_name: str, record: Dict[str, Any]) -> None:
     }}
     for field in _field_specs(entity_name):
         field_name = str(field.get("name", "")).strip()
-        if field_name and field_name not in row:
+        if not field_name:
+            continue
+        if _is_file_field(field):
+            for metadata_name in _file_metadata_field_names(field_name):
+                if metadata_name not in row:
+                    row[metadata_name] = _sqlite_value(record.get(metadata_name))
+            continue
+        if field_name not in row:
             row[field_name] = _sqlite_value(record.get(field_name))
     column_names = [column["name"] for column in columns]
     assignments = [
@@ -10214,6 +10467,9 @@ def _create_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
     if not isinstance(raw_record, dict):
         return 400, {{"error": "record_must_be_object"}}
     record = _strip_record_lifecycle_fields(coerce_record_types(entity_name, dict(raw_record)))
+    upload_error = _apply_uploaded_files(entity_name, record)
+    if upload_error is not None:
+        return upload_error
     validation = validate_record(entity_name, record)
     if not validation["valid"]:
         return _record_validation_failure(validation)
@@ -10239,6 +10495,13 @@ def _create_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
         if persistence_error:
             return 500, {{"error": "persistence_failed", "message": persistence_error}}
         _apg_deliver_webhook("entity.created", entity_name, record.get("id"), payload, _apg_request_id())
+        notify_to = str(os.environ.get("APG_NOTIFY_EMAIL", "") or "").strip()
+        if notify_to:
+            _apg_send_email(
+                notify_to,
+                f"New {{entity_name}} record in {{APG_APP_NAME}}",
+                json.dumps(_record_public_copy(entity_name, record), indent=2, sort_keys=True, default=str),
+            )
     return 201, {{
         "entity": entity_name,
         "record": _record_public_copy(entity_name, record),
@@ -10307,6 +10570,9 @@ def _update_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
     if not isinstance(raw_record, dict):
         return 400, {{"error": "record_must_be_object"}}
     record_update = _strip_record_lifecycle_fields(coerce_record_types(entity_name, dict(raw_record)))
+    upload_error = _apply_uploaded_files(entity_name, record_update)
+    if upload_error is not None:
+        return upload_error
     validation = validate_record(entity_name, record_update, partial=True)
     if not validation["valid"]:
         return _record_validation_failure(validation)
@@ -11361,8 +11627,9 @@ def _apg_content_type_guard() -> _FlaskResponse | None:
     if not _flask_request.path.startswith("/records/"):
         return None
     content_type = _flask_request.content_type or ""
-    if content_type and not content_type.startswith("application/json"):
-        return _apg_error_response(415, "unsupported_media_type", "Content-Type must be application/json")
+    allowed = ("application/json", "application/x-www-form-urlencoded", "multipart/form-data")
+    if content_type and not any(content_type.startswith(item) for item in allowed):
+        return _apg_error_response(415, "unsupported_media_type", "Content-Type must be application/json, form-urlencoded, or multipart/form-data")
     return None
 
 
@@ -11465,6 +11732,16 @@ def _flask_login_post():
     _clear_login_failures(throttle_key)
     _issue_login_session(user)
     _apg_audit_event("login", user=str(user.get("username", username)))
+    if _env_flag("APG_EMAIL_ON_LOGIN") and str(user.get("email", "") or "").strip():
+        _apg_send_email(
+            str(user.get("email", "")),
+            f"New login to {{APG_APP_NAME}}",
+            "A successful login was recorded for "
+            + str(user.get("username", username))
+            + " at "
+            + _datetime.datetime.utcnow().isoformat()
+            + "Z.",
+        )
     return _flask_redirect(next_url)
 
 
@@ -11526,6 +11803,11 @@ def _flask_api_docs():
 @_flask_app.route("/entities/<entity_name>/records.csv", methods=["GET"])
 def _flask_csv_export(entity_name):
     return _FlaskResponse(_csv_export_body(entity_name), content_type="text/csv; charset=utf-8")
+
+
+@_flask_app.route("/uploads/<entity_name>/<filename>", methods=["GET"])
+def _flask_uploaded_file(entity_name, filename):
+    return _uploaded_file_response(str(entity_name), str(filename))
 
 
 @_flask_app.route("/ui", methods=["GET"])
@@ -11702,15 +11984,19 @@ def _flask_api_put(api_path):
     auth_err = _check_mutation_auth()
     if auth_err:
         return auth_err
-    try:
-        payload = _flask_request.get_json(force=True, silent=False) or {{}}
-        if not isinstance(payload, dict):
-            raise ValueError("JSON body must be an object")
-    except Exception as _e:
-        return _FlaskResponse(
-            json.dumps({{"error": "invalid_json", "message": str(_e)}}),
-            status=400, content_type="application/json; charset=utf-8",
-        )
+    ct = _flask_request.content_type or ""
+    if "application/x-www-form-urlencoded" in ct or "multipart/form-data" in ct:
+        payload = _flask_request.form.to_dict(flat=True)
+    else:
+        try:
+            payload = _flask_request.get_json(force=True, silent=False) or {{}}
+            if not isinstance(payload, dict):
+                raise ValueError("JSON body must be an object")
+        except Exception as _e:
+            return _FlaskResponse(
+                json.dumps({{"error": "invalid_json", "message": str(_e)}}),
+                status=400, content_type="application/json; charset=utf-8",
+            )
     status, response = _put_payload(path, payload)
     return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
 
