@@ -10,7 +10,13 @@ being consolidated into a regular package layout.
 from __future__ import annotations
 
 import importlib
+from importlib.metadata import PackageNotFoundError, version
 import sys
+
+try:
+	__version__ = version("apg")
+except PackageNotFoundError:
+	__version__ = "0.1.0"
 
 _ALIASES = (
 	"capabilities",
@@ -29,4 +35,4 @@ for _name in _ALIASES:
 		# Some optional surfaces may be absent in trimmed installs.
 		pass
 
-__all__ = list(_ALIASES)
+__all__ = ["__version__", *_ALIASES]

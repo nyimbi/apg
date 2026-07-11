@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta:__legacy__"
+
+[project]
+name = "apg"
+version = "0.1.0"
+description = "App Platform Generator — DSL compiler for Flask apps"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "antlr4-python3-runtime>=4.13.0",
+    "click>=8.0",
+    "flask>=3.0",
+    "httpx>=0.27.0",
+    "Jinja2>=3.1.0",
+    "psutil>=5.9.0",
+    "pydantic>=2.0.0",
+    "python-dateutil>=2.8.0",
+    "rich>=13.0.0",
+    "sqlalchemy>=2.0.0",
+    "uuid6>=0.4",
+    "watchdog>=3.0.0",
+]
+
+[project.scripts]
+apg = "cli.main:cli"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-httpserver",
+]
+
+[tool.setuptools]
+include-package-data = true
+py-modules = ["uuid_extensions"]
+packages = [
+    "agents",
+    "apg",
+    "apg.auth_rbac",
+    "auth_rbac",
+    "capabilities",
+    "cli",
+    "common",
+    "compiler",
+    "compiler.runtime",
+    "gen",
+    "language_server",
+    "templates",
+    "templates.application_templates",
+    "templates.composable",
+]
+
+[tool.setuptools.package-data]
+compiler = [
+    "assets/*",
+    "templates/**/*.j2",
+]
+templates = [
+    "**/*.json",
+    "**/*.md",
+    "**/*.template",
+]
