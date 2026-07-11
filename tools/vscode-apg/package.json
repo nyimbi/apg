@@ -1,0 +1,41 @@
+{
+  "name": "vscode-apg",
+  "displayName": "APG Language Support",
+  "description": "Syntax highlighting, snippets, and language support for APG DSL",
+  "version": "0.1.0",
+  "publisher": "datacraft",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "apg",
+        "aliases": [
+          "APG",
+          "apg"
+        ],
+        "extensions": [
+          ".apg"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "apg",
+        "scopeName": "source.apg",
+        "path": "./syntaxes/apg.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "apg",
+        "path": "./snippets/apg.json"
+      }
+    ]
+  }
+}

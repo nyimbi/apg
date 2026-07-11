@@ -1,0 +1,86 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "APG",
+  "scopeName": "source.apg",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#decorators"
+    },
+    {
+      "include": "#relationships"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.apg",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.apg",
+      "begin": "\"",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.apg"
+        }
+      },
+      "end": "\"",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.apg"
+        }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape.apg",
+          "match": "\\\\(?:[\"\\\\/bfnrt]|u[0-9a-fA-F]{4})"
+        }
+      ]
+    },
+    "decorators": {
+      "name": "entity.name.tag.apg",
+      "match": "@(?:min_length|max_length|min|max|email|pattern|optional|required)\\b"
+    },
+    "relationships": {
+      "name": "keyword.operator.apg",
+      "match": "\\b(?:has_many|belongs_to|has_one|through)\\b"
+    },
+    "keywords": {
+      "name": "keyword.control.apg",
+      "match": "\\b(?:module|entity|table|enum|security|authentication)\\b"
+    },
+    "types": {
+      "name": "storage.type.apg",
+      "match": "\\b(?:str|int|float|bool|date|datetime|text|uuid|json|file)\\b"
+    },
+    "numbers": {
+      "name": "constant.numeric.apg",
+      "match": "\\b\\d+(?:\\.\\d+)?\\b"
+    },
+    "punctuation": {
+      "name": "punctuation.definition.apg",
+      "match": "[{};:,]"
+    }
+  }
+}

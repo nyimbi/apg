@@ -1,0 +1,74 @@
+{
+  "module": {
+    "prefix": "module",
+    "body": [
+      "module ${1:customer_records} {",
+      "",
+      "\tentity ${2:Customer} {",
+      "\t\tid: uuid @required;",
+      "\t\t${3:name}: str @min_length(1) @max_length(120);",
+      "\t\t${4:email}: str @email @optional;",
+      "\t}",
+      "",
+      "\tenum ${5:CustomerStatus} {",
+      "\t\tactive;",
+      "\t\tinactive;",
+      "\t}",
+      "",
+      "\tsecurity {",
+      "\t\tauthentication: required;",
+      "\t}",
+      "}"
+    ],
+    "description": "Scaffold an APG module with an entity, enum, and security block."
+  },
+  "entity": {
+    "prefix": "entity",
+    "body": [
+      "entity ${1:EntityName} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Create an empty APG entity block."
+  },
+  "enum": {
+    "prefix": "enum",
+    "body": [
+      "enum ${1:Status} {",
+      "\t${2:active};",
+      "\t${3:inactive};",
+      "}"
+    ],
+    "description": "Create an APG enum type declaration."
+  },
+  "has_many": {
+    "prefix": "has_many",
+    "body": [
+      "has_many ${1:items}: ${2:Item};"
+    ],
+    "description": "Create a has_many relationship."
+  },
+  "belongs_to": {
+    "prefix": "belongs_to",
+    "body": [
+      "belongs_to ${1:owner}: ${2:Owner};"
+    ],
+    "description": "Create a belongs_to relationship."
+  },
+  "security": {
+    "prefix": "security",
+    "body": [
+      "security {",
+      "\tauthentication: ${1:required};",
+      "}"
+    ],
+    "description": "Create a security block with authentication."
+  },
+  "field_validated": {
+    "prefix": "field_validated",
+    "body": [
+      "${1:name}: str @min_length(${2:1}) @max_length(${3:255});"
+    ],
+    "description": "Create a validated APG string field."
+  }
+}
