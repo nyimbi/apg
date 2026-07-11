@@ -20,7 +20,7 @@ from .ast_builder import (
 	UnaryExpression, MemberExpression, IndexExpression, ListExpression,
 	DictExpression,
 	AIAgentDeclaration, AgentTeamDeclaration, ApplicationDeclaration, CapabilityDeclaration,
-	DatabaseDeclaration
+	DatabaseDeclaration, EntityType
 )
 from .semantic_model import build_semantic_model_from_module
 
@@ -371,10 +371,16 @@ class PythonCodeGenerator:
 
 	def _entity_specs(self, module: ModuleDeclaration) -> List[Dict[str, Any]]:
 		"""Convert APG entities into generated runtime metadata."""
+		enum_values_by_name = {
+			entity.name: list(getattr(entity, "values", []))
+			for entity in module.entities
+			if getattr(entity, "entity_type", None) == EntityType.ENUM
+		}
 		entities = [
 			entity
 			for entity in module.entities
 			if not self._is_security_config_entity(entity)
+			and getattr(entity, "entity_type", None) != EntityType.ENUM
 		]
 		junction_context: Dict[str, list[tuple[str, str]]] = {}
 		for entity in entities:
@@ -388,7 +394,7 @@ class PythonCodeGenerator:
 						(entity.name, str(relationship.target))
 					)
 		return [
-			self._entity_spec(entity, junction_context.get(entity.name, []))
+			self._entity_spec(entity, junction_context.get(entity.name, []), enum_values_by_name)
 			for entity in entities
 		]
 
@@ -411,16 +417,33 @@ class PythonCodeGenerator:
 			return base + "es"
 		return base + "s"
 
-	def _entity_spec(self, entity: Any, junction_pairs: list[tuple[str, str]] | None = None) -> Dict[str, Any]:
+	def _entity_spec(
+		self,
+		entity: Any,
+		junction_pairs: list[tuple[str, str]] | None = None,
+		enum_values_by_name: Dict[str, list[str]] | None = None,
+	) -> Dict[str, Any]:
 		"""Convert an APG entity AST node into generated runtime metadata."""
+		enum_values_by_name = enum_values_by_name or {}
+
 		def field_spec(property: Any) -> Dict[str, Any]:
+			type_name = property.type_annotation.type_name if property.type_annotation else "any"
 			spec = {
 				"name": property.name,
-				"type": property.type_annotation.type_name if property.type_annotation else "any",
+				"type": type_name,
 				"required": property.is_required,
 			}
 			if property.default_value is not None:
 				spec["default"] = self._expression_value(property.default_value)
+			if type_name in enum_values_by_name:
+				spec["enum"] = list(enum_values_by_name[type_name])
+			validators = []
+			for rule in getattr(property, "validation_rules", []):
+				validator = {"rule": str(getattr(rule, "rule_type", ""))}
+				validator.update(dict(getattr(rule, "parameters", {}) or {}))
+				validators.append(validator)
+			if validators:
+				spec["validators"] = validators
 			return spec
 
 		def add_generated_field(fields: list[Dict[str, Any]], generated: Dict[str, Any]) -> None:
@@ -3541,7 +3564,26 @@ def _record_schema(entity: Dict[str, Any], partial: bool = False) -> Dict[str, A
     required_fields: list[str] = []
     for field in fields:
         field_name = str(field["name"])
-        schema_properties[field_name] = {{"type": _json_schema_type(str(field.get("type", "any")))}}
+        field_schema: Dict[str, Any] = {{"type": _json_schema_type(str(field.get("type", "any")))}}
+        enum_values = field.get("enum") if isinstance(field.get("enum"), list) else []
+        if enum_values:
+            field_schema["enum"] = list(enum_values)
+        for validator in field.get("validators", []):
+            if not isinstance(validator, dict):
+                continue
+            rule = str(validator.get("rule", ""))
+            value = validator.get("value")
+            if rule == "min_length":
+                field_schema["minLength"] = value
+            elif rule == "max_length":
+                field_schema["maxLength"] = value
+            elif rule == "min":
+                field_schema["minimum"] = value
+            elif rule == "max":
+                field_schema["maximum"] = value
+            elif rule == "pattern":
+                field_schema["pattern"] = str(validator.get("pattern", value or ""))
+        schema_properties[field_name] = field_schema
         if not partial and field.get("required", False):
             required_fields.append(field_name)
     schema: Dict[str, Any] = {{
@@ -5881,6 +5923,87 @@ def coerce_record_types(entity_name: str, record: Dict[str, Any]) -> Dict[str, A
     return coerced
 
 
+def _validation_failed(field_name: str, rule: str, detail: str) -> Dict[str, Any]:
+    return {{
+        "valid": False,
+        "status": 400,
+        "error": "validation_failed",
+        "field": field_name,
+        "rule": rule,
+        "detail": detail,
+        "errors": [field_name + " " + detail],
+    }}
+
+
+def _validator_value(validator: Dict[str, Any], key: str = "value") -> Any:
+    if key in validator:
+        return validator.get(key)
+    return validator.get("value")
+
+
+def _validator_failure(field_name: str, value: Any, validator: Dict[str, Any]) -> Dict[str, Any] | None:
+    rule = str(validator.get("rule", ""))
+    if rule in {{"", "optional"}}:
+        return None
+    if rule == "required":
+        if value is None or value == "":
+            return _validation_failed(field_name, "required", "required")
+        return None
+    if value is None:
+        return None
+    if rule == "min_length":
+        limit = int(_validator_value(validator) or 0)
+        if len(str(value)) < limit:
+            return _validation_failed(field_name, "min_length", "min " + str(limit) + " chars")
+    elif rule == "max_length":
+        limit = int(_validator_value(validator) or 0)
+        if len(str(value)) > limit:
+            return _validation_failed(field_name, "max_length", "max " + str(limit) + " chars")
+    elif rule == "min":
+        raw_limit = _validator_value(validator)
+        try:
+            if float(value) < float(raw_limit):
+                return _validation_failed(field_name, "min", "min " + str(raw_limit))
+        except (TypeError, ValueError):
+            return _validation_failed(field_name, "min", "must be numeric")
+    elif rule == "max":
+        raw_limit = _validator_value(validator)
+        try:
+            if float(value) > float(raw_limit):
+                return _validation_failed(field_name, "max", "max " + str(raw_limit))
+        except (TypeError, ValueError):
+            return _validation_failed(field_name, "max", "must be numeric")
+    elif rule == "email":
+        if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", str(value)) is None:
+            return _validation_failed(field_name, "email", "must be a valid email")
+    elif rule == "pattern":
+        pattern = str(_validator_value(validator, "pattern") or "")
+        try:
+            matched = re.fullmatch(pattern, str(value)) is not None
+        except re.error:
+            matched = False
+        if not matched:
+            return _validation_failed(field_name, "pattern", "must match pattern")
+    return None
+
+
+def _record_validation_failure(validation: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    if validation.get("error") == "invalid_enum_value":
+        return 400, {{
+            "error": "invalid_enum_value",
+            "field": validation.get("field"),
+            "allowed": validation.get("allowed", []),
+        }}
+    if validation.get("error") == "validation_failed":
+        return 400, {{
+            "error": "validation_failed",
+            "field": validation.get("field"),
+            "rule": validation.get("rule"),
+            "detail": validation.get("detail"),
+        }}
+    return 422, {{"error": "record_validation_failed", **validation}}
+
+
 def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = False) -> Dict[str, Any]:
     errors: list[str] = []
     fields = _field_specs(entity_name)
@@ -5889,8 +6012,34 @@ def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = Fa
         if not partial and field.get("required", False) and field_name not in record:
             errors.append(f"{{field_name}} is required")
             continue
-        if field_name in record and not _value_matches_type(record[field_name], str(field.get("type", "any"))):
+        if field_name not in record:
+            continue
+        value = record[field_name]
+        if value is None:
+            if field.get("required", False):
+                errors.append(f"{{field_name}} is required")
+            continue
+        if not _value_matches_type(value, str(field.get("type", "any"))):
             errors.append(f"{{field_name}} must be {{_json_schema_type(str(field.get('type', 'any')))}}")
+            continue
+        enum_values = field.get("enum") if isinstance(field.get("enum"), list) else []
+        if enum_values and value not in enum_values:
+            return {{
+                "valid": False,
+                "status": 400,
+                "error": "invalid_enum_value",
+                "entity": entity_name,
+                "field": field_name,
+                "allowed": list(enum_values),
+                "errors": [f"{{field_name}} must be one of {{', '.join(str(item) for item in enum_values)}}"],
+            }}
+        for validator in field.get("validators", []):
+            if not isinstance(validator, dict):
+                continue
+            failure = _validator_failure(field_name, value, validator)
+            if failure is not None:
+                failure["entity"] = entity_name
+                return failure
     return {{
         "valid": not errors,
         "entity": entity_name,
@@ -5930,6 +6079,10 @@ def _sqlite_storage_type(apg_type: str) -> str:
     return "TEXT"
 
 
+def _sqlite_literal(value: Any) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
 def _sqlite_expected_columns(entity_name: str) -> list[Dict[str, str]]:
     columns: list[Dict[str, str]] = [
         {{"name": "id", "ddl": "TEXT PRIMARY KEY", "migration": "TEXT"}},
@@ -5950,6 +6103,9 @@ def _sqlite_expected_columns(entity_name: str) -> list[Dict[str, str]]:
             ddl = storage_type + " REFERENCES " + _sqlite_identifier(target_entity) + "(id) ON DELETE CASCADE"
         else:
             ddl = storage_type
+        enum_values = field.get("enum") if isinstance(field.get("enum"), list) else []
+        if enum_values:
+            ddl += " CHECK(" + _sqlite_identifier(field_name) + " IN (" + ", ".join(_sqlite_literal(value) for value in enum_values) + "))"
         ddl += " NOT NULL" if field.get("required", False) else ""
         columns.append({{"name": field_name, "ddl": ddl, "migration": storage_type}})
     columns.extend([
@@ -10060,7 +10216,7 @@ def _create_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
     record = _strip_record_lifecycle_fields(coerce_record_types(entity_name, dict(raw_record)))
     validation = validate_record(entity_name, record)
     if not validation["valid"]:
-        return 422, {{"error": "record_validation_failed", **validation}}
+        return _record_validation_failure(validation)
     if record.get("id") in (None, ""):
         record["id"] = NEXT_RECORD_IDS[entity_name]
         NEXT_RECORD_IDS[entity_name] += 1
@@ -10153,7 +10309,7 @@ def _update_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
     record_update = _strip_record_lifecycle_fields(coerce_record_types(entity_name, dict(raw_record)))
     validation = validate_record(entity_name, record_update, partial=True)
     if not validation["valid"]:
-        return 422, {{"error": "record_validation_failed", **validation}}
+        return _record_validation_failure(validation)
     for index, existing in enumerate(RECORD_STORE[entity_name]):
         if str(existing.get("id")) == str(record_id):
             if _record_deleted(entity_name, existing):

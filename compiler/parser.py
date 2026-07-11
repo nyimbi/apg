@@ -398,10 +398,12 @@ class APGParser:
 
 		keywords = {
 			"module",
+			"entity",
 			"import",
 			"from",
 			"include",
 			"export",
+			"enum",
 			# Legacy spellings remain accepted by the compatibility validator.
 			"digital_twin",
 			"workflow",
@@ -414,7 +416,7 @@ class APGParser:
 			if match:
 				keywords.update(re.findall(r"'([^']+)'", match.group(1)))
 		except OSError:
-			keywords.update({"agent", "capability", "db", "twin", "screen", "app", "flow"})
+			keywords.update({"entity", "agent", "capability", "db", "enum", "twin", "screen", "app", "flow"})
 
 		self._declaration_keyword_cache = set(keywords)
 		return set(keywords)

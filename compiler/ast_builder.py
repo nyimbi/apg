@@ -27,8 +27,8 @@ def _grammar_entity_keywords() -> frozenset[str]:
 	if _GRAMMAR_ENTITY_KEYWORDS_CACHE is not None:
 		return _GRAMMAR_ENTITY_KEYWORDS_CACHE
 	keywords: set[str] = {
-		"module", "agent", "capability", "digital_twin", "workflow",
-		"database", "db",
+		"module", "entity", "agent", "capability", "digital_twin", "workflow",
+		"database", "db", "enum",
 	}
 	grammar_path = Path(__file__).resolve().parent.parent / "spec" / "apg.g4"
 	try:
@@ -138,6 +138,12 @@ class EntityDeclaration(ASTNode):
 	properties: List['PropertyDeclaration'] = field(default_factory=list)
 	methods: List['MethodDeclaration'] = field(default_factory=list)
 	relationships: List['RelationshipNode'] = field(default_factory=list)
+
+
+@dataclass
+class EnumDeclaration(EntityDeclaration):
+	"""Enum type declaration."""
+	values: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -578,9 +584,15 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			cleaned,
 			re.UNICODE,
 		)
+		module_line, module_column = (
+			self._line_column_for_offset(cleaned, module_match.start())
+			if module_match else (1, 0)
+		)
 		module = ModuleDeclaration(
 			name=module_match.group("name") if module_match else "main",
 			version=module_match.group("version") if module_match else "1.0.0",
+			line=module_line,
+			column=module_column,
 			source_file=source_file,
 		)
 
@@ -608,39 +620,64 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				alias=alias,
 			))
 
-		for body in self._iter_source_anonymous_blocks(cleaned, "security"):
-			properties, methods = self._parse_source_members(body, source_file)
+		for body, body_offset, block_offset in self._iter_source_anonymous_blocks(cleaned, "security"):
+			line, column = self._line_column_for_offset(cleaned, block_offset)
+			properties, methods = self._parse_source_members(body, source_file, body_offset, cleaned)
 			module.entities.append(EntityDeclaration(
 				entity_type=EntityType.ENTITY,
 				name="security",
 				properties=properties,
 				methods=methods,
+				line=line,
+				column=column,
 				source_file=source_file,
 			))
 
-		for kind, name, body in self._iter_source_entities(cleaned):
+		for kind, name, body, body_offset, entity_offset in self._iter_source_entities(cleaned):
 			if kind == "module":
 				continue
+			line, column = self._line_column_for_offset(cleaned, entity_offset)
+			if kind == "enum":
+				entity = self._parse_source_enum(name, body, source_file)
+				entity.line = line
+				entity.column = column
+				module.entities.append(entity)
+				continue
 			if kind in {"app", "application", "composition"}:
-				module.entities.append(self._parse_source_application(kind, name, body, source_file))
+				entity = self._parse_source_application(kind, name, body, source_file)
+				entity.line = line
+				entity.column = column
+				module.entities.append(entity)
 				continue
 			if kind == "capability":
-				module.entities.append(self._parse_source_capability(name, body, source_file))
+				entity = self._parse_source_capability(name, body, source_file)
+				entity.line = line
+				entity.column = column
+				module.entities.append(entity)
 				continue
 			if kind in {"db", "database"}:
-				module.entities.append(self._parse_source_database(name, body, source_file))
+				entity = self._parse_source_database(name, body, source_file)
+				entity.line = line
+				entity.column = column
+				module.entities.append(entity)
 				continue
 			if kind == "agent" and self._is_agent_config_body(body):
-				module.entities.append(self._parse_source_agent(name, body, source_file))
+				entity = self._parse_source_agent(name, body, source_file)
+				entity.line = line
+				entity.column = column
+				module.entities.append(entity)
 				continue
 			if kind in {"workflow", "flow"}:
-				module.entities.append(self._parse_source_workflow(name, body, source_file, kind=kind))
+				entity = self._parse_source_workflow(name, body, source_file, kind=kind)
+				entity.line = line
+				entity.column = column
+				module.entities.append(entity)
 				continue
 			# Form and business-logic entities contain nested sub-block syntax
 			# (widget properties, inline object literals, async def method bodies)
 			# that the flat line scanner misreads as top-level entity properties,
 			# causing spurious duplicate-property errors. Register these with no
-			# flat properties — the full ANTLR grammar path handles them correctly.
+			# flat properties - the full ANTLR grammar path handles them correctly.
 			if kind in {
 				# Form layout / UI
 				"form", "screen", "view", "ui", "component", "widget",
@@ -655,11 +692,13 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 					name=name,
 					properties=[],
 					methods=[],
+					line=line,
+					column=column,
 					source_file=source_file,
 				))
 				continue
-			properties, methods = self._parse_source_members(body, source_file)
-			relationships = self._parse_source_relationships(body, source_file)
+			properties, methods = self._parse_source_members(body, source_file, body_offset, cleaned)
+			relationships = self._parse_source_relationships(body, source_file, body_offset, cleaned)
 			entity_type = self._entity_type_for_source_kind(kind)
 			module.entities.append(EntityDeclaration(
 				entity_type=entity_type,
@@ -667,6 +706,8 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				properties=properties,
 				methods=methods,
 				relationships=relationships,
+				line=line,
+				column=column,
 				source_file=source_file,
 			))
 
@@ -743,7 +784,7 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				elif source_code[index] == "}":
 					depth -= 1
 				index += 1
-			yield match.group(1), match.group(2), source_code[body_start:index - 1]
+			yield match.group(1), match.group(2), source_code[body_start:index - 1], body_start, match.start()
 			position = index
 
 	def _iter_source_anonymous_blocks(self, source_code: str, keyword: str):
@@ -762,7 +803,7 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				elif source_code[index] == "}":
 					depth -= 1
 				index += 1
-			yield source_code[body_start:index - 1]
+			yield source_code[body_start:index - 1], body_start, match.start()
 			position = index
 
 	def _source_entity_keywords(self) -> set[str]:
@@ -772,7 +813,7 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		apg.g4 file is read at most once per process regardless of how many
 		ASTBuilder instances are created.
 		"""
-		return _grammar_entity_keywords()
+		return set(_grammar_entity_keywords()) | {"entity", "enum"}
 
 	def _entity_type_for_source_kind(self, kind: str) -> EntityType:
 		"""Map source keywords to AST entity categories while preserving key APG surfaces."""
@@ -832,6 +873,28 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			"etl": EntityType.ENTITY,
 			"dbt_model": EntityType.ENTITY,
 		}.get(kind, EntityType.ENTITY)
+
+	def _parse_source_enum(self, name: str, body: str, source_file: Optional[str]) -> EnumDeclaration:
+		"""Parse enum Status { Draft; Published; } declarations."""
+		values: List[str] = []
+		for raw_value in re.split(r"[;,]", body):
+			candidate = raw_value.strip()
+			if not candidate:
+				continue
+			match = re.match(r"\"([^\"]+)\"|'([^']+)'|([^\W\d]\w*)", candidate, re.UNICODE)
+			if not match:
+				continue
+			value = next(group for group in match.groups() if group is not None)
+			if value not in values:
+				values.append(value)
+		return EnumDeclaration(
+			entity_type=EntityType.ENUM,
+			name=name,
+			values=values,
+			properties=[],
+			methods=[],
+			source_file=source_file,
+		)
 
 	def _parse_source_capability(self, name: str, body: str, source_file: Optional[str]) -> CapabilityDeclaration:
 		"""Parse the first-class capability contract surface from source text."""
@@ -1151,9 +1214,17 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			compensation=_dict_prop("compensation"),
 		)
 
-	def _parse_source_members(self, body: str, source_file: Optional[str]):
+	def _parse_source_members(
+		self,
+		body: str,
+		source_file: Optional[str],
+		body_offset: int = 0,
+		source_code: Optional[str] = None,
+	):
 		properties: List[PropertyDeclaration] = []
 		methods: List[MethodDeclaration] = []
+		position_source = source_code or body
+		position_base = body_offset if source_code is not None else 0
 
 		method_pattern = re.compile(
 			r"(?P<name>[^\W\d]\w*)\s*:\s*(?P<async>async\s*)?\((?P<params>[^)]*)\)\s*->\s*(?P<return>[^\s={;]+)",
@@ -1162,12 +1233,29 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		method_spans = []
 		for match in method_pattern.finditer(body):
 			method_spans.append(self._source_method_span(body, match))
+			line, column = self._line_column_for_offset(
+				position_source,
+				position_base + match.start("name"),
+			)
+			return_type = self._parse_source_type(
+				match.group("return"),
+				source_file,
+				position_base + match.start("return"),
+				position_source,
+			)
 			methods.append(MethodDeclaration(
 				name=match.group("name"),
-				parameters=self._parse_source_parameters(match.group("params"), source_file),
-				return_type=self._parse_source_type(match.group("return"), source_file),
+				parameters=self._parse_source_parameters(
+					match.group("params"),
+					source_file,
+					position_base + match.start("params"),
+					position_source,
+				),
+				return_type=return_type,
 				body=None,
 				is_async=bool(match.group("async")),
+				line=line,
+				column=column,
 				source_file=source_file,
 			))
 
@@ -1176,31 +1264,105 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			property_body = property_body[:start] + property_body[end:]
 
 		property_pattern = re.compile(
-			r"(?:^|;)\s*(?P<name>[^\W\d]\w*)\s*:\s*"
+			r"(?:^|(?<=;))\s*(?P<name>[^\W\d]\w*)\s*:\s*"
 			r"(?P<type>[^=;{\n]+?)\s*(?:=\s*(?P<default>.*?))?\s*;",
 			re.UNICODE | re.DOTALL,
 		)
 		for match in property_pattern.finditer(property_body):
-			type_text = match.group("type").strip()
+			type_text, validation_rules = self._split_source_type_validators(
+				match.group("type").strip(),
+				source_file,
+				position_base + match.start("type"),
+				position_source,
+			)
 			if type_text.startswith("(") or type_text.startswith("async"):
 				continue
-			_type_ann = self._parse_source_type(type_text, source_file)
+			name_offset = position_base + match.start("name")
+			type_offset = position_base + match.start("type")
+			prop_line, prop_column = self._line_column_for_offset(position_source, name_offset)
+			_type_ann = self._parse_source_type(type_text, source_file, type_offset, position_source)
+			validator_names = {rule.rule_type for rule in validation_rules}
+			if "optional" in validator_names:
+				_type_ann.is_optional = True
+			elif "required" in validator_names:
+				_type_ann.is_optional = False
 			properties.append(PropertyDeclaration(
 				name=match.group("name"),
 				type_annotation=_type_ann,
 				default_value=match.group("default"),
-				is_required=not _type_ann.is_optional and match.group("default") is None,
+				is_required=(
+					"required" in validator_names
+					or (
+						"optional" not in validator_names
+						and not _type_ann.is_optional
+						and match.group("default") is None
+					)
+				),
+				validation_rules=validation_rules,
+				line=prop_line,
+				column=prop_column,
 				source_file=source_file,
 			))
 
 		return properties, methods
 
+	def _split_source_type_validators(
+		self,
+		type_text: str,
+		source_file: Optional[str],
+		type_offset: int,
+		source_code: str,
+	) -> tuple[str, List[ValidationRule]]:
+		decorator_start = type_text.find("@")
+		if decorator_start < 0:
+			return type_text.strip(), []
+		base_type = type_text[:decorator_start].strip()
+		decorator_text = type_text[decorator_start:]
+		rules: List[ValidationRule] = []
+		for match in re.finditer(r"@(?P<name>[^\W\d]\w*)\s*(?:\((?P<arg>[^)]*)\))?", decorator_text, re.UNICODE):
+			rule_name = match.group("name")
+			arg_text = match.group("arg")
+			parameters: Dict[str, Any] = {}
+			if arg_text is not None:
+				parameter_value = self._parse_source_validator_argument(arg_text)
+				parameters["pattern" if rule_name == "pattern" else "value"] = parameter_value
+			line, column = self._line_column_for_offset(
+				source_code,
+				type_offset + decorator_start + match.start(),
+			)
+			rules.append(ValidationRule(
+				rule_type=rule_name,
+				parameters=parameters,
+				line=line,
+				column=column,
+				source_file=source_file,
+			))
+		return base_type, rules
+
+	@staticmethod
+	def _parse_source_validator_argument(arg_text: str) -> Any:
+		text = arg_text.strip()
+		if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
+			return text[1:-1]
+		try:
+			return int(text)
+		except ValueError:
+			pass
+		try:
+			return float(text)
+		except ValueError:
+			return text
+
 	def _parse_source_relationships(
 		self,
 		body: str,
 		source_file: Optional[str],
+		body_offset: int = 0,
+		source_code: Optional[str] = None,
 	) -> List[RelationshipNode]:
 		relationships: List[RelationshipNode] = []
+		position_source = source_code or body
+		position_base = body_offset if source_code is not None else 0
 		pattern = re.compile(
 			r"(?:^|;)\s*(?P<kind>has_many|belongs_to|has_one)\s+"
 			r"(?P<target>[^\W\d]\w*)"
@@ -1209,10 +1371,16 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			re.UNICODE,
 		)
 		for match in pattern.finditer(body):
+			line, column = self._line_column_for_offset(
+				position_source,
+				position_base + match.start("kind"),
+			)
 			relationships.append(RelationshipNode(
 				kind=match.group("kind"),
 				target=match.group("target"),
 				through=match.group("through"),
+				line=line,
+				column=column,
 				source_file=source_file,
 			))
 		return relationships
@@ -1368,25 +1536,53 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			return reference
 		return None
 
-	def _parse_source_parameters(self, params: str, source_file: Optional[str]) -> List[Parameter]:
+	def _parse_source_parameters(
+		self,
+		params: str,
+		source_file: Optional[str],
+		params_offset: int = 0,
+		source_code: Optional[str] = None,
+	) -> List[Parameter]:
 		parsed: List[Parameter] = []
+		position_source = source_code or params
+		position_base = params_offset if source_code is not None else 0
+		search_from = 0
 		for raw_param in [part.strip() for part in params.split(",") if part.strip()]:
+			raw_offset = params.find(raw_param, search_from)
+			search_from = raw_offset + len(raw_param) if raw_offset >= 0 else search_from
 			name_type, _, default = raw_param.partition("=")
 			name, _, type_text = name_type.partition(":")
 			if name.strip() and type_text.strip():
+				name_offset = position_base + (raw_offset if raw_offset >= 0 else 0) + raw_param.find(name.strip())
+				type_offset = position_base + (raw_offset if raw_offset >= 0 else 0) + raw_param.find(type_text.strip())
+				line, column = self._line_column_for_offset(position_source, name_offset)
 				parsed.append(Parameter(
 					name=name.strip(),
-					type_annotation=self._parse_source_type(type_text.strip(), source_file),
+					type_annotation=self._parse_source_type(
+						type_text.strip(),
+						source_file,
+						type_offset,
+						position_source,
+					),
 					default_value=default.strip() or None,
+					line=line,
+					column=column,
 					source_file=source_file,
 				))
 		return parsed
 
-	def _parse_source_type(self, type_text: str, source_file: Optional[str]) -> TypeAnnotation:
+	def _parse_source_type(
+		self,
+		type_text: str,
+		source_file: Optional[str],
+		type_offset: int = 0,
+		source_code: Optional[str] = None,
+	) -> TypeAnnotation:
 		type_text = type_text.strip()
+		line, column = self._line_column_for_offset(source_code or type_text, type_offset if source_code is not None else 0)
 		generic_match = re.match(r"(?P<name>[^\[]+)\[(?P<args>.*)\]$", type_text)
 		if not generic_match:
-			return TypeAnnotation(type_name=type_text, source_file=source_file)
+			return TypeAnnotation(type_name=type_text, line=line, column=column, source_file=source_file)
 		args = [
 			self._parse_source_type(part.strip(), source_file)
 			for part in generic_match.group("args").split(",")
@@ -1397,8 +1593,17 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			generic_args=args,
 			is_list=generic_match.group("name").strip() == "list",
 			is_dict=generic_match.group("name").strip() == "dict",
+			line=line,
+			column=column,
 			source_file=source_file,
 		)
+
+	def _line_column_for_offset(self, source_code: str, offset: int) -> tuple[int, int]:
+		offset = max(0, min(offset, len(source_code)))
+		line = source_code.count("\n", 0, offset) + 1
+		line_start = source_code.rfind("\n", 0, offset)
+		column = offset if line_start < 0 else offset - line_start - 1
+		return line, column
 	
 	def _get_position(self, ctx) -> tuple[int, int]:
 		"""Extract line and column position from parse tree context"""

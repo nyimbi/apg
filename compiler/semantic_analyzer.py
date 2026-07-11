@@ -98,6 +98,13 @@ COMMON_TYPE_HINTS = {
 }
 
 RESERVED_FIELD_NAMES = {"id", "created_at", "updated_at", "deleted_at", "owner_id"}
+VALID_FIELD_VALIDATORS = {
+	"min_length", "max_length", "min", "max", "email", "pattern", "required", "optional",
+}
+NUMERIC_VALIDATOR_FIELD_TYPES = {
+	"int", "integer", "serial", "bigint", "smallint",
+	"float", "double", "decimal", "number", "numeric", "money",
+}
 
 
 @dataclass
@@ -550,10 +557,38 @@ class SemanticAnalyzer:
 		
 		# Validate entity type constraints
 		self._validate_entity_type_constraints(entity)
+
+		# Validate field decorators
+		self._validate_property_validation_rules(entity)
 		
 		# Validate methods
 		for method in entity.methods:
 			self._validate_method_semantics(method)
+
+	def _validate_property_validation_rules(self, entity: EntityDeclaration) -> None:
+		"""Validate field validation decorators."""
+		for prop in entity.properties:
+			type_name = (prop.type_annotation.type_name or "") if prop.type_annotation else ""
+			base_type = type_name[:-1] if type_name.endswith("?") else type_name
+			for rule in getattr(prop, "validation_rules", []):
+				rule_type = str(getattr(rule, "rule_type", ""))
+				if rule_type not in VALID_FIELD_VALIDATORS:
+					self.warnings.append(SemanticError(
+						f"Unknown validator '@{rule_type}' on field {entity.name}.{prop.name}",
+						rule,
+						"warning",
+					))
+					continue
+				if rule_type == "email" and base_type != "str":
+					self.errors.append(SemanticError(
+						f"Validator '@email' can only be used on str fields; {entity.name}.{prop.name} is {base_type}",
+						rule,
+					))
+				if rule_type in {"min", "max"} and base_type not in NUMERIC_VALIDATOR_FIELD_TYPES:
+					self.errors.append(SemanticError(
+						f"Validator '@{rule_type}' can only be used on int or float fields; {entity.name}.{prop.name} is {base_type}",
+						rule,
+					))
 
 	def _validate_relationship_semantics(self, module: ModuleDeclaration) -> None:
 		"""Validate entity relationship declarations."""
