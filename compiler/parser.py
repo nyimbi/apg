@@ -146,6 +146,25 @@ def _strip_comments_preserve_positions(source: str) -> str:
 	return "".join(parts)
 
 
+def looks_like_computed_field_initializer(initializer: str | None) -> bool:
+	"""Return True when a field initializer should be treated as computed.
+
+	Literal initializers keep the existing default-value behavior. Expressions
+	that reference names or operators are computed at read time by generated
+	apps.
+	"""
+	text = str(initializer or "").strip()
+	if not text:
+		return False
+	if re.fullmatch(r"(?s)'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"", text):
+		return False
+	if re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)", text):
+		return False
+	if text.lower() in {"true", "false", "none", "null"}:
+		return False
+	return True
+
+
 class APGSourceParseTree:
 	"""Source-backed parse tree used by the compatibility parser path."""
 

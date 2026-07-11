@@ -51,6 +51,21 @@ try:
 except ImportError:
 	apgParser = apgVisitor = None
 
+try:
+	from .parser import looks_like_computed_field_initializer
+except Exception:
+	def looks_like_computed_field_initializer(initializer: str | None) -> bool:
+		text = str(initializer or "").strip()
+		if not text:
+			return False
+		if re.fullmatch(r"(?s)'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"", text):
+			return False
+		if re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)", text):
+			return False
+		if text.lower() in {"true", "false", "none", "null"}:
+			return False
+		return True
+
 
 # ========================================
 # AST Node Type Definitions
@@ -273,6 +288,33 @@ class PropertyDeclaration(ASTNode):
 	default_value: Optional['Expression'] = None
 	is_required: bool = False
 	validation_rules: List['ValidationRule'] = field(default_factory=list)
+	is_computed: bool = False
+	computed_expression: Optional[str] = None
+
+
+class ComputedFieldNode(PropertyDeclaration):
+	"""Computed field declaration evaluated from a record at read time."""
+
+	def __init__(
+		self,
+		name: str,
+		type_annotation: 'TypeAnnotation',
+		expression: str,
+		validation_rules: Optional[List['ValidationRule']] = None,
+		**kwargs: Any,
+	) -> None:
+		expression_text = str(expression).strip()
+		super().__init__(
+			name=name,
+			type_annotation=type_annotation,
+			default_value=expression_text,
+			is_required=False,
+			validation_rules=list(validation_rules or []),
+			is_computed=True,
+			computed_expression=expression_text,
+			**kwargs,
+		)
+		self.expression = expression_text
 
 
 @dataclass
@@ -1286,23 +1328,35 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				_type_ann.is_optional = True
 			elif "required" in validator_names:
 				_type_ann.is_optional = False
-			properties.append(PropertyDeclaration(
-				name=match.group("name"),
-				type_annotation=_type_ann,
-				default_value=match.group("default"),
-				is_required=(
-					"required" in validator_names
-					or (
-						"optional" not in validator_names
-						and not _type_ann.is_optional
-						and match.group("default") is None
-					)
-				),
-				validation_rules=validation_rules,
-				line=prop_line,
-				column=prop_column,
-				source_file=source_file,
-			))
+			default_text = match.group("default")
+			if looks_like_computed_field_initializer(default_text):
+				properties.append(ComputedFieldNode(
+					name=match.group("name"),
+					type_annotation=_type_ann,
+					expression=default_text or "",
+					validation_rules=validation_rules,
+					line=prop_line,
+					column=prop_column,
+					source_file=source_file,
+				))
+			else:
+				properties.append(PropertyDeclaration(
+					name=match.group("name"),
+					type_annotation=_type_ann,
+					default_value=default_text,
+					is_required=(
+						"required" in validator_names
+						or (
+							"optional" not in validator_names
+							and not _type_ann.is_optional
+							and default_text is None
+						)
+					),
+					validation_rules=validation_rules,
+					line=prop_line,
+					column=prop_column,
+					source_file=source_file,
+				))
 
 		return properties, methods
 
