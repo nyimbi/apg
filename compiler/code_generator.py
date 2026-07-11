@@ -369,7 +369,49 @@ class PythonCodeGenerator:
 			}
 		return self._generate_expression(expr)
 
-	def _entity_spec(self, entity: Any) -> Dict[str, Any]:
+	def _entity_specs(self, module: ModuleDeclaration) -> List[Dict[str, Any]]:
+		"""Convert APG entities into generated runtime metadata."""
+		entities = [
+			entity
+			for entity in module.entities
+			if not self._is_security_config_entity(entity)
+		]
+		junction_context: Dict[str, list[tuple[str, str]]] = {}
+		for entity in entities:
+			for relationship in getattr(entity, "relationships", []):
+				if (
+					getattr(relationship, "kind", "") == "has_many"
+					and getattr(relationship, "through", None)
+					and getattr(relationship, "target", None)
+				):
+					junction_context.setdefault(str(relationship.through), []).append(
+						(entity.name, str(relationship.target))
+					)
+		return [
+			self._entity_spec(entity, junction_context.get(entity.name, []))
+			for entity in entities
+		]
+
+	@staticmethod
+	def _relationship_field_name(entity_name: str) -> str:
+		"""Return the conventional FK field name for a relationship target."""
+		import re as _re
+		text = _re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", str(entity_name))
+		text = _re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text)
+		return text.replace("-", "_").lower() + "_id"
+
+	@staticmethod
+	def _relationship_segment(entity_name: str) -> str:
+		"""Return a stable lowercase nested resource segment."""
+		base = PythonCodeGenerator._relationship_field_name(entity_name)
+		base = base[:-3] if base.endswith("_id") else base
+		if base.endswith("y") and (len(base) == 1 or base[-2] not in "aeiou"):
+			return base[:-1] + "ies"
+		if base.endswith(("s", "x", "z", "ch", "sh")):
+			return base + "es"
+		return base + "s"
+
+	def _entity_spec(self, entity: Any, junction_pairs: list[tuple[str, str]] | None = None) -> Dict[str, Any]:
 		"""Convert an APG entity AST node into generated runtime metadata."""
 		def field_spec(property: Any) -> Dict[str, Any]:
 			spec = {
@@ -381,13 +423,83 @@ class PythonCodeGenerator:
 				spec["default"] = self._expression_value(property.default_value)
 			return spec
 
+		def add_generated_field(fields: list[Dict[str, Any]], generated: Dict[str, Any]) -> None:
+			field_name = str(generated["name"])
+			for field in fields:
+				if str(field.get("name")) == field_name:
+					field.setdefault("relationship", generated.get("relationship", {}))
+					field.setdefault("generated", generated.get("generated", True))
+					return
+			fields.append(generated)
+
+		fields = [field_spec(property) for property in entity.properties]
+		relationships: list[Dict[str, Any]] = []
+		for relationship in getattr(entity, "relationships", []):
+			kind = str(getattr(relationship, "kind", ""))
+			target = str(getattr(relationship, "target", ""))
+			through = getattr(relationship, "through", None)
+			relationship_spec = {
+				"kind": kind,
+				"target": target,
+				"through": str(through) if through else None,
+				"segment": self._relationship_segment(target),
+			}
+			if kind == "belongs_to" and target:
+				fk_field = self._relationship_field_name(target)
+				relationship_spec["fk_field"] = fk_field
+				add_generated_field(fields, {
+					"name": fk_field,
+					"type": "int",
+					"required": False,
+					"generated": True,
+					"relationship": {
+						"kind": kind,
+						"target": target,
+						"on_delete": "SET NULL",
+					},
+				})
+			elif kind == "has_many" and target:
+				relationship_spec["fk_field"] = self._relationship_field_name(entity.name)
+				if through:
+					relationship_spec["left_field"] = "left_id"
+					relationship_spec["right_field"] = "right_id"
+			elif kind == "has_one" and target:
+				relationship_spec["fk_field"] = self._relationship_field_name(entity.name)
+			relationships.append(relationship_spec)
+
+		for left_name, right_name in junction_pairs or []:
+			add_generated_field(fields, {
+				"name": "left_id",
+				"type": "int",
+				"required": False,
+				"generated": True,
+				"relationship": {
+					"kind": "junction_left",
+					"target": left_name,
+					"on_delete": "CASCADE",
+				},
+			})
+			add_generated_field(fields, {
+				"name": "right_id",
+				"type": "int",
+				"required": False,
+				"generated": True,
+				"relationship": {
+					"kind": "junction_right",
+					"target": right_name,
+					"on_delete": "CASCADE",
+				},
+			})
+
 		spec: Dict[str, Any] = {
 			"name": entity.name,
 			"type": entity.entity_type.value,
 			"properties": [property.name for property in entity.properties],
-			"fields": [field_spec(property) for property in entity.properties],
+			"fields": fields,
 			"methods": [method.name for method in entity.methods],
 		}
+		if relationships:
+			spec["relationships"] = relationships
 		if isinstance(entity, DatabaseDeclaration):
 			spec["connection_config"] = dict(entity.connection_config)
 			spec["schemas"] = [
@@ -642,11 +754,7 @@ class PythonCodeGenerator:
 		auth_required = self._module_requires_auth(module)
 		i18n_config = self._module_i18n_config(module)
 		i18n_catalog = self._chrome_i18n_catalog(i18n_config["supported_languages"])
-		entity_specs = [
-			self._entity_spec(entity)
-			for entity in module.entities
-			if not self._is_security_config_entity(entity)
-		]
+		entity_specs = self._entity_specs(module)
 		semantic_model = build_semantic_model_from_module(module, f"{module.name}.apg")
 		ui_templates = self._load_ui_templates()
 		# Derive landing style from theme name or default to "default"
@@ -4310,6 +4418,37 @@ def _build_openapi_document() -> Dict[str, Any]:
                 response_schema=_record_mutation_response_schema(schema_name),
             ),
         }}
+        for relationship in _relationship_specs(entity_name):
+            if str(relationship.get("kind")) != "has_many":
+                continue
+            target_name = str(relationship.get("target", ""))
+            if not target_name:
+                continue
+            target_schema_name = f"{{target_name}}Record"
+            segment = str(relationship.get("segment") or _relationship_segment(target_name))
+            paths[f"/records/{{entity_name}}/{{{{id}}}}/{{segment}}"] = {{
+                "get": _api_operation(
+                    f"List {{entity_name}} {{segment}}",
+                    "Nested relationship records",
+                    response_schema=_record_list_response_schema(target_schema_name),
+                ),
+            }}
+            if relationship.get("through"):
+                paths[f"/records/{{entity_name}}/{{{{id}}}}/{{segment}}/{{{{related_id}}}}"] = {{
+                    "post": _api_operation(
+                        f"Link {{entity_name}} to {{target_name}}",
+                        "Created relationship link",
+                        status="201",
+                        request_body=True,
+                        request_schema={{"type": "object", "additionalProperties": True}},
+                        response_schema={{"type": "object", "additionalProperties": True}},
+                    ),
+                    "delete": _api_operation(
+                        f"Unlink {{entity_name}} from {{target_name}}",
+                        "Deleted relationship link",
+                        response_schema={{"type": "object", "additionalProperties": True}},
+                    ),
+                }}
         paths[f"/entities/{{entity_name}}/records"] = {{
             "get": _api_operation(
                 f"List {{entity_name}} records",
@@ -4685,6 +4824,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             return "_agent_invocation_payload"
         if route.startswith("/records/") and route.endswith("/bulk"):
             return "_create_record_payload"
+        if route.startswith("/records/") and route.count("/") == 5:
+            return "_create_relationship_payload"
         if route.startswith("/records/") and route.count("/") == 2:
             return "_create_record_payload"
         if route.startswith("/entities/") and (route.endswith("/records") or route.endswith("/records/import")):
@@ -4719,6 +4860,8 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             return "_update_record_payload"
         return None
     if method == "delete":
+        if route.startswith("/records/") and route.count("/") == 5:
+            return "_delete_relationship_payload"
         if route.startswith("/records/") and "/{{id}}" in route:
             return "_delete_record_payload"
         if route.startswith("/entities/") and "/records/{{id}}" in route:
@@ -5621,6 +5764,40 @@ def _field_specs(entity_name: str) -> list[Dict[str, Any]]:
     ]
 
 
+def _relationship_specs(entity_name: str) -> list[Dict[str, Any]]:
+    entity = _entity_spec(entity_name)
+    if entity is None:
+        return []
+    relationships = entity.get("relationships") or []
+    return [dict(relationship) for relationship in relationships if isinstance(relationship, dict)]
+
+
+def _relationship_field_name(entity_name: str) -> str:
+    text = re.sub(r"(.)([A-Z][a-z]+)", r"\\1_\\2", str(entity_name))
+    text = re.sub(r"([a-z0-9])([A-Z])", r"\\1_\\2", text)
+    return text.replace("-", "_").lower() + "_id"
+
+
+def _relationship_segment(entity_name: str) -> str:
+    base = _relationship_field_name(entity_name)
+    base = base[:-3] if base.endswith("_id") else base
+    if base.endswith("y") and (len(base) == 1 or base[-2] not in "aeiou"):
+        return base[:-1] + "ies"
+    if base.endswith(("s", "x", "z", "ch", "sh")):
+        return base + "es"
+    return base + "s"
+
+
+def _relationship_by_segment(entity_name: str, segment: str) -> Dict[str, Any] | None:
+    for relationship in _relationship_specs(entity_name):
+        if str(relationship.get("kind")) not in {{"has_many", "has_one"}}:
+            continue
+        candidate = str(relationship.get("segment") or _relationship_segment(str(relationship.get("target", ""))))
+        if candidate == segment:
+            return relationship
+    return None
+
+
 def _json_schema_type(apg_type: str) -> str:
     normalized = apg_type.lower()
     if normalized in {{"str", "string", "text", "varchar", "char", "email", "uuid", "date", "datetime", "timestamp"}}:
@@ -5763,8 +5940,17 @@ def _sqlite_expected_columns(entity_name: str) -> list[Dict[str, str]]:
         field_name = str(field.get("name", "")).strip()
         if not field_name or field_name in {{"id", "_revision", "created_at", "updated_at", "deleted_at"}}:
             continue
-        storage_type = _sqlite_storage_type(str(field.get("type", "any")))
-        ddl = storage_type + (" NOT NULL" if field.get("required", False) else "")
+        relationship = field.get("relationship") if isinstance(field.get("relationship"), dict) else {{}}
+        relationship_kind = str(relationship.get("kind", ""))
+        target_entity = str(relationship.get("target", ""))
+        storage_type = "INTEGER" if relationship_kind in {{"belongs_to", "junction_left", "junction_right"}} else _sqlite_storage_type(str(field.get("type", "any")))
+        if relationship_kind == "belongs_to" and target_entity:
+            ddl = storage_type + " REFERENCES " + _sqlite_identifier(target_entity) + "(id) ON DELETE SET NULL"
+        elif relationship_kind in {{"junction_left", "junction_right"}} and target_entity:
+            ddl = storage_type + " REFERENCES " + _sqlite_identifier(target_entity) + "(id) ON DELETE CASCADE"
+        else:
+            ddl = storage_type
+        ddl += " NOT NULL" if field.get("required", False) else ""
         columns.append({{"name": field_name, "ddl": ddl, "migration": storage_type}})
     columns.extend([
         {{"name": "created_at", "ddl": "TEXT DEFAULT (datetime('now')) NOT NULL", "migration": "TEXT"}},
@@ -6082,6 +6268,29 @@ def relationship_graph() -> Dict[str, Any]:
                             "target_column": str(reference.get("column", "")),
                         }})
                         seen_edges.add(edge_key)
+        for relationship_spec in _relationship_specs(source):
+            target = str(relationship_spec.get("target", ""))
+            relationship = str(relationship_spec.get("kind", "relationship"))
+            if target not in entity_names or target == source:
+                continue
+            field_name = str(
+                relationship_spec.get("through")
+                or relationship_spec.get("fk_field")
+                or relationship_spec.get("segment")
+                or relationship
+            )
+            edge_key = (source, target, field_name, relationship)
+            if edge_key not in seen_edges:
+                edge = {{
+                    "from": source,
+                    "to": target,
+                    "field": field_name,
+                    "relationship": relationship,
+                }}
+                if relationship_spec.get("through"):
+                    edge["through"] = relationship_spec.get("through")
+                edges.append(edge)
+                seen_edges.add(edge_key)
         for field in _field_specs(source):
             field_name = str(field["name"])
             field_type = str(field.get("type", ""))
@@ -9178,6 +9387,179 @@ def _record_by_id(entity_name: str, record_id: str, *, include_deleted: bool = F
     return None
 
 
+def _relationship_route(path: str) -> Dict[str, Any] | None:
+    parts = [part for part in path.split("/") if part]
+    if len(parts) not in {{4, 5}} or parts[0] != "records":
+        return None
+    source_entity = parts[1]
+    source_id = parts[2]
+    segment = parts[3]
+    if source_entity not in ENTITY_NAMES:
+        return None
+    relationship = _relationship_by_segment(source_entity, segment)
+    if relationship is None:
+        return None
+    return {{
+        "source": source_entity,
+        "source_id": source_id,
+        "segment": segment,
+        "relationship": relationship,
+        "target": str(relationship.get("target", "")),
+        "through": relationship.get("through"),
+        "related_id": parts[4] if len(parts) == 5 else None,
+    }}
+
+
+def _relationship_records(source_entity: str, source_id: Any, relationship: Dict[str, Any]) -> list[Dict[str, Any]]:
+    target_entity = str(relationship.get("target", ""))
+    if target_entity not in ENTITY_NAMES:
+        return []
+    through_entity = relationship.get("through")
+    if through_entity:
+        through_name = str(through_entity)
+        if through_name not in ENTITY_NAMES:
+            return []
+        left_field = str(relationship.get("left_field") or "left_id")
+        right_field = str(relationship.get("right_field") or "right_id")
+        related_ids = {{
+            str(link.get(right_field))
+            for link in list_records(through_name)
+            if str(link.get(left_field)) == str(source_id) and link.get(right_field) not in (None, "")
+        }}
+        return [
+            _field_acl_public_copy(target_entity, record)
+            for record in list_records(target_entity)
+            if str(record.get("id")) in related_ids
+        ]
+    fk_field = str(relationship.get("fk_field") or _relationship_field_name(source_entity))
+    return [
+        _field_acl_public_copy(target_entity, record)
+        for record in list_records(target_entity)
+        if str(record.get(fk_field, "")) == str(source_id)
+    ]
+
+
+def _relationship_records_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, Dict[str, Any]]:
+    route = _relationship_route(path)
+    if route is None:
+        return 404, {{"error": "not_found", "path": path}}
+    source_entity = str(route["source"])
+    source_id = str(route["source_id"])
+    relationship = dict(route["relationship"])
+    target_entity = str(route["target"])
+    if target_entity not in ENTITY_NAMES:
+        return 404, {{"error": "unknown_entity", "entity": target_entity}}
+    if _record_by_id(source_entity, source_id) is None:
+        return 404, {{"error": "record_not_found", "entity": source_entity, "id": source_id}}
+    if route.get("related_id") is not None:
+        return 405, {{"error": "method_not_allowed", "operation": "relationship_item"}}
+    records = _relationship_records(source_entity, source_id, relationship)
+    return 200, {{
+        "entity": target_entity,
+        "parent": {{"entity": source_entity, "id": source_id}},
+        "relationship": relationship,
+        "records": records,
+        "count": len(records),
+    }}
+
+
+def _create_relationship_payload(path: str, payload: Dict[str, Any], *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
+    route = _relationship_route(path)
+    if route is None or route.get("related_id") in (None, ""):
+        return 404, {{"error": "not_found", "path": path}}
+    relationship = dict(route["relationship"])
+    through_entity = relationship.get("through")
+    if not through_entity:
+        return 405, {{"error": "method_not_allowed", "operation": "relationship_link"}}
+    source_entity = str(route["source"])
+    source_id = str(route["source_id"])
+    target_entity = str(route["target"])
+    related_id = str(route["related_id"])
+    through_name = str(through_entity)
+    if through_name not in ENTITY_NAMES:
+        return 404, {{"error": "unknown_entity", "entity": through_name}}
+    if _record_by_id(source_entity, source_id) is None:
+        return 404, {{"error": "record_not_found", "entity": source_entity, "id": source_id}}
+    if _record_by_id(target_entity, related_id) is None:
+        return 404, {{"error": "record_not_found", "entity": target_entity, "id": related_id}}
+    left_field = str(relationship.get("left_field") or "left_id")
+    right_field = str(relationship.get("right_field") or "right_id")
+    for link in list_records(through_name):
+        if str(link.get(left_field)) == source_id and str(link.get(right_field)) == related_id:
+            return 200, {{
+                "entity": target_entity,
+                "relationship": relationship,
+                "link": link,
+                "created": False,
+            }}
+    raw_record = payload.get("record", payload)
+    link_record = dict(raw_record) if isinstance(raw_record, dict) else {{}}
+    link_record[left_field] = source_id
+    link_record[right_field] = related_id
+    status, response = _create_record_payload(
+        f"/records/{{quote(through_name, safe='')}}",
+        {{"record": link_record}},
+        persist=persist,
+    )
+    if status >= 400:
+        return status, response
+    return status, {{
+        "entity": target_entity,
+        "relationship": relationship,
+        "link": response.get("record", link_record),
+        "created": True,
+    }}
+
+
+def _delete_relationship_payload(path: str, *, persist: bool = True) -> tuple[int, Dict[str, Any]] | None:
+    route = _relationship_route(path)
+    if route is None or route.get("related_id") in (None, ""):
+        return None
+    relationship = dict(route["relationship"])
+    through_entity = relationship.get("through")
+    if not through_entity:
+        return 405, {{"error": "method_not_allowed", "operation": "relationship_unlink"}}
+    through_name = str(through_entity)
+    if through_name not in ENTITY_NAMES:
+        return 404, {{"error": "unknown_entity", "entity": through_name}}
+    source_id = str(route["source_id"])
+    related_id = str(route["related_id"])
+    left_field = str(relationship.get("left_field") or "left_id")
+    right_field = str(relationship.get("right_field") or "right_id")
+    removed: list[Dict[str, Any]] = []
+    remaining: list[Dict[str, Any]] = []
+    for link in RECORD_STORE[through_name]:
+        if (
+            str(link.get(left_field)) == source_id
+            and str(link.get(right_field)) == related_id
+            and not _record_deleted(through_name, link)
+        ):
+            removed.append(_record_public_copy(through_name, link))
+            continue
+        remaining.append(link)
+    if not removed:
+        return 404, {{"error": "relationship_not_found", "relationship": relationship}}
+    RECORD_STORE[through_name] = remaining
+    conn = _sqlite_connection()
+    if conn is not None:
+        conn.execute(
+            "DELETE FROM " + _sqlite_identifier(through_name)
+            + " WHERE " + _sqlite_identifier(left_field) + "=? AND "
+            + _sqlite_identifier(right_field) + "=?",
+            (source_id, related_id),
+        )
+    if persist:
+        _sqlite_commit()
+        persistence_error = _persist_record_store()
+        if persistence_error:
+            return 500, {{"error": "persistence_failed", "message": persistence_error}}
+    return 200, {{
+        "relationship": relationship,
+        "deleted": removed,
+        "count": len(removed),
+    }}
+
+
 def _records_payload(path: str) -> tuple[int, Dict[str, Any]]:
     return _records_payload_with_query(path, {{}})
 
@@ -9227,6 +9609,9 @@ def search_records(entity_name: str, query: Dict[str, list[str]] | None = None) 
 
 
 def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, Dict[str, Any]]:
+    relationship_route = _relationship_route(path)
+    if relationship_route is not None:
+        return _relationship_records_payload(path, query)
     route = _record_route(path)
     if route is None:
         return 404, {{"error": "not_found", "path": path}}
@@ -9657,6 +10042,8 @@ def _agent_invocation_payload(path: str, payload: Dict[str, Any]) -> tuple[int, 
 
 
 def _create_record_payload(path: str, payload: Dict[str, Any], *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
+    if _relationship_route(path) is not None:
+        return _create_relationship_payload(path, payload, persist=persist)
     route = _record_route(path)
     if route is not None and route.get("operation") == "import":
         return _import_records_payload(str(route["entity"]), payload)
@@ -9844,6 +10231,9 @@ def _restore_record_payload(path: str, *, persist: bool = True) -> tuple[int, Di
 
 
 def _delete_record_payload(path: str, *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
+    relationship_result = _delete_relationship_payload(path, persist=persist)
+    if relationship_result is not None:
+        return relationship_result
     raw_path = path
     path = path.split("?", 1)[0]
     route = _record_route(path)

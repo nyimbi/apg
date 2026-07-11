@@ -193,12 +193,16 @@ class APGASTVisitor(apgVisitor):  # type: ignore[misc]
 		properties, methods = self._builder._parse_source_members(
 			body_text, self._source_file
 		)
+		relationships = self._builder._parse_source_relationships(
+			body_text, self._source_file
+		)
 		entity_type = self._builder._entity_type_for_source_kind(kind)
 		return EntityDeclaration(
 			entity_type=entity_type,
 			name=name,
 			properties=properties,
 			methods=methods,
+			relationships=relationships,
 			source_file=self._source_file,
 		)
 

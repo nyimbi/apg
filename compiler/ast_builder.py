@@ -137,6 +137,15 @@ class EntityDeclaration(ASTNode):
 	name: str
 	properties: List['PropertyDeclaration'] = field(default_factory=list)
 	methods: List['MethodDeclaration'] = field(default_factory=list)
+	relationships: List['RelationshipNode'] = field(default_factory=list)
+
+
+@dataclass
+class RelationshipNode(ASTNode):
+	"""Relationship declaration within an entity."""
+	kind: str
+	target: str
+	through: Optional[str] = None
 
 
 @dataclass
@@ -650,12 +659,14 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 				))
 				continue
 			properties, methods = self._parse_source_members(body, source_file)
+			relationships = self._parse_source_relationships(body, source_file)
 			entity_type = self._entity_type_for_source_kind(kind)
 			module.entities.append(EntityDeclaration(
 				entity_type=entity_type,
 				name=name,
 				properties=properties,
 				methods=methods,
+				relationships=relationships,
 				source_file=source_file,
 			))
 
@@ -1164,14 +1175,12 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		for start, end in reversed(method_spans):
 			property_body = property_body[:start] + property_body[end:]
 
-		for line in property_body.splitlines():
-			match = re.match(
-				r"\s*(?P<name>[^\W\d]\w*)\s*:\s*(?P<type>[^=;{]+?)\s*(?:=\s*(?P<default>.*?))?\s*;\s*$",
-				line,
-				re.UNICODE,
-			)
-			if not match:
-				continue
+		property_pattern = re.compile(
+			r"(?:^|;)\s*(?P<name>[^\W\d]\w*)\s*:\s*"
+			r"(?P<type>[^=;{\n]+?)\s*(?:=\s*(?P<default>.*?))?\s*;",
+			re.UNICODE | re.DOTALL,
+		)
+		for match in property_pattern.finditer(property_body):
 			type_text = match.group("type").strip()
 			if type_text.startswith("(") or type_text.startswith("async"):
 				continue
@@ -1185,6 +1194,28 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 			))
 
 		return properties, methods
+
+	def _parse_source_relationships(
+		self,
+		body: str,
+		source_file: Optional[str],
+	) -> List[RelationshipNode]:
+		relationships: List[RelationshipNode] = []
+		pattern = re.compile(
+			r"(?:^|;)\s*(?P<kind>has_many|belongs_to|has_one)\s+"
+			r"(?P<target>[^\W\d]\w*)"
+			r"(?:\s+through\s+(?P<through>[^\W\d]\w*))?"
+			r"\s*;",
+			re.UNICODE,
+		)
+		for match in pattern.finditer(body):
+			relationships.append(RelationshipNode(
+				kind=match.group("kind"),
+				target=match.group("target"),
+				through=match.group("through"),
+				source_file=source_file,
+			))
+		return relationships
 
 	def _source_method_span(self, body: str, match: re.Match) -> tuple[int, int]:
 		brace_start = body.find("{", match.end())

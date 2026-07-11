@@ -21,7 +21,7 @@ from .ast_builder import (
 	LiteralExpression, IdentifierExpression, BinaryExpression, CallExpression,
 	AssignmentStatement, ReturnStatement, BlockStatement, EntityType,
 	AIAgentDeclaration, AgentTeamDeclaration, ApplicationDeclaration, CapabilityDeclaration,
-	DatabaseDeclaration, ListExpression, DictExpression
+	DatabaseDeclaration, ListExpression, DictExpression, RelationshipNode
 )
 
 
@@ -529,6 +529,7 @@ class SemanticAnalyzer:
 		"""Validate semantic rules"""
 		for entity in module.entities:
 			self._validate_entity_semantics(entity)
+		self._validate_relationship_semantics(module)
 		self._validate_agent_composition(module)
 	
 	def _validate_entity_semantics(self, entity: EntityDeclaration):
@@ -539,6 +540,7 @@ class SemanticAnalyzer:
 			entity.entity_type in {EntityType.ENTITY, EntityType.FORM, EntityType.UI_COMPONENT}
 			and entity.name.lower() != "security"
 			and not entity.properties
+			and not getattr(entity, "relationships", [])
 		):
 			self.warnings.append(SemanticError(
 				f"Entity {entity.name} has no fields",
@@ -552,6 +554,36 @@ class SemanticAnalyzer:
 		# Validate methods
 		for method in entity.methods:
 			self._validate_method_semantics(method)
+
+	def _validate_relationship_semantics(self, module: ModuleDeclaration) -> None:
+		"""Validate entity relationship declarations."""
+		entity_names = {entity.name for entity in module.entities}
+		valid_kinds = {"has_many", "belongs_to", "has_one"}
+		for entity in module.entities:
+			for relationship in getattr(entity, "relationships", []):
+				if not isinstance(relationship, RelationshipNode):
+					continue
+				if relationship.kind not in valid_kinds:
+					self.errors.append(SemanticError(
+						f"Unknown relationship kind '{relationship.kind}' in entity {entity.name}",
+						relationship,
+					))
+				if relationship.target not in entity_names:
+					self.errors.append(SemanticError(
+						f"Relationship target entity '{relationship.target}' does not exist",
+						relationship,
+					))
+				if relationship.through:
+					if relationship.kind != "has_many":
+						self.errors.append(SemanticError(
+							f"Only has_many relationships can use through in entity {entity.name}",
+							relationship,
+						))
+					if relationship.through not in entity_names:
+						self.errors.append(SemanticError(
+							f"Relationship junction entity '{relationship.through}' does not exist",
+							relationship,
+						))
 	
 	def _validate_entity_type_constraints(self, entity: EntityDeclaration):
 		"""Validate constraints specific to entity types"""
