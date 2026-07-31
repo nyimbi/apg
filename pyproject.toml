@@ -29,8 +29,15 @@ apg = "cli.main:cli"
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-asyncio",
     "pytest-httpserver",
+    "PyYAML",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q --tb=short"
 
 [tool.setuptools]
 include-package-data = true

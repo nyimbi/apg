@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -77,6 +78,59 @@ def context(engine: CompositionEngine):
 		project_description="Fixture-backed generated application",
 		author="APG Test Suite",
 	)
+
+
+@pytest.fixture
+def apg_source_minimal() -> str:
+	return """
+module fixture_app version 1.0.0 {}
+
+table Customer {
+	name: str;
+}
+"""
+
+
+@pytest.fixture
+def compiled_app_namespace(apg_source_minimal: str) -> Callable[..., dict[str, object]]:
+	def _compile(
+		source: str | None = None,
+		*,
+		filename: str = "fixture_app.apg",
+		app_filename: str = "generated_fixture_app.py",
+	) -> dict[str, object]:
+		from compiler.compiler import APGCompiler
+
+		result = APGCompiler().compile_string(source or apg_source_minimal, filename)
+		assert result.success, result.errors
+		namespace: dict[str, object] = {"__file__": app_filename}
+		exec(compile(result.generated_files["app.py"], app_filename, "exec"), namespace)
+		return namespace
+
+	return _compile
+
+
+@pytest.fixture
+def minimal_apg_source(apg_source_minimal: str) -> str:
+	"""Alias for apg_source_minimal — Wave V canonical name."""
+	return apg_source_minimal
+
+
+@pytest.fixture
+def compiled_namespace(compiled_app_namespace: Callable[..., dict[str, object]]) -> Callable[..., dict[str, object]]:
+	"""Alias for compiled_app_namespace — Wave V canonical name."""
+	return compiled_app_namespace
+
+
+@pytest.fixture
+def compiled_flask_client(compiled_app_namespace: Callable[..., dict[str, object]]):
+	def _client(source: str | None = None, **compile_kwargs):
+		namespace = compiled_app_namespace(source, **compile_kwargs)
+		app = namespace["_flask_app"]
+		app.config["TESTING"] = True
+		return app.test_client()
+
+	return _client
 
 
 def _pop_flask_contexts() -> None:
