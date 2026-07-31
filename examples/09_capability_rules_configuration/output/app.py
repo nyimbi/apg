@@ -6043,8 +6043,8 @@ def _sqlite_expected_columns(entity_name: str) -> list[Dict[str, str]]:
 
 
 def _sqlite_fts_identifier(identifier: str) -> str:
-    text = str(identifier)
-    return text if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", text) else _sqlite_identifier(text)
+    # Always quote to protect SQL reserved words (Order, Group, Table, etc.)
+    return _sqlite_identifier(str(identifier))
 
 
 _APG_FTS_PG_WARNED: bool = False
