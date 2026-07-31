@@ -1,0 +1,63 @@
+site_name: APG — App Platform Generator
+site_description: DSL compiler that generates production-ready Flask apps
+site_url: https://datacraft.co.ke/apg
+repo_url: https://github.com/nyimbi/apg
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+    - navigation.top
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - Your First App: getting-started/first-app.md
+  - Language Reference:
+      - Entities & Fields: reference/entities.md
+      - Relationships: reference/relationships.md
+      - Enums & Validation: reference/enums-validation.md
+      - Security: reference/security.md
+      - Computed Fields: reference/computed-fields.md
+  - Generated App:
+      - REST API: generated/rest-api.md
+      - Authentication: generated/authentication.md
+      - File Uploads: generated/file-uploads.md
+      - Webhooks: generated/webhooks.md
+      - Configuration Reference: generated/configuration.md
+  - Cookbook:
+      - CRUD App in 5 minutes: cookbook/crud-5min.md
+      - Multi-tenant SaaS: cookbook/multi-tenant.md
+      - With Relationships: cookbook/relationships.md
+      - Adding Webhooks: cookbook/webhooks.md
+  - CLI Reference: cli-reference.md
+  - Changelog: changelog.md
