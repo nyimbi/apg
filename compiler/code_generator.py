@@ -6637,6 +6637,44 @@ def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = Fa
 
 
 _APG_SQLITE_CONN: _sqlite3.Connection | None = None
+_APG_DB_DIALECT: str = "sqlite"
+_APG_DB_POOL_SIZE: int = int(os.environ.get("APG_DB_POOL_SIZE", "5") or "5")
+_APG_DB_POOL_SEMAPHORE = _threading.BoundedSemaphore(max(1, _APG_DB_POOL_SIZE))
+_APG_DB_POOL_LOCAL = _threading.local()
+
+
+def _apg_db_connect() -> "tuple[Any, str]":
+    """Open a connection based on APG_DATABASE_URL and return (connection, dialect).
+
+    Supports 'postgresql://', 'postgres://' and 'sqlite:///...' URLs. Defaults to
+    a local SQLite file at ./apg_data.db when no URL is provided.
+    """
+    global _APG_DB_DIALECT
+    url = os.environ.get("APG_DATABASE_URL", "") or os.environ.get("DATABASE_URL", "") or ""
+    if url.startswith(("postgresql://", "postgres://")):
+        try:
+            import psycopg2  # type: ignore
+        except ImportError:
+            raise RuntimeError("psycopg2 not installed: pip install psycopg2-binary")
+        _APG_DB_DIALECT = "pg"
+        _APG_DB_POOL_SEMAPHORE.acquire()
+        try:
+            conn = psycopg2.connect(url)
+        except Exception:
+            _APG_DB_POOL_SEMAPHORE.release()
+            raise
+        return conn, "pg"
+    if url.startswith("sqlite:///"):
+        path = url.replace("sqlite:///", "", 1) or "./apg_data.db"
+    else:
+        path = "./apg_data.db"
+    import sqlite3 as _sqlite3_mod
+    _APG_DB_DIALECT = "sqlite"
+    return _sqlite3_mod.connect(path), "sqlite"
+
+
+def _apg_db_dialect() -> str:
+    return _APG_DB_DIALECT
 
 
 def _sqlite_path_from_env() -> str:
@@ -6721,6 +6759,9 @@ def _sqlite_fts_identifier(identifier: str) -> str:
 
 
 def _sqlite_init_entity_fts(conn: _sqlite3.Connection, entity_name: str) -> None:
+    # FTS5 is SQLite-only; skip on PostgreSQL.
+    if _apg_db_dialect() == "pg":
+        return
     str_fields = _record_string_field_names(entity_name)
     if not str_fields:
         return
@@ -10372,6 +10413,9 @@ def _records_search_limit(query: Dict[str, list[str]] | None) -> int:
 
 
 def search_records(entity_name: str, query: Dict[str, list[str]] | None = None) -> list[Dict[str, Any]]:
+    # FTS5 search is SQLite-only. On PostgreSQL, return empty until pg_trgm/tsvector is wired.
+    if _apg_db_dialect() == "pg":
+        return []
     q = str(_record_query_value(query or {{}}, "q", "") or "").strip()
     if not q or not _record_string_field_names(entity_name):
         return []
@@ -12053,6 +12097,11 @@ def _apg_ops_after_request(response: _FlaskResponse) -> _FlaskResponse:
     global _APG_READY
     request_id = str(getattr(_flask_g, "request_id", "") or "").strip() or str(_uuid.uuid4())
     response.headers["X-Request-ID"] = request_id
+    try:
+        if "/search" in _flask_request.path and _apg_db_dialect() == "pg":
+            response.headers["X-APG-FTS-Available"] = "false"
+    except Exception:
+        pass
     started_at = getattr(_flask_g, "apg_request_started_at", None)
     try:
         elapsed_s = max(0.0, _time.perf_counter() - float(started_at)) if started_at is not None else 0.0
