@@ -56,7 +56,7 @@ curl -X POST http://localhost:8080/entities/Contact/records \
   -d '{"record": {"name": "Alice", "email": "alice@example.com"}}'
 ```
 
-Response: `201 Created` with the full record including auto-generated `id`, `created_at`, `updated_at`.
+Response: `201 Created` with the full record including auto-generated `id`. `created_at` and `updated_at` are included only when `APG_EXPOSE_TIMESTAMPS=1` is set. `deleted_at` is never returned.
 
 ## Fetch one
 

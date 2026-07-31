@@ -88,6 +88,8 @@ class APGType(Enum):
 
 VALID_APG_FIELD_TYPES = (
 	"str", "int", "float", "bool", "date", "datetime", "text", "uuid", "json", "file",
+	"decimal", "time", "bytes", "any", "Any",
+	"list", "List", "dict", "Dict", "set", "Set",
 )
 
 COMMON_TYPE_HINTS = {

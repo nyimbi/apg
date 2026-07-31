@@ -45,6 +45,14 @@ def _write_generated_files(target: Path, generated_files: dict[str, str]) -> Non
 		path.write_text(content, encoding="utf-8")
 
 
+_LIFECYCLE_FIELDS = frozenset({"created_at", "updated_at", "deleted_at"})
+
+
+def _strip_lifecycle(record: dict) -> dict:
+	"""Remove internal lifecycle fields for comparing stored format to API response shape."""
+	return {k: v for k, v in record.items() if k not in _LIFECYCLE_FIELDS}
+
+
 MINIMAL_AGENT_SOURCE = """
 module baseline version 1.0.0 {
 	description: "Compiler baseline";
@@ -1304,10 +1312,12 @@ def test_generated_python_app_persists_records_with_data_file(tmp_path):
 
 	assert created["record"]["id"] == 1
 	assert created["event"]["id"] == 1
-	assert storage["records"]["Customer"] == [created["record"]]
+	# Stored format includes lifecycle fields (created_at, updated_at, deleted_at);
+	# API response omits them by default. Strip before comparing.
+	assert [_strip_lifecycle(r) for r in storage["records"]["Customer"]] == [created["record"]]
 	assert storage["events"] == [created["event"]]
 	persisted = json.loads(data_file.read_text(encoding="utf-8"))
-	assert persisted["records"]["Customer"] == [created["record"]]
+	assert [_strip_lifecycle(r) for r in persisted["records"]["Customer"]] == [created["record"]]
 	assert persisted["events"] == [created["event"]]
 
 	second_process, second_base_url = start_app()
@@ -1329,7 +1339,7 @@ def test_generated_python_app_persists_records_with_data_file(tmp_path):
 	assert second_created["record"]["id"] == 2
 	assert second_created["event"]["id"] == 2
 	persisted = json.loads(data_file.read_text(encoding="utf-8"))
-	assert persisted["records"]["Customer"] == [created["record"], second_created["record"]]
+	assert [_strip_lifecycle(r) for r in persisted["records"]["Customer"]] == [created["record"], second_created["record"]]
 	assert [event["id"] for event in persisted["events"]] == [1, 2]
 
 

@@ -234,11 +234,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 64
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 64
+          "line": 0
         }
       },
       "related_locations": [],
@@ -254,11 +254,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 64
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 64
+          "line": 0
         }
       },
       "related_locations": [],
@@ -425,11 +425,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 98
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 98
+          "line": 0
         }
       },
       "references": []
@@ -442,11 +442,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 65
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 65
+          "line": 0
         }
       },
       "references": []
@@ -459,11 +459,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 23
+          "line": 3
         },
         "start": {
           "character": 4,
-          "line": 23
+          "line": 3
         }
       },
       "references": []
@@ -475,12 +475,12 @@
       "name": "BinLocation.bin_id",
       "range": {
         "end": {
-          "character": 5,
-          "line": 21
+          "character": 1,
+          "line": 1
         },
         "start": {
-          "character": 4,
-          "line": 21
+          "character": 0,
+          "line": 1
         }
       },
       "references": []
@@ -493,11 +493,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 27
+          "line": 7
         },
         "start": {
           "character": 4,
-          "line": 27
+          "line": 7
         }
       },
       "references": []
@@ -510,11 +510,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 28
+          "line": 8
         },
         "start": {
           "character": 4,
-          "line": 28
+          "line": 8
         }
       },
       "references": []
@@ -527,11 +527,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 26
+          "line": 6
         },
         "start": {
           "character": 4,
-          "line": 26
+          "line": 6
         }
       },
       "references": []
@@ -544,11 +544,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 25
+          "line": 5
         },
         "start": {
           "character": 4,
-          "line": 25
+          "line": 5
         }
       },
       "references": []
@@ -561,11 +561,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 24
+          "line": 4
         },
         "start": {
           "character": 4,
-          "line": 24
+          "line": 4
         }
       },
       "references": []
@@ -578,11 +578,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 22
+          "line": 2
         },
         "start": {
           "character": 4,
-          "line": 22
+          "line": 2
         }
       },
       "references": []
@@ -595,11 +595,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 17
+          "line": 9
         },
         "start": {
           "character": 4,
-          "line": 17
+          "line": 9
         }
       },
       "references": []
@@ -612,11 +612,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 15
+          "line": 7
         },
         "start": {
           "character": 4,
-          "line": 15
+          "line": 7
         }
       },
       "references": []
@@ -629,11 +629,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 10
+          "line": 2
         },
         "start": {
           "character": 4,
-          "line": 10
+          "line": 2
         }
       },
       "references": []
@@ -646,11 +646,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 12
+          "line": 4
         },
         "start": {
           "character": 4,
-          "line": 12
+          "line": 4
         }
       },
       "references": []
@@ -663,11 +663,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 13
+          "line": 5
         },
         "start": {
           "character": 4,
-          "line": 13
+          "line": 5
         }
       },
       "references": []
@@ -680,11 +680,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 14
+          "line": 6
         },
         "start": {
           "character": 4,
-          "line": 14
+          "line": 6
         }
       },
       "references": []
@@ -696,12 +696,12 @@
       "name": "InventoryItem.sku",
       "range": {
         "end": {
-          "character": 5,
-          "line": 9
+          "character": 1,
+          "line": 1
         },
         "start": {
-          "character": 4,
-          "line": 9
+          "character": 0,
+          "line": 1
         }
       },
       "references": []
@@ -714,11 +714,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 16
+          "line": 8
         },
         "start": {
           "character": 4,
-          "line": 16
+          "line": 8
         }
       },
       "references": []
@@ -731,11 +731,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 11
+          "line": 3
         },
         "start": {
           "character": 4,
-          "line": 11
+          "line": 3
         }
       },
       "references": []
@@ -748,11 +748,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 34
+          "line": 3
         },
         "start": {
           "character": 4,
-          "line": 34
+          "line": 3
         }
       },
       "references": []
@@ -765,11 +765,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 33
+          "line": 2
         },
         "start": {
           "character": 4,
-          "line": 33
+          "line": 2
         }
       },
       "references": []
@@ -781,12 +781,12 @@
       "name": "StockMovement.movement_id",
       "range": {
         "end": {
-          "character": 5,
-          "line": 32
+          "character": 1,
+          "line": 1
         },
         "start": {
-          "character": 4,
-          "line": 32
+          "character": 0,
+          "line": 1
         }
       },
       "references": []
@@ -799,11 +799,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 36
+          "line": 5
         },
         "start": {
           "character": 4,
-          "line": 36
+          "line": 5
         }
       },
       "references": []
@@ -816,11 +816,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 40
+          "line": 9
         },
         "start": {
           "character": 4,
-          "line": 40
+          "line": 9
         }
       },
       "references": []
@@ -833,11 +833,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 39
+          "line": 8
         },
         "start": {
           "character": 4,
-          "line": 39
+          "line": 8
         }
       },
       "references": []
@@ -850,11 +850,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 37
+          "line": 6
         },
         "start": {
           "character": 4,
-          "line": 37
+          "line": 6
         }
       },
       "references": []
@@ -867,11 +867,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 38
+          "line": 7
         },
         "start": {
           "character": 4,
-          "line": 38
+          "line": 7
         }
       },
       "references": []
@@ -884,11 +884,11 @@
       "range": {
         "end": {
           "character": 5,
-          "line": 35
+          "line": 4
         },
         "start": {
           "character": 4,
-          "line": 35
+          "line": 4
         }
       },
       "references": []
@@ -901,11 +901,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 44
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 44
+          "line": 0
         }
       },
       "references": []
@@ -918,11 +918,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 4
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 4
+          "line": 0
         }
       },
       "references": []
@@ -935,11 +935,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 52
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 52
+          "line": 0
         }
       },
       "references": []
@@ -952,11 +952,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 20
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 20
+          "line": 0
         }
       },
       "references": []
@@ -969,11 +969,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 8
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 8
+          "line": 0
         }
       },
       "references": []
@@ -986,11 +986,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 31
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 31
+          "line": 0
         }
       },
       "references": []
@@ -1003,11 +1003,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 88
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 88
+          "line": 0
         }
       },
       "references": []

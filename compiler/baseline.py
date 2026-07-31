@@ -618,6 +618,24 @@ def _terminate_process(process: subprocess.Popen[str]) -> tuple[str, str]:
 		return process.communicate(timeout=2.0)
 
 
+def _has_bare_pass_body(source: str) -> bool:
+	"""Return True if any function/class body is a single bare `pass` (placeholder).
+
+	Idiomatic `except: pass` / `finally: pass` are legitimate and ignored.
+	"""
+	import ast as _ast
+	try:
+		tree = _ast.parse(source)
+	except SyntaxError:
+		return False
+	for node in _ast.walk(tree):
+		if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef, _ast.ClassDef)):
+			body = getattr(node, "body", [])
+			if len(body) == 1 and isinstance(body[0], _ast.Pass):
+				return True
+	return False
+
+
 def _generated_source_hygiene(generated_files: dict[str, str]) -> dict[str, Any]:
 	violations: list[str] = []
 	for file_name, content in sorted(generated_files.items()):
@@ -634,7 +652,7 @@ def _generated_source_hygiene(generated_files: dict[str, str]) -> dict[str, Any]
 				violations.append(f"{file_name}: generated source contains {forbidden!r}")
 		if "django" in content.lower():
 			violations.append(f"{file_name}: generated source contains framework target 'django'")
-		if re.search(r"^\s*pass\s*$", content, re.MULTILINE):
+		if _has_bare_pass_body(content):
 			violations.append(f"{file_name}: generated source contains a bare pass body")
 	return {
 		"ok": not violations,

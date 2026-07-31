@@ -870,6 +870,7 @@ _APG_JOB_HANDLERS: Dict[str, Any] = {{}}
 _APG_JOB_WORKERS: list[threading.Thread] = []
 _APG_JOB_WORKERS_STARTED = False
 APG_MULTI_TENANT_ENABLED = str(os.environ.get("APG_MULTI_TENANT", "")).strip().lower() in {{"1", "true", "yes", "on"}}
+APG_EXPOSE_TIMESTAMPS = str(os.environ.get("APG_EXPOSE_TIMESTAMPS", "0")).strip().lower() in {{"1", "true", "yes", "on"}}
 APG_TENANT_DEFAULT = "default"
 APG_TENANT_HEADER_DEFAULT = "X-APG-Tenant"
 TENANT_SCOPED_ENTITIES: set[str] = {{
@@ -2504,9 +2505,13 @@ def _record_public_copy(entity_name: str, record: Dict[str, Any]) -> Dict[str, A
         path_value = public.get(field_name + "_path")
         if path_value not in (None, ""):
             public[field_name + "_url"] = _file_url_for_path(entity_name, path_value)
-    public.setdefault("created_at", metadata.get("created_at") or _record_timestamp())
-    public.setdefault("updated_at", metadata.get("updated_at") or public["created_at"])
-    public.setdefault("deleted_at", metadata.get("deleted_at"))
+    if APG_EXPOSE_TIMESTAMPS:
+        public.setdefault("created_at", metadata.get("created_at") or _record_timestamp())
+        public.setdefault("updated_at", metadata.get("updated_at") or public.get("created_at") or _record_timestamp())
+    else:
+        public.pop("created_at", None)
+        public.pop("updated_at", None)
+    public.pop("deleted_at", None)
     return _apply_computed_fields(entity_name, public)
 
 
@@ -3823,9 +3828,19 @@ def _record_event(
         "record_id": record.get("id"),
     }}
     if before is not None:
-        event["before"] = dict(before)
+        b = dict(before)
+        if not APG_EXPOSE_TIMESTAMPS:
+            b.pop("created_at", None)
+            b.pop("updated_at", None)
+        b.pop("deleted_at", None)
+        event["before"] = b
     if after is not None:
-        event["after"] = dict(after)
+        a = dict(after)
+        if not APG_EXPOSE_TIMESTAMPS:
+            a.pop("created_at", None)
+            a.pop("updated_at", None)
+        a.pop("deleted_at", None)
+        event["after"] = a
     if changed_fields is not None:
         event["changed_fields"] = list(changed_fields)
     NEXT_EVENT_ID += 1
@@ -3882,11 +3897,12 @@ def _record_schema(entity: Dict[str, Any], partial: bool = False) -> Dict[str, A
     schema_properties: Dict[str, Any] = {{
         "id": {{"oneOf": [{{"type": "integer"}}, {{"type": "string"}}]}},
         "_revision": {{"type": "integer"}},
-        "created_at": {{"type": "string"}},
-        "updated_at": {{"type": "string"}},
-        "deleted_at": {{"oneOf": [{{"type": "string"}}, {{"type": "null"}}]}},
-        "owner_id": {{"oneOf": [{{"type": "string"}}, {{"type": "null"}}]}},
     }}
+    if APG_EXPOSE_TIMESTAMPS:
+        schema_properties["created_at"] = {{"type": "string"}}
+        schema_properties["updated_at"] = {{"type": "string"}}
+    if _row_ownership_enabled():
+        schema_properties["owner_id"] = {{"oneOf": [{{"type": "string"}}, {{"type": "null"}}]}}
     if _tenant_scope_enabled(str(entity["name"])):
         schema_properties["tenant_id"] = {{"type": "string"}}
     required_fields: list[str] = []
@@ -13004,6 +13020,9 @@ APG_PORT=8080
 
 # Set to 1 to enable HTTP request logging.
 APG_DEBUG=0
+
+# Set to 1 to include created_at and updated_at in GET responses (off by default).
+# APG_EXPOSE_TIMESTAMPS=0
 """
 
 	def _generate_python_smoke_test(self) -> str:

@@ -8,6 +8,7 @@ Generated from APG source as dependency-free Python artifacts.
 from __future__ import annotations
 
 import base64
+import collections
 import gzip
 import importlib
 import hashlib
@@ -16,27 +17,38 @@ import hmac
 import json
 import datetime as _datetime
 import logging as _logging
+import mimetypes as _mimetypes
 import os
 import queue as _queue
 import re
 import secrets
+import smtplib as _smtplib
+import sqlite3 as _sqlite3
 import sys
+import threading
 import threading as _threading
 import time as _time
+import urllib.request as _urllib_request, hmac as _hmac_mod, hashlib as _hashlib_mod, threading as _threading_mod, time as _time_mod
 import uuid as _uuid
+from email.message import EmailMessage as _EmailMessage
 from flask import Flask as _FlaskApp, request as _flask_request, redirect as _flask_redirect, Response as _FlaskResponse, session as _flask_session, g as _flask_g
 from pathlib import Path
 from typing import Any, Dict, Optional
-from urllib.parse import parse_qs, quote
+from urllib.parse import parse_qs, quote, unquote, urlencode
 
 
 MODULE_NAME = 'hr_payroll'
 MODULE_VERSION = '1.0.0'
 MODULE_DESCRIPTION = None
+APG_APP_NAME = MODULE_NAME
+APG_APP_VERSION = MODULE_VERSION
+APG_APP_DESCRIPTION = MODULE_DESCRIPTION or ""
 LANDING_STYLE = 'default'
 ENTITIES = [{'name': 'Employee', 'type': 'entity', 'properties': ['employee_number', 'first_name', 'last_name', 'email', 'department', 'position', 'employment_type', 'hire_date', 'termination_date', 'salary', 'currency', 'bank_account', 'tax_pin', 'nssf_number', 'nhif_number', 'is_active'], 'fields': [{'name': 'employee_number', 'type': 'str', 'required': True}, {'name': 'first_name', 'type': 'str', 'required': True}, {'name': 'last_name', 'type': 'str', 'required': True}, {'name': 'email', 'type': 'str', 'required': True}, {'name': 'department', 'type': 'str', 'required': True}, {'name': 'position', 'type': 'str', 'required': True}, {'name': 'employment_type', 'type': 'str', 'required': False, 'default': '"permanent"'}, {'name': 'hire_date', 'type': 'str', 'required': True}, {'name': 'termination_date', 'type': 'str?', 'required': True}, {'name': 'salary', 'type': 'float', 'required': True}, {'name': 'currency', 'type': 'str', 'required': False, 'default': '"KES"'}, {'name': 'bank_account', 'type': 'str?', 'required': True}, {'name': 'tax_pin', 'type': 'str?', 'required': True}, {'name': 'nssf_number', 'type': 'str?', 'required': True}, {'name': 'nhif_number', 'type': 'str?', 'required': True}, {'name': 'is_active', 'type': 'bool', 'required': False, 'default': 'true'}], 'methods': []}, {'name': 'PayRun', 'type': 'entity', 'properties': ['pay_run_id', 'period', 'pay_date', 'status', 'total_gross', 'total_deductions', 'total_net', 'approved_by', 'approved_at'], 'fields': [{'name': 'pay_run_id', 'type': 'str', 'required': True}, {'name': 'period', 'type': 'str', 'required': True}, {'name': 'pay_date', 'type': 'str', 'required': True}, {'name': 'status', 'type': 'str', 'required': False, 'default': '"draft"'}, {'name': 'total_gross', 'type': 'float', 'required': False, 'default': '0.0'}, {'name': 'total_deductions', 'type': 'float', 'required': False, 'default': '0.0'}, {'name': 'total_net', 'type': 'float', 'required': False, 'default': '0.0'}, {'name': 'approved_by', 'type': 'str?', 'required': True}, {'name': 'approved_at', 'type': 'str?', 'required': True}], 'methods': []}, {'name': 'Payslip', 'type': 'entity', 'properties': ['payslip_id', 'pay_run_id', 'employee_id', 'gross_pay', 'paye_tax', 'nssf_employee', 'nhif_employee', 'other_deductions', 'net_pay', 'payment_status'], 'fields': [{'name': 'payslip_id', 'type': 'str', 'required': True}, {'name': 'pay_run_id', 'type': 'str', 'required': True}, {'name': 'employee_id', 'type': 'str', 'required': True}, {'name': 'gross_pay', 'type': 'float', 'required': True}, {'name': 'paye_tax', 'type': 'float', 'required': True}, {'name': 'nssf_employee', 'type': 'float', 'required': True}, {'name': 'nhif_employee', 'type': 'float', 'required': True}, {'name': 'other_deductions', 'type': 'float', 'required': False, 'default': '0.0'}, {'name': 'net_pay', 'type': 'float', 'required': True}, {'name': 'payment_status', 'type': 'str', 'required': False, 'default': '"pending"'}], 'methods': []}, {'name': 'HRAdvisor', 'type': 'agent', 'properties': [], 'fields': [], 'methods': []}, {'name': 'PayrollAssistant', 'type': 'agent', 'properties': [], 'fields': [], 'methods': []}, {'name': 'HRPayrollTeam', 'type': 'agent_team', 'properties': ['agents', 'flow', 'capabilities'], 'fields': [{'name': 'agents', 'type': '[HRAdvisor, PayrollAssistant]', 'required': True}, {'name': 'flow', 'type': 'HRAdvisor -> PayrollAssistant', 'required': True}, {'name': 'capabilities', 'type': '[employee_records, payroll_runs]', 'required': True}], 'methods': []}, {'name': 'HRPayroll', 'type': 'capability', 'properties': [], 'fields': [], 'methods': []}, {'name': 'PayRunProcess', 'type': 'workflow', 'properties': [], 'fields': [], 'methods': []}, {'name': 'EmployeeOnboarding', 'type': 'workflow', 'properties': [], 'fields': [], 'methods': []}, {'name': 'LeaveRequest', 'type': 'workflow', 'properties': [], 'fields': [], 'methods': []}, {'name': 'HRPayrollApp', 'type': 'app', 'properties': [], 'fields': [], 'methods': []}]
-ENTITY_NAMES = {entity["name"] for entity in ENTITIES}
+_APG_ENTITIES = ENTITIES
+ENTITY_NAMES = {entity["name"] for entity in _APG_ENTITIES}
 RECORD_STORE: Dict[str, list[Dict[str, Any]]] = {entity["name"]: [] for entity in ENTITIES}
+RECORD_METADATA: Dict[str, Dict[str, Dict[str, Any]]] = {entity["name"]: {} for entity in ENTITIES}
 NEXT_RECORD_IDS: Dict[str, int] = {entity["name"]: 1 for entity in ENTITIES}
 EVENT_LOG: list[Dict[str, Any]] = []
 NEXT_EVENT_ID = 1
@@ -48,19 +60,32 @@ APG_CONNECTOR_REGISTRY: list[Dict[str, Any]] = []
 APG_ACTIVITY_LOG: Dict[str, list[Dict[str, Any]]] = {}
 WORKFLOW_EVENT_JOURNAL: Dict[str, list[Dict[str, Any]]] = {}
 WORKFLOW_SIGNALS: Dict[str, list[str]] = {}
+APG_RECORD_LOCK = _threading.RLock()
 APG_LIVE_LOCK = _threading.Lock()
 APG_LIVE_SUBSCRIBERS: list[Dict[str, Any]] = []
+_APG_JOB_QUEUE = collections.deque()
+_APG_JOB_LOCK = threading.Lock()
+_APG_JOB_HANDLERS: Dict[str, Any] = {}
+_APG_JOB_WORKERS: list[threading.Thread] = []
+_APG_JOB_WORKERS_STARTED = False
+APG_MULTI_TENANT_ENABLED = str(os.environ.get("APG_MULTI_TENANT", "")).strip().lower() in {"1", "true", "yes", "on"}
+APG_EXPOSE_TIMESTAMPS = str(os.environ.get("APG_EXPOSE_TIMESTAMPS", "0")).strip().lower() in {"1", "true", "yes", "on"}
+APG_TENANT_DEFAULT = "default"
+APG_TENANT_HEADER_DEFAULT = "X-APG-Tenant"
 TENANT_SCOPED_ENTITIES: set[str] = {
     e["name"] for e in ENTITIES
-    if any(str(f.get("name")) == "tenant_id" for f in e.get("fields", []))
+    if APG_MULTI_TENANT_ENABLED or any(str(f.get("name")) == "tenant_id" for f in e.get("fields", []))
 }
-SEMANTIC_MODEL: Dict[str, Any] = {'format': 'apg.semantic-model.v1', 'ok': True, 'source_files': ['hr_payroll.apg'], 'app': {'name': 'hr_payroll', 'version': '1.0.0', 'description': None, 'entity_count': 11}, 'symbols': {'module.hr_payroll': {'id': 'module.hr_payroll', 'kind': 'module', 'name': 'hr_payroll', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 4, 'character': 0}, 'end': {'line': 4, 'character': 1}}, 'references': []}, 'table.Employee': {'id': 'table.Employee', 'kind': 'table', 'name': 'Employee', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 8, 'character': 0}, 'end': {'line': 8, 'character': 1}}, 'references': []}, 'field.Employee.employee_number': {'id': 'field.Employee.employee_number', 'kind': 'field', 'name': 'Employee.employee_number', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 9, 'character': 4}, 'end': {'line': 9, 'character': 5}}, 'references': []}, 'field.Employee.first_name': {'id': 'field.Employee.first_name', 'kind': 'field', 'name': 'Employee.first_name', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 10, 'character': 4}, 'end': {'line': 10, 'character': 5}}, 'references': []}, 'field.Employee.last_name': {'id': 'field.Employee.last_name', 'kind': 'field', 'name': 'Employee.last_name', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 11, 'character': 4}, 'end': {'line': 11, 'character': 5}}, 'references': []}, 'field.Employee.email': {'id': 'field.Employee.email', 'kind': 'field', 'name': 'Employee.email', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 12, 'character': 4}, 'end': {'line': 12, 'character': 5}}, 'references': []}, 'field.Employee.department': {'id': 'field.Employee.department', 'kind': 'field', 'name': 'Employee.department', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 13, 'character': 4}, 'end': {'line': 13, 'character': 5}}, 'references': []}, 'field.Employee.position': {'id': 'field.Employee.position', 'kind': 'field', 'name': 'Employee.position', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 14, 'character': 4}, 'end': {'line': 14, 'character': 5}}, 'references': []}, 'field.Employee.employment_type': {'id': 'field.Employee.employment_type', 'kind': 'field', 'name': 'Employee.employment_type', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 15, 'character': 4}, 'end': {'line': 15, 'character': 5}}, 'references': []}, 'field.Employee.hire_date': {'id': 'field.Employee.hire_date', 'kind': 'field', 'name': 'Employee.hire_date', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 16, 'character': 4}, 'end': {'line': 16, 'character': 5}}, 'references': []}, 'field.Employee.termination_date': {'id': 'field.Employee.termination_date', 'kind': 'field', 'name': 'Employee.termination_date', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 17, 'character': 4}, 'end': {'line': 17, 'character': 5}}, 'references': []}, 'field.Employee.salary': {'id': 'field.Employee.salary', 'kind': 'field', 'name': 'Employee.salary', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 18, 'character': 4}, 'end': {'line': 18, 'character': 5}}, 'references': []}, 'field.Employee.currency': {'id': 'field.Employee.currency', 'kind': 'field', 'name': 'Employee.currency', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 19, 'character': 4}, 'end': {'line': 19, 'character': 5}}, 'references': []}, 'field.Employee.bank_account': {'id': 'field.Employee.bank_account', 'kind': 'field', 'name': 'Employee.bank_account', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 20, 'character': 4}, 'end': {'line': 20, 'character': 5}}, 'references': []}, 'field.Employee.tax_pin': {'id': 'field.Employee.tax_pin', 'kind': 'field', 'name': 'Employee.tax_pin', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 21, 'character': 4}, 'end': {'line': 21, 'character': 5}}, 'references': []}, 'field.Employee.nssf_number': {'id': 'field.Employee.nssf_number', 'kind': 'field', 'name': 'Employee.nssf_number', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 22, 'character': 4}, 'end': {'line': 22, 'character': 5}}, 'references': []}, 'field.Employee.nhif_number': {'id': 'field.Employee.nhif_number', 'kind': 'field', 'name': 'Employee.nhif_number', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 23, 'character': 4}, 'end': {'line': 23, 'character': 5}}, 'references': []}, 'field.Employee.is_active': {'id': 'field.Employee.is_active', 'kind': 'field', 'name': 'Employee.is_active', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 24, 'character': 4}, 'end': {'line': 24, 'character': 5}}, 'references': []}, 'table.PayRun': {'id': 'table.PayRun', 'kind': 'table', 'name': 'PayRun', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 27, 'character': 0}, 'end': {'line': 27, 'character': 1}}, 'references': []}, 'field.PayRun.pay_run_id': {'id': 'field.PayRun.pay_run_id', 'kind': 'field', 'name': 'PayRun.pay_run_id', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 28, 'character': 4}, 'end': {'line': 28, 'character': 5}}, 'references': []}, 'field.PayRun.period': {'id': 'field.PayRun.period', 'kind': 'field', 'name': 'PayRun.period', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 29, 'character': 4}, 'end': {'line': 29, 'character': 5}}, 'references': []}, 'field.PayRun.pay_date': {'id': 'field.PayRun.pay_date', 'kind': 'field', 'name': 'PayRun.pay_date', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 30, 'character': 4}, 'end': {'line': 30, 'character': 5}}, 'references': []}, 'field.PayRun.status': {'id': 'field.PayRun.status', 'kind': 'field', 'name': 'PayRun.status', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 31, 'character': 4}, 'end': {'line': 31, 'character': 5}}, 'references': []}, 'field.PayRun.total_gross': {'id': 'field.PayRun.total_gross', 'kind': 'field', 'name': 'PayRun.total_gross', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 32, 'character': 4}, 'end': {'line': 32, 'character': 5}}, 'references': []}, 'field.PayRun.total_deductions': {'id': 'field.PayRun.total_deductions', 'kind': 'field', 'name': 'PayRun.total_deductions', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 33, 'character': 4}, 'end': {'line': 33, 'character': 5}}, 'references': []}, 'field.PayRun.total_net': {'id': 'field.PayRun.total_net', 'kind': 'field', 'name': 'PayRun.total_net', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 34, 'character': 4}, 'end': {'line': 34, 'character': 5}}, 'references': []}, 'field.PayRun.approved_by': {'id': 'field.PayRun.approved_by', 'kind': 'field', 'name': 'PayRun.approved_by', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 35, 'character': 4}, 'end': {'line': 35, 'character': 5}}, 'references': []}, 'field.PayRun.approved_at': {'id': 'field.PayRun.approved_at', 'kind': 'field', 'name': 'PayRun.approved_at', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 36, 'character': 4}, 'end': {'line': 36, 'character': 5}}, 'references': []}, 'table.Payslip': {'id': 'table.Payslip', 'kind': 'table', 'name': 'Payslip', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 39, 'character': 0}, 'end': {'line': 39, 'character': 1}}, 'references': []}, 'field.Payslip.payslip_id': {'id': 'field.Payslip.payslip_id', 'kind': 'field', 'name': 'Payslip.payslip_id', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 40, 'character': 4}, 'end': {'line': 40, 'character': 5}}, 'references': []}, 'field.Payslip.pay_run_id': {'id': 'field.Payslip.pay_run_id', 'kind': 'field', 'name': 'Payslip.pay_run_id', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 41, 'character': 4}, 'end': {'line': 41, 'character': 5}}, 'references': []}, 'field.Payslip.employee_id': {'id': 'field.Payslip.employee_id', 'kind': 'field', 'name': 'Payslip.employee_id', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 42, 'character': 4}, 'end': {'line': 42, 'character': 5}}, 'references': []}, 'field.Payslip.gross_pay': {'id': 'field.Payslip.gross_pay', 'kind': 'field', 'name': 'Payslip.gross_pay', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 43, 'character': 4}, 'end': {'line': 43, 'character': 5}}, 'references': []}, 'field.Payslip.paye_tax': {'id': 'field.Payslip.paye_tax', 'kind': 'field', 'name': 'Payslip.paye_tax', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 44, 'character': 4}, 'end': {'line': 44, 'character': 5}}, 'references': []}, 'field.Payslip.nssf_employee': {'id': 'field.Payslip.nssf_employee', 'kind': 'field', 'name': 'Payslip.nssf_employee', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 45, 'character': 4}, 'end': {'line': 45, 'character': 5}}, 'references': []}, 'field.Payslip.nhif_employee': {'id': 'field.Payslip.nhif_employee', 'kind': 'field', 'name': 'Payslip.nhif_employee', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 46, 'character': 4}, 'end': {'line': 46, 'character': 5}}, 'references': []}, 'field.Payslip.other_deductions': {'id': 'field.Payslip.other_deductions', 'kind': 'field', 'name': 'Payslip.other_deductions', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 47, 'character': 4}, 'end': {'line': 47, 'character': 5}}, 'references': []}, 'field.Payslip.net_pay': {'id': 'field.Payslip.net_pay', 'kind': 'field', 'name': 'Payslip.net_pay', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 48, 'character': 4}, 'end': {'line': 48, 'character': 5}}, 'references': []}, 'field.Payslip.payment_status': {'id': 'field.Payslip.payment_status', 'kind': 'field', 'name': 'Payslip.payment_status', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 49, 'character': 4}, 'end': {'line': 49, 'character': 5}}, 'references': []}, 'agent.HRAdvisor': {'id': 'agent.HRAdvisor', 'kind': 'agent', 'name': 'HRAdvisor', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 52, 'character': 0}, 'end': {'line': 52, 'character': 1}}, 'references': []}, 'llm.openai:gpt-4.1-mini': {'id': 'llm.openai:gpt-4.1-mini', 'kind': 'llm', 'name': 'openai:gpt-4.1-mini', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 63, 'character': 0}, 'end': {'line': 63, 'character': 1}}, 'references': []}, 'agent.PayrollAssistant': {'id': 'agent.PayrollAssistant', 'kind': 'agent', 'name': 'PayrollAssistant', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 63, 'character': 0}, 'end': {'line': 63, 'character': 1}}, 'references': []}, 'agent_team.HRPayrollTeam': {'id': 'agent_team.HRPayrollTeam', 'kind': 'agent_team', 'name': 'HRPayrollTeam', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 73, 'character': 0}, 'end': {'line': 73, 'character': 1}}, 'references': []}, 'capability.HRPayroll': {'id': 'capability.HRPayroll', 'kind': 'capability', 'name': 'HRPayroll', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 80, 'character': 0}, 'end': {'line': 80, 'character': 1}}, 'references': []}, 'workflow.PayRunProcess': {'id': 'workflow.PayRunProcess', 'kind': 'workflow', 'name': 'PayRunProcess', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 108, 'character': 0}, 'end': {'line': 108, 'character': 1}}, 'references': []}, 'workflow.EmployeeOnboarding': {'id': 'workflow.EmployeeOnboarding', 'kind': 'workflow', 'name': 'EmployeeOnboarding', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 121, 'character': 0}, 'end': {'line': 121, 'character': 1}}, 'references': []}, 'workflow.LeaveRequest': {'id': 'workflow.LeaveRequest', 'kind': 'workflow', 'name': 'LeaveRequest', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 142, 'character': 0}, 'end': {'line': 142, 'character': 1}}, 'references': []}, 'app.HRPayrollApp': {'id': 'app.HRPayrollApp', 'kind': 'app', 'name': 'HRPayrollApp', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 152, 'character': 0}, 'end': {'line': 152, 'character': 1}}, 'references': []}}, 'tables': {'Employee': {'name': 'Employee', 'fields': {'employee_number': {'type': 'str', 'required': True, 'relationship': None}, 'first_name': {'type': 'str', 'required': True, 'relationship': None}, 'last_name': {'type': 'str', 'required': True, 'relationship': None}, 'email': {'type': 'str', 'required': True, 'relationship': None}, 'department': {'type': 'str', 'required': True, 'relationship': None}, 'position': {'type': 'str', 'required': True, 'relationship': None}, 'employment_type': {'type': 'str', 'required': False, 'relationship': None}, 'hire_date': {'type': 'str', 'required': True, 'relationship': None}, 'termination_date': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'salary': {'type': 'float', 'required': True, 'relationship': None}, 'currency': {'type': 'str', 'required': False, 'relationship': None}, 'bank_account': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'tax_pin': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'nssf_number': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'nhif_number': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'is_active': {'type': 'bool', 'required': False, 'relationship': None}}, 'lookup_paths': {'termination_date.id': {'chain': ['Employee.termination_date', 'str?.id'], 'valid': True}, 'bank_account.id': {'chain': ['Employee.bank_account', 'str?.id'], 'valid': True}, 'tax_pin.id': {'chain': ['Employee.tax_pin', 'str?.id'], 'valid': True}, 'nssf_number.id': {'chain': ['Employee.nssf_number', 'str?.id'], 'valid': True}, 'nhif_number.id': {'chain': ['Employee.nhif_number', 'str?.id'], 'valid': True}}}, 'PayRun': {'name': 'PayRun', 'fields': {'pay_run_id': {'type': 'str', 'required': True, 'relationship': {'target_table': 'PayRun', 'target_field': 'id', 'cardinality': 'many-to-one', 'alias': 'pay_run'}}, 'period': {'type': 'str', 'required': True, 'relationship': None}, 'pay_date': {'type': 'str', 'required': True, 'relationship': None}, 'status': {'type': 'str', 'required': False, 'relationship': None}, 'total_gross': {'type': 'float', 'required': False, 'relationship': None}, 'total_deductions': {'type': 'float', 'required': False, 'relationship': None}, 'total_net': {'type': 'float', 'required': False, 'relationship': None}, 'approved_by': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'approved_at': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}}, 'lookup_paths': {'approved_by.id': {'chain': ['PayRun.approved_by', 'str?.id'], 'valid': True}, 'approved_at.id': {'chain': ['PayRun.approved_at', 'str?.id'], 'valid': True}}}, 'Payslip': {'name': 'Payslip', 'fields': {'payslip_id': {'type': 'str', 'required': True, 'relationship': {'target_table': 'Payslip', 'target_field': 'id', 'cardinality': 'many-to-one', 'alias': 'payslip'}}, 'pay_run_id': {'type': 'str', 'required': True, 'relationship': {'target_table': 'PayRun', 'target_field': 'id', 'cardinality': 'many-to-one', 'alias': 'pay_run'}}, 'employee_id': {'type': 'str', 'required': True, 'relationship': {'target_table': 'Employee', 'target_field': 'id', 'cardinality': 'many-to-one', 'alias': 'employee'}}, 'gross_pay': {'type': 'float', 'required': True, 'relationship': None}, 'paye_tax': {'type': 'float', 'required': True, 'relationship': None}, 'nssf_employee': {'type': 'float', 'required': True, 'relationship': None}, 'nhif_employee': {'type': 'float', 'required': True, 'relationship': None}, 'other_deductions': {'type': 'float', 'required': False, 'relationship': None}, 'net_pay': {'type': 'float', 'required': True, 'relationship': None}, 'payment_status': {'type': 'str', 'required': False, 'relationship': None}}, 'lookup_paths': {}}}, 'views': {}, 'flows': {'PayRunProcess': {'name': 'PayRunProcess', 'type': 'workflow', 'properties': {}, 'methods': [], 'states': ['draft', 'calculated', 'reviewed', 'approved', 'disbursed', 'closed'], 'transitions': [{'source': 'draft', 'target': 'calculated', 'guard': None}, {'source': 'calculated', 'target': 'reviewed', 'guard': 'all_payslips_generated == true";\n        approved:   "review_complete == true";\n        disbursed:  "bank_file_generated == true";'}, {'source': 'reviewed', 'target': 'approved', 'guard': None}, {'source': 'approved', 'target': 'disbursed', 'guard': None}, {'source': 'disbursed', 'target': 'closed', 'guard': None}], 'steps': ['draft', 'calculated', 'reviewed', 'approved', 'disbursed', 'closed'], 'human_tasks': ['reviewed', 'approved'], 'guards': {'reviewed': 'all_payslips_generated == true";\n        approved:   "review_complete == true";\n        disbursed:  "bank_file_generated == true";'}, 'assignments': {'reviewed': 'hr_manager', 'approved': 'finance_controller'}, 'timers': {'reviewed': 'PT24H', 'approved': 'PT48H'}, 'waits': {}, 'retry_policy': {}, 'compensation': {'approved': 'void_bank_transfers', 'disbursed': 'initiate_recalls'}, 'steps_raw': 'draft -> calculated -> reviewed -> approved -> disbursed -> closed'}, 'EmployeeOnboarding': {'name': 'EmployeeOnboarding', 'type': 'workflow', 'properties': {}, 'methods': [], 'states': ['offer_accepted', 'documents_submitted', 'system_access', 'orientation', 'probation', 'confirmed'], 'transitions': [{'source': 'offer_accepted', 'target': 'documents_submitted', 'guard': None}, {'source': 'documents_submitted', 'target': 'system_access', 'guard': 'all_documents_received == true";\n        orientation:    "system_access_granted == true";\n        confirmed:      "probation_assessment_complete == true";'}, {'source': 'system_access', 'target': 'orientation', 'guard': None}, {'source': 'orientation', 'target': 'probation', 'guard': None}, {'source': 'probation', 'target': 'confirmed', 'guard': None}], 'steps': ['offer_accepted', 'documents_submitted', 'system_access', 'orientation', 'probation', 'confirmed'], 'human_tasks': ['documents_submitted', 'system_access', 'orientation', 'confirmed'], 'guards': {'system_access': 'all_documents_received == true";\n        orientation:    "system_access_granted == true";\n        confirmed:      "probation_assessment_complete == true";'}, 'assignments': {'documents_submitted': 'hr_officer', 'system_access': 'it_administrator', 'orientation': 'hr_manager', 'confirmed': 'department_manager'}, 'timers': {'documents_submitted': 'P3D', 'system_access': 'PT8H', 'orientation': 'P1D'}, 'waits': {}, 'retry_policy': {}, 'compensation': {}, 'steps_raw': 'offer_accepted -> documents_submitted -> system_access -> orientation -> probation -> confirmed'}, 'LeaveRequest': {'name': 'LeaveRequest', 'type': 'workflow', 'properties': {}, 'methods': [], 'states': ['submitted', 'manager_approval', 'hr_approval', 'approved', 'active', 'closed'], 'transitions': [{'source': 'submitted', 'target': 'manager_approval', 'guard': 'leave_balance >= requested_days";\n        hr_approval:      "manager_approved == true";'}, {'source': 'manager_approval', 'target': 'hr_approval', 'guard': None}, {'source': 'hr_approval', 'target': 'approved', 'guard': None}, {'source': 'approved', 'target': 'active', 'guard': None}, {'source': 'active', 'target': 'closed', 'guard': None}], 'steps': ['submitted', 'manager_approval', 'hr_approval', 'approved', 'active', 'closed'], 'human_tasks': ['manager_approval', 'hr_approval'], 'guards': {'manager_approval': 'leave_balance >= requested_days";\n        hr_approval:      "manager_approved == true";'}, 'assignments': {'manager_approval': 'line_manager', 'hr_approval': 'hr_officer'}, 'timers': {}, 'waits': {}, 'retry_policy': {}, 'compensation': {}, 'steps_raw': 'submitted -> manager_approval -> hr_approval -> approved -> active -> closed'}}, 'operations': {}, 'rules': {'HRPayroll.bank_account_required': {'name': 'bank_account_required', 'when': 'bank_account missing', 'action': 'deny', 'when_ast': {'type': 'missing', 'field': 'bank_account', 'negated': False}}, 'HRPayroll.tax_pin_required': {'name': 'tax_pin_required', 'when': 'tax_pin missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'tax_pin', 'negated': False}}, 'HRPayroll.nssf_required': {'name': 'nssf_required', 'when': 'nssf_number missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'nssf_number', 'negated': False}}, 'HRPayroll.payslip_authorised': {'name': 'payslip_authorised', 'when': 'pay_run_status != approved', 'action': 'deny', 'when_ast': {'type': 'compare', 'field': 'pay_run_status', 'op': '!=', 'value': 'approved'}}, 'HRPayroll.back_date_limit': {'name': 'back_date_limit', 'when': 'pay_date_months_ago > 3', 'action': 'require_review', 'when_ast': {'type': 'compare', 'field': 'pay_date_months_ago', 'op': '>', 'value': 3}}}, 'roles': {}, 'security': {}, 'agents': {'HRAdvisor': {'name': 'HRAdvisor', 'role': 'HR policy advisor', 'model': 'openai:gpt-4.1-mini', 'runtime': None, 'system': 'Advise on HR policies, leave entitlements, and employment law compliance. Cite relevant sections.', 'capabilities': ['employee_records', 'hr_policies'], 'tools': ['policy.lookup', 'employment_law.search', 'leave_balance.check'], 'memory': {'kind': 'vector', 'name': 'hr_memory'}, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {'temperature': 0.1, 'max_turns': 6}, 'rules': [], 'ui': {}, 'theme': {}}, 'PayrollAssistant': {'name': 'PayrollAssistant', 'role': 'payroll calculation assistant', 'model': 'openai:gpt-4.1-mini', 'runtime': None, 'system': 'Assist with payroll calculations, statutory deductions, and compliance. Always verify statutory rates.', 'capabilities': ['payroll_runs', 'statutory_deductions'], 'tools': ['tax_table.lookup', 'statutory_rates.fetch', 'payslip.calculate'], 'memory': None, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {'temperature': 0.0, 'max_turns': 4}, 'rules': [], 'ui': {}, 'theme': {}}}, 'llms': {'HRAdvisor': {'model': 'openai:gpt-4.1-mini', 'runtime': None}, 'PayrollAssistant': {'model': 'openai:gpt-4.1-mini', 'runtime': None}}, 'capabilities': {'HRPayroll': {'name': 'HRPayroll', 'provides': ['employee_records', 'payroll_runs', 'payslips', 'statutory_deductions', 'leave_management', 'hr_policies'], 'requires': [], 'configuration': {'tenant_id': 'default', 'country': 'KE', 'currency': 'KES'}, 'rules': [{'name': 'bank_account_required', 'when': 'bank_account missing', 'action': 'deny', 'when_ast': {'type': 'missing', 'field': 'bank_account', 'negated': False}}, {'name': 'tax_pin_required', 'when': 'tax_pin missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'tax_pin', 'negated': False}}, {'name': 'nssf_required', 'when': 'nssf_number missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'nssf_number', 'negated': False}}, {'name': 'payslip_authorised', 'when': 'pay_run_status != approved', 'action': 'deny', 'when_ast': {'type': 'compare', 'field': 'pay_run_status', 'op': '!=', 'value': 'approved'}}, {'name': 'back_date_limit', 'when': 'pay_date_months_ago > 3', 'action': 'require_review', 'when_ast': {'type': 'compare', 'field': 'pay_date_months_ago', 'op': '>', 'value': 3}}], 'rule_engine': {}, 'ui': {'shell': 'python', 'routes': [{'name': 'Employees', 'path': '/hr/employees', 'component': 'EmployeeList', 'permission': 'hr:view'}, {'name': 'Pay Runs', 'path': '/hr/payroll', 'component': 'PayRunList', 'permission': 'hr:payroll'}, {'name': 'Payslips', 'path': '/hr/payslips', 'component': 'PayslipView', 'permission': 'hr:payslips'}]}, 'theme': {'name': 'hr_theme', 'tokens': {'accent': '#6A1B9A'}}, 'runtime': {}, 'erp_modules': ['hr', 'payroll', 'time_attendance'], 'components': {}, 'business_rules': [], 'approvals': {'levels': 2, 'approvers': ['hr_manager', 'finance_controller']}, 'master_data': {'entities': ['employee', 'department', 'position', 'pay_grade', 'statutory_rate']}, 'i18n': {}, 'streaming': {}, 'screens': {}}}, 'composition': {'applications': {'HRPayrollApp': {'name': 'HRPayrollApp', 'description': 'Human resources and payroll management', 'capabilities': ['HRPayroll'], 'agents': [], 'agent_teams': ['HRPayrollTeam'], 'components': {}, 'screens': {}, 'routes': ['/hr', '/hr/employees', '/hr/payroll'], 'workflows': [], 'policies': {}, 'configuration': {}, 'theme': {'name': 'hr_app_theme', 'tokens': {'accent': '#6A1B9A'}}, 'runtime': {}, 'integrations': {}, 'deployments': {}}}, 'agent_teams': {}, 'capability_dependencies': {'HRPayroll': []}}, 'contracts': {'HRPayroll': {'id': 'hr_payroll', 'provides': ['employee_records', 'payroll_runs', 'payslips', 'statutory_deductions', 'leave_management', 'hr_policies'], 'configuration': {'tenant_id': 'default', 'country': 'KE', 'currency': 'KES'}, 'rules': [{'name': 'bank_account_required', 'when': 'bank_account missing', 'action': 'deny', 'when_ast': {'type': 'missing', 'field': 'bank_account', 'negated': False}}, {'name': 'tax_pin_required', 'when': 'tax_pin missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'tax_pin', 'negated': False}}, {'name': 'nssf_required', 'when': 'nssf_number missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'nssf_number', 'negated': False}}, {'name': 'payslip_authorised', 'when': 'pay_run_status != approved', 'action': 'deny', 'when_ast': {'type': 'compare', 'field': 'pay_run_status', 'op': '!=', 'value': 'approved'}}, {'name': 'back_date_limit', 'when': 'pay_date_months_ago > 3', 'action': 'require_review', 'when_ast': {'type': 'compare', 'field': 'pay_date_months_ago', 'op': '>', 'value': 3}}], 'ui': {'shell': 'python', 'routes': [{'name': 'Employees', 'path': '/hr/employees', 'component': 'EmployeeList', 'permission': 'hr:view'}, {'name': 'Pay Runs', 'path': '/hr/payroll', 'component': 'PayRunList', 'permission': 'hr:payroll'}, {'name': 'Payslips', 'path': '/hr/payslips', 'component': 'PayslipView', 'permission': 'hr:payslips'}]}, 'theme': {'name': 'hr_theme', 'tokens': {'accent': '#6A1B9A'}}}}, 'deployment': {'target': 'python', 'source': 'hr_payroll.apg'}, 'packages': {}, 'graphs': {'er': {'kind': 'er', 'nodes': 38, 'edges': 39}, 'lookup': {'kind': 'lookup', 'nodes': 12, 'edges': 11}, 'workflow': {'kind': 'workflow', 'nodes': 12, 'edges': 11}, 'handler': {'kind': 'handler', 'nodes': 12, 'edges': 11}, 'capability': {'kind': 'capability', 'nodes': 2, 'edges': 1}, 'security': {'kind': 'security', 'nodes': 12, 'edges': 11}, 'agent': {'kind': 'agent', 'nodes': 3, 'edges': 0}, 'deployment': {'kind': 'deployment', 'nodes': 12, 'edges': 11}, 'package': {'kind': 'package', 'nodes': 12, 'edges': 11}}, 'diagnostics': []}
+SEMANTIC_MODEL: Dict[str, Any] = {'format': 'apg.semantic-model.v1', 'ok': True, 'source_files': ['hr_payroll.apg'], 'app': {'name': 'hr_payroll', 'version': '1.0.0', 'description': None, 'entity_count': 11}, 'symbols': {'module.hr_payroll': {'id': 'module.hr_payroll', 'kind': 'module', 'name': 'hr_payroll', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'table.Employee': {'id': 'table.Employee', 'kind': 'table', 'name': 'Employee', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Employee.employee_number': {'id': 'field.Employee.employee_number', 'kind': 'field', 'name': 'Employee.employee_number', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 1, 'character': 0}, 'end': {'line': 1, 'character': 1}}, 'references': []}, 'field.Employee.first_name': {'id': 'field.Employee.first_name', 'kind': 'field', 'name': 'Employee.first_name', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 2, 'character': 4}, 'end': {'line': 2, 'character': 5}}, 'references': []}, 'field.Employee.last_name': {'id': 'field.Employee.last_name', 'kind': 'field', 'name': 'Employee.last_name', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 3, 'character': 4}, 'end': {'line': 3, 'character': 5}}, 'references': []}, 'field.Employee.email': {'id': 'field.Employee.email', 'kind': 'field', 'name': 'Employee.email', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 4, 'character': 4}, 'end': {'line': 4, 'character': 5}}, 'references': []}, 'field.Employee.department': {'id': 'field.Employee.department', 'kind': 'field', 'name': 'Employee.department', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 5, 'character': 4}, 'end': {'line': 5, 'character': 5}}, 'references': []}, 'field.Employee.position': {'id': 'field.Employee.position', 'kind': 'field', 'name': 'Employee.position', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 6, 'character': 4}, 'end': {'line': 6, 'character': 5}}, 'references': []}, 'field.Employee.employment_type': {'id': 'field.Employee.employment_type', 'kind': 'field', 'name': 'Employee.employment_type', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 7, 'character': 4}, 'end': {'line': 7, 'character': 5}}, 'references': []}, 'field.Employee.hire_date': {'id': 'field.Employee.hire_date', 'kind': 'field', 'name': 'Employee.hire_date', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 8, 'character': 4}, 'end': {'line': 8, 'character': 5}}, 'references': []}, 'field.Employee.termination_date': {'id': 'field.Employee.termination_date', 'kind': 'field', 'name': 'Employee.termination_date', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 9, 'character': 4}, 'end': {'line': 9, 'character': 5}}, 'references': []}, 'field.Employee.salary': {'id': 'field.Employee.salary', 'kind': 'field', 'name': 'Employee.salary', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 10, 'character': 4}, 'end': {'line': 10, 'character': 5}}, 'references': []}, 'field.Employee.currency': {'id': 'field.Employee.currency', 'kind': 'field', 'name': 'Employee.currency', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 11, 'character': 4}, 'end': {'line': 11, 'character': 5}}, 'references': []}, 'field.Employee.bank_account': {'id': 'field.Employee.bank_account', 'kind': 'field', 'name': 'Employee.bank_account', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 12, 'character': 4}, 'end': {'line': 12, 'character': 5}}, 'references': []}, 'field.Employee.tax_pin': {'id': 'field.Employee.tax_pin', 'kind': 'field', 'name': 'Employee.tax_pin', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 13, 'character': 4}, 'end': {'line': 13, 'character': 5}}, 'references': []}, 'field.Employee.nssf_number': {'id': 'field.Employee.nssf_number', 'kind': 'field', 'name': 'Employee.nssf_number', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 14, 'character': 4}, 'end': {'line': 14, 'character': 5}}, 'references': []}, 'field.Employee.nhif_number': {'id': 'field.Employee.nhif_number', 'kind': 'field', 'name': 'Employee.nhif_number', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 15, 'character': 4}, 'end': {'line': 15, 'character': 5}}, 'references': []}, 'field.Employee.is_active': {'id': 'field.Employee.is_active', 'kind': 'field', 'name': 'Employee.is_active', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 16, 'character': 4}, 'end': {'line': 16, 'character': 5}}, 'references': []}, 'table.PayRun': {'id': 'table.PayRun', 'kind': 'table', 'name': 'PayRun', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.PayRun.pay_run_id': {'id': 'field.PayRun.pay_run_id', 'kind': 'field', 'name': 'PayRun.pay_run_id', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 1, 'character': 0}, 'end': {'line': 1, 'character': 1}}, 'references': []}, 'field.PayRun.period': {'id': 'field.PayRun.period', 'kind': 'field', 'name': 'PayRun.period', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 2, 'character': 4}, 'end': {'line': 2, 'character': 5}}, 'references': []}, 'field.PayRun.pay_date': {'id': 'field.PayRun.pay_date', 'kind': 'field', 'name': 'PayRun.pay_date', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 3, 'character': 4}, 'end': {'line': 3, 'character': 5}}, 'references': []}, 'field.PayRun.status': {'id': 'field.PayRun.status', 'kind': 'field', 'name': 'PayRun.status', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 4, 'character': 4}, 'end': {'line': 4, 'character': 5}}, 'references': []}, 'field.PayRun.total_gross': {'id': 'field.PayRun.total_gross', 'kind': 'field', 'name': 'PayRun.total_gross', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 5, 'character': 4}, 'end': {'line': 5, 'character': 5}}, 'references': []}, 'field.PayRun.total_deductions': {'id': 'field.PayRun.total_deductions', 'kind': 'field', 'name': 'PayRun.total_deductions', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 6, 'character': 4}, 'end': {'line': 6, 'character': 5}}, 'references': []}, 'field.PayRun.total_net': {'id': 'field.PayRun.total_net', 'kind': 'field', 'name': 'PayRun.total_net', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 7, 'character': 4}, 'end': {'line': 7, 'character': 5}}, 'references': []}, 'field.PayRun.approved_by': {'id': 'field.PayRun.approved_by', 'kind': 'field', 'name': 'PayRun.approved_by', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 8, 'character': 4}, 'end': {'line': 8, 'character': 5}}, 'references': []}, 'field.PayRun.approved_at': {'id': 'field.PayRun.approved_at', 'kind': 'field', 'name': 'PayRun.approved_at', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 9, 'character': 4}, 'end': {'line': 9, 'character': 5}}, 'references': []}, 'table.Payslip': {'id': 'table.Payslip', 'kind': 'table', 'name': 'Payslip', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'field.Payslip.payslip_id': {'id': 'field.Payslip.payslip_id', 'kind': 'field', 'name': 'Payslip.payslip_id', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 1, 'character': 0}, 'end': {'line': 1, 'character': 1}}, 'references': []}, 'field.Payslip.pay_run_id': {'id': 'field.Payslip.pay_run_id', 'kind': 'field', 'name': 'Payslip.pay_run_id', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 2, 'character': 4}, 'end': {'line': 2, 'character': 5}}, 'references': []}, 'field.Payslip.employee_id': {'id': 'field.Payslip.employee_id', 'kind': 'field', 'name': 'Payslip.employee_id', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 3, 'character': 4}, 'end': {'line': 3, 'character': 5}}, 'references': []}, 'field.Payslip.gross_pay': {'id': 'field.Payslip.gross_pay', 'kind': 'field', 'name': 'Payslip.gross_pay', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 4, 'character': 4}, 'end': {'line': 4, 'character': 5}}, 'references': []}, 'field.Payslip.paye_tax': {'id': 'field.Payslip.paye_tax', 'kind': 'field', 'name': 'Payslip.paye_tax', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 5, 'character': 4}, 'end': {'line': 5, 'character': 5}}, 'references': []}, 'field.Payslip.nssf_employee': {'id': 'field.Payslip.nssf_employee', 'kind': 'field', 'name': 'Payslip.nssf_employee', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 6, 'character': 4}, 'end': {'line': 6, 'character': 5}}, 'references': []}, 'field.Payslip.nhif_employee': {'id': 'field.Payslip.nhif_employee', 'kind': 'field', 'name': 'Payslip.nhif_employee', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 7, 'character': 4}, 'end': {'line': 7, 'character': 5}}, 'references': []}, 'field.Payslip.other_deductions': {'id': 'field.Payslip.other_deductions', 'kind': 'field', 'name': 'Payslip.other_deductions', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 8, 'character': 4}, 'end': {'line': 8, 'character': 5}}, 'references': []}, 'field.Payslip.net_pay': {'id': 'field.Payslip.net_pay', 'kind': 'field', 'name': 'Payslip.net_pay', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 9, 'character': 4}, 'end': {'line': 9, 'character': 5}}, 'references': []}, 'field.Payslip.payment_status': {'id': 'field.Payslip.payment_status', 'kind': 'field', 'name': 'Payslip.payment_status', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 10, 'character': 4}, 'end': {'line': 10, 'character': 5}}, 'references': []}, 'agent.HRAdvisor': {'id': 'agent.HRAdvisor', 'kind': 'agent', 'name': 'HRAdvisor', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'llm.openai:gpt-4.1-mini': {'id': 'llm.openai:gpt-4.1-mini', 'kind': 'llm', 'name': 'openai:gpt-4.1-mini', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'agent.PayrollAssistant': {'id': 'agent.PayrollAssistant', 'kind': 'agent', 'name': 'PayrollAssistant', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'agent_team.HRPayrollTeam': {'id': 'agent_team.HRPayrollTeam', 'kind': 'agent_team', 'name': 'HRPayrollTeam', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'capability.HRPayroll': {'id': 'capability.HRPayroll', 'kind': 'capability', 'name': 'HRPayroll', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'workflow.PayRunProcess': {'id': 'workflow.PayRunProcess', 'kind': 'workflow', 'name': 'PayRunProcess', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'workflow.EmployeeOnboarding': {'id': 'workflow.EmployeeOnboarding', 'kind': 'workflow', 'name': 'EmployeeOnboarding', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'workflow.LeaveRequest': {'id': 'workflow.LeaveRequest', 'kind': 'workflow', 'name': 'LeaveRequest', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}, 'app.HRPayrollApp': {'id': 'app.HRPayrollApp', 'kind': 'app', 'name': 'HRPayrollApp', 'file': 'hr_payroll.apg', 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': 0, 'character': 1}}, 'references': []}}, 'tables': {'Employee': {'name': 'Employee', 'fields': {'employee_number': {'type': 'str', 'required': True, 'relationship': None}, 'first_name': {'type': 'str', 'required': True, 'relationship': None}, 'last_name': {'type': 'str', 'required': True, 'relationship': None}, 'email': {'type': 'str', 'required': True, 'relationship': None}, 'department': {'type': 'str', 'required': True, 'relationship': None}, 'position': {'type': 'str', 'required': True, 'relationship': None}, 'employment_type': {'type': 'str', 'required': False, 'relationship': None}, 'hire_date': {'type': 'str', 'required': True, 'relationship': None}, 'termination_date': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'salary': {'type': 'float', 'required': True, 'relationship': None}, 'currency': {'type': 'str', 'required': False, 'relationship': None}, 'bank_account': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'tax_pin': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'nssf_number': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'nhif_number': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'is_active': {'type': 'bool', 'required': False, 'relationship': None}}, 'lookup_paths': {'termination_date.id': {'chain': ['Employee.termination_date', 'str?.id'], 'valid': True}, 'bank_account.id': {'chain': ['Employee.bank_account', 'str?.id'], 'valid': True}, 'tax_pin.id': {'chain': ['Employee.tax_pin', 'str?.id'], 'valid': True}, 'nssf_number.id': {'chain': ['Employee.nssf_number', 'str?.id'], 'valid': True}, 'nhif_number.id': {'chain': ['Employee.nhif_number', 'str?.id'], 'valid': True}}}, 'PayRun': {'name': 'PayRun', 'fields': {'pay_run_id': {'type': 'str', 'required': True, 'relationship': {'target_table': 'PayRun', 'target_field': 'id', 'cardinality': 'many-to-one', 'alias': 'pay_run'}}, 'period': {'type': 'str', 'required': True, 'relationship': None}, 'pay_date': {'type': 'str', 'required': True, 'relationship': None}, 'status': {'type': 'str', 'required': False, 'relationship': None}, 'total_gross': {'type': 'float', 'required': False, 'relationship': None}, 'total_deductions': {'type': 'float', 'required': False, 'relationship': None}, 'total_net': {'type': 'float', 'required': False, 'relationship': None}, 'approved_by': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}, 'approved_at': {'type': 'str?', 'required': True, 'relationship': {'target_table': 'str?', 'target_field': 'id', 'cardinality': 'many-to-one'}}}, 'lookup_paths': {'approved_by.id': {'chain': ['PayRun.approved_by', 'str?.id'], 'valid': True}, 'approved_at.id': {'chain': ['PayRun.approved_at', 'str?.id'], 'valid': True}}}, 'Payslip': {'name': 'Payslip', 'fields': {'payslip_id': {'type': 'str', 'required': True, 'relationship': {'target_table': 'Payslip', 'target_field': 'id', 'cardinality': 'many-to-one', 'alias': 'payslip'}}, 'pay_run_id': {'type': 'str', 'required': True, 'relationship': {'target_table': 'PayRun', 'target_field': 'id', 'cardinality': 'many-to-one', 'alias': 'pay_run'}}, 'employee_id': {'type': 'str', 'required': True, 'relationship': {'target_table': 'Employee', 'target_field': 'id', 'cardinality': 'many-to-one', 'alias': 'employee'}}, 'gross_pay': {'type': 'float', 'required': True, 'relationship': None}, 'paye_tax': {'type': 'float', 'required': True, 'relationship': None}, 'nssf_employee': {'type': 'float', 'required': True, 'relationship': None}, 'nhif_employee': {'type': 'float', 'required': True, 'relationship': None}, 'other_deductions': {'type': 'float', 'required': False, 'relationship': None}, 'net_pay': {'type': 'float', 'required': True, 'relationship': None}, 'payment_status': {'type': 'str', 'required': False, 'relationship': None}}, 'lookup_paths': {}}}, 'views': {}, 'flows': {'PayRunProcess': {'name': 'PayRunProcess', 'type': 'workflow', 'properties': {}, 'methods': [], 'states': ['draft', 'calculated', 'reviewed', 'approved', 'disbursed', 'closed'], 'transitions': [{'source': 'draft', 'target': 'calculated', 'guard': None}, {'source': 'calculated', 'target': 'reviewed', 'guard': 'all_payslips_generated == true";\n        approved:   "review_complete == true";\n        disbursed:  "bank_file_generated == true";'}, {'source': 'reviewed', 'target': 'approved', 'guard': None}, {'source': 'approved', 'target': 'disbursed', 'guard': None}, {'source': 'disbursed', 'target': 'closed', 'guard': None}], 'steps': ['draft', 'calculated', 'reviewed', 'approved', 'disbursed', 'closed'], 'human_tasks': ['reviewed', 'approved'], 'guards': {'reviewed': 'all_payslips_generated == true";\n        approved:   "review_complete == true";\n        disbursed:  "bank_file_generated == true";'}, 'assignments': {'reviewed': 'hr_manager', 'approved': 'finance_controller'}, 'timers': {'reviewed': 'PT24H', 'approved': 'PT48H'}, 'waits': {}, 'retry_policy': {}, 'compensation': {'approved': 'void_bank_transfers', 'disbursed': 'initiate_recalls'}, 'steps_raw': 'draft -> calculated -> reviewed -> approved -> disbursed -> closed'}, 'EmployeeOnboarding': {'name': 'EmployeeOnboarding', 'type': 'workflow', 'properties': {}, 'methods': [], 'states': ['offer_accepted', 'documents_submitted', 'system_access', 'orientation', 'probation', 'confirmed'], 'transitions': [{'source': 'offer_accepted', 'target': 'documents_submitted', 'guard': None}, {'source': 'documents_submitted', 'target': 'system_access', 'guard': 'all_documents_received == true";\n        orientation:    "system_access_granted == true";\n        confirmed:      "probation_assessment_complete == true";'}, {'source': 'system_access', 'target': 'orientation', 'guard': None}, {'source': 'orientation', 'target': 'probation', 'guard': None}, {'source': 'probation', 'target': 'confirmed', 'guard': None}], 'steps': ['offer_accepted', 'documents_submitted', 'system_access', 'orientation', 'probation', 'confirmed'], 'human_tasks': ['documents_submitted', 'system_access', 'orientation', 'confirmed'], 'guards': {'system_access': 'all_documents_received == true";\n        orientation:    "system_access_granted == true";\n        confirmed:      "probation_assessment_complete == true";'}, 'assignments': {'documents_submitted': 'hr_officer', 'system_access': 'it_administrator', 'orientation': 'hr_manager', 'confirmed': 'department_manager'}, 'timers': {'documents_submitted': 'P3D', 'system_access': 'PT8H', 'orientation': 'P1D'}, 'waits': {}, 'retry_policy': {}, 'compensation': {}, 'steps_raw': 'offer_accepted -> documents_submitted -> system_access -> orientation -> probation -> confirmed'}, 'LeaveRequest': {'name': 'LeaveRequest', 'type': 'workflow', 'properties': {}, 'methods': [], 'states': ['submitted', 'manager_approval', 'hr_approval', 'approved', 'active', 'closed'], 'transitions': [{'source': 'submitted', 'target': 'manager_approval', 'guard': 'leave_balance >= requested_days";\n        hr_approval:      "manager_approved == true";'}, {'source': 'manager_approval', 'target': 'hr_approval', 'guard': None}, {'source': 'hr_approval', 'target': 'approved', 'guard': None}, {'source': 'approved', 'target': 'active', 'guard': None}, {'source': 'active', 'target': 'closed', 'guard': None}], 'steps': ['submitted', 'manager_approval', 'hr_approval', 'approved', 'active', 'closed'], 'human_tasks': ['manager_approval', 'hr_approval'], 'guards': {'manager_approval': 'leave_balance >= requested_days";\n        hr_approval:      "manager_approved == true";'}, 'assignments': {'manager_approval': 'line_manager', 'hr_approval': 'hr_officer'}, 'timers': {}, 'waits': {}, 'retry_policy': {}, 'compensation': {}, 'steps_raw': 'submitted -> manager_approval -> hr_approval -> approved -> active -> closed'}}, 'operations': {}, 'rules': {'HRPayroll.bank_account_required': {'name': 'bank_account_required', 'when': 'bank_account missing', 'action': 'deny', 'when_ast': {'type': 'missing', 'field': 'bank_account', 'negated': False}}, 'HRPayroll.tax_pin_required': {'name': 'tax_pin_required', 'when': 'tax_pin missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'tax_pin', 'negated': False}}, 'HRPayroll.nssf_required': {'name': 'nssf_required', 'when': 'nssf_number missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'nssf_number', 'negated': False}}, 'HRPayroll.payslip_authorised': {'name': 'payslip_authorised', 'when': 'pay_run_status != approved', 'action': 'deny', 'when_ast': {'type': 'compare', 'field': 'pay_run_status', 'op': '!=', 'value': 'approved'}}, 'HRPayroll.back_date_limit': {'name': 'back_date_limit', 'when': 'pay_date_months_ago > 3', 'action': 'require_review', 'when_ast': {'type': 'compare', 'field': 'pay_date_months_ago', 'op': '>', 'value': 3}}}, 'roles': {}, 'security': {}, 'agents': {'HRAdvisor': {'name': 'HRAdvisor', 'role': 'HR policy advisor', 'model': 'openai:gpt-4.1-mini', 'runtime': None, 'system': 'Advise on HR policies, leave entitlements, and employment law compliance. Cite relevant sections.', 'capabilities': ['employee_records', 'hr_policies'], 'tools': ['policy.lookup', 'employment_law.search', 'leave_balance.check'], 'memory': {'kind': 'vector', 'name': 'hr_memory'}, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {'temperature': 0.1, 'max_turns': 6}, 'rules': [], 'ui': {}, 'theme': {}}, 'PayrollAssistant': {'name': 'PayrollAssistant', 'role': 'payroll calculation assistant', 'model': 'openai:gpt-4.1-mini', 'runtime': None, 'system': 'Assist with payroll calculations, statutory deductions, and compliance. Always verify statutory rates.', 'capabilities': ['payroll_runs', 'statutory_deductions'], 'tools': ['tax_table.lookup', 'statutory_rates.fetch', 'payslip.calculate'], 'memory': None, 'inputs': [], 'outputs': [], 'handoffs': [], 'configuration': {'temperature': 0.0, 'max_turns': 4}, 'rules': [], 'ui': {}, 'theme': {}}}, 'llms': {'HRAdvisor': {'model': 'openai:gpt-4.1-mini', 'runtime': None}, 'PayrollAssistant': {'model': 'openai:gpt-4.1-mini', 'runtime': None}}, 'capabilities': {'HRPayroll': {'name': 'HRPayroll', 'provides': ['employee_records', 'payroll_runs', 'payslips', 'statutory_deductions', 'leave_management', 'hr_policies'], 'requires': [], 'configuration': {'tenant_id': 'default', 'country': 'KE', 'currency': 'KES'}, 'rules': [{'name': 'bank_account_required', 'when': 'bank_account missing', 'action': 'deny', 'when_ast': {'type': 'missing', 'field': 'bank_account', 'negated': False}}, {'name': 'tax_pin_required', 'when': 'tax_pin missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'tax_pin', 'negated': False}}, {'name': 'nssf_required', 'when': 'nssf_number missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'nssf_number', 'negated': False}}, {'name': 'payslip_authorised', 'when': 'pay_run_status != approved', 'action': 'deny', 'when_ast': {'type': 'compare', 'field': 'pay_run_status', 'op': '!=', 'value': 'approved'}}, {'name': 'back_date_limit', 'when': 'pay_date_months_ago > 3', 'action': 'require_review', 'when_ast': {'type': 'compare', 'field': 'pay_date_months_ago', 'op': '>', 'value': 3}}], 'rule_engine': {}, 'ui': {'shell': 'python', 'routes': [{'name': 'Employees', 'path': '/hr/employees', 'component': 'EmployeeList', 'permission': 'hr:view'}, {'name': 'Pay Runs', 'path': '/hr/payroll', 'component': 'PayRunList', 'permission': 'hr:payroll'}, {'name': 'Payslips', 'path': '/hr/payslips', 'component': 'PayslipView', 'permission': 'hr:payslips'}]}, 'theme': {'name': 'hr_theme', 'tokens': {'accent': '#6A1B9A'}}, 'runtime': {}, 'erp_modules': ['hr', 'payroll', 'time_attendance'], 'components': {}, 'business_rules': [], 'approvals': {'levels': 2, 'approvers': ['hr_manager', 'finance_controller']}, 'master_data': {'entities': ['employee', 'department', 'position', 'pay_grade', 'statutory_rate']}, 'i18n': {}, 'streaming': {}, 'screens': {}}}, 'composition': {'applications': {'HRPayrollApp': {'name': 'HRPayrollApp', 'description': 'Human resources and payroll management', 'capabilities': ['HRPayroll'], 'agents': [], 'agent_teams': ['HRPayrollTeam'], 'components': {}, 'screens': {}, 'routes': ['/hr', '/hr/employees', '/hr/payroll'], 'workflows': [], 'policies': {}, 'configuration': {}, 'theme': {'name': 'hr_app_theme', 'tokens': {'accent': '#6A1B9A'}}, 'runtime': {}, 'integrations': {}, 'deployments': {}}}, 'agent_teams': {}, 'capability_dependencies': {'HRPayroll': []}}, 'contracts': {'HRPayroll': {'id': 'hr_payroll', 'provides': ['employee_records', 'payroll_runs', 'payslips', 'statutory_deductions', 'leave_management', 'hr_policies'], 'configuration': {'tenant_id': 'default', 'country': 'KE', 'currency': 'KES'}, 'rules': [{'name': 'bank_account_required', 'when': 'bank_account missing', 'action': 'deny', 'when_ast': {'type': 'missing', 'field': 'bank_account', 'negated': False}}, {'name': 'tax_pin_required', 'when': 'tax_pin missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'tax_pin', 'negated': False}}, {'name': 'nssf_required', 'when': 'nssf_number missing', 'action': 'require_review', 'when_ast': {'type': 'missing', 'field': 'nssf_number', 'negated': False}}, {'name': 'payslip_authorised', 'when': 'pay_run_status != approved', 'action': 'deny', 'when_ast': {'type': 'compare', 'field': 'pay_run_status', 'op': '!=', 'value': 'approved'}}, {'name': 'back_date_limit', 'when': 'pay_date_months_ago > 3', 'action': 'require_review', 'when_ast': {'type': 'compare', 'field': 'pay_date_months_ago', 'op': '>', 'value': 3}}], 'ui': {'shell': 'python', 'routes': [{'name': 'Employees', 'path': '/hr/employees', 'component': 'EmployeeList', 'permission': 'hr:view'}, {'name': 'Pay Runs', 'path': '/hr/payroll', 'component': 'PayRunList', 'permission': 'hr:payroll'}, {'name': 'Payslips', 'path': '/hr/payslips', 'component': 'PayslipView', 'permission': 'hr:payslips'}]}, 'theme': {'name': 'hr_theme', 'tokens': {'accent': '#6A1B9A'}}}}, 'deployment': {'target': 'python', 'source': 'hr_payroll.apg'}, 'packages': {}, 'graphs': {'er': {'kind': 'er', 'nodes': 38, 'edges': 39}, 'lookup': {'kind': 'lookup', 'nodes': 12, 'edges': 11}, 'workflow': {'kind': 'workflow', 'nodes': 12, 'edges': 11}, 'handler': {'kind': 'handler', 'nodes': 12, 'edges': 11}, 'capability': {'kind': 'capability', 'nodes': 2, 'edges': 1}, 'security': {'kind': 'security', 'nodes': 12, 'edges': 11}, 'agent': {'kind': 'agent', 'nodes': 3, 'edges': 0}, 'deployment': {'kind': 'deployment', 'nodes': 12, 'edges': 11}, 'package': {'kind': 'package', 'nodes': 12, 'edges': 11}}, 'diagnostics': []}
 APG_UI_TEMPLATES: Dict[str, str] = {'entity_list.html.j2': '{# entity_list.html.j2 — APG entity list + create form\n   Variables: entity_name, entity_type, safe_entity, fields, records,\n              total, count, records_table, create_inputs, notice, query,\n              saved_views, active_filters, has_kanban (bool), q (search term) #}\n\n{# Breadcrumb + view toggle #}\n<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">\n  <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>\n  <span>/</span>\n  <span class="font-semibold text-gray-900">{{ entity_name }}</span>\n  <div class="ml-auto flex items-center gap-1">\n    {% if has_kanban %}\n    <span class="px-3 py-1 text-xs bg-apg-primary text-white rounded-lg font-medium">≡ List</span>\n    <a href="/ui/entities/{{ safe_entity }}?view=kanban"\n       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">\n      ⊞ Kanban\n    </a>\n    {% endif %}\n    <a href="/ui/entities/{{ safe_entity }}?view=analytics"\n       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">\n      Analytics\n    </a>\n    <button type="button" class="apg-btn" onclick="document.getElementById(\'apg-create-drawer\').showModal();">\n      New {{ entity_name }}\n    </button>\n  </div>\n</nav>\n\n{% if notice %}\n<div role="alert"\n     class="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">\n  ⚠ {{ notice }}\n</div>\n{% endif %}\n\n<section class="apg-card apg-list-toolbar" aria-label="{{ entity_name }} table controls">\n  <div class="apg-view-strip" aria-label="Saved views">\n    {% for view in saved_views %}\n    <a href="{{ view.url }}"\n       class="apg-view-tab{% if view.active %} active{% endif %}"\n       {% if view.active %}aria-current="page"{% endif %}>\n      <span>{{ view.name }}</span>\n      <small>{{ view.description }}</small>\n    </a>\n    {% endfor %}\n  </div>\n\n  <form method="get" action="/ui/entities/{{ safe_entity }}" class="apg-search-form">\n    <label class="sr-only" for="apg-entity-search">Search {{ entity_name }} records</label>\n    <div class="relative">\n      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">Search</span>\n      <input id="apg-entity-search" type="text" name="q" value="{{ q or \'\' }}"\n             placeholder="Search {{ entity_name }} records..."\n             class="w-full pl-14 pr-8 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">\n      {% if q %}\n      <a href="{{ clear_filters_url }}"\n         aria-label="Clear search"\n         class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs leading-none">x</a>\n      {% endif %}\n    </div>\n  </form>\n\n  {% if active_filters %}\n  <div class="apg-filter-chip-row" aria-label="Active filters">\n    {% for chip in active_filters %}\n    <span class="apg-filter-chip">\n      <span>{{ chip.label }}: {{ chip.value }}</span>\n      <a href="{{ chip.clear_url }}" aria-label="Clear {{ chip.label }}">x</a>\n    </span>\n    {% endfor %}\n    <a href="{{ clear_filters_url }}" class="apg-filter-clear">Clear all</a>\n  </div>\n  {% endif %}\n\n  <details class="apg-filter-panel"{% if active_filters %} open{% endif %}>\n    <summary>Advanced filter</summary>\n    <div class="mt-2">{{ query_form | safe }}</div>\n  </details>\n</section>\n\n<section class="apg-list-intelligence" aria-label="{{ entity_name }} list intelligence">\n  <article>\n    <span>Shareable State</span>\n    <strong>{{ list_intelligence.share_url }}</strong>\n    <button type="button" class="apg-mini-btn" data-apg-copy-url="{{ list_intelligence.share_url }}">Copy</button>\n  </article>\n  <article>\n    <span>Column Memory</span>\n    <strong>{{ list_intelligence.column_controls | length }} fields</strong>\n    <div class="apg-column-chip-row">\n      {% for col in list_intelligence.column_controls %}\n      <a href="{{ col.sort_url }}" class="apg-column-chip{% if col.active %} active{% endif %}">{{ col.label }}</a>\n      {% endfor %}\n    </div>\n  </article>\n  <article>\n    <span>Virtual Window</span>\n    <strong>{{ list_intelligence.visible_window }} of {{ list_intelligence.total }}</strong>\n    <small>{{ list_intelligence.page_size }} rows per page{% if list_intelligence.filtered %} after filters{% endif %}</small>\n  </article>\n  <article>\n    <span>Keyboard Fuzzy Filter</span>\n    <strong>/ focuses search</strong>\n    <small>Bulk bar and CSV export stay offline</small>\n  </article>\n</section>\n\n<script nonce="{{ csp_nonce }}">\n(function() {\n  var densityKey = {{ list_intelligence.density_key | tojson }};\n  var root = document.documentElement;\n  var savedDensity = localStorage.getItem(densityKey);\n  if (savedDensity === \'compact\') root.classList.add(\'apg-density-compact\');\n  document.addEventListener(\'click\', function(event) {\n    var copy = event.target.closest(\'[data-apg-copy-url]\');\n    if (copy && navigator.clipboard) {\n      navigator.clipboard.writeText(location.origin + copy.dataset.apgCopyUrl);\n      APGToast(\'List URL copied\', \'success\');\n    }\n  });\n  document.addEventListener(\'keydown\', function(event) {\n    if (event.key === \'/\' && !/input|textarea|select/i.test(event.target.tagName || \'\')) {\n      var search = document.getElementById(\'apg-entity-search\');\n      if (search) {\n        event.preventDefault();\n        search.focus();\n      }\n    }\n    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === \'d\') {\n      event.preventDefault();\n      var compact = !root.classList.contains(\'apg-density-compact\');\n      root.classList.toggle(\'apg-density-compact\', compact);\n      localStorage.setItem(densityKey, compact ? \'compact\' : \'comfortable\');\n      APGToast(compact ? \'Compact rows enabled\' : \'Comfortable rows enabled\', \'info\');\n    }\n  });\n})();\n</script>\n\n<dialog id="apg-create-drawer" class="apg-drawer" aria-labelledby="apg-create-title">\n  <form id="apg-create-form" method="post" action="/ui/entities/{{ safe_entity }}/records" class="apg-drawer-panel"\n        data-apg-draft-key="{{ form_intelligence.draft_key }}"\n        data-apg-undo-seconds="{{ form_intelligence.undo_seconds }}">\n    {{ csrf_input() | safe }}\n    <header class="apg-card-header">\n      <div>\n        <h2 id="apg-create-title" class="text-base font-semibold text-gray-900">New {{ entity_name }}</h2>\n        <p class="text-xs text-gray-400 mt-1">{{ entity_type }}</p>\n      </div>\n      <button type="button" class="apg-btn apg-btn-secondary" onclick="document.getElementById(\'apg-create-drawer\').close();">Close</button>\n    </header>\n    <section class="apg-form-intelligence" aria-label="{{ entity_name }} form intelligence">\n      <article>\n        <span>Autosave Draft</span>\n        <strong id="apg-draft-state">Ready</strong>\n        <small>Restores locally before submit</small>\n      </article>\n      <article>\n        <span>Async Field Validation</span>\n        <strong id="apg-validation-state">{{ form_intelligence.validation_fields | length }} fields watched</strong>\n        <small>{{ form_intelligence.required_fields | length }} required</small>\n      </article>\n      <article>\n        <span>Smart Defaults</span>\n        {% if form_intelligence.smart_defaults %}\n        <div class="apg-default-chip-row">\n          {% for item in form_intelligence.smart_defaults %}\n          <button type="button" class="apg-default-chip" data-apg-default-field="{{ item.field }}" data-apg-default-value="{{ item.value }}">{{ item.label }}</button>\n          {% endfor %}\n        </div>\n        {% else %}\n        <strong>No sibling defaults</strong>\n        {% endif %}\n      </article>\n      <article>\n        <span>Dependency Tree</span>\n        {% if form_intelligence.dependency_edges %}\n        <ul class="apg-dependency-tree">\n          {% for edge in form_intelligence.dependency_edges %}\n          <li>{{ edge.from }} -> {{ edge.to }}</li>\n          {% endfor %}\n        </ul>\n        {% else %}\n        <small>No conditional edges detected</small>\n        {% endif %}\n      </article>\n    </section>\n    <div class="overflow-y-auto max-h-[70vh] space-y-3">\n      {{ create_inputs | safe }}\n    </div>\n    <footer class="flex items-center justify-end gap-2 pt-4 border-t border-gray-100 mt-4">\n      <button type="button" class="apg-btn apg-btn-secondary" onclick="document.getElementById(\'apg-create-drawer\').close();">Cancel</button>\n      <button type="submit" class="apg-btn">Create {{ entity_name }}</button>\n    </footer>\n  </form>\n</dialog>\n\n<script nonce="{{ csp_nonce }}">\n(function() {\n  var drawer = document.getElementById(\'apg-create-drawer\');\n  var form = document.getElementById(\'apg-create-form\');\n  if (!drawer || !form) return;\n  var draftKey = form.dataset.apgDraftKey;\n  var undoSeconds = parseInt(form.dataset.apgUndoSeconds || \'5\', 10);\n  var draftState = document.getElementById(\'apg-draft-state\');\n  var validationState = document.getElementById(\'apg-validation-state\');\n  var pendingSubmit = null;\n  var dirty = false;\n  function serializeForm() {\n    var data = {};\n    Array.prototype.forEach.call(form.elements, function(field) {\n      if (!field.name || field.type === \'hidden\' || field.type === \'submit\' || field.type === \'button\') return;\n      data[field.name] = field.type === \'checkbox\' ? field.checked : field.value;\n    });\n    return data;\n  }\n  function restoreDraft() {\n    if (!draftKey || !localStorage.getItem(draftKey)) return;\n    var data = {};\n    try { data = JSON.parse(localStorage.getItem(draftKey) || \'{}\'); } catch (error) { data = {}; }\n    Object.keys(data).forEach(function(name) {\n      var field = form.elements[name];\n      if (!field) return;\n      if (field.type === \'checkbox\') field.checked = !!data[name];\n      else field.value = data[name];\n    });\n    dirty = true;\n    if (draftState) draftState.textContent = \'Draft restored\';\n    APGToast(\'Draft restored locally\', \'info\');\n  }\n  function saveDraft() {\n    if (!draftKey) return;\n    localStorage.setItem(draftKey, JSON.stringify(serializeForm()));\n    if (draftState) draftState.textContent = \'Saved locally\';\n  }\n  function validateLater() {\n    if (validationState) validationState.textContent = \'Checking...\';\n    window.setTimeout(function() {\n      var invalid = form.querySelectorAll(\':invalid\').length;\n      if (validationState) validationState.textContent = invalid ? invalid + \' field warnings\' : \'Ready to submit\';\n    }, 180);\n  }\n  restoreDraft();\n  form.addEventListener(\'input\', function() {\n    dirty = true;\n    saveDraft();\n    validateLater();\n  });\n  form.addEventListener(\'click\', function(event) {\n    var chip = event.target.closest(\'[data-apg-default-field]\');\n    if (!chip) return;\n    var field = form.elements[chip.dataset.apgDefaultField];\n    if (!field) return;\n    field.value = chip.dataset.apgDefaultValue || \'\';\n    dirty = true;\n    saveDraft();\n    validateLater();\n    APGToast(\'Smart default applied\', \'success\');\n  });\n  form.addEventListener(\'submit\', function(event) {\n    if (form.dataset.apgSubmitArmed === \'1\') {\n      localStorage.removeItem(draftKey);\n      dirty = false;\n      return;\n    }\n    event.preventDefault();\n    if (pendingSubmit) window.clearTimeout(pendingSubmit);\n    APGToast(\'Submitting in \' + undoSeconds + \'s. Press Escape to undo.\', \'info\');\n    pendingSubmit = window.setTimeout(function() {\n      form.dataset.apgSubmitArmed = \'1\';\n      form.requestSubmit();\n    }, undoSeconds * 1000);\n  });\n  drawer.addEventListener(\'cancel\', function(event) {\n    if (pendingSubmit) {\n      window.clearTimeout(pendingSubmit);\n      pendingSubmit = null;\n      APGToast(\'Submit undone\', \'success\');\n      event.preventDefault();\n      return;\n    }\n    if (!dirty) return;\n    event.preventDefault();\n    apgConfirm(\'Discard this draft?\', function() {\n      dirty = false;\n      if (draftKey) localStorage.removeItem(draftKey);\n      drawer.close();\n    });\n  });\n  document.addEventListener(\'keydown\', function(event) {\n    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === \'s\' && drawer.open) {\n      event.preventDefault();\n      form.requestSubmit();\n    }\n  });\n})();\n</script>\n\n<div class="flex items-start gap-5 flex-col lg:flex-row">\n\n  {# ── Records section ─────────────────────────────────────────── #}\n  <section class="flex-1 min-w-0" data-apg-live="entity:{{ entity_name }}">\n    <div class="flex items-center gap-3 mb-3 flex-wrap">\n      <h1 class="text-lg font-semibold text-gray-900">{{ entity_name }}</h1>\n      <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">\n        {{ total }} record{{ \'s\' if total != 1 else \'\' }}\n      </span>\n      {% if count != total %}\n      <span class="text-xs text-apg-primary bg-blue-50 px-2 py-0.5 rounded-full">\n        {{ count }} match{% if q %} for "{{ q }}"{% endif %}\n      </span>\n      {% endif %}\n    </div>\n\n    <p class="text-xs text-gray-500 mb-2">Showing {{ count }} of {{ total }} matching records.</p>\n\n    {% if records %}\n      {{ records_table | safe }}\n    {% else %}\n      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">\n        <div class="text-3xl mb-3 opacity-30">📋</div>\n        {% if q %}\n        <p class="text-sm font-medium text-gray-500">No {{ entity_name }} records match "{{ q }}".</p>\n        <p class="text-xs text-gray-400 mt-1">\n          <a href="/ui/entities/{{ safe_entity }}" class="text-apg-primary hover:underline">Clear search</a>\n        </p>\n        {% else %}\n        <p class="text-sm font-medium text-gray-500">No {{ entity_name }} records yet.</p>\n        <p class="text-xs text-gray-400 mt-1">Create the first record to get started.</p>\n        <button type="button" class="apg-btn mt-4" onclick="document.getElementById(\'apg-create-drawer\').showModal();">New {{ entity_name }}</button>\n        {% endif %}\n      </div>\n    {% endif %}\n\n    {# Pagination controls #}\n    {% if total_pages > 1 %}\n    <nav class="mt-4 flex items-center justify-between flex-wrap gap-3" aria-label="Pagination">\n      <div class="flex items-center gap-1 flex-wrap">\n        {% if page > 1 %}\n        <a href="{{ prev_page_url }}"\n           class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">← Prev</a>\n        {% else %}\n        <span class="px-3 py-1.5 text-sm border border-gray-100 rounded-lg text-gray-300 select-none">← Prev</span>\n        {% endif %}\n\n        {% if page > 3 %}\n        <a href="{{ first_page_url }}"\n           class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">1</a>\n        {% if page > 4 %}<span class="px-1 text-xs text-gray-400">…</span>{% endif %}\n        {% endif %}\n\n        {% for page_link in pagination_pages %}\n        <a href="{{ page_link.url }}"\n           class="px-3 py-1.5 text-sm rounded-lg {% if page_link.number == page %}bg-apg-primary text-white font-semibold{% else %}border border-gray-200 text-gray-600 hover:border-apg-primary hover:text-apg-primary{% endif %} transition-colors">{{ page_link.number }}</a>\n        {% endfor %}\n\n        {% if page < total_pages - 2 %}\n        {% if page < total_pages - 3 %}<span class="px-1 text-xs text-gray-400">…</span>{% endif %}\n        <a href="{{ last_page_url }}"\n           class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">{{ total_pages }}</a>\n        {% endif %}\n\n        {% if page < total_pages %}\n        <a href="{{ next_page_url }}"\n           class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">Next →</a>\n        {% else %}\n        <span class="px-3 py-1.5 text-sm border border-gray-100 rounded-lg text-gray-300 select-none">Next →</span>\n        {% endif %}\n      </div>\n      <div class="flex items-center gap-2 text-xs text-gray-400">\n        <span>Page {{ page }} of {{ total_pages }}</span>\n        <select onchange="location.href=this.options[this.selectedIndex].dataset.url"\n                class="px-2 py-1 border border-gray-200 rounded text-xs text-gray-500 bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-apg-primary">\n          {% for option in per_page_options %}\n          <option value="{{ option.value }}" data-url="{{ option.url }}"{% if option.value == per %} selected{% endif %}>{{ option.value }} / page</option>\n          {% endfor %}\n        </select>\n      </div>\n    </nav>\n    {% endif %}\n  </section>\n\n</div>\n\n<details class="mt-4 apg-developer-panel">\n  <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none">Developer exports</summary>\n  <div class="mt-2 flex items-center gap-2 flex-wrap">\n    <a href="{{ csv_url }}" class="apg-btn apg-btn-secondary">Export CSV</a>\n    <a href="{{ developer_api_url }}" class="apg-btn apg-btn-secondary">API JSON</a>\n  </div>\n  <p class="text-xs text-gray-400 mt-3">Rendered page records</p>\n  <pre class="mt-2 text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-auto max-h-64 font-mono">{{ records_json }}</pre>\n</details>\n', 'workflow_wizard.html.j2': '<section class="max-w-2xl mx-auto" data-apg-live="{{ workflow_topic }}">\n  <p class="text-sm text-gray-500 mb-6">\n    <a href="/ui" class="hover:text-blue-600">Application</a> /\n    <a href="/ui/workflows" class="hover:text-blue-600">Workflows</a> /\n    <span class="font-semibold text-gray-900">{{ workflow.name }}</span>\n  </p>\n\n  {% if completed %}\n  <div class="apg-card text-center py-12">\n    <div class="text-5xl mb-4" aria-hidden="true">✓</div>\n    <h1 class="text-xl font-bold text-gray-900 mb-2">{{ workflow.name }} complete</h1>\n    <p class="text-gray-500 text-sm mb-6">Your {{ entity_name }} record has been created successfully.</p>\n    {% if run %}\n    <div class="mx-auto mb-6 max-w-sm rounded-xl border border-gray-200 bg-gray-50 p-4 text-left">\n      <div class="flex items-center justify-between gap-3">\n        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Recorded run</p>\n        <span class="apg-badge apg-badge-success">{{ run.status }}</span>\n      </div>\n      <p class="mt-2 font-mono text-sm text-gray-900">{{ run.id }}</p>\n      <p class="mt-1 text-xs text-gray-500">{{ run.completed_steps | length }} steps completed{% if run.created_record_id %} · Record {{ run.created_record_id }}{% endif %}</p>\n    </div>\n    {% endif %}\n    <div class="flex items-center justify-center gap-3 flex-wrap">\n      {% if safe_record_id %}\n      <a href="/ui/entities/{{ safe_entity }}/{{ safe_record_id }}" class="apg-btn">Open created record</a>\n      {% endif %}\n      {% if safe_run_id %}\n      <a href="/ui/debug/{{ safe_run_id }}" class="apg-btn apg-btn-secondary">Inspect run</a>\n      {% endif %}\n      <a href="/ui/entities/{{ safe_entity }}" class="apg-btn">View all {{ entity_name }} records</a>\n      <a href="/ui/workflows/{{ safe_entity }}/{{ safe_workflow_id }}" class="apg-btn apg-btn-secondary">Start again</a>\n      <a href="/ui/workflows" class="apg-btn apg-btn-secondary">All workflows</a>\n    </div>\n    {% if workflow_intelligence %}\n    <section class="apg-workflow-intelligence mt-6" aria-label="Workflow completion intelligence">\n      <article>\n        <span>Duration Estimate</span>\n        <strong>Completed</strong>\n        <small>{{ workflow_intelligence.history_count }} comparable run{{ \'s\' if workflow_intelligence.history_count != 1 else \'\' }}</small>\n      </article>\n      <article>\n        <span>Rollback Map</span>\n        <strong>{{ workflow_intelligence.rollback_links | length }} restore points</strong>\n        <small>Inspect run for compensation details</small>\n      </article>\n      <article>\n        <span>Save Template</span>\n        <button type="button" class="apg-mini-btn" data-apg-workflow-template="{{ workflow_intelligence.template_payload | tojson }}" data-apg-workflow-template-key="{{ workflow_intelligence.template_key }}">Save local template</button>\n      </article>\n    </section>\n    {% endif %}\n  </div>\n  {% else %}\n  <div class="text-center mb-8">\n    <div class="text-4xl mb-3" aria-hidden="true">{{ workflow.icon }}</div>\n    <h1 class="text-xl font-bold text-gray-900">{{ workflow.name }}</h1>\n    <p class="text-sm text-gray-500 mt-1">{{ workflow.description }}</p>\n  </div>\n\n  <ol class="flex items-center gap-0 mb-8 px-2" aria-label="Workflow progress">\n    {% for item in progress %}\n    <li class="flex items-center gap-1.5 text-xs font-medium {{ item.class_name }}">\n      <span class="w-5 h-5 rounded-full flex items-center justify-center text-xs {{ item.badge_class }}">{{ item.label }}</span>\n      <span class="hidden sm:block">{{ item.title }}</span>\n    </li>\n    {% if not loop.last %}\n    <li class="flex-1 h-px bg-gray-200 mx-1" aria-hidden="true"><span class="block h-px bg-blue-600" style="width:{{ \'100%\' if loop.index0 < step_index else \'0%\' }}"></span></li>\n    {% endif %}\n    {% endfor %}\n  </ol>\n\n  {% if workflow_intelligence %}\n  <section class="apg-workflow-intelligence" aria-label="Workflow intelligence">\n    <article>\n      <span>Live Duration Estimate</span>\n      <strong>{{ workflow_intelligence.remaining }} remaining</strong>\n      <small>{{ workflow_intelligence.history_count }} historical run{{ \'s\' if workflow_intelligence.history_count != 1 else \'\' }} blended with schema defaults</small>\n    </article>\n    <article>\n      <span>Rollback To Step</span>\n      {% if workflow_intelligence.rollback_links %}\n      <div class="apg-workflow-rollback-row">\n        {% for item in workflow_intelligence.rollback_links %}\n        <a href="{{ item.rollback_url }}">{{ loop.index }}. {{ item.title }}</a>\n        {% endfor %}\n      </div>\n      {% else %}\n      <strong>No completed steps yet</strong>\n      {% endif %}\n    </article>\n    <article>\n      <span>Save As Template</span>\n      <button type="button" class="apg-mini-btn" data-apg-workflow-template="{{ workflow_intelligence.template_payload | tojson }}" data-apg-workflow-template-key="{{ workflow_intelligence.template_key }}">Save local template</button>\n      <small>Stores step shape in this browser</small>\n    </article>\n  </section>\n  <ol class="apg-workflow-estimate-list" aria-label="Estimated workflow steps">\n    {% for item in workflow_intelligence.estimated_steps %}\n    <li class="{{ item.state }}">\n      <span>{{ item.title }}</span>\n      <strong>{{ item.estimate }}</strong>\n      <small>{{ item.field_count }} fields · {{ item.state }}</small>\n    </li>\n    {% endfor %}\n  </ol>\n  {% endif %}\n\n  <article class="apg-card overflow-hidden">\n    <header class="px-6 py-4 border-b border-gray-100 bg-gray-50 -mx-4 -mt-4 mb-4">\n      <h2 class="font-semibold text-gray-900">Step {{ step_index + 1 }} of {{ total_steps }}: {{ step.title }}</h2>\n      <p class="text-sm text-gray-500 mt-0.5">{{ step.subtitle }}</p>\n    </header>\n    {% if error %}\n    <div role="alert" class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ error }}</div>\n    {% endif %}\n    <form method="post" action="{{ next_url }}" class="space-y-4">\n      {{ csrf_input() | safe }}\n      {{ hidden_fields | safe }}\n      {{ step_inputs | safe }}\n      <div class="flex items-center justify-between pt-4 border-t border-gray-100 mt-6">\n        {% if step_index > 0 %}\n        <a href="/ui/workflows/{{ safe_entity }}/{{ safe_workflow_id }}/step/{{ step_index - 1 }}" class="apg-btn apg-btn-secondary">Back</a>\n        {% else %}\n        <a href="/ui/workflows" class="apg-btn apg-btn-secondary">Cancel</a>\n        {% endif %}\n        <button type="submit" class="apg-btn">{{ next_label }}</button>\n      </div>\n    </form>\n  </article>\n  {% endif %}\n</section>\n\n<script nonce="{{ csp_nonce }}">\n(function() {\n  document.addEventListener(\'click\', function(event) {\n    var trigger = event.target.closest(\'[data-apg-workflow-template]\');\n    if (!trigger) return;\n    localStorage.setItem(trigger.dataset.apgWorkflowTemplateKey, trigger.dataset.apgWorkflowTemplate);\n    APGToast(\'Workflow template saved locally\', \'success\');\n  });\n})();\n</script>\n', 'database_catalog.html.j2': '<section class="mb-6">\n  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <span class="font-semibold text-gray-900">Databases</span></p>\n  <div class="flex items-start justify-between gap-4 flex-wrap">\n    <div>\n      <h1 class="text-xl font-bold text-gray-900">Database catalog</h1>\n      <p class="text-sm text-gray-500 mt-1">Schemas, generated tables, columns, indexes, and references for this app.</p>\n    </div>\n    <span class="apg-badge {{ \'apg-badge-success\' if status.valid else \'apg-badge-danger\' }}">{{ status_label }}</span>\n  </div>\n</section>\n\n<section class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" aria-label="Database summary">\n  <article class="apg-card">\n    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Databases</p>\n    <p class="text-2xl font-bold text-gray-900">{{ status.database_count }}</p>\n  </article>\n  <article class="apg-card">\n    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Schemas</p>\n    <p class="text-2xl font-bold text-gray-900">{{ status.schema_count }}</p>\n  </article>\n  <article class="apg-card">\n    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Tables</p>\n    <p class="text-2xl font-bold text-gray-900">{{ status.table_count }}</p>\n  </article>\n  <article class="apg-card">\n    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">References</p>\n    <p class="text-2xl font-bold text-gray-900">{{ status.reference_count }}</p>\n  </article>\n</section>\n\n{% if database_intelligence %}\n<section class="apg-database-intelligence" aria-label="Database intelligence">\n  <article>\n    <div class="apg-database-intel-head">\n      <span>Schema Diff</span>\n      <strong>{{ database_intelligence.schema_diff | length }} checks</strong>\n    </div>\n    <dl class="apg-schema-diff">\n      {% for item in database_intelligence.schema_diff %}\n      <div class="{{ item.state }}">\n        <dt>{{ item.label }}</dt>\n        <dd><span>{{ item.before }}</span><strong>{{ item.after }}</strong></dd>\n      </div>\n      {% endfor %}\n    </dl>\n  </article>\n\n  <article>\n    <div class="apg-database-intel-head">\n      <span>ER Mini-map</span>\n      <strong>{{ database_intelligence.er_nodes | length }} nodes</strong>\n    </div>\n    <div class="apg-er-minimap">\n      {% for node in database_intelligence.er_nodes %}\n      <a href="#table-{{ node.database }}-{{ node.schema }}-{{ node.label }}">\n        {{ node.label }}\n        <small>{{ node.columns }} columns</small>\n      </a>\n      {% endfor %}\n    </div>\n    <small>{{ database_intelligence.er_edges | length }} relationship edges indexed</small>\n  </article>\n\n  <article>\n    <div class="apg-database-intel-head">\n      <span>Query Playground</span>\n      <strong>{{ database_intelligence.query_examples | length }} snippets</strong>\n    </div>\n    <div class="apg-query-playground">\n      {% for item in database_intelligence.query_examples %}\n      <button type="button" data-apg-query="{{ item.sql }}">{{ item.label }}</button>\n      {% endfor %}\n      <textarea id="apg-query-buffer" rows="4" readonly>{{ database_intelligence.query_examples[0].sql if database_intelligence.query_examples else \'select 1;\' }}</textarea>\n    </div>\n  </article>\n</section>\n{% endif %}\n\n{% if databases %}\n<section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">\n  {% for database in databases %}\n  <article class="apg-card">\n    <header class="apg-card-header">\n      <div>\n        <h2 class="text-base font-semibold text-gray-900">{{ database.name }}</h2>\n        <p class="text-xs text-gray-500 mt-1">{{ database.type or \'database\' }}</p>\n      </div>\n      <a class="apg-btn apg-btn-secondary" href="/databases/{{ database.name }}/schemas">Schema JSON</a>\n    </header>\n    {% if database.connection_config %}\n    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">\n      {% for key, value in database.connection_config.items() %}\n      <div class="border border-gray-100 rounded-lg p-3">\n        <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ key }}</dt>\n        <dd class="text-sm font-mono text-gray-900 mt-1">{{ value }}</dd>\n      </div>\n      {% endfor %}\n    </dl>\n    {% endif %}\n    {% if database.schemas %}\n    <div class="space-y-3">\n      {% for schema in database.schemas %}\n      <section class="border border-gray-200 rounded-lg p-3">\n        <div class="flex items-center justify-between gap-3 flex-wrap mb-3">\n          <div>\n            <h3 class="text-sm font-semibold text-gray-900">{{ schema.name }}</h3>\n            <p class="text-xs text-gray-500 mt-1">{{ schema.tables | length }} table{{ \'\' if schema.tables | length == 1 else \'s\' }}</p>\n          </div>\n          {% if schema.source %}\n          <span class="apg-badge apg-badge-neutral">{{ schema.source }}</span>\n          {% endif %}\n        </div>\n        <div class="flex items-center gap-2 flex-wrap">\n          {% for table in schema.tables %}\n          <a href="#table-{{ database.name }}-{{ schema.name }}-{{ table.name }}" class="apg-badge apg-badge-info">{{ table.name }}</a>\n          {% endfor %}\n        </div>\n      </section>\n      {% endfor %}\n    </div>\n    {% else %}\n    <p class="text-sm text-gray-500">No schemas declared.</p>\n    {% endif %}\n  </article>\n  {% endfor %}\n</section>\n\n<script nonce="{{ csp_nonce }}">\n(function() {\n  document.addEventListener(\'click\', function(event) {\n    var query = event.target.closest(\'[data-apg-query]\');\n    if (!query) return;\n    var buffer = document.getElementById(\'apg-query-buffer\');\n    if (buffer) buffer.value = query.dataset.apgQuery || \'\';\n    APGToast(\'Query snippet loaded\', \'info\');\n  });\n})();\n</script>\n{% else %}\n<section class="apg-card text-center">\n  <h2 class="text-base font-semibold text-gray-900">No databases declared</h2>\n  <p class="text-sm text-gray-500 mt-1">This generated application does not declare a database workspace.</p>\n</section>\n{% endif %}\n\n<section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">\n  <div class="lg:col-span-2 space-y-4">\n    {% for database in databases %}\n      {% for schema in database.schemas %}\n        {% for table in schema.tables %}\n        <article id="table-{{ database.name }}-{{ schema.name }}-{{ table.name }}" class="apg-card">\n          <header class="apg-card-header">\n            <div>\n              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ database.name }} / {{ schema.name }}</p>\n              <h2 class="text-base font-semibold text-gray-900">{{ table.name }}</h2>\n            </div>\n            <span class="apg-badge apg-badge-neutral">{{ table.columns | length }} columns</span>\n          </header>\n          <div class="apg-table-wrap">\n            <table class="apg-table">\n              <caption class="apg-sr-only">{{ table.name }} records</caption>\n              <thead>\n                <tr>\n                  <th scope="col">Column</th>\n                  <th scope="col">Type</th>\n                  <th scope="col">Constraints</th>\n                  <th scope="col">Reference</th>\n                </tr>\n              </thead>\n              <tbody>\n                {% for column in table.columns %}\n                <tr>\n                  <td scope="row"><span class="font-mono text-gray-900">{{ column.name }}</span></td>\n                  <td><span class="apg-badge apg-badge-neutral">{{ column.type }}</span></td>\n                  <td>\n                    <div class="flex items-center gap-2 flex-wrap">\n                      {% if column.primary_key %}<span class="apg-badge apg-badge-success">Primary key</span>{% endif %}\n                      {% if column.required and not column.primary_key %}<span class="apg-badge apg-badge-warning">Required</span>{% endif %}\n                      {% if column.nullable %}<span class="apg-badge apg-badge-neutral">Nullable</span>{% endif %}\n                    </div>\n                  </td>\n                  <td>\n                    {% if column.reference %}\n                    <span class="font-mono text-sm text-gray-700">{{ column.reference.table }}.{{ column.reference.column }}</span>\n                    {% else %}\n                    <span class="text-xs text-gray-400">none</span>\n                    {% endif %}\n                  </td>\n                </tr>\n                {% endfor %}\n              </tbody>\n            </table>\n          </div>\n          {% if table.indexes %}\n          <details class="mt-3">\n            <summary class="cursor-pointer text-sm font-medium text-gray-700">Indexes</summary>\n            <ul class="mt-2 space-y-1">\n              {% for index in table.indexes %}\n              <li class="text-sm text-gray-600"><span class="font-mono">{{ index.name }}</span> on <span class="font-mono">{{ index.columns | join(\', \') }}</span></li>\n              {% endfor %}\n            </ul>\n          </details>\n          {% endif %}\n        </article>\n        {% endfor %}\n      {% endfor %}\n    {% endfor %}\n  </div>\n\n  <aside class="space-y-4">\n    <section class="apg-card">\n      <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Reference map</h2></header>\n      {% if relationships %}\n      <ol class="space-y-2">\n        {% for relationship in relationships %}\n        <li class="border border-gray-100 rounded-lg p-3">\n          <p class="text-sm font-mono text-gray-900">{{ relationship.source }}</p>\n          <p class="text-xs text-gray-500 mt-1">references {{ relationship.target }}{% if relationship.cardinality %} · {{ relationship.cardinality }}{% endif %}</p>\n        </li>\n        {% endfor %}\n      </ol>\n      {% else %}\n      <p class="text-sm text-gray-500">No foreign-key references declared.</p>\n      {% endif %}\n    </section>\n\n    <section class="apg-card">\n      <header class="apg-card-header">\n        <h2 class="text-base font-semibold text-gray-900">Validation</h2>\n        <span class="apg-badge {{ \'apg-badge-success\' if status.valid else \'apg-badge-danger\' }}">{{ status_label }}</span>\n      </header>\n      {% if status.validation.warnings %}\n      <ul class="space-y-2 mb-3">\n        {% for warning in status.validation.warnings %}\n        <li class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">{{ warning }}</li>\n        {% endfor %}\n      </ul>\n      {% else %}\n      <p class="text-sm text-gray-500 mb-3">No schema warnings.</p>\n      {% endif %}\n      <details>\n        <summary class="cursor-pointer text-sm font-medium text-gray-700">Validation details</summary>\n        <pre>{{ validation_json }}</pre>\n      </details>\n    </section>\n  </aside>\n</section>\n', 'kanban_view.html.j2': '{# kanban_view.html.j2 — Kanban board view for status-field entities\n   Variables: entity_name, safe_entity, columns, display_field, status_field, fields,\n              status_options, total_records, wip_limit, list_url\n   columns: [{"label": str, "records": [dict]}]\n#}\n\n{# Breadcrumb + view toggle #}\n<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">\n  <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>\n  <span>/</span>\n  <a href="/ui/entities/{{ safe_entity }}" class="hover:text-apg-primary transition-colors">{{ entity_name }}</a>\n  <span>/</span>\n  <span class="font-semibold text-gray-900">Kanban</span>\n  <div class="ml-auto flex items-center gap-1">\n    <a href="/ui/entities/{{ safe_entity }}"\n       class="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-apg-primary hover:text-apg-primary transition-colors">\n      ≡ List\n    </a>\n    <span class="px-3 py-1 text-xs bg-apg-primary text-white rounded-lg font-medium">⊞ Kanban</span>\n  </div>\n</nav>\n\n<section class="apg-kanban-header">\n  <div>\n    <h1 class="text-xl font-bold text-gray-900">{{ entity_name }}</h1>\n    <p class="text-sm text-gray-500 mt-1">Grouped by {{ status_field | replace(\'_\', \' \') }} with drag-and-drop or keyboard move controls.</p>\n  </div>\n  <div class="apg-kanban-summary" aria-label="Board summary">\n    <a href="{{ list_url }}" class="apg-kanban-summary-item"><strong>{{ total_records }}</strong><span>Total</span></a>\n    <span class="apg-kanban-summary-item"><strong>{{ columns | length }}</strong><span>Columns</span></span>\n    <span class="apg-kanban-summary-item"><strong>{{ wip_limit }}</strong><span>WIP guide</span></span>\n  </div>\n</section>\n\n<section class="apg-kanban-intelligence" aria-label="{{ entity_name }} flow intelligence">\n  <article>\n    <div class="apg-card-header">\n      <div>\n        <h2>Cumulative Flow</h2>\n        <p>Detect expanding queues before they block delivery.</p>\n      </div>\n    </div>\n    <ol class="apg-flow-list">\n      {% for row in flow_rows %}\n      <li{% if row.over_limit %} class="warn"{% endif %}>\n        <span>{{ row.label }}</span>\n        <strong>{{ row.cumulative }}</strong>\n        <small>{{ row.percent }}% cumulative · {{ row.count }} in column</small>\n      </li>\n      {% endfor %}\n    </ol>\n  </article>\n  <article>\n    <div class="apg-card-header">\n      <div>\n        <h2>Swimlanes</h2>\n        <p>{% if swimlane_field %}Grouped by {{ swimlane_field | replace(\'_\', \' \') }}{% else %}Add owner, priority, country, or team to unlock lanes{% endif %}</p>\n      </div>\n    </div>\n    <div class="apg-swimlane-list">\n      {% for lane in swimlanes %}\n      <a href="{{ lane.url }}">\n        <span>{{ lane.label }}</span>\n        <strong>{{ lane.count }}</strong>\n      </a>\n      {% else %}\n      <p>No swimlane field detected yet.</p>\n      {% endfor %}\n    </div>\n  </article>\n  <article>\n    <div class="apg-card-header">\n      <div>\n        <h2>WIP Policy</h2>\n        <p>Limits are generated from current board shape.</p>\n      </div>\n    </div>\n    <p class="apg-kanban-policy"><strong>{{ wip_limit }}</strong> cards per column before warning. Over-limit columns stay linked to filtered record lists.</p>\n  </article>\n</section>\n\n{# Kanban board — horizontal scroll #}\n<div class="flex gap-4 overflow-x-auto pb-6 items-start -mx-1 px-1">\n  {% for col in columns %}\n  <div class="flex-shrink-0 w-72">\n    {# Column header #}\n    <div class="flex items-center justify-between mb-3 px-1">\n      <div class="flex items-center gap-2 min-w-0">\n        <span class="w-2.5 h-2.5 rounded-full\n          {% if col.label | lower in [\'active\', \'approved\', \'paid\', \'open\', \'complete\', \'completed\', \'success\', \'done\'] %}bg-green-400\n          {% elif col.label | lower in [\'inactive\', \'rejected\', \'closed\', \'cancelled\', \'canceled\', \'failed\', \'expired\'] %}bg-red-400\n          {% elif col.label | lower in [\'pending\', \'draft\', \'processing\', \'review\', \'in_progress\', \'waiting\'] %}bg-yellow-400\n          {% else %}bg-gray-300{% endif %}"></span>\n        <h2 class="text-sm font-semibold text-gray-900">{{ col.label }}</h2>\n        <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">{{ col.count }}</span>\n      </div>\n      <a href="{{ col.list_url }}" class="text-xs text-gray-400 hover:text-apg-primary">List</a>\n    </div>\n    {% if col.over_limit %}\n    <p class="apg-kanban-wip">Above WIP guide {{ col.wip_limit }}</p>\n    {% endif %}\n\n    {# Card list — apg-kanban-col enables SortableJS drag-and-drop #}\n    <div class="space-y-2.5 apg-kanban-col min-h-16"\n         data-col-label="{{ col.label | e }}"\n         id="apg-col-{{ col.label | urlencode }}">\n      {% for record in col.records %}\n      {% set rec_id = record.get(\'id\', \'\') | string %}\n      <article data-record-id="{{ rec_id | e }}"\n               data-revision="{{ record.get(\'_revision\', \'\') | string | e }}"\n               class="apg-kanban-card bg-white rounded-xl border border-gray-200 p-4 hover:border-apg-primary hover:shadow-md transition-all group/card cursor-grab active:cursor-grabbing">\n        <div class="flex items-start justify-between gap-2 mb-2.5">\n          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0"\n               style="background: var(--apg-primary, #0ea5e9)">\n            {{ (record.get(display_field, \'\') | string)[:1] | upper or \'?\' }}\n          </div>\n          <span class="text-xs text-gray-300 font-mono mt-1">{{ rec_id[:8] }}</span>\n        </div>\n        <a href="/ui/entities/{{ safe_entity }}/{{ rec_id | urlencode }}"\n           class="block text-sm font-semibold text-gray-900 group-hover/card:text-apg-primary transition-colors leading-tight mb-2">\n          {{ record.get(display_field, \'—\') | string | truncate(50) }}\n        </a>\n        {% set shown_fields = namespace(count=0) %}\n        {% for f in fields %}\n        {% if f.name not in [\'id\', \'_revision\', display_field, status_field] %}\n        {% set fval = record.get(f.name, \'\') %}\n        {% if shown_fields.count < 2 and fval and fval != \'\' and fval != \'None\' %}\n        <p class="text-xs text-gray-400 truncate mt-0.5">\n          <span class="font-medium text-gray-500">{{ (f.name[:-3] | replace(\'_\', \' \') | title ~ \' ID\') if f.name.endswith(\'_id\') else (f.name | replace(\'_\', \' \') | title) }}:</span>\n          {{ fval | string | truncate(35) }}\n        </p>\n        {% set shown_fields.count = shown_fields.count + 1 %}\n        {% endif %}\n        {% endif %}\n        {% endfor %}\n        <form method="post" action="/ui/entities/{{ safe_entity }}/records/{{ rec_id | urlencode }}" class="apg-kanban-move">\n          {{ csrf_input() | safe }}\n          <input type="hidden" name="expected_revision" value="{{ record.get(\'_revision\', \'\') | string | e }}">\n          <input type="hidden" name="return_view" value="kanban">\n          <label class="sr-only" for="apg-move-{{ rec_id | e }}">Move {{ record.get(display_field, rec_id) }}</label>\n          <select id="apg-move-{{ rec_id | e }}" name="{{ status_field }}" class="apg-kanban-select">\n            {% for option in status_options %}\n            <option value="{{ option }}"{% if option == col.label %} selected{% endif %}>{{ option }}</option>\n            {% endfor %}\n          </select>\n          <button type="submit" class="apg-btn apg-btn-secondary">Move</button>\n        </form>\n      </article>\n      {% endfor %}\n\n      {% if not col.records %}\n      <div class="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-6 text-center apg-kanban-empty">\n        <p class="text-xs text-gray-400">No {{ col.label }} records.</p>\n        <a href="{{ col.list_url }}" class="text-xs text-apg-primary hover:underline">Open filtered list</a>\n      </div>\n      {% endif %}\n    </div>\n  </div>\n  {% endfor %}\n\n  {% if not columns %}\n  <div class="flex-1 text-center py-16 text-gray-400">\n    <div class="text-4xl mb-3 opacity-20">⊞</div>\n    <p class="text-sm">No records to display.</p>\n  </div>\n  {% endif %}\n</div>\n\n<script nonce="{{ csp_nonce }}">\n(function() {\n  var entity = {{ safe_entity | tojson }};\n  var statusField = {{ status_field | tojson }};\n\n  document.querySelectorAll(\'.apg-kanban-col\').forEach(function(col) {\n    new Sortable(col, {\n      group: \'apg-kanban\',\n      animation: 150,\n      ghostClass: \'opacity-30\',\n      chosenClass: \'shadow-lg\',\n      dragClass: \'rotate-1\',\n      onEnd: function(evt) {\n        var card = evt.item;\n        var recordId = card.dataset.recordId;\n        var newCol = evt.to;\n        var newStatus = newCol.dataset.colLabel;\n        if (!recordId || !newStatus) return;\n\n        var body = {record: {}};\n        body.record[statusField] = newStatus;\n\n        fetch(\'/entities/\' + encodeURIComponent(entity) + \'/records/\' + encodeURIComponent(recordId), {\n          method: \'PUT\',\n          headers: {\'Content-Type\': \'application/json\'},\n          body: JSON.stringify(body)\n        }).then(function(r) {\n          if (r.ok) {\n            APGToast(\'Moved to \' + newStatus, \'success\');\n          } else {\n            APGToast(\'Move failed — \' + r.status, \'error\');\n            evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);\n          }\n        }).catch(function() {\n          APGToast(\'Move failed\', \'error\');\n          evt.from.insertBefore(card, evt.from.children[evt.oldIndex] || null);\n        });\n      }\n    });\n  });\n})();\n</script>\n', 'landing.html.j2': '{# landing.html.j2 — APG application landing page #}\n<!doctype html>\n<html lang="{{ active_locale }}" dir="{{ text_direction }}" class="h-full">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>{{ module_name | replace(\'_\', \' \') | title }}</title>\n  <link rel="stylesheet" href="/static/apg.css">\n  <link rel="stylesheet" href="/theme.css">\n  <style nonce="{{ csp_nonce }}">\n    :root {\n      --brand: {{ theme_primary }};\n      --accent: {{ theme_accent }};\n    }\n  </style>\n</head>\n<body class="min-h-full bg-gray-50 text-gray-900 font-sans antialiased">\n  <a class="apg-skip-link" href="#content">Skip to content</a>\n\n  <header class="bg-white border-b border-gray-200">\n    <nav class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between gap-4">\n      <a href="/" class="text-lg font-bold text-gray-900">{{ module_name | replace(\'_\', \' \') | title }}</a>\n      <div class="flex items-center gap-2 flex-wrap justify-end">\n        <a href="/ui" class="apg-btn">{{ _(\'open_app\') }}</a>\n        <a href="/ui/marketplace" class="apg-btn apg-btn-secondary">{{ _(\'marketplace\') }}</a>\n      </div>\n    </nav>\n  </header>\n\n  <main id="content" class="max-w-6xl mx-auto px-6 py-10">\n    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mb-8">\n      <div>\n        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Generated APG workspace</p>\n        <h1 class="text-4xl font-extrabold text-gray-900 mb-4">{{ module_name | replace(\'_\', \' \') | title }}</h1>\n        <p class="text-lg text-gray-600 mb-6 leading-relaxed">\n          {{ module_description or \'A generated operational application with data, workflows, automation, and integration surfaces ready to use.\' }}\n        </p>\n        <div class="flex items-center gap-3 flex-wrap">\n          <a href="/ui" class="apg-btn">{{ _(\'open_app\') }}</a>\n          {% if primary_entities %}\n          <a href="/ui/entities/{{ primary_entities[0].name }}" class="apg-btn apg-btn-secondary">Open {{ primary_entities[0].name }}</a>\n          {% endif %}\n          <a href="/openapi.json" class="apg-btn apg-btn-secondary">API contract</a>\n        </div>\n      </div>\n      <section class="apg-card" aria-label="Workspace readiness">\n        <h2 class="text-base font-semibold text-gray-900 mb-4">Workspace readiness</h2>\n        <div class="grid grid-cols-2 gap-3">\n          {% for stat in stats %}\n          <div class="border border-gray-100 rounded-lg p-3">\n            <p class="text-2xl font-bold text-gray-900">{{ stat.value }}</p>\n            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ stat.label }}</p>\n          </div>\n          {% endfor %}\n        </div>\n      </section>\n    </section>\n\n    {% if capability_compare %}\n    <section class="apg-marketplace-compare mb-8" aria-label="Capability compare">\n      <div>\n        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Capability compare</p>\n        <h2 class="text-base font-semibold text-gray-900">Generated proof beats marketplace promises</h2>\n      </div>\n      <div class="apg-table-wrap">\n        <table class="apg-table">\n          <caption class="apg-sr-only">{{ module_name }} capability compare records</caption>\n          <thead><tr><th scope="col">Surface</th><th scope="col">APG proof</th><th scope="col">Leader weakness closed</th><th scope="col">Inspect</th></tr></thead>\n          <tbody>\n            {% for row in capability_compare %}\n            <tr>\n              <td scope="row" class="font-semibold">{{ row.surface }}</td>\n              <td>{{ row.apg }}</td>\n              <td>{{ row.leader_gap }}</td>\n              <td><a href="{{ row.proof }}" class="apg-btn apg-btn-secondary apg-mini-btn">Open</a></td>\n            </tr>\n            {% endfor %}\n          </tbody>\n        </table>\n      </div>\n    </section>\n    {% endif %}\n\n    {% if live_demo %}\n    <section class="apg-live-demo-boot mb-8" aria-label="Live demo boot">\n      <header>\n        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Live demo boot</p>\n        <h2 class="text-base font-semibold text-gray-900">{{ live_demo.headline }}</h2>\n      </header>\n      <ol>\n        {% for step in live_demo.steps %}\n        <li>\n          <span>{{ loop.index }}</span>\n          <div>\n            <a href="{{ step.url }}" class="font-semibold text-gray-900">{{ step.label }}</a>\n            <small>{{ step.detail }}</small>\n          </div>\n        </li>\n        {% endfor %}\n      </ol>\n    </section>\n    {% endif %}\n\n    <section class="mb-8" aria-label="Primary actions">\n      <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-4">Start here</h2>\n      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">\n        {% for action in workspace_actions %}\n        <a href="{{ action.url }}" class="apg-card hover:border-apg-primary transition-colors">\n          <h3 class="text-sm font-semibold text-gray-900">{{ action.label }}</h3>\n          <p class="text-xs text-gray-500 mt-2">{{ action.description }}</p>\n        </a>\n        {% endfor %}\n      </div>\n    </section>\n\n    {% if primary_entities %}\n    <section class="mb-8" aria-label="Data workspaces">\n      <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-4">{{ _(\'data_entities\') }}</h2>\n      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">\n        {% for entity in primary_entities %}\n        <a href="/ui/entities/{{ entity.name }}" class="apg-card hover:border-apg-primary transition-colors">\n          <div class="flex items-center justify-between gap-3 mb-3">\n            <span class="w-9 h-9 rounded-lg flex items-center justify-center text-white text-sm font-bold" style="background: var(--brand)">\n              {{ entity.name[0] | upper }}\n            </span>\n            <span class="apg-badge">{{ entity.type }}</span>\n          </div>\n          <h3 class="text-sm font-semibold text-gray-900">{{ entity.name }}</h3>\n          <p class="text-xs text-gray-500 mt-1">{{ entity.fields | length if entity.fields else entity.properties | length }} fields</p>\n        </a>\n        {% endfor %}\n      </div>\n    </section>\n    {% endif %}\n\n    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">\n      <article class="apg-card">\n        <h2 class="text-base font-semibold text-gray-900 mb-3">Integration readiness</h2>\n        <p class="text-sm text-gray-500 mb-4">Generated APIs and marketplace blueprints make the app connectable without external assets.</p>\n        <div class="space-y-2">\n          {% for blueprint in marketplace_blueprints[:3] %}\n          <a href="{{ blueprint.href }}" class="flex items-center justify-between gap-3 border border-gray-100 rounded-lg p-3 hover:border-apg-primary">\n            <span class="text-sm font-semibold text-gray-900">{{ blueprint.title }}</span>\n            <span class="text-xs text-gray-400">{{ blueprint.category }}</span>\n          </a>\n          {% endfor %}\n        </div>\n      </article>\n      <article class="apg-card">\n        <h2 class="text-base font-semibold text-gray-900 mb-3">Developer surfaces</h2>\n        <div class="flex flex-wrap gap-2">\n          {% for link in api_links %}\n          <a href="{{ link.url }}" class="apg-btn apg-btn-secondary">{{ link.label }}</a>\n          {% endfor %}\n        </div>\n      </article>\n    </section>\n\n    {% if marketplace_intelligence %}\n    <section class="apg-install-proof-ledger mb-8" aria-label="Install proof ledger">\n      <header>\n        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Install proof</p>\n        <h2 class="text-base font-semibold text-gray-900">Local evidence for {{ marketplace_intelligence.leader }}-class evaluation</h2>\n      </header>\n      <div>\n        {% for item in marketplace_intelligence.install_proof %}\n        <a href="{{ item.url }}">\n          <span>{{ item.label }}</span>\n          <strong>{{ item.value }}</strong>\n        </a>\n        {% endfor %}\n      </div>\n    </section>\n    {% endif %}\n  </main>\n\n  <footer class="border-t border-gray-200 py-6 text-center text-xs text-gray-400">\n    Generated by <span class="font-medium text-gray-600">APG</span> · Datacraft\n  </footer>\n</body>\n</html>\n', 'capability_console.html.j2': '{% set operation = operation | default(\'\') %}\n{% set operation_label = operation_label | default(\'Result\') %}\n{% set rule_context_json = rule_context_json | default(\'{}\') %}\n{% set configuration_json = configuration_json | default(\'{}\') %}\n{% set approval_context_json = approval_context_json | default(\'{}\') %}\n{% set description = description | default({}) %}\n{% set capability_intelligence = capability_intelligence | default({}) %}\n\n<section class="mb-6">\n  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <a href="/capabilities" class="hover:text-blue-600">Capability catalog</a> / <span class="font-semibold text-gray-900">{{ name }}</span></p>\n  <div class="flex items-start justify-between gap-4 flex-wrap">\n    <div>\n      <h1 class="text-xl font-bold text-gray-900">{{ name }}</h1>\n      <p class="text-sm text-gray-500 mt-1">Rules, configuration, and approval planning workspace.</p>\n    </div>\n    {% if description.contract %}\n    <span class="apg-badge apg-badge-neutral">{{ description.contract.get(\'name\', \'capability\') }}</span>\n    {% endif %}\n  </div>\n</section>\n\n{% if error %}\n<div role="alert" class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm mb-4">{{ error }}</div>\n{% endif %}\n\n{% if capability_intelligence %}\n<section class="apg-capability-intelligence" aria-label="{{ name }} capability intelligence">\n  <article>\n    <div class="apg-capability-intel-head">\n      <span>Rule Test-bench</span>\n      <strong>{{ capability_intelligence.rule_count }} rules</strong>\n    </div>\n    <div class="apg-capability-test-row">\n      {% for item in capability_intelligence.test_cases %}\n      <button type="button" data-apg-rule-context="{{ item.context }}" data-apg-testbench-key="{{ capability_intelligence.bench_key }}">\n        {{ item.name }}\n        <small>{{ item.expected }}</small>\n      </button>\n      {% endfor %}\n    </div>\n  </article>\n\n  <article>\n    <div class="apg-capability-intel-head">\n      <span>Dry-run Diff</span>\n      <strong>{{ capability_intelligence.dry_run_diff | selectattr(\'changed\') | list | length }} changes</strong>\n    </div>\n    <dl class="apg-capability-diff">\n      {% for item in capability_intelligence.dry_run_diff %}\n      <div class="{{ \'changed\' if item.changed else \'\' }}">\n        <dt>{{ item.key }}</dt>\n        <dd><span>{{ item.before }}</span><strong>{{ item.after }}</strong></dd>\n      </div>\n      {% endfor %}\n    </dl>\n  </article>\n\n  <article>\n    <div class="apg-capability-intel-head">\n      <span>Approval SLA</span>\n      <strong>{{ capability_intelligence.approval_sla.remaining }}</strong>\n    </div>\n    <p class="text-sm text-gray-600">{{ capability_intelligence.approval_sla.approvers }} approver{{ \'s\' if capability_intelligence.approval_sla.approvers != 1 else \'\' }} · target {{ capability_intelligence.approval_sla.target }}</p>\n    <div class="apg-sla-bar"><span style="width:72%"></span></div>\n    <small>{{ \'Approval required\' if capability_intelligence.approval_sla.required else \'No approval required yet\' }}</small>\n  </article>\n</section>\n{% endif %}\n\n<section class="grid grid-cols-1 lg:grid-cols-3 gap-4">\n  <form method="post" action="/ui/capabilities/{{ safe_name }}/rules/evaluate" class="apg-card space-y-4">\n    {{ csrf_input() | safe }}\n    <div>\n      <h2 class="text-base font-semibold text-gray-900">Rules evaluation</h2>\n      <p class="text-xs text-gray-500 mt-1">Test policy decisions with an explicit request context.</p>\n    </div>\n    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Context JSON\n      <textarea name="context_json" rows="8" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">{{ rule_context_json }}</textarea>\n    </label>\n    <button type="submit" class="apg-btn">Evaluate rules</button>\n  </form>\n\n  <form method="post" action="/ui/capabilities/{{ safe_name }}/configuration/resolve" class="apg-card space-y-4">\n    {{ csrf_input() | safe }}\n    <div>\n      <h2 class="text-base font-semibold text-gray-900">Configuration</h2>\n      <p class="text-xs text-gray-500 mt-1">Preview resolved configuration after overrides.</p>\n    </div>\n    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Overrides JSON\n      <textarea name="configuration_json" rows="8" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">{{ configuration_json }}</textarea>\n    </label>\n    <button type="submit" class="apg-btn">Resolve config</button>\n  </form>\n\n  <form method="post" action="/ui/capabilities/{{ safe_name }}/approval/plan" class="apg-card space-y-4">\n    {{ csrf_input() | safe }}\n    <div>\n      <h2 class="text-base font-semibold text-gray-900">Approval plan</h2>\n      <p class="text-xs text-gray-500 mt-1">Identify approvers and review requirements before execution.</p>\n    </div>\n    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Context JSON\n      <textarea name="context_json" rows="8" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">{{ approval_context_json }}</textarea>\n    </label>\n    <button type="submit" class="apg-btn">Plan approval</button>\n  </form>\n</section>\n\n<script nonce="{{ csp_nonce }}">\n(function() {\n  document.addEventListener(\'click\', function(event) {\n    var test = event.target.closest(\'[data-apg-rule-context]\');\n    if (!test) return;\n    var input = document.querySelector(\'textarea[name="context_json"]\');\n    if (input) input.value = JSON.stringify(JSON.parse(test.dataset.apgRuleContext || \'{}\'), null, 2);\n    localStorage.setItem(test.dataset.apgTestbenchKey, test.dataset.apgRuleContext || \'{}\');\n    APGToast(\'Rule test case loaded\', \'info\');\n  });\n})();\n</script>\n\n<section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">\n  <article class="apg-card">\n    <h2 class="text-base font-semibold text-gray-900 mb-3">Capability profile</h2>\n    {% if description.configuration %}\n    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Default configuration</p>\n    <dl class="space-y-2 mb-4">\n      {% for key, value in description.configuration.items() %}\n      <div class="flex items-center justify-between gap-3 border-b border-gray-100 py-2">\n        <dt class="text-sm text-gray-600">{{ key }}</dt>\n        <dd class="text-sm font-mono text-gray-900">{{ value }}</dd>\n      </div>\n      {% endfor %}\n    </dl>\n    {% endif %}\n    {% if description.rules %}\n    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Declared rules</p>\n    <ol class="space-y-2 mb-4">\n      {% for rule in description.rules %}\n      <li class="border border-gray-100 rounded-lg p-3">\n        <p class="text-sm font-medium text-gray-900">{{ rule.name or rule.get(\'name\', \'rule\') }}</p>\n        <p class="text-xs text-gray-500 mt-1">{{ rule.when or rule.get(\'when\', \'\') }}</p>\n      </li>\n      {% endfor %}\n    </ol>\n    {% endif %}\n    <details>\n      <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw capability JSON</summary>\n      <pre>{{ description_json }}</pre>\n    </details>\n  </article>\n\n  <article class="apg-card">\n    <div class="flex items-center justify-between gap-3 mb-3">\n      <h2 class="text-base font-semibold text-gray-900">{{ operation_label }}</h2>\n      {% if result and result.decision %}\n      <span class="apg-badge {% if result.decision == \'allow\' %}apg-badge-success{% elif result.decision == \'deny\' %}apg-badge-danger{% else %}apg-badge-warning{% endif %}">{{ result.decision }}</span>\n      {% elif result and result.required is defined %}\n      <span class="apg-badge {% if result.required %}apg-badge-warning{% else %}apg-badge-success{% endif %}">{{ \'required\' if result.required else \'not required\' }}</span>\n      {% endif %}\n    </div>\n    {% if result %}\n      {% if result.matched_rules %}\n      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Matched rules</p>\n      <div class="flex items-center gap-2 flex-wrap mb-4">\n        {% for rule in result.matched_rules %}\n        <span class="apg-badge apg-badge-neutral">{{ rule }}</span>\n        {% endfor %}\n      </div>\n      {% endif %}\n      {% if result.actions %}\n      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Actions</p>\n      <ol class="space-y-2 mb-4">\n        {% for action in result.actions %}\n        <li class="border border-gray-100 rounded-lg p-3">\n          <p class="text-sm font-medium text-gray-900">{{ action.action or action.get(\'action\', \'\') }}</p>\n          <p class="text-xs text-gray-500 mt-1">{{ action.rule or action.get(\'rule\', \'\') }}</p>\n        </li>\n        {% endfor %}\n      </ol>\n      {% endif %}\n      {% if result.configuration %}\n      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Resolved configuration</p>\n      <dl class="space-y-2 mb-4">\n        {% for key, value in result.configuration.items() %}\n        <div class="flex items-center justify-between gap-3 border-b border-gray-100 py-2">\n          <dt class="text-sm text-gray-600">{{ key }}</dt>\n          <dd class="text-sm font-mono text-gray-900">{{ value }}</dd>\n        </div>\n        {% endfor %}\n      </dl>\n      {% endif %}\n      {% if result.approvers %}\n      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Approvers</p>\n      <div class="flex items-center gap-2 flex-wrap mb-4">\n        {% for approver in result.approvers %}\n        <span class="apg-badge apg-badge-neutral">{{ approver }}</span>\n        {% endfor %}\n      </div>\n      {% endif %}\n      <details>\n        <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw result JSON</summary>\n        <pre>{{ result_json_html | safe }}</pre>\n      </details>\n    {% else %}\n    <p class="text-sm text-gray-500">Run a capability operation to view decision, configuration, or approval results.</p>\n    {% endif %}\n  </article>\n</section>\n', 'record_detail.html.j2': '{# record_detail.html.j2 — Salesforce-quality record detail page\n   Variables: entity_name, entity_type, safe_entity, safe_record_id,\n              record, fields, field_semantics, title, status_val, revision,\n              related_lists, related_count, prev_record_url, next_record_url,\n              record_url, has_kanban (bool)\n   related_lists: [{"entity": str, "fk_field": str, "records": [dict], "cols": [str]}]\n   field_semantics: {field_name: semantic_type}\n#}\n\n{# Breadcrumb #}\n<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">\n  <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>\n  <span>/</span>\n  <a href="/ui/entities/{{ safe_entity }}" class="hover:text-apg-primary transition-colors">{{ entity_name }}</a>\n  <span>/</span>\n  <span class="font-semibold text-gray-900 truncate max-w-xs">{{ title }}</span>\n</nav>\n\n{# Record header card #}\n<div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5 overflow-hidden">\n  <div class="h-1 bg-apg-primary"></div>\n  <div class="px-6 py-5 flex items-start gap-4">\n    <div class="w-14 h-14 rounded-xl flex items-center justify-center text-white text-2xl font-bold flex-shrink-0"\n         style="background: var(--apg-primary, #0ea5e9)">\n      {{ (title[:1] | upper) if title else (entity_name[:1] | upper) }}\n    </div>\n    <div class="flex-1 min-w-0">\n      <div class="flex items-center gap-3 flex-wrap">\n        <h1 class="text-xl font-bold text-gray-900 break-all">{{ title }}</h1>\n        {% if status_val %}\n        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold\n          {% if status_val | lower in [\'active\', \'approved\', \'paid\', \'open\', \'enabled\', \'complete\', \'completed\', \'success\'] %}bg-green-100 text-green-800\n          {% elif status_val | lower in [\'inactive\', \'rejected\', \'closed\', \'disabled\', \'cancelled\', \'canceled\', \'failed\', \'expired\'] %}bg-red-100 text-red-800\n          {% elif status_val | lower in [\'pending\', \'draft\', \'processing\', \'review\', \'in_progress\', \'waiting\'] %}bg-yellow-100 text-yellow-800\n          {% else %}bg-gray-100 text-gray-600{% endif %}">\n          {{ status_val }}\n        </span>\n        {% endif %}\n        <span class="text-xs font-medium text-gray-400 bg-gray-50 px-2 py-0.5 rounded uppercase tracking-wide">{{ entity_type }}</span>\n      </div>\n      {% set id_val = record.get(\'id\', \'\') %}\n      {% if id_val %}\n      <p class="text-xs text-gray-400 mt-1 font-mono truncate">{{ id_val | string }}</p>\n      {% endif %}\n    </div>\n    <div class="flex items-center gap-2 flex-shrink-0 flex-wrap">\n      {% if prev_record_url %}\n      <a href="{{ prev_record_url }}" class="apg-btn apg-btn-secondary">Previous</a>\n      {% endif %}\n      {% if next_record_url %}\n      <a href="{{ next_record_url }}" class="apg-btn apg-btn-secondary">Next</a>\n      {% endif %}\n      <button type="button"\n              class="apg-btn apg-btn-secondary"\n              onclick="navigator.clipboard && navigator.clipboard.writeText(location.origin + \'{{ record_url }}\'); APGToast(\'Record link copied\', \'success\');">\n        Copy link\n      </button>\n      {% if has_kanban %}\n      <a href="/ui/entities/{{ safe_entity }}?view=kanban" class="apg-btn apg-btn-secondary">Kanban</a>\n      {% endif %}\n      <a href="/ui/workflows/{{ safe_entity }}/create_{{ safe_entity }}"\n         class="apg-btn">\n        Workflow\n      </a>\n      <form method="post"\n            action="/ui/entities/{{ safe_entity }}/records/{{ safe_record_id }}/delete"\n            class="inline"\n            onsubmit="return apgConfirmSubmit(this, \'Delete this record? This cannot be undone.\')">\n        {{ csrf_input() | safe }}\n        <input type="hidden" name="expected_revision" value="{{ revision }}">\n        <button type="submit"\n                class="px-3 py-1.5 text-sm font-medium border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors">\n          Delete\n        </button>\n      </form>\n    </div>\n  </div>\n{# Highlights panel — top fields at a glance #}\n{% set highlight_fields = [] %}\n{% for f in fields %}\n  {% if f.name not in [\'id\', \'_revision\'] and not f.name.endswith(\'_id\') %}\n    {% if highlight_fields | length < 4 %}\n      {% set _ = highlight_fields.append(f) %}\n    {% endif %}\n  {% endif %}\n{% endfor %}\n{% if highlight_fields %}\n<div class="border-t border-gray-100 px-6 py-3 grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50/50">\n  {% for f in highlight_fields %}\n  {% set fv = record.get(f.name, \'\') %}\n  {% set sem = field_semantics.get(f.name, \'text\') if field_semantics else \'text\' %}\n  <div class="min-w-0">\n    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5 truncate">\n      {{ (f.name[:-3] | replace(\'_\',\' \') | title ~ \' ID\') if f.name.endswith(\'_id\') else (f.name | replace(\'_\',\' \') | title) }}\n    </p>\n    <p class="text-sm font-medium text-gray-900 truncate">\n      {% if fv is none or fv == \'\' or fv | string == \'None\' %}\n      <span class="text-gray-300 italic text-xs">—</span>\n      {% elif sem == \'currency\' %}\n      <span class="tabular-nums">{{ format_currency(fv) }}</span>\n      {% elif sem == \'status\' %}\n      <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-semibold\n        {% if fv | string | lower in [\'active\',\'approved\',\'paid\',\'open\',\'enabled\',\'complete\',\'completed\',\'success\',\'done\'] %}bg-green-100 text-green-800\n        {% elif fv | string | lower in [\'inactive\',\'rejected\',\'closed\',\'disabled\',\'cancelled\',\'canceled\',\'failed\',\'expired\'] %}bg-red-100 text-red-800\n        {% else %}bg-yellow-100 text-yellow-800{% endif %}">{{ fv }}</span>\n      {% else %}\n      {{ fv | string | truncate(30) }}\n      {% endif %}\n    </p>\n  </div>\n  {% endfor %}\n</div>\n{% endif %}\n</div>\n\n{% if detail_intelligence %}\n<section class="apg-detail-command-center" aria-label="Record intelligence">\n  <article class="apg-detail-command-card">\n    <div class="apg-detail-command-head">\n      <span>Change Diff Timeline</span>\n      <strong>rev. {{ revision }}</strong>\n    </div>\n    {% if detail_intelligence.diff_fields %}\n    <ol class="apg-detail-diff-list">\n      {% for item in detail_intelligence.diff_fields %}\n      <li>\n        <span>{{ item.name }}</span>\n        <strong>{{ item.value }}</strong>\n      </li>\n      {% endfor %}\n    </ol>\n    {% else %}\n    <p class="apg-detail-empty">No populated fields to compare yet.</p>\n    {% endif %}\n    <small>{{ detail_intelligence.activity_count }} activity events captured</small>\n  </article>\n\n  <article class="apg-detail-command-card">\n    <div class="apg-detail-command-head">\n      <span>Related Record Graph</span>\n      <strong>{{ related_count }} links</strong>\n    </div>\n    {% if detail_intelligence.related_graph %}\n    <div class="apg-detail-graph">\n      <div class="apg-detail-node apg-detail-node-root">{{ entity_name }}</div>\n      {% for rel in detail_intelligence.related_graph %}\n      <a class="apg-detail-node" href="{{ rel.url }}">\n        {{ rel.entity }}\n        <small>{{ rel.count }} via {{ rel.field }}</small>\n      </a>\n      {% endfor %}\n    </div>\n    {% else %}\n    <p class="apg-detail-empty">No downstream records reference this item yet.</p>\n    {% endif %}\n  </article>\n\n  <article class="apg-detail-command-card">\n    <div class="apg-detail-command-head">\n      <span>Create Sibling Context</span>\n      <strong>{{ detail_intelligence.sibling_fields | length }} defaults</strong>\n    </div>\n    {% if detail_intelligence.sibling_fields %}\n    <dl class="apg-detail-sibling-list">\n      {% for item in detail_intelligence.sibling_fields %}\n      <div>\n        <dt>{{ item.name }}</dt>\n        <dd>{{ item.value or \'Empty\' }}</dd>\n      </div>\n      {% endfor %}\n    </dl>\n    {% else %}\n    <p class="apg-detail-empty">No safe sibling defaults detected.</p>\n    {% endif %}\n    <a href="{{ detail_intelligence.create_sibling_url }}" class="apg-detail-action">Start from this shape</a>\n  </article>\n</section>\n{% endif %}\n\n{# Tab bar #}\n<div class="flex items-center gap-1 border-b border-gray-200 mb-6">\n  <button onclick="apgTab(\'details\')" id="apg-tab-details"\n          class="apg-tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-apg-primary text-apg-primary -mb-px transition-colors">\n    Details\n  </button>\n  <button onclick="apgTab(\'related\')" id="apg-tab-related"\n          class="apg-tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 -mb-px transition-colors">\n    Related\n    {% if related_lists %}\n    <span class="ml-1 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">\n      {{ related_count }}\n    </span>\n    {% endif %}\n  </button>\n  <button onclick="apgTab(\'activity\')" id="apg-tab-activity"\n          class="apg-tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-900 -mb-px transition-colors">\n    Activity\n  </button>\n</div>\n\n{# Details panel #}\n<div id="apg-panel-details">\n  <div class="bg-white rounded-xl border border-gray-200 shadow-sm">\n    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">\n      <h2 class="text-sm font-semibold text-gray-900">Record Details</h2>\n      <span class="text-xs text-gray-400 font-mono">rev. {{ revision }}</span>\n    </div>\n    <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-8">\n      {% for field in fields %}\n      {% if field.name != \'_revision\' %}\n      {% set field_val = record.get(field.name, \'\') %}\n      {% set fld_id = \'fld-\' ~ safe_entity ~ \'-\' ~ safe_record_id ~ \'-\' ~ field.name %}\n      <div id="{{ fld_id }}" class="py-3 border-b border-gray-50 last:border-0 group/field">\n        <dt class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">\n          {{ (field.name[:-3] | replace(\'_\', \' \') | title ~ \' ID\') if field.name.endswith(\'_id\') else (field.name | replace(\'_\', \' \') | title) }}\n        </dt>\n        <dd class="flex items-center justify-between gap-2 min-h-6">\n          <span class="text-sm text-gray-900 break-words">\n            {% set semantic = field_semantics.get(field.name, \'text\') if field_semantics else \'text\' %}\n            {% include \'widgets/field_display.html.j2\' %}\n          </span>\n          <button\n            hx-get="/ui/entities/{{ safe_entity }}/{{ safe_record_id }}/fields/{{ field.name }}/edit"\n            hx-target="#{{ fld_id }}"\n            hx-swap="outerHTML"\n            class="opacity-0 group-hover/field:opacity-100 flex-shrink-0 p-1 text-gray-300 hover:text-apg-primary rounded transition-all"\n            title="Edit {{ field.name }}">\n            <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">\n              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zm-2.207 2.207L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>\n            </svg>\n          </button>\n        </dd>\n      </div>\n      {% endif %}\n      {% endfor %}\n    </div>\n  </div>\n</div>\n\n{# Related panel #}\n<div id="apg-panel-related" class="hidden">\n  {% if related_lists %}\n    {% for rel in related_lists %}\n    <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-4">\n      <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">\n        <div class="flex items-center gap-2">\n          <h2 class="text-sm font-semibold text-gray-900">{{ rel.entity }}</h2>\n          <span class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">{{ rel.records | length }}</span>\n        </div>\n        <a href="{{ rel.list_url }}"\n           class="text-xs text-apg-primary hover:underline">View filtered</a>\n      </div>\n      {% if rel.records %}\n      <div class="overflow-x-auto">\n        <table class="w-full text-sm">\n          <caption class="apg-sr-only">{{ rel.entity }} records</caption>\n          <thead>\n            <tr class="bg-gray-50 border-b border-gray-100">\n              {% for col in rel.cols %}\n              <th scope="col" class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">\n                {{ (col[:-3] | replace(\'_\', \' \') | title ~ \' ID\') if col.endswith(\'_id\') else (col | replace(\'_\', \' \') | title) }}\n              </th>\n              {% endfor %}\n              <th scope="col" class="px-4 py-2 w-16">Actions</th>\n            </tr>\n          </thead>\n          <tbody class="divide-y divide-gray-50">\n            {% for row in rel.records[:5] %}\n            <tr class="hover:bg-gray-50 transition-colors">\n              {% for col in rel.cols %}\n              <td{% if loop.first %} scope="row"{% endif %} class="px-4 py-2.5 text-gray-700 max-w-xs truncate">\n                {{ row.get(col, \'\') | string | truncate(40) }}\n              </td>\n              {% endfor %}\n              <td class="px-4 py-2.5 text-right">\n                <a href="/ui/entities/{{ rel.entity | urlencode }}/{{ row.get(\'id\', \'\') | string | urlencode }}"\n                   class="text-xs text-apg-primary hover:underline font-medium">View →</a>\n              </td>\n            </tr>\n            {% endfor %}\n            {% if rel.records | length > 5 %}\n            <tr>\n              <td colspan="{{ rel.cols | length + 1 }}" class="px-4 py-2.5 text-center text-xs text-gray-400">\n                + {{ rel.records | length - 5 }} more —\n                <a href="{{ rel.list_url }}" class="text-apg-primary hover:underline">view filtered</a>\n              </td>\n            </tr>\n            {% endif %}\n          </tbody>\n        </table>\n      </div>\n      {% else %}\n      <div class="px-4 py-8 text-center text-sm text-gray-400">\n        <p>No related {{ rel.entity }} records through {{ rel.fk_field }}.</p>\n        <div class="mt-3 flex items-center justify-center gap-2 flex-wrap">\n          <a href="{{ rel.list_url }}" class="apg-btn apg-btn-secondary">Open filtered list</a>\n          <a href="{{ rel.create_url }}" class="apg-btn">Create {{ rel.entity }}</a>\n        </div>\n      </div>\n      {% endif %}\n    </div>\n    {% endfor %}\n  {% else %}\n  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">\n    <div class="text-4xl mb-3 opacity-20">🔗</div>\n    <p class="text-sm font-medium text-gray-500">No related records found.</p>\n    <p class="text-xs text-gray-400 mt-1">Other entities with FK fields pointing to {{ entity_name }} appear here.</p>\n  </div>\n  {% endif %}\n</div>\n\n{# Activity panel #}\n<div id="apg-panel-activity" class="hidden">\n  <div class="bg-white rounded-xl border border-gray-200 shadow-sm">\n    <div class="px-4 py-3 border-b border-gray-100">\n      <h2 class="text-sm font-semibold text-gray-900">Activity</h2>\n    </div>\n    <div class="p-5">\n      <ol class="relative border-l-2 border-gray-100 ml-4 space-y-5">\n        {% if activity_events %}\n          {% for ev in activity_events %}\n          <li class="ml-6">\n            <span class="absolute flex items-center justify-center w-8 h-8 rounded-full -left-4 text-sm ring-4 ring-white\n              {% if ev.type == \'create\' %}bg-blue-50\n              {% elif ev.type == \'update\' %}bg-purple-50\n              {% elif ev.type == \'delete\' %}bg-red-50\n              {% elif ev.type == \'note\' %}bg-yellow-50\n              {% else %}bg-gray-50{% endif %}">\n              {% if ev.type == \'create\' %}📋\n              {% elif ev.type == \'update\' %}✏️\n              {% elif ev.type == \'delete\' %}🗑️\n              {% elif ev.type == \'note\' %}💬\n              {% else %}⚡{% endif %}\n            </span>\n            <div class="pl-2">\n              <p class="text-sm font-medium text-gray-900">{{ ev.detail or (ev.type | title) }}</p>\n              <p class="text-xs text-gray-400 mt-0.5">\n                {{ ev.actor or \'APG\' }}\n                {% if ev.ts %} · {{ ev.ts }}{% endif %}\n              </p>\n            </div>\n          </li>\n          {% endfor %}\n        {% else %}\n          <li class="ml-6">\n            <span class="absolute flex items-center justify-center w-8 h-8 bg-blue-50 rounded-full -left-4 text-sm ring-4 ring-white">📋</span>\n            <div class="pl-2">\n              <p class="text-sm font-medium text-gray-900">Record created</p>\n              <p class="text-xs text-gray-400 mt-0.5">Revision {{ revision }} · via APG</p>\n            </div>\n          </li>\n        {% endif %}\n      </ol>\n      <form method="post"\n            action="/ui/entities/{{ safe_entity }}/records/{{ safe_record_id }}/note"\n            class="mt-8 flex gap-3">\n        {{ csrf_input() | safe }}\n        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"\n             style="background: var(--apg-primary, #0ea5e9)">A</div>\n        <div class="flex-1">\n          <textarea name="note" placeholder="Add a note…" rows="2" required\n                    class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent placeholder-gray-300"></textarea>\n          <button type="submit"\n                  class="mt-1.5 px-3 py-1.5 bg-apg-primary text-white text-xs font-medium rounded-lg hover:opacity-90 transition-opacity">\n            Save Note\n          </button>\n        </div>\n      </form>\n    </div>\n  </div>\n</div>\n\n<script nonce="{{ csp_nonce }}">\nfunction apgTab(name) {\n  document.querySelectorAll(\'.apg-tab-btn\').forEach(function(b) {\n    b.classList.remove(\'border-apg-primary\', \'text-apg-primary\');\n    b.classList.add(\'border-transparent\', \'text-gray-500\');\n  });\n  document.querySelectorAll(\'[id^="apg-panel-"]\').forEach(function(p) { p.classList.add(\'hidden\'); });\n  var btn = document.getElementById(\'apg-tab-\' + name);\n  if (btn) {\n    btn.classList.remove(\'border-transparent\', \'text-gray-500\');\n    btn.classList.add(\'border-apg-primary\', \'text-apg-primary\');\n  }\n  var panel = document.getElementById(\'apg-panel-\' + name);\n  if (panel) panel.classList.remove(\'hidden\');\n}\n</script>\n', 'login.html.j2': '<main id="content" class="apg-login-page">\n  <section class="apg-login-card" aria-labelledby="apg-login-title">\n    <div class="mb-4">\n      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Authentication required</p>\n      <h1 id="apg-login-title">{{ module_name }}</h1>\n      <p class="text-sm text-gray-500 mt-2">Secure workspace sign-in.</p>\n    </div>\n    {% if error %}\n    <div role="alert" class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ error }}</div>\n    {% endif %}\n    <form method="post" action="/login" class="space-y-4">\n      {{ csrf_input() | safe }}\n      <input type="hidden" name="next" value="{{ next_url }}">\n      <label for="apg-login-username" class="block text-sm font-semibold text-gray-700">Username\n        <input id="apg-login-username" name="username" value="{{ username | default(\'\') }}" autocomplete="username" required autofocus class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">\n      </label>\n      <label for="apg-login-password" class="block text-sm font-semibold text-gray-700">Password\n        <input id="apg-login-password" name="password" type="password" autocomplete="current-password" required class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">\n      </label>\n      <button type="submit" class="apg-btn w-full justify-center">Sign in</button>\n    </form>\n    {% if auth_intelligence %}\n    <section class="apg-auth-intelligence" aria-label="Authentication options">\n      <article class="apg-auth-panel">\n        <span>{{ auth_intelligence.passkey.label }}</span>\n        <strong data-apg-passkey-status>{{ auth_intelligence.passkey.status }}</strong>\n        <small>{{ auth_intelligence.passkey.detail }}</small>\n        <button type="button" class="apg-mini-btn" data-apg-passkey-check>Check device</button>\n      </article>\n      <article class="apg-auth-panel">\n        <span>{{ auth_intelligence.magic_link.label }}</span>\n        <strong>Stage passwordless handoff</strong>\n        <small>Continue to <span class="font-mono">{{ auth_intelligence.magic_link.next_url }}</span> after verification.</small>\n        <button type="button" class="apg-mini-btn" data-apg-magic-link data-apg-magic-key="{{ auth_intelligence.magic_link.storage_key }}" data-apg-next-url="{{ auth_intelligence.magic_link.next_url }}">Stage link</button>\n      </article>\n      <article class="apg-auth-panel">\n        <span>Device sessions</span>\n        <strong>{{ auth_intelligence.devices | length }} context rows</strong>\n        <ul class="apg-auth-device-list">\n          {% for device in auth_intelligence.devices %}\n          <li data-apg-device-row="{{ device.id }}">\n            <div>\n              <strong>{{ device.label }}</strong>\n              <small>{{ device.detail }}</small>\n            </div>\n            <button type="button" class="apg-mini-btn" data-apg-device-dismiss="{{ device.id }}">{{ device.status }}</button>\n          </li>\n          {% endfor %}\n        </ul>\n      </article>\n      <article class="apg-auth-panel apg-auth-lockout" data-apg-lockout-panel hidden>\n        <span>Lockout recovery</span>\n        <strong>Repeated failures detected</strong>\n        <ol>\n          {% for step in auth_intelligence.lockout.recovery_steps %}\n          <li>{{ step }}</li>\n          {% endfor %}\n        </ol>\n        <button type="button" class="apg-mini-btn" data-apg-clear-lockout>Clear local counter</button>\n      </article>\n    </section>\n    <script nonce="{{ csp_nonce }}">\n    (function () {\n      var toast = function (message, kind) {\n        if (window.APGToast) window.APGToast(message, kind || \'info\');\n      };\n      var attemptKey = \'{{ auth_intelligence.lockout.attempt_key }}\';\n      var threshold = {{ auth_intelligence.lockout.threshold }};\n      var panel = document.querySelector(\'[data-apg-lockout-panel]\');\n      var attempts = parseInt(localStorage.getItem(attemptKey) || \'0\', 10) || 0;\n      {% if auth_intelligence.lockout.error_seen %}\n      attempts += 1;\n      localStorage.setItem(attemptKey, String(attempts));\n      {% endif %}\n      if (panel && attempts >= threshold) panel.hidden = false;\n      document.addEventListener(\'click\', function (event) {\n        var passkey = event.target.closest(\'[data-apg-passkey-check]\');\n        if (passkey) {\n          var status = document.querySelector(\'[data-apg-passkey-status]\');\n          var supported = !!window.PublicKeyCredential;\n          if (status) status.textContent = supported ? \'Passkey-capable device\' : \'Passkeys unavailable here\';\n          toast(supported ? \'Passkey support detected\' : \'Passkey support not detected\', supported ? \'success\' : \'info\');\n          return;\n        }\n        var magic = event.target.closest(\'[data-apg-magic-link]\');\n        if (magic) {\n          var username = document.getElementById(\'apg-login-username\');\n          localStorage.setItem(magic.dataset.apgMagicKey, JSON.stringify({\n            username: username ? username.value : \'\',\n            next: magic.dataset.apgNextUrl || \'/ui\',\n            requestedAt: new Date().toISOString()\n          }));\n          toast(\'Magic-link intent staged locally\', \'success\');\n          return;\n        }\n        var dismiss = event.target.closest(\'[data-apg-device-dismiss]\');\n        if (dismiss) {\n          var row = document.querySelector(\'[data-apg-device-row="\' + dismiss.dataset.apgDeviceDismiss + \'"]\');\n          if (row) row.hidden = true;\n          toast(\'Device row dismissed locally\', \'info\');\n          return;\n        }\n        var clear = event.target.closest(\'[data-apg-clear-lockout]\');\n        if (clear) {\n          localStorage.removeItem(attemptKey);\n          if (panel) panel.hidden = true;\n          toast(\'Local lockout counter cleared\', \'success\');\n        }\n      });\n    })();\n    </script>\n    {% endif %}\n  </section>\n</main>\n', 'entity_analytics.html.j2': '<section class="mb-6">\n  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-apg-primary">Application</a> / <a href="/ui/entities/{{ safe_entity }}" class="hover:text-apg-primary">{{ entity_name }}</a> / <span class="font-semibold text-gray-900">Analytics</span></p>\n  <div class="flex items-center justify-between gap-4 flex-wrap">\n    <div>\n      <h1 class="text-xl font-bold text-gray-900">{{ entity_name }} Analytics</h1>\n      <p class="text-sm text-gray-500 mt-1">{{ total }} record{{ \'s\' if total != 1 else \'\' }}</p>\n    </div>\n    <a class="apg-btn apg-btn-secondary" href="/ui/entities/{{ safe_entity }}">Table</a>\n  </div>\n</section>\n\n<section class="apg-analytics-metrics" aria-label="{{ entity_name }} analytics summary">\n  {% for metric in metrics %}\n  <a href="{{ metric.url }}" class="apg-analytics-metric">\n    <span>{{ metric.label }}</span>\n    <strong>{{ metric.value }}</strong>\n    <small>{{ metric.hint }}</small>\n  </a>\n  {% endfor %}\n</section>\n\n<section class="apg-analytics-decisions" aria-label="{{ entity_name }} decision intelligence">\n  {% for item in analytics_decisions %}\n  <article>\n    <span>{{ item.label }}</span>\n    <strong>{{ item.value }}</strong>\n    <small>{{ item.hint }}</small>\n    <a href="{{ item.url }}">Inspect records</a>\n  </article>\n  {% endfor %}\n</section>\n\n<section class="apg-grid-2 gap-6 mb-6">\n  <article class="apg-card">\n    <div class="apg-card-header">\n      <div>\n        <h2 class="text-sm font-semibold text-gray-900">Records Over Time</h2>\n        <p class="text-xs text-gray-400 mt-1">{% if date_field %}Grouped by {{ date_field }}{% else %}Add a date field for trend history{% endif %}</p>\n      </div>\n    </div>\n    <div class="apg-chart" data-apg-chart="{{ line_chart.id }}"></div>\n    <script id="{{ line_chart.id }}" type="application/json" nonce="{{ csp_nonce }}">{{ line_chart.spec_json | safe }}</script>\n  </article>\n  <article class="apg-card">\n    <div class="apg-card-header">\n      <div>\n        <h2 class="text-sm font-semibold text-gray-900">Status Distribution</h2>\n        <p class="text-xs text-gray-400 mt-1">{% if status_field %}Click a segment below to inspect records{% else %}No status field detected{% endif %}</p>\n      </div>\n    </div>\n    <div class="apg-chart" data-apg-chart="{{ status_chart.id }}"></div>\n    <script id="{{ status_chart.id }}" type="application/json" nonce="{{ csp_nonce }}">{{ status_chart.spec_json | safe }}</script>\n    {% if status_rows %}\n    <div class="apg-status-drilldown" aria-label="Status drilldown">\n      {% for row in status_rows %}\n      <a href="{{ row.url }}" class="apg-status-row">\n        <span>{{ row.label }}</span>\n        <strong>{{ row.count }}</strong>\n        <small>{{ row.percent }}%</small>\n      </a>\n      {% endfor %}\n    </div>\n    {% endif %}\n  </article>\n</section>\n\n{% if insights %}\n<section class="apg-analytics-insights" aria-label="Analytics insights">\n  {% for insight in insights %}\n  <article class="apg-card">\n    <h2 class="text-sm font-semibold text-gray-900 mb-2">{{ insight.title }}</h2>\n    <p class="text-sm text-gray-500">{{ insight.body }}</p>\n    <a href="{{ insight.url }}" class="apg-btn apg-btn-secondary mt-3">{{ insight.action }}</a>\n  </article>\n  {% endfor %}\n</section>\n{% endif %}\n\n<section class="apg-grid-3 gap-4" aria-label="Numeric field statistics">\n  {% for stat in numeric_stats %}\n  <article class="apg-card">\n    <h2 class="text-sm font-semibold text-gray-900 mb-3">{{ stat.field }}</h2>\n    <dl class="grid grid-cols-3 gap-3 text-center">\n      <div><dt class="text-xs text-gray-400">Min</dt><dd class="font-semibold">{{ stat.min }}</dd></div>\n      <div><dt class="text-xs text-gray-400">Avg</dt><dd class="font-semibold">{{ stat.avg }}</dd></div>\n      <div><dt class="text-xs text-gray-400">Max</dt><dd class="font-semibold">{{ stat.max }}</dd></div>\n    </dl>\n    <p class="text-xs text-gray-400 mt-3">{{ stat.count }} measured record{{ \'s\' if stat.count != 1 else \'\' }}</p>\n  </article>\n  {% else %}\n  <article class="apg-card"><div class="apg-chart-empty"><p>No numeric fields available for {{ entity_name }}</p></div></article>\n  {% endfor %}\n</section>\n', 'agent_console.html.j2': '{% set description = description | default({}) %}\n{% set user_message = user_message | default(\'\') %}\n{% set payload_json = payload_json | default(\'{}\') %}\n{% set result_status = result_status | default(\'\') %}\n{% set team_members = team_members | default([]) %}\n{% set team_flow = team_flow | default([]) %}\n{% set agent_intelligence = agent_intelligence | default({}) %}\n<section class="mb-6">\n  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <a href="/agents" class="hover:text-blue-600">Agent catalog</a> / <span class="font-semibold text-gray-900">{{ name }}</span></p>\n  <div class="flex items-start justify-between gap-4 flex-wrap">\n    <div>\n      <h1 class="text-xl font-bold text-gray-900">{{ name }}</h1>\n      <p class="text-sm text-gray-500 mt-1">{{ \'Team console\' if team else \'Agent console\' }}</p>\n    </div>\n    {% if result_status %}\n    <span class="apg-badge apg-badge-neutral">{{ result_status }}</span>\n    {% endif %}\n  </div>\n</section>\n\n<section class="grid grid-cols-1 lg:grid-cols-3 gap-4">\n  <article class="apg-card lg:col-span-2 flex flex-col min-h-16" data-apg-live="{{ live_topic }}">\n    <header class="apg-card-header">\n      <div>\n        <h2 class="text-base font-semibold text-gray-900">Conversation</h2>\n        <p class="text-xs text-gray-500">Prompt, stream, inspect, and retry from one place.</p>\n      </div>\n      <span class="text-xs text-gray-400">{{ live_topic }}</span>\n    </header>\n\n    {% if agent_intelligence %}\n    <section class="apg-agent-meter" aria-label="Streaming meter">\n      <article><span>Tokens</span><strong>{{ agent_intelligence.stream_meter.tokens }}</strong></article>\n      <article><span>Rate</span><strong>{{ agent_intelligence.stream_meter.rate }}</strong></article>\n      <article><span>Cost</span><strong>{{ agent_intelligence.stream_meter.cost }}</strong></article>\n      <article><span>Chars</span><strong>{{ agent_intelligence.stream_meter.chars }}</strong></article>\n    </section>\n    {% endif %}\n\n    <div id="apg-agent-stream" class="flex-1 space-y-3 mb-4" aria-live="polite" aria-busy="false">\n      {% if not user_message and not result and not error %}\n      <div class="rounded-lg bg-gray-50 border border-gray-200 p-4">\n        <p class="text-sm text-gray-600">Ask {{ name }} to work on a concrete task. Add JSON only when the agent needs structured context.</p>\n      </div>\n      {% endif %}\n      {% if error %}\n      <div role="alert" class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">{{ error }}</div>\n      {% endif %}\n      {% if user_message %}\n      <div class="rounded-lg border border-gray-200 p-4 bg-gray-50">\n        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">You</p>\n        <p class="text-sm text-gray-700">{{ user_message }}</p>\n      </div>\n      {% endif %}\n      {% if result %}\n      <div class="rounded-lg border border-gray-200 p-4 bg-white">\n        <div class="flex items-center justify-between gap-3 mb-2">\n          <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ \'Team response\' if team else \'Agent response\' }}</p>\n          {% if result_status %}<span class="apg-badge apg-badge-neutral">{{ result_status }}</span>{% endif %}\n        </div>\n        <div class="apg-agent-output text-sm text-gray-700">{{ result_html|safe }}</div>\n      </div>\n      {% endif %}\n    </div>\n\n    <form method="post" action="{{ action }}" class="space-y-4" data-apg-stream-target="#apg-agent-stream">\n      {{ csrf_input() | safe }}\n      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Message\n        <textarea name="message" rows="3" autocomplete="off" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">{{ user_message }}</textarea>\n      </label>\n      <details>\n        <summary class="cursor-pointer text-sm font-medium text-gray-700">Structured payload</summary>\n        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mt-3">Payload JSON\n          <textarea name="payload_json" rows="6" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">{{ payload_json }}</textarea>\n        </label>\n      </details>\n      <div class="flex items-center justify-between gap-3 flex-wrap">\n        <label class="flex items-center gap-2 text-sm text-gray-600"><input name="stream" type="checkbox" value="true"> Stream when supported</label>\n        <div class="flex items-center gap-2">\n          {% if agent_intelligence %}\n          <button type="button" class="apg-btn apg-btn-secondary" data-apg-agent-branch="{{ agent_intelligence.branch_seed }}" data-apg-agent-branch-key="{{ agent_intelligence.branch_key }}">Fork</button>\n          {% endif %}\n          <button type="submit" class="apg-btn">Send</button>\n          <button type="button" class="apg-btn apg-btn-secondary" onclick="document.getElementById(\'apg-agent-stream\').setAttribute(\'aria-busy\',\'false\')">Stop</button>\n        </div>\n      </div>\n    </form>\n  </article>\n\n  <aside class="space-y-4">\n    {% if team %}\n    <section class="apg-card">\n      <h2 class="text-base font-semibold text-gray-900 mb-3">Team lanes</h2>\n      {% if team_members %}\n      <ol class="space-y-2">\n        {% for member in team_members %}\n        <li class="flex items-center justify-between gap-3 border border-gray-100 rounded-lg p-3">\n          <a href="/ui/agents/{{ member }}" class="text-sm font-medium text-apg-primary hover:underline">{{ member }}</a>\n          <span class="apg-badge apg-badge-neutral">member</span>\n        </li>\n        {% endfor %}\n      </ol>\n      {% else %}\n      <p class="text-sm text-gray-500">No member agents declared for this team.</p>\n      {% endif %}\n    </section>\n\n    <section class="apg-card">\n      <h2 class="text-base font-semibold text-gray-900 mb-3">Handoff flow</h2>\n      {% if team_flow %}\n      <ol class="space-y-2">\n        {% for edge in team_flow %}\n        <li class="text-sm text-gray-600"><span class="font-medium text-gray-900">{{ edge.source }}</span> -> <span class="font-medium text-gray-900">{{ edge.target }}</span></li>\n        {% endfor %}\n      </ol>\n      {% else %}\n      <p class="text-sm text-gray-500">No explicit handoff flow declared.</p>\n      {% endif %}\n    </section>\n    {% endif %}\n\n    {% if agent_intelligence %}\n    <section class="apg-card">\n      <h2 class="text-base font-semibold text-gray-900 mb-3">Tool-call inspector</h2>\n      {% if agent_intelligence.tool_calls %}\n      <ol class="apg-agent-tool-list">\n        {% for tool in agent_intelligence.tool_calls %}\n        <li>\n          <span>{{ tool.name }}</span>\n          <strong>{{ tool.status }}</strong>\n          <small>{{ tool.source }}</small>\n        </li>\n        {% endfor %}\n      </ol>\n      {% else %}\n      <p class="text-sm text-gray-500">No declared tools for this console.</p>\n      {% endif %}\n    </section>\n\n    <section class="apg-card">\n      <h2 class="text-base font-semibold text-gray-900 mb-3">Prompt library</h2>\n      <div class="apg-agent-prompt-list">\n        {% for prompt in agent_intelligence.prompt_library %}\n        <button type="button" data-apg-prompt="{{ prompt.prompt }}" data-apg-prompt-key="{{ agent_intelligence.library_key }}">\n          <span>{{ prompt.name }}</span>\n          <small>{{ prompt.version }}</small>\n        </button>\n        {% endfor %}\n      </div>\n    </section>\n\n    <section class="apg-card">\n      <h2 class="text-base font-semibold text-gray-900 mb-3">Run compare</h2>\n      <dl class="apg-agent-compare">\n        {% for item in agent_intelligence.run_compare %}\n        <div>\n          <dt>{{ item.label }}</dt>\n          <dd><span>{{ item.left }}</span><strong>{{ item.right }}</strong></dd>\n        </div>\n        {% endfor %}\n      </dl>\n    </section>\n    {% endif %}\n\n    <section class="apg-card">\n      <h2 class="text-base font-semibold text-gray-900 mb-3">Configuration</h2>\n      {% if description.role %}<p class="text-sm text-gray-600"><span class="font-medium text-gray-900">Role:</span> {{ description.role }}</p>{% endif %}\n      {% if description.model %}<p class="text-sm text-gray-600 mt-1"><span class="font-medium text-gray-900">Model:</span> {{ description.model }}</p>{% endif %}\n      {% if description.runtime %}<p class="text-sm text-gray-600 mt-1"><span class="font-medium text-gray-900">Runtime:</span> {{ description.runtime }}</p>{% endif %}\n      {% if description.tools %}\n      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mt-4 mb-2">Tools</p>\n      <div class="flex items-center gap-2 flex-wrap">\n        {% for tool in description.tools %}\n        <span class="apg-badge apg-badge-neutral">{{ tool }}</span>\n        {% endfor %}\n      </div>\n      {% endif %}\n      {% if description.capabilities %}\n      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mt-4 mb-2">Capabilities</p>\n      <div class="flex items-center gap-2 flex-wrap">\n        {% for capability in description.capabilities %}\n        <span class="apg-badge apg-badge-neutral">{{ capability }}</span>\n        {% endfor %}\n      </div>\n      {% endif %}\n      <details class="mt-4">\n        <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw description JSON</summary>\n        <pre>{{ description_json }}</pre>\n      </details>\n      {% if result %}\n      <details class="mt-4">\n        <summary class="cursor-pointer text-sm font-medium text-gray-700">Raw response JSON</summary>\n        <pre>{{ result_json }}</pre>\n      </details>\n      {% endif %}\n    </section>\n  </aside>\n</section>\n\n<script nonce="{{ csp_nonce }}">\n(function() {\n  document.addEventListener(\'click\', function(event) {\n    var branch = event.target.closest(\'[data-apg-agent-branch]\');\n    if (branch) {\n      localStorage.setItem(branch.dataset.apgAgentBranchKey, branch.dataset.apgAgentBranch || \'\');\n      APGToast(\'Conversation branch saved\', \'success\');\n      return;\n    }\n    var prompt = event.target.closest(\'[data-apg-prompt]\');\n    if (prompt) {\n      localStorage.setItem(prompt.dataset.apgPromptKey, prompt.dataset.apgPrompt || \'\');\n      var input = document.querySelector(\'textarea[name="message"]\');\n      if (input) input.value = prompt.dataset.apgPrompt || \'\';\n      APGToast(\'Prompt version loaded\', \'info\');\n    }\n  });\n})();\n</script>\n', 'marketplace.html.j2': '{# marketplace.html.j2 — APG Connector Marketplace #}\n\n<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap">\n  <a href="/ui" class="hover:text-apg-primary transition-colors">Application</a>\n  <span>/</span>\n  <span class="font-semibold text-gray-900">Connector Marketplace</span>\n</nav>\n\n<section class="mb-6">\n  <div class="flex items-start justify-between gap-4 flex-wrap">\n    <div>\n      <h1 class="text-xl font-bold text-gray-900">Connector Marketplace</h1>\n      <p class="text-sm text-gray-500 mt-1">\n        Discover installed connectors and generated integration blueprints for this application.\n      </p>\n    </div>\n    {% if has_installed_connectors %}\n    <span class="apg-badge apg-badge-success">{{ installed_count }} installed</span>\n    {% else %}\n    <span class="apg-badge">{{ installed_count }} installed</span>\n    {% endif %}\n  </div>\n</section>\n\n{% if marketplace_intelligence %}\n<section class="apg-marketplace-intelligence mb-6" aria-label="Marketplace proof">\n  <article>\n    <span>Leader benchmark</span>\n    <strong>{{ marketplace_intelligence.leader }}</strong>\n    <small>Local proof replaces hosted install guesswork</small>\n  </article>\n  <article>\n    <span>Ready blueprints</span>\n    <strong>{{ marketplace_intelligence.ready_count }}</strong>\n    <small>{{ marketplace_intelligence.category_count }} categories represented</small>\n  </article>\n  <article>\n    <span>Generated operations</span>\n    <strong>{{ marketplace_intelligence.operation_total }}</strong>\n    <small>Inspectable before installation</small>\n  </article>\n</section>\n{% endif %}\n\n<section class="apg-card apg-list-toolbar mb-6" aria-label="Marketplace discovery">\n  <form method="get" action="/ui/marketplace" class="grid grid-cols-1 md:grid-cols-2 gap-3">\n    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Search\n      <input name="q" value="{{ query }}" placeholder="Search connectors..."\n             class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary focus:border-transparent bg-white">\n    </label>\n    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Category\n      <select name="category" class="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary bg-white">\n        <option value="all"{% if active_category == \'all\' %} selected{% endif %}>All categories</option>\n        {% for category in categories %}\n        <option value="{{ category.name }}"{% if category.active %} selected{% endif %}>{{ category.name }} ({{ category.count }})</option>\n        {% endfor %}\n      </select>\n    </label>\n    <div class="flex items-center gap-2">\n      <button type="submit" class="apg-btn">Apply</button>\n      {% if has_filters %}\n      <a href="/ui/marketplace" class="apg-btn apg-btn-secondary">Clear</a>\n      {% endif %}\n    </div>\n  </form>\n  <div class="flex items-center gap-2 flex-wrap mt-4 text-xs text-gray-500">\n    <span>{{ filtered_count }} of {{ connector_count }} shown</span>\n    {% for category in categories %}\n    <a href="/ui/marketplace?category={{ category.name | urlencode }}"\n       class="px-2 py-1 border border-gray-200 rounded-lg hover:border-apg-primary{% if category.active %} text-apg-primary border-apg-primary{% endif %}">\n      {{ category.name }}\n    </a>\n    {% endfor %}\n  </div>\n</section>\n\n{% if connectors %}\n<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">\n  {% for conn in connectors %}\n  <article class="apg-card hover:border-apg-primary transition-colors">\n    <div class="flex items-start gap-4 mb-3">\n      <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold flex-shrink-0"\n           style="background: var(--apg-primary, #1E5B5A)">\n        {{ (conn.title or conn.name or \'?\')[:1] | upper }}\n      </div>\n      <div class="flex-1 min-w-0">\n        <div class="flex items-center gap-2 flex-wrap">\n          <h2 class="text-sm font-bold text-gray-900">{{ conn.title or conn.name }}</h2>\n          <span class="apg-badge">{{ conn.category }}</span>\n        </div>\n        <p class="text-xs text-gray-500 mt-1">{{ conn.description }}</p>\n      </div>\n    </div>\n    <dl class="grid grid-cols-2 gap-3 mb-4">\n      <div class="border border-gray-100 rounded-lg p-3">\n        <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Operations</dt>\n        <dd class="text-lg font-bold text-gray-900">{{ conn.operation_count }}</dd>\n      </div>\n      <div class="border border-gray-100 rounded-lg p-3">\n        <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Fit score</dt>\n        <dd class="text-lg font-bold text-gray-900">{{ conn.fit_score }}%</dd>\n      </div>\n    </dl>\n    <div class="apg-marketplace-proof mb-4">\n      <div class="apg-marketplace-fit"><span style="width: {{ conn.fit_score }}%"></span></div>\n      {% for proof in conn.proof %}\n      <small>{{ proof }}</small>\n      {% endfor %}\n    </div>\n    {% if conn.operations %}\n    <div class="flex items-center gap-2 flex-wrap mb-4">\n      {% for operation in conn.operations[:3] %}\n      <span class="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">{{ operation }}</span>\n      {% endfor %}\n    </div>\n    {% endif %}\n    <div class="flex items-center gap-2">\n      <span class="flex-1 text-xs text-gray-400 font-mono truncate">{{ conn.file or conn.name }}</span>\n      <button type="button" class="apg-btn apg-btn-secondary" data-apg-install-proof="{{ conn.install_key }}" data-apg-install-name="{{ conn.title or conn.name }}">Proof</button>\n      <a href="{{ conn.href }}" class="apg-btn apg-btn-secondary">Open</a>\n    </div>\n  </article>\n  {% endfor %}\n</div>\n{% else %}\n<div class="apg-card text-center py-12">\n  <div class="text-5xl mb-4 opacity-20">Plug</div>\n  <h2 class="text-base font-semibold text-gray-900 mb-2">No connectors match these filters</h2>\n  <p class="text-sm text-gray-500 mb-4">Clear the search or category filter to return to generated integration blueprints.</p>\n  <a href="/ui/marketplace" class="apg-btn">Clear filters</a>\n</div>\n{% endif %}\n\n<script nonce="{{ csp_nonce }}">\n(function () {\n  document.addEventListener(\'click\', function (event) {\n    var proof = event.target.closest(\'[data-apg-install-proof]\');\n    if (!proof) return;\n    localStorage.setItem(proof.dataset.apgInstallProof, JSON.stringify({\n      connector: proof.dataset.apgInstallName || \'\',\n      provedAt: new Date().toISOString(),\n      source: \'generated-marketplace\'\n    }));\n    if (window.APGToast) window.APGToast(\'Install proof saved locally\', \'success\');\n  });\n})();\n</script>\n', 'workflow_list.html.j2': '<section class="mb-6">\n  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <span class="font-semibold text-gray-900">Workflows</span></p>\n  <div class="flex items-center justify-between gap-4 flex-wrap">\n    <div>\n      <h1 class="text-xl font-bold text-gray-900">Workflows</h1>\n      <p class="text-sm text-gray-500 mt-1">{{ total }} guided workflows across {{ entity_count }} entities · {{ run_count }} recorded runs</p>\n    </div>\n    <a href="/ui/debug" class="apg-btn apg-btn-secondary">Run history</a>\n  </div>\n</section>\n\n{% if workflows %}\n<section class="grid grid-cols-1 lg:grid-cols-3 gap-4">\n  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:col-span-2">\n  {% for workflow in workflows %}\n  <article class="apg-card group">\n    <div class="flex items-start gap-3 mb-3">\n      <span class="text-2xl" aria-hidden="true">{{ workflow.icon }}</span>\n      <div class="min-w-0">\n        <h2 class="font-semibold text-gray-900 group-hover:text-blue-600 text-sm mb-1">{{ workflow.name }}</h2>\n        <p class="text-xs text-gray-400">{{ workflow.entity }} · {{ workflow.step_count }} steps · {{ workflow.run_count }} runs</p>\n      </div>\n    </div>\n    <p class="text-xs text-gray-500 leading-relaxed mb-4">{{ workflow.description }}</p>\n    <div class="flex items-center gap-1 mb-4" aria-hidden="true">\n      {% for step in workflow.steps %}\n      <div class="h-1.5 flex-1 rounded-full {{ \'bg-blue-500\' if loop.first else \'bg-gray-100\' }}"></div>\n      {% endfor %}\n    </div>\n    <a href="{{ workflow.href }}" class="apg-btn">Start</a>\n  </article>\n  {% endfor %}\n  </div>\n\n  <aside class="apg-card">\n    <header class="apg-card-header">\n      <h2 class="text-base font-semibold text-gray-900">Recent runs</h2>\n      <a href="/ui/debug" class="text-xs text-apg-primary hover:underline">Open debugger</a>\n    </header>\n    {% if recent_runs %}\n    <ol class="space-y-3">\n      {% for run in recent_runs %}\n      <li class="border border-gray-100 rounded-lg p-3">\n        <div class="flex items-center justify-between gap-3">\n          <a href="{{ run.href }}" class="font-mono text-xs text-gray-900 hover:underline">{{ run.id }}</a>\n          <span class="apg-badge apg-badge-success">{{ run.status }}</span>\n        </div>\n        <p class="text-xs text-gray-500 mt-1">{{ run.workflow }}{% if run.entity %} · {{ run.entity }}{% endif %} · {{ run.step_count }} steps</p>\n      </li>\n      {% endfor %}\n    </ol>\n    {% else %}\n    <p class="text-sm text-gray-500">Completed wizard runs will appear here and in the flow debugger.</p>\n    {% endif %}\n  </aside>\n</section>\n{% else %}\n<section class="apg-card text-center py-10">\n  <h2 class="text-base font-semibold text-gray-900 mb-2">No workflows available</h2>\n  <p class="text-sm text-gray-500">Declare entities with fields to generate guided workflows.</p>\n</section>\n{% endif %}\n', 'debug_console.html.j2': '<section class="mb-6">\n  <p class="text-sm text-gray-500 mb-2"><a href="/ui" class="hover:text-blue-600">Application</a> / <span class="font-semibold text-gray-900">Debug</span></p>\n  <div class="flex items-start justify-between gap-4 flex-wrap">\n    <div>\n      <h1 class="text-xl font-bold text-gray-900">Flow debugger</h1>\n      <p class="text-sm text-gray-500 mt-1">Workflow run history, timeline, journal events, circuit breakers, and event subscriptions.</p>\n    </div>\n    {% if selected_run %}\n    <span class="apg-badge {{ selected_run.badge_class }}">{{ selected_run.status }}</span>\n    {% endif %}\n  </div>\n</section>\n\n{% if selected_run %}\n<section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">\n  <article class="apg-card lg:col-span-2">\n    <header class="apg-card-header">\n      <div>\n        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Run detail</p>\n        <h2 class="text-base font-semibold text-gray-900">{{ selected_run.id }}</h2>\n      </div>\n      <span class="apg-badge apg-badge-neutral">{{ selected_run.workflow }}</span>\n    </header>\n\n    <section class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4" aria-label="Run summary">\n      <div class="border border-gray-100 rounded-lg p-3">\n        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Steps</p>\n        <p class="text-xl font-bold text-gray-900">{{ selected_run.step_count }}</p>\n      </div>\n      <div class="border border-gray-100 rounded-lg p-3">\n        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Journal events</p>\n        <p class="text-xl font-bold text-gray-900">{{ selected_run.event_count }}</p>\n      </div>\n      <div class="border border-gray-100 rounded-lg p-3">\n        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Created record</p>\n        <p class="text-xl font-bold text-gray-900">{{ selected_run.created_record_id or \'-\' }}</p>\n      </div>\n    </section>\n\n    {% if selected_run.debug_intelligence %}\n    <section class="apg-debugger-grid mb-4" aria-label="Replay debugger">\n      <article class="apg-debugger-panel">\n        <div>\n          <span>Step replay</span>\n          <strong>{{ selected_run.debug_intelligence.replay_count }} checkpoint{{ \'\' if selected_run.debug_intelligence.replay_count == 1 else \'s\' }}</strong>\n          <small>{{ selected_run.debug_intelligence.verdict }}</small>\n        </div>\n        {% if selected_run.debug_intelligence.replay_frames %}\n        <ol class="apg-replay-rail">\n          {% for frame in selected_run.debug_intelligence.replay_frames %}\n          <li>\n            <button type="button" class="apg-replay-dot" data-apg-replay-target="apg-step-{{ frame.index }}" aria-label="Replay {{ frame.step }}">{{ frame.index }}</button>\n            <div>\n              <strong>{{ frame.step }}</strong>\n              <small>{{ frame.reason }} · +{{ frame.duration_ms }} ms · {{ frame.cumulative_ms }} ms total</small>\n            </div>\n            <span class="apg-badge {{ frame.badge_class }}">{{ frame.status }}</span>\n          </li>\n          {% endfor %}\n        </ol>\n        {% endif %}\n      </article>\n\n      <article class="apg-debugger-panel">\n        <div>\n          <span>Breakpoint planner</span>\n          <strong>{{ selected_run.debug_intelligence.breakpoint_count }} suggestion{{ \'\' if selected_run.debug_intelligence.breakpoint_count == 1 else \'s\' }}</strong>\n          <small>Saved locally per run</small>\n        </div>\n        {% if selected_run.debug_intelligence.breakpoints %}\n        <ul class="apg-breakpoint-list">\n          {% for point in selected_run.debug_intelligence.breakpoints %}\n          <li>\n            <div>\n              <strong>{{ point.step }}</strong>\n              <small>{{ point.reason }}</small>\n            </div>\n            <button type="button" class="apg-mini-btn" data-apg-breakpoint-key="{{ point.key }}" data-apg-breakpoint-step="{{ point.step }}">Set</button>\n          </li>\n          {% endfor %}\n        </ul>\n        {% endif %}\n      </article>\n\n      <article class="apg-debugger-panel">\n        <div>\n          <span>Variable inspector</span>\n          <strong>{{ selected_run.debug_intelligence.variable_count }} captured</strong>\n          <small>Payload, record, and run identifiers</small>\n        </div>\n        {% if selected_run.debug_intelligence.variables %}\n        <dl class="apg-variable-inspector">\n          {% for item in selected_run.debug_intelligence.variables %}\n          <div>\n            <dt>{{ item.source }} · {{ item.name }}</dt>\n            <dd>{{ item.value }}</dd>\n          </div>\n          {% endfor %}\n        </dl>\n        {% endif %}\n      </article>\n    </section>\n    {% endif %}\n\n    {% if selected_run.trace %}\n    <h3 class="text-sm font-semibold text-gray-900 mb-3">Run timeline</h3>\n    <ol class="space-y-3">\n      {% for step in selected_run.trace %}\n      <li id="apg-step-{{ step.index }}" class="border border-gray-200 rounded-lg p-3">\n        <div class="flex items-center justify-between gap-3 flex-wrap">\n          <div>\n            <p class="text-sm font-medium text-gray-900">{{ step.step }}</p>\n            <p class="text-xs text-gray-500 mt-1">Step {{ step.index }}{% if step.field_count %} · {{ step.field_count }} field{{ \'\' if step.field_count == 1 else \'s\' }}{% endif %}{% if step.duration_ms %} · {{ step.duration_ms }} ms{% endif %}</p>\n          </div>\n          <span class="apg-badge {{ step.badge_class }}">{{ step.status }}</span>\n        </div>\n        {% if step.notes %}<p class="text-xs text-gray-500 mt-2">{{ step.notes }}</p>{% endif %}\n        {% if step.fields %}<p class="text-xs text-gray-400 mt-2">Fields: <span class="font-mono">{{ step.fields }}</span></p>{% endif %}\n      </li>\n      {% endfor %}\n    </ol>\n    {% else %}\n    <p class="text-sm text-gray-500">No steps recorded for this run.</p>\n    {% endif %}\n  </article>\n\n  <aside class="space-y-4">\n    <article class="apg-card">\n      <h2 class="text-base font-semibold text-gray-900 mb-3">Run context</h2>\n      <dl class="space-y-2">\n        <div class="flex items-center justify-between gap-3"><dt class="text-sm text-gray-500">Entity</dt><dd class="text-sm font-mono text-gray-900">{{ selected_run.entity }}</dd></div>\n        <div class="flex items-center justify-between gap-3"><dt class="text-sm text-gray-500">Workflow ID</dt><dd class="text-sm font-mono text-gray-900">{{ selected_run.workflow_id }}</dd></div>\n        <div class="flex items-center justify-between gap-3"><dt class="text-sm text-gray-500">Event ID</dt><dd class="text-sm font-mono text-gray-900">{{ selected_run.event_id or \'-\' }}</dd></div>\n        <div class="flex items-center justify-between gap-3"><dt class="text-sm text-gray-500">Duration</dt><dd class="text-sm font-mono text-gray-900">{{ selected_run.duration_ms }} ms</dd></div>\n      </dl>\n    </article>\n\n    <article class="apg-card">\n      <h2 class="text-base font-semibold text-gray-900 mb-3">Snapshots</h2>\n      <details class="mb-3">\n        <summary class="cursor-pointer text-sm font-medium text-gray-700">Payload snapshot</summary>\n        <pre>{{ selected_run.payload_json }}</pre>\n      </details>\n      <details>\n        <summary class="cursor-pointer text-sm font-medium text-gray-700">Created record snapshot</summary>\n        <pre>{{ selected_run.record_json }}</pre>\n      </details>\n    </article>\n  </aside>\n</section>\n\n<section class="apg-card">\n  <header class="apg-card-header">\n    <h2 class="text-base font-semibold text-gray-900">Event journal</h2>\n    <a href="/workflows/runs/{{ selected_run.id }}/journal" class="apg-btn apg-btn-secondary">Journal JSON</a>\n  </header>\n  {% if selected_run.journal %}\n  <div class="apg-table-wrap">\n    <table class="apg-table">\n      <caption class="apg-sr-only">{{ selected_run.workflow }} journal records</caption>\n      <thead><tr><th scope="col">Seq</th><th scope="col">Event</th><th scope="col">Step</th><th scope="col">Time</th><th scope="col">Data</th></tr></thead>\n      <tbody>\n        {% for event in selected_run.journal %}\n        <tr>\n          <td scope="row" class="font-mono">{{ event.seq }}</td>\n          <td><span class="apg-badge apg-badge-neutral">{{ event.event_type }}</span></td>\n          <td>{{ event.step }}</td>\n          <td class="font-mono text-xs">{{ event.ts }}</td>\n          <td><details><summary class="cursor-pointer text-sm font-medium text-gray-700">Data</summary><pre>{{ event.data_json }}</pre></details></td>\n        </tr>\n        {% endfor %}\n      </tbody>\n    </table>\n  </div>\n  {% else %}\n  <p class="text-sm text-gray-500">No journal events recorded for this run.</p>\n  {% endif %}\n</section>\n\n{% if selected_run and selected_run.debug_intelligence %}\n<script nonce="{{ csp_nonce }}">\n(function () {\n  document.addEventListener(\'click\', function (event) {\n    var replay = event.target.closest(\'[data-apg-replay-target]\');\n    if (replay) {\n      var target = document.getElementById(replay.dataset.apgReplayTarget || \'\');\n      if (target) {\n        target.scrollIntoView({ behavior: \'smooth\', block: \'center\' });\n        target.classList.add(\'apg-replay-focus\');\n        setTimeout(function () { target.classList.remove(\'apg-replay-focus\'); }, 1600);\n      }\n      return;\n    }\n    var breakpoint = event.target.closest(\'[data-apg-breakpoint-key]\');\n    if (!breakpoint) return;\n    localStorage.setItem(breakpoint.dataset.apgBreakpointKey, breakpoint.dataset.apgBreakpointStep || \'\');\n    breakpoint.textContent = \'Set\';\n    breakpoint.setAttribute(\'aria-pressed\', \'true\');\n    APGToast(\'Breakpoint saved locally\', \'success\');\n  });\n})();\n</script>\n{% endif %}\n{% endif %}\n\n<section class="grid grid-cols-1 lg:grid-cols-2 gap-4">\n  <article class="apg-card">\n    <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Recent runs</h2></header>\n    {% if runs %}\n    <div class="apg-table-wrap">\n      <table class="apg-table">\n        <caption class="apg-sr-only">Workflow run records</caption>\n        <thead><tr><th scope="col">Run</th><th scope="col">Workflow</th><th scope="col">Entity</th><th scope="col">Status</th><th scope="col">Steps</th></tr></thead>\n        <tbody>\n          {% for run in runs %}\n          <tr>\n            <td scope="row"><a href="/ui/debug/{{ run.id }}" class="font-mono hover:underline">{{ run.id }}</a></td>\n            <td>{{ run.workflow }}</td>\n            <td>{{ run.entity }}</td>\n            <td><span class="apg-badge {{ run.badge_class }}">{{ run.status }}</span></td>\n            <td>{{ run.step_count }}</td>\n          </tr>\n          {% endfor %}\n        </tbody>\n      </table>\n    </div>\n    {% else %}\n    <p class="text-sm text-gray-500">No workflow runs yet. Complete a workflow to inspect its timeline here.</p>\n    {% endif %}\n  </article>\n\n  <article class="apg-card">\n    <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Circuit breakers</h2></header>\n    {% if circuit_breakers %}\n    <dl class="space-y-3">\n      {% for item in circuit_breakers %}\n      <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">\n        <dt class="font-mono text-xs text-gray-600">{{ item.key }}</dt>\n        <dd><span class="apg-badge {{ item.badge_class }}">{{ item.state }}</span> <span class="text-xs text-gray-400">{{ item.failures }} failures</span></dd>\n      </div>\n      {% endfor %}\n    </dl>\n    {% else %}\n    <p class="text-sm text-gray-500">No circuit breakers tripped.</p>\n    {% endif %}\n  </article>\n</section>\n\n<section class="apg-card">\n  <header class="apg-card-header"><h2 class="text-base font-semibold text-gray-900">Event subscriptions</h2></header>\n  {% if subscriptions %}\n  <ul class="space-y-2">\n    {% for item in subscriptions %}\n    <li class="text-sm text-gray-600"><span class="font-mono">{{ item.event }}</span> -> {{ item.workflows }}</li>\n    {% endfor %}\n  </ul>\n  {% else %}\n  <p class="text-sm text-gray-500">No event subscriptions declared.</p>\n  {% endif %}\n</section>\n', 'app_index.html.j2': '<!--- app_index.html.j2 - APG application home page --->\n{# Variables: module_name, module_description, entities, capabilities, databases,\n              application_routes, ui_routes, agents, agent_teams #}\n<div class="mb-6">\n  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ module_name }}</h1>\n  <p class="text-gray-500 mt-1">{{ module_description or \'Generated APG application\' }}</p>\n</div>\n\n{# Quick nav #}\n<nav class="flex flex-wrap gap-2 mb-8 text-sm" aria-label="Workspace shortcuts">\n  {% if entities %}\n  <a href="/ui/entities/{{ entities[0].name | urlencode }}"\n     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-apg-primary text-white hover:opacity-90 transition-opacity font-medium">\n    Start with {{ entities[0].name }}\n  </a>\n  {% endif %}\n  {% for link in api_links %}\n  <a href="{{ link.url }}"\n     class="inline-flex items-center px-3 py-1.5 rounded border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-apg-primary transition-colors">\n    {{ link.label }}\n  </a>\n  {% endfor %}\n</nav>\n\n<section class="apg-dashboard-command-center mb-8" aria-label="Dashboard command center">\n  <article class="apg-card apg-dashboard-panel">\n    <div class="apg-card-header">\n      <div>\n        <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Composable Tiles</h2>\n        <p class="text-xs text-gray-400 mt-1">Persisted workspace order and visibility</p>\n      </div>\n      <button type="button" class="apg-btn apg-btn-secondary" data-apg-tour="dashboard-tiles">Save view</button>\n    </div>\n    <ol class="apg-dashboard-sort-list">\n      {% for tile in tile_controls %}\n      <li>\n        <span class="apg-drag-handle" aria-hidden="true">::</span>\n        <a href="{{ tile.href }}">{{ tile.label }}</a>\n        <span>{{ tile.position }}</span>\n      </li>\n      {% else %}\n      <li><span>No record tiles yet</span></li>\n      {% endfor %}\n    </ol>\n  </article>\n\n  <article class="apg-card apg-dashboard-panel">\n    <div class="apg-card-header">\n      <div>\n        <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Threshold Alerts</h2>\n        <p class="text-xs text-gray-400 mt-1">Inline watches before scheduled delivery</p>\n      </div>\n      <a class="apg-btn apg-btn-secondary" href="/metrics">Metrics</a>\n    </div>\n    <ul class="apg-dashboard-watch-list">\n      {% for alert in dashboard_alerts %}\n      <li>\n        <a href="{{ alert.href }}">{{ alert.label }}</a>\n        <strong>{{ alert.value }}</strong>\n        <small>{{ alert.state }} at {{ alert.threshold }}</small>\n      </li>\n      {% else %}\n      <li><span>No thresholds available</span></li>\n      {% endfor %}\n    </ul>\n  </article>\n\n  <article class="apg-card apg-dashboard-panel">\n    <div class="apg-card-header">\n      <div>\n        <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Annotation Pins</h2>\n        <p class="text-xs text-gray-400 mt-1">Decision context travels with charts</p>\n      </div>\n      <span class="apg-badge apg-badge-info">{{ dashboard_annotations | length }} pins</span>\n    </div>\n    <ul class="apg-dashboard-pin-list">\n      {% for pin in dashboard_annotations %}\n      <li>\n        <a href="{{ pin.href }}">{{ pin.title }}</a>\n        <p>{{ pin.body }}</p>\n      </li>\n      {% else %}\n      <li><p>Add status data to unlock annotation pins.</p></li>\n      {% endfor %}\n    </ul>\n  </article>\n\n  <article class="apg-card apg-dashboard-panel">\n    <div class="apg-card-header">\n      <div>\n        <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Scheduled Export</h2>\n        <p class="text-xs text-gray-400 mt-1">Offline packets, no external service</p>\n      </div>\n      <button type="button" class="apg-btn apg-btn-secondary" onclick="window.print()">PNG/PDF</button>\n    </div>\n    <ul class="apg-dashboard-export-list">\n      {% for item in scheduled_exports %}\n      <li>\n        <strong>{{ item.label }}</strong>\n        <span>{{ item.cadence }}</span>\n        <small>{{ item.format }}</small>\n      </li>\n      {% endfor %}\n    </ul>\n  </article>\n</section>\n\n{# Stats row #}\n<div class="apg-grid-4 mb-8" data-apg-live="events">\n  {% for stat in dashboard_stats[:4] %}\n  <article class="apg-card">\n    <div class="apg-stat">\n      <a class="apg-stat-value hover:text-apg-primary" href="/ui/entities/{{ stat.label | urlencode }}">{{ stat.value }}</a>\n      <span class="apg-stat-label">{{ stat.label }} records</span>\n      <span class="apg-stat-delta">{{ stat.delta }}</span>\n    </div>\n    <div class="apg-chart mt-3" data-apg-chart="{{ stat.chart_id }}"></div>\n    <script id="{{ stat.chart_id }}" type="application/json" nonce="{{ csp_nonce }}">{{ stat.spec_json | safe }}</script>\n  </article>\n  {% endfor %}\n  <article class="apg-card">\n    <div class="apg-stat">\n      <a class="apg-stat-value hover:text-apg-primary" href="/ui/marketplace">{{ capabilities | length }}</a>\n      <span class="apg-stat-label">Capabilities</span>\n    </div>\n  </article>\n  <article class="apg-card">\n    <div class="apg-stat">\n      <a class="apg-stat-value hover:text-apg-primary" href="/ui/workflows">{{ workflow_summary.workflow_count }}</a>\n      <span class="apg-stat-label">Workflows</span>\n    </div>\n  </article>\n</div>\n\n{% if status_charts %}\n<section class="apg-grid-2 gap-6 mb-8">\n  {% for chart in status_charts %}\n  <article class="apg-card">\n    <div class="apg-card-header">\n      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ chart.entity }} by {{ chart.field }}</h2>\n      <a class="text-xs hover:underline" href="/ui/entities/{{ chart.entity | urlencode }}?view=analytics">Analytics</a>\n    </div>\n    <div class="apg-chart" data-apg-chart="{{ chart.chart_id }}"></div>\n    <script id="{{ chart.chart_id }}" type="application/json" nonce="{{ csp_nonce }}">{{ chart.spec_json | safe }}</script>\n  </article>\n  {% endfor %}\n</section>\n{% endif %}\n\n<section class="apg-grid-3 gap-6 mb-8">\n  <article class="apg-card">\n    <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Recent Activity</h2>\n    {% if recent_activity %}\n    <ul class="space-y-2">\n      {% for event in recent_activity %}\n      <li class="text-xs text-gray-500">{{ event.get(\'type\', \'event\') }} · {{ event.get(\'entity\', \'\') }}</li>\n      {% endfor %}\n    </ul>\n    {% else %}\n    <div class="apg-chart-empty">\n      <p>No activity yet</p>\n      {% if entities %}<a class="apg-btn apg-btn-secondary mt-3" href="/ui/entities/{{ entities[0].name | urlencode }}">Create the first record</a>{% endif %}\n    </div>\n    {% endif %}\n  </article>\n  <article class="apg-card">\n    <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Workflow Summary</h2>\n    <p class="text-sm text-gray-500">{{ workflow_summary.workflow_count }} workflow(s), {{ workflow_summary.run_count }} run(s)</p>\n    <a class="apg-btn apg-btn-secondary mt-3" href="/ui/workflows">Open workflows</a>\n  </article>\n  <article class="apg-card">\n    <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Agent Summary</h2>\n    <p class="text-sm text-gray-500">{{ agent_summary.agent_count }} agent(s), {{ agent_summary.team_count }} team(s)</p>\n    {% if agents %}<a class="apg-btn apg-btn-secondary mt-3" href="/ui/agents/{{ agents[0].name | urlencode }}">Open agent console</a>{% endif %}\n  </article>\n</section>\n\n<div class="apg-grid-2 gap-6">\n  {% if entities %}\n  <div class="apg-card">\n    <div class="apg-card-header">\n      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Entities</h2>\n    </div>\n    <ul class="divide-y divide-gray-100 dark:divide-gray-700">\n      {% for entity in entities %}\n      <li class="py-2 flex items-center justify-between">\n        <a href="/ui/entities/{{ entity.name | urlencode }}"\n           class="text-sm text-apg-primary hover:underline font-medium">\n          {{ entity.name }}\n        </a>\n        <span class="apg-badge apg-badge-neutral">{{ entity.type }}</span>\n      </li>\n      {% endfor %}\n    </ul>\n  </div>\n  {% endif %}\n\n  {% if capabilities %}\n  <div class="apg-card">\n    <div class="apg-card-header">\n      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Capabilities</h2>\n    </div>\n    <ul class="divide-y divide-gray-100 dark:divide-gray-700">\n      {% for cap in capabilities %}\n      <li class="py-2">\n        <a href="/ui/capabilities/{{ cap.name | urlencode }}"\n           class="text-sm text-apg-primary hover:underline font-medium">\n          {{ cap.name }}\n        </a>\n      </li>\n      {% endfor %}\n    </ul>\n  </div>\n  {% endif %}\n\n  {% if ui_routes %}\n  <div class="apg-card">\n    <div class="apg-card-header">\n      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Application Screens</h2>\n    </div>\n    <ul class="divide-y divide-gray-100 dark:divide-gray-700">\n      {% for route, screen in ui_routes.items() %}\n      <li class="py-2 flex items-center justify-between">\n        <a href="{{ route }}" class="text-sm text-apg-primary hover:underline">{{ route }}</a>\n        <span class="text-xs text-gray-400">{{ screen.get(\'application\', \'\') }}</span>\n      </li>\n      {% endfor %}\n    </ul>\n  </div>\n  {% endif %}\n\n  {% if application_routes %}\n  <div class="apg-card">\n    <div class="apg-card-header">\n      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Application Routes</h2>\n    </div>\n    <ul class="divide-y divide-gray-100 dark:divide-gray-700">\n      {% for route, screen in application_routes.items() %}\n      <li class="py-2 flex items-center justify-between">\n        <a href="{{ route }}" class="text-sm text-apg-primary hover:underline">{{ route }}</a>\n        <span class="text-xs text-gray-400">{{ screen.get(\'application\', \'\') }}</span>\n      </li>\n      {% endfor %}\n    </ul>\n  </div>\n  {% endif %}\n\n  {% if agents %}\n  <div class="apg-card">\n    <div class="apg-card-header">\n      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Agents</h2>\n    </div>\n    <ul class="divide-y divide-gray-100 dark:divide-gray-700">\n      {% for agent in agents %}\n      <li class="py-2">\n        <a href="/ui/agents/{{ agent.name | urlencode }}"\n           class="text-sm text-apg-primary hover:underline font-medium">\n          {{ agent.name }}\n        </a>\n      </li>\n      {% endfor %}\n    </ul>\n  </div>\n  {% endif %}\n\n  {% if agent_teams %}\n  <div class="apg-card">\n    <div class="apg-card-header">\n      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Agent Teams</h2>\n    </div>\n    <ul class="divide-y divide-gray-100 dark:divide-gray-700">\n      {% for team in agent_teams %}\n      <li class="py-2">\n        <a href="/ui/agent-teams/{{ team.name | urlencode }}"\n           class="text-sm text-apg-primary hover:underline font-medium">\n          {{ team.name }}\n        </a>\n      </li>\n      {% endfor %}\n    </ul>\n  </div>\n  {% endif %}\n</div>\n', 'widgets/breadcrumbs.html.j2': '<nav class="flex items-center gap-2 text-sm mb-5 text-gray-500 flex-wrap" aria-label="Breadcrumb">\n  {% for item in breadcrumbs %}\n    {% if item.href and not loop.last %}\n    <a href="{{ item.href }}" class="hover:text-apg-primary transition-colors">{{ item.label }}</a>\n    {% else %}\n    <span class="font-semibold text-gray-900" {% if loop.last %}aria-current="page"{% endif %}>{{ item.label }}</span>\n    {% endif %}\n    {% if not loop.last %}<span aria-hidden="true">/</span>{% endif %}\n  {% endfor %}\n</nav>\n', 'widgets/field_display.html.j2': '{# field_display.html.j2 — semantic field rendering for record detail\n   Included by record_detail.html.j2 for individual field value rendering.\n   Variables: field (dict), field_val (any), semantic (str)\n#}\n{% if semantic == \'email\' and field_val %}\n  <a href="mailto:{{ field_val }}" class="text-apg-primary hover:underline text-sm">{{ field_val }}</a>\n{% elif semantic == \'phone\' and field_val %}\n  <a href="tel:{{ field_val }}" class="text-apg-primary hover:underline text-sm inline-flex items-center gap-1">\n    <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>\n    {{ field_val }}\n  </a>\n{% elif semantic == \'url\' and field_val %}\n  <a href="{{ field_val }}" target="_blank" rel="noopener" class="text-apg-primary hover:underline text-sm inline-flex items-center gap-1 truncate max-w-xs">\n    <svg class="w-3 h-3 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>\n    {{ field_val | string | truncate(40) }}\n  </a>\n{% elif semantic == \'image_url\' and field_val %}\n  <img src="{{ field_val }}" alt="{{ field.name }}" class="w-12 h-12 rounded-lg object-cover border border-gray-100">\n{% elif semantic == \'currency\' and field_val %}\n  <span class="text-sm font-semibold text-gray-900 tabular-nums">{{ format_currency(field_val) }}</span>\n{% elif semantic == \'percent\' and field_val %}\n  <div class="flex items-center gap-2">\n    <div class="flex-1 bg-gray-100 rounded-full h-1.5 max-w-24">\n      <div class="bg-apg-primary h-1.5 rounded-full" style="width: {{ [field_val | float, 100] | min }}%"></div>\n    </div>\n    <span class="text-sm text-gray-700 tabular-nums">{{ field_val }}%</span>\n  </div>\n{% elif semantic == \'rating\' and field_val %}\n  <div class="flex items-center gap-0.5">\n    {% set stars = field_val | float | round | int %}\n    {% for i in range(5) %}\n    <svg class="w-4 h-4 {{ \'text-amber-400\' if i < stars else \'text-gray-200\' }}" viewBox="0 0 20 20" fill="currentColor">\n      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>\n    </svg>\n    {% endfor %}\n    <span class="text-xs text-gray-400 ml-1">{{ field_val }}/5</span>\n  </div>\n{% elif semantic == \'color\' and field_val %}\n  <div class="flex items-center gap-2">\n    <div class="w-5 h-5 rounded-full border border-gray-200 flex-shrink-0" style="background-color: {{ field_val }}"></div>\n    <span class="text-sm text-gray-700 font-mono">{{ field_val }}</span>\n  </div>\n{% elif semantic == \'json\' and field_val %}\n  <details class="max-w-xs">\n    <summary class="text-xs text-apg-primary cursor-pointer hover:underline">View JSON</summary>\n    <pre class="mt-1 text-xs bg-gray-50 rounded-lg p-2 overflow-auto max-h-40 border border-gray-100">{{ field_val | string }}</pre>\n  </details>\n{% elif semantic == \'status\' and field_val %}\n  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold\n    {% if field_val | lower in [\'active\', \'approved\', \'paid\', \'open\', \'enabled\', \'complete\', \'completed\', \'success\', \'done\'] %}bg-green-100 text-green-800\n    {% elif field_val | lower in [\'inactive\', \'rejected\', \'closed\', \'disabled\', \'cancelled\', \'canceled\', \'failed\', \'expired\'] %}bg-red-100 text-red-800\n    {% elif field_val | lower in [\'pending\', \'draft\', \'processing\', \'review\', \'in_progress\', \'waiting\'] %}bg-yellow-100 text-yellow-800\n    {% else %}bg-gray-100 text-gray-600{% endif %}">\n    {{ field_val }}\n  </span>\n{% elif semantic == \'boolean\' %}\n  {% if field_val | string | lower in [\'true\', \'1\', \'yes\'] %}\n  <span class="inline-flex items-center gap-1 text-green-600 text-sm"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>Yes</span>\n  {% else %}\n  <span class="inline-flex items-center gap-1 text-gray-400 text-sm"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>No</span>\n  {% endif %}\n{% else %}\n  {% if field_val is none or field_val == \'\' or field_val | string == \'None\' %}\n  <span class="text-gray-300 italic text-xs">—</span>\n  {% else %}\n  {{ field_val | string | truncate(200) }}\n  {% endif %}\n{% endif %}\n'}
 APG_AUTH_REQUIRED = False
-APG_SUPPORTED_LANGUAGES: list[str] = ['en']
+APG_SUPPORTED_LANGUAGES: list[str] = ['en', 'sw', 'fr', 'ar']
 APG_DEFAULT_LANGUAGE = 'en'
 APG_FALLBACK_LANGUAGE = 'en'
-APG_I18N: Dict[str, Dict[str, str]] = {'en': {'home': 'Home', 'workflows': 'Workflows', 'marketplace': 'Marketplace', 'theme_system': 'System', 'language': 'Language', 'logout': 'Logout', 'sign_in': 'Sign in', 'open_app': 'Open App', 'api_docs': 'API Docs', 'data_entities': 'Data Entities', 'view_manifest': 'View Manifest', 'entities': 'Entities', 'capabilities': 'Capabilities', 'records': 'Records', 'ai_agents': 'AI Agents'}}
+_APG_STRINGS: Dict[str, Dict[str, str]] = {'en': {'cancel': 'Cancel', 'home': 'Home', 'workflows': 'Workflows', 'marketplace': 'Marketplace', 'theme_system': 'System', 'language': 'Language', 'login': 'Login', 'logout': 'Logout', 'sign_in': 'Sign in', 'open_app': 'Open App', 'api_docs': 'API Docs', 'data_entities': 'Data Entities', 'view_manifest': 'View Manifest', 'entities': 'Entities', 'capabilities': 'Capabilities', 'confirm': 'Confirm', 'delete': 'Delete', 'error': 'Error', 'loading': 'Loading', 'no_records': 'No records', 'records': 'Records', 'save': 'Save', 'search': 'Search', 'success': 'Success', 'ai_agents': 'AI Agents'}, 'sw': {'cancel': '', 'home': 'Home', 'workflows': 'Workflows', 'marketplace': 'Marketplace', 'theme_system': 'System', 'language': 'Language', 'login': '', 'logout': '', 'sign_in': 'Sign in', 'open_app': 'Open App', 'api_docs': 'API Docs', 'data_entities': 'Data Entities', 'view_manifest': 'View Manifest', 'entities': 'Entities', 'capabilities': 'Capabilities', 'confirm': '', 'delete': '', 'error': '', 'loading': '', 'no_records': '', 'records': 'Records', 'save': '', 'search': '', 'success': '', 'ai_agents': 'AI Agents'}, 'fr': {'cancel': '', 'home': 'Home', 'workflows': 'Workflows', 'marketplace': 'Marketplace', 'theme_system': 'System', 'language': 'Language', 'login': '', 'logout': '', 'sign_in': 'Sign in', 'open_app': 'Open App', 'api_docs': 'API Docs', 'data_entities': 'Data Entities', 'view_manifest': 'View Manifest', 'entities': 'Entities', 'capabilities': 'Capabilities', 'confirm': '', 'delete': '', 'error': '', 'loading': '', 'no_records': '', 'records': 'Records', 'save': '', 'search': '', 'success': '', 'ai_agents': 'AI Agents'}, 'ar': {'cancel': '', 'home': 'Home', 'workflows': 'Workflows', 'marketplace': 'Marketplace', 'theme_system': 'System', 'language': 'Language', 'login': '', 'logout': '', 'sign_in': 'Sign in', 'open_app': 'Open App', 'api_docs': 'API Docs', 'data_entities': 'Data Entities', 'view_manifest': 'View Manifest', 'entities': 'Entities', 'capabilities': 'Capabilities', 'confirm': '', 'delete': '', 'error': '', 'loading': '', 'no_records': '', 'records': 'Records', 'save': '', 'search': '', 'success': '', 'ai_agents': 'AI Agents'}}
+APG_I18N: Dict[str, Dict[str, str]] = _APG_STRINGS
+_APG_OPENAPI_SPEC: Dict[str, Any] | None = None
+_APG_FIELD_ACL = json.loads(os.environ.get("APG_FIELD_ACL", "{}"))
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -74,10 +99,20 @@ def _production_mode() -> bool:
     return _env_flag("APG_PRODUCTION") or str(os.environ.get("APG_ENV", "")).strip().lower() in {"prod", "production"}
 
 
+def _apg_production_env_enabled() -> bool:
+    return str(os.environ.get("APG_PRODUCTION", "")).strip() == "1"
+
+
+def _configured_session_secret() -> str:
+    return str(os.environ.get("APG_SECRET_KEY") or os.environ.get("APG_SESSION_SECRET") or os.environ.get("APG_JWT_SECRET") or "")
+
+
 def _generated_session_secret() -> str:
-    configured = os.environ.get("APG_SESSION_SECRET") or os.environ.get("APG_JWT_SECRET")
+    configured = _configured_session_secret()
     if configured:
         return configured
+    if _apg_production_env_enabled():
+        return "dev-secret-key-change-me"
     return secrets.token_urlsafe(48)
 
 
@@ -92,6 +127,72 @@ def _env_int(name: str, default: int) -> int:
         return int(str(os.environ.get(name, "")).strip() or default)
     except ValueError:
         return default
+
+
+_APG_JOB_WORKER_THREADS = max(1, _env_int("APG_WORKER_THREADS", 2))
+_APG_JOB_MAX_RETRIES = max(1, _env_int("APG_JOB_MAX_RETRIES", 3))
+_APG_EMAIL_THREADS: list[_threading_mod.Thread] = []
+
+
+def _apg_send_email(to: str, subject: str, body: str) -> None:
+    recipient = str(to or "").strip()
+    smtp_host = str(os.environ.get("APG_SMTP_HOST", "") or "").strip()
+    if not recipient or not smtp_host:
+        return
+    sender = str(
+        os.environ.get("APG_SMTP_FROM")
+        or os.environ.get("APG_SMTP_USER")
+        or "apg@localhost"
+    )
+    smtp_port = _env_int("APG_SMTP_PORT", 587)
+    smtp_user = str(os.environ.get("APG_SMTP_USER", "") or "")
+    smtp_password = str(os.environ.get("APG_SMTP_PASSWORD", "") or "")
+    message = _EmailMessage()
+    message["From"] = sender
+    message["To"] = recipient
+    message["Subject"] = str(subject)
+    message.set_content(str(body))
+
+    def _send() -> None:
+        try:
+            with _smtplib.SMTP(smtp_host, smtp_port, timeout=10) as smtp:
+                smtp.starttls()
+                if smtp_user or smtp_password:
+                    smtp.login(smtp_user, smtp_password)
+                smtp.sendmail(sender, [recipient], message.as_string())
+            _logging.getLogger("apg").info("email_sent to=%s subject=%s", recipient, subject)
+        except Exception as exc:
+            _logging.getLogger("apg").warning("email_send_failed to=%s err=%s", recipient, exc)
+
+    thread = _threading_mod.Thread(target=_send, daemon=True)
+    _APG_EMAIL_THREADS.append(thread)
+    thread.start()
+
+
+def _apg_alert_startup_failure(message: str) -> None:
+    recipient = str(os.environ.get("APG_ALERT_EMAIL", "") or "").strip()
+    if recipient:
+        _apg_send_email(
+            recipient,
+            f"{APG_APP_NAME} startup validation failed",
+            str(message),
+        )
+
+
+def _validate_startup_configuration() -> None:
+    try:
+        if not _apg_production_env_enabled():
+            return
+        if _flask_app.secret_key == "dev-secret-key-change-me":
+            raise RuntimeError("Set APG_SECRET_KEY in production")
+        if _flask_app.config.get("SESSION_COOKIE_SECURE") is False:
+            _logging.getLogger("apg").warning("APG_PRODUCTION is enabled but SESSION_COOKIE_SECURE is false.")
+    except RuntimeError as exc:
+        if _apg_production_env_enabled():
+            _apg_alert_startup_failure(str(exc))
+            raise
+    except Exception as exc:
+        _logging.getLogger("apg").warning("APG startup validation skipped: %s", exc)
 
 
 _APG_SCRYPT_N = 2**17
@@ -528,11 +629,16 @@ def _database_column_specs(entity: Dict[str, Any]) -> list[Dict[str, Any]]:
     columns: list[Dict[str, Any]] = [
         {"name": "id", "type": "integer", "required": True, "nullable": False, "primary_key": True}
     ]
+    if APG_MULTI_TENANT_ENABLED:
+        columns.append({"name": "tenant_id", "type": "string", "required": True, "nullable": False, "primary_key": False})
     for field in entity.get("fields", []):
         if not isinstance(field, dict):
             continue
+        if field.get("computed"):
+            continue
         field_name = str(field.get("name", "")).strip()
-        if not field_name or field_name == "id":
+        existing_column_names = {str(column.get("name")) for column in columns}
+        if not field_name or field_name == "id" or field_name in existing_column_names:
             continue
         required = bool(field.get("required", False))
         column: Dict[str, Any] = {
@@ -550,6 +656,11 @@ def _database_column_specs(entity: Dict[str, Any]) -> list[Dict[str, Any]]:
                 "cardinality": relationship.get("cardinality", "many-to-one"),
             }
         columns.append(column)
+    columns.extend([
+        {"name": "created_at", "type": "string", "required": True, "nullable": False, "primary_key": False},
+        {"name": "updated_at", "type": "string", "required": True, "nullable": False, "primary_key": False},
+        {"name": "deleted_at", "type": "string", "required": False, "nullable": True, "primary_key": False},
+    ])
     return columns
 
 
@@ -1366,8 +1477,58 @@ def circuit_breaker_status() -> Dict[str, Any]:
 _TENANT_LOCAL = _apg_threading.local()
 
 
+def _tenant_header_name() -> str:
+    configured = str(os.environ.get("APG_TENANT_HEADER", "") or "").strip()
+    return configured or APG_TENANT_HEADER_DEFAULT
+
+
+def _tenant_header_value() -> str | None:
+    try:
+        header_name = _tenant_header_name()
+        value = _flask_request.headers.get(header_name)
+        if value is None and header_name.lower() == APG_TENANT_HEADER_DEFAULT.lower():
+            value = _flask_request.headers.get("X-Tenant-ID")
+    except RuntimeError:
+        return None
+    if value in (None, ""):
+        return None
+    value_text = str(value).strip()
+    return value_text or None
+
+
+def _tenant_admin_bypass() -> bool:
+    try:
+        if str(_flask_request.headers.get("X-APG-Admin", "")).strip() != "1":
+            return False
+        admin_key = os.environ.get("APG_ADMIN_KEY")
+        if not admin_key:
+            return False
+        authorization = _flask_request.headers.get("Authorization", "")
+        supplied_key = _flask_request.headers.get("X-APG-API-Key")
+        if authorization.startswith("Bearer "):
+            supplied_key = authorization.removeprefix("Bearer ").strip()
+        return bool(supplied_key) and hmac.compare_digest(str(supplied_key), str(admin_key))
+    except RuntimeError:
+        return False
+
+
 def _tenant_id() -> str | None:
-    return getattr(_TENANT_LOCAL, "tenant_id", None)
+    tenant = getattr(_TENANT_LOCAL, "tenant_id", None)
+    if tenant not in (None, ""):
+        tenant_text = str(tenant).strip()
+        if tenant_text:
+            return tenant_text
+    return APG_TENANT_DEFAULT if APG_MULTI_TENANT_ENABLED else None
+
+
+def _tenant_scope_enabled(entity_name: str) -> bool:
+    return APG_MULTI_TENANT_ENABLED or entity_name in TENANT_SCOPED_ENTITIES
+
+
+def _record_tenant_visible(entity_name: str, record: Dict[str, Any]) -> bool:
+    if not _tenant_scope_enabled(entity_name) or _tenant_admin_bypass():
+        return True
+    return str(record.get("tenant_id") or APG_TENANT_DEFAULT) == str(_tenant_id() or APG_TENANT_DEFAULT)
 
 
 def _subscribe_workflow_event(event_name: str, workflow_name: str) -> None:
@@ -1431,42 +1592,423 @@ def database_status() -> Dict[str, Any]:
     }
 
 
-def list_records(entity_name: str | None = None) -> Dict[str, list[Dict[str, Any]]] | list[Dict[str, Any]]:
+def _record_timestamp() -> str:
+    return _datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _record_metadata_key(record_id: Any) -> str:
+    return str(record_id)
+
+
+def _record_metadata(entity_name: str, record_id: Any, create: bool = False) -> Dict[str, Any] | None:
+    if record_id in (None, ""):
+        return None
+    entity_metadata = RECORD_METADATA.setdefault(entity_name, {})
+    key = _record_metadata_key(record_id)
+    metadata = entity_metadata.get(key)
+    if metadata is None and create:
+        now = _record_timestamp()
+        metadata = {"created_at": now, "updated_at": now, "deleted_at": None}
+        entity_metadata[key] = metadata
+    return metadata
+
+
+def _row_ownership_enabled() -> bool:
+    return _env_flag("APG_ROW_OWNERSHIP")
+
+
+def _apg_current_session_user() -> Dict[str, Any] | None:
+    try:
+        return _current_user()
+    except RuntimeError:
+        return None
+
+
+def _apg_current_uses_header_auth() -> bool:
+    try:
+        return _has_header_auth(_flask_request.headers)
+    except RuntimeError:
+        return False
+
+
+def _apg_current_user_role() -> str:
+    user = _apg_current_session_user()
+    if isinstance(user, dict):
+        roles = user.get("roles", [])
+        if isinstance(roles, list) and roles:
+            return str(roles[0])
+    if _apg_current_uses_header_auth():
+        return "api"
+    return "anonymous"
+
+
+def _apg_current_user_permissions() -> set[str]:
+    user = _apg_current_session_user()
+    if not isinstance(user, dict):
+        return set()
+    permissions = user.get("permissions", [])
+    if not isinstance(permissions, list):
+        return set()
+    return {str(permission) for permission in permissions}
+
+
+def _apg_current_owner_id() -> str:
+    user = _apg_current_session_user()
+    if isinstance(user, dict) and user.get("username"):
+        return str(user["username"])
+    if _apg_current_uses_header_auth():
+        return str(os.environ.get("APG_API_KEY_OWNER") or "api")
+    return "anonymous"
+
+
+def _apg_current_user_unrestricted() -> bool:
+    return _apg_current_user_role().strip().lower() == "admin" or "*" in _apg_current_user_permissions()
+
+
+def _record_owner_visible(record: Dict[str, Any]) -> bool:
+    if not _row_ownership_enabled() or _apg_current_user_unrestricted():
+        return True
+    return str(record.get("owner_id", "")) == _apg_current_owner_id()
+
+
+def _field_acl_allows(entity_name: str, field_name: str) -> bool:
+    if not isinstance(_APG_FIELD_ACL, dict):
+        return True
+    entity_acl = _APG_FIELD_ACL.get(entity_name)
+    if not isinstance(entity_acl, dict) or field_name not in entity_acl:
+        return True
+    allowed_roles = entity_acl.get(field_name)
+    if not isinstance(allowed_roles, list):
+        return True
+    return _apg_current_user_role() in {str(role) for role in allowed_roles}
+
+
+def _field_acl_public_copy(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        key: value
+        for key, value in dict(record).items()
+        if _field_acl_allows(entity_name, str(key))
+    }
+
+
+def _record_public_copy(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
+    public = dict(record)
+    metadata = _record_metadata(entity_name, public.get("id"), create=True) or {}
+    for key in ("created_at", "updated_at", "deleted_at"):
+        if public.get(key) in (None, "") and metadata.get(key) not in (None, ""):
+            public[key] = metadata.get(key)
+    for field in _file_field_specs(entity_name):
+        field_name = str(field.get("name", "")).strip()
+        if not field_name:
+            continue
+        path_value = public.get(field_name + "_path")
+        if path_value not in (None, ""):
+            public[field_name + "_url"] = _file_url_for_path(entity_name, path_value)
+    if APG_EXPOSE_TIMESTAMPS:
+        public.setdefault("created_at", metadata.get("created_at") or _record_timestamp())
+        public.setdefault("updated_at", metadata.get("updated_at") or public.get("created_at") or _record_timestamp())
+    else:
+        public.pop("created_at", None)
+        public.pop("updated_at", None)
+    public.pop("deleted_at", None)
+    return _apply_computed_fields(entity_name, public)
+
+
+def _record_deleted(entity_name: str, record: Dict[str, Any]) -> bool:
+    if record.get("deleted_at") not in (None, ""):
+        return True
+    metadata = _record_metadata(entity_name, record.get("id"))
+    return bool(metadata and metadata.get("deleted_at"))
+
+
+def _record_stored_copy(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
+    stored = dict(record)
+    for field_name in _computed_field_names(entity_name):
+        stored.pop(field_name, None)
+    metadata = _record_metadata(entity_name, stored.get("id"), create=True) or {}
+    for key in ("created_at", "updated_at", "deleted_at"):
+        if stored.get(key) in (None, "") and metadata.get(key) not in (None, ""):
+            stored[key] = metadata.get(key)
+    return stored
+
+
+def _raw_records_by_entity(*, include_deleted: bool = True) -> Dict[str, list[Dict[str, Any]]]:
+    return {
+        entity_name: [
+            _record_stored_copy(entity_name, record)
+            for record in RECORD_STORE[entity_name]
+            if include_deleted or not _record_deleted(entity_name, record)
+        ]
+        for entity_name in sorted(ENTITY_NAMES)
+    }
+
+
+def list_records(
+    entity_name: str | None = None,
+    *,
+    include_deleted: bool = False,
+) -> Dict[str, list[Dict[str, Any]]] | list[Dict[str, Any]]:
     if entity_name is None:
         return {
-            name: [dict(record) for record in records]
-            for name, records in RECORD_STORE.items()
+            name: [
+                _record_public_copy(name, record)
+                for record in RECORD_STORE[name]
+                if (include_deleted or not _record_deleted(name, record))
+                and _record_owner_visible(record)
+                and _record_tenant_visible(name, record)
+            ]
+            for name in sorted(ENTITY_NAMES)
     }
-    return [dict(record) for record in RECORD_STORE[entity_name]]
+    return [
+        _record_public_copy(entity_name, record)
+        for record in RECORD_STORE[entity_name]
+        if (include_deleted or not _record_deleted(entity_name, record))
+        and _record_owner_visible(record)
+        and _record_tenant_visible(entity_name, record)
+    ]
 
 
-def query_records(entity_name: str, query: Dict[str, list[str]] | None = None) -> Dict[str, Any]:
-    query = query or {}
-    records = list_records(entity_name)
-    filters = {
-        key.removeprefix("filter."): values[-1]
-        for key, values in query.items()
-        if values and key not in {"limit", "offset", "sort", "order"}
-    }
-    # Tenant routing: auto-scope to current tenant when entity has tenant_id field
+_RECORD_QUERY_CONTROL_KEYS = {
+    "after",
+    "dir",
+    "format",
+    "include_deleted",
+    "limit",
+    "offset",
+    "order",
+    "page",
+    "per",
+    "q",
+    "sort",
+    "sort_dir",
+}
+
+_RECORD_LIFECYCLE_FIELDS = ("created_at", "updated_at", "deleted_at", "owner_id")
+
+
+def _strip_record_lifecycle_fields(record: Dict[str, Any]) -> Dict[str, Any]:
+    sanitized = dict(record)
+    for field_name in _RECORD_LIFECYCLE_FIELDS:
+        sanitized.pop(field_name, None)
+    if APG_MULTI_TENANT_ENABLED:
+        sanitized.pop("tenant_id", None)
+    return sanitized
+
+
+def _record_query_value(query: Dict[str, list[str]], name: str, default: Any = None) -> Any:
+    values = query.get(name)
+    if not values:
+        return default
+    value = values[-1]
+    return default if value is None else value
+
+
+def _truthy_query_value(value: Any) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _records_admin_allowed() -> bool:
+    if not APG_AUTH_REQUIRED:
+        return True
+    try:
+        if _has_header_auth(_flask_request.headers):
+            return True
+    except RuntimeError:
+        pass
+    try:
+        user = _current_user()
+    except RuntimeError:
+        user = None
+    if not isinstance(user, dict):
+        return False
+    roles = {str(role).lower() for role in user.get("roles", [])}
+    permissions = {str(permission) for permission in user.get("permissions", [])}
+    return "admin" in roles or "*" in permissions or "records:include_deleted" in permissions
+
+
+def _query_includes_deleted(query: Dict[str, list[str]]) -> bool:
+    return _truthy_query_value(_record_query_value(query, "include_deleted", "0"))
+
+
+def _record_field_names(entity_name: str) -> set[str]:
+    names = {"id", "_revision", "created_at", "updated_at", "deleted_at", "owner_id"}
+    if _tenant_scope_enabled(entity_name):
+        names.add("tenant_id")
+    for field in _field_specs(entity_name):
+        field_name = str(field.get("name", ""))
+        if not field_name:
+            continue
+        if _is_file_field(field):
+            names.update(_file_metadata_field_names(field_name))
+        else:
+            names.add(field_name)
+    return names
+
+
+def _record_string_field_names(entity_name: str) -> list[str]:
+    names: list[str] = []
+    for field in _stored_field_specs(entity_name):
+        if _is_file_field(field):
+            continue
+        field_name = str(field.get("name", ""))
+        if field_name and _json_schema_type(str(field.get("type", "any"))) == "string":
+            names.append(field_name)
+    return names
+
+
+def _record_query_filters(
+    entity_name: str,
+    query: Dict[str, list[str]],
+) -> tuple[Dict[str, Any], Dict[str, Any] | None]:
+    valid_fields = _record_field_names(entity_name)
+    filters: Dict[str, Any] = {}
+    for key, values in query.items():
+        if not values:
+            continue
+        field_name: str | None = None
+        if key.startswith("filter[") and key.endswith("]"):
+            field_name = key[len("filter["):-1]
+        elif key.startswith("filter."):
+            field_name = key.removeprefix("filter.")
+        elif key not in _RECORD_QUERY_CONTROL_KEYS and key in valid_fields:
+            field_name = key
+        if field_name is None:
+            continue
+        if field_name not in valid_fields:
+            return filters, {"error": "invalid_field"}
+        filters[field_name] = values[-1]
     tid = _tenant_id()
-    if tid and entity_name in TENANT_SCOPED_ENTITIES and "tenant_id" not in filters:
+    if (
+        tid
+        and _tenant_scope_enabled(entity_name)
+        and not _tenant_admin_bypass()
+        and "tenant_id" not in filters
+    ):
         filters["tenant_id"] = tid
+    return filters, None
+
+
+def _record_sort_key(record: Dict[str, Any], field_name: str) -> tuple[int, float, str]:
+    value = record.get(field_name)
+    if value is None:
+        return (1, 0.0, "")
+    if isinstance(value, bool):
+        return (0, 1.0 if value else 0.0, "")
+    if isinstance(value, (int, float)):
+        return (0, float(value), "")
+    text = str(value)
+    try:
+        return (0, float(text), text.lower())
+    except ValueError:
+        return (0, 0.0, text.lower())
+
+
+def _invalid_record_query_result(entity_name: str, response_style: str) -> Dict[str, Any]:
+    key = "data" if response_style == "records" else "records"
+    return {
+        "error": "invalid_field",
+        "entity": entity_name,
+        key: [],
+        "count": 0,
+        "total": 0,
+        "next_cursor": None,
+    }
+
+
+def query_records(
+    entity_name: str,
+    query: Dict[str, list[str]] | None = None,
+    *,
+    response_style: str = "legacy",
+    paginate: bool = True,
+) -> Dict[str, Any]:
+    query = query or {}
+    include_deleted_requested = _query_includes_deleted(query)
+    if include_deleted_requested and not _records_admin_allowed():
+        return {
+            "error": "include_deleted_requires_admin",
+            "entity": entity_name,
+            "records": [],
+            "data": [],
+            "count": 0,
+            "total": 0,
+        }
+    records = list_records(entity_name, include_deleted=include_deleted_requested)
+    filters, filter_error = _record_query_filters(entity_name, query)
+    if filter_error is not None:
+        return _invalid_record_query_result(entity_name, response_style)
     records = [
         record
         for record in records
         if all(str(record.get(field, "")) == str(expected) for field, expected in filters.items())
     ]
-    sort_field = query.get("sort", [None])[-1]
+    q = str(_record_query_value(query, "q", "") or "").strip().lower()
+    if q:
+        string_fields = _record_string_field_names(entity_name)
+        records = [
+            record
+            for record in records
+            if any(q in str(record.get(field, "")).lower() for field in string_fields)
+        ]
+    default_sort = "id" if response_style == "records" else None
+    sort_field = _record_query_value(query, "sort", default_sort)
+    valid_fields = _record_field_names(entity_name)
     if sort_field:
-        reverse = query.get("order", ["asc"])[-1].lower() == "desc"
-        records = sorted(records, key=lambda record: str(record.get(sort_field, "")), reverse=reverse)
+        sort_field = str(sort_field)
+        if sort_field not in valid_fields:
+            return _invalid_record_query_result(entity_name, response_style)
+    direction_source = _record_query_value(query, "sort_dir", _record_query_value(query, "order", "asc"))
+    sort_dir = str(direction_source or "asc").lower()
+    if sort_dir not in {"asc", "desc"}:
+        sort_dir = "asc"
+    if sort_field:
+        records = sorted(
+            records,
+            key=lambda record: _record_sort_key(record, str(sort_field)),
+            reverse=sort_dir == "desc",
+        )
     total = len(records)
+    if response_style == "records":
+        if paginate:
+            raw_limit = _record_query_value(query, "limit", "50")
+            try:
+                parsed_limit = int(raw_limit)
+            except (TypeError, ValueError):
+                parsed_limit = 50
+            parsed_limit = max(1, min(1000, parsed_limit))
+            after = _record_query_value(query, "after", None)
+            start_index = 0
+            if after not in (None, ""):
+                for index, record in enumerate(records):
+                    if str(record.get("id")) == str(after):
+                        start_index = index + 1
+                        break
+            page_records = records[start_index:start_index + parsed_limit]
+            next_cursor = None
+            if page_records and start_index + len(page_records) < total:
+                next_cursor = page_records[-1].get("id")
+        else:
+            parsed_limit = None
+            after = None
+            page_records = records
+            next_cursor = None
+        return {
+            "entity": entity_name,
+            "data": page_records,
+            "next_cursor": next_cursor,
+            "total": total,
+            "count": len(page_records),
+            "limit": parsed_limit,
+            "after": after,
+            "filters": filters,
+            "sort": sort_field or "id",
+            "sort_dir": sort_dir,
+        }
     try:
-        offset = max(0, int(query.get("offset", ["0"])[-1]))
+        offset = max(0, int(_record_query_value(query, "offset", "0")))
     except (TypeError, ValueError):
         offset = 0
-    limit = query.get("limit", [None])[-1]
+    limit = _record_query_value(query, "limit", None)
     try:
         parsed_limit = int(limit) if limit not in (None, "") else None
     except (TypeError, ValueError):
@@ -1484,7 +2026,7 @@ def query_records(entity_name: str, query: Dict[str, list[str]] | None = None) -
         "limit": parsed_limit,
         "filters": filters,
         "sort": sort_field,
-        "order": query.get("order", ["asc"])[-1],
+        "order": sort_dir,
     }
 
 
@@ -1579,9 +2121,33 @@ def _sync_next_workflow_run_id() -> None:
     NEXT_WORKFLOW_RUN_ID = max(numeric_ids, default=0) + 1
 
 
+def _normalize_record_metadata() -> None:
+    for entity_name in ENTITY_NAMES:
+        entity_metadata = RECORD_METADATA.setdefault(entity_name, {})
+        for record in RECORD_STORE[entity_name]:
+            record_id = record.get("id")
+            if record_id in (None, ""):
+                continue
+            metadata = entity_metadata.get(_record_metadata_key(record_id))
+            if not isinstance(metadata, dict):
+                metadata = {}
+                entity_metadata[_record_metadata_key(record_id)] = metadata
+            now = _record_timestamp()
+            metadata.setdefault("created_at", record.get("created_at") or now)
+            metadata.setdefault("updated_at", record.get("updated_at") or metadata.get("created_at", now))
+            metadata.setdefault("deleted_at", record.get("deleted_at"))
+            record.setdefault("created_at", metadata.get("created_at"))
+            record.setdefault("updated_at", metadata.get("updated_at"))
+            record.setdefault("deleted_at", metadata.get("deleted_at"))
+            if APG_MULTI_TENANT_ENABLED:
+                record.setdefault("tenant_id", APG_TENANT_DEFAULT)
+
+
 def _load_record_store() -> None:
     path = _data_path()
     if path is None or not path.exists():
+        _sqlite_load_records()
+        _normalize_record_metadata()
         return
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -1601,6 +2167,19 @@ def _load_record_store() -> None:
                 for record in entity_records
                 if isinstance(record, dict)
             ]
+    raw_metadata = loaded.get("record_metadata", {})
+    if isinstance(raw_metadata, dict):
+        RECORD_METADATA.clear()
+        for entity_name in ENTITY_NAMES:
+            entity_metadata = raw_metadata.get(entity_name, {})
+            if isinstance(entity_metadata, dict):
+                RECORD_METADATA[entity_name] = {
+                    str(record_id): dict(metadata)
+                    for record_id, metadata in entity_metadata.items()
+                    if isinstance(metadata, dict)
+                }
+            else:
+                RECORD_METADATA[entity_name] = {}
     raw_events = loaded.get("events", [])
     if isinstance(raw_events, list):
         EVENT_LOG.clear()
@@ -1629,14 +2208,16 @@ def _load_record_store() -> None:
             if rid and rid not in WORKFLOW_RUNS:
                 WORKFLOW_RUNS[rid] = run
         for entity_name in list(RECORD_STORE.keys()):
-            pg_records = _pg_load_entity_records(entity_name)
+            pg_records = _pg_load_entity_records(entity_name, tenant_scoped=False)
             if pg_records:
                 RECORD_STORE[entity_name] = pg_records
+    _sqlite_load_records()
+    _normalize_record_metadata()
 
 
 def _persist_record_store() -> str | None:
     if _APG_PG_URL:
-        for entity_name, records in list_records().items():
+        for entity_name, records in _raw_records_by_entity().items():
             _pg_save_entity_records(entity_name, records)
     path = _data_path()
     if path is None:
@@ -1644,7 +2225,8 @@ def _persist_record_store() -> str | None:
     payload = {
         "module": MODULE_NAME,
         "version": MODULE_VERSION,
-        "records": list_records(),
+        "records": _raw_records_by_entity(),
+        "record_metadata": RECORD_METADATA,
         "events": list_events(),
         "workflow_runs": {run_id: dict(run) for run_id, run in WORKFLOW_RUNS.items()},
         "next_record_ids": dict(NEXT_RECORD_IDS),
@@ -1676,7 +2258,7 @@ def storage_status(include_records: bool = False) -> Dict[str, Any]:
 
 def metrics_snapshot() -> Dict[str, Any]:
     record_counts = {
-        entity_name: len(RECORD_STORE[entity_name])
+        entity_name: len(list_records(entity_name))
         for entity_name in sorted(ENTITY_NAMES)
     }
     event_counts: Dict[str, int] = {}
@@ -1852,7 +2434,163 @@ def auth_status() -> Dict[str, Any]:
     }
 
 
+_APG_REQUIRED_LOCALE_KEYS = (
+    "save",
+    "cancel",
+    "delete",
+    "confirm",
+    "error",
+    "success",
+    "loading",
+    "no_records",
+    "search",
+    "login",
+    "logout",
+)
+
+
+def _locale_base_dir() -> Path:
+    configured = str(os.environ.get("APG_LOCALE_DIR", "") or "").strip()
+    if configured:
+        return Path(configured)
+    try:
+        return Path(globals().get("__file__", ".")).resolve().parent / "locales"
+    except Exception:
+        return Path("locales")
+
+
+def _locale_file_path() -> Path | None:
+    configured = str(os.environ.get("APG_LOCALE_FILE", "") or "").strip()
+    return Path(configured) if configured else None
+
+
+def _read_locale_json(path: Path) -> Any | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _flat_locale_strings(value: Any) -> Dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    result: Dict[str, str] = {}
+    for key, item in value.items():
+        if isinstance(item, (dict, list)):
+            return None
+        result[str(key)] = str(item)
+    return result
+
+
+def _locale_file_catalog() -> Dict[str, Dict[str, str]]:
+    catalog: Dict[str, Dict[str, str]] = {}
+    locale_dir = _locale_base_dir()
+    if locale_dir.is_dir():
+        for path in sorted(locale_dir.glob("*.json")):
+            parsed = _read_locale_json(path)
+            flat = _flat_locale_strings(parsed)
+            if flat is not None:
+                catalog[path.stem] = flat
+                continue
+            if isinstance(parsed, dict):
+                for language, strings in parsed.items():
+                    nested = _flat_locale_strings(strings)
+                    if nested is not None:
+                        catalog[str(language)] = nested
+    configured_path = _locale_file_path()
+    if configured_path is not None:
+        parsed = _read_locale_json(configured_path)
+        flat = _flat_locale_strings(parsed)
+        configured_language = str(os.environ.get("APG_LOCALE", "") or "").strip()
+        if flat is not None:
+            catalog["custom"] = flat
+            if configured_language:
+                catalog[configured_language] = flat
+        elif isinstance(parsed, dict):
+            for language, strings in parsed.items():
+                nested = _flat_locale_strings(strings)
+                if nested is not None:
+                    catalog[str(language)] = nested
+    return catalog
+
+
+def _configure_runtime_i18n() -> None:
+    global _APG_STRINGS, APG_I18N, APG_SUPPORTED_LANGUAGES, APG_DEFAULT_LANGUAGE, APG_FALLBACK_LANGUAGE
+    catalog: Dict[str, Dict[str, str]] = json.loads(json.dumps(_APG_STRINGS))
+    english_defaults = dict(catalog.get("en", {}))
+    for language, strings in _locale_file_catalog().items():
+        base = dict(catalog.get(language, english_defaults))
+        base.update(strings)
+        catalog[language] = base
+    configured_language = str(os.environ.get("APG_LOCALE", "") or "").strip()
+    if configured_language:
+        catalog.setdefault(configured_language, dict(english_defaults))
+        APG_DEFAULT_LANGUAGE = configured_language
+    if APG_DEFAULT_LANGUAGE not in catalog:
+        catalog[APG_DEFAULT_LANGUAGE] = dict(english_defaults)
+    if APG_FALLBACK_LANGUAGE not in catalog:
+        APG_FALLBACK_LANGUAGE = "en" if "en" in catalog else APG_DEFAULT_LANGUAGE
+    fallback = dict(catalog.get(APG_FALLBACK_LANGUAGE, english_defaults))
+    for language, strings in list(catalog.items()):
+        merged = dict(fallback)
+        merged.update(strings)
+        for key in _APG_REQUIRED_LOCALE_KEYS:
+            merged.setdefault(key, english_defaults.get(key, key.replace("_", " ").title()))
+        catalog[language] = merged
+    _APG_STRINGS = catalog
+    APG_I18N = _APG_STRINGS
+    APG_SUPPORTED_LANGUAGES = sorted(catalog)
+
+
+def _export_locale_if_requested() -> None:
+    if not _env_flag("APG_EXPORT_LOCALE"):
+        return
+    path = _locale_base_dir() / "en.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(APG_I18N.get("en", {}), indent=2, sort_keys=True), encoding="utf-8")
+    except OSError as exc:
+        _logging.getLogger("apg").warning("locale_export_failed: %s", exc)
+
+
+def _locale_file_payload(language: str) -> Any | None:
+    if not re.match(r"^[A-Za-z0-9_-]+$", str(language)):
+        return None
+    locale_path = _locale_base_dir() / (str(language) + ".json")
+    if locale_path.is_file():
+        parsed = _read_locale_json(locale_path)
+        if parsed is not None:
+            return parsed
+    configured_path = _locale_file_path()
+    if configured_path is not None:
+        configured_language = str(os.environ.get("APG_LOCALE", "") or "").strip()
+        if language == "custom" or (configured_language and language == configured_language):
+            parsed = _read_locale_json(configured_path)
+            if parsed is not None:
+                return parsed
+    return None
+
+
+def _locale_payload(language: str) -> Dict[str, Any] | None:
+    file_payload = _locale_file_payload(language)
+    if isinstance(file_payload, dict):
+        return file_payload
+    if language in APG_I18N:
+        return dict(APG_I18N[language])
+    primary = str(language).split("-", 1)[0]
+    if primary in APG_I18N:
+        return dict(APG_I18N[primary])
+    return None
+
+
+_configure_runtime_i18n()
+_export_locale_if_requested()
+
+
 def _active_locale() -> str:
+    configured_language = str(os.environ.get("APG_LOCALE", "") or "").strip()
+    if configured_language in APG_I18N:
+        return configured_language
     try:
         cookie_locale = _flask_request.cookies.get("apg_lang")
         if cookie_locale in APG_SUPPORTED_LANGUAGES:
@@ -1870,14 +2608,18 @@ def _text_direction(locale: str | None = None) -> str:
     return "rtl" if language in {"ar", "he", "fa", "ur"} else "ltr"
 
 
-def _(key: str) -> str:
+def _apg_t(key: str) -> str:
     locale = _active_locale()
     return (
-        APG_I18N.get(locale, {}).get(key)
-        or APG_I18N.get(APG_FALLBACK_LANGUAGE, {}).get(key)
-        or APG_I18N.get("en", {}).get(key)
+        _APG_STRINGS.get(locale, {}).get(key)
+        or _APG_STRINGS.get(APG_FALLBACK_LANGUAGE, {}).get(key)
+        or _APG_STRINGS.get("en", {}).get(key)
         or key
     )
+
+
+def _(key: str) -> str:
+    return _apg_t(key)
 
 
 def format_number(value: Any) -> str:
@@ -1918,11 +2660,12 @@ def _auth_credentials() -> Dict[str, Dict[str, Any]]:
                         "password": str(spec.get("password", "")),
                         "password_hash": str(spec.get("password_hash", "")),
                         "name": str(spec.get("name", username)),
+                        "email": str(spec.get("email", "")),
                         "roles": list(spec.get("roles", ["user"])) if isinstance(spec.get("roles", []), list) else ["user"],
                         "permissions": list(spec.get("permissions", [])) if isinstance(spec.get("permissions", []), list) else [],
                     }
                 else:
-                    result[str(username)] = {"password": str(spec), "password_hash": "", "name": str(username), "roles": ["user"], "permissions": []}
+                    result[str(username)] = {"password": str(spec), "password_hash": "", "name": str(username), "email": "", "roles": ["user"], "permissions": []}
             if result:
                 return result
     username = os.environ.get("APG_AUTH_USERNAME", "admin")
@@ -1932,6 +2675,7 @@ def _auth_credentials() -> Dict[str, Dict[str, Any]]:
             "password": password,
             "password_hash": os.environ.get("APG_AUTH_PASSWORD_HASH", ""),
             "name": os.environ.get("APG_AUTH_DISPLAY_NAME", username),
+            "email": os.environ.get("APG_AUTH_EMAIL", ""),
             "roles": ["admin"],
             "permissions": ["*"],
         }
@@ -1954,6 +2698,7 @@ def _authenticate_user(username: str, password: str) -> Dict[str, Any] | None:
     return {
         "username": username,
         "name": str(user.get("name", username)),
+        "email": str(user.get("email", "")),
         "roles": list(user.get("roles", [])),
         "permissions": list(user.get("permissions", [])),
     }
@@ -2040,8 +2785,12 @@ def _has_header_auth(headers: Any) -> bool:
             except Exception:
                 return False
         supplied_key = token
-    required_key = os.environ.get("APG_API_KEY")
-    return bool(required_key and supplied_key == required_key)
+    required_keys = [os.environ.get("APG_API_KEY"), os.environ.get("APG_ADMIN_KEY")]
+    return any(
+        bool(required_key and supplied_key)
+        and hmac.compare_digest(str(supplied_key), str(required_key))
+        for required_key in required_keys
+    )
 
 
 def _csrf_required_for_request() -> bool:
@@ -2175,6 +2924,9 @@ def _authorized(headers: Any) -> bool:
             except Exception:
                 return False
         supplied_key = token
+    admin_key = os.environ.get("APG_ADMIN_KEY")
+    if admin_key and supplied_key and hmac.compare_digest(str(supplied_key), str(admin_key)):
+        return True
     required_key = os.environ.get("APG_API_KEY")
     if required_key:
         return bool(supplied_key) and hmac.compare_digest(str(supplied_key), str(required_key))
@@ -2195,6 +2947,63 @@ def _auth_failure_payload() -> tuple[int, Dict[str, Any]]:
     }
 
 
+_APG_AUDIT_LOGGER = _logging.getLogger("apg.audit")
+_APG_AUDIT_FILE_LOCK = _threading.Lock()
+
+
+def _apg_audit_user(default: str = "api") -> str:
+    try:
+        explicit = getattr(_flask_g, "apg_user", "")
+        if explicit:
+            return str(explicit)
+        user = _current_user()
+    except RuntimeError:
+        user = None
+    if isinstance(user, dict) and user.get("username"):
+        return str(user["username"])
+    return default
+
+
+def _apg_audit_write(payload: Dict[str, Any]) -> None:
+    json_line = json.dumps(payload)
+    _APG_AUDIT_LOGGER.info(json_line)
+    if not os.environ.get("APG_AUDIT_LOG_FILE"):
+        return
+    try:
+        with _APG_AUDIT_FILE_LOCK:
+            with open(os.environ["APG_AUDIT_LOG_FILE"], "a", encoding="utf-8") as audit_file:
+                audit_file.write(json_line + "\n")
+    except Exception as exc:
+        _APG_AUDIT_LOGGER.warning("audit_file_write_failed: %s", exc)
+
+
+def _apg_audit_event(action: str, entity: str = "auth", user: str | None = None) -> None:
+    try:
+        request_id = getattr(_flask_g, "request_id", "")
+        extra = getattr(_flask_g, "apg_audit_extra", None)
+    except RuntimeError:
+        request_id = ""
+        extra = None
+    payload = {
+        "audit": True,
+        "action": action,
+        "entity": entity,
+        "req_id": request_id,
+        "user": user if user is not None else _apg_audit_user(),
+        "ts": _datetime.datetime.utcnow().isoformat() + "Z",
+    }
+    if isinstance(extra, dict):
+        payload.update(extra)
+    _apg_audit_write(payload)
+
+
+def _apg_audit_entity_from_path(path: str) -> str:
+    parts = [part for part in str(path).split("/") if part]
+    if len(parts) >= 2 and parts[0] == "records":
+        return parts[1]
+    return ""
+
+
 def list_events(entity_name: str | None = None) -> list[Dict[str, Any]]:
     events = [dict(event) for event in EVENT_LOG]
     if entity_name is None:
@@ -2207,6 +3016,7 @@ def _record_event(
     entity_name: str,
     before: Dict[str, Any] | None = None,
     after: Dict[str, Any] | None = None,
+    changed_fields: list[str] | None = None,
 ) -> Dict[str, Any]:
     global NEXT_EVENT_ID
     record = after if after is not None else before if before is not None else {}
@@ -2217,9 +3027,21 @@ def _record_event(
         "record_id": record.get("id"),
     }
     if before is not None:
-        event["before"] = dict(before)
+        b = dict(before)
+        if not APG_EXPOSE_TIMESTAMPS:
+            b.pop("created_at", None)
+            b.pop("updated_at", None)
+        b.pop("deleted_at", None)
+        event["before"] = b
     if after is not None:
-        event["after"] = dict(after)
+        a = dict(after)
+        if not APG_EXPOSE_TIMESTAMPS:
+            a.pop("created_at", None)
+            a.pop("updated_at", None)
+        a.pop("deleted_at", None)
+        event["after"] = a
+    if changed_fields is not None:
+        event["changed_fields"] = list(changed_fields)
     NEXT_EVENT_ID += 1
     EVENT_LOG.append(event)
     _publish_live_event("events", "record", event)
@@ -2230,9 +3052,17 @@ def _record_event(
 def _prepare_new_record(record: Dict[str, Any], entity_name: str = "") -> Dict[str, Any]:
     prepared = dict(record)
     prepared.setdefault("_revision", 1)
+    now = _record_timestamp()
+    prepared.setdefault("created_at", now)
+    prepared.setdefault("updated_at", now)
+    prepared.setdefault("deleted_at", None)
+    if _row_ownership_enabled():
+        prepared["owner_id"] = _apg_current_owner_id()
     # Auto-inject tenant_id for tenant-scoped entities
     tid = _tenant_id()
-    if tid and entity_name in TENANT_SCOPED_ENTITIES:
+    if APG_MULTI_TENANT_ENABLED and entity_name:
+        prepared["tenant_id"] = tid or APG_TENANT_DEFAULT
+    elif tid and entity_name in TENANT_SCOPED_ENTITIES:
         prepared.setdefault("tenant_id", tid)
     return prepared
 
@@ -2267,11 +3097,39 @@ def _record_schema(entity: Dict[str, Any], partial: bool = False) -> Dict[str, A
         "id": {"oneOf": [{"type": "integer"}, {"type": "string"}]},
         "_revision": {"type": "integer"},
     }
+    if APG_EXPOSE_TIMESTAMPS:
+        schema_properties["created_at"] = {"type": "string"}
+        schema_properties["updated_at"] = {"type": "string"}
+    if _row_ownership_enabled():
+        schema_properties["owner_id"] = {"oneOf": [{"type": "string"}, {"type": "null"}]}
+    if _tenant_scope_enabled(str(entity["name"])):
+        schema_properties["tenant_id"] = {"type": "string"}
     required_fields: list[str] = []
     for field in fields:
         field_name = str(field["name"])
-        schema_properties[field_name] = {"type": _json_schema_type(str(field.get("type", "any")))}
-        if not partial and field.get("required", False):
+        field_schema: Dict[str, Any] = {"type": _json_schema_type(str(field.get("type", "any")))}
+        if field.get("computed"):
+            field_schema["readOnly"] = True
+        enum_values = field.get("enum") if isinstance(field.get("enum"), list) else []
+        if enum_values:
+            field_schema["enum"] = list(enum_values)
+        for validator in field.get("validators", []):
+            if not isinstance(validator, dict):
+                continue
+            rule = str(validator.get("rule", ""))
+            value = validator.get("value")
+            if rule == "min_length":
+                field_schema["minLength"] = value
+            elif rule == "max_length":
+                field_schema["maxLength"] = value
+            elif rule == "min":
+                field_schema["minimum"] = value
+            elif rule == "max":
+                field_schema["maximum"] = value
+            elif rule == "pattern":
+                field_schema["pattern"] = str(validator.get("pattern", value or ""))
+        schema_properties[field_name] = field_schema
+        if not partial and field.get("required", False) and not field.get("computed"):
             required_fields.append(field_name)
     schema: Dict[str, Any] = {
         "type": "object",
@@ -2330,6 +3188,25 @@ def _record_list_response_schema(schema_name: str) -> Dict[str, Any]:
     }
 
 
+def _record_cursor_list_response_schema(schema_name: str) -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {
+            "data": {"type": "array", "items": _schema_ref(schema_name)},
+            "next_cursor": {
+                "oneOf": [
+                    {"type": "integer"},
+                    {"type": "string"},
+                    {"type": "null"},
+                ]
+            },
+            "total": {"type": "integer"},
+        },
+        "required": ["data", "next_cursor", "total"],
+    }
+
+
 def _record_item_response_schema(schema_name: str) -> Dict[str, Any]:
     return {
         "type": "object",
@@ -2383,6 +3260,41 @@ def _record_import_response_schema(schema_name: str) -> Dict[str, Any]:
     }
 
 
+def _record_bulk_body_schema(schema_name: str) -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "create": {"type": "array", "items": _schema_ref(schema_name)},
+            "update": {"type": "array", "items": _schema_ref(schema_name)},
+            "delete": {
+                "type": "array",
+                "items": {
+                    "oneOf": [
+                        {"type": "integer"},
+                        {"type": "string"},
+                        {"type": "object", "additionalProperties": True},
+                    ]
+                },
+            },
+        },
+    }
+
+
+def _record_bulk_response_schema() -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {
+            "created": {"type": "integer"},
+            "updated": {"type": "integer"},
+            "deleted": {"type": "integer"},
+            "errors": {"type": "array", "items": {"type": "object", "additionalProperties": True}},
+        },
+        "required": ["created", "updated", "deleted", "errors"],
+    }
+
+
 def _database_openapi_schemas() -> Dict[str, Any]:
     nullable_string = {"oneOf": [{"type": "string"}, {"type": "null"}]}
     generic_object = {"type": "object", "additionalProperties": True}
@@ -2413,6 +3325,39 @@ def _database_openapi_schemas() -> Dict[str, Any]:
                 "entities": {"type": "array", "items": generic_object},
             },
             "required": ["entities"],
+        },
+        "JobCreateRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "type": {"type": "string"},
+                "payload": generic_object,
+            },
+            "required": ["type"],
+        },
+        "JobCreateResponse": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "job_id": {"type": "string"},
+            },
+            "required": ["job_id"],
+        },
+        "JobStatus": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "id": {"type": "string"},
+                "type": {"type": "string"},
+                "payload": generic_object,
+                "status": {"enum": ["pending", "running", "done", "failed"]},
+                "created_at": {"type": "string"},
+                "started_at": nullable_string,
+                "finished_at": nullable_string,
+                "attempts": {"type": "integer"},
+                "last_error": nullable_string,
+            },
+            "required": ["id", "type", "payload", "status", "created_at", "attempts"],
         },
         "WorkflowSpec": {
             "type": "object",
@@ -2981,7 +3926,7 @@ def _api_operation(
     return operation
 
 
-def openapi_document() -> Dict[str, Any]:
+def _build_openapi_document() -> Dict[str, Any]:
     paths: Dict[str, Any] = {
         "/health": {"get": _api_operation("Application health", "Health report", response_schema=_schema_ref("HealthReport"))},
         "/component.json": {"get": _api_operation("Composable component manifest", "APG component manifest", response_schema=_schema_ref("ComponentManifest"))},
@@ -3002,6 +3947,12 @@ def openapi_document() -> Dict[str, Any]:
         "/workflows/runs/{id}": {"get": _api_operation("Workflow run detail", "Generated workflow run state", response_schema=_schema_ref("WorkflowRunResult"))},
         "/workflows/runs/{id}/resume": {"post": _api_operation("Resume workflow run", "Workflow resume result", request_body=True, request_schema=_schema_ref("WorkflowRunRequest"), response_schema=_schema_ref("WorkflowRunResult"))},
         "/workflows/runs/{id}/compensate": {"post": _api_operation("Execute workflow compensations", "Workflow compensation result", request_body=True, request_schema=_schema_ref("WorkflowCompensationRequest"), response_schema=_schema_ref("WorkflowCompensationResult"))},
+        "/jobs": {
+            "get": _api_operation("List background jobs", "Background job list", response_schema={"type": "array", "items": _schema_ref("JobStatus")}),
+            "post": _api_operation("Enqueue background job", "Created background job", status="201", request_body=True, request_schema=_schema_ref("JobCreateRequest"), response_schema=_schema_ref("JobCreateResponse")),
+        },
+        "/jobs/{id}": {"get": _api_operation("Background job status", "Background job detail", response_schema=_schema_ref("JobStatus"))},
+        "/jobs/{id}/retry": {"post": _api_operation("Retry failed background job", "Requeued background job", request_body=True, request_schema={"type": "object", "additionalProperties": True}, response_schema=_schema_ref("JobCreateResponse"))},
         "/databases": {"get": _api_operation("Database catalog", "Database schema and connection metadata", response_schema=_schema_ref("DatabaseCatalog"))},
         "/databases/status": {"get": _api_operation("Database validation status", "Database schema validation and counts", response_schema=_schema_ref("DatabaseStatus"))},
         "/relationships": {"get": _api_operation("Entity relationship graph", "Relationship graph", response_schema=_schema_ref("RelationshipGraph"))},
@@ -3015,12 +3966,115 @@ def openapi_document() -> Dict[str, Any]:
         "/ui/databases": {"get": _api_operation("Generated database catalog UI", "HTML database catalog")},
     }
     schemas: Dict[str, Any] = _database_openapi_schemas()
-    for entity in ENTITIES:
+    for entity in _APG_ENTITIES:
         entity_name = str(entity["name"])
         schema_name = f"{entity_name}Record"
         patch_schema_name = f"{entity_name}RecordPatch"
         schemas[schema_name] = _record_schema(entity)
         schemas[patch_schema_name] = _record_schema(entity, partial=True)
+        paths[f"/records/{entity_name}"] = {
+            "get": _api_operation(
+                f"List {entity_name} records",
+                "Paginated record list",
+                response_schema=_record_cursor_list_response_schema(schema_name),
+            ),
+            "post": _api_operation(
+                f"Create {entity_name} record",
+                "Created record",
+                status="201",
+                request_body=True,
+                request_schema=_record_body_schema(schema_name),
+                response_schema=_record_mutation_response_schema(schema_name),
+            ),
+        }
+        paths[f"/records/{entity_name}"]["get"]["parameters"] = [
+            {"name": "limit", "in": "query", "required": False, "description": "Maximum records to return, default 50, max 1000"},
+            {"name": "after", "in": "query", "required": False, "description": "Cursor record id"},
+            {"name": "filter[<field>]", "in": "query", "required": False, "description": "Exact field filter"},
+            {"name": "q", "in": "query", "required": False, "description": "LIKE search across string fields"},
+            {"name": "sort", "in": "query", "required": False, "description": "Field to sort by"},
+            {"name": "sort_dir", "in": "query", "required": False, "description": "asc or desc"},
+            {"name": "include_deleted", "in": "query", "required": False, "description": "Admin-only flag to include soft-deleted records"},
+            {"name": "format", "in": "query", "required": False, "description": "Use csv for RFC 4180 export"},
+        ]
+        if _record_string_field_names(entity_name):
+            paths[f"/records/{entity_name}/search"] = {
+                "get": _api_operation(
+                    f"Search {entity_name} records",
+                    "FTS5 record search",
+                    response_schema={"type": "array", "items": _schema_ref(schema_name)},
+                ),
+            }
+            paths[f"/records/{entity_name}/search"]["get"]["parameters"] = [
+                {"name": "q", "in": "query", "required": True, "description": "FTS5 query text"},
+                {"name": "limit", "in": "query", "required": False, "description": "Maximum records to return"},
+            ]
+        paths[f"/records/{entity_name}/bulk"] = {
+            "post": _api_operation(
+                f"Bulk mutate {entity_name} records",
+                "Bulk record mutation result",
+                request_body=True,
+                request_schema=_record_bulk_body_schema(schema_name),
+                response_schema=_record_bulk_response_schema(),
+            ),
+        }
+        paths[f"/records/{entity_name}/{{id}}"] = {
+            "get": _api_operation(
+                f"Fetch {entity_name} record",
+                "Record",
+                response_schema=_record_item_response_schema(schema_name),
+            ),
+            "put": _api_operation(
+                f"Update {entity_name} record",
+                "Updated record",
+                request_body=True,
+                request_schema=_record_body_schema(patch_schema_name),
+                response_schema=_record_mutation_response_schema(schema_name),
+            ),
+            "delete": _api_operation(
+                f"Delete {entity_name} record",
+                "Deleted record",
+                response_schema=_record_mutation_response_schema(schema_name, record_key="deleted"),
+            ),
+        }
+        paths[f"/records/{entity_name}/{{id}}/restore"] = {
+            "delete": _api_operation(
+                f"Restore {entity_name} record",
+                "Restored record",
+                response_schema=_record_mutation_response_schema(schema_name),
+            ),
+        }
+        for relationship in _relationship_specs(entity_name):
+            if str(relationship.get("kind")) != "has_many":
+                continue
+            target_name = str(relationship.get("target", ""))
+            if not target_name:
+                continue
+            target_schema_name = f"{target_name}Record"
+            segment = str(relationship.get("segment") or _relationship_segment(target_name))
+            paths[f"/records/{entity_name}/{{id}}/{segment}"] = {
+                "get": _api_operation(
+                    f"List {entity_name} {segment}",
+                    "Nested relationship records",
+                    response_schema=_record_list_response_schema(target_schema_name),
+                ),
+            }
+            if relationship.get("through"):
+                paths[f"/records/{entity_name}/{{id}}/{segment}/{{related_id}}"] = {
+                    "post": _api_operation(
+                        f"Link {entity_name} to {target_name}",
+                        "Created relationship link",
+                        status="201",
+                        request_body=True,
+                        request_schema={"type": "object", "additionalProperties": True},
+                        response_schema={"type": "object", "additionalProperties": True},
+                    ),
+                    "delete": _api_operation(
+                        f"Unlink {entity_name} from {target_name}",
+                        "Deleted relationship link",
+                        response_schema={"type": "object", "additionalProperties": True},
+                    ),
+                }
         paths[f"/entities/{entity_name}/records"] = {
             "get": _api_operation(
                 f"List {entity_name} records",
@@ -3042,6 +4096,7 @@ def openapi_document() -> Dict[str, Any]:
             {"name": "order", "in": "query", "required": False, "description": "asc or desc"},
             {"name": "limit", "in": "query", "required": False, "description": "Maximum records to return"},
             {"name": "offset", "in": "query", "required": False, "description": "Records to skip"},
+            {"name": "include_deleted", "in": "query", "required": False, "description": "Admin-only flag to include soft-deleted records"},
         ]
         paths[f"/entities/{entity_name}/records/export"] = {
             "get": _api_operation(
@@ -3139,9 +4194,9 @@ def openapi_document() -> Dict[str, Any]:
     return {
         "openapi": "3.1.0",
         "info": {
-            "title": MODULE_NAME,
-            "version": MODULE_VERSION,
-            "description": MODULE_DESCRIPTION,
+            "title": APG_APP_NAME,
+            "version": APG_APP_VERSION,
+            "description": APG_APP_DESCRIPTION,
         },
         "paths": paths,
         "components": {
@@ -3152,6 +4207,12 @@ def openapi_document() -> Dict[str, Any]:
             },
         },
     }
+
+
+def openapi_document() -> Dict[str, Any]:
+    if _APG_OPENAPI_SPEC is None:
+        return _build_openapi_document()
+    return json.loads(json.dumps(_APG_OPENAPI_SPEC))
 
 
 def validate_component_manifest_contract() -> Dict[str, Any]:
@@ -3377,14 +4438,26 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             return "_route_payload"
         if route.startswith("/capabilities/") and route.endswith("/health"):
             return "_route_payload"
+        if route.startswith("/records/"):
+            return "_records_payload_with_query"
         if route.startswith("/entities/") and "/records" in route:
             return "_records_payload_with_query"
+        if route == "/jobs":
+            return "_jobs_payload"
+        if route.startswith("/jobs/"):
+            return "_job_detail_payload"
         return None
     if method == "post":
         if route.startswith("/agents/") and route.endswith(("/invoke", "/run")):
             return "_agent_invocation_payload"
         if (route.startswith("/agent-teams/") or route.startswith("/teams/")) and route.endswith(("/invoke", "/run")):
             return "_agent_invocation_payload"
+        if route.startswith("/records/") and route.endswith("/bulk"):
+            return "_create_record_payload"
+        if route.startswith("/records/") and route.count("/") == 5:
+            return "_create_relationship_payload"
+        if route.startswith("/records/") and route.count("/") == 2:
+            return "_create_record_payload"
         if route.startswith("/entities/") and (route.endswith("/records") or route.endswith("/records/import")):
             return "_create_record_payload"
         if route in {"/rules/evaluate", "/capabilities/rules/evaluate"} or (
@@ -3409,12 +4482,22 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             return "_workflow_resume_payload"
         if route.startswith("/workflows/") and route.endswith("/run"):
             return "_workflow_run_payload"
+        if route == "/jobs":
+            return "_job_create_payload"
+        if route.startswith("/jobs/") and route.endswith("/retry"):
+            return "_job_retry_payload"
         return None
     if method == "put":
+        if route.startswith("/records/") and "/{id}" in route:
+            return "_update_record_payload"
         if route.startswith("/entities/") and "/records/{id}" in route:
             return "_update_record_payload"
         return None
     if method == "delete":
+        if route.startswith("/records/") and route.count("/") == 5:
+            return "_delete_relationship_payload"
+        if route.startswith("/records/") and "/{id}" in route:
+            return "_delete_record_payload"
         if route.startswith("/entities/") and "/records/{id}" in route:
             return "_delete_record_payload"
         return None
@@ -3803,6 +4886,59 @@ def theme_stylesheet() -> str:
         "body.apg-density-compact .apg-table th, body.apg-density-compact .apg-table td, body.apg-density-compact table th, body.apg-density-compact table td { padding-top: 0.75rem; padding-bottom: 0.75rem; }",
         "body.apg-density-comfortable .apg-table th, body.apg-density-comfortable .apg-table td, body.apg-density-comfortable table th, body.apg-density-comfortable table td { padding-top: 1rem; padding-bottom: 1rem; }",
         "body.apg-density-spacious .apg-table th, body.apg-density-spacious .apg-table td, body.apg-density-spacious table th, body.apg-density-spacious table td { padding-top: 1.5rem; padding-bottom: 1.5rem; }",
+        "@media (prefers-color-scheme: dark) {",
+        "  :root {",
+        "    --apg-bg: #0f172a;",
+        "    --apg-surface: #1e293b;",
+        "    --apg-surface-2: #334155;",
+        "    --apg-text: #e2e8f0;",
+        "    --apg-text-muted: #94a3b8;",
+        "    --apg-border: #334155;",
+        "    --apg-input-bg: #1e293b;",
+        "    --apg-shadow: rgba(0,0,0,0.4);",
+        "  }",
+        "  body { background: var(--apg-bg); color: var(--apg-text); }",
+        "  .apg-sidebar { background: var(--apg-surface); border-color: var(--apg-border); }",
+        "  .apg-header { background: var(--apg-surface); border-color: var(--apg-border); }",
+        "  table { background: var(--apg-surface); color: var(--apg-text); }",
+        "  th { background: var(--apg-surface-2); color: var(--apg-text); }",
+        "  td { border-color: var(--apg-border); }",
+        "  input, select, textarea { background: var(--apg-input-bg); color: var(--apg-text); border-color: var(--apg-border); }",
+        "  .apg-card { background: var(--apg-surface); border-color: var(--apg-border); box-shadow: 0 1px 3px var(--apg-shadow); }",
+        "}",
+        "html[data-theme='dark'] {",
+        "  --apg-bg: #0f172a;",
+        "  --apg-surface: #1e293b;",
+        "  --apg-surface-2: #334155;",
+        "  --apg-text: #e2e8f0;",
+        "  --apg-text-muted: #94a3b8;",
+        "  --apg-border: #334155;",
+        "  --apg-input-bg: #1e293b;",
+        "  --apg-shadow: rgba(0,0,0,0.4);",
+        "}",
+        "@media (max-width: 768px) {",
+        "  .apg-sidebar { display: none; }",
+        "  .apg-sidebar.apg-menu-open { display: block; position: fixed; inset: 0; z-index: 100; overflow-y: auto; }",
+        "  .apg-hamburger { display: block !important; }",
+        "  .apg-main { margin-left: 0 !important; }",
+        "  table { display: none; }",
+        "  .apg-card-list { display: block; }",
+        "  .apg-table-row-card { display: block; padding: 1rem; border: 1px solid var(--apg-border,#e2e8f0); border-radius: 8px; margin-bottom: 0.75rem; }",
+        "  .apg-table-row-card .apg-card-label { font-weight: 600; color: var(--apg-text-muted,#64748b); font-size: 0.75rem; text-transform: uppercase; }",
+        "}",
+        "@media (max-width: 480px) {",
+        "  body { font-size: 0.875rem; }",
+        "  h1 { font-size: 1.25rem; } h2 { font-size: 1.1rem; }",
+        "  .apg-btn { padding: 0.375rem 0.625rem; font-size: 0.8rem; }",
+        "}",
+        "@media print {",
+        "  .apg-sidebar, .apg-header, .apg-actions, .apg-form, nav, button, .apg-btn { display: none !important; }",
+        "  .apg-main { margin: 0 !important; padding: 0 !important; }",
+        "  table { width: 100%; border-collapse: collapse; }",
+        "  th, td { border: 1px solid #000; padding: 0.25rem 0.5rem; }",
+        "  body { color: #000; background: #fff; font-size: 11pt; }",
+        "  tr { page-break-inside: avoid; }",
+        "}",
     ]
     if APG_CAPABILITIES is not None and hasattr(APG_CAPABILITIES, "list_capabilities") and hasattr(APG_CAPABILITIES, "capability_theme"):
         for capability_name in APG_CAPABILITIES.list_capabilities():
@@ -3926,7 +5062,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         _shell_link(f'/ui/entities/{quote(str(entity["name"]), safe="")}', str(entity["name"]))
         for entity in ENTITIES
         if entity.get("type") not in {"application"}
-    ) or '<span class="apg-sidebar-empty">No entities</span>'
+    ) or f'<span class="apg-sidebar-empty">{html.escape(_("no_records"))}</span>'
     app = describe_application()
     agent_nav = "".join(
         _shell_link(f'/ui/agents/{quote(str(name), safe="")}', str(name))
@@ -4009,15 +5145,19 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         '<script defer src="/static/apg-charts.js"></script>'
         '<script defer src="/static/apg-sse.js"></script>'
     )
+    confirm_label = html.escape(_("confirm"))
+    cancel_label = html.escape(_("cancel"))
+    delete_label = html.escape(_("delete"))
+    delete_prompt = json.dumps(_("delete") + " this record?")
     toast_js = (
         '<div id="apg-toast-root" role="status" aria-live="polite" aria-atomic="true" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>'
         '<dialog id="apg-confirm-dialog" class="apg-dialog">'
         '<form method="dialog" class="apg-dialog-panel">'
-        '<h2 id="apg-confirm-title">Confirm action</h2>'
+        f'<h2 id="apg-confirm-title">{confirm_label}</h2>'
         '<p id="apg-confirm-message" class="text-sm text-gray-600">Are you sure?</p>'
         '<div class="flex items-center justify-end gap-2 mt-4">'
-        '<button value="cancel" class="apg-btn apg-btn-secondary" type="submit">Cancel</button>'
-        '<button value="confirm" class="apg-btn apg-btn-danger" type="submit">Delete</button>'
+        f'<button value="cancel" class="apg-btn apg-btn-secondary" type="submit">{cancel_label}</button>'
+        f'<button value="confirm" class="apg-btn apg-btn-danger" type="submit">{delete_label}</button>'
         '</div></form></dialog>'
         f'<script{script_nonce_attr}>'
         'var _apgNotifications=[];var _apgDeferredInstall=null;var _apgWasOffline=false;'
@@ -4048,7 +5188,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         'document.addEventListener("DOMContentLoaded",function(){apgApplyDensity(localStorage.getItem("apg-density")||"comfortable");});'
         'document.addEventListener("click",function(e){if(e.target.closest("[data-apg-density-toggle]"))apgCycleDensity();});'
         'function apgConfirm(message,ok){var d=document.getElementById("apg-confirm-dialog");if(!d||!d.showModal){var nativeConfirm=window["confirm"];if(nativeConfirm&&nativeConfirm(message))ok();return;}document.getElementById("apg-confirm-message").textContent=message;var done=false;function close(){if(done)return;done=true;d.removeEventListener("close",onclose);}function onclose(){var v=d.returnValue;close();if(v==="confirm")ok();}d.addEventListener("close",onclose);d.showModal();}'
-        'function apgConfirmSubmit(form,message){apgConfirm(message||"Delete this record?",function(){form.dataset.apgConfirmed="1";form.requestSubmit();});return false;}'
+        'function apgConfirmSubmit(form,message){apgConfirm(message||' + delete_prompt + ',function(){form.dataset.apgConfirmed="1";form.requestSubmit();});return false;}'
         'document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll(".apg-topnav a").forEach(function(a){if(a.getAttribute("href")===location.pathname){a.classList.add("active");a.setAttribute("aria-current","page");}});});'
         'function apgSetSidebar(collapsed){document.documentElement.classList.toggle("apg-sidebar-collapsed",collapsed);try{localStorage.setItem("apg-sidebar-collapsed",collapsed?"1":"0");}catch(e){}}'
         'function apgToggleSidebar(){if(matchMedia("(max-width: 767px)").matches){document.documentElement.classList.toggle("apg-sidebar-open");}else{apgSetSidebar(!document.documentElement.classList.contains("apg-sidebar-collapsed"));}}'
@@ -4227,7 +5367,8 @@ def _render_template(template_name: str, **context: Any) -> str | None:
         # Add url encode filter
         env.filters["urlencode"] = lambda s: __import__("urllib.parse", fromlist=["quote"]).quote(str(s), safe="")
         env.globals.update({
-            "_": _,
+            "_": _apg_t,
+            "_apg_t": _apg_t,
             "format_number": format_number,
             "format_currency": format_currency,
             "format_date": format_date,
@@ -4260,6 +5401,241 @@ def _field_specs(entity_name: str) -> list[Dict[str, Any]]:
         {"name": property_name, "type": "any", "required": True}
         for property_name in entity.get("properties", [])
     ]
+
+
+def _computed_field_specs(entity_name: str) -> list[Dict[str, Any]]:
+    return [field for field in _field_specs(entity_name) if field.get("computed")]
+
+
+def _stored_field_specs(entity_name: str) -> list[Dict[str, Any]]:
+    return [field for field in _field_specs(entity_name) if not field.get("computed")]
+
+
+def _computed_field_names(entity_name: str) -> set[str]:
+    return {
+        str(field.get("name", ""))
+        for field in _computed_field_specs(entity_name)
+        if str(field.get("name", "")).strip()
+    }
+
+
+def _apply_computed_fields(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
+    public = dict(record)
+    local_values = dict(public)
+    for field in _computed_field_specs(entity_name):
+        field_name = str(field.get("name", "")).strip()
+        expression = str(field.get("expression", "") or "").strip()
+        if not field_name or not expression:
+            continue
+        try:
+            public[field_name] = eval(expression, {"__builtins__": {}}, dict(local_values))
+        except Exception as exc:
+            _logging.getLogger("apg").warning(
+                "computed_field_failed entity=%s field=%s err=%s",
+                entity_name,
+                field_name,
+                exc,
+            )
+            public[field_name] = None
+        local_values[field_name] = public[field_name]
+    return public
+
+
+def _is_file_field(field: Dict[str, Any]) -> bool:
+    return str(field.get("type", "")).rstrip("?").lower() == "file"
+
+
+def _file_field_specs(entity_name: str) -> list[Dict[str, Any]]:
+    return [field for field in _field_specs(entity_name) if _is_file_field(field)]
+
+
+def _file_metadata_field_names(field_name: str) -> list[str]:
+    return [field_name + "_path", field_name + "_mime", field_name + "_size"]
+
+
+def _upload_allowed_mime_types() -> set[str]:
+    raw = os.environ.get(
+        "APG_UPLOAD_ALLOWED_TYPES",
+        "image/jpeg,image/png,image/webp,application/pdf",
+    )
+    allowed = {
+        item.strip().lower()
+        for item in str(raw).split(",")
+        if item.strip()
+    }
+    return allowed or {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+
+
+def _upload_max_bytes() -> int:
+    return max(1, _env_int("APG_UPLOAD_MAX_BYTES", 10 * 1024 * 1024))
+
+
+def _upload_root() -> Path:
+    return Path(os.environ.get("APG_UPLOAD_DIR", "./uploads")).expanduser()
+
+
+def _safe_upload_segment(value: Any, fallback: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value or "")).strip("._")
+    return safe or fallback
+
+
+def _multipart_upload_request() -> bool:
+    try:
+        return "multipart/form-data" in str(_flask_request.content_type or "")
+    except RuntimeError:
+        return False
+
+
+def _uploaded_file_mime(upload: Any) -> str:
+    mime_type = str(getattr(upload, "mimetype", "") or getattr(upload, "content_type", "") or "")
+    mime_type = mime_type.split(";", 1)[0].strip().lower()
+    if not mime_type:
+        guessed, _encoding = _mimetypes.guess_type(str(getattr(upload, "filename", "") or ""))
+        mime_type = str(guessed or "").lower()
+    return mime_type
+
+
+def _uploaded_file_extension(upload: Any, mime_type: str) -> str:
+    original = Path(str(getattr(upload, "filename", "") or "")).suffix.lower().lstrip(".")
+    if original and re.fullmatch(r"[A-Za-z0-9]{1,12}", original):
+        return original
+    guessed = str(_mimetypes.guess_extension(mime_type) or "").lower().lstrip(".")
+    return guessed or "bin"
+
+
+def _store_uploaded_file(entity_name: str, field_name: str, upload: Any) -> tuple[int, Dict[str, Any]]:
+    mime_type = _uploaded_file_mime(upload)
+    if mime_type not in _upload_allowed_mime_types():
+        return 415, {
+            "error": "unsupported_media_type",
+            "field": field_name,
+            "mime": mime_type,
+        }
+    data = upload.read()
+    try:
+        upload.stream.seek(0)
+    except Exception:
+        pass
+    size = len(data)
+    if size > _upload_max_bytes():
+        return 413, {
+            "error": "payload_too_large",
+            "field": field_name,
+            "max_bytes": _upload_max_bytes(),
+        }
+    safe_entity = _safe_upload_segment(entity_name, "entity")
+    upload_dir = _upload_root() / safe_entity
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    extension = _uploaded_file_extension(upload, mime_type)
+    filename = str(_uuid.uuid4()) + "." + extension
+    destination = upload_dir / filename
+    destination.write_bytes(data)
+    return 200, {
+        "path": str(destination),
+        "mime": mime_type,
+        "size": size,
+        "filename": filename,
+    }
+
+
+def _apply_uploaded_files(entity_name: str, record: Dict[str, Any]) -> tuple[int, Dict[str, Any]] | None:
+    if not _multipart_upload_request():
+        return None
+    for field in _file_field_specs(entity_name):
+        field_name = str(field.get("name", "")).strip()
+        if not field_name or field_name not in _flask_request.files:
+            continue
+        upload = _flask_request.files.get(field_name)
+        if upload is None or not str(getattr(upload, "filename", "") or ""):
+            continue
+        status, result = _store_uploaded_file(entity_name, field_name, upload)
+        if status != 200:
+            return status, result
+        record.pop(field_name, None)
+        record[field_name + "_path"] = result["path"]
+        record[field_name + "_mime"] = result["mime"]
+        record[field_name + "_size"] = result["size"]
+    return None
+
+
+def _file_url_for_path(entity_name: str, path: Any) -> str:
+    filename = Path(str(path or "")).name
+    if not filename:
+        return ""
+    return f"/uploads/{quote(entity_name, safe='')}/{quote(filename, safe='')}"
+
+
+def _mime_for_uploaded_filename(entity_name: str, filename: str) -> str:
+    for record in RECORD_STORE.get(entity_name, []):
+        for field in _file_field_specs(entity_name):
+            field_name = str(field.get("name", ""))
+            stored_name = Path(str(record.get(field_name + "_path", "") or "")).name
+            if stored_name == filename:
+                stored_mime = str(record.get(field_name + "_mime", "") or "")
+                if stored_mime:
+                    return stored_mime
+    guessed, _encoding = _mimetypes.guess_type(filename)
+    return str(guessed or "application/octet-stream")
+
+
+def _uploaded_file_response(entity_name: str, filename: str) -> _FlaskResponse:
+    if entity_name not in ENTITY_NAMES:
+        return _apg_error_response(404, "unknown_entity", "Unknown entity")
+    safe_filename = _safe_upload_segment(filename, "")
+    if not safe_filename or safe_filename != filename:
+        return _apg_error_response(404, "not_found", "File not found")
+    root = (_upload_root() / _safe_upload_segment(entity_name, "entity")).resolve()
+    path = (root / safe_filename).resolve()
+    if path.parent != root or not path.is_file():
+        return _apg_error_response(404, "not_found", "File not found")
+    data = path.read_bytes()
+    etag = '"' + hashlib.sha256(data).hexdigest()[:16] + '"'
+    requested = [
+        item.strip()
+        for item in str(_flask_request.headers.get("If-None-Match", "")).split(",")
+        if item.strip()
+    ]
+    if etag in requested:
+        response = _FlaskResponse(b"", status=304)
+    else:
+        response = _FlaskResponse(data, status=200, content_type=_mime_for_uploaded_filename(entity_name, safe_filename))
+        response.headers["Content-Length"] = str(len(data))
+    response.headers["ETag"] = etag
+    return response
+
+
+def _relationship_specs(entity_name: str) -> list[Dict[str, Any]]:
+    entity = _entity_spec(entity_name)
+    if entity is None:
+        return []
+    relationships = entity.get("relationships") or []
+    return [dict(relationship) for relationship in relationships if isinstance(relationship, dict)]
+
+
+def _relationship_field_name(entity_name: str) -> str:
+    text = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", str(entity_name))
+    text = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text)
+    return text.replace("-", "_").lower() + "_id"
+
+
+def _relationship_segment(entity_name: str) -> str:
+    base = _relationship_field_name(entity_name)
+    base = base[:-3] if base.endswith("_id") else base
+    if base.endswith("y") and (len(base) == 1 or base[-2] not in "aeiou"):
+        return base[:-1] + "ies"
+    if base.endswith(("s", "x", "z", "ch", "sh")):
+        return base + "es"
+    return base + "s"
+
+
+def _relationship_by_segment(entity_name: str, segment: str) -> Dict[str, Any] | None:
+    for relationship in _relationship_specs(entity_name):
+        if str(relationship.get("kind")) not in {"has_many", "has_one"}:
+            continue
+        candidate = str(relationship.get("segment") or _relationship_segment(str(relationship.get("target", ""))))
+        if candidate == segment:
+            return relationship
+    return None
 
 
 def _json_schema_type(apg_type: str) -> str:
@@ -4335,8 +5711,15 @@ def _coerce_value_for_type(value: Any, apg_type: str) -> Any:
 
 def coerce_record_types(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
     coerced = dict(record)
+    for field_name in _computed_field_names(entity_name):
+        coerced.pop(field_name, None)
     for field in _field_specs(entity_name):
+        if field.get("computed"):
+            continue
         field_name = str(field["name"])
+        if _is_file_field(field):
+            coerced.pop(field_name, None)
+            continue
         if field_name in coerced:
             coerced[field_name] = _coerce_value_for_type(
                 coerced[field_name],
@@ -4345,21 +5728,608 @@ def coerce_record_types(entity_name: str, record: Dict[str, Any]) -> Dict[str, A
     return coerced
 
 
+def _validation_failed(field_name: str, rule: str, detail: str) -> Dict[str, Any]:
+    return {
+        "valid": False,
+        "status": 400,
+        "error": "validation_failed",
+        "field": field_name,
+        "rule": rule,
+        "detail": detail,
+        "errors": [field_name + " " + detail],
+    }
+
+
+def _validator_value(validator: Dict[str, Any], key: str = "value") -> Any:
+    if key in validator:
+        return validator.get(key)
+    return validator.get("value")
+
+
+def _validator_failure(field_name: str, value: Any, validator: Dict[str, Any]) -> Dict[str, Any] | None:
+    rule = str(validator.get("rule", ""))
+    if rule in {"", "optional"}:
+        return None
+    if rule == "required":
+        if value is None or value == "":
+            return _validation_failed(field_name, "required", "required")
+        return None
+    if value is None:
+        return None
+    if rule == "min_length":
+        limit = int(_validator_value(validator) or 0)
+        if len(str(value)) < limit:
+            return _validation_failed(field_name, "min_length", "min " + str(limit) + " chars")
+    elif rule == "max_length":
+        limit = int(_validator_value(validator) or 0)
+        if len(str(value)) > limit:
+            return _validation_failed(field_name, "max_length", "max " + str(limit) + " chars")
+    elif rule == "min":
+        raw_limit = _validator_value(validator)
+        try:
+            if float(value) < float(raw_limit):
+                return _validation_failed(field_name, "min", "min " + str(raw_limit))
+        except (TypeError, ValueError):
+            return _validation_failed(field_name, "min", "must be numeric")
+    elif rule == "max":
+        raw_limit = _validator_value(validator)
+        try:
+            if float(value) > float(raw_limit):
+                return _validation_failed(field_name, "max", "max " + str(raw_limit))
+        except (TypeError, ValueError):
+            return _validation_failed(field_name, "max", "must be numeric")
+    elif rule == "email":
+        if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", str(value)) is None:
+            return _validation_failed(field_name, "email", "must be a valid email")
+    elif rule == "pattern":
+        pattern = str(_validator_value(validator, "pattern") or "")
+        try:
+            matched = re.fullmatch(pattern, str(value)) is not None
+        except re.error:
+            matched = False
+        if not matched:
+            return _validation_failed(field_name, "pattern", "must match pattern")
+    return None
+
+
+def _record_validation_failure(validation: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    if validation.get("error") == "invalid_enum_value":
+        return 400, {
+            "error": "invalid_enum_value",
+            "field": validation.get("field"),
+            "allowed": validation.get("allowed", []),
+        }
+    if validation.get("error") == "validation_failed":
+        return 400, {
+            "error": "validation_failed",
+            "field": validation.get("field"),
+            "rule": validation.get("rule"),
+            "detail": validation.get("detail"),
+        }
+    return 422, {"error": "record_validation_failed", **validation}
+
+
 def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = False) -> Dict[str, Any]:
     errors: list[str] = []
     fields = _field_specs(entity_name)
     for field in fields:
+        if field.get("computed"):
+            continue
         field_name = str(field["name"])
+        if _is_file_field(field):
+            path_field = field_name + "_path"
+            if not partial and field.get("required", False) and path_field not in record:
+                errors.append(f"{field_name} is required")
+            continue
         if not partial and field.get("required", False) and field_name not in record:
             errors.append(f"{field_name} is required")
             continue
-        if field_name in record and not _value_matches_type(record[field_name], str(field.get("type", "any"))):
+        if field_name not in record:
+            continue
+        value = record[field_name]
+        if value is None:
+            if field.get("required", False):
+                errors.append(f"{field_name} is required")
+            continue
+        if not _value_matches_type(value, str(field.get("type", "any"))):
             errors.append(f"{field_name} must be {_json_schema_type(str(field.get('type', 'any')))}")
+            continue
+        enum_values = field.get("enum") if isinstance(field.get("enum"), list) else []
+        if enum_values and value not in enum_values:
+            return {
+                "valid": False,
+                "status": 400,
+                "error": "invalid_enum_value",
+                "entity": entity_name,
+                "field": field_name,
+                "allowed": list(enum_values),
+                "errors": [f"{field_name} must be one of {', '.join(str(item) for item in enum_values)}"],
+            }
+        for validator in field.get("validators", []):
+            if not isinstance(validator, dict):
+                continue
+            failure = _validator_failure(field_name, value, validator)
+            if failure is not None:
+                failure["entity"] = entity_name
+                return failure
     return {
         "valid": not errors,
         "entity": entity_name,
         "errors": errors,
     }
+
+
+_APG_SQLITE_CONN: _sqlite3.Connection | None = None
+_APG_DB_DIALECT: str = "sqlite"
+_APG_DB_POOL_SIZE: int = int(os.environ.get("APG_DB_POOL_SIZE", "5") or "5")
+_APG_DB_POOL_SEMAPHORE = _threading.BoundedSemaphore(max(1, _APG_DB_POOL_SIZE))
+_APG_DB_POOL_LOCAL = _threading.local()
+
+
+def _apg_db_connect() -> "tuple[Any, str]":
+    """Open a connection based on APG_DATABASE_URL and return (connection, dialect).
+
+    Supports 'postgresql://', 'postgres://' and 'sqlite:///...' URLs. Defaults to
+    a local SQLite file at ./apg_data.db when no URL is provided.
+    """
+    global _APG_DB_DIALECT
+    url = os.environ.get("APG_DATABASE_URL", "") or os.environ.get("DATABASE_URL", "") or ""
+    if url.startswith(("postgresql://", "postgres://")):
+        try:
+            import psycopg2  # type: ignore
+        except ImportError:
+            raise RuntimeError("psycopg2 not installed: pip install psycopg2-binary")
+        _APG_DB_DIALECT = "pg"
+        _APG_DB_POOL_SEMAPHORE.acquire()
+        try:
+            conn = psycopg2.connect(url)
+        except Exception:
+            _APG_DB_POOL_SEMAPHORE.release()
+            raise
+        return conn, "pg"
+    if url.startswith("sqlite:///"):
+        path = url.replace("sqlite:///", "", 1) or "./apg_data.db"
+    else:
+        path = "./apg_data.db"
+    import sqlite3 as _sqlite3_mod
+    _APG_DB_DIALECT = "sqlite"
+    return _sqlite3_mod.connect(path), "sqlite"
+
+
+def _apg_db_dialect() -> str:
+    return _APG_DB_DIALECT
+
+
+def _apg_ddl_pk() -> str:
+    """Dialect-appropriate integer autoincrement primary key DDL."""
+    return "BIGSERIAL PRIMARY KEY" if _APG_DB_DIALECT == "pg" else "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+
+def _apg_ddl_now() -> str:
+    """Dialect-appropriate 'current timestamp' expression."""
+    return "NOW()" if _APG_DB_DIALECT == "pg" else "datetime('now')"
+
+
+def _apg_ddl_text_type() -> str:
+    """Dialect-agnostic TEXT type (same for both, centralised for consistency)."""
+    return "TEXT"
+
+
+def _apg_qmark(sql: str) -> str:
+    """Rewrite '?' placeholders to '%s' on PostgreSQL; passthrough on SQLite."""
+    if _APG_DB_DIALECT != "pg":
+        return sql
+    out_chars: list[str] = []
+    in_single = False
+    in_double = False
+    i = 0
+    while i < len(sql):
+        ch = sql[i]
+        if ch == "'" and not in_double:
+            in_single = not in_single
+        elif ch == '"' and not in_single:
+            in_double = not in_double
+        if ch == "?" and not in_single and not in_double:
+            out_chars.append("%s")
+        else:
+            out_chars.append(ch)
+        i += 1
+    return "".join(out_chars)
+
+
+def _apg_insert_returning_id(cursor: Any, sql: str, params: Any) -> Any:
+    """Execute an INSERT and return the new integer id.
+
+    - SQLite: relies on cursor.lastrowid (INTEGER PRIMARY KEY AUTOINCREMENT).
+    - PostgreSQL: appends RETURNING id and fetches the first column.
+    """
+    if _APG_DB_DIALECT == "pg":
+        cursor.execute(_apg_qmark(sql) + " RETURNING id", params)
+        row = cursor.fetchone()
+        return row[0] if row else None
+    cursor.execute(sql, params)
+    return cursor.lastrowid
+
+
+def _apg_touch_updated_at_ddl() -> list[str]:
+    """Return trigger-function DDL required once per DB (PG only)."""
+    if _APG_DB_DIALECT != "pg":
+        return []
+    return [
+        "CREATE OR REPLACE FUNCTION apg_touch_updated_at() RETURNS trigger AS $$"
+        " BEGIN NEW.updated_at = NOW(); RETURN NEW; END;"
+        " $$ LANGUAGE plpgsql;"
+    ]
+
+
+def _sqlite_path_from_env() -> str:
+    explicit_path = os.environ.get("APG_SQLITE_PATH") or os.environ.get("APG_DB_PATH")
+    if explicit_path:
+        return explicit_path
+    database_url = os.environ.get("APG_DATABASE_URL") or os.environ.get("DATABASE_URL") or ""
+    if database_url.startswith("sqlite:///"):
+        path = unquote(database_url.removeprefix("sqlite:///"))
+        return path or ":memory:"
+    if database_url == "sqlite:///:memory:":
+        return ":memory:"
+    return ":memory:"
+
+
+_APG_SQLITE_PATH = _sqlite_path_from_env()
+
+
+def _sqlite_identifier(identifier: str) -> str:
+    return '"' + str(identifier).replace('"', '""') + '"'
+
+
+def _sqlite_storage_type(apg_type: str) -> str:
+    schema_type = _json_schema_type(apg_type)
+    if schema_type in {"integer", "boolean"}:
+        return "INTEGER"
+    if schema_type == "number":
+        return "REAL"
+    return "TEXT"
+
+
+def _sqlite_literal(value: Any) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _sqlite_expected_columns(entity_name: str) -> list[Dict[str, str]]:
+    columns: list[Dict[str, str]] = [
+        {"name": "id", "ddl": "TEXT PRIMARY KEY", "migration": "TEXT"},
+        {"name": "_revision", "ddl": "INTEGER DEFAULT 1 NOT NULL", "migration": "INTEGER"},
+        {"name": "owner_id", "ddl": "TEXT DEFAULT NULL", "migration": "TEXT"},
+    ]
+    if APG_MULTI_TENANT_ENABLED:
+        columns.append({"name": "tenant_id", "ddl": "TEXT NOT NULL DEFAULT 'default'", "migration": "TEXT NOT NULL DEFAULT 'default'"})
+    for field in _stored_field_specs(entity_name):
+        field_name = str(field.get("name", "")).strip()
+        existing_column_names = {column["name"] for column in columns}
+        if not field_name or field_name in {"id", "_revision", "created_at", "updated_at", "deleted_at"} or field_name in existing_column_names:
+            continue
+        if _is_file_field(field):
+            columns.extend([
+                {"name": field_name + "_path", "ddl": "TEXT NULL", "migration": "TEXT"},
+                {"name": field_name + "_mime", "ddl": "TEXT NULL", "migration": "TEXT"},
+                {"name": field_name + "_size", "ddl": "INTEGER NULL", "migration": "INTEGER"},
+            ])
+            continue
+        relationship = field.get("relationship") if isinstance(field.get("relationship"), dict) else {}
+        relationship_kind = str(relationship.get("kind", ""))
+        target_entity = str(relationship.get("target", ""))
+        storage_type = "INTEGER" if relationship_kind in {"belongs_to", "junction_left", "junction_right"} else _sqlite_storage_type(str(field.get("type", "any")))
+        if relationship_kind == "belongs_to" and target_entity:
+            ddl = storage_type + " REFERENCES " + _sqlite_identifier(target_entity) + "(id) ON DELETE SET NULL"
+        elif relationship_kind in {"junction_left", "junction_right"} and target_entity:
+            ddl = storage_type + " REFERENCES " + _sqlite_identifier(target_entity) + "(id) ON DELETE CASCADE"
+        else:
+            ddl = storage_type
+        enum_values = field.get("enum") if isinstance(field.get("enum"), list) else []
+        if enum_values:
+            ddl += " CHECK(" + _sqlite_identifier(field_name) + " IN (" + ", ".join(_sqlite_literal(value) for value in enum_values) + "))"
+        ddl += " NOT NULL" if field.get("required", False) else ""
+        columns.append({"name": field_name, "ddl": ddl, "migration": storage_type})
+    now_expr = _apg_ddl_now()
+    ts_default = "TEXT DEFAULT (" + now_expr + ") NOT NULL" if _APG_DB_DIALECT != "pg" else "TIMESTAMPTZ DEFAULT " + now_expr + " NOT NULL"
+    ts_null = "TEXT NULL" if _APG_DB_DIALECT != "pg" else "TIMESTAMPTZ NULL"
+    ts_migration = "TEXT" if _APG_DB_DIALECT != "pg" else "TIMESTAMPTZ"
+    columns.extend([
+        {"name": "created_at", "ddl": ts_default, "migration": ts_migration},
+        {"name": "updated_at", "ddl": ts_default, "migration": ts_migration},
+        {"name": "deleted_at", "ddl": ts_null, "migration": ts_migration},
+    ])
+    return columns
+
+
+def _sqlite_fts_identifier(identifier: str) -> str:
+    text = str(identifier)
+    return text if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", text) else _sqlite_identifier(text)
+
+
+_APG_FTS_PG_WARNED: bool = False
+
+
+def _sqlite_init_entity_fts(conn: _sqlite3.Connection, entity_name: str) -> None:
+    # FTS5 is SQLite-only; skip on PostgreSQL.
+    if _apg_db_dialect() == "pg":
+        global _APG_FTS_PG_WARNED
+        if not _APG_FTS_PG_WARNED:
+            _logging.getLogger("apg").info(
+                "FTS5 not available on PostgreSQL - /search endpoints will return empty results"
+            )
+            _APG_FTS_PG_WARNED = True
+        return
+    str_fields = _record_string_field_names(entity_name)
+    if not str_fields:
+        return
+    entity_sql = _sqlite_fts_identifier(entity_name)
+    fts_table = entity_name + "_fts"
+    fts_sql = _sqlite_fts_identifier(fts_table)
+    str_fields_csv = ",".join(_sqlite_fts_identifier(field) for field in str_fields)
+    new_str_fields = ",".join("new." + _sqlite_fts_identifier(field) for field in str_fields)
+    conn.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS "
+        + fts_sql
+        + " USING fts5("
+        + str_fields_csv
+        + ", content="
+        + entity_sql
+        + ", content_rowid=id)"
+    )
+    conn.execute(
+        "CREATE TRIGGER IF NOT EXISTS "
+        + _sqlite_fts_identifier(fts_table + "_ai")
+        + " AFTER INSERT ON "
+        + entity_sql
+        + " BEGIN INSERT INTO "
+        + fts_sql
+        + "(rowid,"
+        + str_fields_csv
+        + ") VALUES (new.id,"
+        + new_str_fields
+        + "); END;"
+    )
+    conn.execute(
+        "CREATE TRIGGER IF NOT EXISTS "
+        + _sqlite_fts_identifier(fts_table + "_ad")
+        + " AFTER DELETE ON "
+        + entity_sql
+        + " BEGIN INSERT INTO "
+        + fts_sql
+        + "("
+        + fts_sql
+        + ",rowid) VALUES('delete',old.id); END;"
+    )
+    conn.execute(
+        "CREATE TRIGGER IF NOT EXISTS "
+        + _sqlite_fts_identifier(fts_table + "_au")
+        + " AFTER UPDATE ON "
+        + entity_sql
+        + " BEGIN INSERT INTO "
+        + fts_sql
+        + "("
+        + fts_sql
+        + ",rowid) VALUES('delete',old.id); INSERT INTO "
+        + fts_sql
+        + "(rowid,"
+        + str_fields_csv
+        + ") VALUES(new.id,"
+        + new_str_fields
+        + "); END;"
+    )
+
+
+def _sqlite_connection() -> _sqlite3.Connection | None:
+    global _APG_SQLITE_CONN
+    if _APG_SQLITE_CONN is not None:
+        return _APG_SQLITE_CONN
+    try:
+        if _APG_SQLITE_PATH != ":memory:":
+            Path(_APG_SQLITE_PATH).expanduser().parent.mkdir(parents=True, exist_ok=True)
+        _APG_SQLITE_CONN = _sqlite3.connect(_APG_SQLITE_PATH, check_same_thread=False)
+        _APG_SQLITE_CONN.row_factory = _sqlite3.Row
+        return _APG_SQLITE_CONN
+    except Exception as exc:
+        _logging.getLogger("apg").warning("sqlite_init_failed: %s", exc)
+        _APG_SQLITE_CONN = None
+        return None
+
+
+def _sqlite_init_entity_table(conn: _sqlite3.Connection, entity_name: str) -> None:
+    table = _sqlite_identifier(entity_name)
+    columns = _sqlite_expected_columns(entity_name)
+    column_sql = ", ".join(_sqlite_identifier(column["name"]) + " " + column["ddl"] for column in columns)
+    conn.execute("CREATE TABLE IF NOT EXISTS " + table + " (" + column_sql + ")")
+    _sqlite_init_entity_fts(conn, entity_name)
+    trigger = _sqlite_identifier("trg_" + entity_name + "_updated_at")
+    if _APG_DB_DIALECT == "pg":
+        # PG: BEFORE UPDATE trigger + shared trigger function (emitted once elsewhere).
+        conn.execute(
+            "DROP TRIGGER IF EXISTS " + trigger + " ON " + table + ";"
+            " CREATE TRIGGER " + trigger + " BEFORE UPDATE ON " + table
+            + " FOR EACH ROW EXECUTE FUNCTION apg_touch_updated_at();"
+        )
+    else:
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS " + trigger + " AFTER UPDATE ON " + table + " FOR EACH ROW "
+            "BEGIN UPDATE " + table + " SET updated_at = datetime('now') WHERE id = NEW.id; END;"
+        )
+
+
+def _sqlite_auto_migrate_entity(conn: _sqlite3.Connection, entity_name: str) -> None:
+    if _APG_DB_DIALECT == "pg":
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = %s",
+            (entity_name,),
+        )
+        existing = {str(row[0]) for row in cur.fetchall()}
+        cur.close()
+    else:
+        existing = {
+            str(row["name"])
+            for row in conn.execute("PRAGMA table_info(" + _sqlite_identifier(entity_name) + ")").fetchall()
+        }
+    for column in _sqlite_expected_columns(entity_name):
+        column_name = column["name"]
+        if column_name in existing:
+            continue
+        conn.execute(
+            "ALTER TABLE "
+            + _sqlite_identifier(entity_name)
+            + " ADD COLUMN "
+            + _sqlite_identifier(column_name)
+            + " "
+            + (
+                column["migration"]
+                if "DEFAULT" in column["migration"].upper() or "NOT NULL" in column["migration"].upper()
+                else column["migration"] + " DEFAULT NULL"
+            )
+        )
+        _logging.getLogger("apg").info("auto_migrated_column entity=%s column=%s", entity_name, column_name)
+
+
+def _sqlite_init_database() -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    try:
+        for stmt in _apg_touch_updated_at_ddl():
+            conn.execute(stmt)
+        for entity_name in sorted(ENTITY_NAMES):
+            _sqlite_init_entity_table(conn, entity_name)
+            if str(os.environ.get("APG_AUTO_MIGRATE", "1")) != "0":
+                _sqlite_auto_migrate_entity(conn, entity_name)
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        _logging.getLogger("apg").warning("sqlite_schema_init_failed: %s", exc)
+
+
+def _sqlite_value(value: Any) -> Any:
+    if isinstance(value, bool):
+        return 1 if value else 0
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, sort_keys=True)
+    return value
+
+
+def _sqlite_store_record(entity_name: str, record: Dict[str, Any]) -> None:
+    conn = _sqlite_connection()
+    if conn is None or record.get("id") in (None, ""):
+        return
+    columns = _sqlite_expected_columns(entity_name)
+    metadata = _record_metadata(entity_name, record.get("id"), create=True) or {}
+    row: Dict[str, Any] = {
+        "id": str(record.get("id")),
+        "_revision": int(record.get("_revision", 1)),
+        "owner_id": record.get("owner_id"),
+        "created_at": record.get("created_at") or metadata.get("created_at"),
+        "updated_at": record.get("updated_at") or metadata.get("updated_at"),
+        "deleted_at": record.get("deleted_at") if "deleted_at" in record else metadata.get("deleted_at"),
+    }
+    if any(column["name"] == "tenant_id" for column in columns):
+        row["tenant_id"] = record.get("tenant_id") or APG_TENANT_DEFAULT
+    for field in _stored_field_specs(entity_name):
+        field_name = str(field.get("name", "")).strip()
+        if not field_name:
+            continue
+        if _is_file_field(field):
+            for metadata_name in _file_metadata_field_names(field_name):
+                if metadata_name not in row:
+                    row[metadata_name] = _sqlite_value(record.get(metadata_name))
+            continue
+        if field_name not in row:
+            row[field_name] = _sqlite_value(record.get(field_name))
+    column_names = [column["name"] for column in columns]
+    assignments = [
+        _sqlite_identifier(column_name) + " = excluded." + _sqlite_identifier(column_name)
+        for column_name in column_names
+        if column_name != "id"
+    ]
+    sql = (
+        "INSERT INTO "
+        + _sqlite_identifier(entity_name)
+        + " ("
+        + ", ".join(_sqlite_identifier(column_name) for column_name in column_names)
+        + ") VALUES ("
+        + ", ".join("?" for _column_name in column_names)
+        + ") ON CONFLICT(id) DO UPDATE SET "
+        + ", ".join(assignments)
+    )
+    conn.execute(_apg_qmark(sql), [_sqlite_value(row.get(column_name)) for column_name in column_names])
+
+
+def _sqlite_soft_delete_record(entity_name: str, record_id: Any) -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    sql = "UPDATE " + _sqlite_identifier(entity_name) + " SET deleted_at=" + _apg_ddl_now() + " WHERE id=?"
+    params: list[Any] = [str(record_id)]
+    if _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
+        sql += " AND tenant_id=?"
+        params.append(_tenant_id() or APG_TENANT_DEFAULT)
+    conn.execute(_apg_qmark(sql), params)
+
+
+def _sqlite_restore_record(entity_name: str, record_id: Any) -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    sql = "UPDATE " + _sqlite_identifier(entity_name) + " SET deleted_at=NULL WHERE id=?"
+    params: list[Any] = [str(record_id)]
+    if _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
+        sql += " AND tenant_id=?"
+        params.append(_tenant_id() or APG_TENANT_DEFAULT)
+    conn.execute(_apg_qmark(sql), params)
+
+
+def _sqlite_select_records(
+    entity_name: str,
+    include_deleted: bool = False,
+    tenant_scoped: bool = True,
+) -> list[Dict[str, Any]]:
+    conn = _sqlite_connection()
+    if conn is None:
+        return []
+    sql = "SELECT * FROM " + _sqlite_identifier(entity_name)
+    where_clauses: list[str] = []
+    params: list[Any] = []
+    if not include_deleted:
+        where_clauses.append("deleted_at IS NULL")
+    if tenant_scoped and _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
+        where_clauses.append("tenant_id=?")
+        params.append(_tenant_id() or APG_TENANT_DEFAULT)
+    if where_clauses:
+        sql += " WHERE " + " AND ".join(where_clauses)
+    sql += " ORDER BY id"
+    return [dict(row) for row in conn.execute(_apg_qmark(sql), params).fetchall()]
+
+
+def _sqlite_load_records() -> None:
+    for entity_name in sorted(ENTITY_NAMES):
+        rows = _sqlite_select_records(entity_name, include_deleted=True, tenant_scoped=False)
+        if rows:
+            RECORD_STORE[entity_name] = [dict(row) for row in rows]
+
+
+def _sqlite_begin() -> None:
+    conn = _sqlite_connection()
+    if conn is not None:
+        conn.execute("BEGIN")
+
+
+def _sqlite_commit() -> None:
+    conn = _sqlite_connection()
+    if conn is not None:
+        conn.commit()
+
+
+def _sqlite_rollback() -> None:
+    conn = _sqlite_connection()
+    if conn is not None:
+        conn.rollback()
 
 
 def relationship_graph() -> Dict[str, Any]:
@@ -4438,6 +6408,29 @@ def relationship_graph() -> Dict[str, Any]:
                             "target_column": str(reference.get("column", "")),
                         })
                         seen_edges.add(edge_key)
+        for relationship_spec in _relationship_specs(source):
+            target = str(relationship_spec.get("target", ""))
+            relationship = str(relationship_spec.get("kind", "relationship"))
+            if target not in entity_names or target == source:
+                continue
+            field_name = str(
+                relationship_spec.get("through")
+                or relationship_spec.get("fk_field")
+                or relationship_spec.get("segment")
+                or relationship
+            )
+            edge_key = (source, target, field_name, relationship)
+            if edge_key not in seen_edges:
+                edge = {
+                    "from": source,
+                    "to": target,
+                    "field": field_name,
+                    "relationship": relationship,
+                }
+                if relationship_spec.get("through"):
+                    edge["through"] = relationship_spec.get("through")
+                edges.append(edge)
+                seen_edges.add(edge_key)
         for field in _field_specs(source):
             field_name = str(field["name"])
             field_type = str(field.get("type", ""))
@@ -5219,7 +7212,7 @@ def _ui_dashboard_context(app: Dict[str, Any]) -> Dict[str, Any]:
             continue
         entity_name = str(entity["name"])
         records = list_records(entity_name)
-        spark = {"type": "sparkline", "title": f"{entity_name} records", "data": [{"x": i, "y": len(records)} for i in range(30)], "empty": "No records yet"}
+        spark = {"type": "sparkline", "title": f"{entity_name} records", "data": [{"x": i, "y": len(records)} for i in range(30)], "empty": _("no_records")}
         stats.append({
             "label": entity_name,
             "value": len(records),
@@ -5710,7 +7703,7 @@ def _ui_active_filter_chips(entity_name: str, query: Dict[str, list[str]]) -> li
     q = _ui_query_value(query, "q")
     if q:
         chips.append({
-            "label": "Search",
+            "label": _("search"),
             "value": q,
             "clear_url": _ui_entity_query_path(entity_name, query, drops={"q", "page"}),
         })
@@ -5750,12 +7743,14 @@ def _ui_create_form_html(entity_name: str, fields: list[Dict[str, Any]]) -> str:
 def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | None = None, sort_field: str = "", sort_dir: str = "asc", q: str = "", query: Dict[str, list[str]] | None = None) -> str:
     records = records if records is not None else list_records(entity_name)
     if not records:
-        return "<p>No records yet.</p>"
+        return f"<p>{html.escape(_('no_records'))}</p>"
     fields = _field_specs(entity_name)
     field_names = [str(f["name"]) for f in fields if str(f["name"]) not in {"_revision"}]
     # Show at most 6 columns to keep table readable; id always first
     display_cols = ["id"] + [c for c in field_names if c != "id"][:5]
     safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
+    delete_label = html.escape(_("delete"))
+    delete_prompt = html.escape(_("delete") + " this record?", quote=True)
     header_cells = []
     for col in display_cols:
         label = html.escape((col[:-3].replace("_", " ").title() + " ID") if col.endswith("_id") else col.replace("_", " ").title())
@@ -5811,8 +7806,8 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
             f'<form method="post" action="/ui/entities/{safe_entity}/records/{record_id}/delete" class="inline">'
             f'{_csrf_input()}'
             f'<input type="hidden" name="expected_revision" value="{revision}">'
-            f'<button type="submit" onclick="return apgConfirmSubmit(this.form, this.dataset.msg)" data-msg="Delete this record?"'
-            f' class="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>'
+            f'<button type="submit" onclick="return apgConfirmSubmit(this.form, this.dataset.msg)" data-msg="{delete_prompt}"'
+            f' class="text-xs text-red-400 hover:text-red-600 transition-colors">{delete_label}</button>'
             f'</form>'
             f'</div>'
         )
@@ -5828,7 +7823,7 @@ def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | Non
         f' bg-gray-900 text-white rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-3 text-sm">'
         f'<span id="apg-bulk-cnt" class="font-semibold tabular-nums"></span>'
         f'<button onclick="apgBulkDelete()"'
-        f' class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors">Delete</button>'
+        f' class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors">{delete_label}</button>'
         f'<a id="apg-csv-link" href="/entities/{safe_entity}/records.csv"'
         f' class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition-colors">Export CSV</a>'
         f'<button onclick="apgBulkClear()" class="ml-1 text-gray-400 hover:text-white leading-none text-base">✕</button>'
@@ -6238,7 +8233,7 @@ def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
         })
     if not records:
         insights.append({
-            "title": "No records yet",
+            "title": _("no_records"),
             "body": "Create records before reading analytics.",
             "url": _ui_entity_query_path(entity_name),
             "action": f"Create {entity_name}",
@@ -6587,6 +8582,8 @@ def _ui_field_edit_html(entity_name: str, record_id: str, field_name: str) -> tu
             f' class="w-full border border-apg-primary rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-apg-primary">'
         )
     revision = html.escape(str(record.get("_revision", "")), quote=True)
+    save_label = html.escape(_("save"))
+    cancel_label = html.escape(_("cancel"))
     fragment = (
         f'<div id="{fld_id}" class="py-3 border-b border-gray-50 last:border-0">'
         f'<dt class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</dt>'
@@ -6596,9 +8593,9 @@ def _ui_field_edit_html(entity_name: str, record_id: str, field_name: str) -> tu
         f'<input type="hidden" name="expected_revision" value="{revision}">'
         f'{input_html}'
         f'<div class="flex gap-2">'
-        f'<button type="submit" class="px-2.5 py-1 bg-apg-primary text-white text-xs font-medium rounded-lg hover:opacity-90">Save</button>'
+        f'<button type="submit" class="px-2.5 py-1 bg-apg-primary text-white text-xs font-medium rounded-lg hover:opacity-90">{save_label}</button>'
         f'<button type="button" hx-get="{cancel_url}" hx-target="#{fld_id}" hx-swap="outerHTML"'
-        f' class="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg">Cancel</button>'
+        f' class="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg">{cancel_label}</button>'
         f'</div>'
         f'</form>'
         f'</dd></div>'
@@ -7497,12 +9494,22 @@ def _record_route(path: str) -> Dict[str, str | None] | None:
     parts = [part for part in path.split("/") if part]
     if parts == ["records"]:
         return {"entity": None, "record_id": None, "operation": None}
+    if len(parts) == 3 and parts[0] == "records" and parts[2] == "search":
+        return {"entity": parts[1], "record_id": None, "operation": "search"}
+    if len(parts) == 3 and parts[0] == "records" and parts[2] == "bulk":
+        return {"entity": parts[1], "record_id": None, "operation": "bulk"}
+    if len(parts) == 4 and parts[0] == "records" and parts[3] == "restore":
+        return {"entity": parts[1], "record_id": parts[2], "operation": "restore"}
     if len(parts) in {2, 3} and parts[0] == "records":
         return {
             "entity": parts[1],
             "record_id": parts[2] if len(parts) == 3 else None,
             "operation": None,
         }
+    if len(parts) == 5 and parts[0] == "entities" and parts[2] == "records" and parts[4] == "restore":
+        return {"entity": parts[1], "record_id": parts[3], "operation": "restore"}
+    if len(parts) == 4 and parts[0] == "entities" and parts[2] == "records" and parts[3] == "bulk":
+        return {"entity": parts[1], "record_id": None, "operation": "bulk"}
     if len(parts) in {3, 4} and parts[0] == "entities" and parts[2] == "records":
         operation = parts[3] if len(parts) == 4 and parts[3] in {"export", "import"} else None
         return {
@@ -7513,18 +9520,259 @@ def _record_route(path: str) -> Dict[str, str | None] | None:
     return None
 
 
-def _record_by_id(entity_name: str, record_id: str) -> Dict[str, Any] | None:
+def _record_by_id(entity_name: str, record_id: str, *, include_deleted: bool = False) -> Dict[str, Any] | None:
     for record in RECORD_STORE[entity_name]:
         if str(record.get("id")) == str(record_id):
-            return dict(record)
+            if not include_deleted and _record_deleted(entity_name, record):
+                return None
+            if not _record_owner_visible(record):
+                return None
+            if not _record_tenant_visible(entity_name, record):
+                return None
+            return _record_public_copy(entity_name, record)
     return None
+
+
+def _relationship_route(path: str) -> Dict[str, Any] | None:
+    parts = [part for part in path.split("/") if part]
+    if len(parts) not in {4, 5} or parts[0] != "records":
+        return None
+    source_entity = parts[1]
+    source_id = parts[2]
+    segment = parts[3]
+    if source_entity not in ENTITY_NAMES:
+        return None
+    relationship = _relationship_by_segment(source_entity, segment)
+    if relationship is None:
+        return None
+    return {
+        "source": source_entity,
+        "source_id": source_id,
+        "segment": segment,
+        "relationship": relationship,
+        "target": str(relationship.get("target", "")),
+        "through": relationship.get("through"),
+        "related_id": parts[4] if len(parts) == 5 else None,
+    }
+
+
+def _relationship_records(source_entity: str, source_id: Any, relationship: Dict[str, Any]) -> list[Dict[str, Any]]:
+    target_entity = str(relationship.get("target", ""))
+    if target_entity not in ENTITY_NAMES:
+        return []
+    through_entity = relationship.get("through")
+    if through_entity:
+        through_name = str(through_entity)
+        if through_name not in ENTITY_NAMES:
+            return []
+        left_field = str(relationship.get("left_field") or "left_id")
+        right_field = str(relationship.get("right_field") or "right_id")
+        related_ids = {
+            str(link.get(right_field))
+            for link in list_records(through_name)
+            if str(link.get(left_field)) == str(source_id) and link.get(right_field) not in (None, "")
+        }
+        return [
+            _field_acl_public_copy(target_entity, record)
+            for record in list_records(target_entity)
+            if str(record.get("id")) in related_ids
+        ]
+    fk_field = str(relationship.get("fk_field") or _relationship_field_name(source_entity))
+    return [
+        _field_acl_public_copy(target_entity, record)
+        for record in list_records(target_entity)
+        if str(record.get(fk_field, "")) == str(source_id)
+    ]
+
+
+def _relationship_records_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, Dict[str, Any]]:
+    route = _relationship_route(path)
+    if route is None:
+        return 404, {"error": "not_found", "path": path}
+    source_entity = str(route["source"])
+    source_id = str(route["source_id"])
+    relationship = dict(route["relationship"])
+    target_entity = str(route["target"])
+    if target_entity not in ENTITY_NAMES:
+        return 404, {"error": "unknown_entity", "entity": target_entity}
+    if _record_by_id(source_entity, source_id) is None:
+        return 404, {"error": "record_not_found", "entity": source_entity, "id": source_id}
+    if route.get("related_id") is not None:
+        return 405, {"error": "method_not_allowed", "operation": "relationship_item"}
+    records = _relationship_records(source_entity, source_id, relationship)
+    return 200, {
+        "entity": target_entity,
+        "parent": {"entity": source_entity, "id": source_id},
+        "relationship": relationship,
+        "records": records,
+        "count": len(records),
+    }
+
+
+def _create_relationship_payload(path: str, payload: Dict[str, Any], *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
+    route = _relationship_route(path)
+    if route is None or route.get("related_id") in (None, ""):
+        return 404, {"error": "not_found", "path": path}
+    relationship = dict(route["relationship"])
+    through_entity = relationship.get("through")
+    if not through_entity:
+        return 405, {"error": "method_not_allowed", "operation": "relationship_link"}
+    source_entity = str(route["source"])
+    source_id = str(route["source_id"])
+    target_entity = str(route["target"])
+    related_id = str(route["related_id"])
+    through_name = str(through_entity)
+    if through_name not in ENTITY_NAMES:
+        return 404, {"error": "unknown_entity", "entity": through_name}
+    if _record_by_id(source_entity, source_id) is None:
+        return 404, {"error": "record_not_found", "entity": source_entity, "id": source_id}
+    if _record_by_id(target_entity, related_id) is None:
+        return 404, {"error": "record_not_found", "entity": target_entity, "id": related_id}
+    left_field = str(relationship.get("left_field") or "left_id")
+    right_field = str(relationship.get("right_field") or "right_id")
+    for link in list_records(through_name):
+        if str(link.get(left_field)) == source_id and str(link.get(right_field)) == related_id:
+            return 200, {
+                "entity": target_entity,
+                "relationship": relationship,
+                "link": link,
+                "created": False,
+            }
+    raw_record = payload.get("record", payload)
+    link_record = dict(raw_record) if isinstance(raw_record, dict) else {}
+    link_record[left_field] = source_id
+    link_record[right_field] = related_id
+    status, response = _create_record_payload(
+        f"/records/{quote(through_name, safe='')}",
+        {"record": link_record},
+        persist=persist,
+    )
+    if status >= 400:
+        return status, response
+    return status, {
+        "entity": target_entity,
+        "relationship": relationship,
+        "link": response.get("record", link_record),
+        "created": True,
+    }
+
+
+def _delete_relationship_payload(path: str, *, persist: bool = True) -> tuple[int, Dict[str, Any]] | None:
+    route = _relationship_route(path)
+    if route is None or route.get("related_id") in (None, ""):
+        return None
+    relationship = dict(route["relationship"])
+    through_entity = relationship.get("through")
+    if not through_entity:
+        return 405, {"error": "method_not_allowed", "operation": "relationship_unlink"}
+    through_name = str(through_entity)
+    if through_name not in ENTITY_NAMES:
+        return 404, {"error": "unknown_entity", "entity": through_name}
+    source_id = str(route["source_id"])
+    related_id = str(route["related_id"])
+    left_field = str(relationship.get("left_field") or "left_id")
+    right_field = str(relationship.get("right_field") or "right_id")
+    removed: list[Dict[str, Any]] = []
+    remaining: list[Dict[str, Any]] = []
+    for link in RECORD_STORE[through_name]:
+        if (
+            str(link.get(left_field)) == source_id
+            and str(link.get(right_field)) == related_id
+            and not _record_deleted(through_name, link)
+            and _record_tenant_visible(through_name, link)
+        ):
+            removed.append(_record_public_copy(through_name, link))
+            continue
+        remaining.append(link)
+    if not removed:
+        return 404, {"error": "relationship_not_found", "relationship": relationship}
+    RECORD_STORE[through_name] = remaining
+    conn = _sqlite_connection()
+    if conn is not None:
+        sql = (
+            "DELETE FROM " + _sqlite_identifier(through_name)
+            + " WHERE " + _sqlite_identifier(left_field) + "=? AND "
+            + _sqlite_identifier(right_field) + "=?"
+        )
+        params: list[Any] = [source_id, related_id]
+        if _tenant_scope_enabled(through_name) and not _tenant_admin_bypass():
+            sql += " AND tenant_id=?"
+            params.append(_tenant_id() or APG_TENANT_DEFAULT)
+        conn.execute(_apg_qmark(sql), params)
+    if persist:
+        _sqlite_commit()
+        persistence_error = _persist_record_store()
+        if persistence_error:
+            return 500, {"error": "persistence_failed", "message": persistence_error}
+    return 200, {
+        "relationship": relationship,
+        "deleted": removed,
+        "count": len(removed),
+    }
 
 
 def _records_payload(path: str) -> tuple[int, Dict[str, Any]]:
     return _records_payload_with_query(path, {})
 
 
+def _records_api_collection_path(path: str) -> bool:
+    parts = [part for part in path.split("/") if part]
+    return len(parts) == 2 and parts[0] == "records"
+
+
+def _records_search_limit(query: Dict[str, list[str]] | None) -> int:
+    raw_limit = _record_query_value(query or {}, "limit", 20)
+    try:
+        parsed = int(raw_limit)
+    except (TypeError, ValueError):
+        parsed = 20
+    return max(1, min(parsed, 1000))
+
+
+def search_records(entity_name: str, query: Dict[str, list[str]] | None = None) -> list[Dict[str, Any]]:
+    # FTS5 search is SQLite-only. On PostgreSQL, return empty until pg_trgm/tsvector is wired.
+    if _apg_db_dialect() == "pg":
+        return []
+    q = str(_record_query_value(query or {}, "q", "") or "").strip()
+    if not q or not _record_string_field_names(entity_name):
+        return []
+    conn = _sqlite_connection()
+    if conn is None:
+        return []
+    entity_sql = _sqlite_fts_identifier(entity_name)
+    fts_sql = _sqlite_fts_identifier(entity_name + "_fts")
+    where_clauses = [
+        "id IN (SELECT rowid FROM " + fts_sql + " WHERE " + fts_sql + " MATCH ?)",
+        "deleted_at IS NULL",
+    ]
+    params: list[Any] = [q]
+    if _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
+        where_clauses.append("tenant_id=?")
+        params.append(_tenant_id() or APG_TENANT_DEFAULT)
+    sql = (
+        "SELECT * FROM "
+        + entity_sql
+        + " WHERE "
+        + " AND ".join(where_clauses)
+        + " LIMIT ?"
+    )
+    params.append(_records_search_limit(query))
+    try:
+        rows = conn.execute(sql, params).fetchall()
+    except _sqlite3.DatabaseError:
+        return []
+    records: list[Dict[str, Any]] = []
+    for row in rows:
+        record = _record_by_id(entity_name, row["id"])
+        if record is not None:
+            records.append(record)
+    return records
+
+
 def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, Dict[str, Any]]:
+    relationship_route = _relationship_route(path)
+    if relationship_route is not None:
+        return _relationship_records_payload(path, query)
     route = _record_route(path)
     if route is None:
         return 404, {"error": "not_found", "path": path}
@@ -7541,14 +9789,40 @@ def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = 
             "records": list_records(entity_name),
             "count": len(list_records(entity_name)),
         }
+    if operation == "search":
+        return 200, search_records(entity_name, query)
     if operation is not None:
         return 405, {"error": "method_not_allowed", "operation": operation}
     if record_id is None:
-        return 200, query_records(entity_name, query)
-    record = _record_by_id(entity_name, record_id)
+        style = "records" if _records_api_collection_path(path) else "legacy"
+        result = query_records(entity_name, query, response_style=style)
+        if result.get("error") == "invalid_field":
+            return 400, {"error": "invalid_field"}
+        if result.get("error") == "include_deleted_requires_admin":
+            return 403, {"error": "include_deleted_requires_admin"}
+        if style == "records":
+            result = dict(result)
+            result["data"] = [
+                _field_acl_public_copy(entity_name, record)
+                for record in result.get("data", [])
+                if isinstance(record, dict)
+            ]
+        else:
+            result = dict(result)
+            result["records"] = [
+                _field_acl_public_copy(entity_name, record)
+                for record in result.get("records", [])
+                if isinstance(record, dict)
+            ]
+        return 200, result
+    include_deleted_requested = _query_includes_deleted(query or {})
+    if include_deleted_requested and not _records_admin_allowed():
+        return 403, {"error": "include_deleted_requires_admin"}
+    include_deleted = include_deleted_requested and _records_admin_allowed()
+    record = _record_by_id(entity_name, record_id, include_deleted=include_deleted)
     if record is None:
         return 404, {"error": "record_not_found", "entity": entity_name, "id": record_id}
-    return 200, {"entity": entity_name, "record": record}
+    return 200, {"entity": entity_name, "record": _field_acl_public_copy(entity_name, record)}
 
 
 def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tuple[int, Dict[str, Any]]:
@@ -7597,6 +9871,10 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
                 return 200, describe_workflow(parts[1])
             except KeyError:
                 return 404, {"error": "unknown_workflow", "workflow": parts[1]}
+    if path == "/jobs":
+        return _jobs_payload(query)
+    if path.startswith("/jobs/"):
+        return _job_detail_payload(path)
     if path == "/databases":
         return 200, {"databases": list_databases()}
     if path == "/databases/status":
@@ -7928,10 +10206,14 @@ def _agent_invocation_payload(path: str, payload: Dict[str, Any]) -> tuple[int, 
     return 404, {"error": "not_found", "path": path}
 
 
-def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+def _create_record_payload(path: str, payload: Dict[str, Any], *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
+    if _relationship_route(path) is not None:
+        return _create_relationship_payload(path, payload, persist=persist)
     route = _record_route(path)
     if route is not None and route.get("operation") == "import":
         return _import_records_payload(str(route["entity"]), payload)
+    if route is not None and route.get("operation") == "bulk":
+        return _bulk_records_payload(path, payload)
     if route is None or route["entity"] is None or route["record_id"] is not None:
         return 404, {"error": "not_found", "path": path}
     entity_name = route["entity"]
@@ -7940,27 +10222,47 @@ def _create_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     raw_record = payload.get("record", payload)
     if not isinstance(raw_record, dict):
         return 400, {"error": "record_must_be_object"}
-    record = coerce_record_types(entity_name, dict(raw_record))
+    record = _strip_record_lifecycle_fields(coerce_record_types(entity_name, dict(raw_record)))
+    upload_error = _apply_uploaded_files(entity_name, record)
+    if upload_error is not None:
+        return upload_error
     validation = validate_record(entity_name, record)
     if not validation["valid"]:
-        return 422, {"error": "record_validation_failed", **validation}
+        return _record_validation_failure(validation)
     if record.get("id") in (None, ""):
         record["id"] = NEXT_RECORD_IDS[entity_name]
         NEXT_RECORD_IDS[entity_name] += 1
     elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
         return 409, {"error": "duplicate_record_id", "entity": entity_name, "id": record["id"]}
     record = _prepare_new_record(record, entity_name)
+    RECORD_METADATA.setdefault(entity_name, {})[_record_metadata_key(record["id"])] = {
+        "created_at": record.get("created_at"),
+        "updated_at": record.get("updated_at"),
+        "deleted_at": None,
+    }
     RECORD_STORE[entity_name].append(record)
+    _sqlite_store_record(entity_name, record)
+    if persist:
+        _sqlite_commit()
     event = _record_event("create", entity_name, after=record)
     _log_activity(entity_name, str(record.get("id", "")), "created", detail=f"Record created with {len(record)} fields")
-    persistence_error = _persist_record_store()
-    if persistence_error:
-        return 500, {"error": "persistence_failed", "message": persistence_error}
+    if persist:
+        persistence_error = _persist_record_store()
+        if persistence_error:
+            return 500, {"error": "persistence_failed", "message": persistence_error}
+        _apg_deliver_webhook("entity.created", entity_name, record.get("id"), payload, _apg_request_id())
+        notify_to = str(os.environ.get("APG_NOTIFY_EMAIL", "") or "").strip()
+        if notify_to:
+            _apg_send_email(
+                notify_to,
+                f"New {entity_name} record in {APG_APP_NAME}",
+                json.dumps(_record_public_copy(entity_name, record), indent=2, sort_keys=True, default=str),
+            )
     return 201, {
         "entity": entity_name,
-        "record": dict(record),
+        "record": _record_public_copy(entity_name, record),
         "event": event,
-        "count": len(RECORD_STORE[entity_name]),
+        "count": len(list_records(entity_name)),
     }
 
 
@@ -7977,7 +10279,7 @@ def _import_records_payload(entity_name: str, payload: Dict[str, Any]) -> tuple[
         if not isinstance(raw_record, dict):
             errors.append({"index": index, "errors": ["record must be object"]})
             continue
-        record = coerce_record_types(entity_name, dict(raw_record))
+        record = _strip_record_lifecycle_fields(coerce_record_types(entity_name, dict(raw_record)))
         validation = validate_record(entity_name, record)
         if not validation["valid"]:
             errors.append({"index": index, "errors": validation["errors"]})
@@ -7988,10 +10290,17 @@ def _import_records_payload(entity_name: str, payload: Dict[str, Any]) -> tuple[
         elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
             errors.append({"index": index, "errors": [f"duplicate id {record['id']}"]})
             continue
-        record = _prepare_new_record(record)
+        record = _prepare_new_record(record, entity_name)
+        RECORD_METADATA.setdefault(entity_name, {})[_record_metadata_key(record["id"])] = {
+            "created_at": record.get("created_at"),
+            "updated_at": record.get("updated_at"),
+            "deleted_at": None,
+        }
         RECORD_STORE[entity_name].append(record)
-        imported.append(dict(record))
+        _sqlite_store_record(entity_name, record)
+        imported.append(_record_public_copy(entity_name, record))
         events.append(_record_event("import", entity_name, after=record))
+    _sqlite_commit()
     persistence_error = _persist_record_store()
     if persistence_error:
         return 500, {"error": "persistence_failed", "message": persistence_error}
@@ -8005,7 +10314,7 @@ def _import_records_payload(entity_name: str, payload: Dict[str, Any]) -> tuple[
     }
 
 
-def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+def _update_record_payload(path: str, payload: Dict[str, Any], *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
     route = _record_route(path)
     if route is None or route["entity"] is None or route["record_id"] is None:
         return 404, {"error": "not_found", "path": path}
@@ -8016,32 +10325,61 @@ def _update_record_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dic
     raw_record = payload.get("record", payload)
     if not isinstance(raw_record, dict):
         return 400, {"error": "record_must_be_object"}
-    record_update = coerce_record_types(entity_name, dict(raw_record))
+    record_update = _strip_record_lifecycle_fields(coerce_record_types(entity_name, dict(raw_record)))
+    upload_error = _apply_uploaded_files(entity_name, record_update)
+    if upload_error is not None:
+        return upload_error
     validation = validate_record(entity_name, record_update, partial=True)
     if not validation["valid"]:
-        return 422, {"error": "record_validation_failed", **validation}
+        return _record_validation_failure(validation)
     for index, existing in enumerate(RECORD_STORE[entity_name]):
         if str(existing.get("id")) == str(record_id):
+            if not _record_tenant_visible(entity_name, existing):
+                continue
+            if _record_deleted(entity_name, existing):
+                return 404, {"error": "record_not_found", "entity": entity_name, "id": record_id}
             conflict = _revision_conflict(existing, _expected_revision(payload))
             if conflict is not None:
                 return 409, conflict
+            current_row = _record_public_copy(entity_name, existing)
+            changed_fields = [
+                key
+                for key in record_update
+                if str(record_update[key]) != str(current_row.get(key, ""))
+            ]
+            try:
+                if _flask_request.method == "PUT":
+                    _flask_g.apg_audit_extra = {"changed_fields": changed_fields}
+            except RuntimeError:
+                pass
             updated = dict(existing)
             updated.update(record_update)
             updated["id"] = existing.get("id")
+            updated["created_at"] = existing.get("created_at") or _record_public_copy(entity_name, existing).get("created_at")
+            updated["updated_at"] = _record_timestamp()
+            updated["deleted_at"] = existing.get("deleted_at")
             updated["_revision"] = int(existing.get("_revision", 1)) + 1
+            metadata = _record_metadata(entity_name, updated.get("id"), create=True)
+            if metadata is not None:
+                metadata["created_at"] = updated.get("created_at")
+                metadata["updated_at"] = updated.get("updated_at")
+                metadata["deleted_at"] = updated.get("deleted_at")
             RECORD_STORE[entity_name][index] = updated
-            event = _record_event("update", entity_name, before=existing, after=updated)
+            _sqlite_store_record(entity_name, updated)
+            if persist:
+                _sqlite_commit()
+            event = _record_event("update", entity_name, before=existing, after=updated, changed_fields=changed_fields)
             _log_activity(entity_name, str(record_id), "updated", detail="Fields updated")
-            persistence_error = _persist_record_store()
-            if persistence_error:
-                return 500, {"error": "persistence_failed", "message": persistence_error}
-            return 200, {"entity": entity_name, "record": dict(updated), "event": event}
+            if persist:
+                persistence_error = _persist_record_store()
+                if persistence_error:
+                    return 500, {"error": "persistence_failed", "message": persistence_error}
+                _apg_deliver_webhook("entity.updated", entity_name, record_id, payload, _apg_request_id())
+            return 200, {"entity": entity_name, "record": _record_public_copy(entity_name, updated), "event": event}
     return 404, {"error": "record_not_found", "entity": entity_name, "id": record_id}
 
 
-def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
-    raw_path = path
-    path = path.split("?", 1)[0]
+def _restore_record_payload(path: str, *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
     route = _record_route(path)
     if route is None or route["entity"] is None or route["record_id"] is None:
         return 404, {"error": "not_found", "path": path}
@@ -8049,8 +10387,52 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
     record_id = route["record_id"]
     if entity_name not in ENTITY_NAMES:
         return 404, {"error": "unknown_entity", "entity": entity_name}
-    for index, existing in enumerate(RECORD_STORE[entity_name]):
+    for existing in RECORD_STORE[entity_name]:
         if str(existing.get("id")) == str(record_id):
+            if not _record_tenant_visible(entity_name, existing):
+                continue
+            before = _record_public_copy(entity_name, existing)
+            metadata = _record_metadata(entity_name, existing.get("id"), create=True)
+            if metadata is not None:
+                metadata["deleted_at"] = None
+                metadata["updated_at"] = _record_timestamp()
+            existing["deleted_at"] = None
+            existing["updated_at"] = metadata["updated_at"] if metadata is not None else _record_timestamp()
+            _sqlite_restore_record(entity_name, record_id)
+            if persist:
+                _sqlite_commit()
+            after = _record_public_copy(entity_name, existing)
+            event = _record_event("restore", entity_name, before=before, after=after)
+            _log_activity(entity_name, str(record_id), "restored", detail="Record restored")
+            if persist:
+                persistence_error = _persist_record_store()
+                if persistence_error:
+                    return 500, {"error": "persistence_failed", "message": persistence_error}
+            return 200, {"entity": entity_name, "record": after, "event": event}
+    return 404, {"error": "record_not_found", "entity": entity_name, "id": record_id}
+
+
+def _delete_record_payload(path: str, *, persist: bool = True) -> tuple[int, Dict[str, Any]]:
+    relationship_result = _delete_relationship_payload(path, persist=persist)
+    if relationship_result is not None:
+        return relationship_result
+    raw_path = path
+    path = path.split("?", 1)[0]
+    route = _record_route(path)
+    if route is None or route["entity"] is None or route["record_id"] is None:
+        return 404, {"error": "not_found", "path": path}
+    if route.get("operation") == "restore":
+        return _restore_record_payload(path, persist=persist)
+    entity_name = route["entity"]
+    record_id = route["record_id"]
+    if entity_name not in ENTITY_NAMES:
+        return 404, {"error": "unknown_entity", "entity": entity_name}
+    for existing in RECORD_STORE[entity_name]:
+        if str(existing.get("id")) == str(record_id):
+            if not _record_tenant_visible(entity_name, existing):
+                continue
+            if _record_deleted(entity_name, existing):
+                return 404, {"error": "record_not_found", "entity": entity_name, "id": record_id}
             expected_revision = None
             if "?" in raw_path:
                 query = parse_qs(raw_path.split("?", 1)[1], keep_blank_values=True)
@@ -8063,22 +10445,168 @@ def _delete_record_payload(path: str) -> tuple[int, Dict[str, Any]]:
             if conflict is not None:
                 return 409, conflict
             _log_activity(entity_name, str(record_id), "deleted", detail="Record deleted")
-            deleted = RECORD_STORE[entity_name].pop(index)
+            deleted = _record_public_copy(entity_name, existing)
+            metadata = _record_metadata(entity_name, existing.get("id"), create=True)
+            if metadata is not None:
+                now = _record_timestamp()
+                metadata["deleted_at"] = now
+                metadata["updated_at"] = now
+            existing["deleted_at"] = now
+            existing["updated_at"] = now
+            _sqlite_soft_delete_record(entity_name, record_id)
+            if persist:
+                _sqlite_commit()
             event = _record_event("delete", entity_name, before=deleted)
-            persistence_error = _persist_record_store()
-            if persistence_error:
-                return 500, {"error": "persistence_failed", "message": persistence_error}
+            if persist:
+                persistence_error = _persist_record_store()
+                if persistence_error:
+                    return 500, {"error": "persistence_failed", "message": persistence_error}
+                _apg_deliver_webhook("entity.deleted", entity_name, record_id, {}, _apg_request_id())
             return 200, {
                 "entity": entity_name,
-                "deleted": dict(deleted),
+                "deleted": _record_public_copy(entity_name, existing),
                 "event": event,
-                "count": len(RECORD_STORE[entity_name]),
+                "count": len(list_records(entity_name)),
             }
     return 404, {"error": "record_not_found", "entity": entity_name, "id": record_id}
 
 
+def _record_state_snapshot() -> Dict[str, Any]:
+    return json.loads(json.dumps({
+        "records": _raw_records_by_entity(),
+        "metadata": RECORD_METADATA,
+        "next_record_ids": NEXT_RECORD_IDS,
+        "events": EVENT_LOG,
+        "next_event_id": NEXT_EVENT_ID,
+        "activity": APG_ACTIVITY_LOG,
+    }, default=str))
+
+
+def _restore_record_state(snapshot: Dict[str, Any]) -> None:
+    global NEXT_EVENT_ID
+    RECORD_STORE.clear()
+    for entity_name in ENTITY_NAMES:
+        RECORD_STORE[entity_name] = [
+            dict(record)
+            for record in snapshot.get("records", {}).get(entity_name, [])
+            if isinstance(record, dict)
+        ]
+    RECORD_METADATA.clear()
+    for entity_name in ENTITY_NAMES:
+        entity_metadata = snapshot.get("metadata", {}).get(entity_name, {})
+        RECORD_METADATA[entity_name] = {
+            str(record_id): dict(metadata)
+            for record_id, metadata in entity_metadata.items()
+            if isinstance(metadata, dict)
+        }
+    NEXT_RECORD_IDS.clear()
+    NEXT_RECORD_IDS.update({
+        entity_name: int(snapshot.get("next_record_ids", {}).get(entity_name, 1))
+        for entity_name in ENTITY_NAMES
+    })
+    EVENT_LOG.clear()
+    EVENT_LOG.extend(dict(event) for event in snapshot.get("events", []) if isinstance(event, dict))
+    NEXT_EVENT_ID = int(snapshot.get("next_event_id", 1))
+    APG_ACTIVITY_LOG.clear()
+    APG_ACTIVITY_LOG.update({
+        str(key): list(value) if isinstance(value, list) else []
+        for key, value in snapshot.get("activity", {}).items()
+    })
+
+
+def _bulk_items(payload: Dict[str, Any], key: str) -> list[Any] | None:
+    items = payload.get(key, [])
+    return items if isinstance(items, list) else None
+
+
+def _bulk_delete_record_id(item: Any) -> Any:
+    if isinstance(item, dict):
+        return item.get("id")
+    return item
+
+
+def _bulk_records_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    route = _record_route(path)
+    if route is None or route["entity"] is None or route.get("operation") != "bulk":
+        return 404, {"error": "not_found", "path": path}
+    entity_name = str(route["entity"])
+    if entity_name not in ENTITY_NAMES:
+        return 404, {"error": "unknown_entity", "entity": entity_name}
+    create_items = _bulk_items(payload, "create")
+    update_items = _bulk_items(payload, "update")
+    delete_items = _bulk_items(payload, "delete")
+    if create_items is None or update_items is None or delete_items is None:
+        return 400, {"error": "bulk_items_must_be_arrays"}
+    total_items = len(create_items) + len(update_items) + len(delete_items)
+    if total_items > 1000:
+        return 400, {"error": "bulk_limit_exceeded"}
+    result: Dict[str, Any] = {"created": 0, "updated": 0, "deleted": 0, "errors": []}
+    snapshot = _record_state_snapshot()
+    with APG_RECORD_LOCK:
+        try:
+            _sqlite_begin()
+            for index, item in enumerate(create_items):
+                if not isinstance(item, dict):
+                    result["errors"].append({"op": "create", "index": index, "error": "record_must_be_object"})
+                    continue
+                status, response = _create_record_payload("/records/" + entity_name, item, persist=False)
+                if status >= 400:
+                    result["errors"].append({"op": "create", "index": index, "status": status, "error": response.get("error")})
+                else:
+                    result["created"] += 1
+            for index, item in enumerate(update_items):
+                if not isinstance(item, dict):
+                    result["errors"].append({"op": "update", "index": index, "error": "record_must_be_object"})
+                    continue
+                record_id = item.get("id")
+                if record_id in (None, ""):
+                    result["errors"].append({"op": "update", "index": index, "error": "missing_id"})
+                    continue
+                update_payload = dict(item)
+                update_payload.pop("id", None)
+                status, response = _update_record_payload(
+                    "/records/" + entity_name + "/" + quote(str(record_id), safe=""),
+                    {"record": update_payload},
+                    persist=False,
+                )
+                if status >= 400:
+                    result["errors"].append({"op": "update", "index": index, "status": status, "error": response.get("error")})
+                else:
+                    result["updated"] += 1
+            for index, item in enumerate(delete_items):
+                record_id = _bulk_delete_record_id(item)
+                if record_id in (None, ""):
+                    result["errors"].append({"op": "delete", "index": index, "error": "missing_id"})
+                    continue
+                status, response = _delete_record_payload(
+                    "/records/" + entity_name + "/" + quote(str(record_id), safe=""),
+                    persist=False,
+                )
+                if status >= 400:
+                    result["errors"].append({"op": "delete", "index": index, "status": status, "error": response.get("error")})
+                else:
+                    result["deleted"] += 1
+            if result["errors"]:
+                _sqlite_rollback()
+                _restore_record_state(snapshot)
+                return 422, result
+            _sqlite_commit()
+        except Exception as exc:
+            _sqlite_rollback()
+            _restore_record_state(snapshot)
+            return 500, {"created": 0, "updated": 0, "deleted": 0, "errors": [{"error": "bulk_transaction_failed", "message": str(exc)}]}
+    persistence_error = _persist_record_store()
+    if persistence_error:
+        return 500, {"error": "persistence_failed", "message": persistence_error}
+    return 200, result
+
+
 def _post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     path = path.rstrip("/") or "/"
+    if path == "/jobs":
+        return _create_job_payload(payload)
+    if path.startswith("/jobs/") and path.endswith("/retry"):
+        return _retry_job_payload(path)
     if path == "/events/emit":
         event_name = payload.get("name") or payload.get("event") or ""
         if not event_name:
@@ -8139,23 +10667,49 @@ def _put_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any
     return 404, {"error": "not_found", "path": path}
 
 
-def _csv_export_body(entity_name: str) -> bytes:
-    records = list_records(entity_name)
-    if not records:
-        return b""
+def _csv_export_columns(entity_name: str, records: list[Dict[str, Any]]) -> list[str]:
+    cols: list[str] = ["id"]
+    for field in _field_specs(entity_name):
+        field_name = str(field.get("name", ""))
+        if field_name and field_name not in cols and field_name != "_revision":
+            cols.append(field_name)
+    for record in records:
+        for key in record.keys():
+            key_text = str(key)
+            if key_text not in cols and key_text != "_revision":
+                cols.append(key_text)
+    return cols
+
+
+def _csv_export_body(
+    entity_name: str,
+    query: Dict[str, list[str]] | None = None,
+    records: list[Dict[str, Any]] | None = None,
+) -> bytes:
+    if records is None:
+        result = query_records(entity_name, query or {}, response_style="records", paginate=False)
+        records = result.get("data", []) if result.get("error") != "invalid_field" else []
     import io, csv as _csv
-    fields = _field_specs(entity_name)
-    cols = [str(f["name"]) for f in fields if str(f["name"]) != "_revision"] or list(records[0].keys())
-    buf = io.StringIO()
-    w = _csv.writer(buf)
+    cols = _csv_export_columns(entity_name, records)
+    buf = io.StringIO(newline="")
+    w = _csv.writer(buf, lineterminator="\r\n")
     w.writerow(cols)
     for rec in records:
-        w.writerow([str(rec.get(c, "")) for c in cols])
+        w.writerow([rec.get(c, "") for c in cols])
     return buf.getvalue().encode("utf-8")
 
 
 import os as _os_env
-_APG_PG_URL: str | None = _os_env.environ.get("APG_DATABASE_URL") or _os_env.environ.get("APG_PG_URL") or _os_env.environ.get("DATABASE_URL") or None
+
+
+def _pg_database_url() -> str | None:
+    raw = _os_env.environ.get("APG_DATABASE_URL") or _os_env.environ.get("APG_PG_URL") or _os_env.environ.get("DATABASE_URL") or ""
+    if raw.startswith("sqlite:"):
+        return None
+    return raw or None
+
+
+_APG_PG_URL: str | None = _pg_database_url()
 
 
 def _pg_connection():
@@ -8259,12 +10813,13 @@ def _pg_save_entity_records(entity_name: str, records: list[Dict[str, Any]]) -> 
                 rid = str(record.get("id", ""))
                 if not rid:
                     continue
+                tenant_id = str(record.get("tenant_id") or APG_TENANT_DEFAULT)
                 cur.execute(
                     "INSERT INTO apg_records (id, collection, tenant_id, data)"
                     " VALUES (%s, %s, %s, %s::jsonb)"
                     " ON CONFLICT (collection, id)"
                     " DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()",
-                    (rid, entity_name.lower(), "default", json.dumps(record, default=str))
+                    (rid, entity_name.lower(), tenant_id, json.dumps(record, default=str))
                 )
         conn.commit()
     except Exception:
@@ -8273,17 +10828,20 @@ def _pg_save_entity_records(entity_name: str, records: list[Dict[str, Any]]) -> 
         conn.close()
 
 
-def _pg_load_entity_records(entity_name: str) -> list[Dict[str, Any]]:
+def _pg_load_entity_records(entity_name: str, tenant_scoped: bool = True) -> list[Dict[str, Any]]:
     conn = _pg_connection()
     if not conn:
         return []
     try:
         _pg_ensure_records_table(conn)
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT data FROM apg_records WHERE collection = %s ORDER BY created_at",
-                (entity_name.lower(),)
-            )
+            sql = "SELECT data FROM apg_records WHERE collection = %s"
+            params: list[Any] = [entity_name.lower()]
+            if tenant_scoped and _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
+                sql += " AND tenant_id = %s"
+                params.append(_tenant_id() or APG_TENANT_DEFAULT)
+            sql += " ORDER BY created_at"
+            cur.execute(sql, tuple(params))
             rows = cur.fetchall()
         return [json.loads(row[0]) for row in rows]
     except Exception:
@@ -8292,7 +10850,359 @@ def _pg_load_entity_records(entity_name: str) -> list[Dict[str, Any]]:
         conn.close()
 
 
+def _apg_request_id() -> str:
+    try:
+        return str(getattr(_flask_g, "request_id", "") or "")
+    except RuntimeError:
+        return ""
+
+
+def _apg_deliver_webhook(event, entity, record_id, data, req_id):
+    urls = [u.strip() for u in os.environ.get("APG_WEBHOOK_URL", "").split(",") if u.strip()]
+    if not urls:
+        return
+    secret = os.environ.get("APG_WEBHOOK_SECRET", "").encode()
+    payload = json.dumps({"event": event, "entity": entity, "id": str(record_id), "data": data, "ts": _datetime.datetime.utcnow().isoformat() + "Z", "req_id": req_id}).encode()
+    sig = "sha256=" + _hmac_mod.new(secret, payload, _hashlib_mod.sha256).hexdigest() if secret else ""
+
+    def _send():
+        for url in urls:
+            for delay in (0, 1, 2, 4):
+                try:
+                    if delay:
+                        _time_mod.sleep(delay)
+                    req = _urllib_request.Request(
+                        url,
+                        data=payload,
+                        method="POST",
+                        headers={"Content-Type": "application/json", "X-APG-Signature": sig, "X-APG-Event": event},
+                    )
+                    with _urllib_request.urlopen(req, timeout=5):
+                        pass
+                    break
+                except Exception as _e:
+                    _logging.getLogger("apg").warning("webhook delivery failed url=%s err=%s", url, _e)
+
+    _threading_mod.Thread(target=_send, daemon=True).start()
+
+
+def _apg_job_timestamp() -> str:
+    return _datetime.datetime.utcnow().isoformat() + "Z"
+
+
+def _apg_init_job_store() -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    with _APG_JOB_LOCK:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS apg_jobs ("
+            "id TEXT PRIMARY KEY,"
+            "type TEXT NOT NULL,"
+            "payload TEXT NOT NULL,"
+            "status TEXT NOT NULL,"
+            "created_at TEXT NOT NULL,"
+            "started_at TEXT,"
+            "finished_at TEXT,"
+            "attempts INT NOT NULL DEFAULT 0,"
+            "last_error TEXT"
+            ")"
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_apg_jobs_status ON apg_jobs(status, created_at)")
+        conn.commit()
+
+
+def _apg_job_from_row(row: Any) -> Dict[str, Any]:
+    payload_raw = row["payload"] if "payload" in row.keys() else "{}"
+    try:
+        payload = json.loads(payload_raw or "{}")
+    except (TypeError, json.JSONDecodeError):
+        payload = {}
+    return {
+        "id": str(row["id"]),
+        "type": str(row["type"]),
+        "payload": payload if isinstance(payload, dict) else {"value": payload},
+        "status": str(row["status"]),
+        "created_at": str(row["created_at"]),
+        "started_at": row["started_at"],
+        "finished_at": row["finished_at"],
+        "attempts": int(row["attempts"] or 0),
+        "last_error": row["last_error"],
+    }
+
+
+def _apg_job_payload_json(payload: Dict[str, Any]) -> str:
+    return json.dumps(payload, sort_keys=True, default=str)
+
+
+def _apg_enqueue_job_dict(job: Dict[str, Any]) -> None:
+    with _APG_JOB_LOCK:
+        _APG_JOB_QUEUE.append(dict(job))
+
+
+def _apg_load_pending_jobs() -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    with _APG_JOB_LOCK:
+        conn.execute("UPDATE apg_jobs SET status='pending', started_at=NULL WHERE status='running'")
+        rows = conn.execute(
+            "SELECT * FROM apg_jobs WHERE status='pending' ORDER BY created_at"
+        ).fetchall()
+        _APG_JOB_QUEUE.clear()
+        for row in rows:
+            _APG_JOB_QUEUE.append(_apg_job_from_row(row))
+        conn.commit()
+
+
+def _apg_create_job(job_type: str, payload: Dict[str, Any] | None = None) -> tuple[int, Dict[str, Any]]:
+    job_type = str(job_type or "").strip()
+    if not job_type:
+        return 400, {"error": "missing_job_type"}
+    if job_type not in _APG_JOB_HANDLERS:
+        return 400, {"error": "unknown_job_type", "type": job_type}
+    payload = payload if isinstance(payload, dict) else {}
+    conn = _sqlite_connection()
+    if conn is None:
+        return 500, {"error": "jobs_unavailable"}
+    job = {
+        "id": str(_uuid.uuid4()),
+        "type": job_type,
+        "payload": dict(payload),
+        "status": "pending",
+        "created_at": _apg_job_timestamp(),
+        "attempts": 0,
+        "last_error": None,
+    }
+    with _APG_JOB_LOCK:
+        conn.execute(
+            "INSERT INTO apg_jobs (id, type, payload, status, created_at, attempts, last_error)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                job["id"],
+                job["type"],
+                _apg_job_payload_json(job["payload"]),
+                job["status"],
+                job["created_at"],
+                job["attempts"],
+                job["last_error"],
+            ),
+        )
+        conn.commit()
+        _APG_JOB_QUEUE.append(dict(job))
+    return 201, {"job_id": job["id"]}
+
+
+def _apg_get_job(job_id: str) -> Dict[str, Any] | None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return None
+    with _APG_JOB_LOCK:
+        row = conn.execute("SELECT * FROM apg_jobs WHERE id=?", (str(job_id),)).fetchone()
+    return _apg_job_from_row(row) if row is not None else None
+
+
+def _apg_list_jobs(status: str | None = None, limit: int = 50) -> list[Dict[str, Any]]:
+    conn = _sqlite_connection()
+    if conn is None:
+        return []
+    limit = max(1, min(int(limit or 50), 500))
+    with _APG_JOB_LOCK:
+        if status:
+            rows = conn.execute(
+                "SELECT * FROM apg_jobs WHERE status=? ORDER BY created_at DESC LIMIT ?",
+                (status, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM apg_jobs ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+    return [_apg_job_from_row(row) for row in rows]
+
+
+def _apg_dequeue_job() -> Dict[str, Any] | None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return None
+    with _APG_JOB_LOCK:
+        while _APG_JOB_QUEUE:
+            queued = dict(_APG_JOB_QUEUE.popleft())
+            job_id = str(queued.get("id", ""))
+            row = conn.execute("SELECT * FROM apg_jobs WHERE id=?", (job_id,)).fetchone()
+            if row is None:
+                continue
+            job = _apg_job_from_row(row)
+            if job.get("status") != "pending":
+                continue
+            attempts = int(job.get("attempts") or 0) + 1
+            started_at = _apg_job_timestamp()
+            conn.execute(
+                "UPDATE apg_jobs SET status='running', started_at=?, finished_at=NULL, attempts=?, last_error=NULL WHERE id=?",
+                (started_at, attempts, job_id),
+            )
+            conn.commit()
+            job.update({"status": "running", "started_at": started_at, "finished_at": None, "attempts": attempts, "last_error": None})
+            return job
+    return None
+
+
+def _apg_finish_job(job_id: str, status: str, last_error: str | None = None) -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    finished_at = _apg_job_timestamp() if status in {"done", "failed"} else None
+    with _APG_JOB_LOCK:
+        conn.execute(
+            "UPDATE apg_jobs SET status=?, finished_at=?, last_error=? WHERE id=?",
+            (status, finished_at, last_error, str(job_id)),
+        )
+        conn.commit()
+
+
+def _apg_reschedule_job(job: Dict[str, Any], error: str) -> None:
+    conn = _sqlite_connection()
+    if conn is None:
+        return
+    job_id = str(job.get("id", ""))
+    with _APG_JOB_LOCK:
+        conn.execute(
+            "UPDATE apg_jobs SET status='pending', finished_at=NULL, last_error=? WHERE id=?",
+            (error, job_id),
+        )
+        conn.commit()
+    delay = min(60.0, float(2 ** max(0, int(job.get("attempts") or 1) - 1)))
+    if delay > 0:
+        _time.sleep(delay)
+    current = _apg_get_job(job_id)
+    if current is not None and current.get("status") == "pending":
+        _apg_enqueue_job_dict(current)
+
+
+def _apg_job_worker_loop() -> None:
+    while True:
+        job = _apg_dequeue_job()
+        if job is None:
+            _time.sleep(0.1)
+            continue
+        handler = _APG_JOB_HANDLERS.get(str(job.get("type", "")))
+        try:
+            if handler is None:
+                raise RuntimeError("unknown_job_type: " + str(job.get("type", "")))
+            handler(dict(job.get("payload") or {}))
+        except Exception as exc:
+            last_error = str(exc)
+            if int(job.get("attempts") or 0) < _APG_JOB_MAX_RETRIES:
+                _apg_reschedule_job(job, last_error)
+            else:
+                _apg_finish_job(str(job.get("id", "")), "failed", last_error)
+        else:
+            _apg_finish_job(str(job.get("id", "")), "done", None)
+
+
+def _apg_start_job_workers() -> None:
+    global _APG_JOB_WORKERS_STARTED
+    if _APG_JOB_WORKERS_STARTED:
+        return
+    _APG_JOB_WORKERS_STARTED = True
+    for index in range(_APG_JOB_WORKER_THREADS):
+        thread = threading.Thread(target=_apg_job_worker_loop, name=f"apg-job-worker-{index + 1}", daemon=True)
+        _APG_JOB_WORKERS.append(thread)
+        thread.start()
+
+
+def _apg_echo_job(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return dict(payload)
+
+
+def _apg_webhook_job(payload: Dict[str, Any]) -> None:
+    _apg_deliver_webhook(
+        str(payload.get("event") or "job"),
+        str(payload.get("entity") or "job"),
+        payload.get("record_id", payload.get("id", "")),
+        payload.get("data", payload.get("payload", payload)),
+        str(payload.get("req_id") or ""),
+    )
+
+
+def _apg_email_job(payload: Dict[str, Any]) -> None:
+    _apg_send_email(
+        str(payload.get("to") or ""),
+        str(payload.get("subject") or f"{APG_APP_NAME} job notification"),
+        str(payload.get("body") or ""),
+    )
+
+
+def _apg_register_builtin_job_handlers() -> None:
+    _APG_JOB_HANDLERS.setdefault("apg.echo", _apg_echo_job)
+    _APG_JOB_HANDLERS.setdefault("apg.webhook", _apg_webhook_job)
+    _APG_JOB_HANDLERS.setdefault("apg.email", _apg_email_job)
+
+
+def _jobs_payload(query: Dict[str, list[str]] | None = None) -> tuple[int, Any]:
+    query = query or {}
+    raw_status = query.get("status", [None])[-1] if query.get("status") else None
+    status = str(raw_status).strip() if raw_status not in (None, "") else None
+    if status is not None and status not in {"pending", "running", "done", "failed"}:
+        return 400, {"error": "invalid_status", "allowed": ["pending", "running", "done", "failed"]}
+    raw_limit = query.get("limit", ["50"])[-1] if query.get("limit") else "50"
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        limit = 50
+    return 200, _apg_list_jobs(status, limit)
+
+
+def _job_detail_payload(path: str) -> tuple[int, Dict[str, Any]]:
+    parts = [part for part in path.split("/") if part]
+    if len(parts) != 2:
+        return 404, {"error": "not_found", "path": path}
+    job = _apg_get_job(parts[1])
+    if job is None:
+        return 404, {"error": "job_not_found", "id": parts[1]}
+    return 200, job
+
+
+def _create_job_payload(payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+    job_payload = payload.get("payload", {})
+    if job_payload is None:
+        job_payload = {}
+    if not isinstance(job_payload, dict):
+        return 400, {"error": "payload_must_be_object"}
+    return _apg_create_job(str(payload.get("type", "")), job_payload)
+
+
+def _retry_job_payload(path: str) -> tuple[int, Dict[str, Any]]:
+    parts = [part for part in path.split("/") if part]
+    if len(parts) != 3 or parts[0] != "jobs" or parts[2] != "retry":
+        return 404, {"error": "not_found", "path": path}
+    job = _apg_get_job(parts[1])
+    if job is None:
+        return 404, {"error": "job_not_found", "id": parts[1]}
+    if job.get("status") != "failed":
+        return 409, {"error": "job_not_failed", "status": job.get("status")}
+    conn = _sqlite_connection()
+    if conn is None:
+        return 500, {"error": "jobs_unavailable"}
+    with _APG_JOB_LOCK:
+        conn.execute(
+            "UPDATE apg_jobs SET status='pending', started_at=NULL, finished_at=NULL, attempts=0, last_error=NULL WHERE id=?",
+            (parts[1],),
+        )
+        conn.commit()
+    job = _apg_get_job(parts[1])
+    if job is not None:
+        _apg_enqueue_job_dict(job)
+    return 202, {"job_id": parts[1]}
+
+
+_apg_register_builtin_job_handlers()
+_sqlite_init_database()
+_apg_init_job_store()
+_apg_load_pending_jobs()
+_apg_start_job_workers()
 _load_record_store()
+_APG_OPENAPI_SPEC = _build_openapi_document()
 
 _flask_app = _FlaskApp("app", root_path=os.path.abspath(os.path.dirname(globals().get("__file__", None) or ".")))
 _flask_app.secret_key = _generated_session_secret()
@@ -8308,6 +11218,7 @@ _flask_app.config.update(
     SESSION_COOKIE_SECURE=_APG_SESSION_COOKIE_SECURE,
     MAX_CONTENT_LENGTH=max(1, _env_int("APG_MAX_BODY_BYTES", 16 * 1024 * 1024)),
 )
+_validate_startup_configuration()
 
 
 # Wave B ops hardening: structured JSON logging.
@@ -8503,6 +11414,11 @@ def _apg_ops_after_request(response: _FlaskResponse) -> _FlaskResponse:
     global _APG_READY
     request_id = str(getattr(_flask_g, "request_id", "") or "").strip() or str(_uuid.uuid4())
     response.headers["X-Request-ID"] = request_id
+    try:
+        if "/search" in _flask_request.path and _apg_db_dialect() == "pg":
+            response.headers["X-APG-FTS-Available"] = "false"
+    except Exception:
+        pass
     started_at = getattr(_flask_g, "apg_request_started_at", None)
     try:
         elapsed_s = max(0.0, _time.perf_counter() - float(started_at)) if started_at is not None else 0.0
@@ -8595,9 +11511,9 @@ def _apply_security_headers(response: _FlaskResponse) -> _FlaskResponse:
 
 # Wave C HTTP efficiency: cache semantics, conditional GET, and gzip.
 _APG_GZIP_MIN_BYTES = 860
-_APG_STATIC_CACHE_CONTROL = "public, max-age=31536000, immutable"
+_APG_STATIC_CACHE_CONTROL = "public,max-age=31536000,immutable"
 _APG_RECORDS_CACHE_CONTROL = "no-cache"
-_APG_PRIVATE_CACHE_CONTROL = "no-store, private"
+_APG_PRIVATE_CACHE_CONTROL = "no-store,private"
 
 
 def _add_vary_header(response: _FlaskResponse, value: str) -> _FlaskResponse:
@@ -8648,7 +11564,7 @@ def _maybe_compress(response: _FlaskResponse) -> _FlaskResponse:
     return response
 
 
-def _is_records_list_response(response: _FlaskResponse) -> bool:
+def _is_records_get_response(response: _FlaskResponse) -> bool:
     if _flask_request.method != "GET":
         return False
     if int(response.status_code) != 200:
@@ -8658,12 +11574,11 @@ def _is_records_list_response(response: _FlaskResponse) -> bool:
     if _current_user() is not None:
         return False
     path = _flask_request.path.rstrip("/") or "/"
-    parts = [part for part in path.split("/") if part]
-    return len(parts) == 2 and parts[0] == "records" and parts[1] in ENTITY_NAMES
+    return path.startswith("/records/")
 
 
 def _maybe_apply_records_etag(response: _FlaskResponse) -> _FlaskResponse:
-    if not _is_records_list_response(response):
+    if not _is_records_get_response(response):
         return response
     body = response.get_data()
     etag = '"' + hashlib.sha256(body).hexdigest()[:16] + '"'
@@ -8704,25 +11619,38 @@ def _apg_http_efficiency_after_request(response: _FlaskResponse) -> _FlaskRespon
 def _error_response_wants_json() -> bool:
     if _flask_request.path.startswith("/api/") or _flask_request.path == "/api":
         return True
+    if _flask_request.path.startswith("/records/") or _flask_request.path == "/records":
+        return True
     accept = str(_flask_request.headers.get("Accept", ""))
     return "application/json" in accept and "text/html" not in accept
 
 
-def _apg_error_response(status: int, error_code: str, title: str, message: str) -> _FlaskResponse:
+def _apg_error_response(
+    status: int,
+    error_code: str,
+    title: str,
+    message: str | None = None,
+    extra_headers: Dict[str, str] | None = None,
+) -> _FlaskResponse:
+    message = message if message is not None else title
     if _error_response_wants_json():
-        return _FlaskResponse(
+        response = _FlaskResponse(
             json.dumps({"error": error_code, "message": message, "path": _flask_request.path}),
             status=status,
             content_type="application/json; charset=utf-8",
         )
-    body = (
-        '<section class="apg-error-page" role="alert">'
-        f"<h1>{html.escape(title)}</h1>"
-        f"<p>{html.escape(message)}</p>"
-        '<p><a href="/">Return to the home page</a></p>'
-        "</section>"
-    )
-    return _FlaskResponse(_html_page(title, body, shell=False), status=status, content_type="text/html; charset=utf-8")
+    else:
+        body = (
+            '<section class="apg-error-page" role="alert">'
+            f"<h1>{html.escape(title)}</h1>"
+            f"<p>{html.escape(message)}</p>"
+            '<p><a href="/">Return to the home page</a></p>'
+            "</section>"
+        )
+        response = _FlaskResponse(_html_page(title, body, shell=False), status=status, content_type="text/html; charset=utf-8")
+    for header_name, header_value in (extra_headers or {}).items():
+        response.headers[header_name] = header_value
+    return response
 
 
 @_flask_app.errorhandler(404)
@@ -8745,15 +11673,96 @@ def _apg_internal_error(_error: Any) -> _FlaskResponse:
     return _apg_error_response(500, "internal_error", "Something went wrong", "The generated app hit an unexpected error. Details were logged server-side.")
 
 
+# Wave F app hardening: request rate limits, JSON guard, and audit events.
+_APG_RATE_BUCKETS = {}
+_APG_RATE_LOCK = _threading.Lock()
+_APG_RATE_EXEMPT_PATHS = ("/livez", "/readyz", "/metrics")
+
+
+def _apg_rate_is_authenticated() -> bool:
+    try:
+        return _current_user() is not None or _has_header_auth(_flask_request.headers)
+    except RuntimeError:
+        return False
+
+
+def _apg_rate_limit_guard() -> _FlaskResponse | None:
+    if _flask_request.path in _APG_RATE_EXEMPT_PATHS:
+        return None
+    anon_limit = max(1, _env_int("APG_RATE_LIMIT_ANON", 100))
+    auth_limit = max(1, _env_int("APG_RATE_LIMIT_AUTH", 1000))
+    limit = auth_limit if _apg_rate_is_authenticated() else anon_limit
+    refill_per_second = float(limit) / 60.0
+    now = _time.monotonic()
+    ip = str(_flask_request.remote_addr or "unknown")
+    with _APG_RATE_LOCK:
+        bucket = _APG_RATE_BUCKETS.get(ip, [float(limit), now])
+        tokens = min(float(limit), float(bucket[0]) + max(0.0, now - float(bucket[1])) * refill_per_second)
+        if tokens < 1.0:
+            _APG_RATE_BUCKETS[ip] = [tokens, now]
+            return _apg_error_response(
+                429,
+                "rate_limited",
+                "Too many requests",
+                extra_headers={"Retry-After": "60"},
+            )
+        _APG_RATE_BUCKETS[ip] = [tokens - 1.0, now]
+    return None
+
+
+def _apg_content_type_guard() -> _FlaskResponse | None:
+    if _flask_request.method not in ("POST", "PUT"):
+        return None
+    if not _flask_request.path.startswith("/records/"):
+        return None
+    content_type = _flask_request.content_type or ""
+    allowed = ("application/json", "application/x-www-form-urlencoded", "multipart/form-data")
+    if content_type and not any(content_type.startswith(item) for item in allowed):
+        return _apg_error_response(415, "unsupported_media_type", "Content-Type must be application/json, form-urlencoded, or multipart/form-data")
+    return None
+
+
+def _audited_record_mutation() -> bool:
+    return _flask_request.method in ("POST", "PUT", "DELETE") and _flask_request.path.startswith("/records/")
+
+
+@_flask_app.after_request
+def _apg_audit_after_request(response: _FlaskResponse) -> _FlaskResponse:
+    if _audited_record_mutation():
+        entity = _apg_audit_entity_from_path(_flask_request.path)
+        action = {"POST": "create", "PUT": "update", "DELETE": "delete"}[_flask_request.method]
+        _apg_audit_event(action, entity=entity)
+    return response
+
+
 @_flask_app.before_request
 def _setup_tenant() -> Any:
     body_limit = _flask_app.config.get("MAX_CONTENT_LENGTH")
     if body_limit and (_flask_request.content_length or 0) > body_limit:
         return _apg_error_response(413, "payload_too_large", "Payload too large", "The request body exceeds the configured APG_MAX_BODY_BYTES limit.")
-    tid = _flask_request.headers.get("X-APG-Tenant") or _flask_request.headers.get("X-Tenant-ID")
-    _TENANT_LOCAL.tenant_id = tid or None
+    path = _flask_request.path.rstrip("/") or "/"
+    tid = _tenant_header_value()
+    if (
+        APG_MULTI_TENANT_ENABLED
+        and _production_mode()
+        and not tid
+        and not _tenant_admin_bypass()
+        and not path.startswith("/locales/")
+    ):
+        return _FlaskResponse(
+            json.dumps({"error": "tenant_required"}),
+            status=400,
+            content_type="application/json; charset=utf-8",
+        )
+    _TENANT_LOCAL.tenant_id = tid or (APG_TENANT_DEFAULT if APG_MULTI_TENANT_ENABLED else None)
     if _login_required_for_path(_flask_request.path) and _current_user() is None:
         return _flask_redirect("/login?next=" + quote(_flask_request.full_path.rstrip("?") or "/ui", safe="/?=&%"))
+    content_type_error = _apg_content_type_guard()
+    if content_type_error is not None:
+        return content_type_error
+    rate_limited = _apg_rate_limit_guard()
+    if rate_limited is not None:
+        return rate_limited
     return None
 
 
@@ -8776,6 +11785,14 @@ def _flask_home():
 @_flask_app.route("/theme.css", methods=["GET"])
 def _flask_theme():
     return _FlaskResponse(theme_stylesheet(), content_type="text/css; charset=utf-8")
+
+
+@_flask_app.route("/locales/<lang>.json", methods=["GET"])
+def _flask_locale_file(lang: str):
+    payload = _locale_payload(str(lang))
+    if payload is None:
+        return _FlaskResponse(json.dumps({"error": "locale_not_found", "locale": str(lang)}), status=404, content_type="application/json; charset=utf-8")
+    return _FlaskResponse(json.dumps(payload, sort_keys=True), content_type="application/json; charset=utf-8")
 
 
 @_flask_app.route("/login", methods=["GET"])
@@ -8805,6 +11822,7 @@ def _flask_login_post():
     throttle_key = _login_throttle_key(username)
     retry_after = _login_retry_after(throttle_key)
     if retry_after:
+        _apg_audit_event("login_failed", user=username or "api")
         response = _FlaskResponse(
             _login_page("Too many sign-in attempts. Wait a moment and try again.", next_url, username=username),
             status=429,
@@ -8815,6 +11833,7 @@ def _flask_login_post():
     user = _authenticate_user(username, password)
     if user is None:
         _register_login_failure(throttle_key)
+        _apg_audit_event("login_failed", user=username or "api")
         return _FlaskResponse(
             _login_page("We could not sign you in with those credentials.", next_url, username=username),
             status=401,
@@ -8822,6 +11841,17 @@ def _flask_login_post():
         )
     _clear_login_failures(throttle_key)
     _issue_login_session(user)
+    _apg_audit_event("login", user=str(user.get("username", username)))
+    if _env_flag("APG_EMAIL_ON_LOGIN") and str(user.get("email", "") or "").strip():
+        _apg_send_email(
+            str(user.get("email", "")),
+            f"New login to {APG_APP_NAME}",
+            "A successful login was recorded for "
+            + str(user.get("username", username))
+            + " at "
+            + _datetime.datetime.utcnow().isoformat()
+            + "Z.",
+        )
     return _flask_redirect(next_url)
 
 
@@ -8832,6 +11862,8 @@ def _flask_logout_post():
     csrf_err = _check_csrf_token()
     if csrf_err:
         return csrf_err
+    user = _current_user()
+    _apg_audit_event("logout", user=str(user.get("username", "")) if isinstance(user, dict) else "api")
     _flask_session.pop("apg_user", None)
     return _flask_redirect("/login")
 
@@ -8852,9 +11884,40 @@ def _flask_locale_post():
     return response
 
 
+@_flask_app.route("/api-docs", methods=["GET"])
+def _flask_api_docs():
+    if not _env_flag("APG_SWAGGER_UI"):
+        return _apg_error_response(404, "not_found", "Page not found", "Swagger UI is not enabled for this generated app.")
+    html_doc = (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<title>APG API Docs</title>'
+        '<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">'
+        '</head><body><div id="swagger-ui"></div>'
+        '<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>'
+        '<script>SwaggerUIBundle({url:"/openapi.json",dom_id:"#swagger-ui"});</script>'
+        '</body></html>'
+    )
+    response = _FlaskResponse(html_doc, content_type="text/html; charset=utf-8")
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+        "script-src 'self' 'unsafe-inline' https://unpkg.com; "
+        "img-src 'self' data: https://unpkg.com; "
+        "font-src 'self' data: https://unpkg.com; "
+        "connect-src 'self'"
+    )
+    return response
+
+
 @_flask_app.route("/entities/<entity_name>/records.csv", methods=["GET"])
 def _flask_csv_export(entity_name):
     return _FlaskResponse(_csv_export_body(entity_name), content_type="text/csv; charset=utf-8")
+
+
+@_flask_app.route("/uploads/<entity_name>/<filename>", methods=["GET"])
+def _flask_uploaded_file(entity_name, filename):
+    return _uploaded_file_response(str(entity_name), str(filename))
 
 
 @_flask_app.route("/ui", methods=["GET"])
@@ -8898,6 +11961,71 @@ def _flask_ui_post(subpath=""):
     return _FlaskResponse(_ui_error_payload(path, response), status=status, content_type="text/html; charset=utf-8")
 
 
+def _records_csv_requested(path: str, query: Dict[str, list[str]]) -> bool:
+    return _records_api_collection_path(path) and str(_record_query_value(query, "format", "") or "").lower() == "csv"
+
+
+def _records_next_link(next_cursor: Any) -> str:
+    args: list[tuple[str, str]] = []
+    for key, values in _flask_request.args.lists():
+        if key == "after":
+            continue
+        for value in values:
+            args.append((key, value))
+    args.append(("after", str(next_cursor)))
+    return f'<{_flask_request.base_url}?{urlencode(args)}>; rel="next"'
+
+
+def _records_response_headers(path: str, payload: Dict[str, Any]) -> Dict[str, str]:
+    if not _records_api_collection_path(path):
+        return {}
+    next_cursor = payload.get("next_cursor")
+    if next_cursor in (None, ""):
+        return {}
+    return {"Link": _records_next_link(next_cursor)}
+
+
+def _records_response_payload(path: str, payload: Dict[str, Any]) -> Any:
+    if not _records_api_collection_path(path):
+        return payload
+    compat = str(_flask_request.headers.get("X-APG-Compat", "")).strip().lower()
+    if compat == "v1":
+        return payload.get("data", [])
+    return payload
+
+
+def _records_csv_response(path: str, query: Dict[str, list[str]]) -> _FlaskResponse:
+    route = _record_route(path)
+    if route is None or route["entity"] is None or route["record_id"] is not None:
+        return _FlaskResponse(
+            json.dumps({"error": "not_found", "path": path}),
+            status=404,
+            content_type="application/json; charset=utf-8",
+        )
+    entity_name = str(route["entity"])
+    if entity_name not in ENTITY_NAMES:
+        return _FlaskResponse(
+            json.dumps({"error": "unknown_entity", "entity": entity_name}),
+            status=404,
+            content_type="application/json; charset=utf-8",
+        )
+    result = query_records(entity_name, query, response_style="records", paginate=False)
+    if result.get("error") == "invalid_field":
+        return _FlaskResponse(
+            json.dumps({"error": "invalid_field"}),
+            status=400,
+            content_type="application/json; charset=utf-8",
+        )
+    safe_entity = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in entity_name) or "records"
+    filename = f"{safe_entity}_{_datetime.date.today().isoformat()}.csv"
+    return _FlaskResponse(
+        _csv_export_body(entity_name, records=result.get("data", [])),
+        status=200,
+        content_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 _APG_GET_PUBLIC = frozenset({"/health", "/auth", "/openapi.json", "/metrics", "/describe"})
 
 
@@ -8924,10 +12052,17 @@ def _flask_api_get(api_path):
         status, html_payload = _application_screen_payload(path)
         return _FlaskResponse(html_payload, status=status, content_type="text/html; charset=utf-8")
     query = {k: v for k, v in _flask_request.args.lists()}
+    if _records_csv_requested(path, query):
+        return _records_csv_response(path, query)
     status, payload = _route_payload(path, query)
     if status == 404 and "text/html" in str(_flask_request.headers.get("Accept", "")):
         return _apg_error_response(404, "not_found", "Page not found", "The requested path does not exist in this generated app.")
-    return _FlaskResponse(json.dumps(payload), status=status, content_type="application/json; charset=utf-8")
+    response_payload = _records_response_payload(path, payload) if status == 200 else payload
+    response = _FlaskResponse(json.dumps(response_payload), status=status, content_type="application/json; charset=utf-8")
+    if status == 200 and isinstance(payload, dict):
+        for header_name, header_value in _records_response_headers(path, payload).items():
+            response.headers[header_name] = header_value
+    return response
 
 
 @_flask_app.route("/<path:api_path>", methods=["POST"])
@@ -8959,15 +12094,19 @@ def _flask_api_put(api_path):
     auth_err = _check_mutation_auth()
     if auth_err:
         return auth_err
-    try:
-        payload = _flask_request.get_json(force=True, silent=False) or {}
-        if not isinstance(payload, dict):
-            raise ValueError("JSON body must be an object")
-    except Exception as _e:
-        return _FlaskResponse(
-            json.dumps({"error": "invalid_json", "message": str(_e)}),
-            status=400, content_type="application/json; charset=utf-8",
-        )
+    ct = _flask_request.content_type or ""
+    if "application/x-www-form-urlencoded" in ct or "multipart/form-data" in ct:
+        payload = _flask_request.form.to_dict(flat=True)
+    else:
+        try:
+            payload = _flask_request.get_json(force=True, silent=False) or {}
+            if not isinstance(payload, dict):
+                raise ValueError("JSON body must be an object")
+        except Exception as _e:
+            return _FlaskResponse(
+                json.dumps({"error": "invalid_json", "message": str(_e)}),
+                status=400, content_type="application/json; charset=utf-8",
+            )
     status, response = _put_payload(path, payload)
     return _FlaskResponse(json.dumps(response), status=status, content_type="application/json; charset=utf-8")
 

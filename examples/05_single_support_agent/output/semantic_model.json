@@ -112,11 +112,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 8
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 8
+          "line": 0
         }
       },
       "related_locations": [],
@@ -132,11 +132,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 8
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 8
+          "line": 0
         }
       },
       "related_locations": [],
@@ -152,11 +152,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 8
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 8
+          "line": 0
         }
       },
       "related_locations": [],
@@ -237,11 +237,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 9
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 9
+          "line": 0
         }
       },
       "references": []
@@ -254,11 +254,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 52
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 52
+          "line": 0
         }
       },
       "references": []
@@ -271,11 +271,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 9
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 9
+          "line": 0
         }
       },
       "references": []
@@ -288,11 +288,11 @@
       "range": {
         "end": {
           "character": 1,
-          "line": 5
+          "line": 0
         },
         "start": {
           "character": 0,
-          "line": 5
+          "line": 0
         }
       },
       "references": []

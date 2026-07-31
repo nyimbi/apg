@@ -57,7 +57,9 @@ def _create_customer(client, name: str = "a") -> dict[str, object]:
     return response.get_json()["record"]
 
 
-def test_timestamps_in_response(client):
+def test_timestamps_in_response(generated_db_app, client):
+    # APG_EXPOSE_TIMESTAMPS defaults to off; patch the module-level bool to opt in.
+    generated_db_app["APG_EXPOSE_TIMESTAMPS"] = True
     created = _create_customer(client)
     response = client.get(f"/records/Customer/{created['id']}")
     record = response.get_json()["record"]
@@ -65,6 +67,7 @@ def test_timestamps_in_response(client):
     assert response.status_code == 200
     assert "created_at" in record
     assert "updated_at" in record
+    assert "deleted_at" not in record
 
 
 def test_soft_delete_hides_row(client):

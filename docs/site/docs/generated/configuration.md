@@ -82,6 +82,12 @@ All runtime behaviour of generated APG apps is controlled through environment va
 | `APG_MULTI_TENANT` | — | Set to `1` to enable tenant isolation |
 | `APG_TENANT_HEADER` | `X-Tenant-ID` | HTTP header used to identify the tenant |
 
+## Records
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `APG_EXPOSE_TIMESTAMPS` | `0` | Set to `1` to include `created_at` and `updated_at` in GET responses. Omitted by default to keep response shapes minimal. `deleted_at` is never exposed (soft-delete implementation detail). |
+
 ## Internationalisation
 
 | Variable | Default | Description |
