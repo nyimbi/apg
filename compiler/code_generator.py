@@ -5227,6 +5227,10 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             return "_records_payload_with_query"
         if route.startswith("/entities/") and "/records" in route:
             return "_records_payload_with_query"
+        if route == "/jobs":
+            return "_jobs_payload"
+        if route.startswith("/jobs/"):
+            return "_job_detail_payload"
         return None
     if method == "post":
         if route.startswith("/agents/") and route.endswith(("/invoke", "/run")):
@@ -5263,6 +5267,10 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             return "_workflow_resume_payload"
         if route.startswith("/workflows/") and route.endswith("/run"):
             return "_workflow_run_payload"
+        if route == "/jobs":
+            return "_job_create_payload"
+        if route.startswith("/jobs/") and route.endswith("/retry"):
+            return "_job_retry_payload"
         return None
     if method == "put":
         if route.startswith("/records/") and "/{{id}}" in route:
