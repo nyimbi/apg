@@ -6677,6 +6677,68 @@ def _apg_db_dialect() -> str:
     return _APG_DB_DIALECT
 
 
+def _apg_ddl_pk() -> str:
+    """Dialect-appropriate integer autoincrement primary key DDL."""
+    return "BIGSERIAL PRIMARY KEY" if _APG_DB_DIALECT == "pg" else "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+
+def _apg_ddl_now() -> str:
+    """Dialect-appropriate 'current timestamp' expression."""
+    return "NOW()" if _APG_DB_DIALECT == "pg" else "datetime('now')"
+
+
+def _apg_ddl_text_type() -> str:
+    """Dialect-agnostic TEXT type (same for both, centralised for consistency)."""
+    return "TEXT"
+
+
+def _apg_qmark(sql: str) -> str:
+    """Rewrite '?' placeholders to '%s' on PostgreSQL; passthrough on SQLite."""
+    if _APG_DB_DIALECT != "pg":
+        return sql
+    out_chars: list[str] = []
+    in_single = False
+    in_double = False
+    i = 0
+    while i < len(sql):
+        ch = sql[i]
+        if ch == "'" and not in_double:
+            in_single = not in_single
+        elif ch == '"' and not in_single:
+            in_double = not in_double
+        if ch == "?" and not in_single and not in_double:
+            out_chars.append("%s")
+        else:
+            out_chars.append(ch)
+        i += 1
+    return "".join(out_chars)
+
+
+def _apg_insert_returning_id(cursor: Any, sql: str, params: Any) -> Any:
+    """Execute an INSERT and return the new integer id.
+
+    - SQLite: relies on cursor.lastrowid (INTEGER PRIMARY KEY AUTOINCREMENT).
+    - PostgreSQL: appends RETURNING id and fetches the first column.
+    """
+    if _APG_DB_DIALECT == "pg":
+        cursor.execute(_apg_qmark(sql) + " RETURNING id", params)
+        row = cursor.fetchone()
+        return row[0] if row else None
+    cursor.execute(sql, params)
+    return cursor.lastrowid
+
+
+def _apg_touch_updated_at_ddl() -> list[str]:
+    """Return trigger-function DDL required once per DB (PG only)."""
+    if _APG_DB_DIALECT != "pg":
+        return []
+    return [
+        "CREATE OR REPLACE FUNCTION apg_touch_updated_at() RETURNS trigger AS $$"
+        " BEGIN NEW.updated_at = NOW(); RETURN NEW; END;"
+        " $$ LANGUAGE plpgsql;"
+    ]
+
+
 def _sqlite_path_from_env() -> str:
     explicit_path = os.environ.get("APG_SQLITE_PATH") or os.environ.get("APG_DB_PATH")
     if explicit_path:
@@ -6745,10 +6807,14 @@ def _sqlite_expected_columns(entity_name: str) -> list[Dict[str, str]]:
             ddl += " CHECK(" + _sqlite_identifier(field_name) + " IN (" + ", ".join(_sqlite_literal(value) for value in enum_values) + "))"
         ddl += " NOT NULL" if field.get("required", False) else ""
         columns.append({{"name": field_name, "ddl": ddl, "migration": storage_type}})
+    now_expr = _apg_ddl_now()
+    ts_default = "TEXT DEFAULT (" + now_expr + ") NOT NULL" if _APG_DB_DIALECT != "pg" else "TIMESTAMPTZ DEFAULT " + now_expr + " NOT NULL"
+    ts_null = "TEXT NULL" if _APG_DB_DIALECT != "pg" else "TIMESTAMPTZ NULL"
+    ts_migration = "TEXT" if _APG_DB_DIALECT != "pg" else "TIMESTAMPTZ"
     columns.extend([
-        {{"name": "created_at", "ddl": "TEXT DEFAULT (datetime('now')) NOT NULL", "migration": "TEXT"}},
-        {{"name": "updated_at", "ddl": "TEXT DEFAULT (datetime('now')) NOT NULL", "migration": "TEXT"}},
-        {{"name": "deleted_at", "ddl": "TEXT NULL", "migration": "TEXT"}},
+        {{"name": "created_at", "ddl": ts_default, "migration": ts_migration}},
+        {{"name": "updated_at", "ddl": ts_default, "migration": ts_migration}},
+        {{"name": "deleted_at", "ddl": ts_null, "migration": ts_migration}},
     ])
     return columns
 
@@ -6758,9 +6824,18 @@ def _sqlite_fts_identifier(identifier: str) -> str:
     return text if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", text) else _sqlite_identifier(text)
 
 
+_APG_FTS_PG_WARNED: bool = False
+
+
 def _sqlite_init_entity_fts(conn: _sqlite3.Connection, entity_name: str) -> None:
     # FTS5 is SQLite-only; skip on PostgreSQL.
     if _apg_db_dialect() == "pg":
+        global _APG_FTS_PG_WARNED
+        if not _APG_FTS_PG_WARNED:
+            _logging.getLogger("apg").info(
+                "FTS5 not available on PostgreSQL - /search endpoints will return empty results"
+            )
+            _APG_FTS_PG_WARNED = True
         return
     str_fields = _record_string_field_names(entity_name)
     if not str_fields:
@@ -6845,17 +6920,34 @@ def _sqlite_init_entity_table(conn: _sqlite3.Connection, entity_name: str) -> No
     conn.execute("CREATE TABLE IF NOT EXISTS " + table + " (" + column_sql + ")")
     _sqlite_init_entity_fts(conn, entity_name)
     trigger = _sqlite_identifier("trg_" + entity_name + "_updated_at")
-    conn.execute(
-        "CREATE TRIGGER IF NOT EXISTS " + trigger + " AFTER UPDATE ON " + table + " FOR EACH ROW "
-        "BEGIN UPDATE " + table + " SET updated_at = datetime('now') WHERE id = NEW.id; END;"
-    )
+    if _APG_DB_DIALECT == "pg":
+        # PG: BEFORE UPDATE trigger + shared trigger function (emitted once elsewhere).
+        conn.execute(
+            "DROP TRIGGER IF EXISTS " + trigger + " ON " + table + ";"
+            " CREATE TRIGGER " + trigger + " BEFORE UPDATE ON " + table
+            + " FOR EACH ROW EXECUTE FUNCTION apg_touch_updated_at();"
+        )
+    else:
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS " + trigger + " AFTER UPDATE ON " + table + " FOR EACH ROW "
+            "BEGIN UPDATE " + table + " SET updated_at = datetime('now') WHERE id = NEW.id; END;"
+        )
 
 
 def _sqlite_auto_migrate_entity(conn: _sqlite3.Connection, entity_name: str) -> None:
-    existing = {{
-        str(row["name"])
-        for row in conn.execute("PRAGMA table_info(" + _sqlite_identifier(entity_name) + ")").fetchall()
-    }}
+    if _APG_DB_DIALECT == "pg":
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = %s",
+            (entity_name,),
+        )
+        existing = {{str(row[0]) for row in cur.fetchall()}}
+        cur.close()
+    else:
+        existing = {{
+            str(row["name"])
+            for row in conn.execute("PRAGMA table_info(" + _sqlite_identifier(entity_name) + ")").fetchall()
+        }}
     for column in _sqlite_expected_columns(entity_name):
         column_name = column["name"]
         if column_name in existing:
@@ -6880,6 +6972,8 @@ def _sqlite_init_database() -> None:
     if conn is None:
         return
     try:
+        for stmt in _apg_touch_updated_at_ddl():
+            conn.execute(stmt)
         for entity_name in sorted(ENTITY_NAMES):
             _sqlite_init_entity_table(conn, entity_name)
             if str(os.environ.get("APG_AUTO_MIGRATE", "1")) != "0":
@@ -6941,19 +7035,19 @@ def _sqlite_store_record(entity_name: str, record: Dict[str, Any]) -> None:
         + ") ON CONFLICT(id) DO UPDATE SET "
         + ", ".join(assignments)
     )
-    conn.execute(sql, [_sqlite_value(row.get(column_name)) for column_name in column_names])
+    conn.execute(_apg_qmark(sql), [_sqlite_value(row.get(column_name)) for column_name in column_names])
 
 
 def _sqlite_soft_delete_record(entity_name: str, record_id: Any) -> None:
     conn = _sqlite_connection()
     if conn is None:
         return
-    sql = "UPDATE " + _sqlite_identifier(entity_name) + " SET deleted_at=datetime('now') WHERE id=?"
+    sql = "UPDATE " + _sqlite_identifier(entity_name) + " SET deleted_at=" + _apg_ddl_now() + " WHERE id=?"
     params: list[Any] = [str(record_id)]
     if _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
         sql += " AND tenant_id=?"
         params.append(_tenant_id() or APG_TENANT_DEFAULT)
-    conn.execute(sql, params)
+    conn.execute(_apg_qmark(sql), params)
 
 
 def _sqlite_restore_record(entity_name: str, record_id: Any) -> None:
@@ -6965,7 +7059,7 @@ def _sqlite_restore_record(entity_name: str, record_id: Any) -> None:
     if _tenant_scope_enabled(entity_name) and not _tenant_admin_bypass():
         sql += " AND tenant_id=?"
         params.append(_tenant_id() or APG_TENANT_DEFAULT)
-    conn.execute(sql, params)
+    conn.execute(_apg_qmark(sql), params)
 
 
 def _sqlite_select_records(
@@ -6987,7 +7081,7 @@ def _sqlite_select_records(
     if where_clauses:
         sql += " WHERE " + " AND ".join(where_clauses)
     sql += " ORDER BY id"
-    return [dict(row) for row in conn.execute(sql, params).fetchall()]
+    return [dict(row) for row in conn.execute(_apg_qmark(sql), params).fetchall()]
 
 
 def _sqlite_load_records() -> None:
@@ -10381,7 +10475,7 @@ def _delete_relationship_payload(path: str, *, persist: bool = True) -> tuple[in
         if _tenant_scope_enabled(through_name) and not _tenant_admin_bypass():
             sql += " AND tenant_id=?"
             params.append(_tenant_id() or APG_TENANT_DEFAULT)
-        conn.execute(sql, params)
+        conn.execute(_apg_qmark(sql), params)
     if persist:
         _sqlite_commit()
         persistence_error = _persist_record_store()
