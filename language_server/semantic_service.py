@@ -758,7 +758,7 @@ def _planned_code_actions(
 			))
 			continue
 
-		type_match = re.search(r"Unknown type '([^']+)' for property '([^']+)'", message)
+		type_match = re.search(r"Unknown type '([^']+)' for (?:property|field) '([^']+)'", message)
 		if type_match:
 			table_name = type_match.group(1)
 			property_name = type_match.group(2)
