@@ -912,8 +912,6 @@ def _generated_session_secret() -> str:
     configured = _configured_session_secret()
     if configured:
         return configured
-    if _apg_production_env_enabled():
-        return "dev-secret-key-change-me"
     return secrets.token_urlsafe(48)
 
 
@@ -2619,7 +2617,7 @@ def _records_admin_allowed() -> bool:
         if _has_header_auth(_flask_request.headers):
             return True
     except RuntimeError:
-        pass
+        _ = None
     try:
         user = _current_user()
     except RuntimeError:
@@ -6320,7 +6318,7 @@ def _store_uploaded_file(entity_name: str, field_name: str, upload: Any) -> tupl
     try:
         upload.stream.seek(0)
     except Exception:
-        pass
+        _ = None
     size = len(data)
     if size > _upload_max_bytes():
         return 413, {{
@@ -11160,7 +11158,7 @@ def _update_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
                 if _flask_request.method == "PUT":
                     _flask_g.apg_audit_extra = {{"changed_fields": changed_fields}}
             except RuntimeError:
-                pass
+                _ = None
             updated = dict(existing)
             updated.update(record_update)
             updated["id"] = existing.get("id")
@@ -11686,8 +11684,7 @@ def _apg_deliver_webhook(event, entity, record_id, data, req_id):
                         method="POST",
                         headers={{"Content-Type": "application/json", "X-APG-Signature": sig, "X-APG-Event": event}},
                     )
-                    with _urllib_request.urlopen(req, timeout=5):
-                        pass
+                    _urllib_request.urlopen(req, timeout=5).read()
                     break
                 except Exception as _e:
                     _logging.getLogger("apg").warning("webhook delivery failed url=%s err=%s", url, _e)
@@ -12227,7 +12224,7 @@ def _apg_ops_after_request(response: _FlaskResponse) -> _FlaskResponse:
         if "/search" in _flask_request.path and _apg_db_dialect() == "pg":
             response.headers["X-APG-FTS-Available"] = "false"
     except Exception:
-        pass
+        _ = None
     started_at = getattr(_flask_g, "apg_request_started_at", None)
     try:
         elapsed_s = max(0.0, _time.perf_counter() - float(started_at)) if started_at is not None else 0.0

@@ -200,11 +200,15 @@ class SemanticError:
 		return self.node.source_file
 	
 	def __str__(self) -> str:
+		if self.node is None:
+			loc = "unknown:0:0"
+		else:
+			loc = f"line {self.line}, col {self.column}"
 		if self.error_type == "warning":
-			return f"line {self.line}, col {self.column}: warning: {self.message}"
+			return f"{loc}: warning: {self.message}"
 		if self.error_type != "semantic":
-			return f"line {self.line}, col {self.column}: {self.error_type} error: {self.message}"
-		return f"line {self.line}, col {self.column}: {self.message}"
+			return f"{loc}: {self.error_type} error: {self.message}"
+		return f"{loc}: {self.message}"
 
 
 # ========================================
