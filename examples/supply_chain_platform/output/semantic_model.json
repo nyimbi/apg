@@ -1,0 +1,2270 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 10,
+    "name": "supply_chain_platform",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "AuditLog": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "immutable": true,
+        "retention_days": 2555
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "AuditLog",
+      "provides": [
+        "audit_events",
+        "compliance_trail"
+      ],
+      "requires": [],
+      "rule_engine": {},
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "audit_log_state"
+      },
+      "theme": {},
+      "ui": {}
+    },
+    "FleetManagement": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "driver_licence_expiry_alert_days": 30,
+        "fuel_type": "diesel",
+        "service_interval_km": 10000
+      },
+      "erp_modules": [
+        "transport",
+        "maintenance",
+        "hr"
+      ],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "vehicle",
+          "driver",
+          "maintenance_record",
+          "fuel_log",
+          "insurance_policy"
+        ]
+      },
+      "name": "FleetManagement",
+      "provides": [
+        "vehicle_registry",
+        "driver_registry",
+        "maintenance_schedules",
+        "fuel_records"
+      ],
+      "requires": [
+        "audit_events",
+        "tenant_context"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "expired_licence_blocked",
+          "when": "driver_licence_expired",
+          "when_ast": {
+            "field": "driver_licence_expired",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "warn",
+          "name": "overdue_service_blocked",
+          "when": "km_since_service > service_interval_km",
+          "when_ast": {
+            "field": "km_since_service",
+            "op": ">",
+            "type": "compare",
+            "value": "service_interval_km"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "vehicle_insurance_required",
+          "when": "insurance_expired",
+          "when_ast": {
+            "field": "insurance_expired",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "fleet_telemetry_state"
+      },
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#744210"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "VehicleRegistryScreen",
+            "name": "Vehicles",
+            "path": "/scm/fleet/vehicles"
+          },
+          {
+            "component": "DriverRegistryScreen",
+            "name": "Drivers",
+            "path": "/scm/fleet/drivers"
+          },
+          {
+            "component": "MaintenanceScreen",
+            "name": "Maintenance",
+            "path": "/scm/fleet/maintenance"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "Inventory": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "cycle_count_frequency_days": 30,
+        "default_warehouse": "NBO-WH-01",
+        "negative_stock_allowed": false,
+        "reorder_lead_time_days": 14
+      },
+      "erp_modules": [
+        "inventory",
+        "warehouse",
+        "procurement"
+      ],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "stock_item",
+          "warehouse",
+          "bin_location",
+          "stock_movement",
+          "reorder_rule"
+        ]
+      },
+      "name": "Inventory",
+      "provides": [
+        "stock_balances",
+        "stock_movements",
+        "reorder_alerts",
+        "warehouse_locations"
+      ],
+      "requires": [
+        "goods_receipt",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_negative_stock",
+          "when": "on_hand - reserved < 0 AND negative_stock_allowed = false",
+          "when_ast": {
+            "field": "on_hand",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "warn",
+          "name": "reorder_point_alert",
+          "when": "on_hand <= reorder_level",
+          "when_ast": {
+            "field": "on_hand",
+            "op": "<=",
+            "type": "compare",
+            "value": "reorder_level"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "bin_location_required",
+          "when": "operation = putaway AND bin_location missing",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "putaway"
+            },
+            "right": {
+              "field": "bin_location",
+              "negated": false,
+              "type": "missing"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "expired_stock_quarantine",
+          "when": "expiry_date < today",
+          "when_ast": {
+            "field": "expiry_date",
+            "op": "<",
+            "type": "compare",
+            "value": "today"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "inventory_movement_state"
+      },
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#276749"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "StockLevelScreen",
+            "name": "Stock Levels",
+            "path": "/scm/inventory/stock"
+          },
+          {
+            "component": "MovementScreen",
+            "name": "Movements",
+            "path": "/scm/inventory/movements"
+          },
+          {
+            "component": "ReorderAlertScreen",
+            "name": "Reorder Alerts",
+            "path": "/scm/inventory/reorder"
+          },
+          {
+            "component": "CycleCountScreen",
+            "name": "Cycle Count",
+            "path": "/scm/inventory/cyclecount"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "Procurement": {
+      "approvals": {
+        "approvers": [
+          "department_head",
+          "procurement_lead",
+          "cfo"
+        ],
+        "levels": 3
+      },
+      "business_rules": [],
+      "components": {
+        "ordering": {
+          "capability": "purchase_orders",
+          "permissions": [
+            "create",
+            "approve",
+            "dispatch",
+            "close"
+          ]
+        },
+        "receiving": {
+          "capability": "goods_receipt",
+          "permissions": [
+            "receive",
+            "inspect",
+            "reject"
+          ]
+        },
+        "requisition": {
+          "capability": "purchase_requests",
+          "permissions": [
+            "create",
+            "approve",
+            "cancel"
+          ]
+        }
+      },
+      "configuration": {
+        "approval_threshold_high": 500000,
+        "approval_threshold_low": 50000,
+        "currency": "KES",
+        "three_quote_minimum_above": 100000
+      },
+      "erp_modules": [
+        "procurement",
+        "finance",
+        "inventory"
+      ],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "purchase_request",
+          "purchase_order",
+          "rfq",
+          "goods_receipt_note",
+          "supplier_quote"
+        ]
+      },
+      "name": "Procurement",
+      "provides": [
+        "purchase_requests",
+        "purchase_orders",
+        "rfq_management",
+        "goods_receipt"
+      ],
+      "requires": [
+        "vendor_master",
+        "vendor_qualifications",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "budget_code_required",
+          "when": "budget_code missing",
+          "when_ast": {
+            "field": "budget_code",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "unqualified_vendor_blocked",
+          "when": "vendor_qualified = false",
+          "when_ast": {
+            "field": "vendor_qualified",
+            "op": "==",
+            "type": "compare",
+            "value": false
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "three_quote_rule",
+          "when": "amount > three_quote_minimum_above AND quote_count < 3",
+          "when_ast": {
+            "left": {
+              "field": "amount",
+              "op": ">",
+              "type": "compare",
+              "value": "three_quote_minimum_above"
+            },
+            "right": {
+              "field": "quote_count",
+              "op": "<",
+              "type": "compare",
+              "value": 3
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "high_value_cfo_approval",
+          "when": "amount > approval_threshold_high",
+          "when_ast": {
+            "field": "amount",
+            "op": ">",
+            "type": "compare",
+            "value": "approval_threshold_high"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "po_requires_pr",
+          "when": "purchase_request_id missing",
+          "when_ast": {
+            "field": "purchase_request_id",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "grn_quantity_mismatch",
+          "when": "received_qty != ordered_qty AND variance_pct > 5",
+          "when_ast": {
+            "left": {
+              "field": "received_qty",
+              "op": "!=",
+              "type": "compare",
+              "value": "ordered_qty"
+            },
+            "right": {
+              "field": "variance_pct",
+              "op": ">",
+              "type": "compare",
+              "value": 5
+            },
+            "type": "and"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "ApprovalWorkbench": {
+          "actions": [
+            "approve",
+            "reject",
+            "request_revision"
+          ],
+          "binds": [
+            "purchase_requests.pending",
+            "purchase_orders.pending_approval"
+          ],
+          "contains": [
+            "PendingPRList",
+            "POApprovalPanel"
+          ],
+          "layout": "split",
+          "route": "/scm/procurement/approvals"
+        }
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "state": "procurement_workflow_state"
+      },
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#2B6CB0"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PurchaseRequestScreen",
+            "name": "Purchase Requests",
+            "path": "/scm/procurement/pr"
+          },
+          {
+            "component": "PurchaseOrderScreen",
+            "name": "Purchase Orders",
+            "path": "/scm/procurement/po"
+          },
+          {
+            "component": "RFQScreen",
+            "name": "RFQ",
+            "path": "/scm/procurement/rfq"
+          },
+          {
+            "component": "GoodsReceiptScreen",
+            "name": "Goods Receipt",
+            "path": "/scm/procurement/grn"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "RouteOptimisation": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "algorithm": "vrp_nearest_neighbour",
+        "max_load_kg": 5000,
+        "max_stops_per_route": 20,
+        "time_window_enforcement": true
+      },
+      "erp_modules": [
+        "transport",
+        "logistics",
+        "warehouse"
+      ],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "route",
+          "stop",
+          "delivery_plan",
+          "load_plan",
+          "time_window"
+        ]
+      },
+      "name": "RouteOptimisation",
+      "provides": [
+        "optimised_routes",
+        "delivery_plans",
+        "load_plans"
+      ],
+      "requires": [
+        "vehicle_registry",
+        "driver_registry",
+        "stock_balances",
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "overloaded_vehicle_denied",
+          "when": "load_kg > max_load_kg",
+          "when_ast": {
+            "field": "load_kg",
+            "op": ">",
+            "type": "compare",
+            "value": "max_load_kg"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "driver_hours_limit",
+          "when": "planned_hours > 10",
+          "when_ast": {
+            "field": "planned_hours",
+            "op": ">",
+            "type": "compare",
+            "value": 10
+          }
+        },
+        {
+          "action": "warn",
+          "name": "time_window_violation",
+          "when": "eta > delivery_window_end",
+          "when_ast": {
+            "field": "eta",
+            "op": ">",
+            "type": "compare",
+            "value": "delivery_window_end"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "route_optimisation_state"
+      },
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#744210"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "RoutePlannerScreen",
+            "name": "Route Planner",
+            "path": "/scm/transport/routes"
+          },
+          {
+            "component": "LoadPlanScreen",
+            "name": "Load Plans",
+            "path": "/scm/transport/loads"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "ShipmentTracking": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "geofence_radius_metres": 500,
+        "pod_signature_required": true,
+        "sms_eta_alerts": true,
+        "telemetry_interval_seconds": 30
+      },
+      "erp_modules": [
+        "logistics",
+        "transport",
+        "customer_service"
+      ],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw"
+        ]
+      },
+      "master_data": {
+        "entities": [
+          "shipment",
+          "telemetry_event",
+          "geofence",
+          "proof_of_delivery"
+        ]
+      },
+      "name": "ShipmentTracking",
+      "provides": [
+        "shipment_positions",
+        "eta_updates",
+        "delivery_confirmations",
+        "exception_alerts"
+      ],
+      "requires": [
+        "optimised_routes",
+        "vehicle_registry",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "pod_required_on_delivery",
+          "when": "delivery_completed AND pod_captured = false",
+          "when_ast": {
+            "left": {
+              "field": "delivery_completed",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "right": {
+              "field": "pod_captured",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "geofence_deviation_alert",
+          "when": "distance_from_route > geofence_radius_metres",
+          "when_ast": {
+            "field": "distance_from_route",
+            "op": ">",
+            "type": "compare",
+            "value": "geofence_radius_metres"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "temperature_excursion_alert",
+          "when": "temp_celsius > max_temp OR temp_celsius < min_temp",
+          "when_ast": {
+            "left": {
+              "field": "temp_celsius",
+              "op": ">",
+              "type": "compare",
+              "value": "max_temp"
+            },
+            "right": {
+              "field": "temp_celsius",
+              "op": "<",
+              "type": "compare",
+              "value": "min_temp"
+            },
+            "type": "or"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "LiveDispatchBoard": {
+          "actions": [
+            "reassign_driver",
+            "contact_driver",
+            "escalate_exception"
+          ],
+          "binds": [
+            "shipment_positions.live",
+            "exception_alerts.active"
+          ],
+          "contains": [
+            "LiveVehicleMap",
+            "ActiveShipmentList",
+            "ExceptionPanel"
+          ],
+          "layout": "map_split",
+          "route": "/scm/tracking/dispatch"
+        }
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "state": "shipment_tracking_state"
+      },
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#744210"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "LiveTrackingMapScreen",
+            "name": "Live Map",
+            "path": "/scm/tracking/live"
+          },
+          {
+            "component": "ShipmentListScreen",
+            "name": "Shipments",
+            "path": "/scm/tracking/shipments"
+          },
+          {
+            "component": "ExceptionAlertScreen",
+            "name": "Exceptions",
+            "path": "/scm/tracking/exceptions"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "TenantContext": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "isolation": "strict",
+        "multi_tenant": true
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "tenant",
+          "organisation",
+          "user",
+          "role"
+        ]
+      },
+      "name": "TenantContext",
+      "provides": [
+        "tenant_context",
+        "rbac_policies"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {},
+      "ui": {}
+    },
+    "VendorManagement": {
+      "approvals": {
+        "approvers": [
+          "procurement_officer",
+          "compliance_manager"
+        ],
+        "levels": 2
+      },
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "currency": "KES",
+        "min_score_to_approve": 70,
+        "qualification_validity_days": 365
+      },
+      "erp_modules": [
+        "procurement",
+        "finance",
+        "compliance"
+      ],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "vendor",
+          "qualification_certificate",
+          "bank_account",
+          "tax_record"
+        ]
+      },
+      "name": "VendorManagement",
+      "provides": [
+        "vendor_master",
+        "vendor_qualifications",
+        "vendor_scorecards"
+      ],
+      "requires": [
+        "audit_events",
+        "tenant_context"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "vendor_tax_pin_required",
+          "when": "tax_pin missing",
+          "when_ast": {
+            "field": "tax_pin",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "vendor_bank_details_required",
+          "when": "bank_account missing",
+          "when_ast": {
+            "field": "bank_account",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "expired_qualification_blocked",
+          "when": "qualification_expired",
+          "when_ast": {
+            "field": "qualification_expired",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "low_score_vendor_review",
+          "when": "vendor_score < min_score_to_approve",
+          "when_ast": {
+            "field": "vendor_score",
+            "op": "<",
+            "type": "compare",
+            "value": "min_score_to_approve"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "vendor_qualification_state"
+      },
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#2B6CB0"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "VendorListScreen",
+            "name": "Vendors",
+            "path": "/scm/vendors"
+          },
+          {
+            "component": "QualificationScreen",
+            "name": "Qualifications",
+            "path": "/scm/vendors/qualify"
+          },
+          {
+            "component": "VendorScorecardScreen",
+            "name": "Scorecards",
+            "path": "/scm/vendors/scorecards"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "AuditLog": [],
+      "FleetManagement": [
+        "audit_events",
+        "tenant_context"
+      ],
+      "Inventory": [
+        "goods_receipt",
+        "audit_events",
+        "tenant_context"
+      ],
+      "Procurement": [
+        "vendor_master",
+        "vendor_qualifications",
+        "audit_events",
+        "tenant_context"
+      ],
+      "RouteOptimisation": [
+        "vehicle_registry",
+        "driver_registry",
+        "stock_balances",
+        "audit_events"
+      ],
+      "ShipmentTracking": [
+        "optimised_routes",
+        "vehicle_registry",
+        "audit_events",
+        "tenant_context"
+      ],
+      "TenantContext": [
+        "audit_events"
+      ],
+      "VendorManagement": [
+        "audit_events",
+        "tenant_context"
+      ]
+    }
+  },
+  "contracts": {
+    "AuditLog": {
+      "configuration": {
+        "immutable": true,
+        "retention_days": 2555
+      },
+      "id": "audit_log",
+      "provides": [
+        "audit_events",
+        "compliance_trail"
+      ]
+    },
+    "FleetManagement": {
+      "configuration": {
+        "driver_licence_expiry_alert_days": 30,
+        "fuel_type": "diesel",
+        "service_interval_km": 10000
+      },
+      "id": "fleet_management",
+      "name": "Fleet Management",
+      "provides": [
+        "vehicle_registry",
+        "driver_registry",
+        "maintenance_schedules",
+        "fuel_records"
+      ],
+      "requires": [
+        "audit_events",
+        "tenant_context"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "expired_licence_blocked",
+          "when": "driver_licence_expired",
+          "when_ast": {
+            "field": "driver_licence_expired",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "warn",
+          "name": "overdue_service_blocked",
+          "when": "km_since_service > service_interval_km",
+          "when_ast": {
+            "field": "km_since_service",
+            "op": ">",
+            "type": "compare",
+            "value": "service_interval_km"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "vehicle_insurance_required",
+          "when": "insurance_expired",
+          "when_ast": {
+            "field": "insurance_expired",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        }
+      ],
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#744210"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "VehicleRegistryScreen",
+            "name": "Vehicles",
+            "path": "/scm/fleet/vehicles"
+          },
+          {
+            "component": "DriverRegistryScreen",
+            "name": "Drivers",
+            "path": "/scm/fleet/drivers"
+          },
+          {
+            "component": "MaintenanceScreen",
+            "name": "Maintenance",
+            "path": "/scm/fleet/maintenance"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    },
+    "Inventory": {
+      "configuration": {
+        "cycle_count_frequency_days": 30,
+        "default_warehouse": "NBO-WH-01",
+        "negative_stock_allowed": false,
+        "reorder_lead_time_days": 14
+      },
+      "id": "inventory",
+      "name": "Inventory Management",
+      "provides": [
+        "stock_balances",
+        "stock_movements",
+        "reorder_alerts",
+        "warehouse_locations"
+      ],
+      "requires": [
+        "goods_receipt",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_negative_stock",
+          "when": "on_hand - reserved < 0 AND negative_stock_allowed = false",
+          "when_ast": {
+            "field": "on_hand",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "warn",
+          "name": "reorder_point_alert",
+          "when": "on_hand <= reorder_level",
+          "when_ast": {
+            "field": "on_hand",
+            "op": "<=",
+            "type": "compare",
+            "value": "reorder_level"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "bin_location_required",
+          "when": "operation = putaway AND bin_location missing",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "putaway"
+            },
+            "right": {
+              "field": "bin_location",
+              "negated": false,
+              "type": "missing"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "expired_stock_quarantine",
+          "when": "expiry_date < today",
+          "when_ast": {
+            "field": "expiry_date",
+            "op": "<",
+            "type": "compare",
+            "value": "today"
+          }
+        }
+      ],
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#276749"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "StockLevelScreen",
+            "name": "Stock Levels",
+            "path": "/scm/inventory/stock"
+          },
+          {
+            "component": "MovementScreen",
+            "name": "Movements",
+            "path": "/scm/inventory/movements"
+          },
+          {
+            "component": "ReorderAlertScreen",
+            "name": "Reorder Alerts",
+            "path": "/scm/inventory/reorder"
+          },
+          {
+            "component": "CycleCountScreen",
+            "name": "Cycle Count",
+            "path": "/scm/inventory/cyclecount"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    },
+    "Procurement": {
+      "configuration": {
+        "approval_threshold_high": 500000,
+        "approval_threshold_low": 50000,
+        "currency": "KES",
+        "three_quote_minimum_above": 100000
+      },
+      "id": "procurement",
+      "name": "Procurement",
+      "provides": [
+        "purchase_requests",
+        "purchase_orders",
+        "rfq_management",
+        "goods_receipt"
+      ],
+      "requires": [
+        "vendor_master",
+        "vendor_qualifications",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "budget_code_required",
+          "when": "budget_code missing",
+          "when_ast": {
+            "field": "budget_code",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "unqualified_vendor_blocked",
+          "when": "vendor_qualified = false",
+          "when_ast": {
+            "field": "vendor_qualified",
+            "op": "==",
+            "type": "compare",
+            "value": false
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "three_quote_rule",
+          "when": "amount > three_quote_minimum_above AND quote_count < 3",
+          "when_ast": {
+            "left": {
+              "field": "amount",
+              "op": ">",
+              "type": "compare",
+              "value": "three_quote_minimum_above"
+            },
+            "right": {
+              "field": "quote_count",
+              "op": "<",
+              "type": "compare",
+              "value": 3
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "high_value_cfo_approval",
+          "when": "amount > approval_threshold_high",
+          "when_ast": {
+            "field": "amount",
+            "op": ">",
+            "type": "compare",
+            "value": "approval_threshold_high"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "po_requires_pr",
+          "when": "purchase_request_id missing",
+          "when_ast": {
+            "field": "purchase_request_id",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "grn_quantity_mismatch",
+          "when": "received_qty != ordered_qty AND variance_pct > 5",
+          "when_ast": {
+            "left": {
+              "field": "received_qty",
+              "op": "!=",
+              "type": "compare",
+              "value": "ordered_qty"
+            },
+            "right": {
+              "field": "variance_pct",
+              "op": ">",
+              "type": "compare",
+              "value": 5
+            },
+            "type": "and"
+          }
+        }
+      ],
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#2B6CB0"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PurchaseRequestScreen",
+            "name": "Purchase Requests",
+            "path": "/scm/procurement/pr"
+          },
+          {
+            "component": "PurchaseOrderScreen",
+            "name": "Purchase Orders",
+            "path": "/scm/procurement/po"
+          },
+          {
+            "component": "RFQScreen",
+            "name": "RFQ",
+            "path": "/scm/procurement/rfq"
+          },
+          {
+            "component": "GoodsReceiptScreen",
+            "name": "Goods Receipt",
+            "path": "/scm/procurement/grn"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    },
+    "RouteOptimisation": {
+      "configuration": {
+        "algorithm": "vrp_nearest_neighbour",
+        "max_load_kg": 5000,
+        "max_stops_per_route": 20,
+        "time_window_enforcement": true
+      },
+      "id": "route_optimisation",
+      "name": "Route Optimisation",
+      "provides": [
+        "optimised_routes",
+        "delivery_plans",
+        "load_plans"
+      ],
+      "requires": [
+        "vehicle_registry",
+        "driver_registry",
+        "stock_balances",
+        "audit_events"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "overloaded_vehicle_denied",
+          "when": "load_kg > max_load_kg",
+          "when_ast": {
+            "field": "load_kg",
+            "op": ">",
+            "type": "compare",
+            "value": "max_load_kg"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "driver_hours_limit",
+          "when": "planned_hours > 10",
+          "when_ast": {
+            "field": "planned_hours",
+            "op": ">",
+            "type": "compare",
+            "value": 10
+          }
+        },
+        {
+          "action": "warn",
+          "name": "time_window_violation",
+          "when": "eta > delivery_window_end",
+          "when_ast": {
+            "field": "eta",
+            "op": ">",
+            "type": "compare",
+            "value": "delivery_window_end"
+          }
+        }
+      ],
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#744210"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "RoutePlannerScreen",
+            "name": "Route Planner",
+            "path": "/scm/transport/routes"
+          },
+          {
+            "component": "LoadPlanScreen",
+            "name": "Load Plans",
+            "path": "/scm/transport/loads"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    },
+    "ShipmentTracking": {
+      "configuration": {
+        "geofence_radius_metres": 500,
+        "pod_signature_required": true,
+        "sms_eta_alerts": true,
+        "telemetry_interval_seconds": 30
+      },
+      "id": "shipment_tracking",
+      "name": "Shipment Tracking",
+      "provides": [
+        "shipment_positions",
+        "eta_updates",
+        "delivery_confirmations",
+        "exception_alerts"
+      ],
+      "requires": [
+        "optimised_routes",
+        "vehicle_registry",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "pod_required_on_delivery",
+          "when": "delivery_completed AND pod_captured = false",
+          "when_ast": {
+            "left": {
+              "field": "delivery_completed",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "right": {
+              "field": "pod_captured",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "geofence_deviation_alert",
+          "when": "distance_from_route > geofence_radius_metres",
+          "when_ast": {
+            "field": "distance_from_route",
+            "op": ">",
+            "type": "compare",
+            "value": "geofence_radius_metres"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "temperature_excursion_alert",
+          "when": "temp_celsius > max_temp OR temp_celsius < min_temp",
+          "when_ast": {
+            "left": {
+              "field": "temp_celsius",
+              "op": ">",
+              "type": "compare",
+              "value": "max_temp"
+            },
+            "right": {
+              "field": "temp_celsius",
+              "op": "<",
+              "type": "compare",
+              "value": "min_temp"
+            },
+            "type": "or"
+          }
+        }
+      ],
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#744210"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "LiveTrackingMapScreen",
+            "name": "Live Map",
+            "path": "/scm/tracking/live"
+          },
+          {
+            "component": "ShipmentListScreen",
+            "name": "Shipments",
+            "path": "/scm/tracking/shipments"
+          },
+          {
+            "component": "ExceptionAlertScreen",
+            "name": "Exceptions",
+            "path": "/scm/tracking/exceptions"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    },
+    "TenantContext": {
+      "configuration": {
+        "isolation": "strict",
+        "multi_tenant": true
+      },
+      "id": "tenant_context",
+      "provides": [
+        "tenant_context",
+        "rbac_policies"
+      ],
+      "requires": [
+        "audit_events"
+      ]
+    },
+    "VendorManagement": {
+      "configuration": {
+        "currency": "KES",
+        "min_score_to_approve": 70,
+        "qualification_validity_days": 365
+      },
+      "id": "vendor_management",
+      "name": "Vendor Management",
+      "provides": [
+        "vendor_master",
+        "vendor_qualifications",
+        "vendor_scorecards"
+      ],
+      "requires": [
+        "audit_events",
+        "tenant_context"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "vendor_tax_pin_required",
+          "when": "tax_pin missing",
+          "when_ast": {
+            "field": "tax_pin",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "vendor_bank_details_required",
+          "when": "bank_account missing",
+          "when_ast": {
+            "field": "bank_account",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "expired_qualification_blocked",
+          "when": "qualification_expired",
+          "when_ast": {
+            "field": "qualification_expired",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "low_score_vendor_review",
+          "when": "vendor_score < min_score_to_approve",
+          "when_ast": {
+            "field": "vendor_score",
+            "op": "<",
+            "type": "compare",
+            "value": "min_score_to_approve"
+          }
+        }
+      ],
+      "theme": {
+        "name": "supply_chain_theme",
+        "tokens": {
+          "accent": "#2B6CB0"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "VendorListScreen",
+            "name": "Vendors",
+            "path": "/scm/vendors"
+          },
+          {
+            "component": "QualificationScreen",
+            "name": "Qualifications",
+            "path": "/scm/vendors/qualify"
+          },
+          {
+            "component": "VendorScorecardScreen",
+            "name": "Scorecards",
+            "path": "/scm/vendors/scorecards"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    }
+  },
+  "deployment": {
+    "source": "supply_chain_platform.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {
+    "ProcurementToDelivery": {
+      "assignments": {},
+      "compensation": {},
+      "guards": {},
+      "human_tasks": [],
+      "methods": [],
+      "name": "ProcurementToDelivery",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "purchase_request",
+        "vendor_qualification_check",
+        "rfq",
+        "po_approved",
+        "goods_received",
+        "warehouse_putaway",
+        "pick_and_pack",
+        "load_plan",
+        "route_optimised",
+        "dispatched",
+        "in_transit",
+        "delivered",
+        "pod_captured"
+      ],
+      "steps": [
+        "purchase_request",
+        "vendor_qualification_check",
+        "rfq",
+        "po_approved",
+        "goods_received",
+        "warehouse_putaway",
+        "pick_and_pack",
+        "load_plan",
+        "route_optimised",
+        "dispatched",
+        "in_transit",
+        "delivered",
+        "pod_captured"
+      ],
+      "steps_raw": "purchase_request -> vendor_qualification_check -> rfq -> po_approved -> goods_received -> warehouse_putaway -> pick_and_pack -> load_plan -> route_optimised -> dispatched -> in_transit -> delivered -> pod_captured",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "purchase_request",
+          "target": "vendor_qualification_check"
+        },
+        {
+          "guard": null,
+          "source": "vendor_qualification_check",
+          "target": "rfq"
+        },
+        {
+          "guard": null,
+          "source": "rfq",
+          "target": "po_approved"
+        },
+        {
+          "guard": null,
+          "source": "po_approved",
+          "target": "goods_received"
+        },
+        {
+          "guard": null,
+          "source": "goods_received",
+          "target": "warehouse_putaway"
+        },
+        {
+          "guard": null,
+          "source": "warehouse_putaway",
+          "target": "pick_and_pack"
+        },
+        {
+          "guard": null,
+          "source": "pick_and_pack",
+          "target": "load_plan"
+        },
+        {
+          "guard": null,
+          "source": "load_plan",
+          "target": "route_optimised"
+        },
+        {
+          "guard": null,
+          "source": "route_optimised",
+          "target": "dispatched"
+        },
+        {
+          "guard": null,
+          "source": "dispatched",
+          "target": "in_transit"
+        },
+        {
+          "guard": null,
+          "source": "in_transit",
+          "target": "delivered"
+        },
+        {
+          "guard": null,
+          "source": "delivered",
+          "target": "pod_captured"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "ProcurementToPO": {
+      "assignments": {},
+      "compensation": {},
+      "guards": {},
+      "human_tasks": [],
+      "methods": [],
+      "name": "ProcurementToPO",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "draft",
+        "budget_check",
+        "vendor_selection",
+        "rfq",
+        "po_raised",
+        "approved",
+        "dispatched"
+      ],
+      "steps": [
+        "draft",
+        "budget_check",
+        "vendor_selection",
+        "rfq",
+        "po_raised",
+        "approved",
+        "dispatched"
+      ],
+      "steps_raw": "draft -> budget_check -> vendor_selection -> rfq -> po_raised -> approved -> dispatched",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "draft",
+          "target": "budget_check"
+        },
+        {
+          "guard": null,
+          "source": "budget_check",
+          "target": "vendor_selection"
+        },
+        {
+          "guard": null,
+          "source": "vendor_selection",
+          "target": "rfq"
+        },
+        {
+          "guard": null,
+          "source": "rfq",
+          "target": "po_raised"
+        },
+        {
+          "guard": null,
+          "source": "po_raised",
+          "target": "approved"
+        },
+        {
+          "guard": null,
+          "source": "approved",
+          "target": "dispatched"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 20,
+      "kind": "capability",
+      "nodes": 17
+    },
+    "deployment": {
+      "edges": 10,
+      "kind": "deployment",
+      "nodes": 11
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 10,
+      "kind": "handler",
+      "nodes": 11
+    },
+    "lookup": {
+      "edges": 10,
+      "kind": "lookup",
+      "nodes": 11
+    },
+    "package": {
+      "edges": 10,
+      "kind": "package",
+      "nodes": 11
+    },
+    "security": {
+      "edges": 10,
+      "kind": "security",
+      "nodes": 11
+    },
+    "workflow": {
+      "edges": 10,
+      "kind": "workflow",
+      "nodes": 11
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "FleetManagement.expired_licence_blocked": {
+      "action": "deny",
+      "name": "expired_licence_blocked",
+      "when": "driver_licence_expired",
+      "when_ast": {
+        "field": "driver_licence_expired",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
+    },
+    "FleetManagement.overdue_service_blocked": {
+      "action": "warn",
+      "name": "overdue_service_blocked",
+      "when": "km_since_service > service_interval_km",
+      "when_ast": {
+        "field": "km_since_service",
+        "op": ">",
+        "type": "compare",
+        "value": "service_interval_km"
+      }
+    },
+    "FleetManagement.vehicle_insurance_required": {
+      "action": "deny",
+      "name": "vehicle_insurance_required",
+      "when": "insurance_expired",
+      "when_ast": {
+        "field": "insurance_expired",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
+    },
+    "Inventory.bin_location_required": {
+      "action": "deny",
+      "name": "bin_location_required",
+      "when": "operation = putaway AND bin_location missing",
+      "when_ast": {
+        "left": {
+          "field": "operation",
+          "op": "==",
+          "type": "compare",
+          "value": "putaway"
+        },
+        "right": {
+          "field": "bin_location",
+          "negated": false,
+          "type": "missing"
+        },
+        "type": "and"
+      }
+    },
+    "Inventory.expired_stock_quarantine": {
+      "action": "deny",
+      "name": "expired_stock_quarantine",
+      "when": "expiry_date < today",
+      "when_ast": {
+        "field": "expiry_date",
+        "op": "<",
+        "type": "compare",
+        "value": "today"
+      }
+    },
+    "Inventory.no_negative_stock": {
+      "action": "deny",
+      "name": "no_negative_stock",
+      "when": "on_hand - reserved < 0 AND negative_stock_allowed = false",
+      "when_ast": {
+        "field": "on_hand",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
+    },
+    "Inventory.reorder_point_alert": {
+      "action": "warn",
+      "name": "reorder_point_alert",
+      "when": "on_hand <= reorder_level",
+      "when_ast": {
+        "field": "on_hand",
+        "op": "<=",
+        "type": "compare",
+        "value": "reorder_level"
+      }
+    },
+    "Procurement.budget_code_required": {
+      "action": "deny",
+      "name": "budget_code_required",
+      "when": "budget_code missing",
+      "when_ast": {
+        "field": "budget_code",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "Procurement.grn_quantity_mismatch": {
+      "action": "warn",
+      "name": "grn_quantity_mismatch",
+      "when": "received_qty != ordered_qty AND variance_pct > 5",
+      "when_ast": {
+        "left": {
+          "field": "received_qty",
+          "op": "!=",
+          "type": "compare",
+          "value": "ordered_qty"
+        },
+        "right": {
+          "field": "variance_pct",
+          "op": ">",
+          "type": "compare",
+          "value": 5
+        },
+        "type": "and"
+      }
+    },
+    "Procurement.high_value_cfo_approval": {
+      "action": "require_review",
+      "name": "high_value_cfo_approval",
+      "when": "amount > approval_threshold_high",
+      "when_ast": {
+        "field": "amount",
+        "op": ">",
+        "type": "compare",
+        "value": "approval_threshold_high"
+      }
+    },
+    "Procurement.po_requires_pr": {
+      "action": "deny",
+      "name": "po_requires_pr",
+      "when": "purchase_request_id missing",
+      "when_ast": {
+        "field": "purchase_request_id",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "Procurement.three_quote_rule": {
+      "action": "require_review",
+      "name": "three_quote_rule",
+      "when": "amount > three_quote_minimum_above AND quote_count < 3",
+      "when_ast": {
+        "left": {
+          "field": "amount",
+          "op": ">",
+          "type": "compare",
+          "value": "three_quote_minimum_above"
+        },
+        "right": {
+          "field": "quote_count",
+          "op": "<",
+          "type": "compare",
+          "value": 3
+        },
+        "type": "and"
+      }
+    },
+    "Procurement.unqualified_vendor_blocked": {
+      "action": "deny",
+      "name": "unqualified_vendor_blocked",
+      "when": "vendor_qualified = false",
+      "when_ast": {
+        "field": "vendor_qualified",
+        "op": "==",
+        "type": "compare",
+        "value": false
+      }
+    },
+    "RouteOptimisation.driver_hours_limit": {
+      "action": "deny",
+      "name": "driver_hours_limit",
+      "when": "planned_hours > 10",
+      "when_ast": {
+        "field": "planned_hours",
+        "op": ">",
+        "type": "compare",
+        "value": 10
+      }
+    },
+    "RouteOptimisation.overloaded_vehicle_denied": {
+      "action": "deny",
+      "name": "overloaded_vehicle_denied",
+      "when": "load_kg > max_load_kg",
+      "when_ast": {
+        "field": "load_kg",
+        "op": ">",
+        "type": "compare",
+        "value": "max_load_kg"
+      }
+    },
+    "RouteOptimisation.time_window_violation": {
+      "action": "warn",
+      "name": "time_window_violation",
+      "when": "eta > delivery_window_end",
+      "when_ast": {
+        "field": "eta",
+        "op": ">",
+        "type": "compare",
+        "value": "delivery_window_end"
+      }
+    },
+    "ShipmentTracking.geofence_deviation_alert": {
+      "action": "warn",
+      "name": "geofence_deviation_alert",
+      "when": "distance_from_route > geofence_radius_metres",
+      "when_ast": {
+        "field": "distance_from_route",
+        "op": ">",
+        "type": "compare",
+        "value": "geofence_radius_metres"
+      }
+    },
+    "ShipmentTracking.pod_required_on_delivery": {
+      "action": "deny",
+      "name": "pod_required_on_delivery",
+      "when": "delivery_completed AND pod_captured = false",
+      "when_ast": {
+        "left": {
+          "field": "delivery_completed",
+          "op": "==",
+          "type": "compare",
+          "value": true
+        },
+        "right": {
+          "field": "pod_captured",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "ShipmentTracking.temperature_excursion_alert": {
+      "action": "warn",
+      "name": "temperature_excursion_alert",
+      "when": "temp_celsius > max_temp OR temp_celsius < min_temp",
+      "when_ast": {
+        "left": {
+          "field": "temp_celsius",
+          "op": ">",
+          "type": "compare",
+          "value": "max_temp"
+        },
+        "right": {
+          "field": "temp_celsius",
+          "op": "<",
+          "type": "compare",
+          "value": "min_temp"
+        },
+        "type": "or"
+      }
+    },
+    "VendorManagement.expired_qualification_blocked": {
+      "action": "deny",
+      "name": "expired_qualification_blocked",
+      "when": "qualification_expired",
+      "when_ast": {
+        "field": "qualification_expired",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
+    },
+    "VendorManagement.low_score_vendor_review": {
+      "action": "require_review",
+      "name": "low_score_vendor_review",
+      "when": "vendor_score < min_score_to_approve",
+      "when_ast": {
+        "field": "vendor_score",
+        "op": "<",
+        "type": "compare",
+        "value": "min_score_to_approve"
+      }
+    },
+    "VendorManagement.vendor_bank_details_required": {
+      "action": "deny",
+      "name": "vendor_bank_details_required",
+      "when": "bank_account missing",
+      "when_ast": {
+        "field": "bank_account",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "VendorManagement.vendor_tax_pin_required": {
+      "action": "deny",
+      "name": "vendor_tax_pin_required",
+      "when": "tax_pin missing",
+      "when_ast": {
+        "field": "tax_pin",
+        "negated": false,
+        "type": "missing"
+      }
+    }
+  },
+  "security": {},
+  "source_files": [
+    "supply_chain_platform.apg"
+  ],
+  "symbols": {
+    "capability.AuditLog": {
+      "file": "supply_chain_platform.apg",
+      "id": "capability.AuditLog",
+      "kind": "capability",
+      "name": "AuditLog",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 13
+        },
+        "start": {
+          "character": 0,
+          "line": 13
+        }
+      },
+      "references": []
+    },
+    "capability.FleetManagement": {
+      "file": "supply_chain_platform.apg",
+      "id": "capability.FleetManagement",
+      "kind": "capability",
+      "name": "FleetManagement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 173
+        },
+        "start": {
+          "character": 0,
+          "line": 173
+        }
+      },
+      "references": []
+    },
+    "capability.Inventory": {
+      "file": "supply_chain_platform.apg",
+      "id": "capability.Inventory",
+      "kind": "capability",
+      "name": "Inventory",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 135
+        },
+        "start": {
+          "character": 0,
+          "line": 135
+        }
+      },
+      "references": []
+    },
+    "capability.Procurement": {
+      "file": "supply_chain_platform.apg",
+      "id": "capability.Procurement",
+      "kind": "capability",
+      "name": "Procurement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 71
+        },
+        "start": {
+          "character": 0,
+          "line": 71
+        }
+      },
+      "references": []
+    },
+    "capability.RouteOptimisation": {
+      "file": "supply_chain_platform.apg",
+      "id": "capability.RouteOptimisation",
+      "kind": "capability",
+      "name": "RouteOptimisation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 208
+        },
+        "start": {
+          "character": 0,
+          "line": 208
+        }
+      },
+      "references": []
+    },
+    "capability.ShipmentTracking": {
+      "file": "supply_chain_platform.apg",
+      "id": "capability.ShipmentTracking",
+      "kind": "capability",
+      "name": "ShipmentTracking",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 243
+        },
+        "start": {
+          "character": 0,
+          "line": 243
+        }
+      },
+      "references": []
+    },
+    "capability.TenantContext": {
+      "file": "supply_chain_platform.apg",
+      "id": "capability.TenantContext",
+      "kind": "capability",
+      "name": "TenantContext",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 22
+        },
+        "start": {
+          "character": 0,
+          "line": 22
+        }
+      },
+      "references": []
+    },
+    "capability.VendorManagement": {
+      "file": "supply_chain_platform.apg",
+      "id": "capability.VendorManagement",
+      "kind": "capability",
+      "name": "VendorManagement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 34
+        },
+        "start": {
+          "character": 0,
+          "line": 34
+        }
+      },
+      "references": []
+    },
+    "module.supply_chain_platform": {
+      "file": "supply_chain_platform.apg",
+      "id": "module.supply_chain_platform",
+      "kind": "module",
+      "name": "supply_chain_platform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 7
+        },
+        "start": {
+          "character": 0,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "workflow.ProcurementToDelivery": {
+      "file": "supply_chain_platform.apg",
+      "id": "workflow.ProcurementToDelivery",
+      "kind": "workflow",
+      "name": "ProcurementToDelivery",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 290
+        },
+        "start": {
+          "character": 0,
+          "line": 290
+        }
+      },
+      "references": []
+    },
+    "workflow.ProcurementToPO": {
+      "file": "supply_chain_platform.apg",
+      "id": "workflow.ProcurementToPO",
+      "kind": "workflow",
+      "name": "ProcurementToPO",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 125
+        },
+        "start": {
+          "character": 0,
+          "line": 125
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

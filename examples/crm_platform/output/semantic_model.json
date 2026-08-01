@@ -1,0 +1,1312 @@
+{
+  "agents": {
+    "SalesAssistant": {
+      "capabilities": [
+        "contact_lifecycle",
+        "opportunity_pipeline"
+      ],
+      "configuration": {
+        "max_turns": 6,
+        "temperature": 0.2
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "sales_memory"
+      },
+      "model": "openai:gpt-4.1-mini",
+      "name": "SalesAssistant",
+      "outputs": [],
+      "role": "sales assistant",
+      "rules": [],
+      "runtime": null,
+      "system": "Analyse CRM context and suggest next best actions, talking points, and risk factors.",
+      "theme": {},
+      "tools": [
+        "contact_search",
+        "deal_analysis"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": null,
+    "entity_count": 8,
+    "name": "crm_platform",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "CRMCore": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "pipeline_stages": [
+          "prospecting",
+          "qualification",
+          "proposal",
+          "negotiation",
+          "closed_won",
+          "closed_lost"
+        ],
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "CRMCore",
+      "provides": [
+        "contact_lifecycle",
+        "account_management",
+        "opportunity_pipeline",
+        "sales_analytics"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "large_deal_requires_approval",
+          "when": "amount > 50000",
+          "when_ast": {
+            "field": "amount",
+            "op": ">",
+            "type": "compare",
+            "value": 50000
+          }
+        },
+        {
+          "action": "deny",
+          "name": "discount_cap",
+          "when": "discount_pct > 25",
+          "when_ast": {
+            "field": "discount_pct",
+            "op": ">",
+            "type": "compare",
+            "value": 25
+          }
+        },
+        {
+          "action": "deny",
+          "name": "cross_tenant_denied",
+          "when": "contact_tenant != actor_tenant",
+          "when_ast": {
+            "field": "contact_tenant",
+            "op": "!=",
+            "type": "compare",
+            "value": "actor_tenant"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "crm_event_state"
+      },
+      "theme": {
+        "components": {
+          "opportunities": {
+            "icon": "target",
+            "status_indicator": "stage-chip"
+          }
+        },
+        "name": "crm_theme",
+        "tokens": {
+          "border.radius": "6px",
+          "color.accent": "#FF6D00",
+          "color.primary": "#1565C0"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "CRMDashboard",
+            "name": "Dashboard",
+            "path": "/crm",
+            "permission": "crm:view"
+          },
+          {
+            "component": "ContactList",
+            "name": "Contacts",
+            "path": "/crm/contacts",
+            "permission": "crm:contacts"
+          },
+          {
+            "component": "Pipeline",
+            "name": "Pipeline",
+            "path": "/crm/pipeline",
+            "permission": "crm:pipeline"
+          },
+          {
+            "component": "SalesAnalytics",
+            "name": "Analytics",
+            "path": "/crm/analytics",
+            "permission": "crm:analytics"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "CRMPlatform": {
+        "agent_teams": [],
+        "agents": [
+          "SalesAssistant"
+        ],
+        "capabilities": [
+          "CRMCore"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {
+          "container": "docker",
+          "default": "local"
+        },
+        "description": "Enterprise CRM composed from APG capabilities",
+        "integrations": {},
+        "name": "CRMPlatform",
+        "policies": {},
+        "routes": [
+          "/crm",
+          "/crm/contacts",
+          "/crm/accounts",
+          "/crm/pipeline"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {},
+        "theme": {
+          "name": "crm_platform_theme",
+          "tokens": {
+            "accent": "#FF6D00",
+            "border.radius": "6px"
+          }
+        },
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {
+      "CRMCore": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo"
+      ]
+    }
+  },
+  "contracts": {
+    "CRMCore": {
+      "configuration": {
+        "pipeline_stages": [
+          "prospecting",
+          "qualification",
+          "proposal",
+          "negotiation",
+          "closed_won",
+          "closed_lost"
+        ],
+        "tenant_id": "default"
+      },
+      "id": "crm_platform_core",
+      "provides": [
+        "contact_lifecycle",
+        "account_management",
+        "opportunity_pipeline",
+        "sales_analytics"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo"
+      ],
+      "rules": [
+        {
+          "action": "require_review",
+          "name": "large_deal_requires_approval",
+          "when": "amount > 50000",
+          "when_ast": {
+            "field": "amount",
+            "op": ">",
+            "type": "compare",
+            "value": 50000
+          }
+        },
+        {
+          "action": "deny",
+          "name": "discount_cap",
+          "when": "discount_pct > 25",
+          "when_ast": {
+            "field": "discount_pct",
+            "op": ">",
+            "type": "compare",
+            "value": 25
+          }
+        },
+        {
+          "action": "deny",
+          "name": "cross_tenant_denied",
+          "when": "contact_tenant != actor_tenant",
+          "when_ast": {
+            "field": "contact_tenant",
+            "op": "!=",
+            "type": "compare",
+            "value": "actor_tenant"
+          }
+        }
+      ],
+      "theme": {
+        "components": {
+          "opportunities": {
+            "icon": "target",
+            "status_indicator": "stage-chip"
+          }
+        },
+        "name": "crm_theme",
+        "tokens": {
+          "border.radius": "6px",
+          "color.accent": "#FF6D00",
+          "color.primary": "#1565C0"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "CRMDashboard",
+            "name": "Dashboard",
+            "path": "/crm",
+            "permission": "crm:view"
+          },
+          {
+            "component": "ContactList",
+            "name": "Contacts",
+            "path": "/crm/contacts",
+            "permission": "crm:contacts"
+          },
+          {
+            "component": "Pipeline",
+            "name": "Pipeline",
+            "path": "/crm/pipeline",
+            "permission": "crm:pipeline"
+          },
+          {
+            "component": "SalesAnalytics",
+            "name": "Analytics",
+            "path": "/crm/analytics",
+            "permission": "crm:analytics"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "crm_platform.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_platform.apg",
+      "fixes": [],
+      "message": "Reserved field name 'owner_id' is declared explicitly; APG generates this field automatically",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_platform.apg",
+      "fixes": [],
+      "message": "Reserved field name 'owner_id' is declared explicitly; APG generates this field automatically",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "crm_platform.apg",
+      "fixes": [],
+      "message": "Reserved field name 'owner_id' is declared explicitly; APG generates this field automatically",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {
+    "DealApproval": {
+      "assignments": {
+        "finance_review": "finance_controller",
+        "manager_review": "sales_manager"
+      },
+      "compensation": {},
+      "guards": {
+        "finance_review": "amount > 100000"
+      },
+      "human_tasks": [
+        "manager_review",
+        "finance_review"
+      ],
+      "methods": [],
+      "name": "DealApproval",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "submitted",
+        "manager_review",
+        "finance_review",
+        "approved"
+      ],
+      "steps": [
+        "submitted",
+        "manager_review",
+        "finance_review",
+        "approved"
+      ],
+      "steps_raw": "submitted -> manager_review -> finance_review -> approved",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "submitted",
+          "target": "manager_review"
+        },
+        {
+          "guard": "amount > 100000",
+          "source": "manager_review",
+          "target": "finance_review"
+        },
+        {
+          "guard": null,
+          "source": "finance_review",
+          "target": "approved"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "LeadQualification": {
+      "assignments": {
+        "contacted": "sales_rep",
+        "qualified": "sales_manager"
+      },
+      "compensation": {},
+      "guards": {
+        "qualified": "budget_confirmed and timeline_defined"
+      },
+      "human_tasks": [
+        "contacted",
+        "qualified"
+      ],
+      "methods": [],
+      "name": "LeadQualification",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "new_lead",
+        "researched",
+        "contacted",
+        "qualified",
+        "opportunity_created"
+      ],
+      "steps": [
+        "new_lead",
+        "researched",
+        "contacted",
+        "qualified",
+        "opportunity_created"
+      ],
+      "steps_raw": "new_lead -> researched -> contacted -> qualified -> opportunity_created",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "new_lead",
+          "target": "researched"
+        },
+        {
+          "guard": null,
+          "source": "researched",
+          "target": "contacted"
+        },
+        {
+          "guard": "budget_confirmed and timeline_defined",
+          "source": "contacted",
+          "target": "qualified"
+        },
+        {
+          "guard": null,
+          "source": "qualified",
+          "target": "opportunity_created"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 1
+    },
+    "capability": {
+      "edges": 5,
+      "kind": "capability",
+      "nodes": 6
+    },
+    "deployment": {
+      "edges": 8,
+      "kind": "deployment",
+      "nodes": 9
+    },
+    "er": {
+      "edges": 23,
+      "kind": "er",
+      "nodes": 25
+    },
+    "handler": {
+      "edges": 8,
+      "kind": "handler",
+      "nodes": 9
+    },
+    "lookup": {
+      "edges": 8,
+      "kind": "lookup",
+      "nodes": 9
+    },
+    "package": {
+      "edges": 8,
+      "kind": "package",
+      "nodes": 9
+    },
+    "security": {
+      "edges": 8,
+      "kind": "security",
+      "nodes": 9
+    },
+    "workflow": {
+      "edges": 8,
+      "kind": "workflow",
+      "nodes": 9
+    }
+  },
+  "llms": {
+    "SalesAssistant": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": null
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "CRMCore.cross_tenant_denied": {
+      "action": "deny",
+      "name": "cross_tenant_denied",
+      "when": "contact_tenant != actor_tenant",
+      "when_ast": {
+        "field": "contact_tenant",
+        "op": "!=",
+        "type": "compare",
+        "value": "actor_tenant"
+      }
+    },
+    "CRMCore.discount_cap": {
+      "action": "deny",
+      "name": "discount_cap",
+      "when": "discount_pct > 25",
+      "when_ast": {
+        "field": "discount_pct",
+        "op": ">",
+        "type": "compare",
+        "value": 25
+      }
+    },
+    "CRMCore.large_deal_requires_approval": {
+      "action": "require_review",
+      "name": "large_deal_requires_approval",
+      "when": "amount > 50000",
+      "when_ast": {
+        "field": "amount",
+        "op": ">",
+        "type": "compare",
+        "value": 50000
+      }
+    }
+  },
+  "security": {},
+  "source_files": [
+    "crm_platform.apg"
+  ],
+  "symbols": {
+    "agent.SalesAssistant": {
+      "file": "crm_platform.apg",
+      "id": "agent.SalesAssistant",
+      "kind": "agent",
+      "name": "SalesAssistant",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.CRMPlatform": {
+      "file": "crm_platform.apg",
+      "id": "app.CRMPlatform",
+      "kind": "app",
+      "name": "CRMPlatform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.CRMCore": {
+      "file": "crm_platform.apg",
+      "id": "capability.CRMCore",
+      "kind": "capability",
+      "name": "CRMCore",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Account.account_number": {
+      "file": "crm_platform.apg",
+      "id": "field.Account.account_number",
+      "kind": "field",
+      "name": "Account.account_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Account.health_score": {
+      "file": "crm_platform.apg",
+      "id": "field.Account.health_score",
+      "kind": "field",
+      "name": "Account.health_score",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Account.industry": {
+      "file": "crm_platform.apg",
+      "id": "field.Account.industry",
+      "kind": "field",
+      "name": "Account.industry",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Account.legal_name": {
+      "file": "crm_platform.apg",
+      "id": "field.Account.legal_name",
+      "kind": "field",
+      "name": "Account.legal_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Account.owner_id": {
+      "file": "crm_platform.apg",
+      "id": "field.Account.owner_id",
+      "kind": "field",
+      "name": "Account.owner_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Account.tier": {
+      "file": "crm_platform.apg",
+      "id": "field.Account.tier",
+      "kind": "field",
+      "name": "Account.tier",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Contact.company": {
+      "file": "crm_platform.apg",
+      "id": "field.Contact.company",
+      "kind": "field",
+      "name": "Contact.company",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Contact.contact_number": {
+      "file": "crm_platform.apg",
+      "id": "field.Contact.contact_number",
+      "kind": "field",
+      "name": "Contact.contact_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Contact.email": {
+      "file": "crm_platform.apg",
+      "id": "field.Contact.email",
+      "kind": "field",
+      "name": "Contact.email",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Contact.first_name": {
+      "file": "crm_platform.apg",
+      "id": "field.Contact.first_name",
+      "kind": "field",
+      "name": "Contact.first_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Contact.last_name": {
+      "file": "crm_platform.apg",
+      "id": "field.Contact.last_name",
+      "kind": "field",
+      "name": "Contact.last_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Contact.owner_id": {
+      "file": "crm_platform.apg",
+      "id": "field.Contact.owner_id",
+      "kind": "field",
+      "name": "Contact.owner_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Contact.phone": {
+      "file": "crm_platform.apg",
+      "id": "field.Contact.phone",
+      "kind": "field",
+      "name": "Contact.phone",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Contact.status": {
+      "file": "crm_platform.apg",
+      "id": "field.Contact.status",
+      "kind": "field",
+      "name": "Contact.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.account_id": {
+      "file": "crm_platform.apg",
+      "id": "field.Opportunity.account_id",
+      "kind": "field",
+      "name": "Opportunity.account_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.amount": {
+      "file": "crm_platform.apg",
+      "id": "field.Opportunity.amount",
+      "kind": "field",
+      "name": "Opportunity.amount",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.expected_close": {
+      "file": "crm_platform.apg",
+      "id": "field.Opportunity.expected_close",
+      "kind": "field",
+      "name": "Opportunity.expected_close",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.name": {
+      "file": "crm_platform.apg",
+      "id": "field.Opportunity.name",
+      "kind": "field",
+      "name": "Opportunity.name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.opportunity_number": {
+      "file": "crm_platform.apg",
+      "id": "field.Opportunity.opportunity_number",
+      "kind": "field",
+      "name": "Opportunity.opportunity_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.owner_id": {
+      "file": "crm_platform.apg",
+      "id": "field.Opportunity.owner_id",
+      "kind": "field",
+      "name": "Opportunity.owner_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.probability": {
+      "file": "crm_platform.apg",
+      "id": "field.Opportunity.probability",
+      "kind": "field",
+      "name": "Opportunity.probability",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Opportunity.stage": {
+      "file": "crm_platform.apg",
+      "id": "field.Opportunity.stage",
+      "kind": "field",
+      "name": "Opportunity.stage",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "crm_platform.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.crm_platform": {
+      "file": "crm_platform.apg",
+      "id": "module.crm_platform",
+      "kind": "module",
+      "name": "crm_platform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Account": {
+      "file": "crm_platform.apg",
+      "id": "table.Account",
+      "kind": "table",
+      "name": "Account",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Contact": {
+      "file": "crm_platform.apg",
+      "id": "table.Contact",
+      "kind": "table",
+      "name": "Contact",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Opportunity": {
+      "file": "crm_platform.apg",
+      "id": "table.Opportunity",
+      "kind": "table",
+      "name": "Opportunity",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.DealApproval": {
+      "file": "crm_platform.apg",
+      "id": "workflow.DealApproval",
+      "kind": "workflow",
+      "name": "DealApproval",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.LeadQualification": {
+      "file": "crm_platform.apg",
+      "id": "workflow.LeadQualification",
+      "kind": "workflow",
+      "name": "LeadQualification",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Account": {
+      "fields": {
+        "account_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "health_score": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "industry": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "legal_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "owner_id": {
+          "relationship": {
+            "alias": "owner",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Owner"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "tier": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Account"
+    },
+    "Contact": {
+      "fields": {
+        "company": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "contact_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "first_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "last_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "owner_id": {
+          "relationship": {
+            "alias": "owner",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Owner"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Contact"
+    },
+    "Opportunity": {
+      "fields": {
+        "account_id": {
+          "relationship": {
+            "alias": "account",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Account"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "amount": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "expected_close": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "opportunity_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "owner_id": {
+          "relationship": {
+            "alias": "owner",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Owner"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "probability": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "stage": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "amount.id": {
+          "chain": [
+            "Opportunity.amount",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "expected_close.id": {
+          "chain": [
+            "Opportunity.expected_close",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Opportunity"
+    }
+  },
+  "views": {}
+}

@@ -1073,13 +1073,9 @@
     "InventoryItem": {
       "fields": {
         "bin_location": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "cost_price": {
           "relationship": {
@@ -1127,13 +1123,6 @@
         }
       },
       "lookup_paths": {
-        "bin_location.id": {
-          "chain": [
-            "InventoryItem.bin_location",
-            "str?.id"
-          ],
-          "valid": true
-        },
         "cost_price.id": {
           "chain": [
             "InventoryItem.cost_price",
@@ -1147,13 +1136,9 @@
     "StockMovement": {
       "fields": {
         "from_bin": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "item_sku": {
           "relationship": null,
@@ -1195,50 +1180,21 @@
           "type": "int"
         },
         "reference": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "to_bin": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         }
       },
       "lookup_paths": {
-        "from_bin.id": {
-          "chain": [
-            "StockMovement.from_bin",
-            "str?.id"
-          ],
-          "valid": true
-        },
         "performed_at.id": {
           "chain": [
             "StockMovement.performed_at",
             "datetime.id"
-          ],
-          "valid": true
-        },
-        "reference.id": {
-          "chain": [
-            "StockMovement.reference",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "to_bin.id": {
-          "chain": [
-            "StockMovement.to_bin",
-            "str?.id"
           ],
           "valid": true
         }

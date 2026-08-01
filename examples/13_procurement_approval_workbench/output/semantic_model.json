@@ -1060,13 +1060,9 @@
           "type": "decimal"
         },
         "budget_code": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "created_at": {
           "relationship": {
@@ -1093,13 +1089,9 @@
           "type": "str"
         },
         "justification": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "priority": {
           "relationship": null,
@@ -1140,24 +1132,10 @@
           ],
           "valid": true
         },
-        "budget_code.id": {
-          "chain": [
-            "PurchaseRequest.budget_code",
-            "str?.id"
-          ],
-          "valid": true
-        },
         "created_at.id": {
           "chain": [
             "PurchaseRequest.created_at",
             "datetime.id"
-          ],
-          "valid": true
-        },
-        "justification.id": {
-          "chain": [
-            "PurchaseRequest.justification",
-            "str?.id"
           ],
           "valid": true
         }

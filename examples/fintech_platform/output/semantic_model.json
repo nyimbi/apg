@@ -1,0 +1,1734 @@
+{
+  "agents": {
+    "FintechRiskOfficer": {
+      "capabilities": [
+        "aml_screening_workflow",
+        "regulatory_reporting"
+      ],
+      "configuration": {
+        "max_turns": 4,
+        "temperature": 0.0
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "compliance_memory"
+      },
+      "model": "openai:gpt-4.1-mini",
+      "name": "FintechRiskOfficer",
+      "outputs": [],
+      "role": "risk and compliance officer",
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_sar_without_evidence",
+          "when": "sar_evidence missing"
+        }
+      ],
+      "runtime": null,
+      "system": "You are a fintech compliance officer for Kenya/East Africa. Review AML alerts, assess transaction patterns, and prepare regulatory submissions to CBK, CMA, and FSCA. Apply FATF recommendations and Kenya AML/CFT framework.",
+      "theme": {},
+      "tools": [
+        "transaction_history",
+        "customer_risk_profile",
+        "watchlist_check",
+        "cbk_reporting"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": null,
+    "entity_count": 8,
+    "name": "fintech_platform",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "FintechCore": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "aml_screen_all": true,
+        "base_currency": "KES",
+        "cbk_reporting_threshold": 1000000,
+        "daily_limit_basic": 300000,
+        "daily_limit_full_kyc": 5000000,
+        "daily_limit_standard": 1000000,
+        "kyc_required_for_payment": true,
+        "mpesa_business_short_code": "174379",
+        "require_liveness_for_full_kyc": true,
+        "supported_currencies": [
+          "KES",
+          "UGX",
+          "TZS",
+          "USD"
+        ],
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "FintechCore",
+      "provides": [
+        "customer_onboarding_workflow",
+        "payment_processing_workflow",
+        "wallet_lifecycle",
+        "credit_origination_workflow",
+        "aml_screening_workflow",
+        "regulatory_reporting"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "kyc_verification",
+        "aml_detection",
+        "comp"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "kyc_required_for_payment",
+            "when": "kyc_status != verified"
+          },
+          {
+            "action": "deny",
+            "name": "basic_kyc_daily_limit",
+            "when": "kyc_tier == basic and transaction_amount + daily_used_gt == 300000"
+          },
+          {
+            "action": "deny",
+            "name": "aml_flagged_transaction_blocked",
+            "when": "aml_status == flagged"
+          },
+          {
+            "action": "require_review",
+            "name": "ctr_threshold_requires_report",
+            "when": "amount_gt == 1000000"
+          },
+          {
+            "action": "deny",
+            "name": "sanctioned_entity_denied",
+            "when": "sanctions_match == true"
+          },
+          {
+            "action": "deny",
+            "name": "duplicate_transaction_check",
+            "when": "duplicate_detected == true"
+          },
+          {
+            "action": "require_review",
+            "name": "high_risk_customer_enhanced_dd",
+            "when": "risk_level == high and enhanced_dd_completed != true"
+          },
+          {
+            "action": "require_review",
+            "name": "velocity_breach",
+            "when": "transactions_in_hour_gt == 10"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "events": [
+          "kyc_started",
+          "kyc_verified",
+          "kyc_rejected",
+          "payment_initiated",
+          "payment_completed",
+          "payment_failed",
+          "wallet_credited",
+          "wallet_debited",
+          "wallet_frozen",
+          "aml_alert_raised",
+          "aml_cleared",
+          "sar_filed",
+          "loan_disbursed",
+          "repayment_received"
+        ],
+        "guardrails": [
+          "unverified_kyc_payment_denied",
+          "sanctions_match_blocked",
+          "duplicate_payment_denied",
+          "velocity_breach_requires_review"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.fintech.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "aml_alerts": {
+            "icon": "shield-exclamation",
+            "status_indicator": "aml-risk-chip"
+          },
+          "customers": {
+            "icon": "user-check",
+            "status_indicator": "kyc-tier-chip"
+          },
+          "transactions": {
+            "icon": "arrow-right-left",
+            "status_indicator": "txn-status-chip"
+          }
+        },
+        "name": "fintech_theme",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#00897B",
+          "color.danger": "#B71C1C",
+          "color.primary": "#0D47A1",
+          "color.success": "#1B5E20",
+          "color.warning": "#F57F17",
+          "density": "comfortable",
+          "surface.canvas": "#F5F9FF",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#0D1B2A",
+          "text.secondary": "#546E7A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "FintechDashboard",
+            "name": "Dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech",
+            "permission": "fintech:view"
+          },
+          {
+            "component": "CustomerRegistry",
+            "name": "Customers",
+            "nav_group": "Customers",
+            "path": "/fintech/customers",
+            "permission": "fintech:customers"
+          },
+          {
+            "component": "KYCWorkbench",
+            "name": "KYC Queue",
+            "nav_group": "Compliance",
+            "path": "/fintech/kyc",
+            "permission": "fintech:kyc"
+          },
+          {
+            "component": "TransactionLedger",
+            "name": "Transactions",
+            "nav_group": "Payments",
+            "path": "/fintech/transactions",
+            "permission": "fintech:payments"
+          },
+          {
+            "component": "WalletManager",
+            "name": "Wallets",
+            "nav_group": "Payments",
+            "path": "/fintech/wallets",
+            "permission": "fintech:wallets"
+          },
+          {
+            "component": "AMLWorkbench",
+            "name": "AML Alerts",
+            "nav_group": "Compliance",
+            "path": "/fintech/aml",
+            "permission": "fintech:compliance"
+          },
+          {
+            "component": "LoanPortfolio",
+            "name": "Lending",
+            "nav_group": "Credit",
+            "path": "/fintech/lending",
+            "permission": "fintech:lending"
+          },
+          {
+            "component": "RegulatoryReports",
+            "name": "Reports",
+            "nav_group": "Regulatory",
+            "path": "/fintech/reports",
+            "permission": "fintech:reports"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "FintechPlatform": {
+        "agent_teams": [],
+        "agents": [
+          "FintechRiskOfficer"
+        ],
+        "capabilities": [
+          "FintechCore"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {
+          "container": "docker",
+          "default": "local"
+        },
+        "description": "Africa-first fintech platform composed from APG capabilities",
+        "integrations": {},
+        "name": "FintechPlatform",
+        "policies": {},
+        "routes": [
+          "/fintech",
+          "/fintech/customers",
+          "/fintech/transactions",
+          "/fintech/aml"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {},
+        "theme": {
+          "name": "fintech_platform_theme",
+          "tokens": {
+            "accent": "#00897B",
+            "border.radius": "8px"
+          }
+        },
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {
+      "FintechCore": [
+        "auth",
+        "audl",
+        "ntfy",
+        "kyc_verification",
+        "aml_detection",
+        "comp"
+      ]
+    }
+  },
+  "contracts": {
+    "FintechCore": {
+      "configuration": {
+        "aml_screen_all": true,
+        "base_currency": "KES",
+        "cbk_reporting_threshold": 1000000,
+        "daily_limit_basic": 300000,
+        "daily_limit_full_kyc": 5000000,
+        "daily_limit_standard": 1000000,
+        "kyc_required_for_payment": true,
+        "mpesa_business_short_code": "174379",
+        "require_liveness_for_full_kyc": true,
+        "supported_currencies": [
+          "KES",
+          "UGX",
+          "TZS",
+          "USD"
+        ],
+        "tenant_id": "default"
+      },
+      "id": "fintech_platform_core",
+      "provides": [
+        "customer_onboarding_workflow",
+        "payment_processing_workflow",
+        "wallet_lifecycle",
+        "credit_origination_workflow",
+        "aml_screening_workflow",
+        "regulatory_reporting"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "kyc_verification",
+        "aml_detection",
+        "comp"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "kyc_required_for_payment",
+            "when": "kyc_status != verified"
+          },
+          {
+            "action": "deny",
+            "name": "basic_kyc_daily_limit",
+            "when": "kyc_tier == basic and transaction_amount + daily_used_gt == 300000"
+          },
+          {
+            "action": "deny",
+            "name": "aml_flagged_transaction_blocked",
+            "when": "aml_status == flagged"
+          },
+          {
+            "action": "require_review",
+            "name": "ctr_threshold_requires_report",
+            "when": "amount_gt == 1000000"
+          },
+          {
+            "action": "deny",
+            "name": "sanctioned_entity_denied",
+            "when": "sanctions_match == true"
+          },
+          {
+            "action": "deny",
+            "name": "duplicate_transaction_check",
+            "when": "duplicate_detected == true"
+          },
+          {
+            "action": "require_review",
+            "name": "high_risk_customer_enhanced_dd",
+            "when": "risk_level == high and enhanced_dd_completed != true"
+          },
+          {
+            "action": "require_review",
+            "name": "velocity_breach",
+            "when": "transactions_in_hour_gt == 10"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "components": {
+          "aml_alerts": {
+            "icon": "shield-exclamation",
+            "status_indicator": "aml-risk-chip"
+          },
+          "customers": {
+            "icon": "user-check",
+            "status_indicator": "kyc-tier-chip"
+          },
+          "transactions": {
+            "icon": "arrow-right-left",
+            "status_indicator": "txn-status-chip"
+          }
+        },
+        "name": "fintech_theme",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#00897B",
+          "color.danger": "#B71C1C",
+          "color.primary": "#0D47A1",
+          "color.success": "#1B5E20",
+          "color.warning": "#F57F17",
+          "density": "comfortable",
+          "surface.canvas": "#F5F9FF",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#0D1B2A",
+          "text.secondary": "#546E7A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "FintechDashboard",
+            "name": "Dashboard",
+            "nav_group": "Overview",
+            "path": "/fintech",
+            "permission": "fintech:view"
+          },
+          {
+            "component": "CustomerRegistry",
+            "name": "Customers",
+            "nav_group": "Customers",
+            "path": "/fintech/customers",
+            "permission": "fintech:customers"
+          },
+          {
+            "component": "KYCWorkbench",
+            "name": "KYC Queue",
+            "nav_group": "Compliance",
+            "path": "/fintech/kyc",
+            "permission": "fintech:kyc"
+          },
+          {
+            "component": "TransactionLedger",
+            "name": "Transactions",
+            "nav_group": "Payments",
+            "path": "/fintech/transactions",
+            "permission": "fintech:payments"
+          },
+          {
+            "component": "WalletManager",
+            "name": "Wallets",
+            "nav_group": "Payments",
+            "path": "/fintech/wallets",
+            "permission": "fintech:wallets"
+          },
+          {
+            "component": "AMLWorkbench",
+            "name": "AML Alerts",
+            "nav_group": "Compliance",
+            "path": "/fintech/aml",
+            "permission": "fintech:compliance"
+          },
+          {
+            "component": "LoanPortfolio",
+            "name": "Lending",
+            "nav_group": "Credit",
+            "path": "/fintech/lending",
+            "permission": "fintech:lending"
+          },
+          {
+            "component": "RegulatoryReports",
+            "name": "Reports",
+            "nav_group": "Regulatory",
+            "path": "/fintech/reports",
+            "permission": "fintech:reports"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "fintech_platform.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fintech_platform.apg",
+      "fixes": [],
+      "message": "Capability 'FintechCore' requires 'kyc_verification' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    },
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "fintech_platform.apg",
+      "fixes": [],
+      "message": "Capability 'FintechCore' requires 'aml_detection' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {
+    "CustomerOnboarding": {
+      "assignments": {
+        "pep_screening": "compliance_officer"
+      },
+      "compensation": {},
+      "guards": {
+        "active": "wallet_funded or zero_balance_allowed",
+        "kyc_approved": "liveness_passed and pep_clear and risk_score_acceptable",
+        "liveness_check": "id_document_verified"
+      },
+      "human_tasks": [
+        "pep_screening"
+      ],
+      "methods": [],
+      "name": "CustomerOnboarding",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "registration",
+        "id_verification",
+        "liveness_check",
+        "pep_screening",
+        "risk_scoring",
+        "kyc_approved",
+        "wallet_created",
+        "active"
+      ],
+      "steps": [
+        "registration",
+        "id_verification",
+        "liveness_check",
+        "pep_screening",
+        "risk_scoring",
+        "kyc_approved",
+        "wallet_created",
+        "active"
+      ],
+      "steps_raw": "registration -> id_verification -> liveness_check -> pep_screening -> risk_scoring -> kyc_approved -> wallet_created -> active",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "registration",
+          "target": "id_verification"
+        },
+        {
+          "guard": "id_document_verified",
+          "source": "id_verification",
+          "target": "liveness_check"
+        },
+        {
+          "guard": null,
+          "source": "liveness_check",
+          "target": "pep_screening"
+        },
+        {
+          "guard": null,
+          "source": "pep_screening",
+          "target": "risk_scoring"
+        },
+        {
+          "guard": "liveness_passed and pep_clear and risk_score_acceptable",
+          "source": "risk_scoring",
+          "target": "kyc_approved"
+        },
+        {
+          "guard": null,
+          "source": "kyc_approved",
+          "target": "wallet_created"
+        },
+        {
+          "guard": "wallet_funded or zero_balance_allowed",
+          "source": "wallet_created",
+          "target": "active"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "LoanOrigination": {
+      "assignments": {
+        "underwriting": "credit_analyst"
+      },
+      "compensation": {
+        "disbursed": "reverse_disbursement"
+      },
+      "guards": {
+        "disbursed": "offer_signed and account_verified",
+        "underwriting": "bureau_score available and dsr_within_limit"
+      },
+      "human_tasks": [
+        "underwriting"
+      ],
+      "methods": [],
+      "name": "LoanOrigination",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "application",
+        "bureau_check",
+        "underwriting",
+        "offer_generated",
+        "accepted",
+        "disbursed"
+      ],
+      "steps": [
+        "application",
+        "bureau_check",
+        "underwriting",
+        "offer_generated",
+        "accepted",
+        "disbursed"
+      ],
+      "steps_raw": "application -> bureau_check -> underwriting -> offer_generated -> accepted -> disbursed",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "application",
+          "target": "bureau_check"
+        },
+        {
+          "guard": "bureau_score available and dsr_within_limit",
+          "source": "bureau_check",
+          "target": "underwriting"
+        },
+        {
+          "guard": null,
+          "source": "underwriting",
+          "target": "offer_generated"
+        },
+        {
+          "guard": null,
+          "source": "offer_generated",
+          "target": "accepted"
+        },
+        {
+          "guard": "offer_signed and account_verified",
+          "source": "accepted",
+          "target": "disbursed"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 1
+    },
+    "capability": {
+      "edges": 7,
+      "kind": "capability",
+      "nodes": 8
+    },
+    "deployment": {
+      "edges": 8,
+      "kind": "deployment",
+      "nodes": 9
+    },
+    "er": {
+      "edges": 33,
+      "kind": "er",
+      "nodes": 32
+    },
+    "handler": {
+      "edges": 8,
+      "kind": "handler",
+      "nodes": 9
+    },
+    "lookup": {
+      "edges": 8,
+      "kind": "lookup",
+      "nodes": 9
+    },
+    "package": {
+      "edges": 8,
+      "kind": "package",
+      "nodes": 9
+    },
+    "security": {
+      "edges": 8,
+      "kind": "security",
+      "nodes": 9
+    },
+    "workflow": {
+      "edges": 8,
+      "kind": "workflow",
+      "nodes": 9
+    }
+  },
+  "llms": {
+    "FintechRiskOfficer": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": null
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "FintechCore.aml_flagged_transaction_blocked": {
+      "action": "deny",
+      "name": "aml_flagged_transaction_blocked",
+      "when": "aml_status == flagged"
+    },
+    "FintechCore.basic_kyc_daily_limit": {
+      "action": "deny",
+      "name": "basic_kyc_daily_limit",
+      "when": "kyc_tier == basic and transaction_amount + daily_used_gt == 300000"
+    },
+    "FintechCore.ctr_threshold_requires_report": {
+      "action": "require_review",
+      "name": "ctr_threshold_requires_report",
+      "when": "amount_gt == 1000000"
+    },
+    "FintechCore.duplicate_transaction_check": {
+      "action": "deny",
+      "name": "duplicate_transaction_check",
+      "when": "duplicate_detected == true"
+    },
+    "FintechCore.high_risk_customer_enhanced_dd": {
+      "action": "require_review",
+      "name": "high_risk_customer_enhanced_dd",
+      "when": "risk_level == high and enhanced_dd_completed != true"
+    },
+    "FintechCore.kyc_required_for_payment": {
+      "action": "deny",
+      "name": "kyc_required_for_payment",
+      "when": "kyc_status != verified"
+    },
+    "FintechCore.sanctioned_entity_denied": {
+      "action": "deny",
+      "name": "sanctioned_entity_denied",
+      "when": "sanctions_match == true"
+    },
+    "FintechCore.velocity_breach": {
+      "action": "require_review",
+      "name": "velocity_breach",
+      "when": "transactions_in_hour_gt == 10"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "fintech_platform.apg"
+  ],
+  "symbols": {
+    "agent.FintechRiskOfficer": {
+      "file": "fintech_platform.apg",
+      "id": "agent.FintechRiskOfficer",
+      "kind": "agent",
+      "name": "FintechRiskOfficer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.FintechPlatform": {
+      "file": "fintech_platform.apg",
+      "id": "app.FintechPlatform",
+      "kind": "app",
+      "name": "FintechPlatform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.FintechCore": {
+      "file": "fintech_platform.apg",
+      "id": "capability.FintechCore",
+      "kind": "capability",
+      "name": "FintechCore",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.currency": {
+      "file": "fintech_platform.apg",
+      "id": "field.Customer.currency",
+      "kind": "field",
+      "name": "Customer.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.Customer.customer_id": {
+      "file": "fintech_platform.apg",
+      "id": "field.Customer.customer_id",
+      "kind": "field",
+      "name": "Customer.customer_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Customer.daily_limit": {
+      "file": "fintech_platform.apg",
+      "id": "field.Customer.daily_limit",
+      "kind": "field",
+      "name": "Customer.daily_limit",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Customer.full_name": {
+      "file": "fintech_platform.apg",
+      "id": "field.Customer.full_name",
+      "kind": "field",
+      "name": "Customer.full_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Customer.kyc_status": {
+      "file": "fintech_platform.apg",
+      "id": "field.Customer.kyc_status",
+      "kind": "field",
+      "name": "Customer.kyc_status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Customer.kyc_tier": {
+      "file": "fintech_platform.apg",
+      "id": "field.Customer.kyc_tier",
+      "kind": "field",
+      "name": "Customer.kyc_tier",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Customer.monthly_limit": {
+      "file": "fintech_platform.apg",
+      "id": "field.Customer.monthly_limit",
+      "kind": "field",
+      "name": "Customer.monthly_limit",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Customer.national_id": {
+      "file": "fintech_platform.apg",
+      "id": "field.Customer.national_id",
+      "kind": "field",
+      "name": "Customer.national_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Customer.phone": {
+      "file": "fintech_platform.apg",
+      "id": "field.Customer.phone",
+      "kind": "field",
+      "name": "Customer.phone",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Customer.risk_level": {
+      "file": "fintech_platform.apg",
+      "id": "field.Customer.risk_level",
+      "kind": "field",
+      "name": "Customer.risk_level",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Transaction.aml_status": {
+      "file": "fintech_platform.apg",
+      "id": "field.Transaction.aml_status",
+      "kind": "field",
+      "name": "Transaction.aml_status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.Transaction.amount": {
+      "file": "fintech_platform.apg",
+      "id": "field.Transaction.amount",
+      "kind": "field",
+      "name": "Transaction.amount",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Transaction.channel": {
+      "file": "fintech_platform.apg",
+      "id": "field.Transaction.channel",
+      "kind": "field",
+      "name": "Transaction.channel",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Transaction.currency": {
+      "file": "fintech_platform.apg",
+      "id": "field.Transaction.currency",
+      "kind": "field",
+      "name": "Transaction.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Transaction.fee": {
+      "file": "fintech_platform.apg",
+      "id": "field.Transaction.fee",
+      "kind": "field",
+      "name": "Transaction.fee",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 11
+        },
+        "start": {
+          "character": 4,
+          "line": 11
+        }
+      },
+      "references": []
+    },
+    "field.Transaction.recipient_id": {
+      "file": "fintech_platform.apg",
+      "id": "field.Transaction.recipient_id",
+      "kind": "field",
+      "name": "Transaction.recipient_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Transaction.reference": {
+      "file": "fintech_platform.apg",
+      "id": "field.Transaction.reference",
+      "kind": "field",
+      "name": "Transaction.reference",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Transaction.sender_id": {
+      "file": "fintech_platform.apg",
+      "id": "field.Transaction.sender_id",
+      "kind": "field",
+      "name": "Transaction.sender_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Transaction.status": {
+      "file": "fintech_platform.apg",
+      "id": "field.Transaction.status",
+      "kind": "field",
+      "name": "Transaction.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Transaction.transaction_id": {
+      "file": "fintech_platform.apg",
+      "id": "field.Transaction.transaction_id",
+      "kind": "field",
+      "name": "Transaction.transaction_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Transaction.transaction_type": {
+      "file": "fintech_platform.apg",
+      "id": "field.Transaction.transaction_type",
+      "kind": "field",
+      "name": "Transaction.transaction_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Wallet.balance": {
+      "file": "fintech_platform.apg",
+      "id": "field.Wallet.balance",
+      "kind": "field",
+      "name": "Wallet.balance",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Wallet.currency": {
+      "file": "fintech_platform.apg",
+      "id": "field.Wallet.currency",
+      "kind": "field",
+      "name": "Wallet.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Wallet.customer_id": {
+      "file": "fintech_platform.apg",
+      "id": "field.Wallet.customer_id",
+      "kind": "field",
+      "name": "Wallet.customer_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Wallet.daily_used": {
+      "file": "fintech_platform.apg",
+      "id": "field.Wallet.daily_used",
+      "kind": "field",
+      "name": "Wallet.daily_used",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Wallet.monthly_used": {
+      "file": "fintech_platform.apg",
+      "id": "field.Wallet.monthly_used",
+      "kind": "field",
+      "name": "Wallet.monthly_used",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Wallet.status": {
+      "file": "fintech_platform.apg",
+      "id": "field.Wallet.status",
+      "kind": "field",
+      "name": "Wallet.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Wallet.wallet_id": {
+      "file": "fintech_platform.apg",
+      "id": "field.Wallet.wallet_id",
+      "kind": "field",
+      "name": "Wallet.wallet_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Wallet.wallet_type": {
+      "file": "fintech_platform.apg",
+      "id": "field.Wallet.wallet_type",
+      "kind": "field",
+      "name": "Wallet.wallet_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "fintech_platform.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.fintech_platform": {
+      "file": "fintech_platform.apg",
+      "id": "module.fintech_platform",
+      "kind": "module",
+      "name": "fintech_platform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Customer": {
+      "file": "fintech_platform.apg",
+      "id": "table.Customer",
+      "kind": "table",
+      "name": "Customer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Transaction": {
+      "file": "fintech_platform.apg",
+      "id": "table.Transaction",
+      "kind": "table",
+      "name": "Transaction",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Wallet": {
+      "file": "fintech_platform.apg",
+      "id": "table.Wallet",
+      "kind": "table",
+      "name": "Wallet",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.CustomerOnboarding": {
+      "file": "fintech_platform.apg",
+      "id": "workflow.CustomerOnboarding",
+      "kind": "workflow",
+      "name": "CustomerOnboarding",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.LoanOrigination": {
+      "file": "fintech_platform.apg",
+      "id": "workflow.LoanOrigination",
+      "kind": "workflow",
+      "name": "LoanOrigination",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Customer": {
+      "fields": {
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "customer_id": {
+          "relationship": {
+            "alias": "customer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Customer"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "daily_limit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "full_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "kyc_status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "kyc_tier": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "monthly_limit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "national_id": {
+          "relationship": {
+            "alias": "national",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "National"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "risk_level": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "daily_limit.id": {
+          "chain": [
+            "Customer.daily_limit",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "monthly_limit.id": {
+          "chain": [
+            "Customer.monthly_limit",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Customer"
+    },
+    "Transaction": {
+      "fields": {
+        "aml_status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "amount": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "channel": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "fee": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "recipient_id": {
+          "relationship": {
+            "alias": "recipient",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Recipient"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "reference": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "sender_id": {
+          "relationship": {
+            "alias": "sender",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Sender"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "transaction_id": {
+          "relationship": {
+            "alias": "transaction",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Transaction"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "transaction_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "amount.id": {
+          "chain": [
+            "Transaction.amount",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "fee.id": {
+          "chain": [
+            "Transaction.fee",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Transaction"
+    },
+    "Wallet": {
+      "fields": {
+        "balance": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "customer_id": {
+          "relationship": {
+            "alias": "customer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Customer"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "daily_used": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "monthly_used": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "wallet_id": {
+          "relationship": {
+            "alias": "wallet",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Wallet"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "wallet_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "balance.id": {
+          "chain": [
+            "Wallet.balance",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "daily_used.id": {
+          "chain": [
+            "Wallet.daily_used",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "monthly_used.id": {
+          "chain": [
+            "Wallet.monthly_used",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Wallet"
+    }
+  },
+  "views": {}
+}

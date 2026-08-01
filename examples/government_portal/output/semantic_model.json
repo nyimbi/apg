@@ -1,0 +1,1157 @@
+{
+  "agents": {
+    "CitizenAssistant": {
+      "capabilities": [
+        "citizen_registration",
+        "service_application_lifecycle"
+      ],
+      "configuration": {
+        "max_turns": 8,
+        "temperature": 0.3
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "citizen_help_memory"
+      },
+      "model": "openai:gpt-4.1-mini",
+      "name": "CitizenAssistant",
+      "outputs": [],
+      "role": "digital government assistant",
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_personal_data_collection",
+          "when": "requests_personal_data"
+        }
+      ],
+      "runtime": null,
+      "system": "You assist citizens with government services in Kenya. Speak in simple, clear language. Support Swahili and English. Guide citizens through service applications, explain requirements, and provide status updates.",
+      "theme": {},
+      "tools": [
+        "service_catalogue_search",
+        "application_status_query",
+        "fee_calculator",
+        "document_checklist"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": null,
+    "entity_count": 7,
+    "name": "government_portal",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "CitizenServicesHub": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "payment_providers": [
+          "mpesa",
+          "airtel_money",
+          "bank_transfer"
+        ],
+        "require_id_verification": true,
+        "self_service_enabled": true,
+        "sla_days_service_delivery": 5,
+        "supported_channels": [
+          "web",
+          "mobile",
+          "ussd",
+          "sms"
+        ],
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "CitizenServicesHub",
+      "provides": [
+        "citizen_registration",
+        "service_application_lifecycle",
+        "payment_processing",
+        "status_tracking",
+        "digital_notification",
+        "multi_channel_access"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "schd"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "id_verification_required",
+            "when": "service_requires_verification == true and id_verified != true"
+          },
+          {
+            "action": "deny",
+            "name": "fee_payment_required",
+            "when": "fee_amount > 0 and payment_confirmed != true"
+          },
+          {
+            "action": "deny",
+            "name": "duplicate_application_blocked",
+            "when": "duplicate_application_exists == true and grace_period_expired == true"
+          },
+          {
+            "action": "require_review",
+            "name": "cross_county_service_escalation",
+            "when": "applicant_county != service_county"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "citizen_services_event_state"
+      },
+      "theme": {
+        "components": {
+          "applications": {
+            "icon": "file-text",
+            "status_indicator": "application-status-chip"
+          },
+          "payments": {
+            "icon": "credit-card",
+            "status_indicator": "payment-status-chip"
+          },
+          "services": {
+            "icon": "building-2",
+            "status_indicator": "service-type-chip"
+          }
+        },
+        "name": "government_theme",
+        "tokens": {
+          "border.radius": "4px",
+          "color.accent": "#CC0000",
+          "color.danger": "#990000",
+          "color.primary": "#006600",
+          "color.success": "#004D00",
+          "color.warning": "#FF6600",
+          "density": "comfortable",
+          "surface.canvas": "#F0F5F0",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#1A2B1A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "CitizenHome",
+            "name": "Citizen Portal",
+            "path": "/gov",
+            "permission": "gov:public"
+          },
+          {
+            "component": "ApplicationList",
+            "name": "My Applications",
+            "path": "/gov/applications",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "ServiceApply",
+            "name": "Apply for Service",
+            "path": "/gov/apply",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "FeePayment",
+            "name": "Pay Fees",
+            "path": "/gov/pay",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "StatusTracker",
+            "name": "Track Status",
+            "path": "/gov/track",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "TaxPortal",
+            "name": "Tax Portal",
+            "path": "/gov/tax",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "PermitPortal",
+            "name": "Permits",
+            "path": "/gov/permits",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "OfficerDesk",
+            "name": "Officer Dashboard",
+            "path": "/gov/officer",
+            "permission": "gov:officer"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "GovernmentPortal": {
+        "agent_teams": [],
+        "agents": [
+          "CitizenAssistant"
+        ],
+        "capabilities": [
+          "CitizenServicesHub"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {
+          "container": "docker",
+          "default": "local"
+        },
+        "description": "Digital government services portal composed from APG capabilities",
+        "integrations": {},
+        "name": "GovernmentPortal",
+        "policies": {},
+        "routes": [
+          "/gov",
+          "/gov/applications",
+          "/gov/tax",
+          "/gov/permits"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {},
+        "theme": {
+          "name": "gov_portal_theme",
+          "tokens": {
+            "accent": "#CC0000",
+            "border.radius": "4px"
+          }
+        },
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {
+      "CitizenServicesHub": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "schd"
+      ]
+    }
+  },
+  "contracts": {
+    "CitizenServicesHub": {
+      "configuration": {
+        "payment_providers": [
+          "mpesa",
+          "airtel_money",
+          "bank_transfer"
+        ],
+        "require_id_verification": true,
+        "self_service_enabled": true,
+        "sla_days_service_delivery": 5,
+        "supported_channels": [
+          "web",
+          "mobile",
+          "ussd",
+          "sms"
+        ],
+        "tenant_id": "default"
+      },
+      "id": "government_portal_core",
+      "provides": [
+        "citizen_registration",
+        "service_application_lifecycle",
+        "payment_processing",
+        "status_tracking",
+        "digital_notification",
+        "multi_channel_access"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "schd"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "id_verification_required",
+            "when": "service_requires_verification == true and id_verified != true"
+          },
+          {
+            "action": "deny",
+            "name": "fee_payment_required",
+            "when": "fee_amount > 0 and payment_confirmed != true"
+          },
+          {
+            "action": "deny",
+            "name": "duplicate_application_blocked",
+            "when": "duplicate_application_exists == true and grace_period_expired == true"
+          },
+          {
+            "action": "require_review",
+            "name": "cross_county_service_escalation",
+            "when": "applicant_county != service_county"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "components": {
+          "applications": {
+            "icon": "file-text",
+            "status_indicator": "application-status-chip"
+          },
+          "payments": {
+            "icon": "credit-card",
+            "status_indicator": "payment-status-chip"
+          },
+          "services": {
+            "icon": "building-2",
+            "status_indicator": "service-type-chip"
+          }
+        },
+        "name": "government_theme",
+        "tokens": {
+          "border.radius": "4px",
+          "color.accent": "#CC0000",
+          "color.danger": "#990000",
+          "color.primary": "#006600",
+          "color.success": "#004D00",
+          "color.warning": "#FF6600",
+          "density": "comfortable",
+          "surface.canvas": "#F0F5F0",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#1A2B1A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "CitizenHome",
+            "name": "Citizen Portal",
+            "path": "/gov",
+            "permission": "gov:public"
+          },
+          {
+            "component": "ApplicationList",
+            "name": "My Applications",
+            "path": "/gov/applications",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "ServiceApply",
+            "name": "Apply for Service",
+            "path": "/gov/apply",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "FeePayment",
+            "name": "Pay Fees",
+            "path": "/gov/pay",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "StatusTracker",
+            "name": "Track Status",
+            "path": "/gov/track",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "TaxPortal",
+            "name": "Tax Portal",
+            "path": "/gov/tax",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "PermitPortal",
+            "name": "Permits",
+            "path": "/gov/permits",
+            "permission": "gov:citizen"
+          },
+          {
+            "component": "OfficerDesk",
+            "name": "Officer Dashboard",
+            "path": "/gov/officer",
+            "permission": "gov:officer"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "government_portal.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {
+    "CitizenServiceApplication": {
+      "assignments": {
+        "decision_made": "service_manager",
+        "id_verified": "verification_officer",
+        "under_review": "service_officer"
+      },
+      "compensation": {},
+      "guards": {
+        "decision_made": "supporting_documents_complete and review_notes_provided",
+        "fee_paid": "fee_amount == 0 or payment_confirmed"
+      },
+      "human_tasks": [
+        "id_verified",
+        "under_review",
+        "decision_made"
+      ],
+      "methods": [],
+      "name": "CitizenServiceApplication",
+      "properties": {},
+      "retry_policy": {
+        "under_review": "{'attempts': 3, 'interval': '24hour'}"
+      },
+      "states": [
+        "submitted",
+        "id_verified",
+        "fee_calculated",
+        "fee_paid",
+        "under_review",
+        "decision_made",
+        "completed"
+      ],
+      "steps": [
+        "submitted",
+        "id_verified",
+        "fee_calculated",
+        "fee_paid",
+        "under_review",
+        "decision_made",
+        "completed"
+      ],
+      "steps_raw": "submitted -> id_verified -> fee_calculated -> fee_paid -> under_review -> decision_made -> completed",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "submitted",
+          "target": "id_verified"
+        },
+        {
+          "guard": null,
+          "source": "id_verified",
+          "target": "fee_calculated"
+        },
+        {
+          "guard": "fee_amount == 0 or payment_confirmed",
+          "source": "fee_calculated",
+          "target": "fee_paid"
+        },
+        {
+          "guard": null,
+          "source": "fee_paid",
+          "target": "under_review"
+        },
+        {
+          "guard": "supporting_documents_complete and review_notes_provided",
+          "source": "under_review",
+          "target": "decision_made"
+        },
+        {
+          "guard": null,
+          "source": "decision_made",
+          "target": "completed"
+        }
+      ],
+      "type": "workflow",
+      "waits": {
+        "completed": "service_delivery_confirmation"
+      }
+    },
+    "TaxRegistrationPipeline": {
+      "assignments": {
+        "biometric_capture": "biometrics_officer",
+        "kra_pin_check": "tax_officer"
+      },
+      "compensation": {},
+      "guards": {
+        "kra_pin_check": "national_id_valid and not_blacklisted",
+        "pin_issued": "biometric_captured and tax_type_selected"
+      },
+      "human_tasks": [
+        "kra_pin_check",
+        "biometric_capture"
+      ],
+      "methods": [],
+      "name": "TaxRegistrationPipeline",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "application",
+        "kra_pin_check",
+        "biometric_capture",
+        "registration",
+        "pin_issued"
+      ],
+      "steps": [
+        "application",
+        "kra_pin_check",
+        "biometric_capture",
+        "registration",
+        "pin_issued"
+      ],
+      "steps_raw": "application -> kra_pin_check -> biometric_capture -> registration -> pin_issued",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": "national_id_valid and not_blacklisted",
+          "source": "application",
+          "target": "kra_pin_check"
+        },
+        {
+          "guard": null,
+          "source": "kra_pin_check",
+          "target": "biometric_capture"
+        },
+        {
+          "guard": null,
+          "source": "biometric_capture",
+          "target": "registration"
+        },
+        {
+          "guard": "biometric_captured and tax_type_selected",
+          "source": "registration",
+          "target": "pin_issued"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 1
+    },
+    "capability": {
+      "edges": 6,
+      "kind": "capability",
+      "nodes": 7
+    },
+    "deployment": {
+      "edges": 7,
+      "kind": "deployment",
+      "nodes": 8
+    },
+    "er": {
+      "edges": 15,
+      "kind": "er",
+      "nodes": 16
+    },
+    "handler": {
+      "edges": 7,
+      "kind": "handler",
+      "nodes": 8
+    },
+    "lookup": {
+      "edges": 7,
+      "kind": "lookup",
+      "nodes": 8
+    },
+    "package": {
+      "edges": 7,
+      "kind": "package",
+      "nodes": 8
+    },
+    "security": {
+      "edges": 7,
+      "kind": "security",
+      "nodes": 8
+    },
+    "workflow": {
+      "edges": 7,
+      "kind": "workflow",
+      "nodes": 8
+    }
+  },
+  "llms": {
+    "CitizenAssistant": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": null
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "CitizenServicesHub.cross_county_service_escalation": {
+      "action": "require_review",
+      "name": "cross_county_service_escalation",
+      "when": "applicant_county != service_county"
+    },
+    "CitizenServicesHub.duplicate_application_blocked": {
+      "action": "deny",
+      "name": "duplicate_application_blocked",
+      "when": "duplicate_application_exists == true and grace_period_expired == true"
+    },
+    "CitizenServicesHub.fee_payment_required": {
+      "action": "deny",
+      "name": "fee_payment_required",
+      "when": "fee_amount > 0 and payment_confirmed != true"
+    },
+    "CitizenServicesHub.id_verification_required": {
+      "action": "deny",
+      "name": "id_verification_required",
+      "when": "service_requires_verification == true and id_verified != true"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "government_portal.apg"
+  ],
+  "symbols": {
+    "agent.CitizenAssistant": {
+      "file": "government_portal.apg",
+      "id": "agent.CitizenAssistant",
+      "kind": "agent",
+      "name": "CitizenAssistant",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.GovernmentPortal": {
+      "file": "government_portal.apg",
+      "id": "app.GovernmentPortal",
+      "kind": "app",
+      "name": "GovernmentPortal",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.CitizenServicesHub": {
+      "file": "government_portal.apg",
+      "id": "capability.CitizenServicesHub",
+      "kind": "capability",
+      "name": "CitizenServicesHub",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Citizen.county": {
+      "file": "government_portal.apg",
+      "id": "field.Citizen.county",
+      "kind": "field",
+      "name": "Citizen.county",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Citizen.date_of_birth": {
+      "file": "government_portal.apg",
+      "id": "field.Citizen.date_of_birth",
+      "kind": "field",
+      "name": "Citizen.date_of_birth",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Citizen.email": {
+      "file": "government_portal.apg",
+      "id": "field.Citizen.email",
+      "kind": "field",
+      "name": "Citizen.email",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Citizen.full_name": {
+      "file": "government_portal.apg",
+      "id": "field.Citizen.full_name",
+      "kind": "field",
+      "name": "Citizen.full_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Citizen.national_id": {
+      "file": "government_portal.apg",
+      "id": "field.Citizen.national_id",
+      "kind": "field",
+      "name": "Citizen.national_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Citizen.phone": {
+      "file": "government_portal.apg",
+      "id": "field.Citizen.phone",
+      "kind": "field",
+      "name": "Citizen.phone",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Citizen.registration_status": {
+      "file": "government_portal.apg",
+      "id": "field.Citizen.registration_status",
+      "kind": "field",
+      "name": "Citizen.registration_status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.ServiceApplication.application_number": {
+      "file": "government_portal.apg",
+      "id": "field.ServiceApplication.application_number",
+      "kind": "field",
+      "name": "ServiceApplication.application_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.ServiceApplication.citizen_id": {
+      "file": "government_portal.apg",
+      "id": "field.ServiceApplication.citizen_id",
+      "kind": "field",
+      "name": "ServiceApplication.citizen_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.ServiceApplication.fee_amount": {
+      "file": "government_portal.apg",
+      "id": "field.ServiceApplication.fee_amount",
+      "kind": "field",
+      "name": "ServiceApplication.fee_amount",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.ServiceApplication.paid": {
+      "file": "government_portal.apg",
+      "id": "field.ServiceApplication.paid",
+      "kind": "field",
+      "name": "ServiceApplication.paid",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.ServiceApplication.service_type": {
+      "file": "government_portal.apg",
+      "id": "field.ServiceApplication.service_type",
+      "kind": "field",
+      "name": "ServiceApplication.service_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.ServiceApplication.status": {
+      "file": "government_portal.apg",
+      "id": "field.ServiceApplication.status",
+      "kind": "field",
+      "name": "ServiceApplication.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.ServiceApplication.submitted_at": {
+      "file": "government_portal.apg",
+      "id": "field.ServiceApplication.submitted_at",
+      "kind": "field",
+      "name": "ServiceApplication.submitted_at",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "government_portal.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.government_portal": {
+      "file": "government_portal.apg",
+      "id": "module.government_portal",
+      "kind": "module",
+      "name": "government_portal",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Citizen": {
+      "file": "government_portal.apg",
+      "id": "table.Citizen",
+      "kind": "table",
+      "name": "Citizen",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.ServiceApplication": {
+      "file": "government_portal.apg",
+      "id": "table.ServiceApplication",
+      "kind": "table",
+      "name": "ServiceApplication",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.CitizenServiceApplication": {
+      "file": "government_portal.apg",
+      "id": "workflow.CitizenServiceApplication",
+      "kind": "workflow",
+      "name": "CitizenServiceApplication",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.TaxRegistrationPipeline": {
+      "file": "government_portal.apg",
+      "id": "workflow.TaxRegistrationPipeline",
+      "kind": "workflow",
+      "name": "TaxRegistrationPipeline",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Citizen": {
+      "fields": {
+        "county": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "date_of_birth": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "full_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "national_id": {
+          "relationship": {
+            "alias": "national",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "National"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "registration_status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "date_of_birth.id": {
+          "chain": [
+            "Citizen.date_of_birth",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Citizen"
+    },
+    "ServiceApplication": {
+      "fields": {
+        "application_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "citizen_id": {
+          "relationship": {
+            "alias": "citizen",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Citizen"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "fee_amount": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "paid": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "service_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "submitted_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        }
+      },
+      "lookup_paths": {
+        "fee_amount.id": {
+          "chain": [
+            "ServiceApplication.fee_amount",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "submitted_at.id": {
+          "chain": [
+            "ServiceApplication.submitted_at",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "ServiceApplication"
+    }
+  },
+  "views": {}
+}

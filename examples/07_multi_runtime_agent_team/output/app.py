@@ -656,11 +656,15 @@ def _database_column_specs(entity: Dict[str, Any]) -> list[Dict[str, Any]]:
                 "cardinality": relationship.get("cardinality", "many-to-one"),
             }
         columns.append(column)
-    columns.extend([
+    # Append lifecycle columns only when not already declared in the entity definition.
+    _existing = {str(c.get("name")) for c in columns}
+    for _lc in [
         {"name": "created_at", "type": "string", "required": True, "nullable": False, "primary_key": False},
         {"name": "updated_at", "type": "string", "required": True, "nullable": False, "primary_key": False},
         {"name": "deleted_at", "type": "string", "required": False, "nullable": True, "primary_key": False},
-    ])
+    ]:
+        if _lc["name"] not in _existing:
+            columns.append(_lc)
     return columns
 
 
@@ -5816,6 +5820,10 @@ def validate_record(entity_name: str, record: Dict[str, Any], partial: bool = Fa
         if field.get("computed"):
             continue
         field_name = str(field["name"])
+        # Lifecycle fields are always auto-populated by _prepare_new_record;
+        # never require them from the caller (they're stripped before this runs).
+        if field_name in _RECORD_LIFECYCLE_FIELDS:
+            continue
         if _is_file_field(field):
             path_field = field_name + "_path"
             if not partial and field.get("required", False) and path_field not in record:

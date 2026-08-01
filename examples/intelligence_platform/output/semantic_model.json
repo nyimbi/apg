@@ -1,0 +1,1617 @@
+{
+  "agents": {
+    "ThreatAnalyst": {
+      "capabilities": [
+        "threat_analysis",
+        "indicator_management",
+        "intelligence_fusion"
+      ],
+      "configuration": {
+        "max_turns": 8,
+        "temperature": 0.1
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "intel_memory"
+      },
+      "model": "openai:gpt-4.1-mini",
+      "name": "ThreatAnalyst",
+      "outputs": [],
+      "role": "threat intelligence analyst",
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_fabrication",
+          "when": "evidence_missing"
+        },
+        {
+          "action": "require_review",
+          "name": "classify_outputs",
+          "when": "output_classification missing"
+        }
+      ],
+      "runtime": null,
+      "system": "You are an intelligence analyst. Assess threats, identify patterns, and produce structured analytical products. Apply ACH (Analysis of Competing Hypotheses) rigorously. Classify outputs appropriately.",
+      "theme": {},
+      "tools": [
+        "indicator_search",
+        "correlation_query",
+        "mitre_attack_lookup",
+        "actor_database"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": null,
+    "entity_count": 9,
+    "name": "intelligence_platform",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "IntelPlatformCore": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "alert_sla_critical_minutes": 15,
+        "alert_sla_high_minutes": 60,
+        "auto_correlate": true,
+        "default_classification": "unclassified",
+        "default_tlp": "amber",
+        "dissemination_requires_approval": true,
+        "require_authority": true,
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "IntelPlatformCore",
+      "provides": [
+        "intelligence_collection",
+        "threat_analysis",
+        "indicator_management",
+        "alert_lifecycle",
+        "intelligence_fusion",
+        "analytical_products"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "geos",
+        "grph"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "collection_requires_authority",
+            "when": "operation == collect and authority_ref missing"
+          },
+          {
+            "action": "deny",
+            "name": "secret_requires_clearance",
+            "when": "classification == secret and analyst_clearance_lt == secret"
+          },
+          {
+            "action": "deny",
+            "name": "tlp_red_no_external_share",
+            "when": "tlp == red and recipient_type == external"
+          },
+          {
+            "action": "deny",
+            "name": "autonomous_collection_denied",
+            "when": "collection_mode == autonomous and human_approval_missing == true"
+          },
+          {
+            "action": "deny",
+            "name": "privacy_bypass_denied",
+            "when": "circumvents_privacy_controls == true"
+          },
+          {
+            "action": "deny",
+            "name": "evidence_fabrication_denied",
+            "when": "evidence_source == fabricated"
+          },
+          {
+            "action": "require_review",
+            "name": "critical_alert_requires_immediate_ack",
+            "when": "severity == critical and ack_within_minutes_gt == 15"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "events": [
+          "intelligence_collected",
+          "indicator_created",
+          "indicator_enriched",
+          "alert_fired",
+          "alert_acknowledged",
+          "alert_resolved",
+          "correlation_found",
+          "product_disseminated",
+          "authority_recorded"
+        ],
+        "guardrails": [
+          "autonomous_collection_requires_human_approval",
+          "secret_intel_requires_clearance",
+          "tlp_red_no_external_dissemination",
+          "evidence_fabrication_denied",
+          "privacy_bypass_denied"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.intel.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "alerts": {
+            "icon": "bell-ring",
+            "status_indicator": "severity-chip"
+          },
+          "collection": {
+            "icon": "radar",
+            "status_indicator": "source-type-chip"
+          },
+          "indicators": {
+            "icon": "shield-alert",
+            "status_indicator": "ioc-type-chip"
+          }
+        },
+        "name": "intel_theme",
+        "tokens": {
+          "border.radius": "4px",
+          "color.accent": "#B71C1C",
+          "color.danger": "#880E4F",
+          "color.primary": "#1A237E",
+          "color.success": "#1B5E20",
+          "color.warning": "#E65100",
+          "density": "compact",
+          "surface.canvas": "#0A0E1A",
+          "surface.panel": "#111827",
+          "text.primary": "#E8EAF6",
+          "text.secondary": "#9FA8DA"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "WatchCentre",
+            "name": "Watch Centre",
+            "nav_group": "Operations",
+            "path": "/intel",
+            "permission": "intel:view"
+          },
+          {
+            "component": "AlertQueue",
+            "name": "Alerts",
+            "nav_group": "Operations",
+            "path": "/intel/alerts",
+            "permission": "intel:alerts"
+          },
+          {
+            "component": "IndicatorBank",
+            "name": "Indicators",
+            "nav_group": "Analysis",
+            "path": "/intel/indicators",
+            "permission": "intel:indicators"
+          },
+          {
+            "component": "CorrelationMap",
+            "name": "Correlation",
+            "nav_group": "Analysis",
+            "path": "/intel/correlation",
+            "permission": "intel:analysis"
+          },
+          {
+            "component": "OSINTCollector",
+            "name": "OSINT",
+            "nav_group": "Collection",
+            "path": "/intel/osint",
+            "permission": "intel:collection"
+          },
+          {
+            "component": "FusionWorkspace",
+            "name": "Fusion",
+            "nav_group": "Analysis",
+            "path": "/intel/fusion",
+            "permission": "intel:fusion"
+          },
+          {
+            "component": "IntelReports",
+            "name": "Reports",
+            "nav_group": "Products",
+            "path": "/intel/reports",
+            "permission": "intel:reports"
+          },
+          {
+            "component": "AuthorityLog",
+            "name": "Authorities",
+            "nav_group": "Governance",
+            "path": "/intel/authorities",
+            "permission": "intel:admin"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "IntelligencePlatform": {
+        "agent_teams": [
+          "FusionCell"
+        ],
+        "agents": [
+          "ThreatAnalyst"
+        ],
+        "capabilities": [
+          "IntelPlatformCore"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {
+          "container": "docker",
+          "default": "local"
+        },
+        "description": "Threat intelligence platform composed from APG capabilities",
+        "integrations": {},
+        "name": "IntelligencePlatform",
+        "policies": {},
+        "routes": [
+          "/intel",
+          "/intel/alerts",
+          "/intel/indicators",
+          "/intel/osint"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {},
+        "theme": {
+          "name": "intel_platform_theme",
+          "tokens": {
+            "accent": "#B71C1C",
+            "border.radius": "4px"
+          }
+        },
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {
+      "IntelPlatformCore": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "geos",
+        "grph"
+      ]
+    }
+  },
+  "contracts": {
+    "IntelPlatformCore": {
+      "configuration": {
+        "alert_sla_critical_minutes": 15,
+        "alert_sla_high_minutes": 60,
+        "auto_correlate": true,
+        "default_classification": "unclassified",
+        "default_tlp": "amber",
+        "dissemination_requires_approval": true,
+        "require_authority": true,
+        "tenant_id": "default"
+      },
+      "id": "intelligence_platform_core",
+      "provides": [
+        "intelligence_collection",
+        "threat_analysis",
+        "indicator_management",
+        "alert_lifecycle",
+        "intelligence_fusion",
+        "analytical_products"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "nlpc",
+        "geos",
+        "grph"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "collection_requires_authority",
+            "when": "operation == collect and authority_ref missing"
+          },
+          {
+            "action": "deny",
+            "name": "secret_requires_clearance",
+            "when": "classification == secret and analyst_clearance_lt == secret"
+          },
+          {
+            "action": "deny",
+            "name": "tlp_red_no_external_share",
+            "when": "tlp == red and recipient_type == external"
+          },
+          {
+            "action": "deny",
+            "name": "autonomous_collection_denied",
+            "when": "collection_mode == autonomous and human_approval_missing == true"
+          },
+          {
+            "action": "deny",
+            "name": "privacy_bypass_denied",
+            "when": "circumvents_privacy_controls == true"
+          },
+          {
+            "action": "deny",
+            "name": "evidence_fabrication_denied",
+            "when": "evidence_source == fabricated"
+          },
+          {
+            "action": "require_review",
+            "name": "critical_alert_requires_immediate_ack",
+            "when": "severity == critical and ack_within_minutes_gt == 15"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "components": {
+          "alerts": {
+            "icon": "bell-ring",
+            "status_indicator": "severity-chip"
+          },
+          "collection": {
+            "icon": "radar",
+            "status_indicator": "source-type-chip"
+          },
+          "indicators": {
+            "icon": "shield-alert",
+            "status_indicator": "ioc-type-chip"
+          }
+        },
+        "name": "intel_theme",
+        "tokens": {
+          "border.radius": "4px",
+          "color.accent": "#B71C1C",
+          "color.danger": "#880E4F",
+          "color.primary": "#1A237E",
+          "color.success": "#1B5E20",
+          "color.warning": "#E65100",
+          "density": "compact",
+          "surface.canvas": "#0A0E1A",
+          "surface.panel": "#111827",
+          "text.primary": "#E8EAF6",
+          "text.secondary": "#9FA8DA"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "WatchCentre",
+            "name": "Watch Centre",
+            "nav_group": "Operations",
+            "path": "/intel",
+            "permission": "intel:view"
+          },
+          {
+            "component": "AlertQueue",
+            "name": "Alerts",
+            "nav_group": "Operations",
+            "path": "/intel/alerts",
+            "permission": "intel:alerts"
+          },
+          {
+            "component": "IndicatorBank",
+            "name": "Indicators",
+            "nav_group": "Analysis",
+            "path": "/intel/indicators",
+            "permission": "intel:indicators"
+          },
+          {
+            "component": "CorrelationMap",
+            "name": "Correlation",
+            "nav_group": "Analysis",
+            "path": "/intel/correlation",
+            "permission": "intel:analysis"
+          },
+          {
+            "component": "OSINTCollector",
+            "name": "OSINT",
+            "nav_group": "Collection",
+            "path": "/intel/osint",
+            "permission": "intel:collection"
+          },
+          {
+            "component": "FusionWorkspace",
+            "name": "Fusion",
+            "nav_group": "Analysis",
+            "path": "/intel/fusion",
+            "permission": "intel:fusion"
+          },
+          {
+            "component": "IntelReports",
+            "name": "Reports",
+            "nav_group": "Products",
+            "path": "/intel/reports",
+            "permission": "intel:reports"
+          },
+          {
+            "component": "AuthorityLog",
+            "name": "Authorities",
+            "nav_group": "Governance",
+            "path": "/intel/authorities",
+            "permission": "intel:admin"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "intelligence_platform.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {
+    "AlertInvestigation": {
+      "assignments": {
+        "acknowledged": "duty_analyst",
+        "under_investigation": "senior_analyst"
+      },
+      "compensation": {},
+      "guards": {
+        "acknowledged": "analyst_cleared_for_classification",
+        "resolved": "resolution_documented and supervisor_notified"
+      },
+      "human_tasks": [
+        "acknowledged",
+        "under_investigation"
+      ],
+      "methods": [],
+      "name": "AlertInvestigation",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "new",
+        "acknowledged",
+        "under_investigation",
+        "resolved"
+      ],
+      "steps": [
+        "new",
+        "acknowledged",
+        "under_investigation",
+        "resolved"
+      ],
+      "steps_raw": "new -> acknowledged -> under_investigation -> resolved",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": "analyst_cleared_for_classification",
+          "source": "new",
+          "target": "acknowledged"
+        },
+        {
+          "guard": null,
+          "source": "acknowledged",
+          "target": "under_investigation"
+        },
+        {
+          "guard": "resolution_documented and supervisor_notified",
+          "source": "under_investigation",
+          "target": "resolved"
+        }
+      ],
+      "type": "workflow",
+      "waits": {
+        "resolved": "resolution_confirmation"
+      }
+    },
+    "ProductDissemination": {
+      "assignments": {
+        "approved": "chief_analyst",
+        "reviewed": "senior_analyst"
+      },
+      "compensation": {},
+      "guards": {
+        "approved": "tlp_appropriate and classification_correct",
+        "disseminated": "recipient_cleared and distribution_list_approved"
+      },
+      "human_tasks": [
+        "reviewed",
+        "approved"
+      ],
+      "methods": [],
+      "name": "ProductDissemination",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "draft",
+        "reviewed",
+        "approved",
+        "disseminated"
+      ],
+      "steps": [
+        "draft",
+        "reviewed",
+        "approved",
+        "disseminated"
+      ],
+      "steps_raw": "draft -> reviewed -> approved -> disseminated",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "draft",
+          "target": "reviewed"
+        },
+        {
+          "guard": "tlp_appropriate and classification_correct",
+          "source": "reviewed",
+          "target": "approved"
+        },
+        {
+          "guard": "recipient_cleared and distribution_list_approved",
+          "source": "approved",
+          "target": "disseminated"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 2
+    },
+    "capability": {
+      "edges": 7,
+      "kind": "capability",
+      "nodes": 8
+    },
+    "deployment": {
+      "edges": 9,
+      "kind": "deployment",
+      "nodes": 10
+    },
+    "er": {
+      "edges": 30,
+      "kind": "er",
+      "nodes": 32
+    },
+    "handler": {
+      "edges": 9,
+      "kind": "handler",
+      "nodes": 10
+    },
+    "lookup": {
+      "edges": 9,
+      "kind": "lookup",
+      "nodes": 10
+    },
+    "package": {
+      "edges": 9,
+      "kind": "package",
+      "nodes": 10
+    },
+    "security": {
+      "edges": 9,
+      "kind": "security",
+      "nodes": 10
+    },
+    "workflow": {
+      "edges": 9,
+      "kind": "workflow",
+      "nodes": 10
+    }
+  },
+  "llms": {
+    "ThreatAnalyst": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": null
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "IntelPlatformCore.autonomous_collection_denied": {
+      "action": "deny",
+      "name": "autonomous_collection_denied",
+      "when": "collection_mode == autonomous and human_approval_missing == true"
+    },
+    "IntelPlatformCore.collection_requires_authority": {
+      "action": "deny",
+      "name": "collection_requires_authority",
+      "when": "operation == collect and authority_ref missing"
+    },
+    "IntelPlatformCore.critical_alert_requires_immediate_ack": {
+      "action": "require_review",
+      "name": "critical_alert_requires_immediate_ack",
+      "when": "severity == critical and ack_within_minutes_gt == 15"
+    },
+    "IntelPlatformCore.evidence_fabrication_denied": {
+      "action": "deny",
+      "name": "evidence_fabrication_denied",
+      "when": "evidence_source == fabricated"
+    },
+    "IntelPlatformCore.privacy_bypass_denied": {
+      "action": "deny",
+      "name": "privacy_bypass_denied",
+      "when": "circumvents_privacy_controls == true"
+    },
+    "IntelPlatformCore.secret_requires_clearance": {
+      "action": "deny",
+      "name": "secret_requires_clearance",
+      "when": "classification == secret and analyst_clearance_lt == secret"
+    },
+    "IntelPlatformCore.tlp_red_no_external_share": {
+      "action": "deny",
+      "name": "tlp_red_no_external_share",
+      "when": "tlp == red and recipient_type == external"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "intelligence_platform.apg"
+  ],
+  "symbols": {
+    "agent.ThreatAnalyst": {
+      "file": "intelligence_platform.apg",
+      "id": "agent.ThreatAnalyst",
+      "kind": "agent",
+      "name": "ThreatAnalyst",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "agent_team.FusionCell": {
+      "file": "intelligence_platform.apg",
+      "id": "agent_team.FusionCell",
+      "kind": "agent_team",
+      "name": "FusionCell",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.IntelligencePlatform": {
+      "file": "intelligence_platform.apg",
+      "id": "app.IntelligencePlatform",
+      "kind": "app",
+      "name": "IntelligencePlatform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.IntelPlatformCore": {
+      "file": "intelligence_platform.apg",
+      "id": "capability.IntelPlatformCore",
+      "kind": "capability",
+      "name": "IntelPlatformCore",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Alert.alert_id": {
+      "file": "intelligence_platform.apg",
+      "id": "field.Alert.alert_id",
+      "kind": "field",
+      "name": "Alert.alert_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Alert.alert_type": {
+      "file": "intelligence_platform.apg",
+      "id": "field.Alert.alert_type",
+      "kind": "field",
+      "name": "Alert.alert_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Alert.assigned_to": {
+      "file": "intelligence_platform.apg",
+      "id": "field.Alert.assigned_to",
+      "kind": "field",
+      "name": "Alert.assigned_to",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Alert.description": {
+      "file": "intelligence_platform.apg",
+      "id": "field.Alert.description",
+      "kind": "field",
+      "name": "Alert.description",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Alert.indicators": {
+      "file": "intelligence_platform.apg",
+      "id": "field.Alert.indicators",
+      "kind": "field",
+      "name": "Alert.indicators",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Alert.severity": {
+      "file": "intelligence_platform.apg",
+      "id": "field.Alert.severity",
+      "kind": "field",
+      "name": "Alert.severity",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Alert.status": {
+      "file": "intelligence_platform.apg",
+      "id": "field.Alert.status",
+      "kind": "field",
+      "name": "Alert.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Alert.title": {
+      "file": "intelligence_platform.apg",
+      "id": "field.Alert.title",
+      "kind": "field",
+      "name": "Alert.title",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Alert.workspace_id": {
+      "file": "intelligence_platform.apg",
+      "id": "field.Alert.workspace_id",
+      "kind": "field",
+      "name": "Alert.workspace_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceItem.classification": {
+      "file": "intelligence_platform.apg",
+      "id": "field.IntelligenceItem.classification",
+      "kind": "field",
+      "name": "IntelligenceItem.classification",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceItem.collected_at": {
+      "file": "intelligence_platform.apg",
+      "id": "field.IntelligenceItem.collected_at",
+      "kind": "field",
+      "name": "IntelligenceItem.collected_at",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceItem.collected_by": {
+      "file": "intelligence_platform.apg",
+      "id": "field.IntelligenceItem.collected_by",
+      "kind": "field",
+      "name": "IntelligenceItem.collected_by",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceItem.confidence": {
+      "file": "intelligence_platform.apg",
+      "id": "field.IntelligenceItem.confidence",
+      "kind": "field",
+      "name": "IntelligenceItem.confidence",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceItem.content": {
+      "file": "intelligence_platform.apg",
+      "id": "field.IntelligenceItem.content",
+      "kind": "field",
+      "name": "IntelligenceItem.content",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceItem.item_id": {
+      "file": "intelligence_platform.apg",
+      "id": "field.IntelligenceItem.item_id",
+      "kind": "field",
+      "name": "IntelligenceItem.item_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceItem.source_type": {
+      "file": "intelligence_platform.apg",
+      "id": "field.IntelligenceItem.source_type",
+      "kind": "field",
+      "name": "IntelligenceItem.source_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceItem.subject": {
+      "file": "intelligence_platform.apg",
+      "id": "field.IntelligenceItem.subject",
+      "kind": "field",
+      "name": "IntelligenceItem.subject",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceItem.tags": {
+      "file": "intelligence_platform.apg",
+      "id": "field.IntelligenceItem.tags",
+      "kind": "field",
+      "name": "IntelligenceItem.tags",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.IntelligenceItem.tlp": {
+      "file": "intelligence_platform.apg",
+      "id": "field.IntelligenceItem.tlp",
+      "kind": "field",
+      "name": "IntelligenceItem.tlp",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIndicator.actor_id": {
+      "file": "intelligence_platform.apg",
+      "id": "field.ThreatIndicator.actor_id",
+      "kind": "field",
+      "name": "ThreatIndicator.actor_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIndicator.campaign_id": {
+      "file": "intelligence_platform.apg",
+      "id": "field.ThreatIndicator.campaign_id",
+      "kind": "field",
+      "name": "ThreatIndicator.campaign_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIndicator.confidence": {
+      "file": "intelligence_platform.apg",
+      "id": "field.ThreatIndicator.confidence",
+      "kind": "field",
+      "name": "ThreatIndicator.confidence",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIndicator.first_seen": {
+      "file": "intelligence_platform.apg",
+      "id": "field.ThreatIndicator.first_seen",
+      "kind": "field",
+      "name": "ThreatIndicator.first_seen",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIndicator.indicator_id": {
+      "file": "intelligence_platform.apg",
+      "id": "field.ThreatIndicator.indicator_id",
+      "kind": "field",
+      "name": "ThreatIndicator.indicator_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIndicator.ioc_type": {
+      "file": "intelligence_platform.apg",
+      "id": "field.ThreatIndicator.ioc_type",
+      "kind": "field",
+      "name": "ThreatIndicator.ioc_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIndicator.last_seen": {
+      "file": "intelligence_platform.apg",
+      "id": "field.ThreatIndicator.last_seen",
+      "kind": "field",
+      "name": "ThreatIndicator.last_seen",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIndicator.severity": {
+      "file": "intelligence_platform.apg",
+      "id": "field.ThreatIndicator.severity",
+      "kind": "field",
+      "name": "ThreatIndicator.severity",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIndicator.stale": {
+      "file": "intelligence_platform.apg",
+      "id": "field.ThreatIndicator.stale",
+      "kind": "field",
+      "name": "ThreatIndicator.stale",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.ThreatIndicator.value": {
+      "file": "intelligence_platform.apg",
+      "id": "field.ThreatIndicator.value",
+      "kind": "field",
+      "name": "ThreatIndicator.value",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "intelligence_platform.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.intelligence_platform": {
+      "file": "intelligence_platform.apg",
+      "id": "module.intelligence_platform",
+      "kind": "module",
+      "name": "intelligence_platform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Alert": {
+      "file": "intelligence_platform.apg",
+      "id": "table.Alert",
+      "kind": "table",
+      "name": "Alert",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.IntelligenceItem": {
+      "file": "intelligence_platform.apg",
+      "id": "table.IntelligenceItem",
+      "kind": "table",
+      "name": "IntelligenceItem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.ThreatIndicator": {
+      "file": "intelligence_platform.apg",
+      "id": "table.ThreatIndicator",
+      "kind": "table",
+      "name": "ThreatIndicator",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.AlertInvestigation": {
+      "file": "intelligence_platform.apg",
+      "id": "workflow.AlertInvestigation",
+      "kind": "workflow",
+      "name": "AlertInvestigation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.ProductDissemination": {
+      "file": "intelligence_platform.apg",
+      "id": "workflow.ProductDissemination",
+      "kind": "workflow",
+      "name": "ProductDissemination",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Alert": {
+      "fields": {
+        "alert_id": {
+          "relationship": {
+            "alias": "alert",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Alert"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "alert_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "assigned_to": {
+          "relationship": null,
+          "required": false,
+          "type": "str"
+        },
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "indicators": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        },
+        "severity": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "title": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "workspace_id": {
+          "relationship": {
+            "alias": "workspace",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Workspace"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "indicators.id": {
+          "chain": [
+            "Alert.indicators",
+            "List.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Alert"
+    },
+    "IntelligenceItem": {
+      "fields": {
+        "classification": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "collected_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "collected_by": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "confidence": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "content": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "item_id": {
+          "relationship": {
+            "alias": "item",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Item"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "source_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "subject": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "tags": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        },
+        "tlp": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "collected_at.id": {
+          "chain": [
+            "IntelligenceItem.collected_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "tags.id": {
+          "chain": [
+            "IntelligenceItem.tags",
+            "List.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "IntelligenceItem"
+    },
+    "ThreatIndicator": {
+      "fields": {
+        "actor_id": {
+          "relationship": {
+            "alias": "actor",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Actor"
+          },
+          "required": false,
+          "type": "str"
+        },
+        "campaign_id": {
+          "relationship": {
+            "alias": "campaign",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Campaign"
+          },
+          "required": false,
+          "type": "str"
+        },
+        "confidence": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "first_seen": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "indicator_id": {
+          "relationship": {
+            "alias": "indicator",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Indicator"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "ioc_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "last_seen": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "severity": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "stale": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "value": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "first_seen.id": {
+          "chain": [
+            "ThreatIndicator.first_seen",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "last_seen.id": {
+          "chain": [
+            "ThreatIndicator.last_seen",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "ThreatIndicator"
+    }
+  },
+  "views": {}
+}

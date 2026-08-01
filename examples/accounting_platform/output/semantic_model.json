@@ -1,0 +1,1679 @@
+{
+  "agents": {
+    "AccountingAssistant": {
+      "capabilities": [
+        "journal_entry_lifecycle",
+        "financial_statements"
+      ],
+      "configuration": {
+        "max_turns": 4,
+        "temperature": 0.0
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "accounting_memory"
+      },
+      "model": "openai:gpt-4.1-mini",
+      "name": "AccountingAssistant",
+      "outputs": [],
+      "role": "accounting analyst",
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_posting_authority",
+          "when": "user_requests_direct_post"
+        }
+      ],
+      "runtime": null,
+      "system": "You are a chartered accountant assistant. Help with journal classification, anomaly detection, and compliance checks. Always cite the relevant IFRS/GAAP standard.",
+      "theme": {},
+      "tools": [
+        "coa_search",
+        "transaction_history",
+        "ifrs_standards_lookup"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": null,
+    "entity_count": 9,
+    "name": "accounting_platform",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "AccountingCore": {
+      "approvals": {
+        "approvers": [
+          "controller",
+          "cfo"
+        ],
+        "levels": 2,
+        "segregation_of_duties": true
+      },
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "approval_threshold_ap": 50000,
+        "approval_threshold_ar": 100000,
+        "fiscal_year_start": "01-01",
+        "functional_currency": "KES",
+        "period_lock_days": 10,
+        "require_dual_control": true,
+        "tenant_id": "default"
+      },
+      "erp_modules": [
+        "finance",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable"
+      ],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw"
+        ]
+      },
+      "master_data": {},
+      "name": "AccountingCore",
+      "provides": [
+        "journal_entry_lifecycle",
+        "accounts_receivable_workflow",
+        "accounts_payable_workflow",
+        "cash_management_workflow",
+        "financial_statements",
+        "period_close_process"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "comp"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "journal_must_balance",
+            "when": "total_debit != total_credit"
+          },
+          {
+            "action": "deny",
+            "name": "closed_period_posting_denied",
+            "when": "period_status == closed"
+          },
+          {
+            "action": "require_review",
+            "name": "large_ap_requires_approval",
+            "when": "invoice_amount > 50000 and approval_status != approved"
+          },
+          {
+            "action": "deny",
+            "name": "segregation_of_duties",
+            "when": "preparer_id == approver_id"
+          },
+          {
+            "action": "deny",
+            "name": "ar_write_off_requires_cfo",
+            "when": "operation == write_off and amount > 10000 and cfo_approved != true"
+          },
+          {
+            "action": "require_review",
+            "name": "intercompany_requires_matching",
+            "when": "is_intercompany == true and matching_entry_missing == true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "events": [
+          "journal_posted",
+          "journal_reversed",
+          "invoice_created",
+          "invoice_posted",
+          "invoice_paid",
+          "payment_run_processed",
+          "period_closed",
+          "period_locked",
+          "write_off_approved",
+          "bad_debt_provision_updated"
+        ],
+        "guardrails": [
+          "unbalanced_journal_denied",
+          "closed_period_posting_denied",
+          "segregation_of_duties_enforced"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.accounting.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "cash": {
+            "icon": "banknotes",
+            "status_indicator": "cash-position-badge"
+          },
+          "invoices_ap": {
+            "icon": "receipt",
+            "status_indicator": "ap-status-chip"
+          },
+          "invoices_ar": {
+            "icon": "file-invoice",
+            "status_indicator": "ar-status-chip"
+          },
+          "journals": {
+            "icon": "book-open",
+            "status_indicator": "journal-status-chip"
+          }
+        },
+        "name": "accounting_theme",
+        "tokens": {
+          "border.radius": "4px",
+          "color.accent": "#01579B",
+          "color.danger": "#B71C1C",
+          "color.primary": "#0D47A1",
+          "color.success": "#1B5E20",
+          "color.warning": "#E65100",
+          "density": "compact",
+          "surface.canvas": "#FAFAFA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#212121",
+          "text.secondary": "#757575"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "GLDashboard",
+            "name": "GL Dashboard",
+            "nav_group": "Overview",
+            "path": "/accounting",
+            "permission": "accounting:view"
+          },
+          {
+            "component": "JournalList",
+            "name": "Journal Entries",
+            "nav_group": "General Ledger",
+            "path": "/accounting/journals",
+            "permission": "accounting:journal"
+          },
+          {
+            "component": "ChartOfAccounts",
+            "name": "Chart of Accts",
+            "nav_group": "General Ledger",
+            "path": "/accounting/coa",
+            "permission": "accounting:coa"
+          },
+          {
+            "component": "ARInvoices",
+            "name": "AR Invoices",
+            "nav_group": "Receivables",
+            "path": "/accounting/ar",
+            "permission": "accounting:ar"
+          },
+          {
+            "component": "ARAging",
+            "name": "AR Aging",
+            "nav_group": "Receivables",
+            "path": "/accounting/ar/aging",
+            "permission": "accounting:ar"
+          },
+          {
+            "component": "APInvoices",
+            "name": "AP Invoices",
+            "nav_group": "Payables",
+            "path": "/accounting/ap",
+            "permission": "accounting:ap"
+          },
+          {
+            "component": "PaymentRuns",
+            "name": "Payment Runs",
+            "nav_group": "Payables",
+            "path": "/accounting/ap/runs",
+            "permission": "accounting:ap"
+          },
+          {
+            "component": "CashPosition",
+            "name": "Cash Position",
+            "nav_group": "Cash",
+            "path": "/accounting/cash",
+            "permission": "accounting:cash"
+          },
+          {
+            "component": "IncomeStatement",
+            "name": "P&L",
+            "nav_group": "Reports",
+            "path": "/accounting/pnl",
+            "permission": "accounting:reports"
+          },
+          {
+            "component": "BalanceSheet",
+            "name": "Balance Sheet",
+            "nav_group": "Reports",
+            "path": "/accounting/bs",
+            "permission": "accounting:reports"
+          },
+          {
+            "component": "PeriodClose",
+            "name": "Period Close",
+            "nav_group": "Administration",
+            "path": "/accounting/close",
+            "permission": "accounting:admin"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "AccountingPlatform": {
+        "agent_teams": [],
+        "agents": [
+          "AccountingAssistant"
+        ],
+        "capabilities": [
+          "AccountingCore"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {
+          "container": "docker",
+          "default": "local"
+        },
+        "description": "IFRS-compliant accounting platform composed from APG capabilities",
+        "integrations": {},
+        "name": "AccountingPlatform",
+        "policies": {},
+        "routes": [
+          "/accounting",
+          "/accounting/ar",
+          "/accounting/ap",
+          "/accounting/cash"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {
+          "ControllerHome": {
+            "capability": "AccountingCore",
+            "route": "/accounting"
+          }
+        },
+        "theme": {
+          "name": "accounting_platform_theme",
+          "tokens": {
+            "accent": "#01579B",
+            "border.radius": "4px"
+          }
+        },
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {
+      "AccountingCore": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "comp"
+      ]
+    }
+  },
+  "contracts": {
+    "AccountingCore": {
+      "configuration": {
+        "approval_threshold_ap": 50000,
+        "approval_threshold_ar": 100000,
+        "fiscal_year_start": "01-01",
+        "functional_currency": "KES",
+        "period_lock_days": 10,
+        "require_dual_control": true,
+        "tenant_id": "default"
+      },
+      "id": "accounting_platform_core",
+      "provides": [
+        "journal_entry_lifecycle",
+        "accounts_receivable_workflow",
+        "accounts_payable_workflow",
+        "cash_management_workflow",
+        "financial_statements",
+        "period_close_process"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "comp"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "journal_must_balance",
+            "when": "total_debit != total_credit"
+          },
+          {
+            "action": "deny",
+            "name": "closed_period_posting_denied",
+            "when": "period_status == closed"
+          },
+          {
+            "action": "require_review",
+            "name": "large_ap_requires_approval",
+            "when": "invoice_amount > 50000 and approval_status != approved"
+          },
+          {
+            "action": "deny",
+            "name": "segregation_of_duties",
+            "when": "preparer_id == approver_id"
+          },
+          {
+            "action": "deny",
+            "name": "ar_write_off_requires_cfo",
+            "when": "operation == write_off and amount > 10000 and cfo_approved != true"
+          },
+          {
+            "action": "require_review",
+            "name": "intercompany_requires_matching",
+            "when": "is_intercompany == true and matching_entry_missing == true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "components": {
+          "cash": {
+            "icon": "banknotes",
+            "status_indicator": "cash-position-badge"
+          },
+          "invoices_ap": {
+            "icon": "receipt",
+            "status_indicator": "ap-status-chip"
+          },
+          "invoices_ar": {
+            "icon": "file-invoice",
+            "status_indicator": "ar-status-chip"
+          },
+          "journals": {
+            "icon": "book-open",
+            "status_indicator": "journal-status-chip"
+          }
+        },
+        "name": "accounting_theme",
+        "tokens": {
+          "border.radius": "4px",
+          "color.accent": "#01579B",
+          "color.danger": "#B71C1C",
+          "color.primary": "#0D47A1",
+          "color.success": "#1B5E20",
+          "color.warning": "#E65100",
+          "density": "compact",
+          "surface.canvas": "#FAFAFA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#212121",
+          "text.secondary": "#757575"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "GLDashboard",
+            "name": "GL Dashboard",
+            "nav_group": "Overview",
+            "path": "/accounting",
+            "permission": "accounting:view"
+          },
+          {
+            "component": "JournalList",
+            "name": "Journal Entries",
+            "nav_group": "General Ledger",
+            "path": "/accounting/journals",
+            "permission": "accounting:journal"
+          },
+          {
+            "component": "ChartOfAccounts",
+            "name": "Chart of Accts",
+            "nav_group": "General Ledger",
+            "path": "/accounting/coa",
+            "permission": "accounting:coa"
+          },
+          {
+            "component": "ARInvoices",
+            "name": "AR Invoices",
+            "nav_group": "Receivables",
+            "path": "/accounting/ar",
+            "permission": "accounting:ar"
+          },
+          {
+            "component": "ARAging",
+            "name": "AR Aging",
+            "nav_group": "Receivables",
+            "path": "/accounting/ar/aging",
+            "permission": "accounting:ar"
+          },
+          {
+            "component": "APInvoices",
+            "name": "AP Invoices",
+            "nav_group": "Payables",
+            "path": "/accounting/ap",
+            "permission": "accounting:ap"
+          },
+          {
+            "component": "PaymentRuns",
+            "name": "Payment Runs",
+            "nav_group": "Payables",
+            "path": "/accounting/ap/runs",
+            "permission": "accounting:ap"
+          },
+          {
+            "component": "CashPosition",
+            "name": "Cash Position",
+            "nav_group": "Cash",
+            "path": "/accounting/cash",
+            "permission": "accounting:cash"
+          },
+          {
+            "component": "IncomeStatement",
+            "name": "P&L",
+            "nav_group": "Reports",
+            "path": "/accounting/pnl",
+            "permission": "accounting:reports"
+          },
+          {
+            "component": "BalanceSheet",
+            "name": "Balance Sheet",
+            "nav_group": "Reports",
+            "path": "/accounting/bs",
+            "permission": "accounting:reports"
+          },
+          {
+            "component": "PeriodClose",
+            "name": "Period Close",
+            "nav_group": "Administration",
+            "path": "/accounting/close",
+            "permission": "accounting:admin"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "accounting_platform.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {
+    "APPaymentRun": {
+      "assignments": {
+        "approved": "treasury_manager"
+      },
+      "compensation": {
+        "processed": "reverse_payment_run"
+      },
+      "guards": {
+        "approved": "total_amount_within_daily_limit and all_invoices_matched"
+      },
+      "human_tasks": [
+        "approved"
+      ],
+      "methods": [],
+      "name": "APPaymentRun",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "selected",
+        "approved",
+        "processed",
+        "bank_file_generated",
+        "posted"
+      ],
+      "steps": [
+        "selected",
+        "approved",
+        "processed",
+        "bank_file_generated",
+        "posted"
+      ],
+      "steps_raw": "selected -> approved -> processed -> bank_file_generated -> posted",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": "total_amount_within_daily_limit and all_invoices_matched",
+          "source": "selected",
+          "target": "approved"
+        },
+        {
+          "guard": null,
+          "source": "approved",
+          "target": "processed"
+        },
+        {
+          "guard": null,
+          "source": "processed",
+          "target": "bank_file_generated"
+        },
+        {
+          "guard": null,
+          "source": "bank_file_generated",
+          "target": "posted"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "InvoiceApproval": {
+      "assignments": {
+        "approved": "controller",
+        "validated": "accountant"
+      },
+      "compensation": {
+        "posted": "reverse_invoice"
+      },
+      "guards": {
+        "approved": "amount > 0 and gl_accounts_valid",
+        "validated": "invoice_lines_balanced and tax_calculated"
+      },
+      "human_tasks": [
+        "validated",
+        "approved"
+      ],
+      "methods": [],
+      "name": "InvoiceApproval",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "draft",
+        "validated",
+        "approved",
+        "posted"
+      ],
+      "steps": [
+        "draft",
+        "validated",
+        "approved",
+        "posted"
+      ],
+      "steps_raw": "draft -> validated -> approved -> posted",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": "invoice_lines_balanced and tax_calculated",
+          "source": "draft",
+          "target": "validated"
+        },
+        {
+          "guard": "amount > 0 and gl_accounts_valid",
+          "source": "validated",
+          "target": "approved"
+        },
+        {
+          "guard": null,
+          "source": "approved",
+          "target": "posted"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "PeriodClose": {
+      "assignments": {
+        "accruals_posted": "accountant",
+        "reconciled": "senior_accountant",
+        "reviewed": "controller"
+      },
+      "compensation": {},
+      "guards": {
+        "closed": "cfo_sign_off_received",
+        "reconciled": "all_bank_accounts_reconciled",
+        "reviewed": "trial_balance_balanced and no_outstanding_items"
+      },
+      "human_tasks": [
+        "accruals_posted",
+        "reconciled",
+        "reviewed"
+      ],
+      "methods": [],
+      "name": "PeriodClose",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "open",
+        "accruals_posted",
+        "reconciled",
+        "reviewed",
+        "closed",
+        "locked"
+      ],
+      "steps": [
+        "open",
+        "accruals_posted",
+        "reconciled",
+        "reviewed",
+        "closed",
+        "locked"
+      ],
+      "steps_raw": "open -> accruals_posted -> reconciled -> reviewed -> closed -> locked",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "open",
+          "target": "accruals_posted"
+        },
+        {
+          "guard": "all_bank_accounts_reconciled",
+          "source": "accruals_posted",
+          "target": "reconciled"
+        },
+        {
+          "guard": "trial_balance_balanced and no_outstanding_items",
+          "source": "reconciled",
+          "target": "reviewed"
+        },
+        {
+          "guard": "cfo_sign_off_received",
+          "source": "reviewed",
+          "target": "closed"
+        },
+        {
+          "guard": null,
+          "source": "closed",
+          "target": "locked"
+        }
+      ],
+      "type": "workflow",
+      "waits": {
+        "locked": "period_lock_confirmation"
+      }
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 1
+    },
+    "capability": {
+      "edges": 6,
+      "kind": "capability",
+      "nodes": 7
+    },
+    "deployment": {
+      "edges": 9,
+      "kind": "deployment",
+      "nodes": 10
+    },
+    "er": {
+      "edges": 26,
+      "kind": "er",
+      "nodes": 29
+    },
+    "handler": {
+      "edges": 9,
+      "kind": "handler",
+      "nodes": 10
+    },
+    "lookup": {
+      "edges": 9,
+      "kind": "lookup",
+      "nodes": 10
+    },
+    "package": {
+      "edges": 9,
+      "kind": "package",
+      "nodes": 10
+    },
+    "security": {
+      "edges": 9,
+      "kind": "security",
+      "nodes": 10
+    },
+    "workflow": {
+      "edges": 9,
+      "kind": "workflow",
+      "nodes": 10
+    }
+  },
+  "llms": {
+    "AccountingAssistant": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": null
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "AccountingCore.ar_write_off_requires_cfo": {
+      "action": "deny",
+      "name": "ar_write_off_requires_cfo",
+      "when": "operation == write_off and amount > 10000 and cfo_approved != true"
+    },
+    "AccountingCore.closed_period_posting_denied": {
+      "action": "deny",
+      "name": "closed_period_posting_denied",
+      "when": "period_status == closed"
+    },
+    "AccountingCore.intercompany_requires_matching": {
+      "action": "require_review",
+      "name": "intercompany_requires_matching",
+      "when": "is_intercompany == true and matching_entry_missing == true"
+    },
+    "AccountingCore.journal_must_balance": {
+      "action": "deny",
+      "name": "journal_must_balance",
+      "when": "total_debit != total_credit"
+    },
+    "AccountingCore.large_ap_requires_approval": {
+      "action": "require_review",
+      "name": "large_ap_requires_approval",
+      "when": "invoice_amount > 50000 and approval_status != approved"
+    },
+    "AccountingCore.segregation_of_duties": {
+      "action": "deny",
+      "name": "segregation_of_duties",
+      "when": "preparer_id == approver_id"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "accounting_platform.apg"
+  ],
+  "symbols": {
+    "agent.AccountingAssistant": {
+      "file": "accounting_platform.apg",
+      "id": "agent.AccountingAssistant",
+      "kind": "agent",
+      "name": "AccountingAssistant",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.AccountingPlatform": {
+      "file": "accounting_platform.apg",
+      "id": "app.AccountingPlatform",
+      "kind": "app",
+      "name": "AccountingPlatform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.AccountingCore": {
+      "file": "accounting_platform.apg",
+      "id": "capability.AccountingCore",
+      "kind": "capability",
+      "name": "AccountingCore",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.ChartOfAccounts.account_code": {
+      "file": "accounting_platform.apg",
+      "id": "field.ChartOfAccounts.account_code",
+      "kind": "field",
+      "name": "ChartOfAccounts.account_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.ChartOfAccounts.account_name": {
+      "file": "accounting_platform.apg",
+      "id": "field.ChartOfAccounts.account_name",
+      "kind": "field",
+      "name": "ChartOfAccounts.account_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.ChartOfAccounts.account_type": {
+      "file": "accounting_platform.apg",
+      "id": "field.ChartOfAccounts.account_type",
+      "kind": "field",
+      "name": "ChartOfAccounts.account_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.ChartOfAccounts.allow_posting": {
+      "file": "accounting_platform.apg",
+      "id": "field.ChartOfAccounts.allow_posting",
+      "kind": "field",
+      "name": "ChartOfAccounts.allow_posting",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.ChartOfAccounts.currency": {
+      "file": "accounting_platform.apg",
+      "id": "field.ChartOfAccounts.currency",
+      "kind": "field",
+      "name": "ChartOfAccounts.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.ChartOfAccounts.normal_balance": {
+      "file": "accounting_platform.apg",
+      "id": "field.ChartOfAccounts.normal_balance",
+      "kind": "field",
+      "name": "ChartOfAccounts.normal_balance",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.ChartOfAccounts.parent_code": {
+      "file": "accounting_platform.apg",
+      "id": "field.ChartOfAccounts.parent_code",
+      "kind": "field",
+      "name": "ChartOfAccounts.parent_code",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Invoice.counterparty_id": {
+      "file": "accounting_platform.apg",
+      "id": "field.Invoice.counterparty_id",
+      "kind": "field",
+      "name": "Invoice.counterparty_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Invoice.currency": {
+      "file": "accounting_platform.apg",
+      "id": "field.Invoice.currency",
+      "kind": "field",
+      "name": "Invoice.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Invoice.due_date": {
+      "file": "accounting_platform.apg",
+      "id": "field.Invoice.due_date",
+      "kind": "field",
+      "name": "Invoice.due_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Invoice.invoice_date": {
+      "file": "accounting_platform.apg",
+      "id": "field.Invoice.invoice_date",
+      "kind": "field",
+      "name": "Invoice.invoice_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Invoice.invoice_number": {
+      "file": "accounting_platform.apg",
+      "id": "field.Invoice.invoice_number",
+      "kind": "field",
+      "name": "Invoice.invoice_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Invoice.invoice_type": {
+      "file": "accounting_platform.apg",
+      "id": "field.Invoice.invoice_type",
+      "kind": "field",
+      "name": "Invoice.invoice_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Invoice.status": {
+      "file": "accounting_platform.apg",
+      "id": "field.Invoice.status",
+      "kind": "field",
+      "name": "Invoice.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.Invoice.subtotal": {
+      "file": "accounting_platform.apg",
+      "id": "field.Invoice.subtotal",
+      "kind": "field",
+      "name": "Invoice.subtotal",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Invoice.tax_amount": {
+      "file": "accounting_platform.apg",
+      "id": "field.Invoice.tax_amount",
+      "kind": "field",
+      "name": "Invoice.tax_amount",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Invoice.total": {
+      "file": "accounting_platform.apg",
+      "id": "field.Invoice.total",
+      "kind": "field",
+      "name": "Invoice.total",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.description": {
+      "file": "accounting_platform.apg",
+      "id": "field.JournalEntry.description",
+      "kind": "field",
+      "name": "JournalEntry.description",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.journal_date": {
+      "file": "accounting_platform.apg",
+      "id": "field.JournalEntry.journal_date",
+      "kind": "field",
+      "name": "JournalEntry.journal_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.journal_number": {
+      "file": "accounting_platform.apg",
+      "id": "field.JournalEntry.journal_number",
+      "kind": "field",
+      "name": "JournalEntry.journal_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.journal_type": {
+      "file": "accounting_platform.apg",
+      "id": "field.JournalEntry.journal_type",
+      "kind": "field",
+      "name": "JournalEntry.journal_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.period": {
+      "file": "accounting_platform.apg",
+      "id": "field.JournalEntry.period",
+      "kind": "field",
+      "name": "JournalEntry.period",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.posted_by": {
+      "file": "accounting_platform.apg",
+      "id": "field.JournalEntry.posted_by",
+      "kind": "field",
+      "name": "JournalEntry.posted_by",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.status": {
+      "file": "accounting_platform.apg",
+      "id": "field.JournalEntry.status",
+      "kind": "field",
+      "name": "JournalEntry.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.total_credit": {
+      "file": "accounting_platform.apg",
+      "id": "field.JournalEntry.total_credit",
+      "kind": "field",
+      "name": "JournalEntry.total_credit",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.JournalEntry.total_debit": {
+      "file": "accounting_platform.apg",
+      "id": "field.JournalEntry.total_debit",
+      "kind": "field",
+      "name": "JournalEntry.total_debit",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "accounting_platform.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.accounting_platform": {
+      "file": "accounting_platform.apg",
+      "id": "module.accounting_platform",
+      "kind": "module",
+      "name": "accounting_platform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.ChartOfAccounts": {
+      "file": "accounting_platform.apg",
+      "id": "table.ChartOfAccounts",
+      "kind": "table",
+      "name": "ChartOfAccounts",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Invoice": {
+      "file": "accounting_platform.apg",
+      "id": "table.Invoice",
+      "kind": "table",
+      "name": "Invoice",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.JournalEntry": {
+      "file": "accounting_platform.apg",
+      "id": "table.JournalEntry",
+      "kind": "table",
+      "name": "JournalEntry",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.APPaymentRun": {
+      "file": "accounting_platform.apg",
+      "id": "workflow.APPaymentRun",
+      "kind": "workflow",
+      "name": "APPaymentRun",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.InvoiceApproval": {
+      "file": "accounting_platform.apg",
+      "id": "workflow.InvoiceApproval",
+      "kind": "workflow",
+      "name": "InvoiceApproval",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.PeriodClose": {
+      "file": "accounting_platform.apg",
+      "id": "workflow.PeriodClose",
+      "kind": "workflow",
+      "name": "PeriodClose",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "ChartOfAccounts": {
+      "fields": {
+        "account_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "account_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "account_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "allow_posting": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "normal_balance": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "parent_code": {
+          "relationship": null,
+          "required": false,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "ChartOfAccounts"
+    },
+    "Invoice": {
+      "fields": {
+        "counterparty_id": {
+          "relationship": {
+            "alias": "counterparty",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Counterparty"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "due_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "invoice_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "invoice_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "invoice_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "subtotal": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "tax_amount": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "total": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        }
+      },
+      "lookup_paths": {
+        "due_date.id": {
+          "chain": [
+            "Invoice.due_date",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "invoice_date.id": {
+          "chain": [
+            "Invoice.invoice_date",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "subtotal.id": {
+          "chain": [
+            "Invoice.subtotal",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "tax_amount.id": {
+          "chain": [
+            "Invoice.tax_amount",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "total.id": {
+          "chain": [
+            "Invoice.total",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Invoice"
+    },
+    "JournalEntry": {
+      "fields": {
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "journal_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "journal_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "journal_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "period": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "posted_by": {
+          "relationship": null,
+          "required": false,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total_credit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "total_debit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        }
+      },
+      "lookup_paths": {
+        "journal_date.id": {
+          "chain": [
+            "JournalEntry.journal_date",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "total_credit.id": {
+          "chain": [
+            "JournalEntry.total_credit",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "total_debit.id": {
+          "chain": [
+            "JournalEntry.total_debit",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "JournalEntry"
+    }
+  },
+  "views": {}
+}

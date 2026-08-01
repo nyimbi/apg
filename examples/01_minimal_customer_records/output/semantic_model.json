@@ -469,10 +469,10 @@
           "relationship": {
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "date?"
+            "target_table": "date"
           },
-          "required": true,
-          "type": "date?"
+          "required": false,
+          "type": "date"
         },
         "discount_rate": {
           "relationship": null,
@@ -537,13 +537,9 @@
           "type": "datetime"
         },
         "secondary_email": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "status": {
           "relationship": null,
@@ -578,7 +574,7 @@
         "date_of_birth.id": {
           "chain": [
             "Customer.date_of_birth",
-            "date?.id"
+            "date.id"
           ],
           "valid": true
         },
@@ -600,13 +596,6 @@
           "chain": [
             "Customer.registered_at",
             "datetime.id"
-          ],
-          "valid": true
-        },
-        "secondary_email.id": {
-          "chain": [
-            "Customer.secondary_email",
-            "str?.id"
           ],
           "valid": true
         },

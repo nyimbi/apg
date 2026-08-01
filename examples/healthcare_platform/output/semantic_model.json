@@ -1,0 +1,1909 @@
+{
+  "agents": {
+    "ClinicalAssistant": {
+      "capabilities": [
+        "clinical_decision_support",
+        "medication_management"
+      ],
+      "configuration": {
+        "max_turns": 4,
+        "temperature": 0.0
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "clinical_memory"
+      },
+      "model": "openai:gpt-4.1-mini",
+      "name": "ClinicalAssistant",
+      "outputs": [],
+      "role": "clinical decision support",
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_direct_prescribing",
+          "when": "action == prescribe"
+        },
+        {
+          "action": "require_review",
+          "name": "flag_paediatric_dosing",
+          "when": "patient_age_lt == 12"
+        }
+      ],
+      "runtime": null,
+      "system": "You are a clinical decision support system. Provide evidence-based recommendations, drug interaction checks, and diagnostic support. Always recommend clinician review. Cite clinical guidelines (WHO, NICE, Kenya Clinical Guidelines).",
+      "theme": {},
+      "tools": [
+        "drug_database",
+        "icd10_lookup",
+        "lab_reference_ranges",
+        "clinical_guidelines"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": null,
+    "entity_count": 9,
+    "name": "healthcare_platform",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "ClinicalCore": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "consent_required_for_treatment": true,
+        "controlled_substance_register": true,
+        "critical_lab_alert_minutes": 30,
+        "ehr_standard": "HL7_FHIR_R4",
+        "enable_clinical_decision_support": true,
+        "facility_name": "APG Health Centre",
+        "hipaa_mode": true,
+        "max_prescription_days": 90,
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw"
+        ]
+      },
+      "master_data": {},
+      "name": "ClinicalCore",
+      "provides": [
+        "patient_registration_workflow",
+        "clinical_encounter_lifecycle",
+        "medication_management",
+        "laboratory_workflow",
+        "telemedicine_consultation",
+        "clinical_decision_support"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "schd"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "consent_required",
+            "when": "operation == treat and consent_recorded != true"
+          },
+          {
+            "action": "deny",
+            "name": "drug_allergy_check",
+            "when": "allergy_detected == true and override_reason missing"
+          },
+          {
+            "action": "deny",
+            "name": "controlled_substance_limit",
+            "when": "drug_schedule == II and quantity_gt == 30"
+          },
+          {
+            "action": "deny",
+            "name": "prescriber_must_be_licensed",
+            "when": "prescriber_licensed != true"
+          },
+          {
+            "action": "require_review",
+            "name": "critical_lab_requires_immediate_notify",
+            "when": "lab_value_critical == true and clinician_notified != true"
+          },
+          {
+            "action": "require_review",
+            "name": "minor_patient_requires_guardian_consent",
+            "when": "patient_age_lt == 18 and guardian_consent missing"
+          },
+          {
+            "action": "deny",
+            "name": "mental_health_enhanced_privacy",
+            "when": "diagnosis_category == mental_health and access_level_lt == treating_clinician"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "events": [
+          "patient_registered",
+          "encounter_opened",
+          "encounter_closed",
+          "prescription_created",
+          "medication_dispensed",
+          "adverse_event_reported",
+          "lab_ordered",
+          "specimen_collected",
+          "result_verified",
+          "critical_value_alerted",
+          "teleconsult_booked",
+          "teleconsult_completed",
+          "consent_recorded"
+        ],
+        "guardrails": [
+          "no_treatment_without_consent",
+          "drug_allergy_check_enforced",
+          "controlled_substance_quantity_limit",
+          "critical_lab_immediate_notification",
+          "mental_health_enhanced_privacy"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.clinical.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "encounters": {
+            "icon": "stethoscope",
+            "status_indicator": "encounter-type-chip"
+          },
+          "lab_orders": {
+            "icon": "flask",
+            "status_indicator": "lab-priority-chip"
+          },
+          "patients": {
+            "icon": "user-heart",
+            "status_indicator": "patient-status-chip"
+          },
+          "prescriptions": {
+            "icon": "pill",
+            "status_indicator": "rx-status-chip"
+          }
+        },
+        "name": "clinical_theme",
+        "tokens": {
+          "border.radius": "6px",
+          "color.accent": "#00838F",
+          "color.danger": "#C62828",
+          "color.primary": "#006064",
+          "color.success": "#2E7D32",
+          "color.warning": "#E65100",
+          "density": "comfortable",
+          "surface.canvas": "#F0F7F7",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#004D40",
+          "text.secondary": "#607D8B"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "ClinicalDashboard",
+            "name": "Clinical Dashboard",
+            "nav_group": "Overview",
+            "path": "/clinical",
+            "permission": "clinical:view"
+          },
+          {
+            "component": "PatientRegistry",
+            "name": "Patient Registry",
+            "nav_group": "Patients",
+            "path": "/clinical/patients",
+            "permission": "clinical:patients"
+          },
+          {
+            "component": "EncounterList",
+            "name": "Encounters",
+            "nav_group": "Clinical",
+            "path": "/clinical/encounters",
+            "permission": "clinical:encounters"
+          },
+          {
+            "component": "PharmacyWorkbench",
+            "name": "Prescriptions",
+            "nav_group": "Clinical",
+            "path": "/clinical/pharmacy",
+            "permission": "clinical:pharmacy"
+          },
+          {
+            "component": "LabWorkbench",
+            "name": "Laboratory",
+            "nav_group": "Clinical",
+            "path": "/clinical/lab",
+            "permission": "clinical:lab"
+          },
+          {
+            "component": "TeleConsole",
+            "name": "Telemedicine",
+            "nav_group": "Channels",
+            "path": "/clinical/tele",
+            "permission": "clinical:tele"
+          },
+          {
+            "component": "ClinicalReports",
+            "name": "Reports",
+            "nav_group": "Analytics",
+            "path": "/clinical/reports",
+            "permission": "clinical:reports"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "HealthcarePlatform": {
+        "agent_teams": [],
+        "agents": [
+          "ClinicalAssistant"
+        ],
+        "capabilities": [
+          "ClinicalCore"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {
+          "container": "docker",
+          "default": "local"
+        },
+        "description": "Clinical information system composed from APG capabilities",
+        "integrations": {},
+        "name": "HealthcarePlatform",
+        "policies": {},
+        "routes": [
+          "/clinical",
+          "/clinical/patients",
+          "/clinical/pharmacy",
+          "/clinical/lab"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {},
+        "theme": {
+          "name": "healthcare_platform_theme",
+          "tokens": {
+            "accent": "#00838F",
+            "border.radius": "6px"
+          }
+        },
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {
+      "ClinicalCore": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "schd"
+      ]
+    }
+  },
+  "contracts": {
+    "ClinicalCore": {
+      "configuration": {
+        "consent_required_for_treatment": true,
+        "controlled_substance_register": true,
+        "critical_lab_alert_minutes": 30,
+        "ehr_standard": "HL7_FHIR_R4",
+        "enable_clinical_decision_support": true,
+        "facility_name": "APG Health Centre",
+        "hipaa_mode": true,
+        "max_prescription_days": 90,
+        "tenant_id": "default"
+      },
+      "id": "healthcare_platform_core",
+      "provides": [
+        "patient_registration_workflow",
+        "clinical_encounter_lifecycle",
+        "medication_management",
+        "laboratory_workflow",
+        "telemedicine_consultation",
+        "clinical_decision_support"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "schd"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "consent_required",
+            "when": "operation == treat and consent_recorded != true"
+          },
+          {
+            "action": "deny",
+            "name": "drug_allergy_check",
+            "when": "allergy_detected == true and override_reason missing"
+          },
+          {
+            "action": "deny",
+            "name": "controlled_substance_limit",
+            "when": "drug_schedule == II and quantity_gt == 30"
+          },
+          {
+            "action": "deny",
+            "name": "prescriber_must_be_licensed",
+            "when": "prescriber_licensed != true"
+          },
+          {
+            "action": "require_review",
+            "name": "critical_lab_requires_immediate_notify",
+            "when": "lab_value_critical == true and clinician_notified != true"
+          },
+          {
+            "action": "require_review",
+            "name": "minor_patient_requires_guardian_consent",
+            "when": "patient_age_lt == 18 and guardian_consent missing"
+          },
+          {
+            "action": "deny",
+            "name": "mental_health_enhanced_privacy",
+            "when": "diagnosis_category == mental_health and access_level_lt == treating_clinician"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "components": {
+          "encounters": {
+            "icon": "stethoscope",
+            "status_indicator": "encounter-type-chip"
+          },
+          "lab_orders": {
+            "icon": "flask",
+            "status_indicator": "lab-priority-chip"
+          },
+          "patients": {
+            "icon": "user-heart",
+            "status_indicator": "patient-status-chip"
+          },
+          "prescriptions": {
+            "icon": "pill",
+            "status_indicator": "rx-status-chip"
+          }
+        },
+        "name": "clinical_theme",
+        "tokens": {
+          "border.radius": "6px",
+          "color.accent": "#00838F",
+          "color.danger": "#C62828",
+          "color.primary": "#006064",
+          "color.success": "#2E7D32",
+          "color.warning": "#E65100",
+          "density": "comfortable",
+          "surface.canvas": "#F0F7F7",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#004D40",
+          "text.secondary": "#607D8B"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "ClinicalDashboard",
+            "name": "Clinical Dashboard",
+            "nav_group": "Overview",
+            "path": "/clinical",
+            "permission": "clinical:view"
+          },
+          {
+            "component": "PatientRegistry",
+            "name": "Patient Registry",
+            "nav_group": "Patients",
+            "path": "/clinical/patients",
+            "permission": "clinical:patients"
+          },
+          {
+            "component": "EncounterList",
+            "name": "Encounters",
+            "nav_group": "Clinical",
+            "path": "/clinical/encounters",
+            "permission": "clinical:encounters"
+          },
+          {
+            "component": "PharmacyWorkbench",
+            "name": "Prescriptions",
+            "nav_group": "Clinical",
+            "path": "/clinical/pharmacy",
+            "permission": "clinical:pharmacy"
+          },
+          {
+            "component": "LabWorkbench",
+            "name": "Laboratory",
+            "nav_group": "Clinical",
+            "path": "/clinical/lab",
+            "permission": "clinical:lab"
+          },
+          {
+            "component": "TeleConsole",
+            "name": "Telemedicine",
+            "nav_group": "Channels",
+            "path": "/clinical/tele",
+            "permission": "clinical:tele"
+          },
+          {
+            "component": "ClinicalReports",
+            "name": "Reports",
+            "nav_group": "Analytics",
+            "path": "/clinical/reports",
+            "permission": "clinical:reports"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "healthcare_platform.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {
+    "PatientAdmission": {
+      "assignments": {
+        "discharge_planning": "care_coordinator",
+        "treatment_plan": "attending_doctor",
+        "triage": "triage_nurse"
+      },
+      "compensation": {},
+      "guards": {
+        "discharged": "discharge_summary_complete and follow_up_scheduled",
+        "treatment_plan": "consent_obtained and allergies_checked"
+      },
+      "human_tasks": [
+        "triage",
+        "treatment_plan",
+        "discharge_planning"
+      ],
+      "methods": [],
+      "name": "PatientAdmission",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "registration",
+        "triage",
+        "assigned_to_clinician",
+        "assessment",
+        "treatment_plan",
+        "active_treatment",
+        "discharge_planning",
+        "discharged"
+      ],
+      "steps": [
+        "registration",
+        "triage",
+        "assigned_to_clinician",
+        "assessment",
+        "treatment_plan",
+        "active_treatment",
+        "discharge_planning",
+        "discharged"
+      ],
+      "steps_raw": "registration -> triage -> assigned_to_clinician -> assessment -> treatment_plan -> active_treatment -> discharge_planning -> discharged",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "registration",
+          "target": "triage"
+        },
+        {
+          "guard": null,
+          "source": "triage",
+          "target": "assigned_to_clinician"
+        },
+        {
+          "guard": null,
+          "source": "assigned_to_clinician",
+          "target": "assessment"
+        },
+        {
+          "guard": "consent_obtained and allergies_checked",
+          "source": "assessment",
+          "target": "treatment_plan"
+        },
+        {
+          "guard": null,
+          "source": "treatment_plan",
+          "target": "active_treatment"
+        },
+        {
+          "guard": null,
+          "source": "active_treatment",
+          "target": "discharge_planning"
+        },
+        {
+          "guard": "discharge_summary_complete and follow_up_scheduled",
+          "source": "discharge_planning",
+          "target": "discharged"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "PrescriptionLifecycle": {
+      "assignments": {
+        "dispensed": "pharmacist",
+        "drug_interaction_checked": "pharmacist"
+      },
+      "compensation": {},
+      "guards": {
+        "administered": "patient_identified and dose_confirmed",
+        "dispensed": "interaction_check_passed and allergy_check_passed and consent_valid"
+      },
+      "human_tasks": [
+        "drug_interaction_checked",
+        "dispensed"
+      ],
+      "methods": [],
+      "name": "PrescriptionLifecycle",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "prescribed",
+        "drug_interaction_checked",
+        "dispensed",
+        "administered",
+        "completed"
+      ],
+      "steps": [
+        "prescribed",
+        "drug_interaction_checked",
+        "dispensed",
+        "administered",
+        "completed"
+      ],
+      "steps_raw": "prescribed -> drug_interaction_checked -> dispensed -> administered -> completed",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "prescribed",
+          "target": "drug_interaction_checked"
+        },
+        {
+          "guard": "interaction_check_passed and allergy_check_passed and consent_valid",
+          "source": "drug_interaction_checked",
+          "target": "dispensed"
+        },
+        {
+          "guard": "patient_identified and dose_confirmed",
+          "source": "dispensed",
+          "target": "administered"
+        },
+        {
+          "guard": null,
+          "source": "administered",
+          "target": "completed"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 1
+    },
+    "capability": {
+      "edges": 6,
+      "kind": "capability",
+      "nodes": 7
+    },
+    "deployment": {
+      "edges": 9,
+      "kind": "deployment",
+      "nodes": 10
+    },
+    "er": {
+      "edges": 47,
+      "kind": "er",
+      "nodes": 43
+    },
+    "handler": {
+      "edges": 9,
+      "kind": "handler",
+      "nodes": 10
+    },
+    "lookup": {
+      "edges": 9,
+      "kind": "lookup",
+      "nodes": 10
+    },
+    "package": {
+      "edges": 9,
+      "kind": "package",
+      "nodes": 10
+    },
+    "security": {
+      "edges": 9,
+      "kind": "security",
+      "nodes": 10
+    },
+    "workflow": {
+      "edges": 9,
+      "kind": "workflow",
+      "nodes": 10
+    }
+  },
+  "llms": {
+    "ClinicalAssistant": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": null
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "ClinicalCore.consent_required": {
+      "action": "deny",
+      "name": "consent_required",
+      "when": "operation == treat and consent_recorded != true"
+    },
+    "ClinicalCore.controlled_substance_limit": {
+      "action": "deny",
+      "name": "controlled_substance_limit",
+      "when": "drug_schedule == II and quantity_gt == 30"
+    },
+    "ClinicalCore.critical_lab_requires_immediate_notify": {
+      "action": "require_review",
+      "name": "critical_lab_requires_immediate_notify",
+      "when": "lab_value_critical == true and clinician_notified != true"
+    },
+    "ClinicalCore.drug_allergy_check": {
+      "action": "deny",
+      "name": "drug_allergy_check",
+      "when": "allergy_detected == true and override_reason missing"
+    },
+    "ClinicalCore.mental_health_enhanced_privacy": {
+      "action": "deny",
+      "name": "mental_health_enhanced_privacy",
+      "when": "diagnosis_category == mental_health and access_level_lt == treating_clinician"
+    },
+    "ClinicalCore.minor_patient_requires_guardian_consent": {
+      "action": "require_review",
+      "name": "minor_patient_requires_guardian_consent",
+      "when": "patient_age_lt == 18 and guardian_consent missing"
+    },
+    "ClinicalCore.prescriber_must_be_licensed": {
+      "action": "deny",
+      "name": "prescriber_must_be_licensed",
+      "when": "prescriber_licensed != true"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "healthcare_platform.apg"
+  ],
+  "symbols": {
+    "agent.ClinicalAssistant": {
+      "file": "healthcare_platform.apg",
+      "id": "agent.ClinicalAssistant",
+      "kind": "agent",
+      "name": "ClinicalAssistant",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.HealthcarePlatform": {
+      "file": "healthcare_platform.apg",
+      "id": "app.HealthcarePlatform",
+      "kind": "app",
+      "name": "HealthcarePlatform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.ClinicalCore": {
+      "file": "healthcare_platform.apg",
+      "id": "capability.ClinicalCore",
+      "kind": "capability",
+      "name": "ClinicalCore",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Encounter.admission_date": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Encounter.admission_date",
+      "kind": "field",
+      "name": "Encounter.admission_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Encounter.attending_clinician": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Encounter.attending_clinician",
+      "kind": "field",
+      "name": "Encounter.attending_clinician",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Encounter.discharge_date": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Encounter.discharge_date",
+      "kind": "field",
+      "name": "Encounter.discharge_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Encounter.encounter_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Encounter.encounter_id",
+      "kind": "field",
+      "name": "Encounter.encounter_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Encounter.encounter_type": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Encounter.encounter_type",
+      "kind": "field",
+      "name": "Encounter.encounter_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Encounter.facility_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Encounter.facility_id",
+      "kind": "field",
+      "name": "Encounter.facility_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Encounter.patient_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Encounter.patient_id",
+      "kind": "field",
+      "name": "Encounter.patient_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Encounter.primary_diagnosis": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Encounter.primary_diagnosis",
+      "kind": "field",
+      "name": "Encounter.primary_diagnosis",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Encounter.status": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Encounter.status",
+      "kind": "field",
+      "name": "Encounter.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.LabOrder.encounter_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.LabOrder.encounter_id",
+      "kind": "field",
+      "name": "LabOrder.encounter_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.LabOrder.order_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.LabOrder.order_id",
+      "kind": "field",
+      "name": "LabOrder.order_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.LabOrder.ordered_at": {
+      "file": "healthcare_platform.apg",
+      "id": "field.LabOrder.ordered_at",
+      "kind": "field",
+      "name": "LabOrder.ordered_at",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.LabOrder.ordered_by": {
+      "file": "healthcare_platform.apg",
+      "id": "field.LabOrder.ordered_by",
+      "kind": "field",
+      "name": "LabOrder.ordered_by",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.LabOrder.patient_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.LabOrder.patient_id",
+      "kind": "field",
+      "name": "LabOrder.patient_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.LabOrder.priority": {
+      "file": "healthcare_platform.apg",
+      "id": "field.LabOrder.priority",
+      "kind": "field",
+      "name": "LabOrder.priority",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.LabOrder.status": {
+      "file": "healthcare_platform.apg",
+      "id": "field.LabOrder.status",
+      "kind": "field",
+      "name": "LabOrder.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.LabOrder.test_code": {
+      "file": "healthcare_platform.apg",
+      "id": "field.LabOrder.test_code",
+      "kind": "field",
+      "name": "LabOrder.test_code",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.LabOrder.test_name": {
+      "file": "healthcare_platform.apg",
+      "id": "field.LabOrder.test_name",
+      "kind": "field",
+      "name": "LabOrder.test_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Patient.active": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Patient.active",
+      "kind": "field",
+      "name": "Patient.active",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 11
+        },
+        "start": {
+          "character": 4,
+          "line": 11
+        }
+      },
+      "references": []
+    },
+    "field.Patient.allergies": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Patient.allergies",
+      "kind": "field",
+      "name": "Patient.allergies",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.Patient.blood_group": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Patient.blood_group",
+      "kind": "field",
+      "name": "Patient.blood_group",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Patient.date_of_birth": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Patient.date_of_birth",
+      "kind": "field",
+      "name": "Patient.date_of_birth",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Patient.first_name": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Patient.first_name",
+      "kind": "field",
+      "name": "Patient.first_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Patient.gender": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Patient.gender",
+      "kind": "field",
+      "name": "Patient.gender",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Patient.last_name": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Patient.last_name",
+      "kind": "field",
+      "name": "Patient.last_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Patient.mrn": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Patient.mrn",
+      "kind": "field",
+      "name": "Patient.mrn",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Patient.national_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Patient.national_id",
+      "kind": "field",
+      "name": "Patient.national_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Patient.patient_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Patient.patient_id",
+      "kind": "field",
+      "name": "Patient.patient_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Patient.phone": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Patient.phone",
+      "kind": "field",
+      "name": "Patient.phone",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.dose": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Prescription.dose",
+      "kind": "field",
+      "name": "Prescription.dose",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.drug_name": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Prescription.drug_name",
+      "kind": "field",
+      "name": "Prescription.drug_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.duration_days": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Prescription.duration_days",
+      "kind": "field",
+      "name": "Prescription.duration_days",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.encounter_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Prescription.encounter_id",
+      "kind": "field",
+      "name": "Prescription.encounter_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.frequency": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Prescription.frequency",
+      "kind": "field",
+      "name": "Prescription.frequency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.patient_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Prescription.patient_id",
+      "kind": "field",
+      "name": "Prescription.patient_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.prescriber_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Prescription.prescriber_id",
+      "kind": "field",
+      "name": "Prescription.prescriber_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.prescription_id": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Prescription.prescription_id",
+      "kind": "field",
+      "name": "Prescription.prescription_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.route": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Prescription.route",
+      "kind": "field",
+      "name": "Prescription.route",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Prescription.status": {
+      "file": "healthcare_platform.apg",
+      "id": "field.Prescription.status",
+      "kind": "field",
+      "name": "Prescription.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "healthcare_platform.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.healthcare_platform": {
+      "file": "healthcare_platform.apg",
+      "id": "module.healthcare_platform",
+      "kind": "module",
+      "name": "healthcare_platform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Encounter": {
+      "file": "healthcare_platform.apg",
+      "id": "table.Encounter",
+      "kind": "table",
+      "name": "Encounter",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.LabOrder": {
+      "file": "healthcare_platform.apg",
+      "id": "table.LabOrder",
+      "kind": "table",
+      "name": "LabOrder",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Patient": {
+      "file": "healthcare_platform.apg",
+      "id": "table.Patient",
+      "kind": "table",
+      "name": "Patient",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Prescription": {
+      "file": "healthcare_platform.apg",
+      "id": "table.Prescription",
+      "kind": "table",
+      "name": "Prescription",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.PatientAdmission": {
+      "file": "healthcare_platform.apg",
+      "id": "workflow.PatientAdmission",
+      "kind": "workflow",
+      "name": "PatientAdmission",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.PrescriptionLifecycle": {
+      "file": "healthcare_platform.apg",
+      "id": "workflow.PrescriptionLifecycle",
+      "kind": "workflow",
+      "name": "PrescriptionLifecycle",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Encounter": {
+      "fields": {
+        "admission_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "attending_clinician": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "discharge_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": false,
+          "type": "datetime"
+        },
+        "encounter_id": {
+          "relationship": {
+            "alias": "encounter",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Encounter"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "encounter_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "facility_id": {
+          "relationship": {
+            "alias": "facility",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Facility"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "patient_id": {
+          "relationship": {
+            "alias": "patient",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Patient"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "primary_diagnosis": {
+          "relationship": null,
+          "required": false,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "admission_date.id": {
+          "chain": [
+            "Encounter.admission_date",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "discharge_date.id": {
+          "chain": [
+            "Encounter.discharge_date",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Encounter"
+    },
+    "LabOrder": {
+      "fields": {
+        "encounter_id": {
+          "relationship": {
+            "alias": "encounter",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Encounter"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "order_id": {
+          "relationship": {
+            "alias": "order",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Order"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "ordered_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "ordered_by": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "patient_id": {
+          "relationship": {
+            "alias": "patient",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Patient"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "priority": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "test_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "test_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "ordered_at.id": {
+          "chain": [
+            "LabOrder.ordered_at",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "LabOrder"
+    },
+    "Patient": {
+      "fields": {
+        "active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "allergies": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        },
+        "blood_group": {
+          "relationship": null,
+          "required": false,
+          "type": "str"
+        },
+        "date_of_birth": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "first_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "gender": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "last_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "mrn": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "national_id": {
+          "relationship": {
+            "alias": "national",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "National"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "patient_id": {
+          "relationship": {
+            "alias": "patient",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Patient"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "allergies.id": {
+          "chain": [
+            "Patient.allergies",
+            "List.id"
+          ],
+          "valid": true
+        },
+        "date_of_birth.id": {
+          "chain": [
+            "Patient.date_of_birth",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Patient"
+    },
+    "Prescription": {
+      "fields": {
+        "dose": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "drug_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "duration_days": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "encounter_id": {
+          "relationship": {
+            "alias": "encounter",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Encounter"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "frequency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "patient_id": {
+          "relationship": {
+            "alias": "patient",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Patient"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "prescriber_id": {
+          "relationship": {
+            "alias": "prescriber",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Prescriber"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "prescription_id": {
+          "relationship": {
+            "alias": "prescription",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Prescription"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "route": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Prescription"
+    }
+  },
+  "views": {}
+}

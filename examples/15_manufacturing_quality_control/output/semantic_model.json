@@ -948,22 +948,14 @@
           "type": "str"
         },
         "notes": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "result": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "work_order_id": {
           "relationship": {
@@ -983,20 +975,6 @@
             "datetime.id"
           ],
           "valid": true
-        },
-        "notes.id": {
-          "chain": [
-            "QualityInspection.notes",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "result.id": {
-          "chain": [
-            "QualityInspection.result",
-            "str?.id"
-          ],
-          "valid": true
         }
       },
       "name": "QualityInspection"
@@ -1007,10 +985,10 @@
           "relationship": {
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "datetime?"
+            "target_table": "datetime"
           },
-          "required": true,
-          "type": "datetime?"
+          "required": false,
+          "type": "datetime"
         },
         "product_code": {
           "relationship": null,
@@ -1041,10 +1019,10 @@
           "relationship": {
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "datetime?"
+            "target_table": "datetime"
           },
-          "required": true,
-          "type": "datetime?"
+          "required": false,
+          "type": "datetime"
         },
         "status": {
           "relationship": null,
@@ -1066,14 +1044,14 @@
         "completed_at.id": {
           "chain": [
             "WorkOrder.completed_at",
-            "datetime?.id"
+            "datetime.id"
           ],
           "valid": true
         },
         "started_at.id": {
           "chain": [
             "WorkOrder.started_at",
-            "datetime?.id"
+            "datetime.id"
           ],
           "valid": true
         }

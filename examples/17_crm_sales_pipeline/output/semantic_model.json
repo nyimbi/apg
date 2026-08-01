@@ -1110,13 +1110,9 @@
     "Lead": {
       "fields": {
         "company": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "created_at": {
           "relationship": null,
@@ -1149,13 +1145,9 @@
           "type": "str"
         },
         "notes": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "owner_id": {
           "relationship": {
@@ -1168,13 +1160,9 @@
           "type": "str"
         },
         "phone": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "score": {
           "relationship": null,
@@ -1192,29 +1180,7 @@
           "type": "str"
         }
       },
-      "lookup_paths": {
-        "company.id": {
-          "chain": [
-            "Lead.company",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "notes.id": {
-          "chain": [
-            "Lead.notes",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "phone.id": {
-          "chain": [
-            "Lead.phone",
-            "str?.id"
-          ],
-          "valid": true
-        }
-      },
+      "lookup_paths": {},
       "name": "Lead"
     },
     "Opportunity": {
@@ -1235,13 +1201,9 @@
           "type": "float"
         },
         "competitor": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "expected_close": {
           "relationship": null,
@@ -1250,21 +1212,18 @@
         },
         "lead_id": {
           "relationship": {
+            "alias": "lead",
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "str?"
+            "target_table": "Lead"
           },
-          "required": true,
-          "type": "str?"
+          "required": false,
+          "type": "str"
         },
         "loss_reason": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "name": {
           "relationship": null,
@@ -1302,29 +1261,7 @@
           "type": "str"
         }
       },
-      "lookup_paths": {
-        "competitor.id": {
-          "chain": [
-            "Opportunity.competitor",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "lead_id.id": {
-          "chain": [
-            "Opportunity.lead_id",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "loss_reason.id": {
-          "chain": [
-            "Opportunity.loss_reason",
-            "str?.id"
-          ],
-          "valid": true
-        }
-      },
+      "lookup_paths": {},
       "name": "Opportunity"
     }
   },

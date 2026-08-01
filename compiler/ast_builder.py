@@ -1633,10 +1633,14 @@ class ASTBuilder(apgVisitor if apgVisitor else object):
 		source_code: Optional[str] = None,
 	) -> TypeAnnotation:
 		type_text = type_text.strip()
+		# Trailing ? marks a field as optional (nullable); strip it and set is_optional.
+		is_optional = type_text.endswith("?")
+		if is_optional:
+			type_text = type_text[:-1].strip()
 		line, column = self._line_column_for_offset(source_code or type_text, type_offset if source_code is not None else 0)
 		generic_match = re.match(r"(?P<name>[^\[]+)\[(?P<args>.*)\]$", type_text)
 		if not generic_match:
-			return TypeAnnotation(type_name=type_text, line=line, column=column, source_file=source_file)
+			return TypeAnnotation(type_name=type_text, is_optional=is_optional, line=line, column=column, source_file=source_file)
 		args = [
 			self._parse_source_type(part.strip(), source_file)
 			for part in generic_match.group("args").split(",")

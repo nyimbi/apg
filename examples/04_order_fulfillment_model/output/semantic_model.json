@@ -888,19 +888,19 @@
           "relationship": {
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "datetime?"
+            "target_table": "datetime"
           },
-          "required": true,
-          "type": "datetime?"
+          "required": false,
+          "type": "datetime"
         },
         "dispatched_at": {
           "relationship": {
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "datetime?"
+            "target_table": "datetime"
           },
-          "required": true,
-          "type": "datetime?"
+          "required": false,
+          "type": "datetime"
         },
         "order_id": {
           "relationship": {
@@ -928,34 +928,23 @@
           "type": "str"
         },
         "tracking_number": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         }
       },
       "lookup_paths": {
         "delivered_at.id": {
           "chain": [
             "Shipment.delivered_at",
-            "datetime?.id"
+            "datetime.id"
           ],
           "valid": true
         },
         "dispatched_at.id": {
           "chain": [
             "Shipment.dispatched_at",
-            "datetime?.id"
-          ],
-          "valid": true
-        },
-        "tracking_number.id": {
-          "chain": [
-            "Shipment.tracking_number",
-            "str?.id"
+            "datetime.id"
           ],
           "valid": true
         }

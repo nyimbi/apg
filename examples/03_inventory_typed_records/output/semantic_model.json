@@ -797,22 +797,18 @@
           "type": "Dict"
         },
         "barcode": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "best_before": {
           "relationship": {
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "date?"
+            "target_table": "date"
           },
-          "required": true,
-          "type": "date?"
+          "required": false,
+          "type": "date"
         },
         "categories": {
           "relationship": {
@@ -859,10 +855,10 @@
           "relationship": {
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "bytes?"
+            "target_table": "bytes"
           },
-          "required": true,
-          "type": "bytes?"
+          "required": false,
+          "type": "bytes"
         },
         "is_active": {
           "relationship": null,
@@ -883,10 +879,10 @@
           "relationship": {
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "datetime?"
+            "target_table": "datetime"
           },
-          "required": true,
-          "type": "datetime?"
+          "required": false,
+          "type": "datetime"
         },
         "metadata": {
           "relationship": {
@@ -935,10 +931,10 @@
           "relationship": {
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "time?"
+            "target_table": "time"
           },
-          "required": true,
-          "type": "time?"
+          "required": false,
+          "type": "time"
         },
         "requires_refrigeration": {
           "relationship": null,
@@ -965,13 +961,9 @@
           "type": "decimal"
         },
         "warehouse_location": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "weight_kg": {
           "relationship": null,
@@ -987,17 +979,10 @@
           ],
           "valid": true
         },
-        "barcode.id": {
-          "chain": [
-            "InventoryItem.barcode",
-            "str?.id"
-          ],
-          "valid": true
-        },
         "best_before.id": {
           "chain": [
             "InventoryItem.best_before",
-            "date?.id"
+            "date.id"
           ],
           "valid": true
         },
@@ -1032,14 +1017,14 @@
         "image_thumbnail.id": {
           "chain": [
             "InventoryItem.image_thumbnail",
-            "bytes?.id"
+            "bytes.id"
           ],
           "valid": true
         },
         "last_counted_at.id": {
           "chain": [
             "InventoryItem.last_counted_at",
-            "datetime?.id"
+            "datetime.id"
           ],
           "valid": true
         },
@@ -1060,7 +1045,7 @@
         "reorder_time.id": {
           "chain": [
             "InventoryItem.reorder_time",
-            "time?.id"
+            "time.id"
           ],
           "valid": true
         },
@@ -1068,13 +1053,6 @@
           "chain": [
             "InventoryItem.unit_price",
             "decimal.id"
-          ],
-          "valid": true
-        },
-        "warehouse_location.id": {
-          "chain": [
-            "InventoryItem.warehouse_location",
-            "str?.id"
           ],
           "valid": true
         }
@@ -1137,13 +1115,9 @@
           "type": "int"
         },
         "reference": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         }
       },
       "lookup_paths": {
@@ -1158,13 +1132,6 @@
           "chain": [
             "StockMovement.notes",
             "str | None.id"
-          ],
-          "valid": true
-        },
-        "reference.id": {
-          "chain": [
-            "StockMovement.reference",
-            "str?.id"
           ],
           "valid": true
         }

@@ -1466,13 +1466,9 @@
     "Vendor": {
       "fields": {
         "bank_account": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "country": {
           "relationship": null,
@@ -1515,15 +1511,7 @@
           "type": "str"
         }
       },
-      "lookup_paths": {
-        "bank_account.id": {
-          "chain": [
-            "Vendor.bank_account",
-            "str?.id"
-          ],
-          "valid": true
-        }
-      },
+      "lookup_paths": {},
       "name": "Vendor"
     }
   },

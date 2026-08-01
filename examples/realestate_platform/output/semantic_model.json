@@ -1,0 +1,1695 @@
+{
+  "agents": {
+    "PropertyAdvisor": {
+      "capabilities": [
+        "lease_lifecycle_management",
+        "ifrs16_accounting"
+      ],
+      "configuration": {
+        "max_turns": 6,
+        "temperature": 0.2
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "property_memory"
+      },
+      "model": "openai:gpt-4.1-mini",
+      "name": "PropertyAdvisor",
+      "outputs": [],
+      "role": "property management advisor",
+      "rules": [],
+      "runtime": null,
+      "system": "You assist property managers with lease analysis, IFRS 16 calculations, and market insights for Kenya/East Africa real estate market.",
+      "theme": {},
+      "tools": [
+        "lease_history",
+        "market_rental_query",
+        "ifrs16_calculator",
+        "vacancy_report"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": null,
+    "entity_count": 9,
+    "name": "realestate_platform",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "RealEstatePlatformCore": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "functional_currency": "KES",
+        "ifrs16_applicable": true,
+        "incremental_borrowing_rate": 0.12,
+        "lease_term_months_threshold": 12,
+        "low_value_asset_threshold": 500000,
+        "rent_escalation_default_pct": 5.0,
+        "tenant_id": "default",
+        "vacancy_alert_days": 90
+      },
+      "erp_modules": [
+        "fixed_assets",
+        "project_accounting",
+        "budgeting"
+      ],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw"
+        ]
+      },
+      "master_data": {},
+      "name": "RealEstatePlatformCore",
+      "provides": [
+        "property_portfolio_management",
+        "lease_lifecycle_management",
+        "tenant_relationship_management",
+        "maintenance_management",
+        "service_charge_management",
+        "ifrs16_accounting",
+        "property_analytics"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "comp"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "lease_requires_signed_contract",
+            "when": "operation == activate_lease and contract_signed != true"
+          },
+          {
+            "action": "deny",
+            "name": "deposit_required_before_occupation",
+            "when": "operation == allow_occupation and deposit_paid != true"
+          },
+          {
+            "action": "require_review",
+            "name": "ifrs16_threshold_check",
+            "when": "lease_term_months_lt == 12 or monthly_rent_lt == 41667"
+          },
+          {
+            "action": "require_review",
+            "name": "arrears_block_renewal",
+            "when": "operation == renew_lease and arrears_amount_gt == 0"
+          },
+          {
+            "action": "require_review",
+            "name": "cfo_approval_large_lease",
+            "when": "annual_rent_gt == 5000000 and cfo_approved != true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "realestate_event_state"
+      },
+      "theme": {
+        "components": {
+          "leases": {
+            "icon": "file-contract",
+            "status_indicator": "lease-status-chip"
+          },
+          "properties": {
+            "icon": "building-2",
+            "status_indicator": "occupancy-chip"
+          },
+          "tenants": {
+            "icon": "users",
+            "status_indicator": "tenant-tier-chip"
+          }
+        },
+        "name": "realestate_theme",
+        "tokens": {
+          "border.radius": "6px",
+          "color.accent": "#7C3AED",
+          "color.danger": "#991B1B",
+          "color.primary": "#6B21A8",
+          "color.success": "#166534",
+          "color.warning": "#92400E",
+          "density": "comfortable",
+          "surface.canvas": "#F9F7FF",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#1E1B4B"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PortfolioDashboard",
+            "name": "Portfolio",
+            "path": "/prop",
+            "permission": "prop:view"
+          },
+          {
+            "component": "PropertyList",
+            "name": "Properties",
+            "path": "/prop/properties",
+            "permission": "prop:manage"
+          },
+          {
+            "component": "LeaseWorkbench",
+            "name": "Leases",
+            "path": "/prop/leases",
+            "permission": "prop:leases"
+          },
+          {
+            "component": "TenantPortal",
+            "name": "Tenant Portal",
+            "path": "/prop/tenants",
+            "permission": "prop:tenants"
+          },
+          {
+            "component": "MaintenanceDesk",
+            "name": "Maintenance",
+            "path": "/prop/maintenance",
+            "permission": "prop:maintenance"
+          },
+          {
+            "component": "PropertyAccounting",
+            "name": "Accounting",
+            "path": "/prop/accounting",
+            "permission": "prop:finance"
+          },
+          {
+            "component": "IFRS16Workbench",
+            "name": "IFRS 16",
+            "path": "/prop/ifrs16",
+            "permission": "prop:finance"
+          },
+          {
+            "component": "PropertyAnalytics",
+            "name": "Analytics",
+            "path": "/prop/analytics",
+            "permission": "prop:reports"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "RealEstatePlatform": {
+        "agent_teams": [],
+        "agents": [
+          "PropertyAdvisor"
+        ],
+        "capabilities": [
+          "RealEstatePlatformCore"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {
+          "container": "docker",
+          "default": "local"
+        },
+        "description": "Property management platform composed from APG capabilities",
+        "integrations": {},
+        "name": "RealEstatePlatform",
+        "policies": {},
+        "routes": [
+          "/prop",
+          "/prop/leases",
+          "/prop/tenants",
+          "/prop/ifrs16"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {},
+        "theme": {
+          "name": "realestate_platform_theme",
+          "tokens": {
+            "accent": "#7C3AED",
+            "border.radius": "6px"
+          }
+        },
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {
+      "RealEstatePlatformCore": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "comp"
+      ]
+    }
+  },
+  "contracts": {
+    "RealEstatePlatformCore": {
+      "configuration": {
+        "functional_currency": "KES",
+        "ifrs16_applicable": true,
+        "incremental_borrowing_rate": 0.12,
+        "lease_term_months_threshold": 12,
+        "low_value_asset_threshold": 500000,
+        "rent_escalation_default_pct": 5.0,
+        "tenant_id": "default",
+        "vacancy_alert_days": 90
+      },
+      "id": "realestate_platform_core",
+      "provides": [
+        "property_portfolio_management",
+        "lease_lifecycle_management",
+        "tenant_relationship_management",
+        "maintenance_management",
+        "service_charge_management",
+        "ifrs16_accounting",
+        "property_analytics"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "comp"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "lease_requires_signed_contract",
+            "when": "operation == activate_lease and contract_signed != true"
+          },
+          {
+            "action": "deny",
+            "name": "deposit_required_before_occupation",
+            "when": "operation == allow_occupation and deposit_paid != true"
+          },
+          {
+            "action": "require_review",
+            "name": "ifrs16_threshold_check",
+            "when": "lease_term_months_lt == 12 or monthly_rent_lt == 41667"
+          },
+          {
+            "action": "require_review",
+            "name": "arrears_block_renewal",
+            "when": "operation == renew_lease and arrears_amount_gt == 0"
+          },
+          {
+            "action": "require_review",
+            "name": "cfo_approval_large_lease",
+            "when": "annual_rent_gt == 5000000 and cfo_approved != true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "components": {
+          "leases": {
+            "icon": "file-contract",
+            "status_indicator": "lease-status-chip"
+          },
+          "properties": {
+            "icon": "building-2",
+            "status_indicator": "occupancy-chip"
+          },
+          "tenants": {
+            "icon": "users",
+            "status_indicator": "tenant-tier-chip"
+          }
+        },
+        "name": "realestate_theme",
+        "tokens": {
+          "border.radius": "6px",
+          "color.accent": "#7C3AED",
+          "color.danger": "#991B1B",
+          "color.primary": "#6B21A8",
+          "color.success": "#166534",
+          "color.warning": "#92400E",
+          "density": "comfortable",
+          "surface.canvas": "#F9F7FF",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#1E1B4B"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "PortfolioDashboard",
+            "name": "Portfolio",
+            "path": "/prop",
+            "permission": "prop:view"
+          },
+          {
+            "component": "PropertyList",
+            "name": "Properties",
+            "path": "/prop/properties",
+            "permission": "prop:manage"
+          },
+          {
+            "component": "LeaseWorkbench",
+            "name": "Leases",
+            "path": "/prop/leases",
+            "permission": "prop:leases"
+          },
+          {
+            "component": "TenantPortal",
+            "name": "Tenant Portal",
+            "path": "/prop/tenants",
+            "permission": "prop:tenants"
+          },
+          {
+            "component": "MaintenanceDesk",
+            "name": "Maintenance",
+            "path": "/prop/maintenance",
+            "permission": "prop:maintenance"
+          },
+          {
+            "component": "PropertyAccounting",
+            "name": "Accounting",
+            "path": "/prop/accounting",
+            "permission": "prop:finance"
+          },
+          {
+            "component": "IFRS16Workbench",
+            "name": "IFRS 16",
+            "path": "/prop/ifrs16",
+            "permission": "prop:finance"
+          },
+          {
+            "component": "PropertyAnalytics",
+            "name": "Analytics",
+            "path": "/prop/analytics",
+            "permission": "prop:reports"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "realestate_platform.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "realestate_platform.apg",
+      "fixes": [],
+      "message": "Reserved field name 'owner_id' is declared explicitly; APG generates this field automatically",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {
+    "IFRS16Accounting": {
+      "assignments": {
+        "classification": "property_accountant",
+        "journal_posted": "controller"
+      },
+      "compensation": {},
+      "guards": {
+        "classification": "lease_term_months_gt == 12 and not_short_term and not_low_value",
+        "journal_posted": "rou_asset_calculated and lease_liability_calculated"
+      },
+      "human_tasks": [
+        "classification",
+        "journal_posted"
+      ],
+      "methods": [],
+      "name": "IFRS16Accounting",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "lease_created",
+        "classification",
+        "rou_calculated",
+        "liability_calculated",
+        "journal_posted",
+        "period_amortised"
+      ],
+      "steps": [
+        "lease_created",
+        "classification",
+        "rou_calculated",
+        "liability_calculated",
+        "journal_posted",
+        "period_amortised"
+      ],
+      "steps_raw": "lease_created -> classification -> rou_calculated -> liability_calculated -> journal_posted -> period_amortised",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": "lease_term_months_gt == 12 and not_short_term and not_low_value",
+          "source": "lease_created",
+          "target": "classification"
+        },
+        {
+          "guard": null,
+          "source": "classification",
+          "target": "rou_calculated"
+        },
+        {
+          "guard": null,
+          "source": "rou_calculated",
+          "target": "liability_calculated"
+        },
+        {
+          "guard": "rou_asset_calculated and lease_liability_calculated",
+          "source": "liability_calculated",
+          "target": "journal_posted"
+        },
+        {
+          "guard": null,
+          "source": "journal_posted",
+          "target": "period_amortised"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "LeaseLifecycle": {
+      "assignments": {
+        "deposit_paid": "finance_officer",
+        "offer_sent": "leasing_manager",
+        "signed": "leasing_manager"
+      },
+      "compensation": {},
+      "guards": {
+        "active": "contract_signed and deposit_paid and premises_inspected",
+        "expired": "notice_period_served and final_inspection_done"
+      },
+      "human_tasks": [
+        "offer_sent",
+        "signed",
+        "deposit_paid"
+      ],
+      "methods": [],
+      "name": "LeaseLifecycle",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "prospect",
+        "offer_sent",
+        "offer_accepted",
+        "lease_drafted",
+        "signed",
+        "deposit_paid",
+        "active",
+        "notice_given",
+        "expired"
+      ],
+      "steps": [
+        "prospect",
+        "offer_sent",
+        "offer_accepted",
+        "lease_drafted",
+        "signed",
+        "deposit_paid",
+        "active",
+        "notice_given",
+        "expired"
+      ],
+      "steps_raw": "prospect -> offer_sent -> offer_accepted -> lease_drafted -> signed -> deposit_paid -> active -> notice_given -> expired",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "prospect",
+          "target": "offer_sent"
+        },
+        {
+          "guard": null,
+          "source": "offer_sent",
+          "target": "offer_accepted"
+        },
+        {
+          "guard": null,
+          "source": "offer_accepted",
+          "target": "lease_drafted"
+        },
+        {
+          "guard": null,
+          "source": "lease_drafted",
+          "target": "signed"
+        },
+        {
+          "guard": null,
+          "source": "signed",
+          "target": "deposit_paid"
+        },
+        {
+          "guard": "contract_signed and deposit_paid and premises_inspected",
+          "source": "deposit_paid",
+          "target": "active"
+        },
+        {
+          "guard": null,
+          "source": "active",
+          "target": "notice_given"
+        },
+        {
+          "guard": "notice_period_served and final_inspection_done",
+          "source": "notice_given",
+          "target": "expired"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "MaintenanceWorkflow": {
+      "assignments": {
+        "approved": "property_manager",
+        "triaged": "facilities_manager"
+      },
+      "compensation": {},
+      "guards": {
+        "approved": "quote_within_budget or cfo_approved",
+        "completed": "sign_off_by_tenant and photos_uploaded"
+      },
+      "human_tasks": [
+        "triaged",
+        "approved"
+      ],
+      "methods": [],
+      "name": "MaintenanceWorkflow",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "reported",
+        "triaged",
+        "quoted",
+        "approved",
+        "work_in_progress",
+        "completed",
+        "invoiced"
+      ],
+      "steps": [
+        "reported",
+        "triaged",
+        "quoted",
+        "approved",
+        "work_in_progress",
+        "completed",
+        "invoiced"
+      ],
+      "steps_raw": "reported -> triaged -> quoted -> approved -> work_in_progress -> completed -> invoiced",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "reported",
+          "target": "triaged"
+        },
+        {
+          "guard": null,
+          "source": "triaged",
+          "target": "quoted"
+        },
+        {
+          "guard": "quote_within_budget or cfo_approved",
+          "source": "quoted",
+          "target": "approved"
+        },
+        {
+          "guard": null,
+          "source": "approved",
+          "target": "work_in_progress"
+        },
+        {
+          "guard": "sign_off_by_tenant and photos_uploaded",
+          "source": "work_in_progress",
+          "target": "completed"
+        },
+        {
+          "guard": null,
+          "source": "completed",
+          "target": "invoiced"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 1
+    },
+    "capability": {
+      "edges": 6,
+      "kind": "capability",
+      "nodes": 7
+    },
+    "deployment": {
+      "edges": 9,
+      "kind": "deployment",
+      "nodes": 10
+    },
+    "er": {
+      "edges": 30,
+      "kind": "er",
+      "nodes": 31
+    },
+    "handler": {
+      "edges": 9,
+      "kind": "handler",
+      "nodes": 10
+    },
+    "lookup": {
+      "edges": 9,
+      "kind": "lookup",
+      "nodes": 10
+    },
+    "package": {
+      "edges": 9,
+      "kind": "package",
+      "nodes": 10
+    },
+    "security": {
+      "edges": 9,
+      "kind": "security",
+      "nodes": 10
+    },
+    "workflow": {
+      "edges": 9,
+      "kind": "workflow",
+      "nodes": 10
+    }
+  },
+  "llms": {
+    "PropertyAdvisor": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": null
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "RealEstatePlatformCore.arrears_block_renewal": {
+      "action": "require_review",
+      "name": "arrears_block_renewal",
+      "when": "operation == renew_lease and arrears_amount_gt == 0"
+    },
+    "RealEstatePlatformCore.cfo_approval_large_lease": {
+      "action": "require_review",
+      "name": "cfo_approval_large_lease",
+      "when": "annual_rent_gt == 5000000 and cfo_approved != true"
+    },
+    "RealEstatePlatformCore.deposit_required_before_occupation": {
+      "action": "deny",
+      "name": "deposit_required_before_occupation",
+      "when": "operation == allow_occupation and deposit_paid != true"
+    },
+    "RealEstatePlatformCore.ifrs16_threshold_check": {
+      "action": "require_review",
+      "name": "ifrs16_threshold_check",
+      "when": "lease_term_months_lt == 12 or monthly_rent_lt == 41667"
+    },
+    "RealEstatePlatformCore.lease_requires_signed_contract": {
+      "action": "deny",
+      "name": "lease_requires_signed_contract",
+      "when": "operation == activate_lease and contract_signed != true"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "realestate_platform.apg"
+  ],
+  "symbols": {
+    "agent.PropertyAdvisor": {
+      "file": "realestate_platform.apg",
+      "id": "agent.PropertyAdvisor",
+      "kind": "agent",
+      "name": "PropertyAdvisor",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.RealEstatePlatform": {
+      "file": "realestate_platform.apg",
+      "id": "app.RealEstatePlatform",
+      "kind": "app",
+      "name": "RealEstatePlatform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.RealEstatePlatformCore": {
+      "file": "realestate_platform.apg",
+      "id": "capability.RealEstatePlatformCore",
+      "kind": "capability",
+      "name": "RealEstatePlatformCore",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Lease.currency": {
+      "file": "realestate_platform.apg",
+      "id": "field.Lease.currency",
+      "kind": "field",
+      "name": "Lease.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Lease.deposit": {
+      "file": "realestate_platform.apg",
+      "id": "field.Lease.deposit",
+      "kind": "field",
+      "name": "Lease.deposit",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Lease.end_date": {
+      "file": "realestate_platform.apg",
+      "id": "field.Lease.end_date",
+      "kind": "field",
+      "name": "Lease.end_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Lease.ifrs16_applicable": {
+      "file": "realestate_platform.apg",
+      "id": "field.Lease.ifrs16_applicable",
+      "kind": "field",
+      "name": "Lease.ifrs16_applicable",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 11
+        },
+        "start": {
+          "character": 4,
+          "line": 11
+        }
+      },
+      "references": []
+    },
+    "field.Lease.lease_number": {
+      "file": "realestate_platform.apg",
+      "id": "field.Lease.lease_number",
+      "kind": "field",
+      "name": "Lease.lease_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Lease.lease_type": {
+      "file": "realestate_platform.apg",
+      "id": "field.Lease.lease_type",
+      "kind": "field",
+      "name": "Lease.lease_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Lease.monthly_rent": {
+      "file": "realestate_platform.apg",
+      "id": "field.Lease.monthly_rent",
+      "kind": "field",
+      "name": "Lease.monthly_rent",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Lease.start_date": {
+      "file": "realestate_platform.apg",
+      "id": "field.Lease.start_date",
+      "kind": "field",
+      "name": "Lease.start_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Lease.status": {
+      "file": "realestate_platform.apg",
+      "id": "field.Lease.status",
+      "kind": "field",
+      "name": "Lease.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.Lease.tenant_id": {
+      "file": "realestate_platform.apg",
+      "id": "field.Lease.tenant_id",
+      "kind": "field",
+      "name": "Lease.tenant_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Lease.unit_id": {
+      "file": "realestate_platform.apg",
+      "id": "field.Lease.unit_id",
+      "kind": "field",
+      "name": "Lease.unit_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Property.address": {
+      "file": "realestate_platform.apg",
+      "id": "field.Property.address",
+      "kind": "field",
+      "name": "Property.address",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Property.lettable_area_sqm": {
+      "file": "realestate_platform.apg",
+      "id": "field.Property.lettable_area_sqm",
+      "kind": "field",
+      "name": "Property.lettable_area_sqm",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Property.manager_id": {
+      "file": "realestate_platform.apg",
+      "id": "field.Property.manager_id",
+      "kind": "field",
+      "name": "Property.manager_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Property.owner_id": {
+      "file": "realestate_platform.apg",
+      "id": "field.Property.owner_id",
+      "kind": "field",
+      "name": "Property.owner_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Property.property_code": {
+      "file": "realestate_platform.apg",
+      "id": "field.Property.property_code",
+      "kind": "field",
+      "name": "Property.property_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Property.property_name": {
+      "file": "realestate_platform.apg",
+      "id": "field.Property.property_name",
+      "kind": "field",
+      "name": "Property.property_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Property.property_type": {
+      "file": "realestate_platform.apg",
+      "id": "field.Property.property_type",
+      "kind": "field",
+      "name": "Property.property_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Property.status": {
+      "file": "realestate_platform.apg",
+      "id": "field.Property.status",
+      "kind": "field",
+      "name": "Property.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Property.total_area_sqm": {
+      "file": "realestate_platform.apg",
+      "id": "field.Property.total_area_sqm",
+      "kind": "field",
+      "name": "Property.total_area_sqm",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Unit.area_sqm": {
+      "file": "realestate_platform.apg",
+      "id": "field.Unit.area_sqm",
+      "kind": "field",
+      "name": "Unit.area_sqm",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Unit.currency": {
+      "file": "realestate_platform.apg",
+      "id": "field.Unit.currency",
+      "kind": "field",
+      "name": "Unit.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Unit.floor": {
+      "file": "realestate_platform.apg",
+      "id": "field.Unit.floor",
+      "kind": "field",
+      "name": "Unit.floor",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Unit.monthly_rent": {
+      "file": "realestate_platform.apg",
+      "id": "field.Unit.monthly_rent",
+      "kind": "field",
+      "name": "Unit.monthly_rent",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Unit.property_id": {
+      "file": "realestate_platform.apg",
+      "id": "field.Unit.property_id",
+      "kind": "field",
+      "name": "Unit.property_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Unit.status": {
+      "file": "realestate_platform.apg",
+      "id": "field.Unit.status",
+      "kind": "field",
+      "name": "Unit.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Unit.unit_code": {
+      "file": "realestate_platform.apg",
+      "id": "field.Unit.unit_code",
+      "kind": "field",
+      "name": "Unit.unit_code",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Unit.unit_type": {
+      "file": "realestate_platform.apg",
+      "id": "field.Unit.unit_type",
+      "kind": "field",
+      "name": "Unit.unit_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "realestate_platform.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.realestate_platform": {
+      "file": "realestate_platform.apg",
+      "id": "module.realestate_platform",
+      "kind": "module",
+      "name": "realestate_platform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Lease": {
+      "file": "realestate_platform.apg",
+      "id": "table.Lease",
+      "kind": "table",
+      "name": "Lease",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Property": {
+      "file": "realestate_platform.apg",
+      "id": "table.Property",
+      "kind": "table",
+      "name": "Property",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Unit": {
+      "file": "realestate_platform.apg",
+      "id": "table.Unit",
+      "kind": "table",
+      "name": "Unit",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.IFRS16Accounting": {
+      "file": "realestate_platform.apg",
+      "id": "workflow.IFRS16Accounting",
+      "kind": "workflow",
+      "name": "IFRS16Accounting",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.LeaseLifecycle": {
+      "file": "realestate_platform.apg",
+      "id": "workflow.LeaseLifecycle",
+      "kind": "workflow",
+      "name": "LeaseLifecycle",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.MaintenanceWorkflow": {
+      "file": "realestate_platform.apg",
+      "id": "workflow.MaintenanceWorkflow",
+      "kind": "workflow",
+      "name": "MaintenanceWorkflow",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Lease": {
+      "fields": {
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "deposit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "end_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "ifrs16_applicable": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "lease_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "lease_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "monthly_rent": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "start_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "tenant_id": {
+          "relationship": {
+            "alias": "tenant",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Tenant"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "unit_id": {
+          "relationship": {
+            "alias": "unit",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Unit"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "deposit.id": {
+          "chain": [
+            "Lease.deposit",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "end_date.id": {
+          "chain": [
+            "Lease.end_date",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "monthly_rent.id": {
+          "chain": [
+            "Lease.monthly_rent",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "start_date.id": {
+          "chain": [
+            "Lease.start_date",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Lease"
+    },
+    "Property": {
+      "fields": {
+        "address": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "lettable_area_sqm": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "manager_id": {
+          "relationship": {
+            "alias": "manager",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Manager"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "owner_id": {
+          "relationship": {
+            "alias": "owner",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Owner"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "property_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "property_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "property_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total_area_sqm": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        }
+      },
+      "lookup_paths": {
+        "lettable_area_sqm.id": {
+          "chain": [
+            "Property.lettable_area_sqm",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "total_area_sqm.id": {
+          "chain": [
+            "Property.total_area_sqm",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Property"
+    },
+    "Unit": {
+      "fields": {
+        "area_sqm": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "floor": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "monthly_rent": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "property_id": {
+          "relationship": {
+            "alias": "property",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Property"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "unit_code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "unit_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "area_sqm.id": {
+          "chain": [
+            "Unit.area_sqm",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "monthly_rent.id": {
+          "chain": [
+            "Unit.monthly_rent",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Unit"
+    }
+  },
+  "views": {}
+}

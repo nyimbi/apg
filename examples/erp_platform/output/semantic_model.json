@@ -1,0 +1,2622 @@
+{
+  "agents": {
+    "ERPAssistant": {
+      "capabilities": [
+        "financial_consolidation",
+        "management_reporting",
+        "inventory_management_workflow"
+      ],
+      "configuration": {
+        "max_turns": 6,
+        "temperature": 0.1
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "erp_memory"
+      },
+      "model": "openai:gpt-4.1-mini",
+      "name": "ERPAssistant",
+      "outputs": [],
+      "role": "erp analyst",
+      "rules": [],
+      "runtime": null,
+      "system": "You assist with ERP operations: procurement analysis, cash flow forecasting, payroll queries, and inventory optimisation. Cite relevant standards (IFRS, Kenya Labour Laws, KRA requirements).",
+      "theme": {},
+      "tools": [
+        "gl_query",
+        "vendor_analysis",
+        "inventory_forecast",
+        "payroll_summary"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": null,
+    "entity_count": 14,
+    "name": "enterprise_erp",
+    "version": "2.0.0"
+  },
+  "capabilities": {
+    "ERPCore": {
+      "approvals": {
+        "approvers": [
+          "supervisor",
+          "manager",
+          "director"
+        ],
+        "levels": 3,
+        "segregation_of_duties": true
+      },
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "fiscal_year_start": "01-01",
+        "functional_currency": "KES",
+        "inventory_valuation": "weighted_average",
+        "multi_currency": true,
+        "payroll_country": "KE",
+        "require_po_for_ap": true,
+        "tenant_id": "default",
+        "three_way_match": true
+      },
+      "erp_modules": [
+        "finance",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable",
+        "procurement",
+        "inventory",
+        "sales",
+        "hr",
+        "payroll"
+      ],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw"
+        ]
+      },
+      "master_data": {
+        "entities": [
+          "vendor",
+          "customer",
+          "inventory_item",
+          "employee",
+          "chart_of_accounts"
+        ]
+      },
+      "name": "ERPCore",
+      "provides": [
+        "procure_to_pay",
+        "order_to_cash",
+        "hire_to_retire",
+        "inventory_management_workflow",
+        "financial_consolidation",
+        "management_reporting"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "comp",
+        "schd",
+        "mqeb"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "po_required_for_ap",
+            "when": "invoice_type == ap and po_id missing and require_po == true"
+          },
+          {
+            "action": "require_review",
+            "name": "three_way_match_required",
+            "when": "three_way_match == true and match_status != matched"
+          },
+          {
+            "action": "require_review",
+            "name": "credit_limit_check",
+            "when": "order_amount > customer_credit_limit"
+          },
+          {
+            "action": "deny",
+            "name": "negative_inventory_denied",
+            "when": "on_hand - reserved_lt == 0 and allow_backorder == false"
+          },
+          {
+            "action": "deny",
+            "name": "payroll_requires_approved_timesheet",
+            "when": "payroll_run == true and timesheets_approved != true"
+          },
+          {
+            "action": "deny",
+            "name": "vendor_on_hold_denied",
+            "when": "vendor_status == on_hold"
+          },
+          {
+            "action": "deny",
+            "name": "segregation_purchase_approval",
+            "when": "requester_id == approver_id"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "events": [
+          "po_created",
+          "po_approved",
+          "goods_received",
+          "ap_invoice_matched",
+          "so_confirmed",
+          "shipment_dispatched",
+          "ar_invoice_posted",
+          "payroll_run_completed",
+          "journal_posted",
+          "period_closed"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.erp.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "employees": {
+            "icon": "users",
+            "status_indicator": "employment-type-chip"
+          },
+          "inventory": {
+            "icon": "package",
+            "status_indicator": "stock-level-badge"
+          },
+          "invoices": {
+            "icon": "file-text",
+            "status_indicator": "invoice-status-chip"
+          },
+          "procurement": {
+            "icon": "shopping-cart",
+            "status_indicator": "po-status-chip"
+          }
+        },
+        "name": "erp_theme",
+        "tokens": {
+          "border.radius": "4px",
+          "color.accent": "#006064",
+          "color.danger": "#B71C1C",
+          "color.primary": "#01579B",
+          "color.success": "#2E7D32",
+          "color.warning": "#BF360C",
+          "density": "compact",
+          "surface.canvas": "#F0F4F8",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#1A2332",
+          "text.secondary": "#607D8B"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "ERPDashboard",
+            "name": "ERP Home",
+            "nav_group": "Overview",
+            "path": "/erp",
+            "permission": "erp:view"
+          },
+          {
+            "component": "ProcurementHub",
+            "name": "Procurement",
+            "nav_group": "Procurement",
+            "path": "/erp/procurement",
+            "permission": "erp:procurement"
+          },
+          {
+            "component": "APWorkbench",
+            "name": "Payables",
+            "nav_group": "Finance",
+            "path": "/erp/ap",
+            "permission": "erp:ap"
+          },
+          {
+            "component": "ARWorkbench",
+            "name": "Receivables",
+            "nav_group": "Finance",
+            "path": "/erp/ar",
+            "permission": "erp:ar"
+          },
+          {
+            "component": "GLWorkbench",
+            "name": "General Ledger",
+            "nav_group": "Finance",
+            "path": "/erp/gl",
+            "permission": "erp:gl"
+          },
+          {
+            "component": "InventoryControl",
+            "name": "Inventory",
+            "nav_group": "Operations",
+            "path": "/erp/inventory",
+            "permission": "erp:inventory"
+          },
+          {
+            "component": "SalesOrderDesk",
+            "name": "Sales Orders",
+            "nav_group": "Operations",
+            "path": "/erp/sales",
+            "permission": "erp:sales"
+          },
+          {
+            "component": "HRPortal",
+            "name": "HR",
+            "nav_group": "People",
+            "path": "/erp/hr",
+            "permission": "erp:hr"
+          },
+          {
+            "component": "PayrollDesk",
+            "name": "Payroll",
+            "nav_group": "People",
+            "path": "/erp/payroll",
+            "permission": "erp:payroll"
+          },
+          {
+            "component": "ReportingHub",
+            "name": "Reports",
+            "nav_group": "Reporting",
+            "path": "/erp/reports",
+            "permission": "erp:reports"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "ExecutiveERP": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "ExecutiveERP",
+      "provides": [
+        "executive_erp_dashboard"
+      ],
+      "requires": [
+        "enterprise_erp_core"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "exec_only",
+            "when": "role_not_in_executive"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {
+        "ExecutiveHome": {
+          "actions": [
+            "export_board_pack",
+            "drill_down",
+            "schedule_report"
+          ],
+          "binds": [
+            "financial_consolidation.current_month",
+            "inventory_management_workflow.value"
+          ],
+          "composes": [
+            "ProcurementSummary",
+            "PayrollSummary"
+          ],
+          "contains": [
+            "RevenueKPI",
+            "CashPosition",
+            "OpenOrders",
+            "HeadcountSummary"
+          ],
+          "layout": "dashboard",
+          "route": "/erp/exec",
+          "title": "Executive Operations Dashboard"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {},
+        "name": "erp_exec_theme",
+        "tokens": {
+          "border.radius": "4px"
+        }
+      },
+      "ui": {
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "ERPExecutive",
+            "name": "Executive",
+            "path": "/erp/exec",
+            "permission": "erp:executive"
+          }
+        ],
+        "shell": "python",
+        "template_roots": [
+          "templates/erp"
+        ]
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "EnterpriseERP": {
+        "agent_teams": [],
+        "agents": [
+          "ERPAssistant"
+        ],
+        "capabilities": [
+          "ERPCore",
+          "ExecutiveERP"
+        ],
+        "components": {
+          "finance_workbench": {
+            "capability": "financial_consolidation",
+            "route": "/erp/gl"
+          },
+          "hr_portal": {
+            "capability": "hire_to_retire",
+            "route": "/erp/hr"
+          },
+          "procurement_desk": {
+            "capability": "procure_to_pay",
+            "route": "/erp/procurement"
+          }
+        },
+        "configuration": {},
+        "deployments": {
+          "cloud": "kubernetes",
+          "container": "docker",
+          "default": "local"
+        },
+        "description": "Full-suite ERP composed from APG capabilities",
+        "integrations": {},
+        "name": "EnterpriseERP",
+        "policies": {},
+        "routes": [
+          "/erp",
+          "/erp/procurement",
+          "/erp/ar",
+          "/erp/ap",
+          "/erp/gl",
+          "/erp/payroll"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {},
+        "theme": {
+          "name": "erp_platform_theme",
+          "tokens": {
+            "accent": "#006064",
+            "border.radius": "4px"
+          }
+        },
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {
+      "ERPCore": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "comp",
+        "schd",
+        "mqeb"
+      ],
+      "ExecutiveERP": [
+        "enterprise_erp_core"
+      ]
+    }
+  },
+  "contracts": {
+    "ERPCore": {
+      "configuration": {
+        "fiscal_year_start": "01-01",
+        "functional_currency": "KES",
+        "inventory_valuation": "weighted_average",
+        "multi_currency": true,
+        "payroll_country": "KE",
+        "require_po_for_ap": true,
+        "tenant_id": "default",
+        "three_way_match": true
+      },
+      "id": "enterprise_erp_core",
+      "provides": [
+        "procure_to_pay",
+        "order_to_cash",
+        "hire_to_retire",
+        "inventory_management_workflow",
+        "financial_consolidation",
+        "management_reporting"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "wflo",
+        "comp",
+        "schd",
+        "mqeb"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "po_required_for_ap",
+            "when": "invoice_type == ap and po_id missing and require_po == true"
+          },
+          {
+            "action": "require_review",
+            "name": "three_way_match_required",
+            "when": "three_way_match == true and match_status != matched"
+          },
+          {
+            "action": "require_review",
+            "name": "credit_limit_check",
+            "when": "order_amount > customer_credit_limit"
+          },
+          {
+            "action": "deny",
+            "name": "negative_inventory_denied",
+            "when": "on_hand - reserved_lt == 0 and allow_backorder == false"
+          },
+          {
+            "action": "deny",
+            "name": "payroll_requires_approved_timesheet",
+            "when": "payroll_run == true and timesheets_approved != true"
+          },
+          {
+            "action": "deny",
+            "name": "vendor_on_hold_denied",
+            "when": "vendor_status == on_hold"
+          },
+          {
+            "action": "deny",
+            "name": "segregation_purchase_approval",
+            "when": "requester_id == approver_id"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "components": {
+          "employees": {
+            "icon": "users",
+            "status_indicator": "employment-type-chip"
+          },
+          "inventory": {
+            "icon": "package",
+            "status_indicator": "stock-level-badge"
+          },
+          "invoices": {
+            "icon": "file-text",
+            "status_indicator": "invoice-status-chip"
+          },
+          "procurement": {
+            "icon": "shopping-cart",
+            "status_indicator": "po-status-chip"
+          }
+        },
+        "name": "erp_theme",
+        "tokens": {
+          "border.radius": "4px",
+          "color.accent": "#006064",
+          "color.danger": "#B71C1C",
+          "color.primary": "#01579B",
+          "color.success": "#2E7D32",
+          "color.warning": "#BF360C",
+          "density": "compact",
+          "surface.canvas": "#F0F4F8",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#1A2332",
+          "text.secondary": "#607D8B"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "ERPDashboard",
+            "name": "ERP Home",
+            "nav_group": "Overview",
+            "path": "/erp",
+            "permission": "erp:view"
+          },
+          {
+            "component": "ProcurementHub",
+            "name": "Procurement",
+            "nav_group": "Procurement",
+            "path": "/erp/procurement",
+            "permission": "erp:procurement"
+          },
+          {
+            "component": "APWorkbench",
+            "name": "Payables",
+            "nav_group": "Finance",
+            "path": "/erp/ap",
+            "permission": "erp:ap"
+          },
+          {
+            "component": "ARWorkbench",
+            "name": "Receivables",
+            "nav_group": "Finance",
+            "path": "/erp/ar",
+            "permission": "erp:ar"
+          },
+          {
+            "component": "GLWorkbench",
+            "name": "General Ledger",
+            "nav_group": "Finance",
+            "path": "/erp/gl",
+            "permission": "erp:gl"
+          },
+          {
+            "component": "InventoryControl",
+            "name": "Inventory",
+            "nav_group": "Operations",
+            "path": "/erp/inventory",
+            "permission": "erp:inventory"
+          },
+          {
+            "component": "SalesOrderDesk",
+            "name": "Sales Orders",
+            "nav_group": "Operations",
+            "path": "/erp/sales",
+            "permission": "erp:sales"
+          },
+          {
+            "component": "HRPortal",
+            "name": "HR",
+            "nav_group": "People",
+            "path": "/erp/hr",
+            "permission": "erp:hr"
+          },
+          {
+            "component": "PayrollDesk",
+            "name": "Payroll",
+            "nav_group": "People",
+            "path": "/erp/payroll",
+            "permission": "erp:payroll"
+          },
+          {
+            "component": "ReportingHub",
+            "name": "Reports",
+            "nav_group": "Reporting",
+            "path": "/erp/reports",
+            "permission": "erp:reports"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "ExecutiveERP": {
+      "configuration": {
+        "tenant_id": "default"
+      },
+      "configuration_schema": {
+        "required": [
+          "tenant_id",
+          "ui",
+          "theme"
+        ]
+      },
+      "id": "executive_erp_view",
+      "provides": [
+        "executive_erp_dashboard"
+      ],
+      "requires": [
+        "enterprise_erp_core"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "exec_only",
+            "when": "role_not_in_executive"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "components": {},
+        "name": "erp_exec_theme",
+        "tokens": {
+          "border.radius": "4px"
+        }
+      },
+      "ui": {
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "ERPExecutive",
+            "name": "Executive",
+            "path": "/erp/exec",
+            "permission": "erp:executive"
+          }
+        ],
+        "shell": "python",
+        "template_roots": [
+          "templates/erp"
+        ]
+      }
+    }
+  },
+  "deployment": {
+    "source": "enterprise_erp.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "enterprise_erp.apg",
+      "fixes": [],
+      "message": "Capability 'ExecutiveERP' requires 'enterprise_erp_core' which is not declared in this module",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {
+    "HireToRetire": {
+      "assignments": {
+        "job_offer": "hr_manager",
+        "onboarding": "hr_officer"
+      },
+      "compensation": {},
+      "guards": {},
+      "human_tasks": [
+        "job_offer",
+        "onboarding",
+        "probation",
+        "offboarding"
+      ],
+      "methods": [],
+      "name": "HireToRetire",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "job_offer",
+        "onboarding",
+        "probation",
+        "confirmed",
+        "active",
+        "resignation",
+        "offboarding",
+        "terminated"
+      ],
+      "steps": [
+        "job_offer",
+        "onboarding",
+        "probation",
+        "confirmed",
+        "active",
+        "resignation",
+        "offboarding",
+        "terminated"
+      ],
+      "steps_raw": "job_offer -> onboarding -> probation -> confirmed -> active -> resignation -> offboarding -> terminated",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "job_offer",
+          "target": "onboarding"
+        },
+        {
+          "guard": null,
+          "source": "onboarding",
+          "target": "probation"
+        },
+        {
+          "guard": null,
+          "source": "probation",
+          "target": "confirmed"
+        },
+        {
+          "guard": null,
+          "source": "confirmed",
+          "target": "active"
+        },
+        {
+          "guard": null,
+          "source": "active",
+          "target": "resignation"
+        },
+        {
+          "guard": null,
+          "source": "resignation",
+          "target": "offboarding"
+        },
+        {
+          "guard": null,
+          "source": "offboarding",
+          "target": "terminated"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "MonthEndClose": {
+      "assignments": {
+        "approved": "cfo",
+        "review": "controller"
+      },
+      "compensation": {},
+      "guards": {
+        "approved": "all_reconciliations_complete and no_outstanding_approvals"
+      },
+      "human_tasks": [
+        "accruals",
+        "bank_recon",
+        "review",
+        "approved"
+      ],
+      "methods": [],
+      "name": "MonthEndClose",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "open",
+        "accruals",
+        "bank_recon",
+        "sub_ledger_recon",
+        "review",
+        "approved",
+        "closed",
+        "locked"
+      ],
+      "steps": [
+        "open",
+        "accruals",
+        "bank_recon",
+        "sub_ledger_recon",
+        "review",
+        "approved",
+        "closed",
+        "locked"
+      ],
+      "steps_raw": "open -> accruals -> bank_recon -> sub_ledger_recon -> review -> approved -> closed -> locked",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "open",
+          "target": "accruals"
+        },
+        {
+          "guard": null,
+          "source": "accruals",
+          "target": "bank_recon"
+        },
+        {
+          "guard": null,
+          "source": "bank_recon",
+          "target": "sub_ledger_recon"
+        },
+        {
+          "guard": null,
+          "source": "sub_ledger_recon",
+          "target": "review"
+        },
+        {
+          "guard": "all_reconciliations_complete and no_outstanding_approvals",
+          "source": "review",
+          "target": "approved"
+        },
+        {
+          "guard": null,
+          "source": "approved",
+          "target": "closed"
+        },
+        {
+          "guard": null,
+          "source": "closed",
+          "target": "locked"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "OrderToCash": {
+      "assignments": {
+        "credit_check": "credit_controller",
+        "so_confirmed": "sales_rep"
+      },
+      "compensation": {},
+      "guards": {
+        "ar_invoiced": "delivery_confirmed",
+        "so_confirmed": "customer_active and items_available"
+      },
+      "human_tasks": [
+        "so_confirmed",
+        "credit_check"
+      ],
+      "methods": [],
+      "name": "OrderToCash",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "quote",
+        "so_confirmed",
+        "credit_check",
+        "picking",
+        "quality_check",
+        "dispatched",
+        "ar_invoiced",
+        "payment_received",
+        "closed"
+      ],
+      "steps": [
+        "quote",
+        "so_confirmed",
+        "credit_check",
+        "picking",
+        "quality_check",
+        "dispatched",
+        "ar_invoiced",
+        "payment_received",
+        "closed"
+      ],
+      "steps_raw": "quote -> so_confirmed -> credit_check -> picking -> quality_check -> dispatched -> ar_invoiced -> payment_received -> closed",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": "customer_active and items_available",
+          "source": "quote",
+          "target": "so_confirmed"
+        },
+        {
+          "guard": null,
+          "source": "so_confirmed",
+          "target": "credit_check"
+        },
+        {
+          "guard": null,
+          "source": "credit_check",
+          "target": "picking"
+        },
+        {
+          "guard": null,
+          "source": "picking",
+          "target": "quality_check"
+        },
+        {
+          "guard": null,
+          "source": "quality_check",
+          "target": "dispatched"
+        },
+        {
+          "guard": "delivery_confirmed",
+          "source": "dispatched",
+          "target": "ar_invoiced"
+        },
+        {
+          "guard": null,
+          "source": "ar_invoiced",
+          "target": "payment_received"
+        },
+        {
+          "guard": null,
+          "source": "payment_received",
+          "target": "closed"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "ProcureToPay": {
+      "assignments": {
+        "payment_approved": "finance_manager",
+        "po_approved": "procurement_manager"
+      },
+      "compensation": {
+        "payment_processed": "reverse_payment"
+      },
+      "guards": {
+        "payment_approved": "three_way_match_passed and invoice_validated",
+        "po_approved": "budget_available and vendor_approved"
+      },
+      "human_tasks": [
+        "po_approved",
+        "payment_approved"
+      ],
+      "methods": [],
+      "name": "ProcureToPay",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "purchase_requisition",
+        "po_created",
+        "po_approved",
+        "goods_ordered",
+        "goods_received",
+        "invoice_matched",
+        "payment_approved",
+        "payment_processed"
+      ],
+      "steps": [
+        "purchase_requisition",
+        "po_created",
+        "po_approved",
+        "goods_ordered",
+        "goods_received",
+        "invoice_matched",
+        "payment_approved",
+        "payment_processed"
+      ],
+      "steps_raw": "purchase_requisition -> po_created -> po_approved -> goods_ordered -> goods_received -> invoice_matched -> payment_approved -> payment_processed",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "purchase_requisition",
+          "target": "po_created"
+        },
+        {
+          "guard": "budget_available and vendor_approved",
+          "source": "po_created",
+          "target": "po_approved"
+        },
+        {
+          "guard": null,
+          "source": "po_approved",
+          "target": "goods_ordered"
+        },
+        {
+          "guard": null,
+          "source": "goods_ordered",
+          "target": "goods_received"
+        },
+        {
+          "guard": null,
+          "source": "goods_received",
+          "target": "invoice_matched"
+        },
+        {
+          "guard": "three_way_match_passed and invoice_validated",
+          "source": "invoice_matched",
+          "target": "payment_approved"
+        },
+        {
+          "guard": null,
+          "source": "payment_approved",
+          "target": "payment_processed"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 1
+    },
+    "capability": {
+      "edges": 10,
+      "kind": "capability",
+      "nodes": 11
+    },
+    "deployment": {
+      "edges": 14,
+      "kind": "deployment",
+      "nodes": 15
+    },
+    "er": {
+      "edges": 50,
+      "kind": "er",
+      "nodes": 54
+    },
+    "handler": {
+      "edges": 14,
+      "kind": "handler",
+      "nodes": 15
+    },
+    "lookup": {
+      "edges": 14,
+      "kind": "lookup",
+      "nodes": 15
+    },
+    "package": {
+      "edges": 14,
+      "kind": "package",
+      "nodes": 15
+    },
+    "security": {
+      "edges": 14,
+      "kind": "security",
+      "nodes": 15
+    },
+    "workflow": {
+      "edges": 14,
+      "kind": "workflow",
+      "nodes": 15
+    }
+  },
+  "llms": {
+    "ERPAssistant": {
+      "model": "openai:gpt-4.1-mini",
+      "runtime": null
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "ERPCore.credit_limit_check": {
+      "action": "require_review",
+      "name": "credit_limit_check",
+      "when": "order_amount > customer_credit_limit"
+    },
+    "ERPCore.negative_inventory_denied": {
+      "action": "deny",
+      "name": "negative_inventory_denied",
+      "when": "on_hand - reserved_lt == 0 and allow_backorder == false"
+    },
+    "ERPCore.payroll_requires_approved_timesheet": {
+      "action": "deny",
+      "name": "payroll_requires_approved_timesheet",
+      "when": "payroll_run == true and timesheets_approved != true"
+    },
+    "ERPCore.po_required_for_ap": {
+      "action": "deny",
+      "name": "po_required_for_ap",
+      "when": "invoice_type == ap and po_id missing and require_po == true"
+    },
+    "ERPCore.segregation_purchase_approval": {
+      "action": "deny",
+      "name": "segregation_purchase_approval",
+      "when": "requester_id == approver_id"
+    },
+    "ERPCore.three_way_match_required": {
+      "action": "require_review",
+      "name": "three_way_match_required",
+      "when": "three_way_match == true and match_status != matched"
+    },
+    "ERPCore.vendor_on_hold_denied": {
+      "action": "deny",
+      "name": "vendor_on_hold_denied",
+      "when": "vendor_status == on_hold"
+    },
+    "ExecutiveERP.exec_only": {
+      "action": "deny",
+      "name": "exec_only",
+      "when": "role_not_in_executive"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "enterprise_erp.apg"
+  ],
+  "symbols": {
+    "agent.ERPAssistant": {
+      "file": "enterprise_erp.apg",
+      "id": "agent.ERPAssistant",
+      "kind": "agent",
+      "name": "ERPAssistant",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.EnterpriseERP": {
+      "file": "enterprise_erp.apg",
+      "id": "app.EnterpriseERP",
+      "kind": "app",
+      "name": "EnterpriseERP",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.ERPCore": {
+      "file": "enterprise_erp.apg",
+      "id": "capability.ERPCore",
+      "kind": "capability",
+      "name": "ERPCore",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.ExecutiveERP": {
+      "file": "enterprise_erp.apg",
+      "id": "capability.ExecutiveERP",
+      "kind": "capability",
+      "name": "ExecutiveERP",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.Customer.credit_limit": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Customer.credit_limit",
+      "kind": "field",
+      "name": "Customer.credit_limit",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Customer.currency": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Customer.currency",
+      "kind": "field",
+      "name": "Customer.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Customer.customer_number": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Customer.customer_number",
+      "kind": "field",
+      "name": "Customer.customer_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Customer.legal_name": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Customer.legal_name",
+      "kind": "field",
+      "name": "Customer.legal_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Customer.payment_terms": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Customer.payment_terms",
+      "kind": "field",
+      "name": "Customer.payment_terms",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Customer.status": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Customer.status",
+      "kind": "field",
+      "name": "Customer.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Employee.bank_account": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.bank_account",
+      "kind": "field",
+      "name": "Employee.bank_account",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 11
+        },
+        "start": {
+          "character": 4,
+          "line": 11
+        }
+      },
+      "references": []
+    },
+    "field.Employee.basic_salary": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.basic_salary",
+      "kind": "field",
+      "name": "Employee.basic_salary",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Employee.currency": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.currency",
+      "kind": "field",
+      "name": "Employee.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Employee.department": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.department",
+      "kind": "field",
+      "name": "Employee.department",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Employee.employee_number": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.employee_number",
+      "kind": "field",
+      "name": "Employee.employee_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Employee.employment_type": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.employment_type",
+      "kind": "field",
+      "name": "Employee.employment_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Employee.first_name": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.first_name",
+      "kind": "field",
+      "name": "Employee.first_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Employee.hire_date": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.hire_date",
+      "kind": "field",
+      "name": "Employee.hire_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 12
+        },
+        "start": {
+          "character": 4,
+          "line": 12
+        }
+      },
+      "references": []
+    },
+    "field.Employee.job_grade": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.job_grade",
+      "kind": "field",
+      "name": "Employee.job_grade",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Employee.last_name": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.last_name",
+      "kind": "field",
+      "name": "Employee.last_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Employee.nssf_number": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.nssf_number",
+      "kind": "field",
+      "name": "Employee.nssf_number",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.Employee.tax_pin": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Employee.tax_pin",
+      "kind": "field",
+      "name": "Employee.tax_pin",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.cost_method": {
+      "file": "enterprise_erp.apg",
+      "id": "field.InventoryItem.cost_method",
+      "kind": "field",
+      "name": "InventoryItem.cost_method",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.description": {
+      "file": "enterprise_erp.apg",
+      "id": "field.InventoryItem.description",
+      "kind": "field",
+      "name": "InventoryItem.description",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.on_hand": {
+      "file": "enterprise_erp.apg",
+      "id": "field.InventoryItem.on_hand",
+      "kind": "field",
+      "name": "InventoryItem.on_hand",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.on_order": {
+      "file": "enterprise_erp.apg",
+      "id": "field.InventoryItem.on_order",
+      "kind": "field",
+      "name": "InventoryItem.on_order",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.reorder_point": {
+      "file": "enterprise_erp.apg",
+      "id": "field.InventoryItem.reorder_point",
+      "kind": "field",
+      "name": "InventoryItem.reorder_point",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.reorder_qty": {
+      "file": "enterprise_erp.apg",
+      "id": "field.InventoryItem.reorder_qty",
+      "kind": "field",
+      "name": "InventoryItem.reorder_qty",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.reserved": {
+      "file": "enterprise_erp.apg",
+      "id": "field.InventoryItem.reserved",
+      "kind": "field",
+      "name": "InventoryItem.reserved",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.sku": {
+      "file": "enterprise_erp.apg",
+      "id": "field.InventoryItem.sku",
+      "kind": "field",
+      "name": "InventoryItem.sku",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.InventoryItem.unit_of_measure": {
+      "file": "enterprise_erp.apg",
+      "id": "field.InventoryItem.unit_of_measure",
+      "kind": "field",
+      "name": "InventoryItem.unit_of_measure",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseOrder.currency": {
+      "file": "enterprise_erp.apg",
+      "id": "field.PurchaseOrder.currency",
+      "kind": "field",
+      "name": "PurchaseOrder.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseOrder.expected_delivery": {
+      "file": "enterprise_erp.apg",
+      "id": "field.PurchaseOrder.expected_delivery",
+      "kind": "field",
+      "name": "PurchaseOrder.expected_delivery",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseOrder.order_date": {
+      "file": "enterprise_erp.apg",
+      "id": "field.PurchaseOrder.order_date",
+      "kind": "field",
+      "name": "PurchaseOrder.order_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseOrder.po_number": {
+      "file": "enterprise_erp.apg",
+      "id": "field.PurchaseOrder.po_number",
+      "kind": "field",
+      "name": "PurchaseOrder.po_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseOrder.status": {
+      "file": "enterprise_erp.apg",
+      "id": "field.PurchaseOrder.status",
+      "kind": "field",
+      "name": "PurchaseOrder.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseOrder.total_amount": {
+      "file": "enterprise_erp.apg",
+      "id": "field.PurchaseOrder.total_amount",
+      "kind": "field",
+      "name": "PurchaseOrder.total_amount",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.PurchaseOrder.vendor_id": {
+      "file": "enterprise_erp.apg",
+      "id": "field.PurchaseOrder.vendor_id",
+      "kind": "field",
+      "name": "PurchaseOrder.vendor_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.currency": {
+      "file": "enterprise_erp.apg",
+      "id": "field.SalesOrder.currency",
+      "kind": "field",
+      "name": "SalesOrder.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.customer_id": {
+      "file": "enterprise_erp.apg",
+      "id": "field.SalesOrder.customer_id",
+      "kind": "field",
+      "name": "SalesOrder.customer_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.order_date": {
+      "file": "enterprise_erp.apg",
+      "id": "field.SalesOrder.order_date",
+      "kind": "field",
+      "name": "SalesOrder.order_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.order_number": {
+      "file": "enterprise_erp.apg",
+      "id": "field.SalesOrder.order_number",
+      "kind": "field",
+      "name": "SalesOrder.order_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.required_date": {
+      "file": "enterprise_erp.apg",
+      "id": "field.SalesOrder.required_date",
+      "kind": "field",
+      "name": "SalesOrder.required_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.status": {
+      "file": "enterprise_erp.apg",
+      "id": "field.SalesOrder.status",
+      "kind": "field",
+      "name": "SalesOrder.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.SalesOrder.total_amount": {
+      "file": "enterprise_erp.apg",
+      "id": "field.SalesOrder.total_amount",
+      "kind": "field",
+      "name": "SalesOrder.total_amount",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.bank_account": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.bank_account",
+      "kind": "field",
+      "name": "Vendor.bank_account",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.currency": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.currency",
+      "kind": "field",
+      "name": "Vendor.currency",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.legal_name": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.legal_name",
+      "kind": "field",
+      "name": "Vendor.legal_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.payment_terms": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.payment_terms",
+      "kind": "field",
+      "name": "Vendor.payment_terms",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.status": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.status",
+      "kind": "field",
+      "name": "Vendor.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.tax_id": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.tax_id",
+      "kind": "field",
+      "name": "Vendor.tax_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Vendor.vendor_number": {
+      "file": "enterprise_erp.apg",
+      "id": "field.Vendor.vendor_number",
+      "kind": "field",
+      "name": "Vendor.vendor_number",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "llm.openai:gpt-4.1-mini": {
+      "file": "enterprise_erp.apg",
+      "id": "llm.openai:gpt-4.1-mini",
+      "kind": "llm",
+      "name": "openai:gpt-4.1-mini",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.enterprise_erp": {
+      "file": "enterprise_erp.apg",
+      "id": "module.enterprise_erp",
+      "kind": "module",
+      "name": "enterprise_erp",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Customer": {
+      "file": "enterprise_erp.apg",
+      "id": "table.Customer",
+      "kind": "table",
+      "name": "Customer",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Employee": {
+      "file": "enterprise_erp.apg",
+      "id": "table.Employee",
+      "kind": "table",
+      "name": "Employee",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.InventoryItem": {
+      "file": "enterprise_erp.apg",
+      "id": "table.InventoryItem",
+      "kind": "table",
+      "name": "InventoryItem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.PurchaseOrder": {
+      "file": "enterprise_erp.apg",
+      "id": "table.PurchaseOrder",
+      "kind": "table",
+      "name": "PurchaseOrder",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.SalesOrder": {
+      "file": "enterprise_erp.apg",
+      "id": "table.SalesOrder",
+      "kind": "table",
+      "name": "SalesOrder",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Vendor": {
+      "file": "enterprise_erp.apg",
+      "id": "table.Vendor",
+      "kind": "table",
+      "name": "Vendor",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.HireToRetire": {
+      "file": "enterprise_erp.apg",
+      "id": "workflow.HireToRetire",
+      "kind": "workflow",
+      "name": "HireToRetire",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.MonthEndClose": {
+      "file": "enterprise_erp.apg",
+      "id": "workflow.MonthEndClose",
+      "kind": "workflow",
+      "name": "MonthEndClose",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.OrderToCash": {
+      "file": "enterprise_erp.apg",
+      "id": "workflow.OrderToCash",
+      "kind": "workflow",
+      "name": "OrderToCash",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.ProcureToPay": {
+      "file": "enterprise_erp.apg",
+      "id": "workflow.ProcureToPay",
+      "kind": "workflow",
+      "name": "ProcureToPay",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "Customer": {
+      "fields": {
+        "credit_limit": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "customer_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "legal_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "payment_terms": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "credit_limit.id": {
+          "chain": [
+            "Customer.credit_limit",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Customer"
+    },
+    "Employee": {
+      "fields": {
+        "bank_account": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "basic_salary": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "department": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "employee_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "employment_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "first_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "hire_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "job_grade": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "last_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "nssf_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "tax_pin": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "basic_salary.id": {
+          "chain": [
+            "Employee.basic_salary",
+            "decimal.id"
+          ],
+          "valid": true
+        },
+        "hire_date.id": {
+          "chain": [
+            "Employee.hire_date",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Employee"
+    },
+    "InventoryItem": {
+      "fields": {
+        "cost_method": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "description": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "on_hand": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "on_order": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reorder_point": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reorder_qty": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "reserved": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "sku": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "unit_of_measure": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "InventoryItem"
+    },
+    "PurchaseOrder": {
+      "fields": {
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "expected_delivery": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "order_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "po_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total_amount": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        },
+        "vendor_id": {
+          "relationship": {
+            "alias": "vendor",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Vendor"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "expected_delivery.id": {
+          "chain": [
+            "PurchaseOrder.expected_delivery",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "order_date.id": {
+          "chain": [
+            "PurchaseOrder.order_date",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "total_amount.id": {
+          "chain": [
+            "PurchaseOrder.total_amount",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "PurchaseOrder"
+    },
+    "SalesOrder": {
+      "fields": {
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "customer_id": {
+          "relationship": {
+            "alias": "customer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Customer"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "order_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "order_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "required_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "total_amount": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "decimal"
+          },
+          "required": true,
+          "type": "decimal"
+        }
+      },
+      "lookup_paths": {
+        "order_date.id": {
+          "chain": [
+            "SalesOrder.order_date",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "required_date.id": {
+          "chain": [
+            "SalesOrder.required_date",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "total_amount.id": {
+          "chain": [
+            "SalesOrder.total_amount",
+            "decimal.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "SalesOrder"
+    },
+    "Vendor": {
+      "fields": {
+        "bank_account": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "currency": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "legal_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "payment_terms": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "tax_id": {
+          "relationship": {
+            "alias": "tax",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Tax"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "vendor_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "Vendor"
+    }
+  },
+  "views": {}
+}

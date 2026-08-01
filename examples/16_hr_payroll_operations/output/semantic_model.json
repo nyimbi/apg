@@ -1491,13 +1491,9 @@
     "Employee": {
       "fields": {
         "bank_account": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "currency": {
           "relationship": null,
@@ -1545,22 +1541,14 @@
           "type": "str"
         },
         "nhif_number": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "nssf_number": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "position": {
           "relationship": null,
@@ -1573,82 +1561,30 @@
           "type": "float"
         },
         "tax_pin": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "termination_date": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         }
       },
-      "lookup_paths": {
-        "bank_account.id": {
-          "chain": [
-            "Employee.bank_account",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "nhif_number.id": {
-          "chain": [
-            "Employee.nhif_number",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "nssf_number.id": {
-          "chain": [
-            "Employee.nssf_number",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "tax_pin.id": {
-          "chain": [
-            "Employee.tax_pin",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "termination_date.id": {
-          "chain": [
-            "Employee.termination_date",
-            "str?.id"
-          ],
-          "valid": true
-        }
-      },
+      "lookup_paths": {},
       "name": "Employee"
     },
     "PayRun": {
       "fields": {
         "approved_at": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "approved_by": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "pay_date": {
           "relationship": null,
@@ -1691,22 +1627,7 @@
           "type": "float"
         }
       },
-      "lookup_paths": {
-        "approved_at.id": {
-          "chain": [
-            "PayRun.approved_at",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "approved_by.id": {
-          "chain": [
-            "PayRun.approved_by",
-            "str?.id"
-          ],
-          "valid": true
-        }
-      },
+      "lookup_paths": {},
       "name": "PayRun"
     },
     "Payslip": {

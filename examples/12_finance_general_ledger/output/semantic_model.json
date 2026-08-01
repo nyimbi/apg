@@ -1215,24 +1215,12 @@
           "type": "str"
         },
         "parent_code": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         }
       },
-      "lookup_paths": {
-        "parent_code.id": {
-          "chain": [
-            "Account.parent_code",
-            "str?.id"
-          ],
-          "valid": true
-        }
-      },
+      "lookup_paths": {},
       "name": "Account"
     },
     "JournalEntry": {
@@ -1270,19 +1258,15 @@
           "relationship": {
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "datetime?"
+            "target_table": "datetime"
           },
-          "required": true,
-          "type": "datetime?"
+          "required": false,
+          "type": "datetime"
         },
         "posted_by": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "reference": {
           "relationship": null,
@@ -1324,14 +1308,7 @@
         "posted_at.id": {
           "chain": [
             "JournalEntry.posted_at",
-            "datetime?.id"
-          ],
-          "valid": true
-        },
-        "posted_by.id": {
-          "chain": [
-            "JournalEntry.posted_by",
-            "str?.id"
+            "datetime.id"
           ],
           "valid": true
         },
@@ -1360,13 +1337,9 @@
           "type": "str"
         },
         "cost_centre": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "credit": {
           "relationship": {
@@ -1407,32 +1380,17 @@
           "type": "str"
         },
         "memo": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "project": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         }
       },
       "lookup_paths": {
-        "cost_centre.id": {
-          "chain": [
-            "JournalLine.cost_centre",
-            "str?.id"
-          ],
-          "valid": true
-        },
         "credit.id": {
           "chain": [
             "JournalLine.credit",
@@ -1444,20 +1402,6 @@
           "chain": [
             "JournalLine.debit",
             "decimal.id"
-          ],
-          "valid": true
-        },
-        "memo.id": {
-          "chain": [
-            "JournalLine.memo",
-            "str?.id"
-          ],
-          "valid": true
-        },
-        "project.id": {
-          "chain": [
-            "JournalLine.project",
-            "str?.id"
           ],
           "valid": true
         }

@@ -737,13 +737,9 @@
           "type": "str"
         },
         "phone": {
-          "relationship": {
-            "cardinality": "many-to-one",
-            "target_field": "id",
-            "target_table": "str?"
-          },
-          "required": true,
-          "type": "str?"
+          "relationship": null,
+          "required": false,
+          "type": "str"
         },
         "segment": {
           "relationship": null,
@@ -772,13 +768,6 @@
           "chain": [
             "Customer.credit_limit",
             "decimal.id"
-          ],
-          "valid": true
-        },
-        "phone.id": {
-          "chain": [
-            "Customer.phone",
-            "str?.id"
           ],
           "valid": true
         },
@@ -813,10 +802,10 @@
           "relationship": {
             "cardinality": "many-to-one",
             "target_field": "id",
-            "target_table": "date?"
+            "target_table": "date"
           },
-          "required": true,
-          "type": "date?"
+          "required": false,
+          "type": "date"
         },
         "line_items": {
           "relationship": {
@@ -896,7 +885,7 @@
         "delivery_date.id": {
           "chain": [
             "Order.delivery_date",
-            "date?.id"
+            "date.id"
           ],
           "valid": true
         },

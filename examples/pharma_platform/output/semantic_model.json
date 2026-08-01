@@ -1,0 +1,2974 @@
+{
+  "agents": {},
+  "app": {
+    "description": null,
+    "entity_count": 10,
+    "name": "pharma_platform",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "ClinicalTrials": {
+      "approvals": {
+        "approvers": [
+          "principal_investigator",
+          "medical_monitor",
+          "sponsor_cmo"
+        ],
+        "levels": 3
+      },
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "ae_24h_reporting_enforced": true,
+        "edcsystem": "medidata_rave",
+        "gcp_compliant": true,
+        "supported_phases": [
+          "phase_1",
+          "phase_2",
+          "phase_3",
+          "phase_4"
+        ],
+        "susar_15d_reporting_enforced": true,
+        "tmf_reference_model": "ICH_E6R3"
+      },
+      "erp_modules": [
+        "clinical_operations",
+        "regulatory",
+        "safety",
+        "data_management"
+      ],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "fr",
+          "de",
+          "es",
+          "sw"
+        ]
+      },
+      "master_data": {
+        "entities": [
+          "clinical_trial",
+          "protocol",
+          "site",
+          "patient",
+          "adverse_event",
+          "randomisation_record",
+          "crf",
+          "tmf_document",
+          "regulatory_submission"
+        ]
+      },
+      "name": "ClinicalTrials",
+      "provides": [
+        "trial_registry",
+        "protocol_management",
+        "site_management",
+        "patient_enrollment",
+        "randomisation",
+        "crf_data",
+        "ae_reporting",
+        "regulatory_submissions"
+      ],
+      "requires": [
+        "audit_events",
+        "tenant_context"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "irb_approval_required_before_activation",
+          "when": "operation = activate_trial AND irb_approved = false",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "activate_trial"
+            },
+            "right": {
+              "field": "irb_approved",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "informed_consent_before_enrollment",
+          "when": "operation = enrol_patient AND informed_consent_obtained = false",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "enrol_patient"
+            },
+            "right": {
+              "field": "informed_consent_obtained",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "gcp_compliance_required",
+          "when": "gcp_compliant = false",
+          "when_ast": {
+            "field": "gcp_compliant",
+            "op": "==",
+            "type": "compare",
+            "value": false
+          }
+        },
+        {
+          "action": "deny",
+          "name": "ae_24h_expedited_reporting",
+          "when": "ae_type = serious_adverse_event AND within_24h = false",
+          "when_ast": {
+            "left": {
+              "field": "ae_type",
+              "op": "==",
+              "type": "compare",
+              "value": "serious_adverse_event"
+            },
+            "right": {
+              "field": "within_24h",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "susar_15d_reporting",
+          "when": "ae_type = susar AND within_15d = false",
+          "when_ast": {
+            "left": {
+              "field": "ae_type",
+              "op": "==",
+              "type": "compare",
+              "value": "susar"
+            },
+            "right": {
+              "field": "within_15d",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "site_must_be_initiated",
+          "when": "operation = enrol_patient AND site_initiated = false",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "enrol_patient"
+            },
+            "right": {
+              "field": "site_initiated",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "protocol_version_required",
+          "when": "operation = approve_protocol AND version_present = false",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "approve_protocol"
+            },
+            "right": {
+              "field": "version_present",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "cross_tenant_data_denied",
+          "when": "cross_tenant = true",
+          "when_ast": {
+            "field": "cross_tenant",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "SafetyMonitoringBoard": {
+          "actions": [
+            "escalate_susar",
+            "file_sar",
+            "notify_irb"
+          ],
+          "binds": [
+            "ae_reporting.active",
+            "regulatory_submissions.pending"
+          ],
+          "contains": [
+            "AETimeline",
+            "SUSARAlertPanel",
+            "DunningActions",
+            "SMCReportSummary"
+          ],
+          "layout": "dashboard",
+          "route": "/pharma/ctr/safety/board"
+        }
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "state": "ctr_lifecycle_state"
+      },
+      "theme": {
+        "name": "pharma_theme",
+        "tokens": {
+          "accent": "#553C9A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "TrialListScreen",
+            "name": "Trials",
+            "path": "/pharma/ctr/trials"
+          },
+          {
+            "component": "SiteManagementScreen",
+            "name": "Sites",
+            "path": "/pharma/ctr/sites"
+          },
+          {
+            "component": "PatientEnrollmentScreen",
+            "name": "Patients",
+            "path": "/pharma/ctr/patients"
+          },
+          {
+            "component": "AdverseEventScreen",
+            "name": "Adverse Events",
+            "path": "/pharma/ctr/ae"
+          },
+          {
+            "component": "TrialMasterFileScreen",
+            "name": "TMF",
+            "path": "/pharma/ctr/tmf"
+          },
+          {
+            "component": "SafetyDashboardScreen",
+            "name": "Safety Dashboard",
+            "path": "/pharma/ctr/safety"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "Distribution": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "cold_chain_temp_max_c": 8,
+        "cold_chain_temp_min_c": 2,
+        "gsdp_compliant": true,
+        "recall_notification_hours": 24,
+        "serialisation_standard": "GS1_EPCIS"
+      },
+      "erp_modules": [
+        "distribution",
+        "warehouse",
+        "quality",
+        "logistics"
+      ],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "fr",
+          "sw"
+        ]
+      },
+      "master_data": {
+        "entities": [
+          "batch",
+          "serial_number",
+          "dispatch_record",
+          "cold_chain_log",
+          "recall_notice"
+        ]
+      },
+      "name": "Distribution",
+      "provides": [
+        "batch_traceability",
+        "cold_chain_management",
+        "serialisation",
+        "distribution_records",
+        "recall_management"
+      ],
+      "requires": [
+        "batch_records",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "batch_release_required_before_dispatch",
+          "when": "batch_status != released",
+          "when_ast": {
+            "field": "batch_status",
+            "op": "!=",
+            "type": "compare",
+            "value": "released"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "cold_chain_temp_excursion_hold",
+          "when": "temp_celsius > cold_chain_temp_max_c OR temp_celsius < cold_chain_temp_min_c",
+          "when_ast": {
+            "left": {
+              "field": "temp_celsius",
+              "op": ">",
+              "type": "compare",
+              "value": "cold_chain_temp_max_c"
+            },
+            "right": {
+              "field": "temp_celsius",
+              "op": "<",
+              "type": "compare",
+              "value": "cold_chain_temp_min_c"
+            },
+            "type": "or"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "serialisation_required",
+          "when": "product_serialised = false",
+          "when_ast": {
+            "field": "product_serialised",
+            "op": "==",
+            "type": "compare",
+            "value": false
+          }
+        },
+        {
+          "action": "warn",
+          "name": "expiry_check_before_dispatch",
+          "when": "days_to_expiry < 90",
+          "when_ast": {
+            "field": "days_to_expiry",
+            "op": "<",
+            "type": "compare",
+            "value": 90
+          }
+        },
+        {
+          "action": "deny",
+          "name": "recall_triggers_distribution_hold",
+          "when": "recall_active AND product_id = recalled_product_id",
+          "when_ast": {
+            "left": {
+              "field": "recall_active",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "right": {
+              "field": "product_id",
+              "op": "==",
+              "type": "compare",
+              "value": "recalled_product_id"
+            },
+            "type": "and"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "ColdChainDashboard": {
+          "actions": [
+            "quarantine_batch",
+            "notify_logistics",
+            "initiate_investigation"
+          ],
+          "binds": [
+            "cold_chain_management.live_sensors",
+            "distribution_records.in_transit"
+          ],
+          "contains": [
+            "TemperatureMap",
+            "ExcursionAlertList",
+            "BatchStatusPanel"
+          ],
+          "layout": "dashboard",
+          "route": "/pharma/dis/coldchain/live"
+        }
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "state": "distribution_cold_chain_state"
+      },
+      "theme": {
+        "name": "pharma_theme",
+        "tokens": {
+          "accent": "#276749"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "DispatchScreen",
+            "name": "Dispatch",
+            "path": "/pharma/dis/dispatch"
+          },
+          {
+            "component": "ColdChainMonitorScreen",
+            "name": "Cold Chain",
+            "path": "/pharma/dis/coldchain"
+          },
+          {
+            "component": "SerialisationScreen",
+            "name": "Serialisation",
+            "path": "/pharma/dis/serial"
+          },
+          {
+            "component": "RecallManagementScreen",
+            "name": "Recalls",
+            "path": "/pharma/dis/recalls"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "PharmaAuditLog": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "electronic_signature_required": true,
+        "immutable": true,
+        "retention_days": 3650
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {},
+      "name": "PharmaAuditLog",
+      "provides": [
+        "audit_events",
+        "compliance_trail",
+        "21cfr_audit_trail"
+      ],
+      "requires": [],
+      "rule_engine": {},
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "pharma_audit_state"
+      },
+      "theme": {},
+      "ui": {}
+    },
+    "PharmaTenantContext": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "gxp_validated": true,
+        "isolation": "strict",
+        "multi_tenant": true
+      },
+      "erp_modules": [],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "tenant",
+          "organisation",
+          "user",
+          "role",
+          "training_record"
+        ]
+      },
+      "name": "PharmaTenantContext",
+      "provides": [
+        "tenant_context",
+        "rbac_policies",
+        "gxp_user_roles"
+      ],
+      "requires": [
+        "audit_events"
+      ],
+      "rule_engine": {},
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {},
+      "theme": {},
+      "ui": {}
+    },
+    "Pharmacovigilance": {
+      "approvals": {
+        "approvers": [
+          "safety_physician",
+          "global_safety_officer"
+        ],
+        "levels": 2
+      },
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "meddra_version": "26.0",
+        "psur_frequency_months": 12,
+        "rmp_required": true,
+        "susar_15day_reporting": true,
+        "susar_7day_fatal_reporting": true
+      },
+      "erp_modules": [
+        "safety",
+        "regulatory",
+        "medical_affairs"
+      ],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "icsr_case",
+          "signal",
+          "psur",
+          "rmp",
+          "safety_communication"
+        ]
+      },
+      "name": "Pharmacovigilance",
+      "provides": [
+        "case_management",
+        "signal_detection",
+        "aggregate_reporting",
+        "risk_management"
+      ],
+      "requires": [
+        "ae_reporting",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "meddra_coding_required",
+          "when": "meddra_pt missing",
+          "when_ast": {
+            "field": "meddra_pt",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "fatal_7day_sar_required",
+          "when": "severity = fatal AND sar_filed = false AND days_since_onset > 7",
+          "when_ast": {
+            "left": {
+              "left": {
+                "field": "severity",
+                "op": "==",
+                "type": "compare",
+                "value": "fatal"
+              },
+              "right": {
+                "field": "sar_filed",
+                "op": "==",
+                "type": "compare",
+                "value": false
+              },
+              "type": "and"
+            },
+            "right": {
+              "field": "days_since_onset",
+              "op": ">",
+              "type": "compare",
+              "value": 7
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "serious_15day_sar_required",
+          "when": "seriousness = serious AND sar_filed = false AND days_since_onset > 15",
+          "when_ast": {
+            "left": {
+              "left": {
+                "field": "seriousness",
+                "op": "==",
+                "type": "compare",
+                "value": "serious"
+              },
+              "right": {
+                "field": "sar_filed",
+                "op": "==",
+                "type": "compare",
+                "value": false
+              },
+              "type": "and"
+            },
+            "right": {
+              "field": "days_since_onset",
+              "op": ">",
+              "type": "compare",
+              "value": 15
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "causality_required_for_susar",
+          "when": "is_susar_candidate AND causality_assessed = false",
+          "when_ast": {
+            "left": {
+              "field": "is_susar_candidate",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "right": {
+              "field": "causality_assessed",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "duplicate_case_detection",
+          "when": "duplicate_detected",
+          "when_ast": {
+            "field": "duplicate_detected",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {
+        "SafetyCaseWorkbench": {
+          "actions": [
+            "triage_case",
+            "assess_causality",
+            "file_sar",
+            "close_case"
+          ],
+          "binds": [
+            "case_management.pending_triage",
+            "risk_management.active_signals"
+          ],
+          "contains": [
+            "PendingCaseList",
+            "CausalityAssessmentPanel",
+            "SARFilingQueue"
+          ],
+          "layout": "split",
+          "route": "/pharma/pvi/workbench"
+        }
+      },
+      "streaming": {
+        "processor": "bytewax",
+        "state": "pharmacovigilance_signal_state"
+      },
+      "theme": {
+        "name": "pharma_theme",
+        "tokens": {
+          "accent": "#C53030"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "CaseManagementScreen",
+            "name": "Cases",
+            "path": "/pharma/pvi/cases"
+          },
+          {
+            "component": "SignalDetectionScreen",
+            "name": "Signal Detection",
+            "path": "/pharma/pvi/signals"
+          },
+          {
+            "component": "PSURScreen",
+            "name": "PSUR",
+            "path": "/pharma/pvi/psur"
+          },
+          {
+            "component": "RiskManagementScreen",
+            "name": "Risk Management",
+            "path": "/pharma/pvi/rmp"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "QualityManagementSystem": {
+      "approvals": {
+        "approvers": [
+          "qa_officer",
+          "qa_manager",
+          "qualified_person"
+        ],
+        "levels": 3
+      },
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "capa_sla_days": 30,
+        "deviation_investigation_days": 15,
+        "electronic_batch_record": true,
+        "gmp_standard": "ICH_Q10"
+      },
+      "erp_modules": [
+        "quality",
+        "manufacturing",
+        "regulatory",
+        "training"
+      ],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "deviation",
+          "capa",
+          "change_request",
+          "batch_record",
+          "audit_finding",
+          "sop"
+        ]
+      },
+      "name": "QualityManagementSystem",
+      "provides": [
+        "deviations",
+        "capa_management",
+        "change_control",
+        "batch_records",
+        "gmp_audits",
+        "sop_management"
+      ],
+      "requires": [
+        "audit_events",
+        "tenant_context"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "critical_deviation_capa_required",
+          "when": "deviation_severity = critical AND capa_raised = false",
+          "when_ast": {
+            "left": {
+              "field": "deviation_severity",
+              "op": "==",
+              "type": "compare",
+              "value": "critical"
+            },
+            "right": {
+              "field": "capa_raised",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "change_control_required_for_critical",
+          "when": "change_type = critical AND change_control_id missing",
+          "when_ast": {
+            "left": {
+              "field": "change_type",
+              "op": "==",
+              "type": "compare",
+              "value": "critical"
+            },
+            "right": {
+              "field": "change_control_id",
+              "negated": false,
+              "type": "missing"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "batch_release_requires_qp_sign",
+          "when": "operation = release_batch AND qp_signed = false",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "release_batch"
+            },
+            "right": {
+              "field": "qp_signed",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "overdue_capa_escalation",
+          "when": "capa_days_open > capa_sla_days",
+          "when_ast": {
+            "field": "capa_days_open",
+            "op": ">",
+            "type": "compare",
+            "value": "capa_sla_days"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "sop_version_current",
+          "when": "sop_version != current_approved_version",
+          "when_ast": {
+            "field": "sop_version",
+            "op": "!=",
+            "type": "compare",
+            "value": "current_approved_version"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "qms_workflow_state"
+      },
+      "theme": {
+        "name": "pharma_theme",
+        "tokens": {
+          "accent": "#2C7A7B"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "DeviationScreen",
+            "name": "Deviations",
+            "path": "/pharma/qms/deviations"
+          },
+          {
+            "component": "CAPAScreen",
+            "name": "CAPA",
+            "path": "/pharma/qms/capa"
+          },
+          {
+            "component": "ChangeControlScreen",
+            "name": "Change Control",
+            "path": "/pharma/qms/changes"
+          },
+          {
+            "component": "BatchRecordScreen",
+            "name": "Batch Records",
+            "path": "/pharma/qms/batches"
+          },
+          {
+            "component": "AuditScreen",
+            "name": "Audits",
+            "path": "/pharma/qms/audits"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "RegulatoryAffairs": {
+      "approvals": {
+        "approvers": [
+          "regulatory_affairs_manager",
+          "medical_director",
+          "cro"
+        ],
+        "levels": 3
+      },
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "ectd_version": "4.0",
+        "response_tracking_days": 90,
+        "submission_types": [
+          "IND",
+          "NDA",
+          "BLA",
+          "MAA",
+          "CTA",
+          "variation"
+        ],
+        "supported_agencies": [
+          "FDA",
+          "EMA",
+          "NMRA",
+          "WHO"
+        ]
+      },
+      "erp_modules": [
+        "regulatory",
+        "legal",
+        "quality",
+        "clinical_operations"
+      ],
+      "i18n": {},
+      "master_data": {
+        "entities": [
+          "dossier",
+          "submission",
+          "agency_correspondence",
+          "registration",
+          "variation"
+        ]
+      },
+      "name": "RegulatoryAffairs",
+      "provides": [
+        "dossier_management",
+        "submission_tracking",
+        "agency_correspondence",
+        "registration_status",
+        "variation_management"
+      ],
+      "requires": [
+        "ae_reporting",
+        "batch_records",
+        "capa_management",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rule_engine": {},
+      "rules": [
+        {
+          "action": "deny",
+          "name": "ectd_format_required_for_fda_ema",
+          "when": "agency in [FDA, EMA] AND ectd_compliant = false",
+          "when_ast": {
+            "left": {
+              "field": "agency",
+              "negated": false,
+              "type": "in",
+              "values": [
+                "FDA",
+                "EMA"
+              ]
+            },
+            "right": {
+              "field": "ectd_compliant",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "csr_required_before_nda",
+          "when": "submission_type = NDA AND csr_status != final",
+          "when_ast": {
+            "left": {
+              "field": "submission_type",
+              "op": "==",
+              "type": "compare",
+              "value": "NDA"
+            },
+            "right": {
+              "field": "csr_status",
+              "op": "!=",
+              "type": "compare",
+              "value": "final"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "safety_update_required_with_variation",
+          "when": "variation_type = type_2 AND safety_profile_reviewed = false",
+          "when_ast": {
+            "left": {
+              "field": "variation_type",
+              "op": "==",
+              "type": "compare",
+              "value": "type_2"
+            },
+            "right": {
+              "field": "safety_profile_reviewed",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "agency_response_tracking",
+          "when": "days_since_submission > response_tracking_days AND agency_response missing",
+          "when_ast": {
+            "left": {
+              "field": "days_since_submission",
+              "op": ">",
+              "type": "compare",
+              "value": "response_tracking_days"
+            },
+            "right": {
+              "field": "agency_response",
+              "negated": false,
+              "type": "missing"
+            },
+            "type": "and"
+          }
+        }
+      ],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "processor": "bytewax",
+        "state": "regulatory_submission_state"
+      },
+      "theme": {
+        "name": "pharma_theme",
+        "tokens": {
+          "accent": "#2B4C7E"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "SubmissionTrackerScreen",
+            "name": "Submissions",
+            "path": "/pharma/reg/submissions"
+          },
+          {
+            "component": "DossierManagementScreen",
+            "name": "Dossiers",
+            "path": "/pharma/reg/dossiers"
+          },
+          {
+            "component": "CorrespondenceScreen",
+            "name": "Agency Correspondence",
+            "path": "/pharma/reg/correspondence"
+          },
+          {
+            "component": "RegistrationStatusScreen",
+            "name": "Registration Status",
+            "path": "/pharma/reg/status"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "ClinicalTrials": [
+        "audit_events",
+        "tenant_context"
+      ],
+      "Distribution": [
+        "batch_records",
+        "audit_events",
+        "tenant_context"
+      ],
+      "PharmaAuditLog": [],
+      "PharmaTenantContext": [
+        "audit_events"
+      ],
+      "Pharmacovigilance": [
+        "ae_reporting",
+        "audit_events",
+        "tenant_context"
+      ],
+      "QualityManagementSystem": [
+        "audit_events",
+        "tenant_context"
+      ],
+      "RegulatoryAffairs": [
+        "ae_reporting",
+        "batch_records",
+        "capa_management",
+        "audit_events",
+        "tenant_context"
+      ]
+    }
+  },
+  "contracts": {
+    "ClinicalTrials": {
+      "configuration": {
+        "ae_24h_reporting_enforced": true,
+        "edcsystem": "medidata_rave",
+        "gcp_compliant": true,
+        "supported_phases": [
+          "phase_1",
+          "phase_2",
+          "phase_3",
+          "phase_4"
+        ],
+        "susar_15d_reporting_enforced": true,
+        "tmf_reference_model": "ICH_E6R3"
+      },
+      "id": "pharma_ctr",
+      "name": "Clinical Trials Management",
+      "provides": [
+        "trial_registry",
+        "protocol_management",
+        "site_management",
+        "patient_enrollment",
+        "randomisation",
+        "crf_data",
+        "ae_reporting",
+        "regulatory_submissions"
+      ],
+      "requires": [
+        "audit_events",
+        "tenant_context"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "irb_approval_required_before_activation",
+          "when": "operation = activate_trial AND irb_approved = false",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "activate_trial"
+            },
+            "right": {
+              "field": "irb_approved",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "informed_consent_before_enrollment",
+          "when": "operation = enrol_patient AND informed_consent_obtained = false",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "enrol_patient"
+            },
+            "right": {
+              "field": "informed_consent_obtained",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "gcp_compliance_required",
+          "when": "gcp_compliant = false",
+          "when_ast": {
+            "field": "gcp_compliant",
+            "op": "==",
+            "type": "compare",
+            "value": false
+          }
+        },
+        {
+          "action": "deny",
+          "name": "ae_24h_expedited_reporting",
+          "when": "ae_type = serious_adverse_event AND within_24h = false",
+          "when_ast": {
+            "left": {
+              "field": "ae_type",
+              "op": "==",
+              "type": "compare",
+              "value": "serious_adverse_event"
+            },
+            "right": {
+              "field": "within_24h",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "susar_15d_reporting",
+          "when": "ae_type = susar AND within_15d = false",
+          "when_ast": {
+            "left": {
+              "field": "ae_type",
+              "op": "==",
+              "type": "compare",
+              "value": "susar"
+            },
+            "right": {
+              "field": "within_15d",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "site_must_be_initiated",
+          "when": "operation = enrol_patient AND site_initiated = false",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "enrol_patient"
+            },
+            "right": {
+              "field": "site_initiated",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "protocol_version_required",
+          "when": "operation = approve_protocol AND version_present = false",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "approve_protocol"
+            },
+            "right": {
+              "field": "version_present",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "cross_tenant_data_denied",
+          "when": "cross_tenant = true",
+          "when_ast": {
+            "field": "cross_tenant",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        }
+      ],
+      "theme": {
+        "name": "pharma_theme",
+        "tokens": {
+          "accent": "#553C9A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "TrialListScreen",
+            "name": "Trials",
+            "path": "/pharma/ctr/trials"
+          },
+          {
+            "component": "SiteManagementScreen",
+            "name": "Sites",
+            "path": "/pharma/ctr/sites"
+          },
+          {
+            "component": "PatientEnrollmentScreen",
+            "name": "Patients",
+            "path": "/pharma/ctr/patients"
+          },
+          {
+            "component": "AdverseEventScreen",
+            "name": "Adverse Events",
+            "path": "/pharma/ctr/ae"
+          },
+          {
+            "component": "TrialMasterFileScreen",
+            "name": "TMF",
+            "path": "/pharma/ctr/tmf"
+          },
+          {
+            "component": "SafetyDashboardScreen",
+            "name": "Safety Dashboard",
+            "path": "/pharma/ctr/safety"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    },
+    "Distribution": {
+      "configuration": {
+        "cold_chain_temp_max_c": 8,
+        "cold_chain_temp_min_c": 2,
+        "gsdp_compliant": true,
+        "recall_notification_hours": 24,
+        "serialisation_standard": "GS1_EPCIS"
+      },
+      "id": "pharma_dis",
+      "name": "Pharmaceutical Distribution",
+      "provides": [
+        "batch_traceability",
+        "cold_chain_management",
+        "serialisation",
+        "distribution_records",
+        "recall_management"
+      ],
+      "requires": [
+        "batch_records",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "batch_release_required_before_dispatch",
+          "when": "batch_status != released",
+          "when_ast": {
+            "field": "batch_status",
+            "op": "!=",
+            "type": "compare",
+            "value": "released"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "cold_chain_temp_excursion_hold",
+          "when": "temp_celsius > cold_chain_temp_max_c OR temp_celsius < cold_chain_temp_min_c",
+          "when_ast": {
+            "left": {
+              "field": "temp_celsius",
+              "op": ">",
+              "type": "compare",
+              "value": "cold_chain_temp_max_c"
+            },
+            "right": {
+              "field": "temp_celsius",
+              "op": "<",
+              "type": "compare",
+              "value": "cold_chain_temp_min_c"
+            },
+            "type": "or"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "serialisation_required",
+          "when": "product_serialised = false",
+          "when_ast": {
+            "field": "product_serialised",
+            "op": "==",
+            "type": "compare",
+            "value": false
+          }
+        },
+        {
+          "action": "warn",
+          "name": "expiry_check_before_dispatch",
+          "when": "days_to_expiry < 90",
+          "when_ast": {
+            "field": "days_to_expiry",
+            "op": "<",
+            "type": "compare",
+            "value": 90
+          }
+        },
+        {
+          "action": "deny",
+          "name": "recall_triggers_distribution_hold",
+          "when": "recall_active AND product_id = recalled_product_id",
+          "when_ast": {
+            "left": {
+              "field": "recall_active",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "right": {
+              "field": "product_id",
+              "op": "==",
+              "type": "compare",
+              "value": "recalled_product_id"
+            },
+            "type": "and"
+          }
+        }
+      ],
+      "theme": {
+        "name": "pharma_theme",
+        "tokens": {
+          "accent": "#276749"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "DispatchScreen",
+            "name": "Dispatch",
+            "path": "/pharma/dis/dispatch"
+          },
+          {
+            "component": "ColdChainMonitorScreen",
+            "name": "Cold Chain",
+            "path": "/pharma/dis/coldchain"
+          },
+          {
+            "component": "SerialisationScreen",
+            "name": "Serialisation",
+            "path": "/pharma/dis/serial"
+          },
+          {
+            "component": "RecallManagementScreen",
+            "name": "Recalls",
+            "path": "/pharma/dis/recalls"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    },
+    "PharmaAuditLog": {
+      "configuration": {
+        "electronic_signature_required": true,
+        "immutable": true,
+        "retention_days": 3650
+      },
+      "id": "pharma_audit_log",
+      "provides": [
+        "audit_events",
+        "compliance_trail",
+        "21cfr_audit_trail"
+      ]
+    },
+    "PharmaTenantContext": {
+      "configuration": {
+        "gxp_validated": true,
+        "isolation": "strict",
+        "multi_tenant": true
+      },
+      "id": "pharma_tenant_context",
+      "provides": [
+        "tenant_context",
+        "rbac_policies",
+        "gxp_user_roles"
+      ],
+      "requires": [
+        "audit_events"
+      ]
+    },
+    "Pharmacovigilance": {
+      "configuration": {
+        "meddra_version": "26.0",
+        "psur_frequency_months": 12,
+        "rmp_required": true,
+        "susar_15day_reporting": true,
+        "susar_7day_fatal_reporting": true
+      },
+      "id": "pharma_pvi",
+      "name": "Pharmacovigilance",
+      "provides": [
+        "case_management",
+        "signal_detection",
+        "aggregate_reporting",
+        "risk_management"
+      ],
+      "requires": [
+        "ae_reporting",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "meddra_coding_required",
+          "when": "meddra_pt missing",
+          "when_ast": {
+            "field": "meddra_pt",
+            "negated": false,
+            "type": "missing"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "fatal_7day_sar_required",
+          "when": "severity = fatal AND sar_filed = false AND days_since_onset > 7",
+          "when_ast": {
+            "left": {
+              "left": {
+                "field": "severity",
+                "op": "==",
+                "type": "compare",
+                "value": "fatal"
+              },
+              "right": {
+                "field": "sar_filed",
+                "op": "==",
+                "type": "compare",
+                "value": false
+              },
+              "type": "and"
+            },
+            "right": {
+              "field": "days_since_onset",
+              "op": ">",
+              "type": "compare",
+              "value": 7
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "serious_15day_sar_required",
+          "when": "seriousness = serious AND sar_filed = false AND days_since_onset > 15",
+          "when_ast": {
+            "left": {
+              "left": {
+                "field": "seriousness",
+                "op": "==",
+                "type": "compare",
+                "value": "serious"
+              },
+              "right": {
+                "field": "sar_filed",
+                "op": "==",
+                "type": "compare",
+                "value": false
+              },
+              "type": "and"
+            },
+            "right": {
+              "field": "days_since_onset",
+              "op": ">",
+              "type": "compare",
+              "value": 15
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "causality_required_for_susar",
+          "when": "is_susar_candidate AND causality_assessed = false",
+          "when_ast": {
+            "left": {
+              "field": "is_susar_candidate",
+              "op": "==",
+              "type": "compare",
+              "value": true
+            },
+            "right": {
+              "field": "causality_assessed",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "duplicate_case_detection",
+          "when": "duplicate_detected",
+          "when_ast": {
+            "field": "duplicate_detected",
+            "op": "==",
+            "type": "compare",
+            "value": true
+          }
+        }
+      ],
+      "theme": {
+        "name": "pharma_theme",
+        "tokens": {
+          "accent": "#C53030"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "CaseManagementScreen",
+            "name": "Cases",
+            "path": "/pharma/pvi/cases"
+          },
+          {
+            "component": "SignalDetectionScreen",
+            "name": "Signal Detection",
+            "path": "/pharma/pvi/signals"
+          },
+          {
+            "component": "PSURScreen",
+            "name": "PSUR",
+            "path": "/pharma/pvi/psur"
+          },
+          {
+            "component": "RiskManagementScreen",
+            "name": "Risk Management",
+            "path": "/pharma/pvi/rmp"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    },
+    "QualityManagementSystem": {
+      "configuration": {
+        "capa_sla_days": 30,
+        "deviation_investigation_days": 15,
+        "electronic_batch_record": true,
+        "gmp_standard": "ICH_Q10"
+      },
+      "id": "pharma_qms",
+      "name": "Quality Management System",
+      "provides": [
+        "deviations",
+        "capa_management",
+        "change_control",
+        "batch_records",
+        "gmp_audits",
+        "sop_management"
+      ],
+      "requires": [
+        "audit_events",
+        "tenant_context"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "critical_deviation_capa_required",
+          "when": "deviation_severity = critical AND capa_raised = false",
+          "when_ast": {
+            "left": {
+              "field": "deviation_severity",
+              "op": "==",
+              "type": "compare",
+              "value": "critical"
+            },
+            "right": {
+              "field": "capa_raised",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "change_control_required_for_critical",
+          "when": "change_type = critical AND change_control_id missing",
+          "when_ast": {
+            "left": {
+              "field": "change_type",
+              "op": "==",
+              "type": "compare",
+              "value": "critical"
+            },
+            "right": {
+              "field": "change_control_id",
+              "negated": false,
+              "type": "missing"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "batch_release_requires_qp_sign",
+          "when": "operation = release_batch AND qp_signed = false",
+          "when_ast": {
+            "left": {
+              "field": "operation",
+              "op": "==",
+              "type": "compare",
+              "value": "release_batch"
+            },
+            "right": {
+              "field": "qp_signed",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "overdue_capa_escalation",
+          "when": "capa_days_open > capa_sla_days",
+          "when_ast": {
+            "field": "capa_days_open",
+            "op": ">",
+            "type": "compare",
+            "value": "capa_sla_days"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "sop_version_current",
+          "when": "sop_version != current_approved_version",
+          "when_ast": {
+            "field": "sop_version",
+            "op": "!=",
+            "type": "compare",
+            "value": "current_approved_version"
+          }
+        }
+      ],
+      "theme": {
+        "name": "pharma_theme",
+        "tokens": {
+          "accent": "#2C7A7B"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "DeviationScreen",
+            "name": "Deviations",
+            "path": "/pharma/qms/deviations"
+          },
+          {
+            "component": "CAPAScreen",
+            "name": "CAPA",
+            "path": "/pharma/qms/capa"
+          },
+          {
+            "component": "ChangeControlScreen",
+            "name": "Change Control",
+            "path": "/pharma/qms/changes"
+          },
+          {
+            "component": "BatchRecordScreen",
+            "name": "Batch Records",
+            "path": "/pharma/qms/batches"
+          },
+          {
+            "component": "AuditScreen",
+            "name": "Audits",
+            "path": "/pharma/qms/audits"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    },
+    "RegulatoryAffairs": {
+      "configuration": {
+        "ectd_version": "4.0",
+        "response_tracking_days": 90,
+        "submission_types": [
+          "IND",
+          "NDA",
+          "BLA",
+          "MAA",
+          "CTA",
+          "variation"
+        ],
+        "supported_agencies": [
+          "FDA",
+          "EMA",
+          "NMRA",
+          "WHO"
+        ]
+      },
+      "id": "pharma_reg",
+      "name": "Regulatory Affairs",
+      "provides": [
+        "dossier_management",
+        "submission_tracking",
+        "agency_correspondence",
+        "registration_status",
+        "variation_management"
+      ],
+      "requires": [
+        "ae_reporting",
+        "batch_records",
+        "capa_management",
+        "audit_events",
+        "tenant_context"
+      ],
+      "rules": [
+        {
+          "action": "deny",
+          "name": "ectd_format_required_for_fda_ema",
+          "when": "agency in [FDA, EMA] AND ectd_compliant = false",
+          "when_ast": {
+            "left": {
+              "field": "agency",
+              "negated": false,
+              "type": "in",
+              "values": [
+                "FDA",
+                "EMA"
+              ]
+            },
+            "right": {
+              "field": "ectd_compliant",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "deny",
+          "name": "csr_required_before_nda",
+          "when": "submission_type = NDA AND csr_status != final",
+          "when_ast": {
+            "left": {
+              "field": "submission_type",
+              "op": "==",
+              "type": "compare",
+              "value": "NDA"
+            },
+            "right": {
+              "field": "csr_status",
+              "op": "!=",
+              "type": "compare",
+              "value": "final"
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "require_review",
+          "name": "safety_update_required_with_variation",
+          "when": "variation_type = type_2 AND safety_profile_reviewed = false",
+          "when_ast": {
+            "left": {
+              "field": "variation_type",
+              "op": "==",
+              "type": "compare",
+              "value": "type_2"
+            },
+            "right": {
+              "field": "safety_profile_reviewed",
+              "op": "==",
+              "type": "compare",
+              "value": false
+            },
+            "type": "and"
+          }
+        },
+        {
+          "action": "warn",
+          "name": "agency_response_tracking",
+          "when": "days_since_submission > response_tracking_days AND agency_response missing",
+          "when_ast": {
+            "left": {
+              "field": "days_since_submission",
+              "op": ">",
+              "type": "compare",
+              "value": "response_tracking_days"
+            },
+            "right": {
+              "field": "agency_response",
+              "negated": false,
+              "type": "missing"
+            },
+            "type": "and"
+          }
+        }
+      ],
+      "theme": {
+        "name": "pharma_theme",
+        "tokens": {
+          "accent": "#2B4C7E"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "SubmissionTrackerScreen",
+            "name": "Submissions",
+            "path": "/pharma/reg/submissions"
+          },
+          {
+            "component": "DossierManagementScreen",
+            "name": "Dossiers",
+            "path": "/pharma/reg/dossiers"
+          },
+          {
+            "component": "CorrespondenceScreen",
+            "name": "Agency Correspondence",
+            "path": "/pharma/reg/correspondence"
+          },
+          {
+            "component": "RegistrationStatusScreen",
+            "name": "Registration Status",
+            "path": "/pharma/reg/status"
+          }
+        ],
+        "shell": "python"
+      },
+      "version": "1.0.0"
+    }
+  },
+  "deployment": {
+    "source": "pharma_platform.apg",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {
+    "AdverseEventPipeline": {
+      "assignments": {},
+      "compensation": {},
+      "guards": {},
+      "human_tasks": [],
+      "methods": [],
+      "name": "AdverseEventPipeline",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "ae_reported",
+        "meddra_coding",
+        "causality_assessment",
+        "seriousness_determination",
+        "susar_check",
+        "sar_filing",
+        "agency_acknowledgement",
+        "case_closure"
+      ],
+      "steps": [
+        "ae_reported",
+        "meddra_coding",
+        "causality_assessment",
+        "seriousness_determination",
+        "susar_check",
+        "sar_filing",
+        "agency_acknowledgement",
+        "case_closure"
+      ],
+      "steps_raw": "ae_reported -> meddra_coding -> causality_assessment -> seriousness_determination -> susar_check -> sar_filing -> agency_acknowledgement -> case_closure",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "ae_reported",
+          "target": "meddra_coding"
+        },
+        {
+          "guard": null,
+          "source": "meddra_coding",
+          "target": "causality_assessment"
+        },
+        {
+          "guard": null,
+          "source": "causality_assessment",
+          "target": "seriousness_determination"
+        },
+        {
+          "guard": null,
+          "source": "seriousness_determination",
+          "target": "susar_check"
+        },
+        {
+          "guard": null,
+          "source": "susar_check",
+          "target": "sar_filing"
+        },
+        {
+          "guard": null,
+          "source": "sar_filing",
+          "target": "agency_acknowledgement"
+        },
+        {
+          "guard": null,
+          "source": "agency_acknowledgement",
+          "target": "case_closure"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "DrialDevelopmentLifecycle": {
+      "assignments": {},
+      "compensation": {},
+      "guards": {},
+      "human_tasks": [],
+      "methods": [],
+      "name": "DrialDevelopmentLifecycle",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "protocol_drafting",
+        "irb_submission",
+        "irb_approval",
+        "trial_registration",
+        "site_selection",
+        "site_initiation",
+        "patient_enrollment",
+        "randomisation",
+        "crf_data_collection",
+        "interim_analysis",
+        "database_lock",
+        "csr_generation",
+        "regulatory_submission"
+      ],
+      "steps": [
+        "protocol_drafting",
+        "irb_submission",
+        "irb_approval",
+        "trial_registration",
+        "site_selection",
+        "site_initiation",
+        "patient_enrollment",
+        "randomisation",
+        "crf_data_collection",
+        "interim_analysis",
+        "database_lock",
+        "csr_generation",
+        "regulatory_submission"
+      ],
+      "steps_raw": "protocol_drafting -> irb_submission -> irb_approval -> trial_registration -> site_selection -> site_initiation -> patient_enrollment -> randomisation -> crf_data_collection -> interim_analysis -> database_lock -> csr_generation -> regulatory_submission",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "protocol_drafting",
+          "target": "irb_submission"
+        },
+        {
+          "guard": null,
+          "source": "irb_submission",
+          "target": "irb_approval"
+        },
+        {
+          "guard": null,
+          "source": "irb_approval",
+          "target": "trial_registration"
+        },
+        {
+          "guard": null,
+          "source": "trial_registration",
+          "target": "site_selection"
+        },
+        {
+          "guard": null,
+          "source": "site_selection",
+          "target": "site_initiation"
+        },
+        {
+          "guard": null,
+          "source": "site_initiation",
+          "target": "patient_enrollment"
+        },
+        {
+          "guard": null,
+          "source": "patient_enrollment",
+          "target": "randomisation"
+        },
+        {
+          "guard": null,
+          "source": "randomisation",
+          "target": "crf_data_collection"
+        },
+        {
+          "guard": null,
+          "source": "crf_data_collection",
+          "target": "interim_analysis"
+        },
+        {
+          "guard": null,
+          "source": "interim_analysis",
+          "target": "database_lock"
+        },
+        {
+          "guard": null,
+          "source": "database_lock",
+          "target": "csr_generation"
+        },
+        {
+          "guard": null,
+          "source": "csr_generation",
+          "target": "regulatory_submission"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "DrugApprovalToDistribution": {
+      "assignments": {},
+      "compensation": {},
+      "guards": {},
+      "human_tasks": [],
+      "methods": [],
+      "name": "DrugApprovalToDistribution",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "trial_complete",
+        "csr_finalised",
+        "nda_dossier_prepared",
+        "regulatory_submission",
+        "agency_review",
+        "approval_granted",
+        "gmp_batch_manufacturing",
+        "batch_qp_release",
+        "serialisation",
+        "distribution_dispatch",
+        "cold_chain_monitoring",
+        "delivery_confirmed"
+      ],
+      "steps": [
+        "trial_complete",
+        "csr_finalised",
+        "nda_dossier_prepared",
+        "regulatory_submission",
+        "agency_review",
+        "approval_granted",
+        "gmp_batch_manufacturing",
+        "batch_qp_release",
+        "serialisation",
+        "distribution_dispatch",
+        "cold_chain_monitoring",
+        "delivery_confirmed"
+      ],
+      "steps_raw": "trial_complete -> csr_finalised -> nda_dossier_prepared -> regulatory_submission -> agency_review -> approval_granted -> gmp_batch_manufacturing -> batch_qp_release -> serialisation -> distribution_dispatch -> cold_chain_monitoring -> delivery_confirmed",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "trial_complete",
+          "target": "csr_finalised"
+        },
+        {
+          "guard": null,
+          "source": "csr_finalised",
+          "target": "nda_dossier_prepared"
+        },
+        {
+          "guard": null,
+          "source": "nda_dossier_prepared",
+          "target": "regulatory_submission"
+        },
+        {
+          "guard": null,
+          "source": "regulatory_submission",
+          "target": "agency_review"
+        },
+        {
+          "guard": null,
+          "source": "agency_review",
+          "target": "approval_granted"
+        },
+        {
+          "guard": null,
+          "source": "approval_granted",
+          "target": "gmp_batch_manufacturing"
+        },
+        {
+          "guard": null,
+          "source": "gmp_batch_manufacturing",
+          "target": "batch_qp_release"
+        },
+        {
+          "guard": null,
+          "source": "batch_qp_release",
+          "target": "serialisation"
+        },
+        {
+          "guard": null,
+          "source": "serialisation",
+          "target": "distribution_dispatch"
+        },
+        {
+          "guard": null,
+          "source": "distribution_dispatch",
+          "target": "cold_chain_monitoring"
+        },
+        {
+          "guard": null,
+          "source": "cold_chain_monitoring",
+          "target": "delivery_confirmed"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 0
+    },
+    "capability": {
+      "edges": 16,
+      "kind": "capability",
+      "nodes": 12
+    },
+    "deployment": {
+      "edges": 10,
+      "kind": "deployment",
+      "nodes": 11
+    },
+    "er": {
+      "edges": 0,
+      "kind": "er",
+      "nodes": 0
+    },
+    "handler": {
+      "edges": 10,
+      "kind": "handler",
+      "nodes": 11
+    },
+    "lookup": {
+      "edges": 10,
+      "kind": "lookup",
+      "nodes": 11
+    },
+    "package": {
+      "edges": 10,
+      "kind": "package",
+      "nodes": 11
+    },
+    "security": {
+      "edges": 10,
+      "kind": "security",
+      "nodes": 11
+    },
+    "workflow": {
+      "edges": 10,
+      "kind": "workflow",
+      "nodes": 11
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "ClinicalTrials.ae_24h_expedited_reporting": {
+      "action": "deny",
+      "name": "ae_24h_expedited_reporting",
+      "when": "ae_type = serious_adverse_event AND within_24h = false",
+      "when_ast": {
+        "left": {
+          "field": "ae_type",
+          "op": "==",
+          "type": "compare",
+          "value": "serious_adverse_event"
+        },
+        "right": {
+          "field": "within_24h",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "ClinicalTrials.cross_tenant_data_denied": {
+      "action": "deny",
+      "name": "cross_tenant_data_denied",
+      "when": "cross_tenant = true",
+      "when_ast": {
+        "field": "cross_tenant",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
+    },
+    "ClinicalTrials.gcp_compliance_required": {
+      "action": "deny",
+      "name": "gcp_compliance_required",
+      "when": "gcp_compliant = false",
+      "when_ast": {
+        "field": "gcp_compliant",
+        "op": "==",
+        "type": "compare",
+        "value": false
+      }
+    },
+    "ClinicalTrials.informed_consent_before_enrollment": {
+      "action": "deny",
+      "name": "informed_consent_before_enrollment",
+      "when": "operation = enrol_patient AND informed_consent_obtained = false",
+      "when_ast": {
+        "left": {
+          "field": "operation",
+          "op": "==",
+          "type": "compare",
+          "value": "enrol_patient"
+        },
+        "right": {
+          "field": "informed_consent_obtained",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "ClinicalTrials.irb_approval_required_before_activation": {
+      "action": "deny",
+      "name": "irb_approval_required_before_activation",
+      "when": "operation = activate_trial AND irb_approved = false",
+      "when_ast": {
+        "left": {
+          "field": "operation",
+          "op": "==",
+          "type": "compare",
+          "value": "activate_trial"
+        },
+        "right": {
+          "field": "irb_approved",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "ClinicalTrials.protocol_version_required": {
+      "action": "deny",
+      "name": "protocol_version_required",
+      "when": "operation = approve_protocol AND version_present = false",
+      "when_ast": {
+        "left": {
+          "field": "operation",
+          "op": "==",
+          "type": "compare",
+          "value": "approve_protocol"
+        },
+        "right": {
+          "field": "version_present",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "ClinicalTrials.site_must_be_initiated": {
+      "action": "deny",
+      "name": "site_must_be_initiated",
+      "when": "operation = enrol_patient AND site_initiated = false",
+      "when_ast": {
+        "left": {
+          "field": "operation",
+          "op": "==",
+          "type": "compare",
+          "value": "enrol_patient"
+        },
+        "right": {
+          "field": "site_initiated",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "ClinicalTrials.susar_15d_reporting": {
+      "action": "deny",
+      "name": "susar_15d_reporting",
+      "when": "ae_type = susar AND within_15d = false",
+      "when_ast": {
+        "left": {
+          "field": "ae_type",
+          "op": "==",
+          "type": "compare",
+          "value": "susar"
+        },
+        "right": {
+          "field": "within_15d",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "Distribution.batch_release_required_before_dispatch": {
+      "action": "deny",
+      "name": "batch_release_required_before_dispatch",
+      "when": "batch_status != released",
+      "when_ast": {
+        "field": "batch_status",
+        "op": "!=",
+        "type": "compare",
+        "value": "released"
+      }
+    },
+    "Distribution.cold_chain_temp_excursion_hold": {
+      "action": "deny",
+      "name": "cold_chain_temp_excursion_hold",
+      "when": "temp_celsius > cold_chain_temp_max_c OR temp_celsius < cold_chain_temp_min_c",
+      "when_ast": {
+        "left": {
+          "field": "temp_celsius",
+          "op": ">",
+          "type": "compare",
+          "value": "cold_chain_temp_max_c"
+        },
+        "right": {
+          "field": "temp_celsius",
+          "op": "<",
+          "type": "compare",
+          "value": "cold_chain_temp_min_c"
+        },
+        "type": "or"
+      }
+    },
+    "Distribution.expiry_check_before_dispatch": {
+      "action": "warn",
+      "name": "expiry_check_before_dispatch",
+      "when": "days_to_expiry < 90",
+      "when_ast": {
+        "field": "days_to_expiry",
+        "op": "<",
+        "type": "compare",
+        "value": 90
+      }
+    },
+    "Distribution.recall_triggers_distribution_hold": {
+      "action": "deny",
+      "name": "recall_triggers_distribution_hold",
+      "when": "recall_active AND product_id = recalled_product_id",
+      "when_ast": {
+        "left": {
+          "field": "recall_active",
+          "op": "==",
+          "type": "compare",
+          "value": true
+        },
+        "right": {
+          "field": "product_id",
+          "op": "==",
+          "type": "compare",
+          "value": "recalled_product_id"
+        },
+        "type": "and"
+      }
+    },
+    "Distribution.serialisation_required": {
+      "action": "deny",
+      "name": "serialisation_required",
+      "when": "product_serialised = false",
+      "when_ast": {
+        "field": "product_serialised",
+        "op": "==",
+        "type": "compare",
+        "value": false
+      }
+    },
+    "Pharmacovigilance.causality_required_for_susar": {
+      "action": "warn",
+      "name": "causality_required_for_susar",
+      "when": "is_susar_candidate AND causality_assessed = false",
+      "when_ast": {
+        "left": {
+          "field": "is_susar_candidate",
+          "op": "==",
+          "type": "compare",
+          "value": true
+        },
+        "right": {
+          "field": "causality_assessed",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "Pharmacovigilance.duplicate_case_detection": {
+      "action": "require_review",
+      "name": "duplicate_case_detection",
+      "when": "duplicate_detected",
+      "when_ast": {
+        "field": "duplicate_detected",
+        "op": "==",
+        "type": "compare",
+        "value": true
+      }
+    },
+    "Pharmacovigilance.fatal_7day_sar_required": {
+      "action": "deny",
+      "name": "fatal_7day_sar_required",
+      "when": "severity = fatal AND sar_filed = false AND days_since_onset > 7",
+      "when_ast": {
+        "left": {
+          "left": {
+            "field": "severity",
+            "op": "==",
+            "type": "compare",
+            "value": "fatal"
+          },
+          "right": {
+            "field": "sar_filed",
+            "op": "==",
+            "type": "compare",
+            "value": false
+          },
+          "type": "and"
+        },
+        "right": {
+          "field": "days_since_onset",
+          "op": ">",
+          "type": "compare",
+          "value": 7
+        },
+        "type": "and"
+      }
+    },
+    "Pharmacovigilance.meddra_coding_required": {
+      "action": "deny",
+      "name": "meddra_coding_required",
+      "when": "meddra_pt missing",
+      "when_ast": {
+        "field": "meddra_pt",
+        "negated": false,
+        "type": "missing"
+      }
+    },
+    "Pharmacovigilance.serious_15day_sar_required": {
+      "action": "deny",
+      "name": "serious_15day_sar_required",
+      "when": "seriousness = serious AND sar_filed = false AND days_since_onset > 15",
+      "when_ast": {
+        "left": {
+          "left": {
+            "field": "seriousness",
+            "op": "==",
+            "type": "compare",
+            "value": "serious"
+          },
+          "right": {
+            "field": "sar_filed",
+            "op": "==",
+            "type": "compare",
+            "value": false
+          },
+          "type": "and"
+        },
+        "right": {
+          "field": "days_since_onset",
+          "op": ">",
+          "type": "compare",
+          "value": 15
+        },
+        "type": "and"
+      }
+    },
+    "QualityManagementSystem.batch_release_requires_qp_sign": {
+      "action": "deny",
+      "name": "batch_release_requires_qp_sign",
+      "when": "operation = release_batch AND qp_signed = false",
+      "when_ast": {
+        "left": {
+          "field": "operation",
+          "op": "==",
+          "type": "compare",
+          "value": "release_batch"
+        },
+        "right": {
+          "field": "qp_signed",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "QualityManagementSystem.change_control_required_for_critical": {
+      "action": "deny",
+      "name": "change_control_required_for_critical",
+      "when": "change_type = critical AND change_control_id missing",
+      "when_ast": {
+        "left": {
+          "field": "change_type",
+          "op": "==",
+          "type": "compare",
+          "value": "critical"
+        },
+        "right": {
+          "field": "change_control_id",
+          "negated": false,
+          "type": "missing"
+        },
+        "type": "and"
+      }
+    },
+    "QualityManagementSystem.critical_deviation_capa_required": {
+      "action": "deny",
+      "name": "critical_deviation_capa_required",
+      "when": "deviation_severity = critical AND capa_raised = false",
+      "when_ast": {
+        "left": {
+          "field": "deviation_severity",
+          "op": "==",
+          "type": "compare",
+          "value": "critical"
+        },
+        "right": {
+          "field": "capa_raised",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "QualityManagementSystem.overdue_capa_escalation": {
+      "action": "warn",
+      "name": "overdue_capa_escalation",
+      "when": "capa_days_open > capa_sla_days",
+      "when_ast": {
+        "field": "capa_days_open",
+        "op": ">",
+        "type": "compare",
+        "value": "capa_sla_days"
+      }
+    },
+    "QualityManagementSystem.sop_version_current": {
+      "action": "warn",
+      "name": "sop_version_current",
+      "when": "sop_version != current_approved_version",
+      "when_ast": {
+        "field": "sop_version",
+        "op": "!=",
+        "type": "compare",
+        "value": "current_approved_version"
+      }
+    },
+    "RegulatoryAffairs.agency_response_tracking": {
+      "action": "warn",
+      "name": "agency_response_tracking",
+      "when": "days_since_submission > response_tracking_days AND agency_response missing",
+      "when_ast": {
+        "left": {
+          "field": "days_since_submission",
+          "op": ">",
+          "type": "compare",
+          "value": "response_tracking_days"
+        },
+        "right": {
+          "field": "agency_response",
+          "negated": false,
+          "type": "missing"
+        },
+        "type": "and"
+      }
+    },
+    "RegulatoryAffairs.csr_required_before_nda": {
+      "action": "deny",
+      "name": "csr_required_before_nda",
+      "when": "submission_type = NDA AND csr_status != final",
+      "when_ast": {
+        "left": {
+          "field": "submission_type",
+          "op": "==",
+          "type": "compare",
+          "value": "NDA"
+        },
+        "right": {
+          "field": "csr_status",
+          "op": "!=",
+          "type": "compare",
+          "value": "final"
+        },
+        "type": "and"
+      }
+    },
+    "RegulatoryAffairs.ectd_format_required_for_fda_ema": {
+      "action": "deny",
+      "name": "ectd_format_required_for_fda_ema",
+      "when": "agency in [FDA, EMA] AND ectd_compliant = false",
+      "when_ast": {
+        "left": {
+          "field": "agency",
+          "negated": false,
+          "type": "in",
+          "values": [
+            "FDA",
+            "EMA"
+          ]
+        },
+        "right": {
+          "field": "ectd_compliant",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    },
+    "RegulatoryAffairs.safety_update_required_with_variation": {
+      "action": "require_review",
+      "name": "safety_update_required_with_variation",
+      "when": "variation_type = type_2 AND safety_profile_reviewed = false",
+      "when_ast": {
+        "left": {
+          "field": "variation_type",
+          "op": "==",
+          "type": "compare",
+          "value": "type_2"
+        },
+        "right": {
+          "field": "safety_profile_reviewed",
+          "op": "==",
+          "type": "compare",
+          "value": false
+        },
+        "type": "and"
+      }
+    }
+  },
+  "security": {},
+  "source_files": [
+    "pharma_platform.apg"
+  ],
+  "symbols": {
+    "capability.ClinicalTrials": {
+      "file": "pharma_platform.apg",
+      "id": "capability.ClinicalTrials",
+      "kind": "capability",
+      "name": "ClinicalTrials",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 38
+        },
+        "start": {
+          "character": 0,
+          "line": 38
+        }
+      },
+      "references": []
+    },
+    "capability.Distribution": {
+      "file": "pharma_platform.apg",
+      "id": "capability.Distribution",
+      "kind": "capability",
+      "name": "Distribution",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 204
+        },
+        "start": {
+          "character": 0,
+          "line": 204
+        }
+      },
+      "references": []
+    },
+    "capability.PharmaAuditLog": {
+      "file": "pharma_platform.apg",
+      "id": "capability.PharmaAuditLog",
+      "kind": "capability",
+      "name": "PharmaAuditLog",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 13
+        },
+        "start": {
+          "character": 0,
+          "line": 13
+        }
+      },
+      "references": []
+    },
+    "capability.PharmaTenantContext": {
+      "file": "pharma_platform.apg",
+      "id": "capability.PharmaTenantContext",
+      "kind": "capability",
+      "name": "PharmaTenantContext",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 26
+        },
+        "start": {
+          "character": 0,
+          "line": 26
+        }
+      },
+      "references": []
+    },
+    "capability.Pharmacovigilance": {
+      "file": "pharma_platform.apg",
+      "id": "capability.Pharmacovigilance",
+      "kind": "capability",
+      "name": "Pharmacovigilance",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 145
+        },
+        "start": {
+          "character": 0,
+          "line": 145
+        }
+      },
+      "references": []
+    },
+    "capability.QualityManagementSystem": {
+      "file": "pharma_platform.apg",
+      "id": "capability.QualityManagementSystem",
+      "kind": "capability",
+      "name": "QualityManagementSystem",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 104
+        },
+        "start": {
+          "character": 0,
+          "line": 104
+        }
+      },
+      "references": []
+    },
+    "capability.RegulatoryAffairs": {
+      "file": "pharma_platform.apg",
+      "id": "capability.RegulatoryAffairs",
+      "kind": "capability",
+      "name": "RegulatoryAffairs",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 255
+        },
+        "start": {
+          "character": 0,
+          "line": 255
+        }
+      },
+      "references": []
+    },
+    "module.pharma_platform": {
+      "file": "pharma_platform.apg",
+      "id": "module.pharma_platform",
+      "kind": "module",
+      "name": "pharma_platform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 7
+        },
+        "start": {
+          "character": 0,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "workflow.AdverseEventPipeline": {
+      "file": "pharma_platform.apg",
+      "id": "workflow.AdverseEventPipeline",
+      "kind": "workflow",
+      "name": "AdverseEventPipeline",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 194
+        },
+        "start": {
+          "character": 0,
+          "line": 194
+        }
+      },
+      "references": []
+    },
+    "workflow.DrialDevelopmentLifecycle": {
+      "file": "pharma_platform.apg",
+      "id": "workflow.DrialDevelopmentLifecycle",
+      "kind": "workflow",
+      "name": "DrialDevelopmentLifecycle",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 94
+        },
+        "start": {
+          "character": 0,
+          "line": 94
+        }
+      },
+      "references": []
+    },
+    "workflow.DrugApprovalToDistribution": {
+      "file": "pharma_platform.apg",
+      "id": "workflow.DrugApprovalToDistribution",
+      "kind": "workflow",
+      "name": "DrugApprovalToDistribution",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 294
+        },
+        "start": {
+          "character": 0,
+          "line": 294
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

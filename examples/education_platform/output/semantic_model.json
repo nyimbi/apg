@@ -1,0 +1,4995 @@
+{
+  "agents": {
+    "AdaptiveLearningAgent": {
+      "capabilities": [
+        "education_lms"
+      ],
+      "configuration": {
+        "max_turns": 5,
+        "temperature": 0.3
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "vector",
+        "name": "learner_memory"
+      },
+      "model": "ollama:llama3.2",
+      "name": "AdaptiveLearningAgent",
+      "outputs": [],
+      "role": "personalised learning recommendation",
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_pii_in_recommendations",
+          "when": "response_contains_pii == true"
+        },
+        {
+          "action": "deny",
+          "name": "consent_required",
+          "when": "learner_age_lt == 18 and guardian_consent != true"
+        }
+      ],
+      "runtime": null,
+      "system": "You are an adaptive learning engine. Analyse learner progress data, identify knowledge gaps, and recommend the next most appropriate learning activities. Personalise difficulty and content type based on learner performance history. Always respect data privacy and parental consent requirements.",
+      "theme": {},
+      "tools": [
+        "learner_progress_api",
+        "course_catalogue_api",
+        "competency_map"
+      ],
+      "ui": {}
+    },
+    "ParentCommunicationAgent": {
+      "capabilities": [
+        "education_sch_mgmt"
+      ],
+      "configuration": {
+        "max_turns": 3,
+        "temperature": 0.4
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "episodic",
+        "name": "parent_interaction_memory"
+      },
+      "model": "ollama:llama3.2",
+      "name": "ParentCommunicationAgent",
+      "outputs": [],
+      "role": "guardian communication and reporting",
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_disciplinary_details_via_sms",
+          "when": "channel == sms and message_type == disciplinary"
+        },
+        {
+          "action": "deny",
+          "name": "guardian_only_access",
+          "when": "recipient_is_guardian != true"
+        }
+      ],
+      "runtime": null,
+      "system": "You are a school communication assistant. Compose clear, professional messages to parents and guardians about student progress, events, and important notices. Use appropriate language for the audience. Always include the school name and contact details.",
+      "theme": {},
+      "tools": [
+        "student_profile_api",
+        "calendar_api",
+        "fee_api"
+      ],
+      "ui": {}
+    },
+    "TimetableOptimiserAgent": {
+      "capabilities": [
+        "education_ttbl",
+        "education_sch_mgmt"
+      ],
+      "configuration": {
+        "max_turns": 10,
+        "temperature": 0.1
+      },
+      "handoffs": [],
+      "inputs": [],
+      "memory": {
+        "kind": "working",
+        "name": "timetable_state"
+      },
+      "model": "ollama:llama3.2",
+      "name": "TimetableOptimiserAgent",
+      "outputs": [],
+      "role": "automated timetable generation and conflict resolution",
+      "rules": [
+        {
+          "action": "deny",
+          "name": "no_double_booking",
+          "when": "clash_detected == true"
+        },
+        {
+          "action": "require_review",
+          "name": "require_human_approval",
+          "when": "bulk_timetable_change == true and affected_classes_gte == 5"
+        }
+      ],
+      "runtime": null,
+      "system": "You are a timetabling optimisation agent. Generate conflict-free timetables that balance teacher workloads, maximise room utilisation, and respect curriculum requirements. Detect and resolve scheduling clashes automatically.",
+      "theme": {},
+      "tools": [
+        "timetable_api",
+        "room_availability_api",
+        "teacher_workload_api"
+      ],
+      "ui": {}
+    }
+  },
+  "app": {
+    "description": null,
+    "entity_count": 22,
+    "name": "education_platform",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "LearningManagement": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "adaptive_learning_enabled": true,
+        "certificate_digital_signing": true,
+        "gamification_enabled": true,
+        "max_attempts_default": 3,
+        "passing_score_default": 50.0,
+        "peer_assessment_enabled": true,
+        "plagiarism_detection": true,
+        "scorm_enabled": true,
+        "tenant_id": "default",
+        "xapi_endpoint": "https://lrs.apgacademy.ke/xapi"
+      },
+      "erp_modules": [],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw"
+        ]
+      },
+      "master_data": {},
+      "name": "LearningManagement",
+      "provides": [
+        "course_management",
+        "learner_enrolment",
+        "content_delivery",
+        "assessment_and_grading",
+        "certificate_issuance",
+        "learning_path_management",
+        "adaptive_learning",
+        "xapi_scorm_tracking"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "ntfy",
+        "wflo",
+        "nlpc",
+        "moni",
+        "comp",
+        "mqeb",
+        "schd"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "enrolment_requires_active_student",
+            "when": "student_status != active"
+          },
+          {
+            "action": "deny",
+            "name": "paid_course_requires_payment",
+            "when": "enrolment_type == paid and payment_reference missing"
+          },
+          {
+            "action": "deny",
+            "name": "grade_override_requires_approval",
+            "when": "operation == override_grade and approval_reference_present != true"
+          },
+          {
+            "action": "deny",
+            "name": "certificate_requires_passing_score",
+            "when": "operation == issue_certificate and completion_criteria_met != true"
+          },
+          {
+            "action": "deny",
+            "name": "scorm_version_check",
+            "when": "content_type == scorm and scorm_version_supported != true"
+          },
+          {
+            "action": "deny",
+            "name": "learner_data_consent",
+            "when": "operation == export_learner_analytics and consent_recorded != true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "events": [
+          "course_created",
+          "course_published",
+          "course_archived",
+          "learner_enrolled",
+          "learner_unenrolled",
+          "content_item_added",
+          "progress_recorded",
+          "assessment_submitted",
+          "grade_recorded",
+          "certificate_issued",
+          "certificate_revoked",
+          "learning_path_created",
+          "adaptive_recommendation_generated",
+          "badge_awarded",
+          "scorm_statement_received"
+        ],
+        "guardrails": [
+          "no_enrolment_for_inactive_students",
+          "payment_required_for_paid_courses",
+          "grade_override_requires_approval",
+          "certificate_only_on_passing_score",
+          "consent_required_for_analytics_export"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.education.lms.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "assessments": {
+            "icon": "clipboard-check",
+            "status_indicator": "assessment-type-chip"
+          },
+          "certificates": {
+            "icon": "award",
+            "status_indicator": "cert-type-chip"
+          },
+          "courses": {
+            "icon": "book-open",
+            "status_indicator": "course-status-chip"
+          },
+          "progress": {
+            "icon": "chart-line",
+            "status_indicator": "progress-bar"
+          }
+        },
+        "name": "lms_theme",
+        "tokens": {
+          "border.radius": "10px",
+          "color.accent": "#7B1FA2",
+          "color.danger": "#B71C1C",
+          "color.primary": "#4527A0",
+          "color.success": "#1B5E20",
+          "color.warning": "#E65100",
+          "density": "spacious",
+          "surface.canvas": "#F8F5FF",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#1A0050",
+          "text.secondary": "#6A1B9A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "LmsDashboard",
+            "name": "LMS Dashboard",
+            "nav_group": "Overview",
+            "path": "/lms",
+            "permission": "lms:view"
+          },
+          {
+            "component": "CourseCatalogue",
+            "name": "Course Catalogue",
+            "nav_group": "Learning",
+            "path": "/lms/courses",
+            "permission": "lms:courses"
+          },
+          {
+            "component": "LearnerDashboard",
+            "name": "My Learning",
+            "nav_group": "Learning",
+            "path": "/lms/my-learning",
+            "permission": "lms:learner"
+          },
+          {
+            "component": "AssessmentWorkbench",
+            "name": "Assessments",
+            "nav_group": "Assessment",
+            "path": "/lms/assessments",
+            "permission": "lms:assess"
+          },
+          {
+            "component": "CertificateVault",
+            "name": "Certificates",
+            "nav_group": "Credentials",
+            "path": "/lms/certificates",
+            "permission": "lms:certs"
+          },
+          {
+            "component": "LearningPaths",
+            "name": "Learning Paths",
+            "nav_group": "Learning",
+            "path": "/lms/paths",
+            "permission": "lms:paths"
+          },
+          {
+            "component": "LmsAnalytics",
+            "name": "Analytics",
+            "nav_group": "Analytics",
+            "path": "/lms/analytics",
+            "permission": "lms:analytics"
+          },
+          {
+            "component": "LmsAgents",
+            "name": "Agents",
+            "nav_group": "AI",
+            "path": "/lms/agents",
+            "permission": "lms:agents"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "SchoolManagement": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "academic_year_start_month": 1,
+        "country": "KE",
+        "curriculum": "CBC",
+        "email_enabled": true,
+        "fee_currency": "KES",
+        "max_class_size": 45,
+        "parent_portal_enabled": true,
+        "school_name": "APG Academy",
+        "sms_enabled": true,
+        "tenant_id": "default"
+      },
+      "erp_modules": [],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw"
+        ]
+      },
+      "master_data": {},
+      "name": "SchoolManagement",
+      "provides": [
+        "student_registration",
+        "staff_management",
+        "class_assignment",
+        "academic_calendar_management",
+        "fee_management",
+        "parent_portal",
+        "reporting"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "ntfy",
+        "wflo",
+        "comp",
+        "mqeb",
+        "schd"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "require_review",
+            "name": "guardian_consent_for_minor",
+            "when": "student_age_lt == 18 and guardian_consent missing"
+          },
+          {
+            "action": "deny",
+            "name": "class_capacity_check",
+            "when": "class_enrollment_count_gte == max_class_size"
+          },
+          {
+            "action": "deny",
+            "name": "staff_clearance_required",
+            "when": "role == teacher and background_check_passed != true"
+          },
+          {
+            "action": "require_review",
+            "name": "fee_arrears_block",
+            "when": "fee_balance_gt == 0 and exam_registration == true"
+          },
+          {
+            "action": "deny",
+            "name": "parent_communication_consent",
+            "when": "channel == sms and sms_consent != true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "events": [
+          "student_registered",
+          "student_transferred",
+          "student_graduated",
+          "staff_hired",
+          "staff_terminated",
+          "class_created",
+          "class_assigned",
+          "term_opened",
+          "term_closed",
+          "fee_invoiced",
+          "fee_paid",
+          "fee_overdue",
+          "parent_message_sent",
+          "guardian_consent_recorded"
+        ],
+        "guardrails": [
+          "no_enrolment_without_guardian_consent_for_minors",
+          "class_capacity_enforced",
+          "background_check_required_for_teachers",
+          "fee_arrears_exam_block"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.education.school.lifecycle"
+      },
+      "theme": {
+        "components": {
+          "calendar": {
+            "icon": "calendar-days",
+            "status_indicator": "term-chip"
+          },
+          "classes": {
+            "icon": "building-columns",
+            "status_indicator": "class-level-chip"
+          },
+          "staff": {
+            "icon": "chalkboard-teacher",
+            "status_indicator": "staff-role-chip"
+          },
+          "students": {
+            "icon": "user-graduate",
+            "status_indicator": "student-status-chip"
+          }
+        },
+        "name": "school_theme",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#0288D1",
+          "color.danger": "#C62828",
+          "color.primary": "#1565C0",
+          "color.success": "#2E7D32",
+          "color.warning": "#F57F17",
+          "density": "comfortable",
+          "surface.canvas": "#F3F8FF",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#0D1B2A",
+          "text.secondary": "#546E7A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "SchoolDashboard",
+            "name": "School Dashboard",
+            "nav_group": "Overview",
+            "path": "/school",
+            "permission": "school:view"
+          },
+          {
+            "component": "StudentRegistry",
+            "name": "Students",
+            "nav_group": "People",
+            "path": "/school/students",
+            "permission": "school:students"
+          },
+          {
+            "component": "StaffDirectory",
+            "name": "Staff",
+            "nav_group": "People",
+            "path": "/school/staff",
+            "permission": "school:staff"
+          },
+          {
+            "component": "ClassManager",
+            "name": "Classes",
+            "nav_group": "Academic",
+            "path": "/school/classes",
+            "permission": "school:classes"
+          },
+          {
+            "component": "AcademicCalendar",
+            "name": "Calendar",
+            "nav_group": "Academic",
+            "path": "/school/calendar",
+            "permission": "school:calendar"
+          },
+          {
+            "component": "FeeManagement",
+            "name": "Fees",
+            "nav_group": "Finance",
+            "path": "/school/fees",
+            "permission": "school:fees"
+          },
+          {
+            "component": "ParentPortal",
+            "name": "Parent Portal",
+            "nav_group": "Communication",
+            "path": "/school/parents",
+            "permission": "school:parents"
+          },
+          {
+            "component": "SchoolReports",
+            "name": "Reports",
+            "nav_group": "Analytics",
+            "path": "/school/reports",
+            "permission": "school:reports"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "Timetabling": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "auto_clash_detection": true,
+        "break_periods": [
+          3,
+          6
+        ],
+        "double_period_enabled": true,
+        "period_duration_minutes": 40,
+        "periods_per_day": 8,
+        "room_utilisation_target_pct": 80,
+        "teacher_max_periods_per_day": 6,
+        "tenant_id": "default",
+        "working_days": "monday,tuesday,wednesday,thursday,friday"
+      },
+      "erp_modules": [],
+      "i18n": {
+        "default_language": "en",
+        "fallback_language": "en",
+        "supported_languages": [
+          "en",
+          "sw"
+        ]
+      },
+      "master_data": {},
+      "name": "Timetabling",
+      "provides": [
+        "timetable_generation",
+        "room_allocation",
+        "teacher_assignment",
+        "clash_detection",
+        "substitution_management",
+        "exam_scheduling"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "ntfy",
+        "wflo",
+        "moni",
+        "mqeb",
+        "schd",
+        "comp"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "no_teacher_double_booking",
+            "when": "teacher_already_assigned == true and period == same"
+          },
+          {
+            "action": "deny",
+            "name": "no_room_double_booking",
+            "when": "room_already_occupied == true and period == same"
+          },
+          {
+            "action": "deny",
+            "name": "teacher_daily_load_limit",
+            "when": "teacher_periods_today_gte == max_periods_per_day"
+          },
+          {
+            "action": "require_review",
+            "name": "exam_requires_invigilator",
+            "when": "slot_type == exam and invigilator_assigned != true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [],
+      "runtime": {},
+      "screens": {},
+      "streaming": {
+        "events": [
+          "slot_created",
+          "slot_modified",
+          "slot_deleted",
+          "clash_detected",
+          "clash_resolved",
+          "substitution_created",
+          "substitution_confirmed",
+          "exam_slot_created",
+          "invigilator_assigned"
+        ],
+        "guardrails": [
+          "no_teacher_double_booking",
+          "no_room_double_booking",
+          "teacher_load_limit_enforced"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "stream": "apg.education.timetable.lifecycle"
+      },
+      "theme": {
+        "name": "timetable_theme",
+        "tokens": {
+          "border.radius": "6px",
+          "color.accent": "#00897B",
+          "color.primary": "#00695C",
+          "density": "compact",
+          "surface.canvas": "#F0FBF9"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "TimetableGrid",
+            "name": "Timetable Grid",
+            "nav_group": "Schedule",
+            "path": "/timetable",
+            "permission": "timetable:view"
+          },
+          {
+            "component": "RoomAllocation",
+            "name": "Room Allocation",
+            "nav_group": "Resources",
+            "path": "/timetable/rooms",
+            "permission": "timetable:rooms"
+          },
+          {
+            "component": "TeacherLoad",
+            "name": "Teacher Loads",
+            "nav_group": "Resources",
+            "path": "/timetable/teachers",
+            "permission": "timetable:teachers"
+          },
+          {
+            "component": "ExamScheduler",
+            "name": "Exam Schedule",
+            "nav_group": "Exams",
+            "path": "/timetable/exams",
+            "permission": "timetable:exams"
+          },
+          {
+            "component": "SubstitutionBoard",
+            "name": "Substitutions",
+            "nav_group": "Operations",
+            "path": "/timetable/subs",
+            "permission": "timetable:subs"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {
+      "EducationPlatform": {
+        "agent_teams": [],
+        "agents": [
+          "AdaptiveLearningAgent",
+          "ParentCommunicationAgent",
+          "TimetableOptimiserAgent"
+        ],
+        "capabilities": [
+          "SchoolManagement",
+          "LearningManagement",
+          "Timetabling"
+        ],
+        "components": {},
+        "configuration": {},
+        "deployments": {
+          "container": "docker",
+          "default": "local",
+          "production": "kubernetes"
+        },
+        "description": "Integrated K-12 and higher education platform composed from APG capabilities",
+        "integrations": {},
+        "name": "EducationPlatform",
+        "policies": {},
+        "routes": [
+          "/school",
+          "/school/students",
+          "/school/staff",
+          "/school/calendar",
+          "/school/fees",
+          "/lms",
+          "/lms/courses",
+          "/lms/assessments",
+          "/lms/certificates",
+          "/lms/analytics",
+          "/timetable",
+          "/timetable/rooms",
+          "/timetable/exams"
+        ],
+        "runtime": {
+          "deployment": "container",
+          "streaming": {
+            "processor": "bytewax"
+          },
+          "target": "python"
+        },
+        "screens": {},
+        "theme": {
+          "name": "education_platform_theme",
+          "tokens": {
+            "border.radius": "8px",
+            "color.accent": "#4527A0",
+            "color.primary": "#1565C0",
+            "density": "comfortable",
+            "surface.canvas": "#F5F7FF"
+          }
+        },
+        "workflows": []
+      }
+    },
+    "capability_dependencies": {
+      "LearningManagement": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "ntfy",
+        "wflo",
+        "nlpc",
+        "moni",
+        "comp",
+        "mqeb",
+        "schd"
+      ],
+      "SchoolManagement": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "ntfy",
+        "wflo",
+        "comp",
+        "mqeb",
+        "schd"
+      ],
+      "Timetabling": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "ntfy",
+        "wflo",
+        "moni",
+        "mqeb",
+        "schd",
+        "comp"
+      ]
+    }
+  },
+  "contracts": {
+    "LearningManagement": {
+      "configuration": {
+        "adaptive_learning_enabled": true,
+        "certificate_digital_signing": true,
+        "gamification_enabled": true,
+        "max_attempts_default": 3,
+        "passing_score_default": 50.0,
+        "peer_assessment_enabled": true,
+        "plagiarism_detection": true,
+        "scorm_enabled": true,
+        "tenant_id": "default",
+        "xapi_endpoint": "https://lrs.apgacademy.ke/xapi"
+      },
+      "id": "education_lms",
+      "provides": [
+        "course_management",
+        "learner_enrolment",
+        "content_delivery",
+        "assessment_and_grading",
+        "certificate_issuance",
+        "learning_path_management",
+        "adaptive_learning",
+        "xapi_scorm_tracking"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "ntfy",
+        "wflo",
+        "nlpc",
+        "moni",
+        "comp",
+        "mqeb",
+        "schd"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "enrolment_requires_active_student",
+            "when": "student_status != active"
+          },
+          {
+            "action": "deny",
+            "name": "paid_course_requires_payment",
+            "when": "enrolment_type == paid and payment_reference missing"
+          },
+          {
+            "action": "deny",
+            "name": "grade_override_requires_approval",
+            "when": "operation == override_grade and approval_reference_present != true"
+          },
+          {
+            "action": "deny",
+            "name": "certificate_requires_passing_score",
+            "when": "operation == issue_certificate and completion_criteria_met != true"
+          },
+          {
+            "action": "deny",
+            "name": "scorm_version_check",
+            "when": "content_type == scorm and scorm_version_supported != true"
+          },
+          {
+            "action": "deny",
+            "name": "learner_data_consent",
+            "when": "operation == export_learner_analytics and consent_recorded != true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "components": {
+          "assessments": {
+            "icon": "clipboard-check",
+            "status_indicator": "assessment-type-chip"
+          },
+          "certificates": {
+            "icon": "award",
+            "status_indicator": "cert-type-chip"
+          },
+          "courses": {
+            "icon": "book-open",
+            "status_indicator": "course-status-chip"
+          },
+          "progress": {
+            "icon": "chart-line",
+            "status_indicator": "progress-bar"
+          }
+        },
+        "name": "lms_theme",
+        "tokens": {
+          "border.radius": "10px",
+          "color.accent": "#7B1FA2",
+          "color.danger": "#B71C1C",
+          "color.primary": "#4527A0",
+          "color.success": "#1B5E20",
+          "color.warning": "#E65100",
+          "density": "spacious",
+          "surface.canvas": "#F8F5FF",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#1A0050",
+          "text.secondary": "#6A1B9A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "LmsDashboard",
+            "name": "LMS Dashboard",
+            "nav_group": "Overview",
+            "path": "/lms",
+            "permission": "lms:view"
+          },
+          {
+            "component": "CourseCatalogue",
+            "name": "Course Catalogue",
+            "nav_group": "Learning",
+            "path": "/lms/courses",
+            "permission": "lms:courses"
+          },
+          {
+            "component": "LearnerDashboard",
+            "name": "My Learning",
+            "nav_group": "Learning",
+            "path": "/lms/my-learning",
+            "permission": "lms:learner"
+          },
+          {
+            "component": "AssessmentWorkbench",
+            "name": "Assessments",
+            "nav_group": "Assessment",
+            "path": "/lms/assessments",
+            "permission": "lms:assess"
+          },
+          {
+            "component": "CertificateVault",
+            "name": "Certificates",
+            "nav_group": "Credentials",
+            "path": "/lms/certificates",
+            "permission": "lms:certs"
+          },
+          {
+            "component": "LearningPaths",
+            "name": "Learning Paths",
+            "nav_group": "Learning",
+            "path": "/lms/paths",
+            "permission": "lms:paths"
+          },
+          {
+            "component": "LmsAnalytics",
+            "name": "Analytics",
+            "nav_group": "Analytics",
+            "path": "/lms/analytics",
+            "permission": "lms:analytics"
+          },
+          {
+            "component": "LmsAgents",
+            "name": "Agents",
+            "nav_group": "AI",
+            "path": "/lms/agents",
+            "permission": "lms:agents"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "SchoolManagement": {
+      "configuration": {
+        "academic_year_start_month": 1,
+        "country": "KE",
+        "curriculum": "CBC",
+        "email_enabled": true,
+        "fee_currency": "KES",
+        "max_class_size": 45,
+        "parent_portal_enabled": true,
+        "school_name": "APG Academy",
+        "sms_enabled": true,
+        "tenant_id": "default"
+      },
+      "id": "education_sch_mgmt",
+      "provides": [
+        "student_registration",
+        "staff_management",
+        "class_assignment",
+        "academic_calendar_management",
+        "fee_management",
+        "parent_portal",
+        "reporting"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "ntfy",
+        "wflo",
+        "comp",
+        "mqeb",
+        "schd"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "require_review",
+            "name": "guardian_consent_for_minor",
+            "when": "student_age_lt == 18 and guardian_consent missing"
+          },
+          {
+            "action": "deny",
+            "name": "class_capacity_check",
+            "when": "class_enrollment_count_gte == max_class_size"
+          },
+          {
+            "action": "deny",
+            "name": "staff_clearance_required",
+            "when": "role == teacher and background_check_passed != true"
+          },
+          {
+            "action": "require_review",
+            "name": "fee_arrears_block",
+            "when": "fee_balance_gt == 0 and exam_registration == true"
+          },
+          {
+            "action": "deny",
+            "name": "parent_communication_consent",
+            "when": "channel == sms and sms_consent != true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "components": {
+          "calendar": {
+            "icon": "calendar-days",
+            "status_indicator": "term-chip"
+          },
+          "classes": {
+            "icon": "building-columns",
+            "status_indicator": "class-level-chip"
+          },
+          "staff": {
+            "icon": "chalkboard-teacher",
+            "status_indicator": "staff-role-chip"
+          },
+          "students": {
+            "icon": "user-graduate",
+            "status_indicator": "student-status-chip"
+          }
+        },
+        "name": "school_theme",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#0288D1",
+          "color.danger": "#C62828",
+          "color.primary": "#1565C0",
+          "color.success": "#2E7D32",
+          "color.warning": "#F57F17",
+          "density": "comfortable",
+          "surface.canvas": "#F3F8FF",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#0D1B2A",
+          "text.secondary": "#546E7A"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "SchoolDashboard",
+            "name": "School Dashboard",
+            "nav_group": "Overview",
+            "path": "/school",
+            "permission": "school:view"
+          },
+          {
+            "component": "StudentRegistry",
+            "name": "Students",
+            "nav_group": "People",
+            "path": "/school/students",
+            "permission": "school:students"
+          },
+          {
+            "component": "StaffDirectory",
+            "name": "Staff",
+            "nav_group": "People",
+            "path": "/school/staff",
+            "permission": "school:staff"
+          },
+          {
+            "component": "ClassManager",
+            "name": "Classes",
+            "nav_group": "Academic",
+            "path": "/school/classes",
+            "permission": "school:classes"
+          },
+          {
+            "component": "AcademicCalendar",
+            "name": "Calendar",
+            "nav_group": "Academic",
+            "path": "/school/calendar",
+            "permission": "school:calendar"
+          },
+          {
+            "component": "FeeManagement",
+            "name": "Fees",
+            "nav_group": "Finance",
+            "path": "/school/fees",
+            "permission": "school:fees"
+          },
+          {
+            "component": "ParentPortal",
+            "name": "Parent Portal",
+            "nav_group": "Communication",
+            "path": "/school/parents",
+            "permission": "school:parents"
+          },
+          {
+            "component": "SchoolReports",
+            "name": "Reports",
+            "nav_group": "Analytics",
+            "path": "/school/reports",
+            "permission": "school:reports"
+          }
+        ],
+        "shell": "python"
+      }
+    },
+    "Timetabling": {
+      "configuration": {
+        "auto_clash_detection": true,
+        "break_periods": [
+          3,
+          6
+        ],
+        "double_period_enabled": true,
+        "period_duration_minutes": 40,
+        "periods_per_day": 8,
+        "room_utilisation_target_pct": 80,
+        "teacher_max_periods_per_day": 6,
+        "tenant_id": "default",
+        "working_days": "monday,tuesday,wednesday,thursday,friday"
+      },
+      "id": "education_ttbl",
+      "provides": [
+        "timetable_generation",
+        "room_allocation",
+        "teacher_assignment",
+        "clash_detection",
+        "substitution_management",
+        "exam_scheduling"
+      ],
+      "requires": [
+        "auth",
+        "audl",
+        "mten",
+        "conf",
+        "ntfy",
+        "wflo",
+        "moni",
+        "mqeb",
+        "schd",
+        "comp"
+      ],
+      "rule_engine": {
+        "default_decision": "allow",
+        "rules": [
+          {
+            "action": "deny",
+            "name": "no_teacher_double_booking",
+            "when": "teacher_already_assigned == true and period == same"
+          },
+          {
+            "action": "deny",
+            "name": "no_room_double_booking",
+            "when": "room_already_occupied == true and period == same"
+          },
+          {
+            "action": "deny",
+            "name": "teacher_daily_load_limit",
+            "when": "teacher_periods_today_gte == max_periods_per_day"
+          },
+          {
+            "action": "require_review",
+            "name": "exam_requires_invigilator",
+            "when": "slot_type == exam and invigilator_assigned != true"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "theme": {
+        "name": "timetable_theme",
+        "tokens": {
+          "border.radius": "6px",
+          "color.accent": "#00897B",
+          "color.primary": "#00695C",
+          "density": "compact",
+          "surface.canvas": "#F0FBF9"
+        }
+      },
+      "ui": {
+        "routes": [
+          {
+            "component": "TimetableGrid",
+            "name": "Timetable Grid",
+            "nav_group": "Schedule",
+            "path": "/timetable",
+            "permission": "timetable:view"
+          },
+          {
+            "component": "RoomAllocation",
+            "name": "Room Allocation",
+            "nav_group": "Resources",
+            "path": "/timetable/rooms",
+            "permission": "timetable:rooms"
+          },
+          {
+            "component": "TeacherLoad",
+            "name": "Teacher Loads",
+            "nav_group": "Resources",
+            "path": "/timetable/teachers",
+            "permission": "timetable:teachers"
+          },
+          {
+            "component": "ExamScheduler",
+            "name": "Exam Schedule",
+            "nav_group": "Exams",
+            "path": "/timetable/exams",
+            "permission": "timetable:exams"
+          },
+          {
+            "component": "SubstitutionBoard",
+            "name": "Substitutions",
+            "nav_group": "Operations",
+            "path": "/timetable/subs",
+            "permission": "timetable:subs"
+          }
+        ],
+        "shell": "python"
+      }
+    }
+  },
+  "deployment": {
+    "source": "education_platform.apg",
+    "target": "python"
+  },
+  "diagnostics": [
+    {
+      "code": "APG0100",
+      "docs_url": "docs/tooling.md#semantic-model-contract",
+      "file": "education_platform.apg",
+      "fixes": [],
+      "message": "Reserved field name 'owner_id' is declared explicitly; APG generates this field automatically",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "related_locations": [],
+      "severity": "warning",
+      "title": "Semantic warning"
+    }
+  ],
+  "flows": {
+    "AcademicCalendarManagement": {
+      "assignments": {
+        "approved": "board_of_governors",
+        "board_review": "principal",
+        "exams": "examination_officer",
+        "results_released": "principal"
+      },
+      "compensation": {},
+      "guards": {
+        "approved": "board_quorum_present and calendar_conflicts_resolved",
+        "results_released": "all_scripts_marked and moderation_complete",
+        "term_open": "calendar_approved and staff_briefed"
+      },
+      "human_tasks": [
+        "board_review",
+        "approved",
+        "exams",
+        "results_released"
+      ],
+      "methods": [],
+      "name": "AcademicCalendarManagement",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "draft_calendar",
+        "board_review",
+        "approved",
+        "term_open",
+        "mid_term_break",
+        "term_resume",
+        "exams",
+        "marking",
+        "results_released",
+        "term_close",
+        "holiday"
+      ],
+      "steps": [
+        "draft_calendar",
+        "board_review",
+        "approved",
+        "term_open",
+        "mid_term_break",
+        "term_resume",
+        "exams",
+        "marking",
+        "results_released",
+        "term_close",
+        "holiday"
+      ],
+      "steps_raw": "draft_calendar -> board_review -> approved -> term_open -> mid_term_break -> term_resume -> exams -> marking -> results_released -> term_close -> holiday",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "draft_calendar",
+          "target": "board_review"
+        },
+        {
+          "guard": "board_quorum_present and calendar_conflicts_resolved",
+          "source": "board_review",
+          "target": "approved"
+        },
+        {
+          "guard": "calendar_approved and staff_briefed",
+          "source": "approved",
+          "target": "term_open"
+        },
+        {
+          "guard": null,
+          "source": "term_open",
+          "target": "mid_term_break"
+        },
+        {
+          "guard": null,
+          "source": "mid_term_break",
+          "target": "term_resume"
+        },
+        {
+          "guard": null,
+          "source": "term_resume",
+          "target": "exams"
+        },
+        {
+          "guard": null,
+          "source": "exams",
+          "target": "marking"
+        },
+        {
+          "guard": "all_scripts_marked and moderation_complete",
+          "source": "marking",
+          "target": "results_released"
+        },
+        {
+          "guard": null,
+          "source": "results_released",
+          "target": "term_close"
+        },
+        {
+          "guard": null,
+          "source": "term_close",
+          "target": "holiday"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "LearningAndAssessmentFlow": {
+      "assignments": {
+        "assessment_scheduled": "subject_teacher",
+        "graded": "subject_teacher",
+        "result_released": "head_of_department"
+      },
+      "compensation": {},
+      "guards": {
+        "assessment_submitted": "enrolment_status == active and attempts_remaining > 0",
+        "certificate_issued": "final_score >= passing_score and all_assessments_graded",
+        "graded": "submission_complete and marking_scheme_loaded"
+      },
+      "human_tasks": [
+        "assessment_scheduled",
+        "graded",
+        "result_released"
+      ],
+      "methods": [],
+      "name": "LearningAndAssessmentFlow",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "enrolled",
+        "content_access",
+        "learning_in_progress",
+        "assessment_scheduled",
+        "assessment_submitted",
+        "graded",
+        "result_released",
+        "certificate_issued"
+      ],
+      "steps": [
+        "enrolled",
+        "content_access",
+        "learning_in_progress",
+        "assessment_scheduled",
+        "assessment_submitted",
+        "graded",
+        "result_released",
+        "certificate_issued"
+      ],
+      "steps_raw": "enrolled -> content_access -> learning_in_progress -> assessment_scheduled -> assessment_submitted -> graded -> result_released -> certificate_issued",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "enrolled",
+          "target": "content_access"
+        },
+        {
+          "guard": null,
+          "source": "content_access",
+          "target": "learning_in_progress"
+        },
+        {
+          "guard": null,
+          "source": "learning_in_progress",
+          "target": "assessment_scheduled"
+        },
+        {
+          "guard": "enrolment_status == active and attempts_remaining > 0",
+          "source": "assessment_scheduled",
+          "target": "assessment_submitted"
+        },
+        {
+          "guard": "submission_complete and marking_scheme_loaded",
+          "source": "assessment_submitted",
+          "target": "graded"
+        },
+        {
+          "guard": null,
+          "source": "graded",
+          "target": "result_released"
+        },
+        {
+          "guard": "final_score >= passing_score and all_assessments_graded",
+          "source": "result_released",
+          "target": "certificate_issued"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "ParentCommunicationFlow": {
+      "assignments": {
+        "message_composed": "class_teacher"
+      },
+      "compensation": {},
+      "guards": {
+        "delivery_confirmed": "channel_ack_received",
+        "message_sent": "sms_consent_valid or email_confirmed"
+      },
+      "human_tasks": [
+        "message_composed"
+      ],
+      "methods": [],
+      "name": "ParentCommunicationFlow",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "trigger_event",
+        "message_composed",
+        "consent_checked",
+        "channel_selected",
+        "message_sent",
+        "delivery_confirmed",
+        "response_tracked"
+      ],
+      "steps": [
+        "trigger_event",
+        "message_composed",
+        "consent_checked",
+        "channel_selected",
+        "message_sent",
+        "delivery_confirmed",
+        "response_tracked"
+      ],
+      "steps_raw": "trigger_event -> message_composed -> consent_checked -> channel_selected -> message_sent -> delivery_confirmed -> response_tracked",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "trigger_event",
+          "target": "message_composed"
+        },
+        {
+          "guard": null,
+          "source": "message_composed",
+          "target": "consent_checked"
+        },
+        {
+          "guard": null,
+          "source": "consent_checked",
+          "target": "channel_selected"
+        },
+        {
+          "guard": "sms_consent_valid or email_confirmed",
+          "source": "channel_selected",
+          "target": "message_sent"
+        },
+        {
+          "guard": "channel_ack_received",
+          "source": "message_sent",
+          "target": "delivery_confirmed"
+        },
+        {
+          "guard": null,
+          "source": "delivery_confirmed",
+          "target": "response_tracked"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    },
+    "StudentEnrolmentPipeline": {
+      "assignments": {
+        "class_assigned": "head_of_year",
+        "documents_verified": "admissions_officer",
+        "fees_invoiced": "finance_officer",
+        "orientation": "class_teacher"
+      },
+      "compensation": {},
+      "guards": {
+        "active_learner": "orientation_completed and lms_enrolled",
+        "class_assigned": "class_capacity_available and documents_verified",
+        "fees_paid": "fee_amount_paid >= registration_fee",
+        "lms_account_created": "class_assigned and guardian_consent_recorded"
+      },
+      "human_tasks": [
+        "documents_verified",
+        "fees_invoiced",
+        "class_assigned",
+        "orientation"
+      ],
+      "methods": [],
+      "name": "StudentEnrolmentPipeline",
+      "properties": {},
+      "retry_policy": {},
+      "states": [
+        "application_received",
+        "documents_verified",
+        "fees_invoiced",
+        "fees_paid",
+        "class_assigned",
+        "lms_account_created",
+        "orientation",
+        "active_learner"
+      ],
+      "steps": [
+        "application_received",
+        "documents_verified",
+        "fees_invoiced",
+        "fees_paid",
+        "class_assigned",
+        "lms_account_created",
+        "orientation",
+        "active_learner"
+      ],
+      "steps_raw": "application_received -> documents_verified -> fees_invoiced -> fees_paid -> class_assigned -> lms_account_created -> orientation -> active_learner",
+      "timers": {},
+      "transitions": [
+        {
+          "guard": null,
+          "source": "application_received",
+          "target": "documents_verified"
+        },
+        {
+          "guard": null,
+          "source": "documents_verified",
+          "target": "fees_invoiced"
+        },
+        {
+          "guard": "fee_amount_paid >= registration_fee",
+          "source": "fees_invoiced",
+          "target": "fees_paid"
+        },
+        {
+          "guard": "class_capacity_available and documents_verified",
+          "source": "fees_paid",
+          "target": "class_assigned"
+        },
+        {
+          "guard": "class_assigned and guardian_consent_recorded",
+          "source": "class_assigned",
+          "target": "lms_account_created"
+        },
+        {
+          "guard": null,
+          "source": "lms_account_created",
+          "target": "orientation"
+        },
+        {
+          "guard": "orientation_completed and lms_enrolled",
+          "source": "orientation",
+          "target": "active_learner"
+        }
+      ],
+      "type": "workflow",
+      "waits": {}
+    }
+  },
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "agent": {
+      "edges": 0,
+      "kind": "agent",
+      "nodes": 3
+    },
+    "capability": {
+      "edges": 33,
+      "kind": "capability",
+      "nodes": 15
+    },
+    "deployment": {
+      "edges": 22,
+      "kind": "deployment",
+      "nodes": 23
+    },
+    "er": {
+      "edges": 125,
+      "kind": "er",
+      "nodes": 119
+    },
+    "handler": {
+      "edges": 22,
+      "kind": "handler",
+      "nodes": 23
+    },
+    "lookup": {
+      "edges": 22,
+      "kind": "lookup",
+      "nodes": 23
+    },
+    "package": {
+      "edges": 22,
+      "kind": "package",
+      "nodes": 23
+    },
+    "security": {
+      "edges": 22,
+      "kind": "security",
+      "nodes": 23
+    },
+    "workflow": {
+      "edges": 22,
+      "kind": "workflow",
+      "nodes": 23
+    }
+  },
+  "llms": {
+    "AdaptiveLearningAgent": {
+      "model": "ollama:llama3.2",
+      "runtime": null
+    },
+    "ParentCommunicationAgent": {
+      "model": "ollama:llama3.2",
+      "runtime": null
+    },
+    "TimetableOptimiserAgent": {
+      "model": "ollama:llama3.2",
+      "runtime": null
+    }
+  },
+  "ok": true,
+  "operations": {},
+  "packages": {},
+  "roles": {},
+  "rules": {
+    "LearningManagement.certificate_requires_passing_score": {
+      "action": "deny",
+      "name": "certificate_requires_passing_score",
+      "when": "operation == issue_certificate and completion_criteria_met != true"
+    },
+    "LearningManagement.enrolment_requires_active_student": {
+      "action": "deny",
+      "name": "enrolment_requires_active_student",
+      "when": "student_status != active"
+    },
+    "LearningManagement.grade_override_requires_approval": {
+      "action": "deny",
+      "name": "grade_override_requires_approval",
+      "when": "operation == override_grade and approval_reference_present != true"
+    },
+    "LearningManagement.learner_data_consent": {
+      "action": "deny",
+      "name": "learner_data_consent",
+      "when": "operation == export_learner_analytics and consent_recorded != true"
+    },
+    "LearningManagement.paid_course_requires_payment": {
+      "action": "deny",
+      "name": "paid_course_requires_payment",
+      "when": "enrolment_type == paid and payment_reference missing"
+    },
+    "LearningManagement.scorm_version_check": {
+      "action": "deny",
+      "name": "scorm_version_check",
+      "when": "content_type == scorm and scorm_version_supported != true"
+    },
+    "SchoolManagement.class_capacity_check": {
+      "action": "deny",
+      "name": "class_capacity_check",
+      "when": "class_enrollment_count_gte == max_class_size"
+    },
+    "SchoolManagement.fee_arrears_block": {
+      "action": "require_review",
+      "name": "fee_arrears_block",
+      "when": "fee_balance_gt == 0 and exam_registration == true"
+    },
+    "SchoolManagement.guardian_consent_for_minor": {
+      "action": "require_review",
+      "name": "guardian_consent_for_minor",
+      "when": "student_age_lt == 18 and guardian_consent missing"
+    },
+    "SchoolManagement.parent_communication_consent": {
+      "action": "deny",
+      "name": "parent_communication_consent",
+      "when": "channel == sms and sms_consent != true"
+    },
+    "SchoolManagement.staff_clearance_required": {
+      "action": "deny",
+      "name": "staff_clearance_required",
+      "when": "role == teacher and background_check_passed != true"
+    },
+    "Timetabling.exam_requires_invigilator": {
+      "action": "require_review",
+      "name": "exam_requires_invigilator",
+      "when": "slot_type == exam and invigilator_assigned != true"
+    },
+    "Timetabling.no_room_double_booking": {
+      "action": "deny",
+      "name": "no_room_double_booking",
+      "when": "room_already_occupied == true and period == same"
+    },
+    "Timetabling.no_teacher_double_booking": {
+      "action": "deny",
+      "name": "no_teacher_double_booking",
+      "when": "teacher_already_assigned == true and period == same"
+    },
+    "Timetabling.teacher_daily_load_limit": {
+      "action": "deny",
+      "name": "teacher_daily_load_limit",
+      "when": "teacher_periods_today_gte == max_periods_per_day"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "education_platform.apg"
+  ],
+  "symbols": {
+    "agent.AdaptiveLearningAgent": {
+      "file": "education_platform.apg",
+      "id": "agent.AdaptiveLearningAgent",
+      "kind": "agent",
+      "name": "AdaptiveLearningAgent",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "agent.ParentCommunicationAgent": {
+      "file": "education_platform.apg",
+      "id": "agent.ParentCommunicationAgent",
+      "kind": "agent",
+      "name": "ParentCommunicationAgent",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "agent.TimetableOptimiserAgent": {
+      "file": "education_platform.apg",
+      "id": "agent.TimetableOptimiserAgent",
+      "kind": "agent",
+      "name": "TimetableOptimiserAgent",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "app.EducationPlatform": {
+      "file": "education_platform.apg",
+      "id": "app.EducationPlatform",
+      "kind": "app",
+      "name": "EducationPlatform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.LearningManagement": {
+      "file": "education_platform.apg",
+      "id": "capability.LearningManagement",
+      "kind": "capability",
+      "name": "LearningManagement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.SchoolManagement": {
+      "file": "education_platform.apg",
+      "id": "capability.SchoolManagement",
+      "kind": "capability",
+      "name": "SchoolManagement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "capability.Timetabling": {
+      "file": "education_platform.apg",
+      "id": "capability.Timetabling",
+      "kind": "capability",
+      "name": "Timetabling",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "field.AcademicCalendar.academic_year": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicCalendar.academic_year",
+      "kind": "field",
+      "name": "AcademicCalendar.academic_year",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.AcademicCalendar.active": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicCalendar.active",
+      "kind": "field",
+      "name": "AcademicCalendar.active",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.AcademicCalendar.calendar_id": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicCalendar.calendar_id",
+      "kind": "field",
+      "name": "AcademicCalendar.calendar_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.AcademicCalendar.events": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicCalendar.events",
+      "kind": "field",
+      "name": "AcademicCalendar.events",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.AcademicCalendar.term": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicCalendar.term",
+      "kind": "field",
+      "name": "AcademicCalendar.term",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.AcademicCalendar.term_end": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicCalendar.term_end",
+      "kind": "field",
+      "name": "AcademicCalendar.term_end",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.AcademicCalendar.term_start": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicCalendar.term_start",
+      "kind": "field",
+      "name": "AcademicCalendar.term_start",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.AcademicClass.academic_year": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicClass.academic_year",
+      "kind": "field",
+      "name": "AcademicClass.academic_year",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.AcademicClass.capacity": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicClass.capacity",
+      "kind": "field",
+      "name": "AcademicClass.capacity",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.AcademicClass.class_id": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicClass.class_id",
+      "kind": "field",
+      "name": "AcademicClass.class_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.AcademicClass.class_teacher_id": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicClass.class_teacher_id",
+      "kind": "field",
+      "name": "AcademicClass.class_teacher_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.AcademicClass.level": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicClass.level",
+      "kind": "field",
+      "name": "AcademicClass.level",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.AcademicClass.name": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicClass.name",
+      "kind": "field",
+      "name": "AcademicClass.name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.AcademicClass.room_id": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicClass.room_id",
+      "kind": "field",
+      "name": "AcademicClass.room_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.AcademicClass.stream": {
+      "file": "education_platform.apg",
+      "id": "field.AcademicClass.stream",
+      "kind": "field",
+      "name": "AcademicClass.stream",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Assessment.assessment_id": {
+      "file": "education_platform.apg",
+      "id": "field.Assessment.assessment_id",
+      "kind": "field",
+      "name": "Assessment.assessment_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Assessment.assessment_type": {
+      "file": "education_platform.apg",
+      "id": "field.Assessment.assessment_type",
+      "kind": "field",
+      "name": "Assessment.assessment_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Assessment.attempts_allowed": {
+      "file": "education_platform.apg",
+      "id": "field.Assessment.attempts_allowed",
+      "kind": "field",
+      "name": "Assessment.attempts_allowed",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Assessment.course_id": {
+      "file": "education_platform.apg",
+      "id": "field.Assessment.course_id",
+      "kind": "field",
+      "name": "Assessment.course_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Assessment.due_at": {
+      "file": "education_platform.apg",
+      "id": "field.Assessment.due_at",
+      "kind": "field",
+      "name": "Assessment.due_at",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Assessment.max_score": {
+      "file": "education_platform.apg",
+      "id": "field.Assessment.max_score",
+      "kind": "field",
+      "name": "Assessment.max_score",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Assessment.passing_score": {
+      "file": "education_platform.apg",
+      "id": "field.Assessment.passing_score",
+      "kind": "field",
+      "name": "Assessment.passing_score",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Assessment.title": {
+      "file": "education_platform.apg",
+      "id": "field.Assessment.title",
+      "kind": "field",
+      "name": "Assessment.title",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Assessment.weight_percent": {
+      "file": "education_platform.apg",
+      "id": "field.Assessment.weight_percent",
+      "kind": "field",
+      "name": "Assessment.weight_percent",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Certificate.certificate_id": {
+      "file": "education_platform.apg",
+      "id": "field.Certificate.certificate_id",
+      "kind": "field",
+      "name": "Certificate.certificate_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Certificate.certificate_type": {
+      "file": "education_platform.apg",
+      "id": "field.Certificate.certificate_type",
+      "kind": "field",
+      "name": "Certificate.certificate_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Certificate.course_id": {
+      "file": "education_platform.apg",
+      "id": "field.Certificate.course_id",
+      "kind": "field",
+      "name": "Certificate.course_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Certificate.enrolment_id": {
+      "file": "education_platform.apg",
+      "id": "field.Certificate.enrolment_id",
+      "kind": "field",
+      "name": "Certificate.enrolment_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Certificate.expires_at": {
+      "file": "education_platform.apg",
+      "id": "field.Certificate.expires_at",
+      "kind": "field",
+      "name": "Certificate.expires_at",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Certificate.issued_at": {
+      "file": "education_platform.apg",
+      "id": "field.Certificate.issued_at",
+      "kind": "field",
+      "name": "Certificate.issued_at",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Certificate.issuer_id": {
+      "file": "education_platform.apg",
+      "id": "field.Certificate.issuer_id",
+      "kind": "field",
+      "name": "Certificate.issuer_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Certificate.status": {
+      "file": "education_platform.apg",
+      "id": "field.Certificate.status",
+      "kind": "field",
+      "name": "Certificate.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Certificate.student_id": {
+      "file": "education_platform.apg",
+      "id": "field.Certificate.student_id",
+      "kind": "field",
+      "name": "Certificate.student_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Course.code": {
+      "file": "education_platform.apg",
+      "id": "field.Course.code",
+      "kind": "field",
+      "name": "Course.code",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Course.course_id": {
+      "file": "education_platform.apg",
+      "id": "field.Course.course_id",
+      "kind": "field",
+      "name": "Course.course_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Course.course_type": {
+      "file": "education_platform.apg",
+      "id": "field.Course.course_type",
+      "kind": "field",
+      "name": "Course.course_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Course.description": {
+      "file": "education_platform.apg",
+      "id": "field.Course.description",
+      "kind": "field",
+      "name": "Course.description",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Course.duration_weeks": {
+      "file": "education_platform.apg",
+      "id": "field.Course.duration_weeks",
+      "kind": "field",
+      "name": "Course.duration_weeks",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Course.owner_id": {
+      "file": "education_platform.apg",
+      "id": "field.Course.owner_id",
+      "kind": "field",
+      "name": "Course.owner_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Course.passing_score": {
+      "file": "education_platform.apg",
+      "id": "field.Course.passing_score",
+      "kind": "field",
+      "name": "Course.passing_score",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Course.status": {
+      "file": "education_platform.apg",
+      "id": "field.Course.status",
+      "kind": "field",
+      "name": "Course.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.Course.subject": {
+      "file": "education_platform.apg",
+      "id": "field.Course.subject",
+      "kind": "field",
+      "name": "Course.subject",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Course.tags": {
+      "file": "education_platform.apg",
+      "id": "field.Course.tags",
+      "kind": "field",
+      "name": "Course.tags",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 11
+        },
+        "start": {
+          "character": 4,
+          "line": 11
+        }
+      },
+      "references": []
+    },
+    "field.Course.title": {
+      "file": "education_platform.apg",
+      "id": "field.Course.title",
+      "kind": "field",
+      "name": "Course.title",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Enrolment.class_id": {
+      "file": "education_platform.apg",
+      "id": "field.Enrolment.class_id",
+      "kind": "field",
+      "name": "Enrolment.class_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Enrolment.completed_at": {
+      "file": "education_platform.apg",
+      "id": "field.Enrolment.completed_at",
+      "kind": "field",
+      "name": "Enrolment.completed_at",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Enrolment.course_id": {
+      "file": "education_platform.apg",
+      "id": "field.Enrolment.course_id",
+      "kind": "field",
+      "name": "Enrolment.course_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Enrolment.enrolled_at": {
+      "file": "education_platform.apg",
+      "id": "field.Enrolment.enrolled_at",
+      "kind": "field",
+      "name": "Enrolment.enrolled_at",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Enrolment.enrolment_id": {
+      "file": "education_platform.apg",
+      "id": "field.Enrolment.enrolment_id",
+      "kind": "field",
+      "name": "Enrolment.enrolment_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Enrolment.enrolment_type": {
+      "file": "education_platform.apg",
+      "id": "field.Enrolment.enrolment_type",
+      "kind": "field",
+      "name": "Enrolment.enrolment_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Enrolment.status": {
+      "file": "education_platform.apg",
+      "id": "field.Enrolment.status",
+      "kind": "field",
+      "name": "Enrolment.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Enrolment.student_id": {
+      "file": "education_platform.apg",
+      "id": "field.Enrolment.student_id",
+      "kind": "field",
+      "name": "Enrolment.student_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.ParentCommunication.body": {
+      "file": "education_platform.apg",
+      "id": "field.ParentCommunication.body",
+      "kind": "field",
+      "name": "ParentCommunication.body",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.ParentCommunication.channel": {
+      "file": "education_platform.apg",
+      "id": "field.ParentCommunication.channel",
+      "kind": "field",
+      "name": "ParentCommunication.channel",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.ParentCommunication.guardian_email": {
+      "file": "education_platform.apg",
+      "id": "field.ParentCommunication.guardian_email",
+      "kind": "field",
+      "name": "ParentCommunication.guardian_email",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.ParentCommunication.guardian_phone": {
+      "file": "education_platform.apg",
+      "id": "field.ParentCommunication.guardian_phone",
+      "kind": "field",
+      "name": "ParentCommunication.guardian_phone",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.ParentCommunication.message_id": {
+      "file": "education_platform.apg",
+      "id": "field.ParentCommunication.message_id",
+      "kind": "field",
+      "name": "ParentCommunication.message_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.ParentCommunication.message_type": {
+      "file": "education_platform.apg",
+      "id": "field.ParentCommunication.message_type",
+      "kind": "field",
+      "name": "ParentCommunication.message_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.ParentCommunication.sent_at": {
+      "file": "education_platform.apg",
+      "id": "field.ParentCommunication.sent_at",
+      "kind": "field",
+      "name": "ParentCommunication.sent_at",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.ParentCommunication.status": {
+      "file": "education_platform.apg",
+      "id": "field.ParentCommunication.status",
+      "kind": "field",
+      "name": "ParentCommunication.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.ParentCommunication.student_id": {
+      "file": "education_platform.apg",
+      "id": "field.ParentCommunication.student_id",
+      "kind": "field",
+      "name": "ParentCommunication.student_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.ParentCommunication.subject": {
+      "file": "education_platform.apg",
+      "id": "field.ParentCommunication.subject",
+      "kind": "field",
+      "name": "ParentCommunication.subject",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Staff.department_id": {
+      "file": "education_platform.apg",
+      "id": "field.Staff.department_id",
+      "kind": "field",
+      "name": "Staff.department_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Staff.employee_number": {
+      "file": "education_platform.apg",
+      "id": "field.Staff.employee_number",
+      "kind": "field",
+      "name": "Staff.employee_number",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Staff.first_name": {
+      "file": "education_platform.apg",
+      "id": "field.Staff.first_name",
+      "kind": "field",
+      "name": "Staff.first_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Staff.hire_date": {
+      "file": "education_platform.apg",
+      "id": "field.Staff.hire_date",
+      "kind": "field",
+      "name": "Staff.hire_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Staff.last_name": {
+      "file": "education_platform.apg",
+      "id": "field.Staff.last_name",
+      "kind": "field",
+      "name": "Staff.last_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Staff.qualifications": {
+      "file": "education_platform.apg",
+      "id": "field.Staff.qualifications",
+      "kind": "field",
+      "name": "Staff.qualifications",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Staff.role": {
+      "file": "education_platform.apg",
+      "id": "field.Staff.role",
+      "kind": "field",
+      "name": "Staff.role",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Staff.staff_id": {
+      "file": "education_platform.apg",
+      "id": "field.Staff.staff_id",
+      "kind": "field",
+      "name": "Staff.staff_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Staff.status": {
+      "file": "education_platform.apg",
+      "id": "field.Staff.status",
+      "kind": "field",
+      "name": "Staff.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.Staff.subjects": {
+      "file": "education_platform.apg",
+      "id": "field.Staff.subjects",
+      "kind": "field",
+      "name": "Staff.subjects",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Student.admission_number": {
+      "file": "education_platform.apg",
+      "id": "field.Student.admission_number",
+      "kind": "field",
+      "name": "Student.admission_number",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Student.class_id": {
+      "file": "education_platform.apg",
+      "id": "field.Student.class_id",
+      "kind": "field",
+      "name": "Student.class_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 11
+        },
+        "start": {
+          "character": 4,
+          "line": 11
+        }
+      },
+      "references": []
+    },
+    "field.Student.date_of_birth": {
+      "file": "education_platform.apg",
+      "id": "field.Student.date_of_birth",
+      "kind": "field",
+      "name": "Student.date_of_birth",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Student.enrolment_date": {
+      "file": "education_platform.apg",
+      "id": "field.Student.enrolment_date",
+      "kind": "field",
+      "name": "Student.enrolment_date",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 13
+        },
+        "start": {
+          "character": 4,
+          "line": 13
+        }
+      },
+      "references": []
+    },
+    "field.Student.first_name": {
+      "file": "education_platform.apg",
+      "id": "field.Student.first_name",
+      "kind": "field",
+      "name": "Student.first_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Student.gender": {
+      "file": "education_platform.apg",
+      "id": "field.Student.gender",
+      "kind": "field",
+      "name": "Student.gender",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Student.guardian_email": {
+      "file": "education_platform.apg",
+      "id": "field.Student.guardian_email",
+      "kind": "field",
+      "name": "Student.guardian_email",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.Student.guardian_name": {
+      "file": "education_platform.apg",
+      "id": "field.Student.guardian_name",
+      "kind": "field",
+      "name": "Student.guardian_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.Student.guardian_phone": {
+      "file": "education_platform.apg",
+      "id": "field.Student.guardian_phone",
+      "kind": "field",
+      "name": "Student.guardian_phone",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Student.last_name": {
+      "file": "education_platform.apg",
+      "id": "field.Student.last_name",
+      "kind": "field",
+      "name": "Student.last_name",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Student.national_id": {
+      "file": "education_platform.apg",
+      "id": "field.Student.national_id",
+      "kind": "field",
+      "name": "Student.national_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Student.special_needs": {
+      "file": "education_platform.apg",
+      "id": "field.Student.special_needs",
+      "kind": "field",
+      "name": "Student.special_needs",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 15
+        },
+        "start": {
+          "character": 4,
+          "line": 15
+        }
+      },
+      "references": []
+    },
+    "field.Student.status": {
+      "file": "education_platform.apg",
+      "id": "field.Student.status",
+      "kind": "field",
+      "name": "Student.status",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 14
+        },
+        "start": {
+          "character": 4,
+          "line": 14
+        }
+      },
+      "references": []
+    },
+    "field.Student.stream_id": {
+      "file": "education_platform.apg",
+      "id": "field.Student.stream_id",
+      "kind": "field",
+      "name": "Student.stream_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 12
+        },
+        "start": {
+          "character": 4,
+          "line": 12
+        }
+      },
+      "references": []
+    },
+    "field.Student.student_id": {
+      "file": "education_platform.apg",
+      "id": "field.Student.student_id",
+      "kind": "field",
+      "name": "Student.student_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Submission.assessment_id": {
+      "file": "education_platform.apg",
+      "id": "field.Submission.assessment_id",
+      "kind": "field",
+      "name": "Submission.assessment_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.Submission.enrolment_id": {
+      "file": "education_platform.apg",
+      "id": "field.Submission.enrolment_id",
+      "kind": "field",
+      "name": "Submission.enrolment_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.Submission.feedback": {
+      "file": "education_platform.apg",
+      "id": "field.Submission.feedback",
+      "kind": "field",
+      "name": "Submission.feedback",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.Submission.grade": {
+      "file": "education_platform.apg",
+      "id": "field.Submission.grade",
+      "kind": "field",
+      "name": "Submission.grade",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.Submission.graded_at": {
+      "file": "education_platform.apg",
+      "id": "field.Submission.graded_at",
+      "kind": "field",
+      "name": "Submission.graded_at",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "field.Submission.graded_by": {
+      "file": "education_platform.apg",
+      "id": "field.Submission.graded_by",
+      "kind": "field",
+      "name": "Submission.graded_by",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.Submission.score": {
+      "file": "education_platform.apg",
+      "id": "field.Submission.score",
+      "kind": "field",
+      "name": "Submission.score",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.Submission.student_id": {
+      "file": "education_platform.apg",
+      "id": "field.Submission.student_id",
+      "kind": "field",
+      "name": "Submission.student_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.Submission.submission_id": {
+      "file": "education_platform.apg",
+      "id": "field.Submission.submission_id",
+      "kind": "field",
+      "name": "Submission.submission_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.Submission.submitted_at": {
+      "file": "education_platform.apg",
+      "id": "field.Submission.submitted_at",
+      "kind": "field",
+      "name": "Submission.submitted_at",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.TimetableSlot.academic_year": {
+      "file": "education_platform.apg",
+      "id": "field.TimetableSlot.academic_year",
+      "kind": "field",
+      "name": "TimetableSlot.academic_year",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "references": []
+    },
+    "field.TimetableSlot.class_id": {
+      "file": "education_platform.apg",
+      "id": "field.TimetableSlot.class_id",
+      "kind": "field",
+      "name": "TimetableSlot.class_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 2
+        },
+        "start": {
+          "character": 4,
+          "line": 2
+        }
+      },
+      "references": []
+    },
+    "field.TimetableSlot.day_of_week": {
+      "file": "education_platform.apg",
+      "id": "field.TimetableSlot.day_of_week",
+      "kind": "field",
+      "name": "TimetableSlot.day_of_week",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 6
+        },
+        "start": {
+          "character": 4,
+          "line": 6
+        }
+      },
+      "references": []
+    },
+    "field.TimetableSlot.period_end": {
+      "file": "education_platform.apg",
+      "id": "field.TimetableSlot.period_end",
+      "kind": "field",
+      "name": "TimetableSlot.period_end",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 8
+        },
+        "start": {
+          "character": 4,
+          "line": 8
+        }
+      },
+      "references": []
+    },
+    "field.TimetableSlot.period_start": {
+      "file": "education_platform.apg",
+      "id": "field.TimetableSlot.period_start",
+      "kind": "field",
+      "name": "TimetableSlot.period_start",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
+      },
+      "references": []
+    },
+    "field.TimetableSlot.room_id": {
+      "file": "education_platform.apg",
+      "id": "field.TimetableSlot.room_id",
+      "kind": "field",
+      "name": "TimetableSlot.room_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 5
+        },
+        "start": {
+          "character": 4,
+          "line": 5
+        }
+      },
+      "references": []
+    },
+    "field.TimetableSlot.slot_id": {
+      "file": "education_platform.apg",
+      "id": "field.TimetableSlot.slot_id",
+      "kind": "field",
+      "name": "TimetableSlot.slot_id",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "references": []
+    },
+    "field.TimetableSlot.subject": {
+      "file": "education_platform.apg",
+      "id": "field.TimetableSlot.subject",
+      "kind": "field",
+      "name": "TimetableSlot.subject",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 3
+        },
+        "start": {
+          "character": 4,
+          "line": 3
+        }
+      },
+      "references": []
+    },
+    "field.TimetableSlot.teacher_id": {
+      "file": "education_platform.apg",
+      "id": "field.TimetableSlot.teacher_id",
+      "kind": "field",
+      "name": "TimetableSlot.teacher_id",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 4
+        },
+        "start": {
+          "character": 4,
+          "line": 4
+        }
+      },
+      "references": []
+    },
+    "field.TimetableSlot.term": {
+      "file": "education_platform.apg",
+      "id": "field.TimetableSlot.term",
+      "kind": "field",
+      "name": "TimetableSlot.term",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 11
+        },
+        "start": {
+          "character": 4,
+          "line": 11
+        }
+      },
+      "references": []
+    },
+    "field.TimetableSlot.week_type": {
+      "file": "education_platform.apg",
+      "id": "field.TimetableSlot.week_type",
+      "kind": "field",
+      "name": "TimetableSlot.week_type",
+      "range": {
+        "end": {
+          "character": 5,
+          "line": 9
+        },
+        "start": {
+          "character": 4,
+          "line": 9
+        }
+      },
+      "references": []
+    },
+    "llm.ollama:llama3.2": {
+      "file": "education_platform.apg",
+      "id": "llm.ollama:llama3.2",
+      "kind": "llm",
+      "name": "ollama:llama3.2",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "module.education_platform": {
+      "file": "education_platform.apg",
+      "id": "module.education_platform",
+      "kind": "module",
+      "name": "education_platform",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.AcademicCalendar": {
+      "file": "education_platform.apg",
+      "id": "table.AcademicCalendar",
+      "kind": "table",
+      "name": "AcademicCalendar",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.AcademicClass": {
+      "file": "education_platform.apg",
+      "id": "table.AcademicClass",
+      "kind": "table",
+      "name": "AcademicClass",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Assessment": {
+      "file": "education_platform.apg",
+      "id": "table.Assessment",
+      "kind": "table",
+      "name": "Assessment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Certificate": {
+      "file": "education_platform.apg",
+      "id": "table.Certificate",
+      "kind": "table",
+      "name": "Certificate",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Course": {
+      "file": "education_platform.apg",
+      "id": "table.Course",
+      "kind": "table",
+      "name": "Course",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Enrolment": {
+      "file": "education_platform.apg",
+      "id": "table.Enrolment",
+      "kind": "table",
+      "name": "Enrolment",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.ParentCommunication": {
+      "file": "education_platform.apg",
+      "id": "table.ParentCommunication",
+      "kind": "table",
+      "name": "ParentCommunication",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Staff": {
+      "file": "education_platform.apg",
+      "id": "table.Staff",
+      "kind": "table",
+      "name": "Staff",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Student": {
+      "file": "education_platform.apg",
+      "id": "table.Student",
+      "kind": "table",
+      "name": "Student",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.Submission": {
+      "file": "education_platform.apg",
+      "id": "table.Submission",
+      "kind": "table",
+      "name": "Submission",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "table.TimetableSlot": {
+      "file": "education_platform.apg",
+      "id": "table.TimetableSlot",
+      "kind": "table",
+      "name": "TimetableSlot",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.AcademicCalendarManagement": {
+      "file": "education_platform.apg",
+      "id": "workflow.AcademicCalendarManagement",
+      "kind": "workflow",
+      "name": "AcademicCalendarManagement",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.LearningAndAssessmentFlow": {
+      "file": "education_platform.apg",
+      "id": "workflow.LearningAndAssessmentFlow",
+      "kind": "workflow",
+      "name": "LearningAndAssessmentFlow",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.ParentCommunicationFlow": {
+      "file": "education_platform.apg",
+      "id": "workflow.ParentCommunicationFlow",
+      "kind": "workflow",
+      "name": "ParentCommunicationFlow",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    },
+    "workflow.StudentEnrolmentPipeline": {
+      "file": "education_platform.apg",
+      "id": "workflow.StudentEnrolmentPipeline",
+      "kind": "workflow",
+      "name": "StudentEnrolmentPipeline",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {
+    "AcademicCalendar": {
+      "fields": {
+        "academic_year": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "active": {
+          "relationship": null,
+          "required": true,
+          "type": "bool"
+        },
+        "calendar_id": {
+          "relationship": {
+            "alias": "calendar",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Calendar"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "events": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        },
+        "term": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "term_end": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "term_start": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        }
+      },
+      "lookup_paths": {
+        "events.id": {
+          "chain": [
+            "AcademicCalendar.events",
+            "List.id"
+          ],
+          "valid": true
+        },
+        "term_end.id": {
+          "chain": [
+            "AcademicCalendar.term_end",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "term_start.id": {
+          "chain": [
+            "AcademicCalendar.term_start",
+            "date.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "AcademicCalendar"
+    },
+    "AcademicClass": {
+      "fields": {
+        "academic_year": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "capacity": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "class_id": {
+          "relationship": {
+            "alias": "class",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Class"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "class_teacher_id": {
+          "relationship": {
+            "alias": "class_teacher",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "ClassTeacher"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "level": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "room_id": {
+          "relationship": {
+            "alias": "room",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Room"
+          },
+          "required": false,
+          "type": "str"
+        },
+        "stream": {
+          "relationship": null,
+          "required": false,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "AcademicClass"
+    },
+    "Assessment": {
+      "fields": {
+        "assessment_id": {
+          "relationship": {
+            "alias": "assessment",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Assessment"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "assessment_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "attempts_allowed": {
+          "relationship": null,
+          "required": true,
+          "type": "int"
+        },
+        "course_id": {
+          "relationship": {
+            "alias": "course",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Course"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "due_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": false,
+          "type": "datetime"
+        },
+        "max_score": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "passing_score": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "title": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "weight_percent": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        }
+      },
+      "lookup_paths": {
+        "due_at.id": {
+          "chain": [
+            "Assessment.due_at",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Assessment"
+    },
+    "Certificate": {
+      "fields": {
+        "certificate_id": {
+          "relationship": {
+            "alias": "certificate",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Certificate"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "certificate_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "course_id": {
+          "relationship": {
+            "alias": "course",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Course"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "enrolment_id": {
+          "relationship": {
+            "alias": "enrolment",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Enrolment"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "expires_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": false,
+          "type": "datetime"
+        },
+        "issued_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "issuer_id": {
+          "relationship": {
+            "alias": "issuer",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Issuer"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "student_id": {
+          "relationship": {
+            "alias": "student",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Student"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "expires_at.id": {
+          "chain": [
+            "Certificate.expires_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "issued_at.id": {
+          "chain": [
+            "Certificate.issued_at",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Certificate"
+    },
+    "Course": {
+      "fields": {
+        "code": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "course_id": {
+          "relationship": {
+            "alias": "course",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Course"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "course_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "description": {
+          "relationship": null,
+          "required": false,
+          "type": "str"
+        },
+        "duration_weeks": {
+          "relationship": null,
+          "required": false,
+          "type": "int"
+        },
+        "owner_id": {
+          "relationship": {
+            "alias": "owner",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Owner"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "passing_score": {
+          "relationship": null,
+          "required": true,
+          "type": "float"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "subject": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "tags": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        },
+        "title": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "tags.id": {
+          "chain": [
+            "Course.tags",
+            "List.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Course"
+    },
+    "Enrolment": {
+      "fields": {
+        "class_id": {
+          "relationship": {
+            "alias": "class",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Class"
+          },
+          "required": false,
+          "type": "str"
+        },
+        "completed_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": false,
+          "type": "datetime"
+        },
+        "course_id": {
+          "relationship": {
+            "alias": "course",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Course"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "enrolled_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "enrolment_id": {
+          "relationship": {
+            "alias": "enrolment",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Enrolment"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "enrolment_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "student_id": {
+          "relationship": {
+            "alias": "student",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Student"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "completed_at.id": {
+          "chain": [
+            "Enrolment.completed_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "enrolled_at.id": {
+          "chain": [
+            "Enrolment.enrolled_at",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Enrolment"
+    },
+    "ParentCommunication": {
+      "fields": {
+        "body": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "channel": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "guardian_email": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "guardian_phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "message_id": {
+          "relationship": {
+            "alias": "message",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Message"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "message_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "sent_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": false,
+          "type": "datetime"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "student_id": {
+          "relationship": {
+            "alias": "student",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Student"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "subject": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "sent_at.id": {
+          "chain": [
+            "ParentCommunication.sent_at",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "ParentCommunication"
+    },
+    "Staff": {
+      "fields": {
+        "department_id": {
+          "relationship": {
+            "alias": "department",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Department"
+          },
+          "required": false,
+          "type": "str"
+        },
+        "employee_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "first_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "hire_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "last_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "qualifications": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        },
+        "role": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "staff_id": {
+          "relationship": {
+            "alias": "staff",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Staff"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "subjects": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        }
+      },
+      "lookup_paths": {
+        "hire_date.id": {
+          "chain": [
+            "Staff.hire_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "qualifications.id": {
+          "chain": [
+            "Staff.qualifications",
+            "List.id"
+          ],
+          "valid": true
+        },
+        "subjects.id": {
+          "chain": [
+            "Staff.subjects",
+            "List.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Staff"
+    },
+    "Student": {
+      "fields": {
+        "admission_number": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "class_id": {
+          "relationship": {
+            "alias": "class",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Class"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "date_of_birth": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        },
+        "enrolment_date": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "date"
+          },
+          "required": true,
+          "type": "date"
+        },
+        "first_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "gender": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "guardian_email": {
+          "relationship": null,
+          "required": false,
+          "type": "str"
+        },
+        "guardian_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "guardian_phone": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "last_name": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "national_id": {
+          "relationship": {
+            "alias": "national",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "National"
+          },
+          "required": false,
+          "type": "str"
+        },
+        "special_needs": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "List"
+          },
+          "required": true,
+          "type": "List"
+        },
+        "status": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "stream_id": {
+          "relationship": {
+            "alias": "stream",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Stream"
+          },
+          "required": false,
+          "type": "str"
+        },
+        "student_id": {
+          "relationship": {
+            "alias": "student",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Student"
+          },
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {
+        "date_of_birth.id": {
+          "chain": [
+            "Student.date_of_birth",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "enrolment_date.id": {
+          "chain": [
+            "Student.enrolment_date",
+            "date.id"
+          ],
+          "valid": true
+        },
+        "special_needs.id": {
+          "chain": [
+            "Student.special_needs",
+            "List.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Student"
+    },
+    "Submission": {
+      "fields": {
+        "assessment_id": {
+          "relationship": {
+            "alias": "assessment",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Assessment"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "enrolment_id": {
+          "relationship": {
+            "alias": "enrolment",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Enrolment"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "feedback": {
+          "relationship": null,
+          "required": false,
+          "type": "str"
+        },
+        "grade": {
+          "relationship": null,
+          "required": false,
+          "type": "str"
+        },
+        "graded_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": false,
+          "type": "datetime"
+        },
+        "graded_by": {
+          "relationship": null,
+          "required": false,
+          "type": "str"
+        },
+        "score": {
+          "relationship": null,
+          "required": false,
+          "type": "float"
+        },
+        "student_id": {
+          "relationship": {
+            "alias": "student",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Student"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "submission_id": {
+          "relationship": {
+            "alias": "submission",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Submission"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "submitted_at": {
+          "relationship": {
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "datetime"
+          },
+          "required": true,
+          "type": "datetime"
+        }
+      },
+      "lookup_paths": {
+        "graded_at.id": {
+          "chain": [
+            "Submission.graded_at",
+            "datetime.id"
+          ],
+          "valid": true
+        },
+        "submitted_at.id": {
+          "chain": [
+            "Submission.submitted_at",
+            "datetime.id"
+          ],
+          "valid": true
+        }
+      },
+      "name": "Submission"
+    },
+    "TimetableSlot": {
+      "fields": {
+        "academic_year": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "class_id": {
+          "relationship": {
+            "alias": "class",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Class"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "day_of_week": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "period_end": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "period_start": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "room_id": {
+          "relationship": {
+            "alias": "room",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Room"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "slot_id": {
+          "relationship": {
+            "alias": "slot",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Slot"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "subject": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "teacher_id": {
+          "relationship": {
+            "alias": "teacher",
+            "cardinality": "many-to-one",
+            "target_field": "id",
+            "target_table": "Teacher"
+          },
+          "required": true,
+          "type": "str"
+        },
+        "term": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        },
+        "week_type": {
+          "relationship": null,
+          "required": true,
+          "type": "str"
+        }
+      },
+      "lookup_paths": {},
+      "name": "TimetableSlot"
+    }
+  },
+  "views": {}
+}
