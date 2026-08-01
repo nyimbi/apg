@@ -26,19 +26,23 @@ ALLOWED_ROOT_TRACKED_FILES = {
 	"README.md",
 	"PACKAGES.md",
 	"CONTRIBUTING.md",
+	"CHANGELOG.md",       # Wave U: release history
 	"cli.py",
 	"conftest.py",
 	"docker-compose.yml",
 	"Dockerfile.capability",
 	"Dockerfile.gateway",
+	"Makefile",           # Wave U: dev convenience targets
+	"prompt.md",
+	"pyproject.toml",     # Wave U: PEP 517 packaging metadata
 	"pytest.ini",
 	"requirements.txt",
 	"setup.py",
 	"uuid_extensions.py",
-	"prompt.md",
+	"VERSION",            # Wave U: single-source version file
 	"catalog-info.yaml",   # Backstage software catalog for APG developer portal
 }
-ALLOWED_ROOT_MARKDOWN = {"README.md", "PACKAGES.md", "CONTRIBUTING.md", "prompt.md"}
+ALLOWED_ROOT_MARKDOWN = {"README.md", "PACKAGES.md", "CONTRIBUTING.md", "CHANGELOG.md", "prompt.md"}
 SOURCE_ROOT_OPERATIONAL_DOC_DIRECTORIES = {"capabilities", "gen", "mobile_apps"}
 SOURCE_ROOT_OPERATIONAL_DOC_SUFFIXES = (
 	"_COMPLETE.md",
@@ -76,6 +80,9 @@ STREAMING_TERM_EXCLUDED_PATHS = {
 	"docs/capability_integration_guide.md",
 	"docs/progress_log.md",
 	"docs/competitive_analysis_2025.md",  # competitor analysis legitimately references external platforms
+	"docs/research/app-generator-competitive-landscape-2026/README.md",  # competitive landscape; references external platforms
+	"docs/research/skill-plugin-audit-2026-07/README.md",  # skill audit research; references external platforms
+	"docs/test-failures-wave-v.md",  # Wave V test failure notes; references external systems for context
 	"tests/test_repository_hygiene.py",
 	"compiler/repository_hygiene.py",
 }
