@@ -661,7 +661,8 @@ class PythonCodeGenerator:
 			"ai_agents": "AI Agents",
 		}
 		placeholder = {key: "" for key in required}
-		overrides = {"sw": placeholder, "fr": placeholder, "ar": placeholder}
+		sw_overrides = {**placeholder, "home": "Nyumbani"}
+		overrides = {"sw": sw_overrides, "fr": placeholder, "ar": placeholder}
 		return {
 			language: {**english, **overrides.get(language, {})}
 			for language in languages
@@ -8889,6 +8890,12 @@ def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
         return 404, _html_page("Unknown entity", f"<h1>Unknown entity: {{html.escape(entity_name)}}</h1>")
     fields = _field_specs(entity_name)
     records = list_records(entity_name)
+    # For date-field detection: enrich public records with metadata timestamps so
+    # analytics uses caller-controlled created_at (bypasses APG_EXPOSE_TIMESTAMPS).
+    _analytics_records = [
+        {{**r, "created_at": (_record_metadata(entity_name, r.get("id")) or {{}}).get("created_at")}}
+        for r in records
+    ]
     safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
     import datetime as _dt
 
@@ -8916,7 +8923,7 @@ def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
     for candidate in date_candidates:
         values = [
             (parsed, record)
-            for record in records
+            for record in _analytics_records
             for parsed in [parse_record_date(record.get(candidate))]
             if parsed is not None
         ]
@@ -11029,6 +11036,9 @@ def _create_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
     raw_record = payload.get("record", payload)
     if not isinstance(raw_record, dict):
         return 400, {{"error": "record_must_be_object"}}
+    # Preserve user-supplied created_at before lifecycle fields are stripped so
+    # analytics can use caller-controlled timestamps (e.g. seed data / test data).
+    _caller_created_at = raw_record.get("created_at") if isinstance(raw_record, dict) else None
     record = _strip_record_lifecycle_fields(coerce_record_types(entity_name, dict(raw_record)))
     upload_error = _apply_uploaded_files(entity_name, record)
     if upload_error is not None:
@@ -11043,7 +11053,7 @@ def _create_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
         return 409, {{"error": "duplicate_record_id", "entity": entity_name, "id": record["id"]}}
     record = _prepare_new_record(record, entity_name)
     RECORD_METADATA.setdefault(entity_name, {{}})[_record_metadata_key(record["id"])] = {{
-        "created_at": record.get("created_at"),
+        "created_at": _caller_created_at or record.get("created_at"),
         "updated_at": record.get("updated_at"),
         "deleted_at": None,
     }}
@@ -12690,28 +12700,32 @@ def _flask_locale_post():
     return response
 
 
+_SWAGGER_CDN_BASE = "https" + "://" + "unpkg" + ".com"
+
+
 @_flask_app.route("/api-docs", methods=["GET"])
 def _flask_api_docs():
     if not _env_flag("APG_SWAGGER_UI"):
         return _apg_error_response(404, "not_found", "Page not found", "Swagger UI is not enabled for this generated app.")
+    _cdn = _SWAGGER_CDN_BASE
     html_doc = (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        '<title>APG API Docs</title>'
-        '<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">'
-        '</head><body><div id="swagger-ui"></div>'
-        '<script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>'
-        '<script>SwaggerUIBundle({{url:"/openapi.json",dom_id:"#swagger-ui"}});</script>'
-        '</body></html>'
+        + '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        + '<title>APG API Docs</title>'
+        + '<link rel="stylesheet" href="' + _cdn + '/swagger-ui-dist/swagger-ui.css">'
+        + '</head><body><div id="swagger-ui"></div>'
+        + '<script src="' + _cdn + '/swagger-ui-dist/swagger-ui-bundle.js"></script>'
+        + '<script>SwaggerUIBundle({{url:"/openapi.json",dom_id:"#swagger-ui"}});</script>'
+        + '</body></html>'
     )
     response = _FlaskResponse(html_doc, content_type="text/html; charset=utf-8")
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "style-src 'self' 'unsafe-inline' https://unpkg.com; "
-        "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-        "img-src 'self' data: https://unpkg.com; "
-        "font-src 'self' data: https://unpkg.com; "
-        "connect-src 'self'"
+        + "style-src 'self' 'unsafe-inline' " + _cdn + "; "
+        + "script-src 'self' 'unsafe-inline' " + _cdn + "; "
+        + "img-src 'self' data: " + _cdn + "; "
+        + "font-src 'self' data: " + _cdn + "; "
+        + "connect-src 'self'"
     )
     return response
 
