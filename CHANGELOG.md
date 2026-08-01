@@ -23,3 +23,7 @@
 - Wave S: LSP server support for completion, hover, diagnostics, and go-to-definition.
 - Wave T: CLI excellence with `init`, `doctor`, `watch`, `serve`, and Docker `export`.
 - Wave U: Python package metadata, editable install support, PyPI build scaffold, Makefile targets, changelog, and version file.
+- Wave V: GitHub Actions CI pipeline with test, lint, and type-check jobs; conftest fixtures and test suite cleanup.
+- Wave W: MkDocs documentation site with Material theme; 17-page reference covering quickstart, CLI, configuration, relationships, enums, webhooks, file uploads, computed fields, security, and cookbook.
+- Wave X: PostgreSQL DDL generation (BIGSERIAL, RETURNING, TIMESTAMPTZ, information_schema queries, %s placeholders); integration test harness for SQLite and PostgreSQL.
+- Wave X.1: PG placeholder port — BIGSERIAL primary keys, RETURNING clauses, information_schema column lookups, and %s-style query parameters across all generated app paths.

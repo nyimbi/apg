@@ -60,17 +60,38 @@ That's it. You now have a running Flask service with:
 
 ## Key features
 
-- **All field types** — `str`, `int`, `float`, `decimal`, `bool`, `date`, `datetime`, `time`, `bytes`, `uuid`, `json`, `file`, collection types
-- **Relationships** — `has_many`, `belongs_to`, `has_one`, and through-associations with nested REST endpoints
-- **Validation** — `@email`, `@min_length`, `@max_length`, `@min`, `@max`, `@pattern`, `@optional`
-- **Enums** — `enum ["a", "b", "c"]` inline or named
-- **Computed fields** — server-side expressions derived at read time
-- **Workflows** — state-machine step definitions with human tasks and guards
-- **Webhooks** — HMAC-signed outbound webhooks with retry
-- **Full-text search** — FTS5-backed search endpoints
-- **Multi-tenancy** — tenant isolation scaffolding
-- **i18n** — locale and theme scaffolding
-- **VS Code extension** — syntax highlighting, snippets, and Language Server
+**DSL**
+
+- **All field types** — `str`, `int`, `float`, `decimal`, `bool`, `date`, `datetime`, `time`, `bytes`, `uuid`, `json`, `file`, `List`, `Dict`, `Set`, collection types
+- **Relationships** — `has_many`, `belongs_to`, `has_one`, and `through`-associations with nested REST endpoints
+- **Validation** — `@email`, `@min_length`, `@max_length`, `@min`, `@max`, `@pattern`, `@optional` field annotations
+- **Enums** — inline `enum ["a", "b", "c"]` or named enum types
+- **Computed fields** — server-side expressions derived at read time with no storage overhead
+
+**Generated app**
+
+- **Security** — scrypt password hashing, session-fixation defense, login throttle, rate limiting, CSP nonce, branded error pages, append-only audit log
+- **REST API** — OpenAPI 3.1, pagination, filtering, sort, CSV export, FTS5 full-text search, gzip/ETag/Cache-Control
+- **Database** — SQLite + PostgreSQL (`APG_DATABASE_URL`), soft deletes, auto-migration, bulk ops, timestamps; BIGSERIAL PKs and `%s` placeholders for PostgreSQL
+- **Integrations** — outbound HMAC-signed webhooks with retry, SMTP email, file uploads with type/size guards
+- **Multi-tenancy** — per-request tenant isolation via header
+- **i18n** — locale scaffolding, fallback chain, per-export locale
+- **Job queue** — in-process thread-pool background jobs
+- **Column ACL + row ownership** — field-level access control and per-user record ownership
+
+**Tooling**
+
+- **CLI** — `init`, `compile`, `doctor`, `watch`, `serve`, `export`, `baseline`, `lint`, `format`, `diagnostics`, `language-server`
+- **LSP server** — completion, hover, diagnostics, and go-to-definition for `.apg` files
+- **VS Code extension** — syntax highlighting, snippets, and Language Server integration
+- **GitHub Actions CI** — test, lint, and type-check pipeline
+
+**Ops**
+
+- `/livez`, `/readyz` liveness and readiness probes
+- Prometheus `/metrics` with request counters and duration histograms
+- Structured JSON logs with `X-Request-ID` propagation
+- Docker `export` for container delivery
 
 ---
 

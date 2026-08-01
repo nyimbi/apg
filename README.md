@@ -39,14 +39,36 @@ flowchart LR
     R[compiler/assets/] --> G
 ```
 
-## Quick Start
-
-Install the developer environment with `uv`:
+## Install
 
 ```bash
-uv venv .venv
-uv pip install -e ".[dev]"
+pip install -e .          # minimal install (compiler + CLI)
+pip install -e ".[dev]"   # adds test deps, type checker, linters
 ```
+
+Or with `uv`:
+
+```bash
+uv venv .venv && uv pip install -e ".[dev]"
+```
+
+Verify:
+
+```bash
+apg --help
+```
+
+## Quick Start
+
+Three commands from zero to running app:
+
+```bash
+apg init myapp                       # scaffold project directory
+apg compile myapp/app.apg -o out/    # compile .apg → Flask app
+python out/app.py                    # run on http://127.0.0.1:8080
+```
+
+Or scaffold, edit, and serve in one workflow:
 
 Write `clinic.apg`:
 
@@ -97,27 +119,54 @@ apg baseline examples --refresh
 
 ## Key Features
 
-- Python-first compiler pipeline: parser, AST builder, semantic model, lint,
-  validation, graphs, code generation, packaging, release evidence, and drift
-  checks.
-- Generated Flask applications with `app.py`, package exports, OpenAPI 3.1,
-  component manifests, semantic models, smoke tests, Dockerfile, environment
-  example, and optional agent/capability/application sidecars.
-- Self-contained generated UI. Browser dependencies are vendored into
-  `static/`; generated apps do not require CDN assets.
-- Capability contracts with configuration, deterministic rules, UI route
-  metadata, theme tokens, i18n metadata, streaming metadata, and package
-  lifecycle audits.
-- Agent and team composition for Codex, Claude Code, OpenCode, OpenAI, Ollama,
-  Pi, and compatible adapter runtimes.
-- Africa-first product surface: payments and financial rails are modeled around
-  MPESA, MTN MoMo, Airtel Money, Orange Money, Wave, M-Shwari, SACCO workflows,
-  USSD, multilingual UI, and low-bandwidth operational use.
-- Baseline gate for all numbered examples: semantic/lint/validate readiness,
-  graph-suite output, generated release evidence, output synchronization,
-  self-tests, smoke tests, HTTP contract probes, and Python-only targeting.
-- Current full repository test evidence: `uv run pytest tests/ -q` completed
-  with 1486 passed, 1 skipped, and 3 warnings.
+**DSL**
+
+- Typed entities: `str`, `int`, `float`, `decimal`, `bool`, `date`, `datetime`,
+  `time`, `bytes`, `uuid`, `json`, `file`, `List`, `Dict`, `Set`
+- Relationships: `has_many`, `belongs_to`, `has_one`, `through`-associations
+  with generated nested REST endpoints
+- Validators: `@email`, `@min_length`, `@max_length`, `@min`, `@max`,
+  `@pattern`, `@optional`
+- Named and inline enums; computed fields; workflow state machines
+
+**Generated App**
+
+- Security: scrypt password hashing, session-fixation defense, login throttle,
+  CSP nonce, rate limiting, column ACL, row ownership, branded error pages,
+  append-only audit log
+- REST CRUD with OpenAPI 3.1, pagination, filtering, sort, FTS5 full-text
+  search, CSV export, gzip/ETag/Cache-Control
+- SQLite + PostgreSQL (`APG_DATABASE_URL`), soft deletes, auto-migration,
+  bulk ops, timestamps
+- Outbound HMAC-signed webhooks, SMTP email, file uploads with type/size guards
+- Multi-tenancy, i18n with fallback chain, in-process background job queue
+- Dark mode, mobile, and print CSS; self-contained static assets (no CDN)
+
+**Tooling**
+
+- CLI: `init`, `compile`, `doctor`, `watch`, `serve`, `export`, `baseline`,
+  `lint`, `format`, `diagnostics`, `language-server`
+- LSP server: completion, hover, diagnostics, go-to-definition for `.apg` files
+- VS Code extension scaffold; GitHub Actions CI pipeline
+
+**Ops**
+
+- `/livez`, `/readyz` probes; Prometheus `/metrics`
+- Structured JSON logs; `X-Request-ID` propagation
+- Docker `export`; PyPI-ready `pyproject.toml` with `apg` console entry point
+
+**Compiler**
+
+- Python-first pipeline: parser, AST, semantic model, lint, validation, graphs,
+  code generation, packaging, release evidence, drift checks
+- Capability contracts with deterministic rules, theme tokens, i18n metadata,
+  streaming metadata, and package lifecycle audits
+- Agent and team composition: Codex, Claude Code, OpenCode, OpenAI, Ollama, Pi
+
+**Africa-first**
+
+- MPESA, MTN MoMo, Airtel Money, Orange Money, Wave, M-Shwari, SACCO workflows
+- USSD, multilingual UI, low-bandwidth operational use
 
 ## Capability Domains
 
@@ -269,4 +318,6 @@ apg/
 
 ## License
 
-Copyright (c) 2025 Datacraft. Author: Nyimbi Odero.
+Copyright © 2025 Datacraft. Author: Nyimbi Odero &lt;nyimbi@gmail.com&gt; — [www.datacraft.co.ke](https://www.datacraft.co.ke)
+
+Full documentation: [docs/site/](docs/site/)
