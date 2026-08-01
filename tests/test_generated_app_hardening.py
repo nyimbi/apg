@@ -213,6 +213,7 @@ def test_generated_app_serves_branded_not_found_page():
 
 def test_generated_production_mode_denies_unconfigured_api_mutations(monkeypatch):
 	monkeypatch.setenv("APG_PRODUCTION", "1")
+	monkeypatch.setenv("APG_SECRET_KEY", "test-secret-key-for-production-hardening")
 	monkeypatch.delenv("APG_API_KEY", raising=False)
 	monkeypatch.delenv("APG_JWT_SECRET", raising=False)
 	namespace = _generated_namespace(OPEN_SOURCE)

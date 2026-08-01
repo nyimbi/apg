@@ -983,7 +983,7 @@ def _validate_startup_configuration() -> None:
     try:
         if not _apg_production_env_enabled():
             return
-        if _flask_app.secret_key == "dev-secret-key-change-me":
+        if not _configured_session_secret() or _flask_app.secret_key == "dev-secret-key-change-me":
             raise RuntimeError("Set APG_SECRET_KEY in production")
         if _flask_app.config.get("SESSION_COOKIE_SECURE") is False:
             _logging.getLogger("apg").warning("APG_PRODUCTION is enabled but SESSION_COOKIE_SECURE is false.")
