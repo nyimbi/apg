@@ -56,6 +56,7 @@ nav:
       - Configuration Reference: generated/configuration.md
   - Cookbook:
       - CRUD App in 5 minutes: cookbook/crud-5min.md
+      - In-process Job Queue: cookbook/job-queue.md
       - Multi-tenant SaaS: cookbook/multi-tenant.md
       - With Relationships: cookbook/relationships.md
       - Adding Webhooks: cookbook/webhooks.md
