@@ -38,3 +38,6 @@ uploads/
 # Local copied reference documents belong under docs/reference and stay local.
 docs/reference/*
 !docs/reference/README.md
+
+# zvec-grep local workspace index
+.zvec-grep/
