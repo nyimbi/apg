@@ -595,7 +595,7 @@ class MPESAPaymentProcessor:
 			return base64.b64encode(initiator_password.encode()).decode()
 
 		except Exception as e:
-			self._log_error("security_credential_generation_failed", str(e))
+			self._log_mpesa_security_credential_error(str(e))
 			raise
 	
 	def _get_callback_url(self) -> str:
@@ -637,6 +637,10 @@ class MPESAPaymentProcessor:
 	def _log_mpesa_initialization_error(self, error: str):
 		"""Log MPESA initialization error"""
 		print(f"❌ MPESA initialization failed: {error}")
+
+	def _log_mpesa_security_credential_error(self, error: str):
+		"""Log MPESA security credential generation failure"""
+		print(f"❌ MPESA security credential generation failed: {error}")
 	
 	def _log_mpesa_payment_start(self, transaction_id: str, phone_number: str, amount: int):
 		"""Log MPESA payment start"""
