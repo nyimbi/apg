@@ -15,7 +15,7 @@ version: "3.9"
 # ── Shared infrastructure ────────────────────────────────────────────────────
 
 x-common-env: &common-env
-  APG_DATABASE_URL: postgresql+asyncpg://apg:apg_secret@apg-db:5432/apg
+  APG_DATABASE_URL: postgresql+asyncpg://apg:${APG_DB_PASSWORD:?set APG_DB_PASSWORD in .env - see .env.example}@apg-db:5432/apg
   APG_DEFAULT_TENANT: platform
   NATS_URL: nats://apg-nats:4222
   TEMPORAL_HOST: apg-temporal:7233
@@ -65,7 +65,7 @@ services:
       DB: postgres12
       DB_PORT: "5432"
       POSTGRES_USER: apg
-      POSTGRES_PWD: apg_secret
+      POSTGRES_PWD: ${APG_DB_PASSWORD:?set APG_DB_PASSWORD in .env - see .env.example}
       POSTGRES_SEEDS: apg-db
       DYNAMIC_CONFIG_FILE_PATH: /etc/temporal/dynamicconfig.yaml
     ports:
@@ -130,7 +130,7 @@ services:
     environment:
       POSTGRES_DB: apg
       POSTGRES_USER: apg
-      POSTGRES_PASSWORD: apg_secret
+      POSTGRES_PASSWORD: ${APG_DB_PASSWORD:?set APG_DB_PASSWORD in .env - see .env.example}
     volumes:
       - apg-db-data:/var/lib/postgresql/data
       - ./capabilities/intel/alerts/database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql

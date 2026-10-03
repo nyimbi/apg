@@ -1,8 +1,11 @@
 # APG Capability Dockerfile
-# Each capability installs as a standalone PyPI package and runs its app.py server.
+# Each capability installs as a standalone PyPI package and is served by
+# capability_runner.py, which refuses to report healthy unless the named
+# capability imports and its create_app() succeeds.
 #
 # Build: docker build -f Dockerfile.capability -t apg-capability .
-# Run:   docker run -e APG_DATABASE_URL=... -p 8080:8080 apg-capability python -m apg_intel_alerts
+# Run:   docker run -e APG_CAPABILITY=capabilities.agriculture.mkt.app \
+#          -e APG_DATABASE_URL=... -p 8080:8080 apg-capability
 
 FROM python:3.12-slim
 
@@ -19,6 +22,7 @@ RUN pip install --no-cache-dir build wheel setuptools>=68
 # Copy the full capabilities tree (used for local installs during platform mode)
 COPY capabilities/ ./capabilities/
 COPY capabilities/MANIFEST.json ./capabilities/MANIFEST.json
+COPY capability_runner.py ./capability_runner.py
 
 # Install base dependencies shared across all capabilities
 RUN pip install --no-cache-dir \
@@ -32,18 +36,20 @@ RUN pip install --no-cache-dir \
     "temporalio>=1.7" \
     "httpx>=0.27"
 
-# Install all capability packages from local source
+# Install all capability packages from local source.
+# Failures are fatal: a broken capability must not yield a "healthy" image.
 # In production, replace with: pip install apg-intel-alerts apg-fin-arc etc.
-RUN find capabilities -name "pyproject.toml" -not -path "*/build/*" -not -path "*/__pycache__/*" | \
-    xargs -I{} dirname {} | \
-    xargs -I{} pip install --no-cache-dir -e {} 2>/dev/null || true
+RUN set -eux; \
+    find capabilities -name "pyproject.toml" -not -path "*/build/*" -not -path "*/__pycache__/*" \
+        | xargs -I{} dirname {} \
+        | xargs -I{} pip install --no-cache-dir -e {}
 
 # Expose default port (override via CMD)
 EXPOSE 8080
 
-# Default healthcheck
+# Health reflects the real capability boot, not a stub process
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
-# Default: run with no-op (override in docker-compose command)
-CMD ["python", "-c", "print('Specify a capability: python -m apg_intel_alerts --port 8080')"]
+# Serve the capability named by $APG_CAPABILITY
+CMD ["python", "capability_runner.py"]

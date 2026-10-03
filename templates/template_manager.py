@@ -933,7 +933,14 @@ import os
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 # Security
-SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
+# No development fallback: a shipped default key means every deployment that
+# forgets to set SECRET_KEY shares the same signing material.
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    raise RuntimeError(
+        'SECRET_KEY is not set. Generate one with: '
+        'python -c "import secrets; print(secrets.token_hex(32))"'
+    )
 
 # Database
 DATABASE_URL = os.environ.get('DATABASE_URL') or 'sqlite:///' + os.path.join(basedir, 'app.db')

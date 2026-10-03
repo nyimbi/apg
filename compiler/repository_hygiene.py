@@ -20,6 +20,8 @@ ALLOWED_ROOT_TRACKED_FILES = {
 	"CHANGELOG.md",       # Wave U: release history
 	"cli.py",
 	"conftest.py",
+	"capability_runner.py",  # container entrypoint for Dockerfile.capability
+	"gateway.py",            # container entrypoint for Dockerfile.gateway
 	"docker-compose.yml",
 	"Dockerfile.capability",
 	"Dockerfile.gateway",

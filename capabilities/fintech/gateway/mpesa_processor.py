@@ -10,6 +10,7 @@ including STK Push, B2C, B2B, and Lipa Na MPESA Online capabilities.
 import asyncio
 import base64
 import json
+import os
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from uuid_extensions import uuid7str
@@ -576,18 +577,23 @@ class MPESAPaymentProcessor:
 		# In production, this would encrypt the initiator password with MPESA's public key
 		# Generate actual security credential using M-Pesa public key
 		try:
-			# In production, you would use the actual M-Pesa public key
-			# For now, return a basic credential
-			initiator_password = "Safcom001!"  # Default initiator password
-			
+			# No default: a hardcoded initiator password in source is a live
+			# credential leak. Startup must fail loudly without it.
+			initiator_password = os.environ.get("MPESA_INITIATOR_PASSWORD", "").strip()
+			if not initiator_password:
+				raise RuntimeError(
+					"MPESA_INITIATOR_PASSWORD is not set; refusing to build a credential "
+					"from a default. Set it in the environment (see .env.example)."
+				)
+
 			# In real implementation, this would be encrypted with M-Pesa public key
 			# from cryptography.hazmat.primitives import serialization, hashes
 			# from cryptography.hazmat.primitives.asymmetric import padding
-			
+
 			# For development, return base64 encoded password
 			import base64
 			return base64.b64encode(initiator_password.encode()).decode()
-			
+
 		except Exception as e:
 			self._log_error("security_credential_generation_failed", str(e))
 			raise
