@@ -332,6 +332,8 @@ designers, and natural-language tools.
 | `compiler.packager` | Existing package-profile builder over generated Python applications and release evidence. Extend it toward signed distribution bundles as packaging requirements deepen. |
 | `compiler.migrations` | Existing semantic-model diff planner for database and capability ownership changes. It emits `apg.migration-plan.v1` from previous/current APG sources or semantic-model JSON files. |
 | `compiler.nl_plan` | Existing constrained natural-language-to-APG-patch planner. It emits reviewable append-only DSL diffs, candidate lint, migration previews, and test plans without writing generated code. |
+| `compiler.openui_library` | Builds an OpenUI `LibrarySpec` from the APG design system, plus one typed composite per entity from the semantic model. Conformance rules from the OpenUI 1.0 spec are enforced by `validate_library`. |
+| `compiler.openui_prompt` | Deterministic system-prompt generation from a `LibrarySpec`. Same library and options give byte-identical output. |
 | `compiler.release` | Existing release evidence builder for generated applications. Extend it toward capability package and deployment evidence. |
 | `compiler.tooling_audit` | Existing aggregate fixture audit over compiler tooling catalogs. Keep it as the umbrella CI gate when Phase 0 contracts need to be proven together. |
 | `language_server.server` | Existing LSP entry point. It should move from direct parser/analyzer calls to the shared semantic model. |
@@ -877,6 +879,9 @@ apg language-server --audit-fixtures --json
 apg ide audit --json
 apg studio snapshot app.apg --json
 apg studio plan-edit app.apg --edit-json '{"operation":"add_field","table":"Customer","name":"phone","type":"str"}' --json
+apg openui app.apg --report --json
+apg openui app.apg --library --json
+apg openui app.apg --entities Patient,Appointment --tools list_patients
 apg capabilities contracts --json
 apg capabilities validate-contracts --json
 apg capabilities audit --json
@@ -1300,6 +1305,27 @@ instead of free-form rewriting.
 producing the expected intent, affected symbols, linted DSL patch, migration
 preview, or test plan, when an unrepresentable prompt stops returning `APG1201`,
 or when the planner mutates a source fixture.
+
+### `apg openui`
+
+```console
+apg openui app.apg --report --json
+apg openui app.apg --library --json
+apg openui app.apg --entities Patient,Appointment --tools list_patients
+```
+
+Emits the OpenUI component library and system prompt for a generated app's
+agent console. `--library` prints the `LibrarySpec` (components, functions,
+actions, JSON Schema); the bare form prints the system prompt; `--report`
+emits `apg.openui-prompt.v1` conformance facts and exits non-zero if any
+component signature is missing from the prompt.
+
+`--entities` selects which tables become typed composites (`<Entity>Row`,
+`<Entity>Table`, and a board trio when the table has a status field);
+`--max-entities` (default 12) bounds prompt size. Without `--entities` the
+first `--max-entities` tables are used.
+
+Design and rejected alternatives: `docs/research/openui-generative-ui/README.md`.
 
 ## Language Server Specification
 

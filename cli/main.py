@@ -39,6 +39,7 @@ from cli.lint_command import lint
 from cli.migrate_plan_command import migrate_plan
 from cli.model_command import model
 from cli.nl_plan_command import nl_plan
+from cli.openui_command import openui
 from cli.package_command import package
 from cli.package_verify_command import package_verify
 from cli.parser_golden_command import parser_golden
@@ -86,6 +87,7 @@ cli.add_command(lint)
 cli.add_command(migrate_plan)
 cli.add_command(model)
 cli.add_command(nl_plan)
+cli.add_command(openui)
 cli.add_command(package)
 cli.add_command(package_verify)
 cli.add_command(parser_golden)
