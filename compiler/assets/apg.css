@@ -959,6 +959,30 @@ html[dir="rtl"] .apg-sidebar-backdrop { inset: 0; }
 .group\/field:hover .group-hover\/field\:opacity-100,
 .group\/row:hover .group-hover\/row\:opacity-100 { opacity: 1; }
 
+/* ── OpenUI Lang render surface (compiler/openui_lang/render.py) ──────────
+   A model-generated screen renders into these. They carry layout only; every
+   visual token comes from the classes above, so a generated screen matches the
+   hand-built ones without a second design system. */
+.apg-openui-page { display: grid; gap: var(--apg-space-4); }
+.apg-openui-stack { display: flex; flex-direction: column; gap: var(--apg-space-3); }
+.apg-openui-stack[data-direction="row"] { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
+.apg-openui-stack[data-direction="row"] > * { flex: 1 1 12rem; min-width: 0; }
+.apg-openui-text { color: var(--apg-text); }
+.apg-openui-heading { font-size: 1.05rem; font-weight: 700; color: var(--apg-text); margin: 0; }
+.apg-openui-body { margin: 0; color: var(--apg-text); }
+.apg-openui-muted { margin: 0; color: var(--apg-muted); font-size: 0.875rem; }
+.apg-openui-form { display: grid; gap: var(--apg-space-3); }
+.apg-openui-link { color: var(--apg-primary); text-decoration: none; }
+.apg-openui-link:hover { text-decoration: underline; }
+.apg-openui-stream { display: grid; gap: var(--apg-space-3); }
+.apg-openui-stream[aria-busy="true"]::after {
+	content: ""; display: block; height: 2px;
+	background: linear-gradient(90deg, transparent, var(--apg-primary), transparent);
+	animation: apg-openui-pulse 1.1s ease-in-out infinite;
+}
+@keyframes apg-openui-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+.apg-openui-error { color: var(--apg-danger); font-size: 0.8rem; }
+
 @media (min-width: 640px) {
 	.sm\:block { display: block; }
 	.sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
