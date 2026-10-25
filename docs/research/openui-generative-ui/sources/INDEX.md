@@ -6,11 +6,12 @@ Accessed 2026-10-24. Local copies are authoritative; URLs are provenance only.
 
 | Document | Local copy | Upstream URL |
 | --- | --- | --- |
+| OpenUI Overview, v1.0 — what OpenUI is, and a tour of every feature | `openui-lang-1.0-overview.md` | https://github.com/thesysdev/openui/blob/main/spec/overview.md |
 | The OpenUI Language, v1.0 — grammar, program model, evaluation, streaming, state, actions, editing, errors | `openui-lang-1.0-language.md` | https://github.com/thesysdev/openui/blob/main/spec/language.md |
 | The OpenUI Prompt and LibrarySpec, v1.0 — LibrarySpec format, library rules, prompt generation, signature format, message protocol | `openui-lang-1.0-prompt.md` | https://github.com/thesysdev/openui/blob/main/spec/prompt.md |
 | Conformance test library (12 components, 1 function, 1 action) | `openui-fixture-library.json` | https://github.com/thesysdev/openui/blob/main/spec/fixtures/1.0/library.json |
 
-Section numbers cited in `README.md` refer to these two documents.
+Section numbers cited in `README.md` refer to `language.md` and `prompt.md`.
 
 ## Secondary
 

@@ -73,10 +73,12 @@ Concretely, four steps, each independently shippable:
 
 1. **Library from design system** — `compiler/openui_library.py`. Derive a `LibrarySpec` from a fixed APG component set, with entity-aware variants. *Prototyped.*
 2. **Prompt generation** — `compiler/openui_prompt.py`. Deterministic, byte-stable prompt from the spec, following the spec's section 4.4 ordering. *Prototyped.*
-3. **Parser** — a Python port of §1.6 grammar + §4 streaming rules. Not built. ~600 lines; the grammar is small, the streaming rules are the work.
-4. **Renderer** — Jinja/HTML emitter that maps parsed components to `.apg-*` classes, delivered over the existing SSE channel.
+3. **Parser** — `compiler/openui_lang/`. Lexer, expression parser, statement splitter with the three continuation rules, evaluator, and streaming parser. *Built and conformant* against the spec's own 58-case fixture suite (`tests/ci/test_openui_conformance.py`).
+4. **Renderer** — two emitters over one component-to-class table. `compiler/openui_lang/render.py` paints server-side; `compiler/assets/apg-openui.js` parses and paints in the browser, so a streamed screen and a server-rendered one agree. *Built.*
 
-Steps 3–4 are where the risk sits. Step 4 in particular: OpenUI's own renderers are client-side JS; APG's generated apps are deliberately no-build, no-CDN. A small vanilla JS renderer (~200 lines) emitting APG's classes fits that constraint better than adopting `@openuidev/react-lang`.
+Step 4 is where the risk sat, and the split above is the answer: OpenUI's own renderers are client-side JS, and APG's generated apps are deliberately no-build, no-CDN. The browser half is vanilla JS vendored as a static asset (no build, no CDN, no framework), held to the same fixture suite as the Python parser (`tests/ci/openui_render_js.test.js`, invoked from the Python suite so CI runs it).
+
+**What a generated app ships.** `generate_deployment_bundle` emits `openui_library.json` and `openui_prompt.txt` beside `semantic_model.json`, and `app.py` serves the library at `/openui-library.json`. The agent console fetches that document and renders a reply written in OpenUI Lang through `APGOpenUI`, falling back to the sanitised text when the reply is prose. The library is emitted only when `validate_library` passes: a contract no client can satisfy is worse than none.
 
 ### Why the entity-aware library matters
 

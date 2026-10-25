@@ -59,6 +59,7 @@
           {% if result_status %}<span class="apg-badge apg-badge-neutral">{{ result_status }}</span>{% endif %}
         </div>
         <div class="apg-agent-output text-sm text-gray-700">{{ result_html|safe }}</div>
+        <template data-apg-openui-source>{{ result_text }}</template>
       </div>
       {% endif %}
     </div>
@@ -199,6 +200,33 @@
 
 <script nonce="{{ csp_nonce }}">
 (function() {
+  // A reply written in OpenUI Lang paints as a real screen instead of as text.
+  // The library is the same document the model was given, so a component the
+  // model invents is refused here rather than rendered as an empty box.
+  function paintOpenUI() {
+    if (!window.APGOpenUI || !window.fetch) return;
+    var source = document.querySelector('[data-apg-openui-source]');
+    var target = source && source.parentElement && source.parentElement.querySelector('.apg-agent-output');
+    if (!target || !source) return;
+    // textContent of the template keeps the newlines the parser needs; the
+    // rendered HTML above has already turned them into markup.
+    var text = source.content ? source.content.textContent : source.textContent;
+    text = (text || '').trim();
+    if (text.indexOf('=') < 0) return;
+    fetch('/openui-library.json', {credentials: 'same-origin'})
+      .then(function(response) { return response.ok ? response.json() : null; })
+      .then(function(library) {
+        if (!library) return;
+        var result = APGOpenUI.parse(text, library);
+        if (result.root) {
+          target.innerHTML = APGOpenUI.render(result.root, library);
+          target.classList.add('apg-openui-rendered');
+        }
+      })
+      .catch(function() { /* keep the text form when the library is absent */ });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paintOpenUI);
+  else paintOpenUI();
   document.addEventListener('click', function(event) {
     var branch = event.target.closest('[data-apg-agent-branch]');
     if (branch) {

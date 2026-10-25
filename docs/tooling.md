@@ -173,11 +173,14 @@ APG currently has an executable compiler path:
   through the semantic model;
 - the only advertised compiler target is `python`;
 - generated applications are dependency-light Python artifacts with `app.py`,
-  package exports, OpenAPI metadata, component manifests, smoke tests, and
-  `semantic_model.json`, plus optional `ai_agents.py`, `apg_capabilities.py`,
-  and `apg_application.py` sidecars;
+  package exports, OpenAPI metadata, component manifests, smoke tests,
+  `semantic_model.json`, and an `openui_library.json` / `openui_prompt.txt`
+  pair when the derived library passes its own conformance check, plus
+  optional `ai_agents.py`, `apg_capabilities.py`, and `apg_application.py`
+  sidecars;
 - generated apps expose `--self-test`, `--describe`, `--validate`, HTTP
-  routes, OpenAPI JSON, component manifest JSON, and semantic-model JSON;
+  routes, OpenAPI JSON, component manifest JSON, semantic-model JSON, and
+  OpenUI library JSON;
 - capability contracts can be listed with `apg capabilities contracts --json`,
   inspected with `apg capabilities inspect <capability> --json`, rule-tested
   with `apg capabilities evaluate-rules <capability> --context-json ... --json`,
@@ -332,6 +335,7 @@ designers, and natural-language tools.
 | `compiler.packager` | Existing package-profile builder over generated Python applications and release evidence. Extend it toward signed distribution bundles as packaging requirements deepen. |
 | `compiler.migrations` | Existing semantic-model diff planner for database and capability ownership changes. It emits `apg.migration-plan.v1` from previous/current APG sources or semantic-model JSON files. |
 | `compiler.nl_plan` | Existing constrained natural-language-to-APG-patch planner. It emits reviewable append-only DSL diffs, candidate lint, migration previews, and test plans without writing generated code. |
+| `compiler.openui_lang` | OpenUI Lang 1.0 itself: lexer, expression parser, statement splitter, evaluator, and streaming parser (`parser`, `evaluator`, `program`), plus the renderer (`render`) that paints an evaluated tree as APG markup. Conformant against the spec's 58-case fixture suite. |
 | `compiler.openui_library` | Builds an OpenUI `LibrarySpec` from the APG design system, plus one typed composite per entity from the semantic model. Conformance rules from the OpenUI 1.0 spec are enforced by `validate_library`. |
 | `compiler.openui_prompt` | Deterministic system-prompt generation from a `LibrarySpec`. Same library and options give byte-identical output. |
 | `compiler.release` | Existing release evidence builder for generated applications. Extend it toward capability package and deployment evidence. |
@@ -882,6 +886,7 @@ apg studio plan-edit app.apg --edit-json '{"operation":"add_field","table":"Cust
 apg openui app.apg --report --json
 apg openui app.apg --library --json
 apg openui app.apg --entities Patient,Appointment --tools list_patients
+apg openui app.apg --render screen.oui --fragment
 apg capabilities contracts --json
 apg capabilities validate-contracts --json
 apg capabilities audit --json
@@ -1312,6 +1317,7 @@ or when the planner mutates a source fixture.
 apg openui app.apg --report --json
 apg openui app.apg --library --json
 apg openui app.apg --entities Patient,Appointment --tools list_patients
+apg openui app.apg --render screen.oui --fragment
 ```
 
 Emits the OpenUI component library and system prompt for a generated app's
@@ -1324,6 +1330,19 @@ component signature is missing from the prompt.
 `<Entity>Table`, and a board trio when the table has a status field);
 `--max-entities` (default 12) bounds prompt size. Without `--entities` the
 first `--max-entities` tables are used.
+
+`--render PROGRAM` parses an OpenUI Lang program against that same library and
+prints the HTML it describes — the full page by default, the bare fragment
+with `--fragment`, so the output can be pasted into an existing template.
+`--state JSON` seeds `$state` for the evaluation, and every error and
+unresolved name is reported on stderr; a program with no entry renders nothing
+and exits 1.
+
+A generated app ships the same contract: `openui_library.json` and
+`openui_prompt.txt` in the deployment bundle, the library served at
+`/openui-library.json`, and `apg-openui.js` in `static/` so the browser can
+paint a streamed screen without a build step. The library is emitted only when
+`validate_library` passes.
 
 Design and rejected alternatives: `docs/research/openui-generative-ui/README.md`.
 

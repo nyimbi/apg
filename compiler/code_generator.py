@@ -23,6 +23,8 @@ from .ast_builder import (
 	DatabaseDeclaration, EntityType
 )
 from .semantic_model import build_semantic_model_from_module
+from .openui_library import build_library, validate_library
+from .openui_prompt import generate_system_prompt
 
 # Import composable template system
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -207,7 +209,7 @@ class PythonCodeGenerator:
 		``APGCompiler`` calls this after generation so that unit tests that use
 		``PythonCodeGenerator`` directly receive only the predictable core set.
 		"""
-		return {
+		bundle = {
 			"semantic_model.json": self._generate_semantic_model_json(ast),
 			".dockerignore": self._generate_python_dockerignore(),
 			".env.example": self._generate_python_env_example(ast),
@@ -215,6 +217,8 @@ class PythonCodeGenerator:
 			"README.md": self._generate_python_readme(ast),
 			"smoke_test.py": self._generate_python_smoke_test(),
 		}
+		bundle.update(self._generate_openui_files(ast))
+		return bundle
 
 	def _generate_agent_stubs(self, ast: ModuleDeclaration) -> str:
 		"""Generate typed Python stub classes for declared AI agents (Phase 6).
@@ -342,6 +346,24 @@ class PythonCodeGenerator:
 	def _generate_semantic_model_files(self, ast: ModuleDeclaration) -> Dict[str, str]:
 		"""Generate the compiler semantic model artifact shipped with apps."""
 		return {"semantic_model.json": self._generate_semantic_model_json(ast)}
+
+	def _generate_openui_files(self, ast: ModuleDeclaration) -> Dict[str, str]:
+		"""Emit the OpenUI LibrarySpec and system prompt beside the semantic model.
+
+		A generated app serves both, so an agent console can hand a model the
+		component contract and the browser can render what it writes without a
+		build step. A library that fails its own conformance check is not emitted:
+		shipping a contract a client cannot satisfy is worse than shipping none.
+		"""
+		model = build_semantic_model_from_module(ast, f"{ast.name}.apg")
+		spec = build_library(model)
+		if validate_library(spec):
+			return {}
+		document = spec.to_spec()
+		return {
+			"openui_library.json": json.dumps(document, indent=2, sort_keys=True) + "\n",
+			"openui_prompt.txt": generate_system_prompt(spec) + "\n",
+		}
 
 	def _generate_semantic_model_json(self, ast: ModuleDeclaration) -> str:
 		"""Generate deterministic apg.semantic-model.v1 JSON."""
@@ -697,7 +719,7 @@ class PythonCodeGenerator:
 	def _load_static_assets() -> dict[str, str]:
 		"""Load vendored UI assets to emit into generated static/ output."""
 		asset_dir = Path(__file__).parent / "assets"
-		asset_files = ("apg.css", "htmx.min.js", "sortable.min.js", "uplot.min.js", "uplot.min.css", "apg-charts.js", "apg-sse.js")
+		asset_files = ("apg.css", "htmx.min.js", "sortable.min.js", "uplot.min.js", "uplot.min.css", "apg-charts.js", "apg-sse.js", "apg-openui.js")
 		assets: dict[str, str] = {}
 		for asset_name in asset_files:
 			asset_path = asset_dir / asset_name
@@ -775,6 +797,8 @@ class PythonCodeGenerator:
 		i18n_catalog = self._chrome_i18n_catalog(i18n_config["supported_languages"])
 		entity_specs = self._entity_specs(module)
 		semantic_model = build_semantic_model_from_module(module, f"{module.name}.apg")
+		openui_spec = build_library(semantic_model)
+		openui_library = openui_spec.to_spec() if not validate_library(openui_spec) else {}
 		ui_templates = self._load_ui_templates()
 		# Derive landing style from theme name or default to "default"
 		landing_style = self._landing_style_for(module)
@@ -879,6 +903,7 @@ TENANT_SCOPED_ENTITIES: set[str] = {{
     if APG_MULTI_TENANT_ENABLED or any(str(f.get("name")) == "tenant_id" for f in e.get("fields", []))
 }}
 SEMANTIC_MODEL: Dict[str, Any] = {semantic_model!r}
+APG_OPENUI_LIBRARY: Dict[str, Any] = {openui_library!r}
 APG_UI_TEMPLATES: Dict[str, str] = {ui_templates!r}
 APG_AUTH_REQUIRED = {auth_required!r}
 APG_SUPPORTED_LANGUAGES: list[str] = {i18n_config["supported_languages"]!r}
@@ -5209,6 +5234,7 @@ def _route_dispatch_target(route: str, method: str) -> str | None:
             "/application",
             "/component.json",
             "/semantic-model.json",
+            "/openui-library.json",
             "/health",
             "/validate",
             "/openapi.json",
@@ -5948,6 +5974,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         '<script defer src="/static/uplot.min.js"></script>'
         '<script defer src="/static/apg-charts.js"></script>'
         '<script defer src="/static/apg-sse.js"></script>'
+        '<script defer src="/static/apg-openui.js"></script>'
     )
     confirm_label = html.escape(_("confirm"))
     cancel_label = html.escape(_("cancel"))
@@ -9944,6 +9971,7 @@ def _ui_agent_console_html(
         result=result,
         result_json=json.dumps(result, indent=2, sort_keys=True) if result is not None else "",
         result_html=_sanitize_agent_markdown(_agent_display_text(result)) if result is not None else "",
+        result_text=_agent_display_text(result) if result is not None else "",
         result_status=result_status,
         result_badge_class=_agent_status_badge(result_status),
         error=error,
@@ -10647,6 +10675,10 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         return 200, component_manifest()
     if path == "/semantic-model.json":
         return 200, semantic_model()
+    if path == "/openui-library.json":
+        if not APG_OPENUI_LIBRARY:
+            return 404, {{"error": "openui_library_unavailable"}}
+        return 200, APG_OPENUI_LIBRARY
     if path == "/health":
         validation = validate_application()
         return 200, {{
