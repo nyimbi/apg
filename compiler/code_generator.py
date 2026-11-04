@@ -12638,6 +12638,14 @@ def _setup_tenant() -> Any:
     if body_limit and (_flask_request.content_length or 0) > body_limit:
         return _apg_error_response(413, "payload_too_large", "Payload too large", "The request body exceeds the configured APG_MAX_BODY_BYTES limit.")
     path = _flask_request.path.rstrip("/") or "/"
+    # Default-deny authorisation chokepoint (Phase 1): any path not explicitly
+    # public must pass _check_mutation_auth(). Routes that bypass the dispatcher
+    # (CSV export, uploads, /livez ...) are covered because this hook runs for
+    # every request before dispatch.
+    if not _apg_is_public_path(path):
+        auth_err = _check_mutation_auth()
+        if auth_err is not None:
+            return auth_err
     tid = _tenant_header_value()
     # In production, tenant selection from an HTTP header is only honoured when
     # the caller presents valid admin credentials (D-04). A glibc API key or a
@@ -12945,6 +12953,21 @@ def _records_csv_response(path: str, query: Dict[str, list[str]]) -> _FlaskRespo
 
 
 _APG_GET_PUBLIC = frozenset({{"/health", "/auth", "/openapi.json", "/metrics", "/describe"}})
+
+_APG_PUBLIC_PATHS = frozenset({{
+    "/", "/home", "/livez", "/readyz", "/metrics", "/health", "/auth",
+    "/openapi.json", "/describe", "/theme.css", "/api-docs", "/login",
+    "/locales", "/openui-library.json",
+}})
+
+
+def _apg_is_public_path(path: str) -> bool:
+    path = path.rstrip("/") or "/"
+    if path in _APG_PUBLIC_PATHS:
+        return True
+    if path.startswith("/locales/") or path.startswith("/ui"):
+        return True
+    return False
 
 
 @_flask_app.route("/<path:api_path>", methods=["GET"])
