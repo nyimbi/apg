@@ -2574,7 +2574,7 @@ def _raw_records_by_entity(*, include_deleted: bool = True) -> Dict[str, list[Di
     }}
 
 
-def list_records(
+def _list_records(
     entity_name: str | None = None,
     *,
     include_deleted: bool = False,
@@ -2746,7 +2746,7 @@ def _invalid_record_query_result(entity_name: str, response_style: str) -> Dict[
     }}
 
 
-def query_records(
+def _query_records(
     entity_name: str,
     query: Dict[str, list[str]] | None = None,
     *,
@@ -2764,7 +2764,7 @@ def query_records(
             "count": 0,
             "total": 0,
         }}
-    records = list_records(entity_name, include_deleted=include_deleted_requested)
+    records = _list_records(entity_name, include_deleted=include_deleted_requested)
     filters, filter_error = _record_query_filters(entity_name, query)
     if filter_error is not None:
         return _invalid_record_query_result(entity_name, response_style)
@@ -2865,11 +2865,11 @@ def get_record(entity_name: str, record_id: Any) -> tuple[int, Dict[str, Any]]:
     return _records_payload(f"/entities/{{entity_name}}/records/{{record_id}}")
 
 
-def create_record(entity_name: str, record: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+def _create_record(entity_name: str, record: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     return _create_record_payload(f"/entities/{{entity_name}}/records", {{"record": record}})
 
 
-def update_record(
+def _update_record(
     entity_name: str,
     record_id: Any,
     record: Dict[str, Any],
@@ -2881,7 +2881,7 @@ def update_record(
     return _update_record_payload(f"/entities/{{entity_name}}/records/{{record_id}}", payload)
 
 
-def delete_record(
+def _delete_record(
     entity_name: str,
     record_id: Any,
     expected_revision: int | None = None,
@@ -3081,7 +3081,7 @@ def storage_status(include_records: bool = False) -> Dict[str, Any]:
         "path": str(path) if path is not None else None,
     }}
     if include_records:
-        status["records"] = list_records()
+        status["records"] = _list_records()
         status["events"] = list_events()
         status["workflow_runs"] = list_workflow_runs()
     return status
@@ -3089,7 +3089,7 @@ def storage_status(include_records: bool = False) -> Dict[str, Any]:
 
 def metrics_snapshot() -> Dict[str, Any]:
     record_counts = {{
-        entity_name: len(list_records(entity_name))
+        entity_name: len(_list_records(entity_name))
         for entity_name in sorted(ENTITY_NAMES)
     }}
     event_counts: Dict[str, int] = {{}}
@@ -7004,21 +7004,40 @@ def _sqlite_init_entity_fts(conn: _sqlite3.Connection, entity_name: str) -> None
     )
 
 
+_APG_SQLITE_THREAD_LOCAL = _threading.local()
+
+
 def _sqlite_connection() -> _sqlite3.Connection | None:
-    global _APG_SQLITE_CONN
-    if _APG_SQLITE_CONN is not None:
-        return _APG_SQLITE_CONN
+    # Thread-local connections (D-07): a shared connection with
+    # check_same_thread=False is unsafe. Memory databases keep a single
+    # process-wide connection under a lock so state is shared and safe.
+    if _APG_SQLITE_PATH == ":memory:":
+        global _APG_SQLITE_CONN
+        if _APG_SQLITE_CONN is not None:
+            return _APG_SQLITE_CONN
+        try:
+            _APG_SQLITE_CONN = _sqlite3.connect(_APG_SQLITE_PATH, check_same_thread=False)
+            _APG_SQLITE_CONN.row_factory = _sqlite3.Row
+            return _APG_SQLITE_CONN
+        except Exception as exc:
+            _logging.getLogger("apg").warning("sqlite_init_failed: %s", exc)
+            _APG_SQLITE_CONN = None
+            return None
+    conn = getattr(_APG_SQLITE_THREAD_LOCAL, "connection", None)
+    if conn is not None:
+        return conn
     try:
-        if _APG_SQLITE_PATH != ":memory:":
-            Path(_APG_SQLITE_PATH).expanduser().parent.mkdir(parents=True, exist_ok=True)
-        _APG_SQLITE_CONN = _sqlite3.connect(_APG_SQLITE_PATH, check_same_thread=False)
-        _APG_SQLITE_CONN.row_factory = _sqlite3.Row
-        return _APG_SQLITE_CONN
+        conn_path = Path(_APG_SQLITE_PATH).expanduser()
+        conn_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = _sqlite3.connect(conn_path, timeout=30.0)
+        conn.row_factory = _sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=30000")
+        _APG_SQLITE_THREAD_LOCAL.connection = conn
+        return conn
     except Exception as exc:
         _logging.getLogger("apg").warning("sqlite_init_failed: %s", exc)
-        _APG_SQLITE_CONN = None
         return None
-
 
 def _sqlite_init_entity_table(conn: _sqlite3.Connection, entity_name: str) -> None:
     table = _sqlite_identifier(entity_name)
@@ -7145,7 +7164,7 @@ def _sqlite_store_record(entity_name: str, record: Dict[str, Any]) -> None:
     conn.execute(_apg_qmark(sql), [_sqlite_value(row.get(column_name)) for column_name in column_names])
 
 
-def _sqlite_soft_delete_record(entity_name: str, record_id: Any) -> None:
+def _sqlite_soft__delete_record(entity_name: str, record_id: Any) -> None:
     conn = _sqlite_connection()
     if conn is None:
         return
@@ -7642,7 +7661,7 @@ def _ui_workflow_wizard_html(
     # Final step: show summary and create record
     if step_index >= total_steps:
         record_data = dict(accumulated)
-        create_status, result = create_record(entity_name, record_data)
+        create_status, result = _create_record(entity_name, record_data)
         if create_status in {{200, 201}}:
             run = _record_ui_workflow_run(wf, entity_name, workflow_id, record_data, result)
             safe_entity = html.escape(quote(entity_name, safe=""), quote=True)
@@ -7854,7 +7873,7 @@ def _landing_page_html() -> str:
         {{"value": len([e for e in ENTITIES if e.get("type") not in {{"application"}}]), "label": "Entities"}},
         {{"value": len(describe_application().get("capabilities", [])), "label": "Capabilities"}},
         {{"value": len(describe_application().get("ai_agents", [])), "label": "AI Agents"}},
-        {{"value": sum(len(list_records(e["name"])) for e in ENTITIES if e.get("type") not in {{"application"}}), "label": "Records"}},
+        {{"value": sum(len(_list_records(e["name"])) for e in ENTITIES if e.get("type") not in {{"application"}}), "label": "Records"}},
     ]
     app = describe_application()
     primary_entities = [entity for entity in ENTITIES if entity.get("type") not in {{"application"}}][:4]
@@ -8095,7 +8114,7 @@ def _ui_dashboard_context(app: Dict[str, Any]) -> Dict[str, Any]:
         if entity.get("type") not in {{"entity", "table"}}:
             continue
         entity_name = str(entity["name"])
-        records = list_records(entity_name)
+        records = _list_records(entity_name)
         spark = {{"type": "sparkline", "title": f"{{entity_name}} records", "data": [{{"x": i, "y": len(records)}} for i in range(30)], "empty": _("no_records")}}
         stats.append({{
             "label": entity_name,
@@ -8277,7 +8296,7 @@ def _best_display_field(target_entity: str) -> str:
 
 def _fk_select_options(target_entity: str, current_value: str = "", form_id: str = "") -> str:
     """Render <option> elements for a foreign key select, populated from live records."""
-    records = list_records(target_entity)
+    records = _list_records(target_entity)
     display_field = _best_display_field(target_entity)
     blank_label = html.escape(f"— select {{target_entity}} —")
     options = [f'<option value="">{{blank_label}}</option>']
@@ -8567,7 +8586,7 @@ def _ui_saved_views(entity_name: str, query: Dict[str, list[str]], fields: list[
         }})
         observed_values = sorted({{
             str(record.get(status_field))
-            for record in list_records(entity_name)
+            for record in _list_records(entity_name)
             if record.get(status_field) not in (None, "")
         }})
         for value in observed_values[:4]:
@@ -8625,7 +8644,7 @@ def _ui_create_form_html(entity_name: str, fields: list[Dict[str, Any]]) -> str:
 
 
 def _ui_records_table_html(entity_name: str, records: list[Dict[str, Any]] | None = None, sort_field: str = "", sort_dir: str = "asc", q: str = "", query: Dict[str, list[str]] | None = None) -> str:
-    records = records if records is not None else list_records(entity_name)
+    records = records if records is not None else _list_records(entity_name)
     if not records:
         return f"<p>{{html.escape(_('no_records'))}}</p>"
     fields = _field_specs(entity_name)
@@ -8798,7 +8817,7 @@ def _ui_entity_html(entity_name: str, notice: str = "", query: Dict[str, list[st
     for _k, _v in query.items():
         if _k.startswith("filter."):
             base_query[_k] = _v
-    query_result = query_records(entity_name, base_query)
+    query_result = _query_records(entity_name, base_query)
     all_records = query_result["records"]
 
     # Full-text search filter
@@ -8965,7 +8984,7 @@ def _ui_entity_analytics_html(entity_name: str) -> tuple[int, str]:
     if entity is None:
         return 404, _html_page("Unknown entity", f"<h1>Unknown entity: {{html.escape(entity_name)}}</h1>")
     fields = _field_specs(entity_name)
-    records = list_records(entity_name)
+    records = _list_records(entity_name)
     # For date-field detection: enrich public records with metadata timestamps so
     # analytics uses caller-controlled created_at (bypasses APG_EXPOSE_TIMESTAMPS).
     _analytics_records = [
@@ -9310,7 +9329,7 @@ def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
             fk_field = fk_candidates[0] if fk_candidates else None
         if fk_field:
             fk_name = str(fk_field["name"])
-            rel_result = query_records(ent, {{f"filter.{{fk_name}}": [record_id]}})
+            rel_result = _query_records(ent, {{f"filter.{{fk_name}}": [record_id]}})
             rel_records = rel_result.get("records", [])
             rel_cols = ["id"] + [str(f["name"]) for f in ent_fields if str(f.get("name")) not in {{"id", "_revision", fk_name}}][:4]
             related_lists.append({{
@@ -9325,7 +9344,7 @@ def _ui_record_detail_html(entity_name: str, record_id: str) -> tuple[int, str]:
 
     has_kanban = any(str(f.get("name", "")).lower() in {{"status", "state", "stage", "phase"}} for f in fields)
     revision = html.escape(str(record.get("_revision", "")))
-    entity_records = list_records(entity_name)
+    entity_records = _list_records(entity_name)
     record_ids = [str(item.get("id", "")) for item in entity_records if item.get("id", "") not in (None, "")]
     try:
         current_index = record_ids.index(str(record_id))
@@ -9530,7 +9549,7 @@ def _ui_field_patch_post(entity_name: str, record_id: str, field_name: str, form
         expected_revision_int: int | None = int(expected_revision_raw) if expected_revision_raw is not None else None
     except (TypeError, ValueError):
         expected_revision_int = None
-    save_status, save_result = update_record(entity_name, record_id, updated, expected_revision_int)
+    save_status, save_result = _update_record(entity_name, record_id, updated, expected_revision_int)
     if save_status not in (200, 201, 204):
         err_msg = html.escape(str(save_result.get("error") or save_result.get("message") or "Save failed"))
         fragment = (
@@ -9556,7 +9575,7 @@ def _ui_kanban_html(entity_name: str) -> tuple[int, str]:
     if status_field is None:
         return _ui_entity_html(entity_name)
     status_fname = str(status_field["name"])
-    all_records = query_records(entity_name, {{}}).get("records", [])
+    all_records = _query_records(entity_name, {{}}).get("records", [])
     # Gather unique status values preserving insertion order
     seen: list[str] = []
     for r in all_records:
@@ -10251,7 +10270,7 @@ def _ui_post_payload(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str,
         ids = [i.strip() for i in ids_raw.split(",") if i.strip()]
         for rid in ids:
             try:
-                delete_record(entity_name, rid)
+                _delete_record(entity_name, rid)
             except Exception:
                 _ = None  # best-effort
         return 303, {{"location": _ui_entity_location(entity_name)}}
@@ -10411,7 +10430,7 @@ def _record_route(path: str) -> Dict[str, str | None] | None:
     return None
 
 
-def _record_by_id(entity_name: str, record_id: str, *, include_deleted: bool = False) -> Dict[str, Any] | None:
+def __record_by_id(entity_name: str, record_id: str, *, include_deleted: bool = False) -> Dict[str, Any] | None:
     for record in RECORD_STORE[entity_name]:
         if str(record.get("id")) == str(record_id):
             if not include_deleted and _record_deleted(entity_name, record):
@@ -10460,18 +10479,18 @@ def _relationship_records(source_entity: str, source_id: Any, relationship: Dict
         right_field = str(relationship.get("right_field") or "right_id")
         related_ids = {{
             str(link.get(right_field))
-            for link in list_records(through_name)
+            for link in _list_records(through_name)
             if str(link.get(left_field)) == str(source_id) and link.get(right_field) not in (None, "")
         }}
         return [
             _field_acl_public_copy(target_entity, record)
-            for record in list_records(target_entity)
+            for record in _list_records(target_entity)
             if str(record.get("id")) in related_ids
         ]
     fk_field = str(relationship.get("fk_field") or _relationship_field_name(source_entity))
     return [
         _field_acl_public_copy(target_entity, record)
-        for record in list_records(target_entity)
+        for record in _list_records(target_entity)
         if str(record.get(fk_field, "")) == str(source_id)
     ]
 
@@ -10486,7 +10505,7 @@ def _relationship_records_payload(path: str, query: Dict[str, list[str]] | None 
     target_entity = str(route["target"])
     if target_entity not in ENTITY_NAMES:
         return 404, {{"error": "unknown_entity", "entity": target_entity}}
-    if _record_by_id(source_entity, source_id) is None:
+    if __record_by_id(source_entity, source_id) is None:
         return 404, {{"error": "record_not_found", "entity": source_entity, "id": source_id}}
     if route.get("related_id") is not None:
         return 405, {{"error": "method_not_allowed", "operation": "relationship_item"}}
@@ -10515,13 +10534,13 @@ def _create_relationship_payload(path: str, payload: Dict[str, Any], *, persist:
     through_name = str(through_entity)
     if through_name not in ENTITY_NAMES:
         return 404, {{"error": "unknown_entity", "entity": through_name}}
-    if _record_by_id(source_entity, source_id) is None:
+    if __record_by_id(source_entity, source_id) is None:
         return 404, {{"error": "record_not_found", "entity": source_entity, "id": source_id}}
-    if _record_by_id(target_entity, related_id) is None:
+    if __record_by_id(target_entity, related_id) is None:
         return 404, {{"error": "record_not_found", "entity": target_entity, "id": related_id}}
     left_field = str(relationship.get("left_field") or "left_id")
     right_field = str(relationship.get("right_field") or "right_id")
-    for link in list_records(through_name):
+    for link in _list_records(through_name):
         if str(link.get(left_field)) == source_id and str(link.get(right_field)) == related_id:
             return 200, {{
                 "entity": target_entity,
@@ -10620,7 +10639,7 @@ def _records_search_limit(query: Dict[str, list[str]] | None) -> int:
     return max(1, min(parsed, 1000))
 
 
-def search_records(entity_name: str, query: Dict[str, list[str]] | None = None) -> list[Dict[str, Any]]:
+def _search_records(entity_name: str, query: Dict[str, list[str]] | None = None) -> list[Dict[str, Any]]:
     # FTS5 search is SQLite-only. On PostgreSQL, return empty until pg_trgm/tsvector is wired.
     if _apg_db_dialect() == "pg":
         return []
@@ -10654,7 +10673,7 @@ def search_records(entity_name: str, query: Dict[str, list[str]] | None = None) 
         return []
     records: list[Dict[str, Any]] = []
     for row in rows:
-        record = _record_by_id(entity_name, row["id"])
+        record = __record_by_id(entity_name, row["id"])
         if record is not None:
             records.append(record)
     return records
@@ -10671,22 +10690,22 @@ def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = 
     record_id = route["record_id"]
     operation = route.get("operation")
     if entity_name is None:
-        return 200, {{"records": list_records()}}
+        return 200, {{"records": _list_records()}}
     if entity_name not in ENTITY_NAMES:
         return 404, {{"error": "unknown_entity", "entity": entity_name}}
     if operation == "export":
         return 200, {{
             "entity": entity_name,
-            "records": list_records(entity_name),
-            "count": len(list_records(entity_name)),
+            "records": _list_records(entity_name),
+            "count": len(_list_records(entity_name)),
         }}
     if operation == "search":
-        return 200, search_records(entity_name, query)
+        return 200, _search_records(entity_name, query)
     if operation is not None:
         return 405, {{"error": "method_not_allowed", "operation": operation}}
     if record_id is None:
         style = "records" if _records_api_collection_path(path) else "legacy"
-        result = query_records(entity_name, query, response_style=style)
+        result = _query_records(entity_name, query, response_style=style)
         if result.get("error") == "invalid_field":
             return 400, {{"error": "invalid_field"}}
         if result.get("error") == "include_deleted_requires_admin":
@@ -10710,7 +10729,7 @@ def _records_payload_with_query(path: str, query: Dict[str, list[str]] | None = 
     if include_deleted_requested and not _records_admin_allowed():
         return 403, {{"error": "include_deleted_requires_admin"}}
     include_deleted = include_deleted_requested and _records_admin_allowed()
-    record = _record_by_id(entity_name, record_id, include_deleted=include_deleted)
+    record = __record_by_id(entity_name, record_id, include_deleted=include_deleted)
     if record is None:
         return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
     return 200, {{"entity": entity_name, "record": _field_acl_public_copy(entity_name, record)}}
@@ -10796,7 +10815,7 @@ def _route_payload(path: str, query: Dict[str, list[str]] | None = None) -> tupl
         if q:
             for ent in ENTITIES:
                 ename = str(ent["name"])
-                for rec in list_records(ename)[:200]:
+                for rec in _list_records(ename)[:200]:
                     for v in rec.values():
                         if q in str(v).lower():
                             label_field = next(
@@ -11128,8 +11147,9 @@ def _create_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
     if not validation["valid"]:
         return _record_validation_failure(validation)
     if record.get("id") in (None, ""):
-        record["id"] = NEXT_RECORD_IDS[entity_name]
-        NEXT_RECORD_IDS[entity_name] += 1
+        with APG_RECORD_LOCK:
+            record["id"] = NEXT_RECORD_IDS[entity_name]
+            NEXT_RECORD_IDS[entity_name] += 1
     elif any(str(existing.get("id")) == str(record["id"]) for existing in RECORD_STORE[entity_name]):
         return 409, {{"error": "duplicate_record_id", "entity": entity_name, "id": record["id"]}}
     record = _prepare_new_record(record, entity_name)
@@ -11160,7 +11180,7 @@ def _create_record_payload(path: str, payload: Dict[str, Any], *, persist: bool 
         "entity": entity_name,
         "record": _record_public_copy(entity_name, record),
         "event": event,
-        "count": len(list_records(entity_name)),
+        "count": len(_list_records(entity_name)),
     }}
 
 
@@ -11351,7 +11371,7 @@ def _delete_record_payload(path: str, *, persist: bool = True) -> tuple[int, Dic
                 metadata["updated_at"] = now
             existing["deleted_at"] = now
             existing["updated_at"] = now
-            _sqlite_soft_delete_record(entity_name, record_id)
+            _sqlite_soft__delete_record(entity_name, record_id)
             if persist:
                 _sqlite_commit()
             event = _record_event("delete", entity_name, before=deleted)
@@ -11364,7 +11384,7 @@ def _delete_record_payload(path: str, *, persist: bool = True) -> tuple[int, Dic
                 "entity": entity_name,
                 "deleted": _record_public_copy(entity_name, existing),
                 "event": event,
-                "count": len(list_records(entity_name)),
+                "count": len(_list_records(entity_name)),
             }}
     return 404, {{"error": "record_not_found", "entity": entity_name, "id": record_id}}
 
@@ -11585,7 +11605,7 @@ def _csv_export_body(
     records: list[Dict[str, Any]] | None = None,
 ) -> bytes:
     if records is None:
-        result = query_records(entity_name, query or {{}}, response_style="records", paginate=False)
+        result = _query_records(entity_name, query or {{}}, response_style="records", paginate=False)
         records = result.get("data", []) if result.get("error") != "invalid_field" else []
     import io, csv as _csv
     cols = _csv_export_columns(entity_name, records)
@@ -12935,7 +12955,7 @@ def _records_csv_response(path: str, query: Dict[str, list[str]]) -> _FlaskRespo
             status=404,
             content_type="application/json; charset=utf-8",
         )
-    result = query_records(entity_name, query, response_style="records", paginate=False)
+    result = _query_records(entity_name, query, response_style="records", paginate=False)
     if result.get("error") == "invalid_field":
         return _FlaskResponse(
             json.dumps({{"error": "invalid_field"}}),
@@ -13098,6 +13118,37 @@ def main(argv: list[str] | None = None) -> None:
     host = _arg_value(args, "--host", os.environ.get("APG_HOST") or os.environ.get("HOST") or "127.0.0.1")
     port = _arg_value(args, "--port", os.environ.get("APG_PORT") or os.environ.get("PORT") or "8080")
     run_server(host, port)
+
+
+# Public, thread-safe entry points (Phase 2 wiring)
+def list_records(*args, **kwargs):
+    with APG_RECORD_LOCK:
+        return _list_records(*args, **kwargs)
+
+
+def query_records(*args, **kwargs):
+    with APG_RECORD_LOCK:
+        return _query_records(*args, **kwargs)
+
+
+def create_record(*args, **kwargs):
+    with APG_RECORD_LOCK:
+        return _create_record(*args, **kwargs)
+
+
+def update_record(*args, **kwargs):
+    with APG_RECORD_LOCK:
+        return _update_record(*args, **kwargs)
+
+
+def delete_record(*args, **kwargs):
+    with APG_RECORD_LOCK:
+        return _delete_record(*args, **kwargs)
+
+
+def search_records(*args, **kwargs):
+    with APG_RECORD_LOCK:
+        return _search_records(*args, **kwargs)
 
 
 if __name__ == "__main__":
@@ -13265,7 +13316,7 @@ if __name__ == "__main__":
 			"- `GET /entities/{Entity}/records/export` - export records",
 			"- `POST /entities/{Entity}/records/import` - import records",
 			"",
-			"Python package helpers: `create_record()`, `get_record()`, `query_records()`, `update_record()`, and `delete_record()` expose the same executable record behavior for composition.",
+			"Python package helpers: `_create_record()`, `get_record()`, `_query_records()`, `_update_record()`, and `_delete_record()` expose the same executable record behavior for composition.",
 			"",
 			"Set `APG_DATA_FILE=/path/to/data.json` to persist records to JSON.",
 			"Set `APG_API_KEY=<key>` to require an API key for mutations.",

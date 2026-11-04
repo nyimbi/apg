@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"git add \\\\\\n  capabilities/hcm/chr/employee_data_management/service.py \\\\\\n  capabilities/fintech/insurance/service.py \\\\\\n  capabilities/telecom/bil/service.py \\\\\\n  capabilities/mining/e...",
-  "error": "Exit code 1\nThe following paths are ignored by one of your .gitignore files:\ncapabilities/mining/env\nhint: Use -f if you really want to add them.\nhint: Disable this message with \"git config set advice.addIgnoredFile false\"",
-  "timestamp": "2026-06-09T06:21:35.246Z",
-  "retry_count": 1
-}

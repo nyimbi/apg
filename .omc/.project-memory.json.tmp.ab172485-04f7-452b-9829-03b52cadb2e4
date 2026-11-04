@@ -1,0 +1,703 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1783642879005,
+  "projectRoot": "/Users/nyimbiodero/src/pjs/apg",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "requirements.txt"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "pip",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "cat > /private/tmp/claude-502/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc/scratchpad/full_restart.sh << 'SCRIPT'\n#!/bin/bash\nset -e\ncd /Users/nyimbiodero/src/pjs/apg\n\necho \"=== FIX: tooling_audit gate ===\"\ncodex exec --full-auto --skip-git-repo-check \\\n\"Fix the one remaining failing test in APG:\n  tests/test_tooling_audit.py::test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces\n\nSteps:\n1. Run the test with verbose output to see the exact assertion that fails:\n   python -m pytest tests/test_tooling_audit.py::test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces -v --tb=long 2>&1 | head -80\n\n2. Read compiler/tooling_audit.py to understand audit_tooling_fixtures().\n\n3. The test expects report['ok'] is True, 21 surfaces all ok, and these specific counts:\n   - capability_operability: inoperable_contract_count == 0\n   - capability_implementation: capability_count >= 100\n   - capability_lifecycle: complete_lifecycle_count >= 100, incomplete_lifecycle_count == 0\n   - compiler_baseline: passed_examples == 20, failed_examples == 0\n   - surface_count == 21, blocking_gap_count == 0\n\n4. Diagnose which surface is returning ok=False and why. Fix the production code in\n   compiler/tooling_audit.py (NOT the test) so the audit passes legitimately.\n   If a surface reports a gap because fixture files are missing, create the minimal\n   fixture files needed. If it reports failure because a count is wrong, investigate\n   why the count is off and fix the underlying issue.\n\n5. Verify: python -m pytest tests/test_tooling_audit.py -v --tb=short\n   All 4 tests in that file must pass.\n\n6. Run full suite smoke: python -m pytest tests/ -x -q --tb=line 2>&1 | tail -15\n\nCommit: 'fix: resolve tooling-audit gate — all 21 surfaces ok'\"\n\necho \"=== WAVE C: HTTP Efficiency ===\"\ncodex exec --full-auto --skip-git-repo-check \\\n\"Implement Wave C HTTP efficiency inside the APG generated-app template in compiler/code_generator.py.\nFile is ~12k lines, template starts ~line 683. Double ALL literal braces {{ }}. 4-space indent.\n\n=== 1. Gzip response compression ===\nAdd _maybe_compress(response) called in after_request:\n- Only compress if: Accept-Encoding includes gzip, body > 860 bytes, Content-Type text/* or application/json, status 200-299\n- Use stdlib gzip.compress(), set Content-Encoding: gzip, update Content-Length\n- APG_DISABLE_GZIP=1 skips compression\n\n=== 2. ETag / conditional GET for list endpoints ===\nFor GET /records/<Entity> list responses:\n- Compute ETag as sha256(body)[:16] in double-quotes\n- Set ETag response header\n- Check If-None-Match on request; return 304 Not Modified if matches\n- Only for 200 JSON responses; skip when session user present\n\n=== 3. Cache-Control headers ===\n- Static /static/* /apg-static/*: Cache-Control: public, max-age=31536000, immutable\n- GET /records/*: Cache-Control: no-cache\n- Login/UI pages: Cache-Control: no-store, private\n\nWrite tests in tests/test_generated_app_http.py:\n- Gzip compressed when Accept-Encoding: gzip and body > 860 bytes\n- Not compressed when APG_DISABLE_GZIP=1\n- ETag set on GET /records list response\n- 304 returned when If-None-Match matches ETag\n- Cache-Control: no-store on login page\n\nRun: python -m pytest tests/test_generated_app_http.py -v --tb=short\nThen: python -m pytest tests/ -x -q --tb=short 2>&1 | tail -15\nCommit: 'feat(generated-app): Wave C — gzip compression, ETag/conditional-GET, Cache-Control'\"\n\necho \"=== WAVE E: API Completeness ===\"\ncodex exec --full-auto --skip-git-repo-check \\\n\"Implement Wave E API completeness in the APG generated-app template.\nFile: compiler/code_generator.py, template ~line 683. Double braces {{ }}, 4-space indent.\nThe generated app has entity registry _APG_ENTITIES with field names/types.\n\n=== 1. OpenAPI 3.1 spec ===\nGET /openapi.json — build at startup from _APG_ENTITIES:\n- Paths for GET/POST /records/{Entity} and GET/PUT/DELETE /records/{Entity}/{id}\n- info block: title from APG_APP_NAME, version, APG_APP_DESCRIPTION\n- No auth required on /openapi.json\nGET /api-docs — when APG_SWAGGER_UI=1, serve minimal HTML page pointing to /openapi.json.\n\n=== 2. Pagination ===\nGET /records/{Entity}: add ?limit=N (default 50, max 1000) and ?after=<id> cursor.\nResponse: {\\\"data\\\": [...], \\\"next_cursor\\\": <id|null>, \\\"total\\\": N}\nCompat: if X-APG-Compat: v1 header present, return bare array.\nAdd Link: <url>; rel=\\\"next\\\" header when more pages exist.\n\n=== 3. Field filtering and sorting ===\n- ?filter[<field>]=<value> for exact match\n- ?q=<text> for LIKE search across string fields\n- ?sort=<field>&sort_dir=asc|desc (default: id asc)\n- Validate field names; return 400 {\\\"error\\\": \\\"invalid_field\\\"} on unknown\n- Parameterised queries only (no SQL injection)\n\n=== 4. CSV export ===\nGET /records/{Entity}?format=csv:\n- Content-Type: text/csv; charset=utf-8\n- Content-Disposition: attachment; filename=\\\"{entity}_{date}.csv\\\"\n- RFC 4180, header row + data rows, respects filter/sort\n\nWrite tests in tests/test_generated_app_api.py:\n- /openapi.json returns valid JSON with entity paths\n- Pagination: limit works, next_cursor present when more rows\n- ?filter[name]=foo returns only matching rows\n- ?q=foo does full-text LIKE search\n- ?sort=name&sort_dir=desc returns sorted\n- Unknown filter field returns 400\n- ?format=csv returns text/csv with header row\n\nRun: python -m pytest tests/test_generated_app_api.py -v --tb=short\nThen: python -m pytest tests/ -x -q --tb=short 2>&1 | tail -15\nCommit: 'feat(generated-app): Wave E — OpenAPI spec, pagination, filtering/sorting, CSV export'\"\n\necho \"=== WAVE F: Production Hardening ===\"\ncodex exec --full-auto --skip-git-repo-check \\\n\"Implement Wave F production hardening in APG generated-app template.\nFile: compiler/code_generator.py, template ~line 683. Double braces {{ }}, 4-space indent.\n\n=== 1. Startup env validation ===\nOn startup: if APG_PRODUCTION=1 and APG_SECRET_KEY is default 'dev-secret-key-change-me' -> raise RuntimeError.\nIf APG_PRODUCTION=1 and SESSION_COOKIE_SECURE=False -> log WARNING.\nIf APG_PRODUCTION=1 and auth required but APG_AUTH_USERS unset -> raise RuntimeError.\n\n=== 2. Structured audit log ===\nLogger named apg.audit. Emit JSON on:\n- POST/PUT/DELETE /records/*: {\\\"audit\\\":true, \\\"action\\\":\\\"create|update|delete\\\", \\\"entity\\\":\\\"...\\\", \\\"id\\\":\\\"...\\\", \\\"user\\\":\\\"...\\\", \\\"req_id\\\":\\\"...\\\", \\\"ts\\\":ISO8601}\n- Successful login/logout: {\\\"audit\\\":true, \\\"action\\\":\\\"login|logout\\\", \\\"user\\\":\\\"...\\\", \\\"ts\\\":...}\n- Login failure: {\\\"audit\\\":true, \\\"action\\\":\\\"login_failed\\\", ...}\nAPG_AUDIT_LOG_FILE: if set, append JSONL to that file.\n\n=== 3. Per-IP rate limiting ===\nToken bucket: 100 req/min per IP anon, 1000 req/min authenticated.\nAPG_RATE_LIMIT_ANON and APG_RATE_LIMIT_AUTH override defaults.\n429 with Retry-After. In-memory dict + threading.Lock. Exclude /livez /readyz /metrics.\n\n=== 4. Content-Type validation ===\nPOST/PUT /records/*: require Content-Type: application/json; return 415 otherwise.\n\nWrite tests in tests/test_generated_app_hardening2.py:\n- Startup raises on production mode + default secret key\n- Audit logger emits on POST /records/Customer\n- Login audit event emitted on successful login\n- Rate limiter returns 429 after limit exceeded (set limit=2 for test speed)\n- 415 returned on POST with Content-Type: text/plain\n\nRun: python -m pytest tests/test_generated_app_hardening2.py -v --tb=short\nThen: python -m pytest tests/ -x -q --tb=short 2>&1 | tail -15\nCommit: 'feat(generated-app): Wave F — startup validation, audit log, rate limiting, Content-Type guard'\"\n\necho \"=== WAVE G: Dark Mode + Mobile + Print ===\"\ncodex exec --full-auto --skip-git-repo-check \\\n\"Enhance the APG generated-app CSS inside compiler/code_generator.py (template ~line 683).\nLiteral braces doubled {{ }}. Modify ONLY the CSS section — do not change Python logic.\n\n=== 1. Dark mode ===\n@media (prefers-color-scheme: dark) block: dark grays (#1a1a2e, #16213e, #0f3460),\nreadable text (#e0e0e0, muted #a0a0b0), dark borders/inputs.\nAlso honour [data-theme='dark'] on <html>.\n\n=== 2. Mobile responsive ===\nBelow 768px: sidebar collapses; hamburger button in header toggles .apg-menu-open on body.\nBelow 768px: tables switch to card view (each row = label:value card).\nBelow 480px: font sizes -1 step.\n\n=== 3. Print stylesheet ===\n@media print: hide sidebar/nav/buttons/forms, tables full-width, black text,\npage-break-inside: avoid on rows.\n\nWrite tests in tests/test_generated_app_css.py:\n- Compiled CSS contains @media (prefers-color-scheme: dark)\n- Contains @media print\n- Contains a max-width or max-device-width breakpoint\n\nRun: python -m pytest tests/test_generated_app_css.py tests/test_generated_ui_assets.py -v --tb=short\nThen: python -m pytest tests/ -x -q --tb=short 2>&1 | tail -15\nCommit: 'feat(generated-app): Wave G — dark mode, mobile layout, print stylesheet'\"\n\necho \"=== WAVE H: Compiler Error Quality ===\"\ncodex exec --full-auto --skip-git-repo-check \\\n\"Improve APG compiler error messages and developer experience.\nThe compiler lives in compiler/compiler.py, compiler/parser.py and related files.\n\n=== 1. Line/column numbers in errors ===\nAdd line and column to every parse/semantic error: 'line N, col M: <message>'.\nWire position tracking through to result.errors.\n\n=== 2. Did-you-mean hints ===\nFor unknown field type (e.g. 'integer'): show valid types list.\nFor missing required block (e.g. module decl): show minimal example.\nFor unclosed brace/missing semicolon: point to nearest open brace.\n\n=== 3. Semantic validation ===\nDuplicate entity name -> error.\nDuplicate field name within entity -> error.\nReserved field names (id, created_at, updated_at) -> warning.\nEmpty entity (no fields) -> warning.\n\n=== 4. CLI output ===\nIn CLI entrypoint: colour errors (red) / warnings (yellow) when stdout is a tty.\nUse sys.stderr for errors. Exit code 1 on error, 0 on success.\n\nWrite tests in tests/test_compiler_errors.py:\n- Error for unknown field type includes line number\n- Error for duplicate entity name\n- Error for duplicate field name\n- Warning for empty entity\n- Did-you-mean hint for typo'd type name\n\nRun: python -m pytest tests/test_compiler_errors.py -v --tb=short\nThen: python -m pytest tests/ -x -q --tb=short 2>&1 | tail -15\nCommit: 'feat(compiler): line/col errors, Did-you-mean hints, semantic validation'\"\n\necho \"=== WAVE I: Database Patterns ===\"\ncodex exec --full-auto --skip-git-repo-check \\\n\"Implement Wave I database patterns in APG generated-app template.\nFile: compiler/code_generator.py, template ~line 683. Double braces {{ }}, 4-space indent.\n\n=== 1. Auto timestamps ===\nEvery table gets created_at DATETIME DEFAULT CURRENT_TIMESTAMP and updated_at DATETIME DEFAULT CURRENT_TIMESTAMP.\nSQLite trigger AFTER UPDATE sets updated_at = datetime('now').\nInclude in GET responses. ?sort=created_at&sort_dir=desc works.\n\n=== 2. Soft deletes ===\ndeleted_at DATETIME NULL on every table.\nDELETE /records/<E>/<id>: sets deleted_at = NOW() (no hard DELETE).\nAll SELECTs add WHERE deleted_at IS NULL.\nGET /records/<E>?include_deleted=1 shows all (admin only).\nDELETE /records/<E>/<id>/restore sets deleted_at = NULL.\n\n=== 3. Schema auto-migration ===\nAPG_AUTO_MIGRATE=1 (default True in dev): on startup, ALTER TABLE ADD COLUMN for each missing column.\nLog each migration at INFO. Never DROP columns.\n\n=== 4. Bulk operations ===\nPOST /records/<E>/bulk: {\\\"create\\\":[...], \\\"update\\\":[...], \\\"delete\\\":[...]}\nIn transaction. Returns {\\\"created\\\":N, \\\"updated\\\":N, \\\"deleted\\\":N, \\\"errors\\\":[]}.\nMax 1000 items; 400 if exceeded.\n\nWrite tests in tests/test_generated_app_db.py:\n- created_at/updated_at in GET response\n- Soft delete: DELETE 200, row excluded from GET, visible with include_deleted=1\n- Restore endpoint un-deletes row\n- Bulk create creates multiple rows\n- Bulk over 1000 returns 400\n\nRun: python -m pytest tests/test_generated_app_db.py -v --tb=short\nThen: python -m pytest tests/ -x -q --tb=short 2>&1 | tail -15\nCommit: 'feat(generated-app): Wave I — auto timestamps, soft deletes, schema migration, bulk ops'\"\n\necho \"=== WAVE J: Outbound Webhooks ===\"\ncodex exec --full-auto --skip-git-repo-check \\\n\"Implement outbound webhook notifications in APG generated-app template.\nFile: compiler/code_generator.py, template ~line 683. Double braces {{ }}, 4-space indent.\n\nWhen APG_WEBHOOK_URL set: after every entity mutation, POST JSON payload asynchronously\n(background thread, does not block response).\nPayload: {\\\"event\\\":\\\"entity.created|entity.updated|entity.deleted\\\", \\\"entity\\\":\\\"Foo\\\",\n  \\\"id\\\":\\\"...\\\", \\\"data\\\":{...}, \\\"ts\\\":ISO8601, \\\"req_id\\\":\\\"...\\\"}\nRetry 3x exponential backoff (1s,2s,4s). Timeout 5s per attempt.\nHMAC-SHA256 signing: X-APG-Signature: sha256=<hex> using APG_WEBHOOK_SECRET if set.\nAPG_WEBHOOK_URL can be comma-separated list for fan-out.\nFailure does NOT affect the HTTP response.\n\nWrite tests in tests/test_generated_app_webhooks.py using pytest-httpserver:\n- Webhook fired on entity create\n- Payload has correct event type and entity data\n- HMAC signature verifiable with secret\n- Webhook failure does not break the 200/201 response\n\nRun: python -m pytest tests/test_generated_app_webhooks.py -v --tb=short\nThen: python -m pytest tests/ -x -q --tb=short 2>&1 | tail -15\nCommit: 'feat(generated-app): Wave J — outbound webhooks with HMAC signing'\"\n\necho \"=== WAVE K: FTS5 Search + Generated Tests ===\"\ncodex exec --full-auto --skip-git-repo-check \\\n\"Implement Wave K: FTS5 full-text search and generated test scaffolding.\n\n=== PART 1: FTS5 Search (compiler/code_generator.py) ===\nTemplate ~line 683. Double ALL braces {{ }}, 4-space indent.\n\nFor every entity with >= 1 str field:\n1. CREATE VIRTUAL TABLE IF NOT EXISTS {entity}_fts USING fts5(str_fields..., content={entity}, content_rowid=id)\n2. Sync triggers: AFTER INSERT/UPDATE/DELETE on entity table keep FTS up to date.\n3. GET /records/{Entity}/search?q=<text>&limit=N endpoint:\n   SELECT * FROM {entity} WHERE id IN (SELECT rowid FROM {entity}_fts WHERE {entity}_fts MATCH ?) LIMIT N\n   Returns same schema as list endpoint. Include in /openapi.json.\n\n=== PART 2: Generated Test Scaffolding (compiler/compiler.py) ===\nAPGCompiler.compile_string() and compile() add key 'tests/test_<module>.py' to result.generated_files.\nGenerated test file contains:\n- test_smoke_livez(): hits GET /livez, asserts 200 and status==ok\n- test_crud_<first_entity>(): POST then GET then DELETE cycle\n- test_search_<first_entity>(): GET /records/<E>/search?q=<val> if entity has str fields\n\nCLI --output-dir writes this test file alongside app.py.\n\nWrite meta-tests in tests/test_generated_tests.py:\n- Compiler output includes tests/test_<module>.py\n- Generated test file is valid Python (ast.parse)\n- Contains at least one def test_\n\nWrite search tests in tests/test_generated_app_search.py:\n- /records/Customer/search?q=alice returns matching row\n- /records/Customer/search?q=nomatch returns empty\n- Respects ?limit param\n\nRun: python -m pytest tests/test_generated_tests.py tests/test_generated_app_search.py -v --tb=short\nThen: python -m pytest tests/ -x -q --tb=short 2>&1 | tail -15\nCommit: 'feat: Wave K — FTS5 full-text search, generated test scaffolding'\"\n\necho \"=== WAVE L: Column ACL + Row Ownership ===\"\ncodex exec --full-auto --skip-git-repo-check \\\n\"Implement Wave L RBAC enhancements in APG generated-app template.\nFile: compiler/code_generator.py, template ~line 683. Double braces {{ }}, 4-space indent.\n\n=== 1. Column-level visibility (APG_FIELD_ACL) ===\nAPG_FIELD_ACL env var (JSON: {\\\"Customer\\\":{\\\"ssn\\\":[\\\"admin\\\"],\\\"email\\\":[\\\"admin\\\",\\\"manager\\\"]}})\nFields not in map visible to all auth users. Hidden fields omitted (not nulled) from GET responses.\n\n=== 2. Row-level ownership (APG_ROW_OWNERSHIP=1) ===\nEvery entity table gets owner_id TEXT column (set to auth username on POST, server-side only).\nRegular users can only GET/PUT/DELETE own rows (WHERE owner_id = current_user).\nRole 'admin' or permission '*' sees all rows.\n\n=== 3. Field-diff audit ===\nOn PUT /records/<E>/<id>: compute changed_fields by comparing old row vs new payload.\nInclude in audit event: {\\\"changed_fields\\\":[\\\"name\\\",\\\"email\\\"], ...}\n\nWrite tests in tests/test_generated_app_rbac.py:\n- With APG_FIELD_ACL set, non-admin GET omits restricted field\n- With APG_FIELD_ACL set, admin GET includes restricted field\n- With APG_ROW_OWNERSHIP=1, user A cannot GET user B's row (returns 404)\n- With APG_ROW_OWNERSHIP=1, admin sees all rows\n- Audit log on PUT includes changed_fields\n\nRun: python -m pytest tests/test_generated_app_rbac.py -v --tb=short\nThen full suite: python -m pytest tests/ -q --tb=short 2>&1 | tail -20\nCommit: 'feat(generated-app): Wave L — column ACL, row ownership scoping, field-diff audit'\"\n\necho \"=== RESEARCH: World-Class Gap Analysis ===\"\ncodex exec --full-auto --skip-git-repo-check \\\n\"Write a comprehensive research document covering the remaining gaps between APG and world-class\napp-generator standards. Save to docs/research/world-class-gap-analysis-2026-07/README.md.\n\nResearch tasks:\n1. Read docs/research/world-class-uplift-2026-07/README.md to understand what has been done.\n2. Read docs/research/app-generator-competitive-landscape-2026/ for competitor context.\n3. Read docs/research/generated-app-runtime-baseline/ for OWASP/k8s baseline.\n4. List all capabilities in capabilities/ directory. Count them.\n5. Read compiler/code_generator.py (first 200 lines + last 200 lines) for current generated-app features.\n6. Compare against: Retool, Budibase, Wasp, Appsmith, DreamFactory, Directus.\n\nProduce docs/research/world-class-gap-analysis-2026-07/README.md with:\n- What has been shipped (Waves A-L)\n- Remaining gaps vs competitors (ranked P1/P2/P3)\n- Specific DSL features missing (relationships, validation rules, computed fields, enums)\n- Generated-app features missing (email notifications, file uploads, background jobs, multi-tenancy)\n- Tooling gaps (VS Code extension, language server completeness, debug adapter)\n- Documentation gaps (user guide, cookbook, API reference)\n- Test coverage gaps\n\nAlso save:\n- docs/research/world-class-gap-analysis-2026-07/sources.md (all references consulted)\n- docs/research/world-class-gap-analysis-2026-07/rationale.md (prioritisation rationale)\n\nCommit: 'docs(research): world-class gap analysis after Waves A-L'\"\n\necho \"=== ALL DONE ===\"\ngit log --oneline -20\npython -m pytest tests/ -q --tb=line 2>&1 | tail -5\nSCRIPT\nchmod +x /private/tmp/claude-502/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc/scratchpad/full_restart.sh\necho \"Script ready at scratchpad/full_restart.sh\"",
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "examples",
+      "scripts",
+      "spec",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "__pycache__": {
+      "path": "__pycache__",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1783642878834,
+      "keyFiles": [
+        "cli.cpython-311.pyc",
+        "cli.cpython-314.pyc",
+        "complete_demo.cpython-311.pyc",
+        "conftest.cpython-311-pytest-9.0.3.pyc",
+        "setup.cpython-311.pyc"
+      ]
+    },
+    "agents": {
+      "path": "agents",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1783642878969,
+      "keyFiles": [
+        "__init__.py",
+        "architect_agent.py",
+        "base_agent.py",
+        "deployment_manager.py",
+        "developer_agent.py"
+      ]
+    },
+    "apg": {
+      "path": "apg",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783642878973,
+      "keyFiles": [
+        "__init__.py"
+      ]
+    },
+    "apg_demo_output": {
+      "path": "apg_demo_output",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783642878974,
+      "keyFiles": []
+    },
+    "apg_language.egg-info": {
+      "path": "apg_language.egg-info",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1783642878981,
+      "keyFiles": [
+        "PKG-INFO",
+        "SOURCES.txt",
+        "dependency_links.txt",
+        "entry_points.txt",
+        "not-zip-safe"
+      ]
+    },
+    "auth_rbac": {
+      "path": "auth_rbac",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1783642878992,
+      "keyFiles": [
+        "__init__.py",
+        "decorators.py",
+        "models.py",
+        "service.py"
+      ]
+    },
+    "capabilities": {
+      "path": "capabilities",
+      "purpose": null,
+      "fileCount": 15,
+      "lastAccessed": 1783642878992,
+      "keyFiles": [
+        "COMPOSABILITY.md",
+        "MANIFEST.json",
+        "MANIFEST.md",
+        "PLAN.md",
+        "README.md"
+      ]
+    },
+    "cli": {
+      "path": "cli",
+      "purpose": null,
+      "fileCount": 33,
+      "lastAccessed": 1783642878992,
+      "keyFiles": [
+        "__init__.py",
+        "agent_adapter.py",
+        "baseline_command.py",
+        "capabilities_command.py",
+        "compile_command.py"
+      ]
+    },
+    "common": {
+      "path": "common",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1783642878993,
+      "keyFiles": [
+        "__init__.py",
+        "base.py"
+      ]
+    },
+    "compiler": {
+      "path": "compiler",
+      "purpose": null,
+      "fileCount": 40,
+      "lastAccessed": 1783642878993,
+      "keyFiles": [
+        "__init__.py",
+        "ai_agent_composition.py",
+        "antlr_ast_visitor.py",
+        "ast_builder.py",
+        "baseline.py"
+      ]
+    },
+    "connectors": {
+      "path": "connectors",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783642878993,
+      "keyFiles": [
+        "MANIFEST.json"
+      ]
+    },
+    "database": {
+      "path": "database",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783642878993,
+      "keyFiles": [
+        "init_postgresql.py"
+      ]
+    },
+    "demo_apps": {
+      "path": "demo_apps",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1783642878993,
+      "keyFiles": [
+        "agri_marketplace.apg",
+        "clinic.apg",
+        "fintech_lending.apg",
+        "itsm_helpdesk.apg",
+        "ngo_grants.apg"
+      ]
+    },
+    "devops": {
+      "path": "devops",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783642878994,
+      "keyFiles": []
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 37,
+      "lastAccessed": 1783642878994,
+      "keyFiles": [
+        "README.md",
+        "ai_agent_composition.md",
+        "apg_cheat_sheet.md",
+        "apg_grammar_guide.md",
+        "apg_language.md"
+      ]
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 26,
+      "lastAccessed": 1783642878995,
+      "keyFiles": [
+        "FEEL_1_1.g4",
+        "README.md",
+        "RuleSet.g4",
+        "agri_marketplace.apg",
+        "ai_agent_systems.apg"
+      ]
+    },
+    "gen": {
+      "path": "gen",
+      "purpose": null,
+      "fileCount": 34,
+      "lastAccessed": 1783642878996,
+      "keyFiles": [
+        "D2DiagramVisitor.py",
+        "FABModelGenerator.py",
+        "FABViewGenerator.py",
+        "FMG.py",
+        "SQLGenerator.py"
+      ]
+    },
+    "installed_capabilities": {
+      "path": "installed_capabilities",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783642878996,
+      "keyFiles": []
+    },
+    "language_server": {
+      "path": "language_server",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1783642878996,
+      "keyFiles": [
+        "__init__.py",
+        "client.py",
+        "semantic_service.py",
+        "server.py"
+      ]
+    },
+    "marketplace": {
+      "path": "marketplace",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1783642878996,
+      "keyFiles": [
+        "README.md",
+        "capability_marketplace.py",
+        "capability_template.json",
+        "cli.py",
+        "web_api.py"
+      ]
+    },
+    "migrations": {
+      "path": "migrations",
+      "purpose": "Database migrations",
+      "fileCount": 2,
+      "lastAccessed": 1783642878997,
+      "keyFiles": [
+        "env.py",
+        "script.py.mako"
+      ]
+    },
+    "mobile_apps": {
+      "path": "mobile_apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783642878997,
+      "keyFiles": []
+    },
+    "out": {
+      "path": "out",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1783642878998,
+      "keyFiles": []
+    },
+    "policies": {
+      "path": "policies",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783642878998,
+      "keyFiles": []
+    },
+    "ref": {
+      "path": "ref",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783642878998,
+      "keyFiles": [
+        "types.txt"
+      ]
+    },
+    "screenshots": {
+      "path": "screenshots",
+      "purpose": null,
+      "fileCount": 176,
+      "lastAccessed": 1783642878998,
+      "keyFiles": [
+        "activity_tab.png",
+        "agri_01_home.png",
+        "agri_02_farmer.png",
+        "agri_03_produce.png",
+        "agri_04_order.png"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 3,
+      "lastAccessed": 1783642878998,
+      "keyFiles": [
+        "README.md",
+        "build_all_packages.sh",
+        "gen_lifecycle_artifacts.py"
+      ]
+    },
+    "singer_logs": {
+      "path": "singer_logs",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783642878998,
+      "keyFiles": []
+    },
+    "singer_runtime": {
+      "path": "singer_runtime",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783642878998,
+      "keyFiles": []
+    },
+    "singer_state": {
+      "path": "singer_state",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783642878999,
+      "keyFiles": []
+    },
+    "spec": {
+      "path": "spec",
+      "purpose": "Test specifications",
+      "fileCount": 15,
+      "lastAccessed": 1783642878999,
+      "keyFiles": [
+        "apg.g4",
+        "apg.interp",
+        "apg.tokens",
+        "apgLexer.interp",
+        "apgLexer.py"
+      ]
+    },
+    "storage": {
+      "path": "storage",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783642879000,
+      "keyFiles": []
+    },
+    "templates": {
+      "path": "templates",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1783642879000,
+      "keyFiles": [
+        "__init__.py",
+        "application_template_manager.py",
+        "project_scaffolder.py",
+        "template_manager.py",
+        "template_types.py"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 250,
+      "lastAccessed": 1783642879000,
+      "keyFiles": [
+        "__init__.py",
+        "conftest.py",
+        "test_additional_connectors.py",
+        "test_agent_adapter_shims.py",
+        "test_agent_basic.py"
+      ]
+    },
+    "tmp": {
+      "path": "tmp",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783642879001,
+      "keyFiles": []
+    },
+    "tools": {
+      "path": "tools",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1783642879001,
+      "keyFiles": [
+        "fix_missing_store.py",
+        "migrate_services_to_store.py"
+      ]
+    },
+    "uploads": {
+      "path": "uploads",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783642879001,
+      "keyFiles": []
+    },
+    "vscode-extension": {
+      "path": "vscode-extension",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1783642879001,
+      "keyFiles": [
+        "README.md",
+        "language-configuration.json",
+        "package.json"
+      ]
+    },
+    "works": {
+      "path": "works",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1783642879001,
+      "keyFiles": [
+        "capability_enhancement_tracker.md"
+      ]
+    },
+    "compiler/assets": {
+      "path": "compiler/assets",
+      "purpose": "Static assets",
+      "fileCount": 8,
+      "lastAccessed": 1783642879002,
+      "keyFiles": [
+        "LICENSES.md",
+        "apg-charts.js",
+        "apg-sse.js"
+      ]
+    },
+    "docs/api": {
+      "path": "docs/api",
+      "purpose": "API routes",
+      "fileCount": 1,
+      "lastAccessed": 1783642879002,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "scripts/migrations": {
+      "path": "scripts/migrations",
+      "purpose": "Database migrations",
+      "fileCount": 1,
+      "lastAccessed": 1783642879004,
+      "keyFiles": [
+        "migration_to_v2.py"
+      ]
+    },
+    "tests/fixtures": {
+      "path": "tests/fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 0,
+      "lastAccessed": 1783642879005,
+      "keyFiles": []
+    },
+    "vscode-extension/src": {
+      "path": "vscode-extension/src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1783642879005,
+      "keyFiles": [
+        "extension.ts"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "compiler/code_generator.py",
+      "accessCount": 23,
+      "lastAccessed": 1783647346356,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 7,
+      "lastAccessed": 1783643826102,
+      "type": "directory"
+    },
+    {
+      "path": "tests/test_generated_app_hardening.py",
+      "accessCount": 7,
+      "lastAccessed": 1783646817981,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/common/cach/service.py",
+      "accessCount": 4,
+      "lastAccessed": 1783646023008,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_generated_ui_auth.py",
+      "accessCount": 2,
+      "lastAccessed": 1783643653567,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/composition/gateway/apg_integration.py",
+      "accessCount": 2,
+      "lastAccessed": 1783645604867,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/enterprise-ui-gap-analysis.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643079131,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/composition-systems-gap-analysis.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643079621,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/ui_integration_gaps_2026.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643085076,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/ui_integration_gaps_2026_v1.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643086094,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/generated-ui-round2/SUMMARY.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643201539,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/generated-ui-workspaces/SUMMARY.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643201968,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/generated-app-runtime-baseline/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643558880,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/generated-ui-excellence-2026/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643559696,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/app-generator-competitive-landscape-2026/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643583063,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/generated-app-runtime-baseline/sources.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643642056,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/generated-ui-excellence-2026/sources.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643647763,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/app-generator-competitive-landscape-2026/sources.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643696310,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/generated-app-runtime-baseline/thinking.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643721192,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/generated-ui-excellence-2026/thinking.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643731912,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/app-generator-competitive-landscape-2026/thinking.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643758666,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/generated-app-runtime-baseline/rationale.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643793356,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/generated-ui-excellence-2026/rationale.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643798849,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/world-class-uplift-2026-07/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643813399,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/app-generator-competitive-landscape-2026/rationale.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643818709,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/world-class-uplift-2026-07/findings-state-of-play.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643851752,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/world-class-uplift-2026-07/rationale.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643901160,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/world-class-uplift-2026-07/findings-environment.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643924379,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/world-class-uplift-2026-07/thinking.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643963166,
+      "type": "file"
+    },
+    {
+      "path": "docs/research/world-class-uplift-2026-07/sources.md",
+      "accessCount": 1,
+      "lastAccessed": 1783643974694,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/hcm/tat/time_attendance/monitoring.py",
+      "accessCount": 1,
+      "lastAccessed": 1783645441461,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/composition/orchestration/service.py",
+      "accessCount": 1,
+      "lastAccessed": 1783645482051,
+      "type": "file"
+    },
+    {
+      "path": "capabilities/capability_contract_registry.py",
+      "accessCount": 1,
+      "lastAccessed": 1783645767073,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_tooling_audit.py",
+      "accessCount": 1,
+      "lastAccessed": 1783677201209,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

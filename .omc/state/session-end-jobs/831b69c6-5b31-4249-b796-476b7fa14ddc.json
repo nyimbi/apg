@@ -1,0 +1,328 @@
+{
+  "version": 1,
+  "jobId": "d5b4d02c-6d69-46a6-8660-db93cb5127b3",
+  "sessionId": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+  "scopeKey": "c2ba001ddcaefb28f0a58f45c206495e02cb4fc4a3f63c511cfd53c8ec2e1063",
+  "revision": 41,
+  "createdAt": "2026-08-03T08:21:07.967Z",
+  "updatedAt": "2026-08-03T08:21:09.261Z",
+  "producerGraceExpiresAt": "2026-08-03T08:21:37.968Z",
+  "bestEffortDeadlineAt": "2026-08-03T08:22:28.968Z",
+  "producers": {
+    "core": {
+      "state": "sealed",
+      "intentKey": "320a4c727f11d782b3f01b866a3b744b829030ca1e3cc2078d8e9aeb136d1e8f",
+      "payloadDigest": "320a4c727f11d782b3f01b866a3b744b829030ca1e3cc2078d8e9aeb136d1e8f",
+      "sealedAt": "2026-08-03T08:21:08.060Z",
+      "sealedBy": "foreground"
+    },
+    "wiki": {
+      "state": "no-op",
+      "sealedAt": "2026-08-03T08:21:07.967Z",
+      "sealedBy": "wiki-producer"
+    }
+  },
+  "actions": {
+    "foreground-cleanup": {
+      "class": "required",
+      "phase": "deferred-required",
+      "status": "completed",
+      "attempts": 0,
+      "idempotencyKey": "febf6dba2f2536433960a07f7cedce72e946b43ced0896570df80f017b8914d2",
+      "payload": {
+        "transcriptPath": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+        "cwd": "/Users/nyimbiodero/src/pjs/apg",
+        "reason": "clear",
+        "input": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "transcript_path": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+          "cwd": "/Users/nyimbiodero/src/pjs/apg",
+          "prompt_id": "f9acaba9-834c-40ac-b184-c04f063637ec",
+          "hook_event_name": "SessionEnd",
+          "reason": "clear"
+        },
+        "metrics": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "ended_at": "2026-08-03T08:21:07.966Z",
+          "reason": "clear",
+          "agents_spawned": 334,
+          "agents_completed": 172,
+          "modes_used": []
+        },
+        "initialTeamNames": [],
+        "openClawEnabled": false,
+        "openClawRouting": {},
+        "foregroundResult": {
+          "removedTransientFiles": 7,
+          "completedAt": "2026-08-03T08:21:08.060Z"
+        }
+      },
+      "budgetMs": 9000,
+      "completedAt": "2026-08-03T08:21:08.060Z",
+      "lastOutcomeCode": "completed"
+    },
+    "wiki-capture": {
+      "class": "required",
+      "phase": "deferred-required",
+      "status": "completed",
+      "attempts": 0,
+      "idempotencyKey": "1719cd1ef5b51e0269b78c4cb8c9308c9c1f7b82fd1c067fc034c060f23863f5",
+      "payload": {},
+      "budgetMs": 9000,
+      "completedAt": "2026-08-03T08:21:07.967Z"
+    },
+    "team-cleanup": {
+      "class": "required",
+      "phase": "deferred-required",
+      "status": "completed",
+      "attempts": 1,
+      "idempotencyKey": "cee6ac31df545408e1e822247ac249b3f8182a98a5fe8e448ae3b251e55bdee1",
+      "payload": {
+        "transcriptPath": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+        "cwd": "/Users/nyimbiodero/src/pjs/apg",
+        "reason": "clear",
+        "input": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "transcript_path": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+          "cwd": "/Users/nyimbiodero/src/pjs/apg",
+          "prompt_id": "f9acaba9-834c-40ac-b184-c04f063637ec",
+          "hook_event_name": "SessionEnd",
+          "reason": "clear"
+        },
+        "metrics": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "ended_at": "2026-08-03T08:21:07.966Z",
+          "reason": "clear",
+          "agents_spawned": 334,
+          "agents_completed": 172,
+          "modes_used": []
+        },
+        "initialTeamNames": [],
+        "openClawEnabled": false,
+        "openClawRouting": {}
+      },
+      "budgetMs": 9000,
+      "claimedAt": "2026-08-03T08:21:08.118Z",
+      "runner": {
+        "attempt": 1,
+        "runnerNonce": "ccca4d5d-1901-450e-9de9-ab355905b66c",
+        "phase": "terminal",
+        "deadlineAt": "2026-08-03T08:21:18.080Z"
+      },
+      "lastOutcomeCode": "completed",
+      "completedAt": "2026-08-03T08:21:08.336Z"
+    },
+    "python-cleanup": {
+      "class": "required",
+      "phase": "deferred-required",
+      "status": "completed",
+      "attempts": 1,
+      "idempotencyKey": "1f1370c4ac056606059d517e2f106b602d8cbcb04587b3fcc5f3b9f89e649cd0",
+      "payload": {
+        "transcriptPath": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+        "cwd": "/Users/nyimbiodero/src/pjs/apg",
+        "reason": "clear",
+        "input": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "transcript_path": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+          "cwd": "/Users/nyimbiodero/src/pjs/apg",
+          "prompt_id": "f9acaba9-834c-40ac-b184-c04f063637ec",
+          "hook_event_name": "SessionEnd",
+          "reason": "clear"
+        },
+        "metrics": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "ended_at": "2026-08-03T08:21:07.966Z",
+          "reason": "clear",
+          "agents_spawned": 334,
+          "agents_completed": 172,
+          "modes_used": []
+        },
+        "initialTeamNames": [],
+        "openClawEnabled": false,
+        "openClawRouting": {}
+      },
+      "budgetMs": 9000,
+      "claimedAt": "2026-08-03T08:21:08.372Z",
+      "runner": {
+        "attempt": 1,
+        "runnerNonce": "3b4da3b8-f2a4-4929-a56e-fcaac4b8d175",
+        "phase": "terminal",
+        "deadlineAt": "2026-08-03T08:21:18.080Z"
+      },
+      "lastOutcomeCode": "completed",
+      "completedAt": "2026-08-03T08:21:08.561Z"
+    },
+    "reply-cleanup": {
+      "class": "required",
+      "phase": "deferred-required",
+      "status": "completed",
+      "attempts": 1,
+      "idempotencyKey": "0b3a8b47c28b26d56aca004d4f572b96c118f16819c0d35162418816f9a5420a",
+      "payload": {
+        "transcriptPath": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+        "cwd": "/Users/nyimbiodero/src/pjs/apg",
+        "reason": "clear",
+        "input": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "transcript_path": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+          "cwd": "/Users/nyimbiodero/src/pjs/apg",
+          "prompt_id": "f9acaba9-834c-40ac-b184-c04f063637ec",
+          "hook_event_name": "SessionEnd",
+          "reason": "clear"
+        },
+        "metrics": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "ended_at": "2026-08-03T08:21:07.966Z",
+          "reason": "clear",
+          "agents_spawned": 334,
+          "agents_completed": 172,
+          "modes_used": []
+        },
+        "initialTeamNames": [],
+        "openClawEnabled": false,
+        "openClawRouting": {}
+      },
+      "budgetMs": 9000,
+      "claimedAt": "2026-08-03T08:21:08.583Z",
+      "runner": {
+        "attempt": 1,
+        "runnerNonce": "37e12003-8f9a-4e96-aade-887658735d13",
+        "phase": "terminal",
+        "deadlineAt": "2026-08-03T08:21:18.080Z"
+      },
+      "lastOutcomeCode": "completed",
+      "completedAt": "2026-08-03T08:21:08.731Z"
+    },
+    "callback": {
+      "class": "best-effort",
+      "phase": "deferred-best-effort",
+      "status": "completed",
+      "attempts": 1,
+      "idempotencyKey": "d068ede2655bf89e0c0950e087d0603d7dcf45538e94f20a654d08c6f4841895",
+      "payload": {
+        "transcriptPath": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+        "cwd": "/Users/nyimbiodero/src/pjs/apg",
+        "reason": "clear",
+        "input": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "transcript_path": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+          "cwd": "/Users/nyimbiodero/src/pjs/apg",
+          "prompt_id": "f9acaba9-834c-40ac-b184-c04f063637ec",
+          "hook_event_name": "SessionEnd",
+          "reason": "clear"
+        },
+        "metrics": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "ended_at": "2026-08-03T08:21:07.966Z",
+          "reason": "clear",
+          "agents_spawned": 334,
+          "agents_completed": 172,
+          "modes_used": []
+        },
+        "initialTeamNames": [],
+        "openClawEnabled": false,
+        "openClawRouting": {}
+      },
+      "budgetMs": 2000,
+      "claimedAt": "2026-08-03T08:21:08.751Z",
+      "runner": {
+        "attempt": 1,
+        "runnerNonce": "c7547d4f-0281-45e7-8bca-dedaec230a26",
+        "phase": "terminal",
+        "deadlineAt": "2026-08-03T08:21:18.080Z"
+      },
+      "lastOutcomeCode": "completed",
+      "completedAt": "2026-08-03T08:21:08.892Z"
+    },
+    "notification": {
+      "class": "best-effort",
+      "phase": "deferred-best-effort",
+      "status": "completed",
+      "attempts": 1,
+      "idempotencyKey": "89c0438ff63097ce04beb60efb87292ff68a7af350a0ee331f3de9dbf42d62fc",
+      "payload": {
+        "transcriptPath": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+        "cwd": "/Users/nyimbiodero/src/pjs/apg",
+        "reason": "clear",
+        "input": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "transcript_path": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+          "cwd": "/Users/nyimbiodero/src/pjs/apg",
+          "prompt_id": "f9acaba9-834c-40ac-b184-c04f063637ec",
+          "hook_event_name": "SessionEnd",
+          "reason": "clear"
+        },
+        "metrics": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "ended_at": "2026-08-03T08:21:07.966Z",
+          "reason": "clear",
+          "agents_spawned": 334,
+          "agents_completed": 172,
+          "modes_used": []
+        },
+        "initialTeamNames": [],
+        "openClawEnabled": false,
+        "openClawRouting": {}
+      },
+      "budgetMs": 2000,
+      "claimedAt": "2026-08-03T08:21:08.911Z",
+      "runner": {
+        "attempt": 1,
+        "runnerNonce": "cc49f1b6-cfb4-4c4b-8f21-94869a951880",
+        "phase": "terminal",
+        "deadlineAt": "2026-08-03T08:21:18.080Z"
+      },
+      "lastOutcomeCode": "completed",
+      "completedAt": "2026-08-03T08:21:09.045Z"
+    },
+    "openclaw": {
+      "class": "best-effort",
+      "phase": "deferred-best-effort",
+      "status": "completed",
+      "attempts": 1,
+      "idempotencyKey": "31fe8f6e1cf204e27006de511df257326fdd98655122ca437013e8779ffc735b",
+      "payload": {
+        "transcriptPath": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+        "cwd": "/Users/nyimbiodero/src/pjs/apg",
+        "reason": "clear",
+        "input": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "transcript_path": "/Users/nyimbiodero/.claude/projects/-Users-nyimbiodero-src-pjs-apg/831b69c6-5b31-4249-b796-476b7fa14ddc.jsonl",
+          "cwd": "/Users/nyimbiodero/src/pjs/apg",
+          "prompt_id": "f9acaba9-834c-40ac-b184-c04f063637ec",
+          "hook_event_name": "SessionEnd",
+          "reason": "clear"
+        },
+        "metrics": {
+          "session_id": "831b69c6-5b31-4249-b796-476b7fa14ddc",
+          "ended_at": "2026-08-03T08:21:07.966Z",
+          "reason": "clear",
+          "agents_spawned": 334,
+          "agents_completed": 172,
+          "modes_used": []
+        },
+        "initialTeamNames": [],
+        "openClawEnabled": false,
+        "openClawRouting": {}
+      },
+      "budgetMs": 2000,
+      "claimedAt": "2026-08-03T08:21:09.066Z",
+      "runner": {
+        "attempt": 1,
+        "runnerNonce": "41806efd-cbd8-45c4-a161-0afebb9a2e6a",
+        "phase": "terminal",
+        "deadlineAt": "2026-08-03T08:21:18.080Z"
+      },
+      "lastOutcomeCode": "completed",
+      "completedAt": "2026-08-03T08:21:09.215Z"
+    }
+  },
+  "owner": null,
+  "phase": "complete",
+  "completion": {
+    "completedAt": "2026-08-03T08:21:09.238Z",
+    "terminalDigest": "545380a17967eec45ecf9b239d78de0993120248f1aab8b4fa9bff4c3edc559c",
+    "terminalRevision": 40
+  }
+}

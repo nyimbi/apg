@@ -1,0 +1,7 @@
+{
+  "tool_name": "mcp__codebase-memory-mcp__get_architecture",
+  "tool_input_preview": "{\"project\":\"apg\",\"aspects\":[\"packages\",\"services\",\"structure\"]}",
+  "error": "{\"error\":\"project not found or not indexed\",\"hint\":\"Use list_projects to see all indexed projects, then pass the project name.\",\"available_projects\":[\"Users-nyimbiodero-src-pjs-fleet\",\"Users-nyimbiodero-src-pjs-archt\",\"Users-nyimbiodero-src-pjs-MeGuard-src\",\"Users-nyimbiodero-src-pjs-work_docs-Archive\",\"Users-nyimbiodero-src-pjs-wakili\",\"Users-nyimbiodero-src-pjs-fleet-packages-database\",\"Users-nyimbiodero-src-pjs-dArchiva-darchiva-ui\",\"Users-nyimbiodero-src-pjs-NoReplay\",\"Users-nyimbiodero-src-...",
+  "timestamp": "2026-08-03T08:21:37.487Z",
+  "retry_count": 1
+}

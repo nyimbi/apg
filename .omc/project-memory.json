@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1781695396377,
+  "lastScanned": 1785745268307,
   "projectRoot": "/Users/nyimbiodero/src/pjs/apg",
   "techStack": {
     "languages": [
@@ -9,18 +9,38 @@
         "version": null,
         "confidence": "high",
         "markers": [
+          "pyproject.toml",
           "requirements.txt"
+        ]
+      },
+      {
+        "name": "C/C++",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "Makefile"
         ]
       }
     ],
-    "frameworks": [],
+    "frameworks": [
+      {
+        "name": "flask",
+        "version": null,
+        "category": "backend"
+      },
+      {
+        "name": "pytest",
+        "version": null,
+        "category": "testing"
+      }
+    ],
     "packageManager": "pip",
     "runtime": null
   },
   "build": {
     "buildCommand": null,
-    "testCommand": "uv run pytest tests/test_compiler_baseline.py -q 2>&1 | tail -5",
-    "lintCommand": null,
+    "testCommand": "make test",
+    "lintCommand": "ruff check",
     "devCommand": null,
     "scripts": {}
   },
@@ -50,21 +70,21 @@
     "__pycache__": {
       "path": "__pycache__",
       "purpose": null,
-      "fileCount": 7,
-      "lastAccessed": 1781695396359,
+      "fileCount": 8,
+      "lastAccessed": 1785745268292,
       "keyFiles": [
         "cli.cpython-311.pyc",
         "cli.cpython-314.pyc",
         "complete_demo.cpython-311.pyc",
         "conftest.cpython-311-pytest-9.0.3.pyc",
-        "setup.cpython-311.pyc"
+        "conftest.cpython-311-pytest-9.1.1.pyc"
       ]
     },
     "agents": {
       "path": "agents",
       "purpose": null,
       "fileCount": 10,
-      "lastAccessed": 1781695396359,
+      "lastAccessed": 1785745268292,
       "keyFiles": [
         "__init__.py",
         "architect_agent.py",
@@ -77,23 +97,36 @@
       "path": "apg",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1781695396360,
+      "lastAccessed": 1785745268293,
       "keyFiles": [
         "__init__.py"
+      ]
+    },
+    "apg.egg-info": {
+      "path": "apg.egg-info",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1785745268293,
+      "keyFiles": [
+        "PKG-INFO",
+        "SOURCES.txt",
+        "dependency_links.txt",
+        "entry_points.txt",
+        "requires.txt"
       ]
     },
     "apg_demo_output": {
       "path": "apg_demo_output",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1781695396360,
+      "lastAccessed": 1785745268293,
       "keyFiles": []
     },
     "apg_language.egg-info": {
       "path": "apg_language.egg-info",
       "purpose": null,
       "fileCount": 7,
-      "lastAccessed": 1781695396361,
+      "lastAccessed": 1785745268294,
       "keyFiles": [
         "PKG-INFO",
         "SOURCES.txt",
@@ -102,11 +135,23 @@
         "not-zip-safe"
       ]
     },
+    "auth_rbac": {
+      "path": "auth_rbac",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1785745268294,
+      "keyFiles": [
+        "__init__.py",
+        "decorators.py",
+        "models.py",
+        "service.py"
+      ]
+    },
     "capabilities": {
       "path": "capabilities",
       "purpose": null,
       "fileCount": 15,
-      "lastAccessed": 1781695396361,
+      "lastAccessed": 1785745268294,
       "keyFiles": [
         "COMPOSABILITY.md",
         "MANIFEST.json",
@@ -118,8 +163,8 @@
     "cli": {
       "path": "cli",
       "purpose": null,
-      "fileCount": 33,
-      "lastAccessed": 1781695396362,
+      "fileCount": 34,
+      "lastAccessed": 1785745268294,
       "keyFiles": [
         "__init__.py",
         "agent_adapter.py",
@@ -132,7 +177,7 @@
       "path": "common",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1781695396362,
+      "lastAccessed": 1785745268295,
       "keyFiles": [
         "__init__.py",
         "base.py"
@@ -142,7 +187,7 @@
       "path": "compiler",
       "purpose": null,
       "fileCount": 40,
-      "lastAccessed": 1781695396363,
+      "lastAccessed": 1785745268295,
       "keyFiles": [
         "__init__.py",
         "ai_agent_composition.py",
@@ -155,7 +200,7 @@
       "path": "connectors",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1781695396363,
+      "lastAccessed": 1785745268296,
       "keyFiles": [
         "MANIFEST.json"
       ]
@@ -164,7 +209,7 @@
       "path": "database",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1781695396363,
+      "lastAccessed": 1785745268296,
       "keyFiles": [
         "init_postgresql.py"
       ]
@@ -173,7 +218,7 @@
       "path": "demo_apps",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1781695396363,
+      "lastAccessed": 1785745268296,
       "keyFiles": [
         "agri_marketplace.apg",
         "clinic.apg",
@@ -186,14 +231,14 @@
       "path": "devops",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1781695396364,
+      "lastAccessed": 1785745268296,
       "keyFiles": []
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 36,
-      "lastAccessed": 1781695396364,
+      "fileCount": 38,
+      "lastAccessed": 1785745268297,
       "keyFiles": [
         "README.md",
         "ai_agent_composition.md",
@@ -206,7 +251,7 @@
       "path": "examples",
       "purpose": "Example code",
       "fileCount": 26,
-      "lastAccessed": 1781695396364,
+      "lastAccessed": 1785745268297,
       "keyFiles": [
         "FEEL_1_1.g4",
         "README.md",
@@ -219,7 +264,7 @@
       "path": "gen",
       "purpose": null,
       "fileCount": 34,
-      "lastAccessed": 1781695396365,
+      "lastAccessed": 1785745268297,
       "keyFiles": [
         "D2DiagramVisitor.py",
         "FABModelGenerator.py",
@@ -232,14 +277,14 @@
       "path": "installed_capabilities",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1781695396365,
+      "lastAccessed": 1785745268297,
       "keyFiles": []
     },
     "language_server": {
       "path": "language_server",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1781695396365,
+      "lastAccessed": 1785745268298,
       "keyFiles": [
         "__init__.py",
         "client.py",
@@ -251,7 +296,7 @@
       "path": "marketplace",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1781695396365,
+      "lastAccessed": 1785745268298,
       "keyFiles": [
         "README.md",
         "capability_marketplace.py",
@@ -264,7 +309,7 @@
       "path": "migrations",
       "purpose": "Database migrations",
       "fileCount": 2,
-      "lastAccessed": 1781695396366,
+      "lastAccessed": 1785745268298,
       "keyFiles": [
         "env.py",
         "script.py.mako"
@@ -274,28 +319,28 @@
       "path": "mobile_apps",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1781695396366,
+      "lastAccessed": 1785745268298,
       "keyFiles": []
     },
     "out": {
       "path": "out",
       "purpose": "Build output",
       "fileCount": 0,
-      "lastAccessed": 1781695396366,
+      "lastAccessed": 1785745268299,
       "keyFiles": []
     },
     "policies": {
       "path": "policies",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1781695396366,
+      "lastAccessed": 1785745268299,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1781695396367,
+      "lastAccessed": 1785745268300,
       "keyFiles": [
         "types.txt"
       ]
@@ -304,7 +349,7 @@
       "path": "screenshots",
       "purpose": null,
       "fileCount": 176,
-      "lastAccessed": 1781695396367,
+      "lastAccessed": 1785745268300,
       "keyFiles": [
         "activity_tab.png",
         "agri_01_home.png",
@@ -316,39 +361,40 @@
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 2,
-      "lastAccessed": 1781695396367,
+      "fileCount": 3,
+      "lastAccessed": 1785745268300,
       "keyFiles": [
         "README.md",
-        "build_all_packages.sh"
+        "build_all_packages.sh",
+        "gen_lifecycle_artifacts.py"
       ]
     },
     "singer_logs": {
       "path": "singer_logs",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1781695396367,
+      "lastAccessed": 1785745268300,
       "keyFiles": []
     },
     "singer_runtime": {
       "path": "singer_runtime",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1781695396368,
+      "lastAccessed": 1785745268301,
       "keyFiles": []
     },
     "singer_state": {
       "path": "singer_state",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1781695396368,
+      "lastAccessed": 1785745268301,
       "keyFiles": []
     },
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
       "fileCount": 15,
-      "lastAccessed": 1781695396368,
+      "lastAccessed": 1785745268301,
       "keyFiles": [
         "apg.g4",
         "apg.interp",
@@ -361,14 +407,14 @@
       "path": "storage",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1781695396369,
+      "lastAccessed": 1785745268301,
       "keyFiles": []
     },
     "templates": {
       "path": "templates",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1781695396369,
+      "lastAccessed": 1785745268301,
       "keyFiles": [
         "__init__.py",
         "application_template_manager.py",
@@ -380,8 +426,8 @@
     "tests": {
       "path": "tests",
       "purpose": "Test files",
-      "fileCount": 243,
-      "lastAccessed": 1781695396370,
+      "fileCount": 279,
+      "lastAccessed": 1785745268302,
       "keyFiles": [
         "__init__.py",
         "conftest.py",
@@ -394,14 +440,14 @@
       "path": "tmp",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1781695396371,
+      "lastAccessed": 1785745268302,
       "keyFiles": []
     },
     "tools": {
       "path": "tools",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1781695396371,
+      "lastAccessed": 1785745268302,
       "keyFiles": [
         "fix_missing_store.py",
         "migrate_services_to_store.py"
@@ -411,14 +457,14 @@
       "path": "uploads",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1781695396371,
+      "lastAccessed": 1785745268302,
       "keyFiles": []
     },
     "vscode-extension": {
       "path": "vscode-extension",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1781695396371,
+      "lastAccessed": 1785745268302,
       "keyFiles": [
         "README.md",
         "language-configuration.json",
@@ -429,16 +475,27 @@
       "path": "works",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1781695396372,
+      "lastAccessed": 1785745268303,
       "keyFiles": [
         "capability_enhancement_tracker.md"
+      ]
+    },
+    "compiler/assets": {
+      "path": "compiler/assets",
+      "purpose": "Static assets",
+      "fileCount": 8,
+      "lastAccessed": 1785745268303,
+      "keyFiles": [
+        "LICENSES.md",
+        "apg-charts.js",
+        "apg-sse.js"
       ]
     },
     "docs/api": {
       "path": "docs/api",
       "purpose": "API routes",
       "fileCount": 1,
-      "lastAccessed": 1781695396373,
+      "lastAccessed": 1785745268304,
       "keyFiles": [
         "README.md"
       ]
@@ -447,7 +504,7 @@
       "path": "scripts/migrations",
       "purpose": "Database migrations",
       "fileCount": 1,
-      "lastAccessed": 1781695396375,
+      "lastAccessed": 1785745268306,
       "keyFiles": [
         "migration_to_v2.py"
       ]
@@ -456,14 +513,14 @@
       "path": "tests/fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1781695396376,
+      "lastAccessed": 1785745268307,
       "keyFiles": []
     },
     "vscode-extension/src": {
       "path": "vscode-extension/src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1781695396377,
+      "lastAccessed": 1785745268307,
       "keyFiles": [
         "extension.ts"
       ]
@@ -471,303 +528,9 @@
   },
   "hotPaths": [
     {
-      "path": "compiler/code_generator.py",
-      "accessCount": 63,
-      "lastAccessed": 1781760274146,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/auth/service.py",
-      "accessCount": 54,
-      "lastAccessed": 1781754862333,
-      "type": "file"
-    },
-    {
-      "path": "tests/test_compiler_baseline.py",
-      "accessCount": 39,
-      "lastAccessed": 1781754348599,
-      "type": "file"
-    },
-    {
-      "path": "compiler/templates/entity_list.html.j2",
-      "accessCount": 7,
-      "lastAccessed": 1781753943158,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/ckm/wfa/models.py",
-      "accessCount": 6,
-      "lastAccessed": 1781756256861,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/fin/bfc/budgeting_forecasting/models_new.py",
-      "accessCount": 6,
-      "lastAccessed": 1781756258436,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/scm/ven/models.py",
-      "accessCount": 6,
-      "lastAccessed": 1781756259496,
-      "type": "file"
-    },
-    {
-      "path": "compiler/baseline.py",
-      "accessCount": 5,
-      "lastAccessed": 1781701469133,
-      "type": "file"
-    },
-    {
-      "path": "templates/template_manager.py",
-      "accessCount": 4,
-      "lastAccessed": 1781695578015,
-      "type": "file"
-    },
-    {
-      "path": "compiler/templates/kanban_view.html.j2",
-      "accessCount": 4,
-      "lastAccessed": 1781754084199,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/bia/anl/models.py",
-      "accessCount": 4,
-      "lastAccessed": 1781756202507,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/fin/bfc/budgeting_forecasting/approval_workflows.py",
-      "accessCount": 4,
-      "lastAccessed": 1781756206474,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/fin/bfc/budgeting_forecasting/template_system.py",
-      "accessCount": 4,
-      "lastAccessed": 1781756210521,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/fin/bfc/budgeting_forecasting/version_control_audit.py",
-      "accessCount": 4,
-      "lastAccessed": 1781756211263,
-      "type": "file"
-    },
-    {
-      "path": "templates/project_scaffolder.py",
-      "accessCount": 3,
-      "lastAccessed": 1781695535753,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/db/write_thru.py",
-      "accessCount": 3,
-      "lastAccessed": 1781699210648,
-      "type": "file"
-    },
-    {
-      "path": "compiler/templates/record_detail.html.j2",
-      "accessCount": 3,
-      "lastAccessed": 1781754105153,
-      "type": "file"
-    },
-    {
-      "path": "compiler/templates/landing.html.j2",
-      "accessCount": 3,
-      "lastAccessed": 1781754117513,
-      "type": "file"
-    },
-    {
-      "path": "cli/compile_command.py",
+      "path": "examples/11_screen_composition_relationships/output/app.py",
       "accessCount": 2,
-      "lastAccessed": 1781697731380,
-      "type": "file"
-    },
-    {
-      "path": "cli/create_project.py",
-      "accessCount": 2,
-      "lastAccessed": 1781697763736,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/composition/orchestration/config.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756145368,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/crm/adv/calendar_activity_management.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756146698,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/fin/arc/accounts_receivable/ai_collections_optimization.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756150129,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/fin/arc/accounts_receivable/ai_credit_scoring.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756151456,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/fin/arc/accounts_receivable/api_endpoints.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756153369,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/int/api/discovery.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756161232,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/ckm/wfa/service.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756557954,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/apig/service.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756563233,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/fin/cos/service.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756574015,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/scm/ctm/contract_management/service.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756576261,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/scm/inv/stock_tracking_control/service.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756577640,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/scm/pom/service.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756578487,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/scm/req/service.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756579824,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/scm/src/service.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756581080,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/intel/threats/service.py",
-      "accessCount": 2,
-      "lastAccessed": 1781756869180,
-      "type": "file"
-    },
-    {
-      "path": "templates/composable/base_template.py",
-      "accessCount": 1,
-      "lastAccessed": 1781695445232,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/db/store.py",
-      "accessCount": 1,
-      "lastAccessed": 1781698759335,
-      "type": "file"
-    },
-    {
-      "path": "compiler/templates/app_index.html.j2",
-      "accessCount": 1,
-      "lastAccessed": 1781748580966,
-      "type": "file"
-    },
-    {
-      "path": "uuid_extensions.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756355489,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/ckm/rtc/service.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756450204,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/frec/service.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756454007,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/grag/service.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756454460,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/imex/service.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756455224,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/mdm/service.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756456206,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/meta/service.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756456571,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/mfau/service.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756456951,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/secu/service.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756457382,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/dvrl/service.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756458022,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/frec/database.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756469616,
-      "type": "file"
-    },
-    {
-      "path": "capabilities/common/grag/database.py",
-      "accessCount": 1,
-      "lastAccessed": 1781756470382,
+      "lastAccessed": 1785745345828,
       "type": "file"
     }
   ],

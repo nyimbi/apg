@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"python -c \\\"\\nimport compiler\\nfrom language_server.semantic_service import build_code_action_report, build_semantic_snapshot\\nimport json\\nsrc = open('tests/fixtures/language_server/missi...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nImportError: cannot import name 'build_semantic_snapshot' from 'language_server.semantic_service' (/Users/nyimbiodero/src/pjs/apg/language_server/semantic_service.py)",
+  "timestamp": "2026-08-01T07:10:18.046Z",
+  "retry_count": 1
+}
