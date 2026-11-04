@@ -6,6 +6,8 @@ APG CLI Main Entry Point
 Main command-line interface for APG (Application Programming Generation) language.
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import json
@@ -780,9 +782,9 @@ agent BasicAgent {{
 	(current_dir / 'tests').mkdir(exist_ok=True)
 
 	console.print("APG project initialized")
-	console.print(f"Created: apg.json")
-	console.print(f"Created: main.apg")
-	console.print(f"Created: generated/ directory")
+	console.print("Created: apg.json")
+	console.print("Created: main.apg")
+	console.print("Created: generated/ directory")
 
 	console.print("\n[green]Next steps:[/green]")
 	console.print("  1. Edit main.apg to define your application")

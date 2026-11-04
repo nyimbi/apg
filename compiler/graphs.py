@@ -14,7 +14,6 @@ from compiler.ast_builder import (
 	ApplicationDeclaration,
 	CapabilityDeclaration,
 	DatabaseDeclaration,
-	EntityDeclaration,
 	EntityType,
 	ModuleDeclaration,
 )

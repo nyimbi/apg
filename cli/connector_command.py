@@ -40,7 +40,7 @@ def list_connectors(scan_dir: str) -> None:
 	manifests = scan_connectors(scan_dir)
 	if not manifests:
 		console.print("[yellow]No connectors found.[/yellow]")
-		console.print(f"  Generate one: apg connector generate --spec openapi.yaml")
+		console.print("  Generate one: apg connector generate --spec openapi.yaml")
 		return
 	table = Table(title=f"APG Connectors ({scan_dir}/)")
 	table.add_column("Name", style="cyan")

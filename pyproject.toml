@@ -32,12 +32,31 @@ dev = [
     "pytest-asyncio",
     "pytest-httpserver",
     "PyYAML",
+    "cryptography>=42",
+    "flask-appbuilder>=4.5",
+    "numpy>=1.26",
+    "starlette>=0.36",
+    "marshmallow-sqlalchemy>=0.28",
+    "ruff>=0.6",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-q --tb=short"
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+extend-ignore = ["E701", "E702"]
+
+[tool.ruff.lint.per-file-ignores]
+"cli/main.py" = ["E402"]
+"compiler/antlr_ast_visitor.py" = ["E402"]
+"compiler/linting.py" = ["E402"]
+"compiler/semantic_model.py" = ["E402"]
 
 [tool.setuptools]
 include-package-data = true

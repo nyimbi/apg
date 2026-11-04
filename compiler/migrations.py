@@ -624,7 +624,7 @@ def _generate_apg_patch(old_model: dict[str, Any], new_model: dict[str, Any]) ->
 	plan = build_migration_plan(old_model, new_model)
 	changes = plan.get("changes", [])
 
-	old_tables = old_model.get("tables", {})
+	_old_tables = old_model.get("tables", {})
 	new_tables = new_model.get("tables", {})
 	old_caps = old_model.get("capabilities", {})
 	new_caps = new_model.get("capabilities", {})

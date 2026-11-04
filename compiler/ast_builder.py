@@ -5,10 +5,12 @@ APG AST Builder Module
 Converts ANTLR parse trees into structured Abstract Syntax Tree (AST) nodes.
 Provides a clean, typed representation of APG programs for semantic analysis and code generation.
 """
+from __future__ import annotations
 
 import sys
 import re
-from typing import Any, Dict, List, Optional, Union
+
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -510,7 +512,6 @@ class DatabaseSchema(ASTNode):
 	"""Database schema definition"""
 	name: str
 	tables: List['TableDeclaration'] = field(default_factory=list)
-	views: List['ViewDeclaration'] = field(default_factory=list)
 	procedures: List['ProcedureDeclaration'] = field(default_factory=list)
 	triggers: List['TriggerDeclaration'] = field(default_factory=list)
 
@@ -521,7 +522,6 @@ class TableDeclaration(ASTNode):
 	name: str
 	columns: List['ColumnDeclaration'] = field(default_factory=list)
 	indexes: List['IndexDeclaration'] = field(default_factory=list)
-	constraints: List['ConstraintDeclaration'] = field(default_factory=list)
 
 
 @dataclass

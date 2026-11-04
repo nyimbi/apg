@@ -32,8 +32,6 @@ from .ast_builder import (
 	ASTBuilder,
 	ModuleDeclaration,
 	EntityDeclaration,
-	EntityType,
-	WorkflowDeclaration,
 )
 
 

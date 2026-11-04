@@ -5,13 +5,14 @@ APG Parser Module
 Provides high-level parsing interface for APG source code using ANTLR-generated parsers.
 Handles lexical analysis, syntax parsing, and initial AST construction.
 """
+from __future__ import annotations
 
 import sys
 import re
-from dataclasses import dataclass
+
 from typing import Optional, List, Dict, Any
 from pathlib import Path
-from antlr4 import InputStream, CommonTokenStream, ParseTreeWalker
+from antlr4 import InputStream, CommonTokenStream
 from antlr4.error.ErrorListener import ErrorListener
 
 from .ai_agent_composition import (

@@ -7,6 +7,8 @@ Transforms APG entities, workflows, and other constructs into executable Python 
 with proper imports, type hints, and runtime support.
 """
 
+from __future__ import annotations
+
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from pathlib import Path
@@ -13022,6 +13024,7 @@ if __name__ == "__main__":
 
 flask>=3.0,<4
 PyJWT>=2.8,<3
+gunicorn>=21,<23
 """
 
 	def _generate_python_dockerfile(self, module: ModuleDeclaration) -> str:
@@ -13041,7 +13044,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \\
   CMD python app.py --self-test >/tmp/{module.name}_self_test.json || exit 1
 
-CMD ["python", "app.py"]
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:8080", "app:_flask_app", "--access-logfile", "-"]
 """
 
 	def _generate_python_dockerignore(self) -> str:

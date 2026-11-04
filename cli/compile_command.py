@@ -7,13 +7,12 @@ Command-line interface for compiling APG source files.
 """
 
 import sys
-import os
 import json
 import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 import click
 from rich.console import Console
@@ -26,7 +25,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from compiler.compiler import APGCompiler, CodeGenConfig
 from compiler.code_generator import CodeGenerator
-from compiler.parser import APGParser
 
 console = Console()
 
@@ -180,7 +178,7 @@ def _generate_parser():
 				# List generated files
 				generated_files = list(output_dir.glob('apg*.py'))
 				if generated_files:
-					console.print(f"[cyan]Generated files:[/cyan]")
+					console.print("[cyan]Generated files:[/cyan]")
 					for file in generated_files:
 						console.print(f"  - {file.name}")
 			else:
@@ -213,7 +211,7 @@ def _compile_single(
 	if catalog is not None:
 		_validate_compile_preflight(source_path, config, catalog)
 	
-	console.print(Panel(f"[bold blue]APG Compiler[/bold blue]", 
+	console.print(Panel("[bold blue]APG Compiler[/bold blue]", 
 					   subtitle=f"Compiling {source_path}"))
 	
 	start_time = time.time()
@@ -251,7 +249,7 @@ def _compile_single(
 		if result.success:
 			progress.update(task, description="✅ Compilation successful!")
 
-			console.print(f"\n[green]✅ Compilation successful![/green]")
+			console.print("\n[green]✅ Compilation successful![/green]")
 			console.print(f"[cyan]Time:[/cyan] {compilation_time:.2f}s")
 			console.print(f"[cyan]Generated files:[/cyan] {len(result.generated_files)}")
 			_emit_compilation_diagnostics(result)
@@ -266,7 +264,7 @@ def _compile_single(
 			if verify and not _verify_generated_app(output_dir):
 				raise click.ClickException("Generated verification failed")
 
-			console.print(f"\n[green]Next steps:[/green]")
+			console.print("\n[green]Next steps:[/green]")
 			console.print(f"  1. Inspect generated files in {config.output_directory}", soft_wrap=True)
 			console.print(f"  2. pip install -r {config.output_directory}/requirements.txt", soft_wrap=True)
 			console.print(f"  3. python {config.output_directory}/app.py", soft_wrap=True)
@@ -329,7 +327,7 @@ def _show_compilation_details(result, config: CodeGenConfig):
 	
 	# Show generated files
 	if result.generated_files:
-		console.print(f"\n[bold]Generated Files:[/bold]")
+		console.print("\n[bold]Generated Files:[/bold]")
 		files_table = Table(show_header=True, header_style="bold magenta")
 		files_table.add_column("File", style="cyan")
 		files_table.add_column("Lines", style="yellow")
@@ -347,7 +345,7 @@ def _show_compilation_details(result, config: CodeGenConfig):
 	# Show statistics
 	statistics = getattr(result, "statistics", {})
 	if statistics:
-		console.print(f"\n[bold]Statistics:[/bold]")
+		console.print("\n[bold]Statistics:[/bold]")
 		stats_table = Table(show_header=False, box=None)
 		stats_table.add_column("Metric", style="cyan")
 		stats_table.add_column("Count", style="white")

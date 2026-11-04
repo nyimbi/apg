@@ -18,7 +18,6 @@ from typing import Any
 from .ast_builder import ASTBuilder
 from .parser import APGParser, APGSyntaxError
 from .semantic_analyzer import SemanticAnalyzer, SemanticError
-from .semantic_model import build_semantic_model_from_source
 
 
 NL_PLAN_FORMAT = "apg.nl-plan.v1"
@@ -503,7 +502,7 @@ def _agent_edit(base_name: str) -> PlannedEdit:
 def _add_field_edit(table_name: str, field_name: str, field_type: str = "str") -> PlannedEdit:
 	"""Insert a new field into an existing table block."""
 	# Normalise: table name as written in source (preserve case from regex match)
-	field_line = f"    {field_name}: {field_type};"
+	_field_line = f"    {field_name}: {field_type};"
 	# We encode the insertion as a sentinel comment + field line so _apply_field_insertion
 	# can find it. The actual source mutation happens in build_nl_plan via _apply_add_field.
 	append_text = f"\n// APG_ADD_FIELD target={table_name} field={field_name} type={field_type}\n"
@@ -755,7 +754,7 @@ def _source_insert_field(source: str, table_name: str, field_line: str) -> str:
 	body = match.group(2).rstrip()
 	indent_match = re.search(r"\n([ \t]+)[A-Za-z_][A-Za-z0-9_]*\s*:", body)
 	if indent_match:
-		field_line = re.sub(r"^[ \t]+", indent_match.group(1), field_line)
+		__field_line = re.sub(r"^[ \t]+", indent_match.group(1), field_line)
 	new_body = f"{body}\n{field_line}" if body else f"\n{field_line}"
 	return source[: match.start()] + match.group(1) + new_body + match.group(3) + source[match.end() :]
 

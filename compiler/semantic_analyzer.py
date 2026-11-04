@@ -7,11 +7,10 @@ Validates program semantics, resolves symbols, performs type inference and check
 and reports semantic errors before code generation.
 """
 
-from typing import Any, Dict, List, Optional, Set, Union
-from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Set
+from dataclasses import dataclass
 from enum import Enum
 import difflib
-import sys
 from pathlib import Path
 
 # Import AST nodes
@@ -32,7 +31,6 @@ _MANIFEST_KNOWN_SYSTEM_CACHE: "tuple[frozenset[str], int] | None" = None
 def _load_known_system_capabilities() -> frozenset[str]:
 	"""Load capability IDs from MANIFEST.json, cached by file mtime."""
 	global _MANIFEST_KNOWN_SYSTEM_CACHE
-	from pathlib import Path
 	manifest_path = Path(__file__).resolve().parents[1] / "capabilities" / "MANIFEST.json"
 	try:
 		mtime = manifest_path.stat().st_mtime_ns

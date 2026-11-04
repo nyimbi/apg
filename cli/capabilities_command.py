@@ -261,7 +261,7 @@ def _final_scaffold_report(
 		"next_steps": [
 			f"Review {capability_dir / 'cap_spec.md'}",
 			f"Run python -m pytest -q {capability_dir / 'tests'}",
-			f"Run apg capabilities validate-contracts --json after moving the scaffold under the repository capabilities root",
+			"Run apg capabilities validate-contracts --json after moving the scaffold under the repository capabilities root",
 		],
 	}
 
@@ -1353,7 +1353,7 @@ def capabilities_manifest(capability: str | None, domain: str | None, stats: boo
         caps = all_capabilities()
         methods = [c["service_method_count"] for c in caps]
         rules = [c["rule_count"] for c in caps]
-        click.echo(f"\n=== APG Capability Quality Statistics ===\n")
+        click.echo("\n=== APG Capability Quality Statistics ===\n")
         click.echo(f"  Total capabilities:   {capability_count()}")
         click.echo(f"  World-class (40+):    {sum(1 for m in methods if m >= 40)} ({sum(1 for m in methods if m >= 40)*100//len(caps)}%)")
         click.echo(f"  Mean methods:         {statistics.mean(methods):.1f}")

@@ -7,9 +7,8 @@ Command-line interface for creating new APG projects from templates.
 """
 
 import sys
-import json
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict
 
 import click
 from rich.console import Console
@@ -22,7 +21,6 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from templates.template_types import TemplateType, ProjectConfig, list_available_templates, get_recommended_templates
-from templates.template_manager import TemplateManager
 from templates.project_scaffolder import ProjectScaffolder
 
 console = Console()
@@ -379,7 +377,7 @@ def _create_project_with_progress(config: ProjectConfig):
 		else:
 			progress.update(task, description="❌ Project creation failed")
 			
-			console.print(f"\n[red]❌ Project creation failed![/red]")
+			console.print("\n[red]❌ Project creation failed![/red]")
 			for error in result['errors']:
 				console.print(f"[red]  - {error}[/red]")
 
@@ -402,7 +400,7 @@ def _show_next_steps(config: ProjectConfig, project_path: Path):
 	console.print("\n[green]The generated Python app is a Flask 3.x service. Use --describe for JSON metadata.[/green]")
 	
 	if config.template_type != TemplateType.BASIC_AGENT:
-		console.print(f"\n[yellow]📚 Check the README.md for template-specific usage instructions[/yellow]")
+		console.print("\n[yellow]📚 Check the README.md for template-specific usage instructions[/yellow]")
 
 
 @create.command()
@@ -467,13 +465,13 @@ def info(template_type: str):
 	
 	features = info.get('features', [])
 	if features:
-		console.print(f"\n[cyan]Features:[/cyan]")
+		console.print("\n[cyan]Features:[/cyan]")
 		for feature in features:
 			console.print(f"  • {feature}")
 	
 	use_cases = info.get('use_cases', [])
 	if use_cases:
-		console.print(f"\n[cyan]Use Cases:[/cyan]")
+		console.print("\n[cyan]Use Cases:[/cyan]")
 		for use_case in use_cases:
 			console.print(f"  • {use_case}")
 	

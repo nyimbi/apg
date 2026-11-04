@@ -85,7 +85,7 @@ def _auto_compile() -> bool:
 	"""Auto-compile APG source"""
 	try:
 		from cli.compile_command import _compile_single
-		from compiler.compiler import APGCompiler, CodeGenConfig
+		from compiler.compiler import CodeGenConfig
 		
 		# Find source file
 		source_candidates = ['main.apg', 'src/main.apg', 'app.apg']
@@ -133,7 +133,7 @@ def _auto_compile() -> bool:
 def _run_single(app_path: Path, host: str, port: int, debug: bool):
 	"""Run application once"""
 	
-	console.print(Panel(f"[bold blue]APG Application Runner[/bold blue]", 
+	console.print(Panel("[bold blue]APG Application Runner[/bold blue]", 
 					   subtitle=f"Starting {app_path}"))
 	
 	# Check whether the generated file has an executable Python entrypoint.
@@ -153,14 +153,14 @@ def _run_single(app_path: Path, host: str, port: int, debug: bool):
 	env['APG_PORT'] = str(port)
 	env['APG_DEBUG'] = '1' if debug else '0'
 	
-	console.print(f"[green]Starting APG Python artifact...[/green]")
+	console.print("[green]Starting APG Python artifact...[/green]")
 	console.print(f"[cyan]Host:[/cyan] {host}")
 	console.print(f"[cyan]Port:[/cyan] {port}")
 	console.print(f"[cyan]Debug:[/cyan] {'enabled' if debug else 'disabled'}")
 	console.print(f"[cyan]Application:[/cyan] {app_path}")
 	console.print(f"[cyan]Detected runtime:[/cyan] {app_kind}")
-	console.print(f"\n[green]Executing generated Python application[/green]")
-	console.print(f"[yellow]Press Ctrl+C to stop[/yellow]")
+	console.print("\n[green]Executing generated Python application[/green]")
+	console.print("[yellow]Press Ctrl+C to stop[/yellow]")
 	console.print("-" * 50)
 	
 	try:
@@ -190,7 +190,7 @@ def _run_with_watch(app_path: Path, host: str, port: int, debug: bool):
 	"""Run application with file watching"""
 	
 	console.print(f"[blue]Running {app_path} with file watching...[/blue]")
-	console.print(f"[yellow]Press Ctrl+C to stop[/yellow]")
+	console.print("[yellow]Press Ctrl+C to stop[/yellow]")
 	
 	import hashlib
 	
@@ -358,9 +358,9 @@ def check(port: int, timeout: int):
 			console.print(f"[red]❌ HTTP health check failed: {last_error}[/red]")
 			
 	except socket.timeout:
-		console.print(f"[red]❌ Connection timeout - application may not be running[/red]")
+		console.print("[red]❌ Connection timeout - application may not be running[/red]")
 	except ConnectionRefusedError:
-		console.print(f"[red]❌ Connection refused - application is not running[/red]")
+		console.print("[red]❌ Connection refused - application is not running[/red]")
 	except urllib.error.URLError as e:
 		console.print(f"[red]❌ HTTP error: {e}[/red]")
 	except Exception as e:
