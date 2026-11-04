@@ -6252,6 +6252,53 @@ def _computed_field_names(entity_name: str) -> set[str]:
     }}
 
 
+def _apg_eval_expr(expression: str, local_values: Dict[str, Any]) -> Any:
+    import ast as _apg_ast
+    try:
+        _tree = _apg_ast.parse(str(expression), "<expr>", "eval").body
+    except SyntaxError as _apg_err:
+        raise ValueError(str(_apg_err))
+    _OPS = {{
+        _apg_ast.Add: lambda a, b: a + b,
+        _apg_ast.Sub: lambda a, b: a - b,
+        _apg_ast.Mult: lambda a, b: a * b,
+        _apg_ast.Div: lambda a, b: a / b,
+        _apg_ast.FloorDiv: lambda a, b: a // b,
+        _apg_ast.Mod: lambda a, b: a % b,
+        _apg_ast.Pow: lambda a, b: a ** b,
+        _apg_ast.USub: lambda a: -a,
+        _apg_ast.UAdd: lambda a: +a,
+    }}
+
+    def _eval(node):
+        if isinstance(node, _apg_ast.Constant):
+            if isinstance(node.value, (int, float, str, bool, type(None))):
+                return node.value
+            raise ValueError("constant type not allowed")
+        if isinstance(node, _apg_ast.Num):
+            return node.n
+        if isinstance(node, _apg_ast.Str):
+            return node.s
+        if isinstance(node, _apg_ast.Name):
+            if node.id in local_values:
+                return local_values[node.id]
+            raise ValueError("name not allowed: " + str(node.id))
+        if isinstance(node, _apg_ast.BinOp):
+            op = type(node.op)
+            if op not in _OPS:
+                raise ValueError("operator not allowed")
+            return _OPS[op](_eval(node.left), _eval(node.right))
+        if isinstance(node, _apg_ast.UnaryOp):
+            op = type(node.op)
+            if op not in _OPS:
+                raise ValueError("operator not allowed")
+            return _OPS[op](_eval(node.operand))
+        # function calls are deliberately disallowed
+        raise ValueError("unsupported expression node: " + type(node).__name__)
+
+    return _eval(_tree)
+
+
 def _apply_computed_fields(entity_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
     public = dict(record)
     local_values = dict(public)
@@ -6261,7 +6308,7 @@ def _apply_computed_fields(entity_name: str, record: Dict[str, Any]) -> Dict[str
         if not field_name or not expression:
             continue
         try:
-            public[field_name] = eval(expression, {{"__builtins__": {{}}}}, dict(local_values))
+            public[field_name] = _apg_eval_expr(expression, dict(local_values))
         except Exception as exc:
             _logging.getLogger("apg").warning(
                 "computed_field_failed entity=%s field=%s err=%s",
@@ -12592,6 +12639,17 @@ def _setup_tenant() -> Any:
         return _apg_error_response(413, "payload_too_large", "Payload too large", "The request body exceeds the configured APG_MAX_BODY_BYTES limit.")
     path = _flask_request.path.rstrip("/") or "/"
     tid = _tenant_header_value()
+    # In production, tenant selection from an HTTP header is only honoured when
+    # the caller presents valid admin credentials (D-04). A glibc API key or a
+    # session user may request the *configured* default tenant only.
+    if (
+        _production_mode()
+        and tid is not None
+        and APG_MULTI_TENANT_ENABLED
+        and not _tenant_admin_bypass()
+        and _authorized(_flask_request.headers)
+    ):
+        tid = None
     if (
         APG_MULTI_TENANT_ENABLED
         and _production_mode()
@@ -12766,11 +12824,17 @@ def _flask_api_docs():
 
 @_flask_app.route("/entities/<entity_name>/records.csv", methods=["GET"])
 def _flask_csv_export(entity_name):
+    auth_err = _check_mutation_auth()
+    if auth_err:
+        return auth_err
     return _FlaskResponse(_csv_export_body(entity_name), content_type="text/csv; charset=utf-8")
 
 
 @_flask_app.route("/uploads/<entity_name>/<filename>", methods=["GET"])
 def _flask_uploaded_file(entity_name, filename):
+    auth_err = _check_mutation_auth()
+    if auth_err:
+        return auth_err
     return _uploaded_file_response(str(entity_name), str(filename))
 
 
