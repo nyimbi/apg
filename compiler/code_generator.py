@@ -992,6 +992,9 @@ def _apg_send_email(to: str, subject: str, body: str) -> None:
             _logging.getLogger("apg").warning("email_send_failed to=%s err=%s", recipient, exc)
 
     thread = _threading_mod.Thread(target=_send, daemon=True)
+    if len(_APG_EMAIL_THREADS) >= 1000:
+        # Drop references to finished threads to bound memory (D-16)
+        _APG_EMAIL_THREADS[:] = [t for t in _APG_EMAIL_THREADS if t.is_alive()]
     _APG_EMAIL_THREADS.append(thread)
     thread.start()
 
@@ -12211,6 +12214,8 @@ _APG_METRIC_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 
 _APG_HTTP_REQUESTS_TOTAL: Dict[tuple[str, str, str], int] = {{}}
 _APG_HTTP_REQUEST_DURATION: Dict[tuple[str, str], Dict[str, Any]] = {{}}
 _APG_ACTIVE_REQUESTS = 0
+_APG_METRICS_MAX_LABELS = 256
+_APG_METRICS_OVERFLOW = 0
 
 
 def _apg_path_template(path: str | None = None) -> str:
@@ -12247,9 +12252,17 @@ def _apg_metrics_dec_active() -> None:
 
 
 def _apg_metrics_observe(method: str, path_template: str, status: int, duration_s: float) -> None:
-    request_key = (method.upper(), path_template, str(int(status)))
-    duration_key = (method.upper(), path_template)
+    global _APG_METRICS_OVERFLOW
+    # Bounded cardinality (D-14): an attacker-chosen path must not mint an
+    # unbounded number of series. Overflow collapses to a shared bucket.
     with _APG_METRICS_LOCK:
+        if len(_APG_HTTP_REQUESTS_TOTAL) + (1 if (method.upper(), path_template, str(int(status))) not in _APG_HTTP_REQUESTS_TOTAL else 0) > _APG_METRICS_MAX_LABELS:
+            request_key = (method.upper(), "_other", str(int(status)))
+            duration_key = (method.upper(), "_other")
+            _APG_METRICS_OVERFLOW += 1
+        else:
+            request_key = (method.upper(), path_template, str(int(status)))
+            duration_key = (method.upper(), path_template)
         _APG_HTTP_REQUESTS_TOTAL[request_key] = _APG_HTTP_REQUESTS_TOTAL.get(request_key, 0) + 1
         stats = _APG_HTTP_REQUEST_DURATION.setdefault(duration_key, {{"count": 0, "sum": 0.0, "buckets": [0 for _ in _APG_METRIC_BUCKETS]}})
         stats["count"] += 1
@@ -12608,6 +12621,9 @@ def _apg_internal_error(_error: Any) -> _FlaskResponse:
 _APG_RATE_BUCKETS = {{}}
 _APG_RATE_LOCK = _threading.Lock()
 _APG_RATE_EXEMPT_PATHS = ("/livez", "/readyz", "/metrics")
+_APG_RATE_BUCKET_TTL = 600.0
+_APG_RATE_BUCKET_CAP = 4096
+_APG_RATE_SWEEP_COUNTER = [0]
 
 
 def _apg_rate_is_authenticated() -> bool:
@@ -12627,6 +12643,12 @@ def _apg_rate_limit_guard() -> _FlaskResponse | None:
     now = _time.monotonic()
     ip = str(_flask_request.remote_addr or "unknown")
     with _APG_RATE_LOCK:
+        # Bounded cardinality (D-15): evict stale buckets periodically
+        _APG_RATE_SWEEP_COUNTER[0] += 1
+        if _APG_RATE_SWEEP_COUNTER[0] % 1000 == 0 or len(_APG_RATE_BUCKETS) > _APG_RATE_BUCKET_CAP:
+            _stale = [k for k, v in _APG_RATE_BUCKETS.items() if (now - float(v[1])) > _APG_RATE_BUCKET_TTL]
+            for k in _stale:
+                _APG_RATE_BUCKETS.pop(k, None)
         bucket = _APG_RATE_BUCKETS.get(ip, [float(limit), now])
         tokens = min(float(limit), float(bucket[0]) + max(0.0, now - float(bucket[1])) * refill_per_second)
         if tokens < 1.0:
