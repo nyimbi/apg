@@ -3115,6 +3115,22 @@ def metrics_snapshot() -> Dict[str, Any]:
         "auth": auth_status(),
     }}
 
+def audit_chain_verify() -> Dict[str, Any]:
+    """Re-compute the event hash chain and report the first break."""
+    prev = "0"*64
+    for idx, event in enumerate(EVENT_LOG):
+        raw = prev
+        raw = raw + str(event.get("id"))
+        raw = raw + str(event.get("action"))
+        raw = raw + str(event.get("entity"))
+        raw = raw + str(event.get("record_id") or "")
+        raw = raw + repr(event.get("before", "")) + repr(event.get("after", ""))
+        expected = _hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        if event.get("hash") != expected or event.get("prev_hash") != prev:
+            return {{"valid": False, "broke_at_index": idx, "broke_at_id": event.get("id"), "reason": "hash mismatch"}}
+        prev = event.get("hash")
+    return {{"valid": True, "events_checked": len(EVENT_LOG), "tail_hash": prev}}
+
 
 def self_test() -> Dict[str, Any]:
     validation = validate_application()
@@ -3876,6 +3892,19 @@ def _record_event(
         event["after"] = a
     if changed_fields is not None:
         event["changed_fields"] = list(changed_fields)
+    import hashlib as _apg_hashlib
+    import datetime as _apg_dt
+    _prev_hash = EVENT_LOG[-1].get("hash", "0"*64) if EVENT_LOG else "0"*64
+    _ts = _apg_dt.datetime.utcnow().isoformat() + "Z"
+    event["ts"] = _ts
+    _raw = _prev_hash
+    _raw = _raw + str(event.get("id"))
+    _raw = _raw + str(action)
+    _raw = _raw + str(entity_name)
+    _raw = _raw + str(record.get("id") if record is not None else "")
+    _raw = _raw + repr(event.get("before", "")) + repr(event.get("after", ""))
+    event["prev_hash"] = _prev_hash
+    event["hash"] = _hashlib.sha256(_raw.encode("utf-8")).hexdigest()
     NEXT_EVENT_ID += 1
     EVENT_LOG.append(event)
     _publish_live_event("events", "record", event)
