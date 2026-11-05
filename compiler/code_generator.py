@@ -7044,6 +7044,20 @@ def _sqlite_init_entity_table(conn: _sqlite3.Connection, entity_name: str) -> No
     columns = _sqlite_expected_columns(entity_name)
     column_sql = ", ".join(_sqlite_identifier(column["name"]) + " " + column["ddl"] for column in columns)
     conn.execute("CREATE TABLE IF NOT EXISTS " + table + " (" + column_sql + ")")
+    indexes = [c["name"] for c in columns if c["name"] not in ("deleted_at",)]
+    # indexes on the hot columns (feature 11, closes D-24).
+    _INDEX_COLUMNS = ("tenant_id", "owner_id", "created_at", "updated_at", "deleted_at")
+    for col_name in _INDEX_COLUMNS:
+        if any(c["name"] == col_name for c in columns):
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS "
+                + _sqlite_identifier("idx_" + entity_name + "_" + col_name)
+                + " ON "
+                + table
+                + " ("
+                + _sqlite_identifier(col_name)
+                + ")"
+            )
     _sqlite_init_entity_fts(conn, entity_name)
     trigger = _sqlite_identifier("trg_" + entity_name + "_updated_at")
     if _APG_DB_DIALECT == "pg":
