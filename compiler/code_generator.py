@@ -6041,6 +6041,7 @@ def _html_page(title: str, body: str, shell: bool = True) -> str:
         'setTimeout(function(){{el.classList.add("opacity-0");setTimeout(function(){{el.remove();}},300);}},3000);'
         '}}'
         'document.addEventListener("htmx:afterOnLoad",function(e){{'
+        'document.addEventListener("htmx:afterSwap",function(e){{var t=e.detail.target||document;var h=t.querySelector("h1,h2,h3,[data-apg-autofocus]");if(h&&typeof h.focus==="function"){{if(!h.hasAttribute("tabindex"))h.setAttribute("tabindex","-1");h.focus({{preventScroll:true}});}}}});'
         'var t=e.detail.xhr.getResponseHeader("HX-Trigger");'
         'if(!t)return;'
         'try{{var d=JSON.parse(t);if(d.apgToast)apgToast(d.apgToast.msg,d.apgToast.type||"success");}}catch(ex){{}}'
