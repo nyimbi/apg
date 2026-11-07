@@ -42,3 +42,9 @@ def test_fluid_typography_uses_clamp():
 	app_source = _generated_app_source()
 
 	assert "clamp(" in app_source
+
+
+def test_container_queries_present():
+	app_source = _generated_app_source()
+
+	assert "container-type" in app_source

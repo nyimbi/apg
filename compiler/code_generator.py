@@ -5849,7 +5849,7 @@ def theme_stylesheet() -> str:
         ".apg-nav-link:hover {{ background: var(--apg-bg-hover); text-decoration: none !important; opacity: 1; }}",
         ".apg-nav-link.active {{ background: var(--apg-bg-hover); font-weight: 500; }}",
         # Card
-        ".apg-card {{ background: var(--apg-bg-card); border: 1px solid var(--apg-border); border-radius: var(--apg-radius); box-shadow: var(--apg-shadow-sm); padding: var(--apg-space-4); margin-bottom: var(--apg-space-4); }}",
+        ".apg-card {{ container-type: inline-size; container-name: apg-card; background: var(--apg-bg-card); border: 1px solid var(--apg-border); border-radius: var(--apg-radius); box-shadow: var(--apg-shadow-sm); padding: var(--apg-space-4); margin-bottom: var(--apg-space-4); }}"\n        "@container apg-card (min-width: 32rem) {{ .apg-card .apg-grid-2 {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }} .apg-card .apg-grid-3 {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }} }}",
         ".apg-card-header {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--apg-space-3); padding-bottom: var(--apg-space-3); border-bottom: 1px solid var(--apg-border); }}",
         # Table
         ".apg-table {{ width: 100%; border-collapse: collapse; font-size: 0.875rem; }}",

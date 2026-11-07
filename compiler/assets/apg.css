@@ -194,6 +194,8 @@ p { margin: 0 0 var(--apg-space-3); }
 :root.apg-sidebar-collapsed .apg-shell-content { padding-left: calc(4.5rem + var(--apg-space-6)); }
 
 .apg-card {
+	container-type: inline-size;
+	container-name: apg-card;
 	background: var(--apg-bg-card);
 	border: 1px solid var(--apg-border);
 	border-radius: var(--apg-radius);
@@ -1029,6 +1031,13 @@ html[dir="rtl"] .apg-sidebar-backdrop { inset: 0; }
 }
 @media (max-width: 480px) {
 	.apg-table { min-width: 42rem; }
+}
+
+
+/* ---- worldclass/ui-polish: container queries for nested cards ---- */
+@container apg-card (min-width: 32rem) {
+	.apg-card .apg-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.apg-card .apg-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 
