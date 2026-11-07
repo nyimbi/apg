@@ -5833,9 +5833,9 @@ def theme_stylesheet() -> str:
         # Base styles
         "*, *::before, *::after {{ box-sizing: border-box; }}",
         "body {{ margin: 0; font-family: var(--apg-font-sans); color: var(--apg-text); background: var(--apg-bg-canvas); line-height: 1.5; font-size: 14px; }}",
-        "h1 {{ margin: 0 0 var(--apg-space-4); font-size: 1.5rem; font-weight: 600; color: var(--apg-text); }}",
-        "h2 {{ margin: var(--apg-space-6) 0 var(--apg-space-3); font-size: 1.125rem; font-weight: 600; color: var(--apg-text); }}",
-        "h3 {{ margin: var(--apg-space-4) 0 var(--apg-space-2); font-size: 1rem; font-weight: 600; color: var(--apg-text); }}",
+        "h1 {{ margin: 0 0 var(--apg-space-4); font-size: clamp(1.25rem, 1.1rem + 0.75vw, 1.75rem); font-weight: 600; color: var(--apg-text); }}",
+        "h2 {{ margin: var(--apg-space-6) 0 var(--apg-space-3); font-size: clamp(1.05rem, 1rem + 0.25vw, 1.25rem); font-weight: 600; color: var(--apg-text); }}",
+        "h3 {{ margin: var(--apg-space-4) 0 var(--apg-space-2); font-size: clamp(1rem, 0.95rem + 0.2vw, 1.125rem); font-weight: 600; color: var(--apg-text); }}",
         "a {{ color: var(--apg-accent); text-decoration: none; transition: opacity var(--apg-duration-fast); }}",
         "a:hover {{ text-decoration: underline; opacity: 0.85; }}",
         "p {{ margin: 0 0 var(--apg-space-3); }}",

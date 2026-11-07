@@ -36,3 +36,9 @@ def test_mobile_breakpoint_present():
 	app_source = _generated_app_source()
 
 	assert "max-width: 768px" in app_source
+
+
+def test_fluid_typography_uses_clamp():
+	app_source = _generated_app_source()
+
+	assert "clamp(" in app_source
