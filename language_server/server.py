@@ -222,8 +222,66 @@ def _matching_brace(text: str, open_offset: int) -> int:
 	return len(text)
 
 
-def parse_entities(text: str) -> list[EntityInfo]:
+def _parse_entities_with_real_parser(text: str) -> list[EntityInfo] | None:
+	"""Parse entities with the compiler's actual ANTLR-backed parser.
+
+	Returns None on any parse error or availability problem so callers can
+	fall through to the legacy regex path, which is more forgiving on incomplete
+	(live, mid-typing) documents.
+	"""
+	try:
+		from compiler.parser import APGParser  # type: ignore[import-not-found]
+	except Exception:
+		return None
+	try:
+		parser = APGParser()
+		result = parser.parse_string(text, "<lsp>")
+	except Exception:
+		return None
+	if not result or not result.get("success"):
+		return None
+	ast_mod = result.get("ast")
+	if ast_mod is None or not hasattr(ast_mod, "entities"):
+		return None
 	entities: list[EntityInfo] = []
+	for ent in getattr(ast_mod, "entities", []) or []:
+		name = getattr(ent, "name", None)
+		if not isinstance(name, str) or not name:
+			continue
+		kind_val = getattr(getattr(ent, "entity_type", None), "value", None)
+		kind = kind_val if isinstance(kind_val, str) else str(kind_val or "entity")
+		if kind not in ("entity", "table"):
+			continue
+		match = re.search(r"\b" + re.escape(kind) + r"\s+" + re.escape(name) + r"\s*\{", text)
+		if not match:
+			continue
+		open_brace = text.rfind("{", match.start(), match.end() + 1)
+		if open_brace < 0:
+			open_brace = text.find("{", match.start())
+		if open_brace < 0:
+			continue
+		close_brace = _matching_brace(text, open_brace)
+		line, character = offset_to_position(text, match.start(2))
+		body = text[open_brace + 1:close_brace]
+		entity = EntityInfo(
+			kind=match.group(1) if hasattr(match, "group") and match.group(1) in ("entity", "table") else kind,
+			name=name,
+			line=line,
+			character=character,
+			body_start=open_brace + 1,
+			body_end=close_brace,
+		)
+		entity.fields = _parse_fields(body, entity.body_start, text)
+		entity.relationships = _parse_relationships(body, entity.body_start, text)
+		entities.append(entity)
+	return entities
+
+
+def parse_entities(text: str) -> list[EntityInfo]:
+	entities = _parse_entities_with_real_parser(text)
+	if entities is not None:
+		return entities
+	entities = []
 	pattern = re.compile(r"\b(entity|table)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{")
 	for match in pattern.finditer(text):
 		open_brace = text.find("{", match.start())
