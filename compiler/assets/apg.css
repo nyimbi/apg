@@ -39,7 +39,7 @@
 	--apg-space-8: 32px;
 	--apg-duration-fast: 150ms;
 	--apg-duration-base: 200ms;
-	color-scheme: light;
+	color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -432,7 +432,7 @@ pre code { background: transparent; padding: 0; color: inherit; }
 .apg-analytics-decisions small { color: var(--apg-muted); }
 .apg-analytics-decisions a { justify-self: start; font-size: .78rem; font-weight: 600; }
 .apg-status-drilldown { display: grid; gap: var(--apg-space-2); margin-top: var(--apg-space-3); }
-.apg-status-row { display: grid; grid-template-columns: 1fr auto auto; gap: var(--apg-space-2); align-items: center; min-height: 40px; padding: .45rem .65rem; border-radius: var(--apg-radius-sm); background: var(--apg-bg-hover); color: var(--apg-text); text-decoration: none; }
+.apg-status-row { display: grid; grid-template-columns: 1fr auto auto; gap: var(--apg-space-2); align-items: center; min-height: 44px; padding: .45rem .65rem; border-radius: var(--apg-radius-sm); background: var(--apg-bg-hover); color: var(--apg-text); text-decoration: none; }
 .apg-status-row:hover { text-decoration: none; opacity: 1; background: color-mix(in srgb, var(--apg-primary), transparent 92%); }
 .apg-status-row small { color: var(--apg-muted); font-variant-numeric: tabular-nums; }
 .apg-analytics-insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--apg-space-4); margin-bottom: var(--apg-space-5); }
@@ -1029,4 +1029,22 @@ html[dir="rtl"] .apg-sidebar-backdrop { inset: 0; }
 }
 @media (max-width: 480px) {
 	.apg-table { min-width: 42rem; }
+}
+
+
+/* ---- worldclass/ui-polish: accessibility & motion safety ---- */
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+		scroll-behavior: auto !important;
+	}
+	.apg-shimmer { animation: none; background: #f0f0f0; }
+}
+body {
+	padding-left: max(var(--apg-space-2), env(safe-area-inset-left, 0px));
+	padding-right: max(var(--apg-space-2), env(safe-area-inset-right, 0px));
+	padding-top: max(0px, env(safe-area-inset-top, 0px));
+	padding-bottom: max(var(--apg-space-2), env(safe-area-inset-bottom, 0px));
 }
