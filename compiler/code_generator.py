@@ -1298,7 +1298,7 @@ def _pg_save_journal_entry(entry: Dict[str, Any]) -> None:
     except Exception:
         _ = None  # best-effort
     finally:
-        conn.close()
+        _pg_release(conn)
 
 
 def _get_journal(run_id: str) -> list[Dict[str, Any]]:
@@ -11675,16 +11675,89 @@ def _pg_database_url() -> str | None:
 
 
 _APG_PG_URL: str | None = _pg_database_url()
+_APG_PG_THREAD_LOCAL = threading.local()
+_APG_PG_CONNECT_FAILURES: set = set()
+_APG_PG_CONNECTIONS: list = []
+
+
+def _pg_discard(conn) -> None:
+    if conn is None:
+        return
+    try:
+        if getattr(_APG_PG_THREAD_LOCAL, "connection", None) is conn:
+            _APG_PG_THREAD_LOCAL.connection = None
+    except Exception:
+        _ = None
+    try:
+        conn.close()
+    except Exception:
+        _ = None
 
 
 def _pg_connection():
+    # D-07/D-12: one connection per thread, reused across calls. The previous
+    # implementation opened (TCP + TLS + auth + backend fork) and closed a
+    # connection on every journal/run/record touch, tens of milliseconds each.
     if not _APG_PG_URL:
         return None
+    cached = getattr(_APG_PG_THREAD_LOCAL, "connection", None)
+    if cached is not None:
+        try:
+            if not getattr(cached, "closed", False):
+                cached.rollback()
+                return cached
+        except Exception as exc:
+            _logging.getLogger("apg").warning("pg_reuse_failed: %s", exc)
+        _pg_discard(cached)
     try:
         import psycopg2  # type: ignore
-        return psycopg2.connect(_APG_PG_URL)
-    except Exception:
+        conn = psycopg2.connect(_APG_PG_URL)
+    except Exception as exc:
+        # The bare except used to make an outage indistinguishable from
+        # "no database configured"; log the first sighting of each failure.
+        message = str(exc) or type(exc).__name__
+        if message not in _APG_PG_CONNECT_FAILURES and len(_APG_PG_CONNECT_FAILURES) < 32:
+            _APG_PG_CONNECT_FAILURES.add(message)
+            _logging.getLogger("apg").warning("pg_connect_failed: %s", exc)
         return None
+    _APG_PG_THREAD_LOCAL.connection = conn
+    _APG_PG_CONNECTIONS.append(conn)
+    return conn
+
+
+def _pg_release(conn) -> None:
+    # Callers release instead of closing: the connection stays cached for this
+    # thread. Rollback clears any transaction a swallowed error left open,
+    # which is what the old close() did implicitly.
+    if conn is None:
+        return
+    if getattr(_APG_PG_THREAD_LOCAL, "connection", None) is not conn:
+        _pg_discard(conn)
+        return
+    try:
+        conn.rollback()
+    except Exception:
+        _pg_discard(conn)
+
+
+def _pg_close_all_connections() -> None:
+    for connection in list(_APG_PG_CONNECTIONS):
+        try:
+            connection.close()
+        except Exception:
+            _ = None
+    _APG_PG_CONNECTIONS.clear()
+    try:
+        _APG_PG_THREAD_LOCAL.connection = None
+    except Exception:
+        _ = None
+
+
+try:
+    import atexit as _atexit
+    _atexit.register(_pg_close_all_connections)
+except Exception:
+    _ = None
 
 
 def _pg_ensure_runs_table(conn) -> None:
@@ -11721,7 +11794,7 @@ def _pg_save_workflow_run(run: Dict[str, Any]) -> None:
     except Exception:
         _ = None  # best-effort
     finally:
-        conn.close()
+        _pg_release(conn)
 
 
 def _pg_load_workflow_runs() -> list[Dict[str, Any]]:
@@ -11737,7 +11810,7 @@ def _pg_load_workflow_runs() -> list[Dict[str, Any]]:
     except Exception:
         return []
     finally:
-        conn.close()
+        _pg_release(conn)
 
 
 def _pg_ensure_records_table(conn) -> None:
@@ -11790,7 +11863,7 @@ def _pg_save_entity_records(entity_name: str, records: list[Dict[str, Any]]) -> 
     except Exception:
         _ = None  # best-effort
     finally:
-        conn.close()
+        _pg_release(conn)
 
 
 def _pg_load_entity_records(entity_name: str, tenant_scoped: bool = True) -> list[Dict[str, Any]]:
@@ -11812,7 +11885,7 @@ def _pg_load_entity_records(entity_name: str, tenant_scoped: bool = True) -> lis
     except Exception:
         return []
     finally:
-        conn.close()
+        _pg_release(conn)
 
 
 def _apg_request_id() -> str:
