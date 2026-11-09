@@ -165,6 +165,8 @@ The tenant filter that would otherwise limit the export lives in `list_records` 
 
 **Compounding:** `_records_payload_with_query` (`:10614`) and the UI payload builders call this per page render; `metrics_snapshot` (`:3088`) calls `len(list_records(entity))` per entity per scrape (D-14).
 
+**Prerequisite landed `e7f2f03b` (2026-11-09).** The store-divergence blocker is closed: JSON-file boot hydrates `RECORD_STORE` into SQLite (`_sqlite_hydrate_record_store`) then merges back SQLite-only ids (`_sqlite_merge_record_store`); `_restore_record_state` marks `_APG_SQLITE_SYNCED` dirty on entry and re-hydrates with `prune=True`; the flag arms True at both boot exits and after a successful hydrate. A count-only probe was rejected — equal `COUNT(*)` does not imply equal id sets, so it would skip while divergence survived. Pushdown must check the flag in O(1) and fall back to the Python path when False. Gates: `tests/test_generated_app_store_sync.py` (3 tests, each canaried). The pushdown itself remains open.
+
 ---
 
 ### D-12 — New PostgreSQL connection per call
