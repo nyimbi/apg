@@ -2977,11 +2977,77 @@ def _normalize_record_metadata() -> None:
                 record.setdefault("tenant_id", APG_TENANT_DEFAULT)
 
 
+# D-10 prerequisite: a WHERE clause may only be pushed into SQLite when both
+# stores hold the same rows. True after a boot or restore path has made
+# RECORD_STORE and the SQLite tables equal; a direct RECORD_STORE mutation
+# outside the dual-write pairs clears it so the pushdown falls back to the
+# Python path in O(1).
+_APG_SQLITE_SYNCED: bool = False
+
+
+def _sqlite_hydrate_record_store(*, prune: bool = False) -> bool:
+    """Upsert RECORD_STORE into SQLite so both stores hold the same rows.
+
+    With prune=True, SQLite rows whose id is absent from RECORD_STORE are
+    deleted too — for callers (snapshot restore) whose Python state wins.
+    """
+    global _APG_SQLITE_SYNCED
+    conn = _sqlite_connection()
+    if conn is None:
+        _APG_SQLITE_SYNCED = False
+        return False
+    try:
+        for entity_name in sorted(ENTITY_NAMES):
+            records = RECORD_STORE.get(entity_name, [])
+            expected_ids = {{
+                str(record.get("id"))
+                for record in records
+                if isinstance(record, dict) and record.get("id") not in (None, "")
+            }}
+            for record in records:
+                if isinstance(record, dict) and record.get("id") not in (None, ""):
+                    _sqlite_store_record(entity_name, record)
+            if prune:
+                stored_ids = {{
+                    str(row[0])
+                    for row in conn.execute("SELECT id FROM " + _sqlite_identifier(entity_name)).fetchall()
+                }}
+                for orphan_id in sorted(stored_ids - expected_ids):
+                    conn.execute(
+                        _apg_qmark("DELETE FROM " + _sqlite_identifier(entity_name) + " WHERE id=?"),
+                        (orphan_id,),
+                    )
+        conn.commit()
+        _APG_SQLITE_SYNCED = True
+        return True
+    except Exception as exc:
+        conn.rollback()
+        _logging.getLogger("apg").warning("sqlite_hydrate_failed: %s", exc)
+        _APG_SQLITE_SYNCED = False
+        return False
+
+
+def _sqlite_merge_record_store() -> None:
+    """Append SQLite rows whose ids RECORD_STORE lacks after hydration.
+
+    Hydration pushed the data file's rows into SQLite, so any id still
+    missing from RECORD_STORE is one SQLite has and the file does not. Shared
+    ids keep the data file's dict: the JSON path's reads are unchanged.
+    """
+    for entity_name in sorted(ENTITY_NAMES):
+        known_ids = {{str(record.get("id")) for record in RECORD_STORE.get(entity_name, [])}}
+        for row in _sqlite_select_records(entity_name, include_deleted=True, tenant_scoped=False):
+            if str(row.get("id")) not in known_ids:
+                RECORD_STORE.setdefault(entity_name, []).append(dict(row))
+
+
 def _load_record_store() -> None:
+    global _APG_SQLITE_SYNCED
     path = _data_path()
     if path is None or not path.exists():
         _sqlite_load_records()
         _normalize_record_metadata()
+        _APG_SQLITE_SYNCED = _sqlite_connection() is not None
         return
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -3045,7 +3111,11 @@ def _load_record_store() -> None:
             pg_records = _pg_load_entity_records(entity_name, tenant_scoped=False)
             if pg_records:
                 RECORD_STORE[entity_name] = pg_records
-    _sqlite_load_records()
+    # The data file was the source: push its rows into SQLite, then pull back
+    # any rows SQLite has that the file does not, so both stores hold the same
+    # ids (D-10). Hydrate arms _APG_SQLITE_SYNCED.
+    _sqlite_hydrate_record_store()
+    _sqlite_merge_record_store()
     _normalize_record_metadata()
 
 
@@ -11448,7 +11518,8 @@ def _record_state_snapshot() -> Dict[str, Any]:
 
 
 def _restore_record_state(snapshot: Dict[str, Any]) -> None:
-    global NEXT_EVENT_ID
+    global NEXT_EVENT_ID, _APG_SQLITE_SYNCED
+    _APG_SQLITE_SYNCED = False
     RECORD_STORE.clear()
     for entity_name in ENTITY_NAMES:
         RECORD_STORE[entity_name] = [
@@ -11477,6 +11548,9 @@ def _restore_record_state(snapshot: Dict[str, Any]) -> None:
         str(key): list(value) if isinstance(value, list) else []
         for key, value in snapshot.get("activity", {{}}).items()
     }})
+    # The snapshot wins: rewrite SQLite to match it, pruning rows the
+    # snapshot does not have, and re-arm the sync flag.
+    _sqlite_hydrate_record_store(prune=True)
 
 
 def _bulk_items(payload: Dict[str, Any], key: str) -> list[Any] | None:
